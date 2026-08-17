@@ -153,6 +153,7 @@ Section KforkTfLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra2 := (mword_of_int 12 : mword 5).
@@ -184,7 +185,7 @@ Section KforkTfLoop.
        -- and what the capstone actually wants -- is preservation relative to
        ITS OWN entry map [M].  (durable-notes / S11: getting this wrong
        compiles, and only fails when the capstone tries to apply the block.) *)
-    sie_cap_gpr M n false p -∗
+    sie_cap_gpr kt M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     tf_page tfsrc ws -∗
@@ -194,7 +195,7 @@ Section KforkTfLoop.
         ⌜callee_saved M mf /\
          mf !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 36) /\
          mf !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 36)⌝ -∗
-        sie_cap_gpr mf n false p -∗
+        sie_cap_gpr kt mf n false p -∗
         pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
         tf_page tfsrc ws -∗
         tf_page tfdst ws -∗
@@ -241,7 +242,7 @@ Section KforkTfLoop.
        Mk !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat (4*k)) /\
        Mk !!! Regidx Ra3 = tf_pa tfsrc (8 * Z.of_nat 36) /\
        (forall r : mword 5, is_cs_idx r = true -> Mk !!! Regidx r = M !!! Regidx r)⌝ -∗
-      sie_cap_gpr Mk n false p -∗
+      sie_cap_gpr kt Mk n false p -∗
       pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
       tf_page tfsrc ws -∗
       tf_page tfdst cur -∗
@@ -250,7 +251,7 @@ Section KforkTfLoop.
           ⌜callee_saved M mf /\
            mf !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 36) /\
            mf !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 36)⌝ -∗
-          sie_cap_gpr mf n false p -∗
+          sie_cap_gpr kt mf n false p -∗
           pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
           tf_page tfsrc ws -∗
           tf_page tfdst ws -∗

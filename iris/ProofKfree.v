@@ -47,12 +47,13 @@ Section ProofKfree.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Lemma wp_kfree_sconf
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
 
       (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string)
-    : wp_kfree_sconf_body γl γk lk fl m on n eb pcur K b lks.
+    : wp_kfree_sconf_body kt γl γk lk fl m on n eb pcur K b lks.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
     intros pcE p ret_tgt HK Hlk Hfl Hnoffpos Hfresh.
@@ -93,7 +94,7 @@ Section ProofKfree.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 upd_eq; reflexivity).
     (* frame cells at [pa_stk sp0 1..4] *)
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -408,7 +409,7 @@ Section ProofKfree.
     { rewrite /Mms upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HMmssp : Mms !!! Regidx csp_rs1 = spr)
       by (rewrite /Mms upd_ne; [ exact Hsp_14 | vm_compute; discriminate ]).
-    iApply (MemsetPage.wp_memset_page_sconf Mms (K - 4)%nat (mword_of_int 1 : mword 64) b pcur
+    iApply (MemsetPage.wp_memset_page_sconf kt Mms (K - 4)%nat (mword_of_int 1 : mword 64) b pcur
               ltac:(lia)
               ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
               with "Hcg Htext Hpc [Hpown]").
@@ -507,7 +508,7 @@ Section ProofKfree.
        CID22..CID25), so acquire wants it at CID25. *)
     iDestruct (cpu_own_transport CID CID25 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) Kacq
+    iApply (Acquire.wp_acquire_sconf kt γl "kmem"%string (kmem_res γk fl) Kacq
               n eb pcur (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
@@ -629,7 +630,7 @@ Section ProofKfree.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
-    iApply (Release.wp_release_sconf γl lk "kmem"%string (kmem_res γk fl) Rrel
+    iApply (Release.wp_release_sconf kt γl lk "kmem"%string (kmem_res γk fl) Rrel
               n eb pcur (K - 4)%nat ({["kmem"]} ∪ lks)
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -719,8 +720,8 @@ Section ProofKfree.
     { rewrite Hwv HspQ5a. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     (* reassemble the four frame cells (at pa_stk sp0 1..4) into stack_own sp0 4 *)
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr8"|].

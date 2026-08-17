@@ -90,6 +90,7 @@ Section ProofFileclose.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -131,7 +132,7 @@ Section ProofFileclose.
      lock layer into every function proof that has one.) *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
       (p : mword 64) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr kt m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -149,7 +150,7 @@ Section ProofFileclose.
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks.
+    : wp_fileclose_sconf_body kt γfl γf k q Cf fn on us m n eb p K b lks.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -194,7 +195,7 @@ Section ProofFileclose.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
     assert (HsprS : spr = pa_stk sp0 8) by exact Hpush.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -324,7 +325,7 @@ Section ProofFileclose.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γfl "ftable"%string (ftable_res γf) mA
+    iApply (Acquire.wp_acquire_sconf kt γfl "ftable"%string (ftable_res γf) mA
               n eb p (K - 8)%nat b lks
               HnZ ltac:(lia) ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -551,7 +552,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
+      iApply (Release.wp_release_sconf kt γfl ftable_addr "ftable"%string
                 (ftable_res γf) E3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
@@ -963,7 +964,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
+      iApply (Release.wp_release_sconf kt γfl ftable_addr "ftable"%string
                 (ftable_res γf) G3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
@@ -1149,7 +1150,7 @@ Section ProofFileclose.
            plain instructions have moved us. *)
         iDestruct (cpu_own_transport CIDr2 CIDp4 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Pipeclose.wp_pipeclose_sconf (CID := CIDp4)  (fcn_procs fn) (fp_lock pn)
+        iApply (Pipeclose.wp_pipeclose_sconf kt (CID := CIDp4)  (fcn_procs fn) (fp_lock pn)
                   (fp_pipe pn) (fc_wbool Cf) (fcn_kmem fn) (fcn_kalloc fn)
                   (mword_of_int KernelSyms.kmem)
                   (mword_of_int (KernelSyms.kmem + 24)) on
@@ -1308,7 +1309,7 @@ Section ProofFileclose.
                          || bool_decide (fc_type Cf = FD_DEVICE)) = true).
           { apply orb_true_intro. destruct Hinode as [H|H]; [left|right];
               by apply bool_decide_eq_true_2. }
-          iAssert (fileclose_fs_env fn us n eb p) with "[Henv]" as "Henv".
+          iAssert (fileclose_fs_env (kt := kt) fn us n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Henv". }
           (* THE PAYLOAD IS THE REFERENCE, and this closer holds ALL of it:
@@ -1408,7 +1409,7 @@ Section ProofFileclose.
                        ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CID CIDf2 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
-          iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2)  (fcn_procs fn)
+          iApply (BeginOp.wp_begin_op_sconf kt (CID := CIDf2)  (fcn_procs fn)
                     (fcn_j fn) (fcn_plock fn) (fcn_bio fn) (fcn_log fn) (fcn_fs fn)
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
                     (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat eb b lks
@@ -1470,7 +1471,7 @@ Section ProofFileclose.
                        ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CIDf3 CIDf5 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
-          iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
+          iApply (Iput.wp_iput_sconf kt (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
                     (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn)
@@ -1520,7 +1521,7 @@ Section ProofFileclose.
                        ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CIDf6 CIDf7 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
-          iApply (EndOp.wp_end_op_sconf (CID := CIDf7)  (fcn_procs fn) (fcn_j fn)
+          iApply (EndOp.wp_end_op_sconf kt (CID := CIDf7)  (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
                     (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)

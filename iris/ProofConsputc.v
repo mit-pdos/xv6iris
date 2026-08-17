@@ -76,6 +76,7 @@ Section ProofConsputc.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -103,14 +104,14 @@ Section ProofConsputc.
       = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) ->
     (forall c : mword 5, is_cs_idx c = true -> c <> csp_rs1 -> c <> s0_idx ->
        mc !!! Regidx c = m !!! Regidx c) ->
-    sie_cap_gpr mc (K - 2)%nat b p -∗
+    sie_cap_gpr kt mc (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.consputc + 0x14) : mword 64) -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx ra_idx) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx s0_idx) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf,
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr kt mf K b p -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -157,8 +158,8 @@ Section ProofConsputc.
     { rewrite HE2sp. apply frame_cancel_16. }
     assert (Hpop : E2 !!! Regidx csp_rs1 = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HE2sp. exact Hpush. }
-    iAssert (stack_own (m !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
-    { rewrite stack_own_slots; cbn [seq].
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)); cbn [seq].
       iSplitL "Hc1". { iExists (m !!! Regidx ra_idx). iExact "Hc1". }
       iSplitL "Hc2". { iExists (m !!! Regidx s0_idx). iExact "Hc2". }
       done. }
@@ -208,12 +209,12 @@ Section ProofConsputc.
     forall `{CID : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
       (b : bool) (p : mword 64) (lks : gset string),
-      wp_uartputc_sconf_body γl γd γv m0 K bs n eb b p lks.
+      wp_uartputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
 
   Lemma wp_consputc_sconf_gen (γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
       (b : bool) (p : mword 64) (lks : gset string)
-    : wp_consputc_sconf_body γl γd γv m K bs n eb b p lks.
+    : wp_consputc_sconf_body kt γl γd γv m K bs n eb b p lks.
   Proof.
     cbv beta delta [wp_consputc_sconf_body].
     intros ra_i pcE ra0 ret_tgt HK Hn Hbelow.
@@ -247,7 +248,7 @@ Section ProofConsputc.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /W1 upd_eq; reflexivity).
@@ -484,16 +485,16 @@ End ProofConsputc.
 (* proven spec, discharging the CONSPUTC Module Type.                      *)
 (* ===================================================================== *)
   Definition wp_consputc_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+      {kt : ktier} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string)
-      : wp_consputc_sconf_body γl γd γv m0 K bs n eb b p lks :=
+      : wp_consputc_sconf_body kt γl γd γv m0 K bs n eb b p lks :=
     (* eta-expand to keep [UartPutc.wp_uartputc_sconf]'s own [CID] genuinely
        polymorphic per application (see ProofConsoleinit.v's identical fix
        for [wp_initlock]/[wp_uartinit]) rather than letting it be eagerly
        specialized to THIS definition's [CID]. *)
     wp_consputc_sconf_gen
       (fun `(CID' : CpuId) γl' γd' γv' m' K' bs' n' eb' b' p' lks' =>
-         UartPutc.wp_uartputc_sconf (CID:=CID') γl' γd' γv' m' K' bs' n' eb' b' p' lks')
+         UartPutc.wp_uartputc_sconf kt (CID:=CID') γl' γd' γv' m' K' bs' n' eb' b' p' lks')
       γl γd γv m0 K bs n eb b p lks.
 
 End ConsputcProof.

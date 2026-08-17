@@ -199,7 +199,7 @@ Definition wp_ilock_sconf_body
       !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -238,7 +238,7 @@ Definition wp_ilock_sconf_body
      of the two, so one premise at its rank covers the whole cone via
      [locks_below_mono]. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread
      both sleep, and a parking thread hands [trap_csrs] / [cpu_claim] across
@@ -247,7 +247,7 @@ Definition wp_ilock_sconf_body
      and the caller brings nothing -- which is why this used to be an
      [eb = true] premise instead.  At [eb = false] the caller brings the
      pair, holding it because the TRAP handed it over. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -279,7 +279,7 @@ Definition wp_ilock_sconf_body
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   (* the disk fabric *)
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
@@ -296,9 +296,9 @@ Definition wp_ilock_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -347,7 +347,7 @@ Module Type ILOCK.
              !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -359,7 +359,7 @@ Module Type ILOCK.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+      wp_ilock_sconf_body kt gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g dev inum
                           pidv dq dqs m K eb b lks.
 End ILOCK.

@@ -450,7 +450,7 @@ Definition wp_filestat_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+    (kt : ktier) (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
@@ -475,7 +475,7 @@ Definition wp_filestat_sconf_body
      "bcache" is the lower, so one premise there covers both via
      [locks_below_mono]. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -486,7 +486,7 @@ Definition wp_filestat_sconf_body
   (* ambient: myproc runs first, and the surviving arm copies out *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* ...and what the file's TYPE selects *)
   filestat_env fn Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  filestat can SLEEP (its
@@ -499,7 +499,7 @@ Definition wp_filestat_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜filestat_ret r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
@@ -515,11 +515,11 @@ Module Type FILESTAT.
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γa : gname) (γf : gname)
+      (kt : ktier) (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
+      wp_filestat_sconf_body kt γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
 End FILESTAT.

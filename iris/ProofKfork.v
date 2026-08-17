@@ -63,6 +63,7 @@ Notation KF := KernelSyms.kfork (only parsing).
 Section ProofKfork.
   Context `{!riscvGS Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -137,14 +138,14 @@ Section ProofKfork.
     Mt !!! Regidx Rs1 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xfc) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -179,14 +180,14 @@ Section ProofKfork.
     Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -264,7 +265,7 @@ Section ProofKfork.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xf6) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -278,7 +279,7 @@ Section ProofKfork.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

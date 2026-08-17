@@ -111,6 +111,7 @@ Module WakeupProof (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUP
 
 Section ProofWakeup.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
+  Context {kt : ktier}.
   (* NO [Context `{GEN : GenId} `{CID : CpuId}]: the loop lemma is applied at the hart the
      prologue's own [wp_next] hands back, which a section variable could not
      express.  Every lemma below takes its own implicit [CID0]. *)
@@ -145,7 +146,7 @@ Section ProofWakeup.
          /\ Mexit !!! Regidx (mword_of_int 26) = vs10
          /\ Mexit !!! Regidx (mword_of_int 27) = vs11
          /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
-       sie_cap_gpr Mexit av b pme -∗
+       sie_cap_gpr kt Mexit av b pme -∗
        cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
        wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
@@ -163,9 +164,9 @@ Section ProofWakeup.
        ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
        ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
        wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
-         wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
+         wk_exit_body (kt := kt) pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
            vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CIDq) -∗
-       sie_cap_gpr M av b pme -∗
+       sie_cap_gpr kt M av b pme -∗
        cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
        wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
@@ -194,9 +195,9 @@ Section ProofWakeup.
          Mr !!! Regidx (mword_of_int 26 : mword 5) = vs10 /\
          Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
          (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
-       sie_cap_gpr (CID := CID) Mr (trap_res b + av)%nat false pme -∗
+       sie_cap_gpr kt (CID := CID) Mr (trap_res b + av)%nat false pme -∗
        pc_is (CID := CID) (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
-       locked γk CID -∗ proc_lock_res γs γk (proc_addr k) -∗
+       locked γk CID -∗ proc_lock_res (kt := kt) γs γk (proc_addr k) -∗
        WP (LoopE gen_id CID : expr riscv_lang))%I.
 
   (* wakeup only RELAYS parked contexts (SLEEPING->RUNNABLE, untouched), never
@@ -216,16 +217,16 @@ Section ProofWakeup.
     (* acquire's order premise, threaded to every iteration's acquire/release
        pair -- see [wp_wakeup_sconf] where it originates *)
     locks_below lks "proc" ->
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     (* acquire's "already holding" arm sits above panic() *)
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x54],
        at whatever hart the scan ended on. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
-      wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
+      wk_exit_body (kt := kt) pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
         vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-      sie_cap_gpr M av b pme -∗
+      sie_cap_gpr kt M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
@@ -238,7 +239,7 @@ Section ProofWakeup.
        so the induction hypothesis is re-enterable at a migrated hart. *)
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
-                 wk_loop_body pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
+                 wk_loop_body (kt := kt) pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
                    vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID0 fuel CID))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -255,7 +256,7 @@ Section ProofWakeup.
       iAssert (wp_next (CID0 := CID0) b pme (fun (CIDt : CpuId) =>
                  ∀ Mt : regfile,
                    ⌜ wkl_regs Mt spF chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
-                   sie_cap_gpr Mt av b pme -∗
+                   sie_cap_gpr kt Mt av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗
                    wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
@@ -401,7 +402,7 @@ Section ProofWakeup.
          here or below needs to know, see the file header. *)
       iDestruct (cpu_own_transport CIDk CIDe lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf (CID := CIDe) γk "proc"%string (proc_lock_res γs γk (proc_addr k)) M3a
+      iApply (Acquire.wp_acquire_sconf kt (CID := CIDe) γk "proc"%string (proc_lock_res (kt := kt) γs γk (proc_addr k)) M3a
                 lvl eb pme av b lks
                 ltac:(lia)
                 ltac:(lia)
@@ -457,7 +458,7 @@ Section ProofWakeup.
       (* the p++ tail at 0x30.                                            *)
       (* Stated at the FIXED hart CIDf -- the whole stretch is at [false]. *)
       (* =============================================================== *)
-      iAssert (wk_rel_body γs γk pme spF chan av lvl k eb b
+      iAssert (wk_rel_body (kt := kt) γs γk pme spF chan av lvl k eb b
                  vs6 vs7 vs8 vs9 vs10 vs11 CIDf)%I
         with "[Hown Hpay Hframe Htail]"
         as "Hrel".
@@ -511,7 +512,7 @@ Section ProofWakeup.
         (* [b] IS [outb] ([cpu_own] forces it, = [Hbmatch]); pure re-spelling
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
+        iApply (Release.wp_release_sconf kt (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res (kt := kt) γs γk (proc_addr k)) Mr2c
                   lvl eb pme av ({["proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)
@@ -853,13 +854,13 @@ Section ProofWakeup.
       
       (m : regfile) (γs : list gname) (pme : mword 64)
       (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_wakeup_sconf_body m γs pme lvl K eb b lks.
+    : wp_wakeup_sconf_body kt m γs pme lvl K eb b lks.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hlvl Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
-    iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
+    iApply (WakeupParts.wp_wakeup_prologue_sconf kt (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
     iIntros (CIDpro Hspro M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM19 & HM20 & HM21 & HM18 & HMcsp & HM1 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
@@ -883,7 +884,7 @@ Section ProofWakeup.
       iIntros (CIDex Hsex Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
                        Hcg Hown Htextx Hpc Hframe".
       iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
-      iApply (WakeupParts.wp_wakeup_epilogue_sconf (CID := CIDex) Mexit K
+      iApply (WakeupParts.wp_wakeup_epilogue_sconf kt (CID := CIDex) Mexit K
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))

@@ -61,23 +61,24 @@ Section WpIntrOff.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_intr_off_lvl0_s_sconf
       (pc : mword 64) (b : bool) (p : mword 64)
       (m : regfile) (n : nat) (lks : gset string) :
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     cpu_own 0%nat b p b lks -∗
-    trap_csrs_ext b -∗
+    trap_csrs_ext kt b -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m (trap_res b + n)%nat false p -∗
+      sie_cap_gpr kt m (trap_res b + n)%nat false p -∗
       (* the exit set is [lks] -- and at [b = true] the entry arm already
          forced [lks = ∅], which is exactly what the dismantled arm pays out
          ([WpSconfCsr.cpu_priv_pay_on] hands back [cpu_priv 0 true p ∅]). *)
       cpu_own 0%nat false p false lks -∗
-      trap_csrs -∗
+      trap_csrs kt -∗
       (* THE RUNNING CLAIM, on the same two-sided split as [trap_csrs_ext]
          above but in the OTHER direction: at [b = true] the dismantled arm
          pays it out, at [b = false] the caller never handed it over and keeps

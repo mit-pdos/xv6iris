@@ -195,7 +195,7 @@ Definition wp_iget_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+    (kt : ktier) (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
     (dev inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
@@ -218,7 +218,7 @@ Definition wp_iget_sconf_body
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
@@ -238,7 +238,7 @@ Definition wp_iget_sconf_body
   iname γi γfs inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
@@ -255,12 +255,12 @@ Module Type IGET.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (kt : ktier) (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
+      wp_iget_sconf_body kt γl cn γfs γi cov logstart nib dev inum l
                          m n eb p K b lks.
 End IGET.

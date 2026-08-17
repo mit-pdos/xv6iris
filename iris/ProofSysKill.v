@@ -60,6 +60,7 @@ Section ProofSysKill.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -68,7 +69,7 @@ Section ProofSysKill.
   Lemma wp_sys_kill_sconf  (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_sys_kill_sconf_body γs m av n eb p tfp ws v dqt b lks.
+    : wp_sys_kill_sconf_body kt γs m av n eb p tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_kill_sconf_body].
     intros pcE ret_tgt Hlen Hws Hn Hav Hbelow Hpv.
@@ -101,7 +102,7 @@ Section ProofSysKill.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -219,7 +220,7 @@ Section ProofSysKill.
     (* ===================== argint(0, &pid) ===================== *)
     iEval (rewrite -HA4a1) in "Hb3hi".
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p 0%nat tfp ws v (word_hi w3) dqt b lks
+    iApply (Argint.wp_argint_sconf kt A4 (av - 4)%nat n eb p 0%nat tfp ws v (word_hi w3) dqt b lks
               ltac:(unfold NARG; lia) HA4a0 Hws Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
@@ -267,7 +268,7 @@ Section ProofSysKill.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kkill(pid) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kkill.wp_kkill_sconf γs B2 (av - 4)%nat n eb p b lks
+    iApply (Kkill.wp_kkill_sconf kt γs B2 (av - 4)%nat n eb p b lks
               Hlen Hn ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs").
     all: try lkbelow.
@@ -328,8 +329,8 @@ Section ProofSysKill.
                    = pa_stk (add_vec (E1 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HE1sp).
-    iAssert (stack_own sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1". { iExists _. iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iExact "Hb3". }

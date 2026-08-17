@@ -381,6 +381,7 @@ Section WriteHeadDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  Context {kt : ktier}.
   (* ---------------------------------------------------------------- *)
   (*  the payload-less handle, with its bytes in window form            *)
   (* ---------------------------------------------------------------- *)
@@ -473,9 +474,9 @@ Section WriteHeadDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr kt mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext kt eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -516,6 +517,7 @@ Section WriteHeadBlocks.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  Context {kt : ktier}.
   (* ================================================================== *)
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
   (*  Entered from the loop's exit AND from the [blez] shortcut (n = 0). *)
@@ -551,15 +553,15 @@ Section WriteHeadBlocks.
     (* wh_tail's own acquire (via brelse's unlink/splice) is at "bcache"
        (rank 4); nothing below it is touched here. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x46) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -575,7 +577,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Q -∗
+    wh_cont (kt := kt) (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1 Hbelow.
@@ -669,7 +671,7 @@ Section WriteHeadBlocks.
       change (2 ^ 32)%Z with 4294967296%Z. lia. }
     assert (Hdec_early : hdr_dec (f <$> seq 0 1024) = (n, map uint W))
       by exact (wh_hdr_dec f n W HnW HnB Hf4 Henc).
-    iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
+    iApply (BW.wp_bwrite_sconf kt γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat eb
               (f <$> seq 0 1024) bsd0 b Q
               _ HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
@@ -778,7 +780,7 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
       by (lia).
-    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
+    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat eb (proc_addr j)
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
               _ HKbl Hk HT4a0 Hbelow
@@ -906,9 +908,9 @@ Section WriteHeadBlocks.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].
@@ -1062,15 +1064,15 @@ Section WriteHeadBlocks.
     M !!! Regidx Ra4 = lh_block i ->
     M !!! Regidx Ra5 = pa_add (bnode kk) (4 * i)%nat ->
     M !!! Regidx Ra2 = pa_add (bnode kk) (4 * n)%nat ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x3a) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -1086,7 +1088,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Q -∗
+    wh_cont (kt := kt) (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hbelow.
@@ -1325,6 +1327,7 @@ Section ProofWriteHead.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_write_head_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1336,7 +1339,7 @@ Section ProofWriteHead.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (Q : iProp Σ) (lks : gset string)
-    : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
+    : wp_write_head_sconf_body kt γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb b Q lks.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
@@ -1365,7 +1368,7 @@ Section ProofWriteHead.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
-    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K eb b lks Q)%I
+    iAssert (wh_cont (kt := kt) (CID0 := CID)  γfs bn logstart n W L pidv dq j m K eb b lks Q)%I
       with "[Hcont]" as "Hcont"; [rewrite /wh_cont; iExact "Hcont"|].
     iPoseProof (whi_00 with "Htext") as "Hi00".
     iPoseProof (whi_02 with "Htext") as "Hi02".
@@ -1396,7 +1399,7 @@ Section ProofWriteHead.
                     = add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -1607,7 +1610,7 @@ Section ProofWriteHead.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
-    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf kt γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat eb b lks
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 Hbelow

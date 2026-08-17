@@ -136,6 +136,7 @@ Qed.
 Section UiCont.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
+  Context {kt : ktier}.
   (* the frame the prologue spilled *)
   Definition ui_frame (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
@@ -149,7 +150,7 @@ Section UiCont.
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-         sie_cap_gpr mf av b pme -∗
+         sie_cap_gpr kt mf av b pme -∗
          cpu_own lvl eb pme b lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -177,6 +178,7 @@ Section ProofUartintr.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -194,11 +196,11 @@ Section ProofUartintr.
     m0 !!! Regidx csp_rs1 = sp0 ->
     (uartintr_stack <= av)%nat ->
     kernel_text -∗
-    sie_cap_gpr M (av - 4) b pme -∗
+    sie_cap_gpr kt M (av - 4) b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
     ui_frame sp0 m0 -∗
-    ui_ret_cont m0 av lvl eb pme b lks -∗
+    ui_ret_cont (kt := kt) m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hav.
@@ -264,8 +266,8 @@ Section ProofUartintr.
     assert (HE4sp : E4 !!! Regidx csp_rs1 = spd) by (rewrite /E4 upd_ne; [exact HE3sp | reg_neq]).
     iEval (rewrite P54) in "Hpc".
     (* +0x54 c.addi16sp sp,32 -- the frame pop *)
-    iAssert (stack_own sp0 4) with "[H1 H2 H3 H4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[H1 H2 H3 H4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "H1"; [by iExists _|]. iSplitL "H2"; [iExists _; iEval (rewrite -Hb2 -HE1sp); iExact "H2"|].
       iSplitL "H3"; [iExists _; iEval (rewrite -Hb3 -HE2sp); iExact "H3"|].
       iSplitL "H4"; [iExists _; iEval (rewrite -Hb4 -HE3sp); iExact "H4"|]. done. }
@@ -359,13 +361,13 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M (pa_stk sp0 4) ⌝ -∗
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗
+      kernel_text -∗ dev_inv γu γv -∗ procs_inv (kt := kt) γs -∗
       console_caps γu -∗
-      sie_cap_gpr (CID := CIDe) M (av - 4) b pme -∗
+      sie_cap_gpr kt (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
-      ui_ret_cont (CID0 := CIDe)  m0 av lvl eb pme b lks -∗
+      ui_ret_cont (kt := kt) (CID0 := CIDe)  m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav Hbelow.
@@ -388,11 +390,11 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M1 (pa_stk sp0 4) ⌝ -∗
       ⌜ M1 !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M1 !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      sie_cap_gpr (CID := CIDk) M1 (av - 4) b pme -∗
+      sie_cap_gpr kt (CID := CIDk) M1 (av - 4) b pme -∗
       cpu_own (CID := CIDk) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
-      ui_ret_cont (CID0 := CIDk)  m0 av lvl eb pme b lks -∗
+      ui_ret_cont (kt := kt) (CID0 := CIDk)  m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
     { iLöb as "IH".
       iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Hcont".
@@ -448,7 +450,7 @@ Section ProofUartintr.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_refl. }
         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
+        iApply (Consoleintr.wp_consoleintr_sconf kt γu γv G1 γs pme lvl (av - 4)%nat eb b lks
                   ltac:(lia)
                   Hlen ltac:(lia) Hbelow
                   with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps").
@@ -492,12 +494,12 @@ Section ProofUartintr.
     (uartintr_stack <= av)%nat ->
     locks_below lks "cons" ->
     kernel_text -∗ dev_inv γu γv -∗
-    procs_inv γs -∗ console_caps γu -∗
-    sie_cap_gpr M (av - 4)%nat b pme -∗
+    procs_inv (kt := kt) γs -∗ console_caps γu -∗
+    sie_cap_gpr kt M (av - 4)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
     ui_frame sp0 m0 -∗
-    ui_ret_cont m0 av lvl eb pme b lks -∗
+    ui_ret_cont (kt := kt) m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav Hbelow.
@@ -559,12 +561,12 @@ Section ProofUartintr.
   Lemma wp_uartintr_sconf (γu : uart_names) (γv : disk_names)
       (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string)
-    : wp_uartintr_sconf_body γu γv γs m av lvl eb pme b lks.
+    : wp_uartintr_sconf_body kt γu γv γs m av lvl eb pme b lks.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
     iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hccaps Hcont".
-    iAssert (ui_ret_cont m av lvl eb pme b lks) with "[Hcont]" as "Hcont".
+    iAssert (ui_ret_cont (kt := kt) m av lvl eb pme b lks) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
@@ -603,7 +605,7 @@ Section ProofUartintr.
     assert (HcspA0 : A0 !!! Regidx csp_rs1 = spd)
       by (rewrite /A0 upd_eq Hpush Hspm; reflexivity).
     iEval (rewrite P02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
     iDestruct "F3" as (v3) "H3". iDestruct "F4" as (v4) "H4".
@@ -800,7 +802,7 @@ Section ProofUartintr.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
       iDestruct (cpu_own_transport CID CIDW3 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (Wakeup.wp_wakeup_sconf T3 γs pme lvl (av - 4)%nat eb b lks
+      iApply (Wakeup.wp_wakeup_sconf kt T3 γs pme lvl (av - 4)%nat eb b lks
                 ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen

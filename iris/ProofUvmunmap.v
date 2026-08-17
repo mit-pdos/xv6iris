@@ -136,6 +136,7 @@ Section ProofUvmunmap.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -210,7 +211,7 @@ Section ProofUvmunmap.
     mm !!! Regidx csp_rs1 = sp0 ->
     mj !!! Regidx csp_rs1 = spr ->
     uu_thr1 mm mj ->
-    sie_cap_gpr mj (K - 8) b p -∗
+    sie_cap_gpr kt mj (K - 8) b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x78) : mword 64) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
@@ -223,7 +224,7 @@ Section ProofUvmunmap.
     pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr kt mf K b p -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -353,8 +354,8 @@ Section ProofUvmunmap.
                    = pa_stk (add_vec (E7 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8).
     { rewrite Hwv HE7sp. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 8) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 8) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
       iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
       iSplitL "Hk3"; [iExists _; iExact "Hk3" |].
@@ -440,7 +441,7 @@ Section ProofUvmunmap.
        /\ uptg_view (uu_fx df fx (svpn_of va) (S done))
                     (uu_um df um (svpn_of va) (S done)) m'
        /\ pt_base t' = uroot ⌝ -∗
-     sie_cap_gpr mt (K - 8) b p -∗
+     sie_cap_gpr kt mt (K - 8) b p -∗
      cpu_own ilvl eb p b lks -∗
      pc_is (mword_of_int (KernelSyms.uvmunmap + 0x4a) : mword 64) -∗
      ptree_own 2 (DfracOwn 1) t' -∗
@@ -461,7 +462,7 @@ Section ProofUvmunmap.
        /\ uu_s5 df ms
        /\ ms !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
        /\ uu_thr mm ms ⌝ -∗
-     sie_cap_gpr ms (K - 8) b p -∗
+     sie_cap_gpr kt ms (K - 8) b p -∗
      cpu_own ilvl eb p b lks -∗
      pc_is (mword_of_int (KernelSyms.uvmunmap + 0x46) : mword 64) -∗
      ptree_own 2 (DfracOwn 1) t -∗
@@ -505,7 +506,7 @@ Section ProofUvmunmap.
     (* the loop's kfree only runs when [do_free != 0] ([destruct df] below);
        at [df = false] the run never touches a lock at all. *)
     (if df then locks_below lks "kmem" else True) ->
-    sie_cap_gpr m (K - 8) b p -∗
+    sie_cap_gpr kt m (K - 8) b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x50) : mword 64) -∗
@@ -516,7 +517,7 @@ Section ProofUvmunmap.
       ∀ mj : regfile,
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜uu_thr mm mj⌝ -∗
-      sie_cap_gpr mj (K - 8) b p -∗
+      sie_cap_gpr kt mj (K - 8) b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.uvmunmap + 0x76) : mword 64) -∗
       uptg (uu_fx df fx (svpn_of va) npages)
@@ -584,7 +585,7 @@ Section ProofUvmunmap.
     (*  THE +0x4a JOIN: the loop tail, over the post-body descriptor.     *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDt : CpuId) =>
-        uu_tail_body b p spr va uroot done npages df fx um K ilvl eb mm
+        uu_tail_body (kt := kt) b p spr va uroot done npages df fx um K ilvl eb mm
           CIDt lks))%I with "[Hcont]" as "TAIL".
     { iIntros (CIDt Hst mt t' m').
       iIntros "(%Htsp & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
@@ -739,7 +740,7 @@ Section ProofUvmunmap.
       change (2 ^ 38)%Z with 274877906944%Z. exact Hc38. }
     assert (Hret5a : ret_pc (L4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmunmap + 0x5a)).
     { rewrite /L4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf L4 t m_ad (K - 8)%nat (DfracOwn 1) b p
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf kt L4 t m_ad (K - 8)%nat (DfracOwn 1) b p
               ltac:(lia) HL4a0 HL4a2 Hwkva Hrep
               with "Hcg Htext Hpc Hptree").
     iIntros (CIDx Hsx mw) "Hcg Hpc Hptree %Hwcs %Hpay".
@@ -954,7 +955,7 @@ Section ProofUvmunmap.
     (*  which is why the whole [df] split is ONE [destruct] here.         *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDs : CpuId) =>
-        uu_store_body b p spr va uroot done npages df um K ilvl eb mm mw t
+        uu_store_body (kt := kt) b p spr va uroot done npages df um K ilvl eb mm mw t
           CIDs lks))%I with "[TAIL]" as "STORE".
     { iIntros (CIDs Hss ms).
       iIntros "(%Hmksp & %Hss1 & %Hmks2 & %Hmks3 & %Hmks4 & %Hmks5 & %Hmks6 & %Hmkthr)
@@ -1135,7 +1136,7 @@ Section ProofUvmunmap.
     { rewrite /B6 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (cpu_own_transport CID0 CIDz9 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf kt γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) B6 None ilvl eb p (K - 8)%nat b lks
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl Hbelow
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
@@ -1220,7 +1221,7 @@ Section ProofUvmunmap.
     (* threaded straight to [uu_loop]: kfree's "kmem" bound applies only
        when [do_free != 0]. *)
     (if df then locks_below lks "kmem" else True) ->
-    sie_cap_gpr mm K b p -∗
+    sie_cap_gpr kt mm K b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is pcE -∗
@@ -1228,7 +1229,7 @@ Section ProofUvmunmap.
     kalloc_env γa None -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr kt mr K b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
@@ -1281,7 +1282,7 @@ Section ProofUvmunmap.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> mm) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hk1".   iDestruct "S2" as (u2) "Hk2".
     iDestruct "S3" as (u3) "Hk3".   iDestruct "S4" as (u4) "Hk4".
@@ -1703,6 +1704,7 @@ Section SealUvmunmap.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* [proc_pt] IS the [upt_fixed_both] instance; the round trip owes [uptg] the two
      conjuncts it does not carry -- [upt_acc_wf] (preserved along the run
      by [upt_acc_wf_del_run]) and the trapframe page's [page_valid], which
@@ -1711,7 +1713,7 @@ Section SealUvmunmap.
       (γa : gname) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_sconf_body γa mm P npages K eb p ilvl b lks.
+    : wp_uvmunmap_sconf_body kt γa mm P npages K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmunmap_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hbelow.
@@ -1748,6 +1750,7 @@ Section SealUvmunmapBare.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* [bare_pt] IS the [∅] instance, definitionally -- there is nothing
      to owe. *)
   Lemma wp_uvmunmap_bare_sconf
@@ -1755,7 +1758,7 @@ Section SealUvmunmapBare.
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p ilvl b lks.
+    : wp_uvmunmap_bare_sconf_body kt γa mm uroot um npages K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmunmap_bare_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hbelow.
@@ -1794,13 +1797,14 @@ Section SealUvmunmapFixed.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_uvmunmap_fixed_sconf
       (γa : gname) (mm : regfile)
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)
       (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p ilvl b lks.
+    : wp_uvmunmap_fixed_sconf_body kt γa mm fx uroot um v K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmunmap_fixed_sconf_body].
     intros pcE va ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hv Hfixed Hrange.

@@ -99,6 +99,7 @@ Section UtSysBlock.
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* the trapframe page's own [page_valid], read off [proc_priv] without
      consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
      does not spend the resource (durable-notes.md), so [Hpv] is still
@@ -132,7 +133,7 @@ Section UtSysBlock.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr kt m nx false (un_pj N) -∗
     ut_hold (SY.syscall_env) N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -151,7 +152,7 @@ Section UtSysBlock.
     (* depth 0 forces the held set empty, so killed/kexit's order premises
        need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
-    iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
+    iAssert (procs_inv (kt := kt) (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
     { iDestruct "Hcaps" as "(_ & $ & _)". }
@@ -181,7 +182,7 @@ Section UtSysBlock.
       by (rewrite /M1 upd_eq; pcw).
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
-    iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
+    iApply (KI.wp_killed_sconf kt (un_s N) (un_j N) (un_l N)
               M1 nx 0%nat false (un_pj N) false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpi [-]").
@@ -433,7 +434,7 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
-      iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
+      iApply (SY.wp_syscall_sconf kt (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
                 (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; lia)

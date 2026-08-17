@@ -72,6 +72,7 @@ Section ProofKerneltrap.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
   Notation s1_idx := (mword_of_int 9 : mword 5).
@@ -87,7 +88,7 @@ Section ProofKerneltrap.
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64)
       (ep sc tv : mword 64) (lks : gset string)
-    : wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu m av p ep sc tv lks.
+    : wp_kerneltrap_sconf_body kt γu γv γdk γtl γs pd pav pu m av p ep sc tv lks.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal Hbelow.
@@ -131,7 +132,7 @@ Section ProofKerneltrap.
     assert (HD0s2 : D0 !!! Regidx s2_idx = ep)
       by (rewrite /D0 upd_ne; [exact HMs2 | vm_compute; discriminate]).
     (* devintr's caps are the whole device complement, threaded persistently *)
-    iApply (Devintr.wp_devintr_sconf γu γv γdk γtl γs pd pav pu
+    iApply (Devintr.wp_devintr_sconf kt γu γv γdk γtl γs pd pav pu
               D0 (av - 6)%nat 0 false p (DfracOwn 1) sc lks
               Hlen ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(lia)
@@ -244,7 +245,7 @@ Section ProofKerneltrap.
       assert (HD2thr : kt_thr m D2).
       { intros r Hr Hsp Hs0 Hs1 Hs2 Hs3.
         rewrite /D2 upd_ne; [| ktne_ra ]. apply HD1thr; assumption. }
-      iApply (Myproc.wp_myproc_sconf D2 (av - 6)%nat 0 false p false _
+      iApply (Myproc.wp_myproc_sconf kt D2 (av - 6)%nat 0 false p false _
                 ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
@@ -364,7 +365,7 @@ Section ProofKerneltrap.
         assert (Hjl : (j < length γs)%nat) by (rewrite Hlen; exact Hj).
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].
         iEval (rewrite Hlkempty) in "Hcpu".
-        iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false
+        iApply (Yield.wp_yield_sconf kt γs j γl Y0 (av - 6)%nat false
                   Hj Hgl ltac:(lia)
                   with "Hcg Hcpu Htext Hpc Hprocs [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm]").
         (* THE HANDLER RESOURCE GOES INTO THE PARK, as the fifth member of

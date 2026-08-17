@@ -38,6 +38,7 @@ Section MachineProof.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -204,7 +205,7 @@ Section MachineProof.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b p -∗
+    sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -212,7 +213,7 @@ Section MachineProof.
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗ pc_is (ret_pc ra0) -∗
+        sie_cap_gpr kt mf K b p -∗ pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -391,7 +392,7 @@ Qed.
     M !!! Regidx Ra0 = s -> M !!! Regidx Ra4 = pa_add s k -> M !!! Regidx Ra5 = endw ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
+    sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x30) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
@@ -402,7 +403,7 @@ Qed.
         ⌜Mt !!! Regidx Ra0 = s⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b p -∗
+        sie_cap_gpr kt Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
@@ -565,7 +566,7 @@ Qed.
     M !!! Regidx Ra5 = pa_add s d ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
+    sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x0e) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
@@ -576,7 +577,7 @@ Qed.
         ⌜Mt !!! Regidx Ra0 = s⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b p -∗
+        sie_cap_gpr kt Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
@@ -965,7 +966,7 @@ Qed.
      signed 32-bit word instructions. *)
   Lemma wp_strncpy_sconf (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_strncpy_sconf_body mm n f g K dq b p.
+    : wp_strncpy_sconf_body kt mm n f g K dq b p.
   Proof.
     cbv beta delta [wp_strncpy_sconf_body].
     intros pcE s t ret_tgt HK Hn2 Hn31.

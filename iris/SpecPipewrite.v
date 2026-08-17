@@ -79,7 +79,7 @@ Local Open Scope Z_scope.
    killed 14, myproc/acquire/release 10. *)
 Notation pipewrite_stack := (64%nat) (only parsing).
 Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname) 
+    (kt : ktier) (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
     (m : regfile) (av : nat) (eb : bool)
@@ -108,7 +108,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      [locks_below_mono] lifts it to "proc" wherever a callee wants that
      instead (LockRank.v). *)
   locks_below lks "pipe" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr kt m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -119,13 +119,13 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr kt mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗
@@ -136,9 +136,9 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type PIPEWRITE.
   Parameter wp_pipewrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (kt : ktier) (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb pid V n b lks.
+      wp_pipewrite_sconf_body kt γa γf γs j γlp γl γp w q m av eb pid V n b lks.
 End PIPEWRITE.

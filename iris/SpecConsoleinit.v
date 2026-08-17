@@ -91,7 +91,7 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    SpecPlicClaim.v. *)
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (m : regfile) (K : nat)
+    (kt : ktier) (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
     (dread0 dwrite0 : mword 64) (p : mword 64) :=
@@ -105,7 +105,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
      callee is uartinit, which needs 4 (its own 2-slot frame plus initlock's
      2).  So the budget is 2 + 4. *)
   (6 <= K)%nat ->
-  sie_cap_gpr m K false p -∗
+  sie_cap_gpr kt m K false p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
      uartinit's own spec, the "uart" one. *)
@@ -128,7 +128,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
   ( ∀ mr,
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr kt mr K false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
@@ -152,9 +152,9 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (m : regfile) (K : nat)
+      (kt : ktier) (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64),
-      wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu dread0 dwrite0 p.
+      wp_consoleinit_sconf_body kt γd m K l b0 vclock vcname vccpu dread0 dwrite0 p.
 End CONSOLEINIT.

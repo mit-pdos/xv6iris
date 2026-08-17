@@ -78,6 +78,7 @@ Section WpSmodeIntr.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
@@ -98,13 +99,13 @@ Section WpSmodeIntr.
   Lemma wp_instr_s_intr (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     ret_pc pc = pc ->
-    sie_cap_gpr m n true p -∗
+    sie_cap_gpr kt m n true p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
     wp_next true p (fun (CID : CpuId) =>
       ∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
        sconf -∗
-       sie_cap m n true p -∗
+       sie_cap kt m n true p -∗
        gpr_file (tp_pin m) -∗
        nextPC ↦ᵣ pc -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -242,7 +243,7 @@ Section WpSmodeIntr.
   Lemma wp_instr_s_sconf
       (m : regfile) (n : nat) (b : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
     (* THE σ-CALLBACK IS HART-GENERIC: after the absorbing engine has run, the
@@ -259,7 +260,7 @@ Section WpSmodeIntr.
     wp_next b p (fun (CID : CpuId) =>
       ∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
        sconf -∗
-       sie_cap m n b p -∗
+       sie_cap kt m n b p -∗
        gpr_file (tp_pin m) -∗
        nextPC ↦ᵣ pc -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -366,11 +367,11 @@ Section WpSmodeIntr.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true base -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -466,11 +467,11 @@ Section WpSmodeIntr.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false base -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -564,11 +565,11 @@ Section WpSmodeIntr.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

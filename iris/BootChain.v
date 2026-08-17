@@ -367,6 +367,7 @@ Section BootRun.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
      once: [boot_entry_pre]'s output MINUS the two PLIC wire pins, plus the
      image and this hart's stack slice (the CARVE's outputs), plus the bridge's
@@ -448,7 +449,7 @@ Section BootRun.
        it at [K_main] would be a silent 78-slot leak that leaves main unable
        to fund a trap. *)
     (∀ mf : regfile,
-       sie_cap_gpr mf (kv_frame_slots + K_main)%nat false zero_reg -∗
+       sie_cap_gpr kt mf (kv_frame_slots + K_main)%nat false zero_reg -∗
        cpu_ctx_free -∗
        cpu_own 0 false zero_reg false ∅ -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
@@ -565,6 +566,7 @@ Section BootSecondary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma boot_hart_secondary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
     reset_regs cpu_id rs ->
@@ -581,7 +583,7 @@ Section BootSecondary.
     iIntros "#Htext #Hdata Hres #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
-    iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
+    iApply (MainSecondary.wp_main_secondary_sconf kt mf (kv_frame_slots + K_main)%nat zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
@@ -615,6 +617,7 @@ Section BootPrimary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
       (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg) :
@@ -656,7 +659,7 @@ Section BootPrimary.
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
-    iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
+    iApply (Main.wp_main_boot_sconf kt mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0

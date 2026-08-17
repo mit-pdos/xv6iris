@@ -148,7 +148,7 @@ Definition wp_syscall_sconf_body
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+    (kt : ktier) (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
     (bn : bio_names) (fn : fclose_names) (us : gset Z)
     (ip : mword 64) (dqi : dfrac)
@@ -162,13 +162,13 @@ Definition wp_syscall_sconf_body
   (K_syscall <= av)%nat ->
   (* INTERRUPTS ON, at push_off level 0 -- see the header: the [csrsi] that
      precedes the only call site, and what the parking entries need. *)
-  sie_cap_gpr m av true pj -∗
+  sie_cap_gpr kt m av true pj -∗
   cpu_own 0%nat true pj true lks -∗
   (* [kernel_data] is the jump table itself ([syscalls] lives in .rodata) and
      argraw's below it; [procs_inv] is the proc array and the
      panic arms every acquire/release in the cone reaches. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* THE FIVE FAMILIES [ut_own] ALSO holds -- see the header for why they
      ride here rather than inside [R].  [sys_exit] (reached through the
      table) is the only entry that draws on them; the other twenty-one
@@ -195,7 +195,7 @@ Definition wp_syscall_sconf_body
          else in the record may: [pv_tf] always does (the a0 slot is the
          return value), and sbrk / exec / chdir / open move the rest. *)
       ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
-      sie_cap_gpr mf av true pj -∗
+      sie_cap_gpr kt mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots bn 3 -∗
       (* [us] may shrink -- [SYSCLOSE]'s own postcondition re-indexes it the
@@ -234,17 +234,17 @@ Module Type SYSCALL.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId},
+      `{GEN : GenId}(kt : ktier) {kt : ktier} ,
       gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
+      wp_syscall_sconf_body kt syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
 End SYSCALL.

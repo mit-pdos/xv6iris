@@ -59,7 +59,7 @@ Module Syscall : SYSCALL.
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId}
-    (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+    {kt : ktier} (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
     : iProp Σ := emp%I.
 
   Axiom wp_syscall_sconf :
@@ -67,10 +67,10 @@ Module Syscall : SYSCALL.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
+      wp_syscall_sconf_body kt syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
 End Syscall.

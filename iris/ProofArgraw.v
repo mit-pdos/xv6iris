@@ -210,6 +210,7 @@ Section ProofArgraw.
 
 
 
+  Context {kt : ktier}.
   (* the switch index is in range, so [bltu a5,s1] (5 <u n) does not fire *)
   Lemma ar_bltu_false (i : nat) : (i < NARG)%nat ->
     zopz0zI_u (mword_of_int 5 : mword 64) (mword_of_int (Z.of_nat i) : mword 64) = false.
@@ -269,7 +270,7 @@ Section ProofArgraw.
   Lemma ar_tail `{CID0 : CpuId}
       (M : regfile) (sp0 ra0 s00 s10 gapv : mword 64) (k : nat) (b : bool) (p : mword 64) :
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
-    sie_cap_gpr M k b p -∗
+    sie_cap_gpr kt M k b p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
@@ -284,7 +285,7 @@ Section ProofArgraw.
           (forall r : mword 5, is_cs_idx r = true ->
              r <> csp_rs1 -> r <> ar_s0 -> r <> ar_s1 ->
              Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mf (k + 4)%nat b p -∗
+        sie_cap_gpr kt Mf (k + 4)%nat b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -352,8 +353,8 @@ Section ProofArgraw.
                    = pa_stk (add_vec (T3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HT3sp; reflexivity).
     iPoseProof (ari_32 with "Htext") as "Hi32".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HMsp). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HT1sp). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HT2sp). iExact "Hr8". }
@@ -460,10 +461,10 @@ Section ProofArgraw.
 
   Lemma ar_join `{CID0 : CpuId} (M : regfile) (k : nat) (av' : nat) (b : bool) (p : mword 64) :
     (k < NARG)%nat ->
-    kernel_text -∗ sie_cap_gpr M av' b p -∗
+    kernel_text -∗ sie_cap_gpr kt M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr M av' b p -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
+      sie_cap_gpr kt M av' b p -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -515,7 +516,7 @@ Section ProofArgraw.
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     page_valid (page_base tfp) ->
     kernel_text -∗ kernel_data -∗
-    sie_cap_gpr M av' b p -∗
+    sie_cap_gpr kt M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + 0x22) : mword 64) -∗
     p_trapframe p ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
@@ -532,7 +533,7 @@ Section ProofArgraw.
           (forall r : mword 5, is_cs_idx r = true ->
              r <> csp_rs1 -> r <> ar_s0 -> r <> ar_s1 ->
              Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mf (av' + 4)%nat b p -∗
+        sie_cap_gpr kt Mf (av' + 4)%nat b p -∗
         pc_is (ret_pc ra0) -∗
         p_trapframe p ↦₈{dqt} page_base tfp -∗
         tf_page tfp ws -∗
@@ -542,7 +543,7 @@ Section ProofArgraw.
   Local Lemma ar_arm0 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M 0%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M 0%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
     intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
@@ -662,7 +663,7 @@ Section ProofArgraw.
   Local Lemma ar_arm1 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M 1%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M 1%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
     intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
@@ -782,7 +783,7 @@ Section ProofArgraw.
   Local Lemma ar_arm2 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M 2%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M 2%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
     intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
@@ -902,7 +903,7 @@ Section ProofArgraw.
   Local Lemma ar_arm3 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M 3%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M 3%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
     intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
@@ -1022,7 +1023,7 @@ Section ProofArgraw.
   Local Lemma ar_arm4 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M 4%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M 4%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
     intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
@@ -1142,7 +1143,7 @@ Section ProofArgraw.
   Local Lemma ar_arm5 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M 5%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M 5%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
     intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
@@ -1267,7 +1268,7 @@ Section ProofArgraw.
       (M : regfile) (k : nat) (av' : nat)
       (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
-    ar_arm_body M k av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
+    ar_arm_body (kt := kt) M k av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     destruct k as [|[|[|[|[|[|k']]]]]];
       [ apply ar_arm0 | apply ar_arm1 | apply ar_arm2
@@ -1280,7 +1281,7 @@ Section ProofArgraw.
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_argraw_sconf_body m av n eb p i tfp ws v dqt b lks.
+    : wp_argraw_sconf_body kt m av n eb p i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_argraw_sconf_body].
     intros pcE ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
@@ -1305,7 +1306,7 @@ Section ProofArgraw.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.argraw + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24". iDestruct "S2c" as (vr16) "Hr16".
     iDestruct "S3c" as (vr8) "Hr8".  iDestruct "S4c" as (vgap) "Hgap".
@@ -1387,7 +1388,7 @@ Section ProofArgraw.
     assert (HA3ra : A3 !!! Regidx ar_ra = add_vec_int (mword_of_int (KernelSyms.argraw + 0x0c) : mword 64) 4)
       by (rewrite /A3 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
+    iApply (Myproc.wp_myproc_sconf kt A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].

@@ -117,6 +117,7 @@ Section ProofBrelse.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
   Notation Rs1  := (mword_of_int 9 : mword 5).
@@ -154,7 +155,7 @@ Section ProofBrelse.
       (m0 : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset)
       (b : bool) (pme : mword 64) :
     ↑kptN ⊆ Em ->
-    sie_cap_gpr m0 av b pme -∗
+    sie_cap_gpr kt m0 av b pme -∗
     pc_is pc -∗
     instr pc true (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 64,
@@ -162,7 +163,7 @@ Section ProofBrelse.
        (add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000")))
           ↦₈ (rget m0 rs2) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     wp_next b pme (fun (CID : CpuId) =>
-      sie_cap_gpr m0 av b pme -∗
+      sie_cap_gpr kt m0 av b pme -∗
       pc_is (add_vec_int pc 2) -∗
       Ψ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -261,14 +262,14 @@ Section ProofBrelse.
        [{["bcache"]} ∪ lks], not bare [lks]; see the OUTER/INNER
        convention in claude-notes/completed/lock-set.md). *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (trap_res eb + (K - 4))%nat false p -∗
+    sie_cap_gpr kt M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.brelse + 0x60) : mword 64) -∗
     is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
     cpu_own 1%nat eb p false ({["bcache"]} ∪ lks) -∗
-    arm_pay 0%nat eb p -∗
+    arm_pay kt 0%nat eb p -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx Rs1) -∗
@@ -276,7 +277,7 @@ Section ProofBrelse.
     wp_next eb p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K eb p -∗
+        sie_cap_gpr kt mf K eb p -∗
         (* [lks], NOT [∅]: the release above only drops "bcache"; whatever
            this hart already held on entry to brelse is untouched by this
            tail, so it is handed back to the caller's continuation as-is. *)
@@ -349,7 +350,7 @@ Section ProofBrelse.
       by (rewrite (HT3thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HMsp).
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
-    iApply (Rl.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
+    iApply (Rl.wp_release_sconf kt (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
               0%nat eb p (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -453,8 +454,8 @@ Section ProofBrelse.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold spr, sp0, pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].
@@ -533,7 +534,7 @@ Section ProofBrelse.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string)
-    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
+    : wp_brelse_sconf_body kt γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
     intros pcE ret_tgt HK Hk Ha0 Hbelow.
@@ -603,7 +604,7 @@ Section ProofBrelse.
       by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
     assert (HR1s2 : R1 !!! Regidx Rs2 = m !!! Regidx Rs2)
       by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -787,7 +788,7 @@ Section ProofBrelse.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
+    iApply (Hsl.wp_holdingsleep_sconf kt (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
@@ -869,7 +870,7 @@ Section ProofBrelse.
       by (rewrite /H2; apply upd_eq).
     iDestruct (cpu_own_transport CID11 CID14 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
+    iApply (Rsl.wp_releasesleep_sconf kt γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hprocs").
@@ -949,7 +950,7 @@ Section ProofBrelse.
       by (rewrite /U3; apply upd_eq).
     iDestruct (cpu_own_transport CID15 CID18 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Aq.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) U3
+    iApply (Aq.wp_acquire_sconf kt (bn_lk bn) "bcache"%string (bcache_res bn V) U3
               0%nat b p (K - 4)%nat b lks
               ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").

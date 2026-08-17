@@ -90,6 +90,7 @@ Section ProofIunlockputMain.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  iunlockput is a wrapper,
      so this is one call site's worth of threading; the counted seal is
      after the proof. *)
@@ -109,7 +110,7 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_iunlockput_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
                              crz e0 pidv dq dqb dqs m K eb b lks.
@@ -151,7 +152,7 @@ Section ProofIunlockputMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : iulp_sp m R1) by (rewrite /iulp_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3".
@@ -275,7 +276,7 @@ Section ProofIunlockputMain.
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
-    iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
+    iApply (IU.wp_iunlock_sconf kt gs gfs gi cn gil gisl cov logstart k s gy dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks
               ltac:(lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
@@ -353,7 +354,7 @@ Section ProofIunlockputMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID10) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+    iApply (IP.wp_iput_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
               k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks
               ltac:(lia) Hk Hcrb Hcru
@@ -477,9 +478,9 @@ Section ProofIunlockputMain.
                    = pa_stk (add_vec (P3 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP3sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 S4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -590,7 +591,7 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_iunlockput_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb b lks.

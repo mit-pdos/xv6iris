@@ -59,6 +59,7 @@ Section ProofHoldingsleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)
   Local Ltac hpeel :=
     repeat first
@@ -69,7 +70,7 @@ Section ProofHoldingsleep.
   Lemma wp_holdingsleep_gen_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb dq b lks.
+    : wp_holdingsleep_gen_sconf_body kt γl γsl s R H q m p pidv av eb dq b lks.
   Proof.
     cbv beta delta [wp_holdingsleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
@@ -101,7 +102,7 @@ Section ProofHoldingsleep.
     set (M0 := <[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m).
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with M0.
     assert (HM0csp : M0 !!! Regidx csp_rs1 = spr) by (rewrite /M0 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (vra0) "Hslot_ra".
     iDestruct "S2" as (vs00) "Hslot_s0".
@@ -233,7 +234,7 @@ Section ProofHoldingsleep.
     iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) M5
+    iApply (Acquire.wp_acquire_sconf kt γl "sleep lock"%string (sl_res_gen γsl slk R H) M5
               0%nat b p (av - 6)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -338,7 +339,7 @@ Section ProofHoldingsleep.
        Called at [b = false] (holding the lock, level 1): myproc's own
        [wp_next] index is the [false] we pass, so it collapses too -- the
        hart stays at [CIDacq] throughout, no transport needed. *)
-    iApply (Myproc.wp_myproc_sconf Bj (trap_res b + (av - 6))%nat 1%nat b p false
+    iApply (Myproc.wp_myproc_sconf kt Bj (trap_res b + (av - 6))%nat 1%nat b p false
               ({["sleep lock"]} ∪ lks)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
@@ -484,7 +485,7 @@ Section ProofHoldingsleep.
     (* close sl_res again (held), for release's R argument. *)
     iDestruct (sl_res_close_held γsl slk R H v Hvnz with "Hslk Hdep") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) D20
+    iApply (Release.wp_release_sconf kt γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) D20
               0%nat b p (av - 6)%nat ({["sleep lock"]} ∪ lks)
               ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)
@@ -588,8 +589,8 @@ Section ProofHoldingsleep.
       change (add_vec sp0 (mword_of_int 0)) with (add_vec_int sp0 0). apply avi0. }
     assert (Hpop : E2c !!! Regidx csp_rs1 = pa_stk (add_vec (E2c !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hpopval HE2ccsp. exact Hspr6. }
-    iAssert (stack_own sp0 6) with "[Hslot_ra Hslot_s0 Hslot_s1 Hslot_s2 Hslot_s3 S6]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hslot_ra Hslot_s0 Hslot_s1 Hslot_s2 Hslot_s3 S6]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hslot_ra"; [iExists _; iExact "Hslot_ra"|].
       iSplitL "Hslot_s0"; [iExists _; iExact "Hslot_s0"|].
       iSplitL "Hslot_s1"; [iExists _; iExact "Hslot_s1"|].
@@ -717,7 +718,7 @@ Section ProofHoldingsleep.
   Lemma wp_holdingsleep_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb dq b lks.
+    : wp_holdingsleep_sconf_body kt γl γsl s R m p pidv av eb dq b lks.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Hav Hbelow.

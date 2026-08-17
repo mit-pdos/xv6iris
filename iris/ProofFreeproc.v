@@ -133,6 +133,7 @@ Section ProofFreeproc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation FR := KernelSyms.freeproc.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -197,7 +198,7 @@ Section ProofFreeproc.
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string)
-    : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
+    : wp_freeproc_sconf_body (kt := kt) γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
   Proof.
     cbv beta delta [wp_freeproc_sconf_body].
     intros pcE pa ret_tgt HK Hilvl Ha0 Hlkbelow.
@@ -261,7 +262,7 @@ Section ProofFreeproc.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm) with A0.
     assert (HA0sp : A0 !!! Regidx csp_rs1 = spd) by (rewrite /A0 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -362,7 +363,7 @@ Section ProofFreeproc.
         ⌜ me !!! Regidx csp_rs1 = spd
           /\ me !!! Regidx Rs1 = pa
           /\ fr_thr mm me ⌝ -∗
-        sie_cap_gpr me (K - 4)%nat false pme -∗
+        sie_cap_gpr kt me (K - 4)%nat false pme -∗
         cpu_own ilvl eb pme false lks -∗
         pc_is (mword_of_int (FR + 0x22) : mword 64) -∗
         p_pagetable pa ↦₈ pgv -∗
@@ -538,8 +539,8 @@ Section ProofFreeproc.
                      = pa_stk (add_vec (E2 !!! Regidx csp_rs1)
                           (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HE2sp. symmetry. exact Hspd4. }
-      iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe".
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hr24". { iExists (mm !!! Regidx Rra). iExact "Hr24". }
         iSplitL "Hr16". { iExists (mm !!! Regidx Rs0). iExact "Hr16". }
         iSplitL "Hr8".  { iExists (mm !!! Regidx Rs1). iExact "Hr8". }
@@ -623,7 +624,7 @@ Section ProofFreeproc.
         ⌜ me !!! Regidx csp_rs1 = spd
           /\ me !!! Regidx Rs1 = pa
           /\ fr_thr mm me ⌝ -∗
-        sie_cap_gpr me (K - 4)%nat false pme -∗
+        sie_cap_gpr kt me (K - 4)%nat false pme -∗
         cpu_own ilvl eb pme false lks -∗
         pc_is (mword_of_int (FR + 0x14) : mword 64) -∗
         p_trapframe pa ↦₈ tfv -∗
@@ -722,7 +723,7 @@ Section ProofFreeproc.
           by (rewrite /B2 upd_eq; reflexivity).
         iDestruct (cpu_own_transport CIDp CIDp5 ilvl eb pme false ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
-        iApply (PFP.wp_proc_freepagetable_sconf γa B2 P (K - 4)%nat eb pme ilvl false lks
+        iApply (PFP.wp_proc_freepagetable_sconf kt γa B2 P (K - 4)%nat eb pme ilvl false lks
                   Hcpf Hilvl HB2a0
                   ltac:(rewrite HB2a1; exact Hszr)
                   ltac:(rewrite HB2a1; exact Hbelow)
@@ -850,7 +851,7 @@ Section ProofFreeproc.
       iDestruct "Henv" as (γk) "(#Hkmem & #Havail)".
       iDestruct (cpu_own_transport CID CID9 ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (KF.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
+      iApply (KF.wp_kfree_sconf kt γa γk (mword_of_int KernelSyms.kmem)
                 (mword_of_int (KernelSyms.kmem + 24)) T1 None ilvl eb pme
                 (K - 4)%nat false lks
                 Hckf eq_refl eq_refl Hilvl

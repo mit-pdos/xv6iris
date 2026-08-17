@@ -74,6 +74,7 @@ Section ProofArgstr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -90,7 +91,7 @@ Section ProofArgstr.
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_argstr_sconf_body γa γf m av n eb p i v pid V maxn buf_olds b lks.
+    : wp_argstr_sconf_body kt γa γf m av n eb p i v pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
     intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31 Hlkbelow.
@@ -300,7 +301,7 @@ Section ProofArgstr.
     (* ---- the FIRST borrow: argraw wants the trapframe page ---- *)
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Htfa & Hpbacktf)".
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argraw.wp_argraw_sconf M5 (av - 4)%nat n eb p
+    iApply (Argraw.wp_argraw_sconf kt M5 (av - 4)%nat n eb p
               i (ud_tfp (pv_upt V)) (pv_tf V) v (DfracOwn (1/4)) b
               _ Hi HM5a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
@@ -390,7 +391,7 @@ Section ProofArgstr.
     iEval (rewrite -HA3a1) in "Hbuf".
     (* ---- fetchstr(addr, buf, max) ---- *)
     iDestruct (cpu_own_transport CID10 CID13 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p pid V maxn buf_olds b
+    iApply (Fetchstr.wp_fetchstr_sconf kt γa γf A3 (av - 4)%nat n eb p pid V maxn buf_olds b
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
     all: try lkbelow.

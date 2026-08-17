@@ -94,6 +94,7 @@ Section SpecMainSecondary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ------------------------------------------------------------------- *)
   (* THE DEPOSIT: the canonical instantiation of SpecMain's payload [P].  *)
   (* Exactly the nine facts the boot arm's □-wand takes as arguments,      *)
@@ -106,7 +107,7 @@ Section SpecMainSecondary.
     (∃ (γpr γk : gname) (γs : list gname) (pd pav pu : mword 64)
        (root : mword 44) (pas : nat -> mword 44),
        printk_env γpr γd γv ∗
-       procs_inv γs ∗
+       procs_inv (kt := kt) γs ∗
        (* consoleintr's credential, which the kernelvec handler contract
           closes over ([SpecDevintr.devintr_caps]) and which no hart can make
           for itself: both halves are locks over static globals. *)
@@ -145,7 +146,7 @@ Section SpecMainSecondary.
        it is scheduler() at the far end that first enables them.  So the hart
        provably cannot move under this contract, and (as on the boot arm) it
        needs no [wp_next] wrapper: it diverges, there is no continuation. *)
-    sie_cap_gpr m K false p0 -∗
+    sie_cap_gpr kt m K false p0 -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
@@ -174,9 +175,9 @@ Module Type MAIN_SECONDARY.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       
-      (m : regfile) (K : nat)
+      (kt : ktier) (m : regfile) (K : nat)
       (p0 : mword 64)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_main_secondary_sconf_body m K p0 γd γv tlbvec0.
+      wp_main_secondary_sconf_body (kt := kt) m K p0 γd γv tlbvec0.
 End MAIN_SECONDARY.

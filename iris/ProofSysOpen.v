@@ -152,6 +152,7 @@ Section ProofSysOpenBody.
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -201,9 +202,9 @@ Section ProofSysOpenBody.
          ⌜callee_saved m mf⌝ -∗
          ⌜used' ⊆ used⌝ -∗
          ⌜(nsj <= ns')%nat /\ (ns' <= S nsj)%nat⌝ -∗
-         sie_cap_gpr mf K b pj -∗
+         sie_cap_gpr kt mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
-         trap_csrs_ext eb -∗
+         trap_csrs_ext kt eb -∗
          cpu_claim_ext eb pj -∗
          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -265,9 +266,9 @@ Section ProofSysOpenBody.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs3 : mword 64) = (mword_of_int (Z.of_nat fd) : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr M (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr kt M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0xb8)) -∗
     panic_env -∗
@@ -298,7 +299,7 @@ Section ProofSysOpenBody.
     proc_priv_core (proc_addr jx) pidv V -∗
     proc_ofiles_owe gf (proc_addr jx)
       (pv_ofile (upd_ofile V fd (fnode kf))) ({[fd]} ∪ ∅) -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -476,9 +477,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = fnode kf ->
     (N !!! Regidx Rs3 : mword 64) = (mword_of_int (Z.of_nat fd) : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr kt N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x88)) -∗
     panic_env -∗
@@ -513,7 +514,7 @@ Section ProofSysOpenBody.
     proc_priv_core (proc_addr jx) pidv V -∗
     proc_ofiles_owe gf (proc_addr jx)
       (pv_ofile (upd_ofile V fd (fnode kf))) ({[fd]} ∪ ∅) -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -948,7 +949,7 @@ Section ProofSysOpenBody.
       as (data) "(%Hok & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk)".
     destruct Hok as (Hbwf & Hbcov & Haddrs & Htynz & Hszcap & Hholes & Hsized).
     iDestruct (proc_priv_core_pid with "Hcore") as "[Hpidq Hcback]".
-    iApply (Itrunc.wp_itrunc_sconf (CID := CID15) gs jx gl gu gd gk pd pav pu
+    iApply (Itrunc.wp_itrunc_sconf kt (CID := CID15) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart bmapstart inodestart icfg_nib size
               icfg_dev used (ientry kk) inum dn dn bm data u2 pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs
@@ -1084,9 +1085,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (N !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr kt N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x5e)) -∗
     panic_env -∗
@@ -1110,7 +1111,7 @@ Section ProofSysOpenBody.
     ity_shot gy (di_type dn) -∗
     inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
     proc_priv gf (proc_addr jx) pidv V -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -1207,7 +1208,7 @@ Section ProofSysOpenBody.
       exact (HNthr c Hc N2b N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Filealloc.wp_filealloc_sconf (CID := CID2) gfl gf M1 0%nat eb
+    iApply (Filealloc.wp_filealloc_sconf kt (CID := CID2) gfl gf M1 0%nat eb
               (proc_addr jx) (K - 24)%nat b lks HKfa so_noff0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hpc Hftab Hfds").
@@ -1378,7 +1379,7 @@ Section ProofSysOpenBody.
     iDestruct (proc_ofiles_owe_len with "Howe") as %Hlen.
     iDestruct (cpu_own_transport CID3 CID7 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Fdalloc.wp_fdalloc_sconf (CID := CID7) gf kf ∅ M3 (K - 24)%nat
+    iApply (Fdalloc.wp_fdalloc_sconf kt (CID := CID7) gf kf ∅ M3 (K - 24)%nat
               0%nat eb (proc_addr jx) pidv V b lks HM3a0 Hkf so_noff0 HKfd
               with "Hcg Hown Htext Hdata Hpc Hcore Howe").
     iIntros (CID8 Hq8 mfd) "%Hcsfd Hcg Hown Hpc Hcore Hfdpost".
@@ -1838,9 +1839,9 @@ Section ProofSysOpenBody.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr M (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr kt M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x4a)) -∗
     panic_env -∗
@@ -1864,7 +1865,7 @@ Section ProofSysOpenBody.
     ity_shot gy (di_type dn) -∗
     inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
     proc_priv gf (proc_addr jx) pidv V -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -2204,9 +2205,9 @@ Section ProofSysOpenBody.
       (∀ (mf : regfile) (used' : gset Z) (ns' : nat),
          ⌜callee_saved m mf⌝ -∗
          ⌜((ns - sys_open_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
-         sie_cap_gpr mf K b pj -∗
+         sie_cap_gpr kt mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
-         trap_csrs_ext eb -∗
+         trap_csrs_ext kt eb -∗
          cpu_claim_ext eb pj -∗
          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
          sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -2269,7 +2270,7 @@ Section ProofSysOpenBody.
     (plen < 128)%nat ->
     1 < ninodes -> ninodes <= 16 * Z.of_nat nib -> ninodes < 2 ^ 31 ->
     16 * Z.of_nat nib <= 2 ^ 16 ->
-    printk_gen_contract gpr gu gd ->
+    printk_gen_contract (kt := kt) gpr gu gd ->
     (sys_open_slots <= ns)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     eb = true ->
@@ -2281,9 +2282,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (N !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr kt N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x38)) -∗
     printk_env gpr gu gd -∗
@@ -2304,7 +2305,7 @@ Section ProofSysOpenBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     proc_priv gf (proc_addr jx) pidv V -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -2476,7 +2477,7 @@ Section ProofSysOpenBody.
       as "[Hbufk Hbufrest]".
     iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Create.wp_create_sconf (CID := CID5) gs jx gl gu gd gk pd pav pu bn
+    iApply (Create.wp_create_sconf kt (CID := CID5) gs jx gl gu gd gk pd pav pu bn
               g gfs gi cn gtl ga gf gpr cov logstart bmapstart inodestart nib
               ninodes size dev used plen bp
               SpecCreate.T_FILE (mword_of_int 0) (mword_of_int 0)
@@ -2724,7 +2725,7 @@ Section ProofSysOpenBody.
     (plen < 128)%nat ->
     1 < ninodes -> ninodes <= 16 * Z.of_nat nib -> ninodes < 2 ^ 31 ->
     16 * Z.of_nat nib <= 2 ^ 16 ->
-    printk_gen_contract gpr gu gd ->
+    printk_gen_contract (kt := kt) gpr gu gd ->
     (sys_open_slots <= ns)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     eb = true ->
@@ -2736,9 +2737,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (N !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr kt N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0xdc)) -∗
     printk_env gpr gu gd -∗
@@ -2759,7 +2760,7 @@ Section ProofSysOpenBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     proc_priv gf (proc_addr jx) pidv V -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -2875,7 +2876,7 @@ Section ProofSysOpenBody.
       as "[Hbufk Hbufrest]".
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Namei.wp_namei_gen (CID := CID2) gs jx gl gu gd gk pd pav pu bn
+    iApply (Namei.wp_namei_gen kt (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               g gfs gi cn gtl ga gf cov logstart bmapstart inodestart nib
               size dev used (pv_cwd V) plen bp MAXOPBLOCKS Sb
               pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
@@ -3061,7 +3062,7 @@ Section ProofSysOpenBody.
       exact (HP1thr c Hc N2b N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID3 CID6 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Ilock.wp_ilock_sconf (CID := CID6) gs jx gl gu gd gk pd pav pu bn
+    iApply (Ilock.wp_ilock_sconf kt (CID := CID6) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib
               kk (qq/2)%Qp gy dev inum pidv (DfracOwn (1/4)) dqs
               P2 (K - 24)%nat eb b lks
@@ -3398,7 +3399,7 @@ Section ProofSysOpenBody.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_sys_open_sconf_body gfl gf ga gpr gs j gl gu gd gk pd pav pu bn g gfs
+    wp_sys_open_sconf_body kt gfl gf ga gpr gs j gl gu gd gk pd pav pu bn g gfs
                            gi cn gtl cov logstart bmapstart inodestart nib
                            ninodes size dev used ns dqb dqs dqbs dqn v vom
                            pid V m K eb b lks.
@@ -3621,7 +3622,7 @@ Section ProofSysOpenBody.
     iEval (rewrite -HM5a1) in "H23hi".
     iDestruct (cpu_own_transport CID0 CID7 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Argint.wp_argint_sconf M5 (K - 24)%nat 0%nat eb (proc_addr j) 1%nat
+    iApply (Argint.wp_argint_sconf kt M5 (K - 24)%nat 0%nat eb (proc_addr j) 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) vom (word_hi u23) (DfracOwn (1/4))
               b lks so_arg1_lt HM5a0 Hargvom so_noff0 HKai Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage H23hi").
@@ -3778,7 +3779,7 @@ Section ProofSysOpenBody.
     iDestruct (so_bytes_name (pa_stk sp0 22) 128 with "Hbytes") as (bf0) "Hbuf".
     iDestruct (cpu_own_transport CID8 CID12 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Argstr.wp_argstr_sconf (CID := CID12) ga gf M9 (K - 24)%nat 0%nat
+    iApply (Argstr.wp_argstr_sconf kt (CID := CID12) ga gf M9 (K - 24)%nat 0%nat
               eb (proc_addr j) 0%nat v pid V 128%nat bf0 b lks
               so_arg0_lt HM9a0 Hargv so_noff0 HKas HM9a2 so_maxpath_lt
               (Hlb "kmem"%string)
@@ -3939,7 +3940,7 @@ Section ProofSysOpenBody.
       as "[Hpidq Hpback0]".
     iDestruct (cpu_own_transport CID13 CID18 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (BeginOp.wp_begin_op_sconf (CID := CID18) gs j gl bn g gfs cov
+    iApply (BeginOp.wp_begin_op_sconf kt (CID := CID18) gs j gl bn g gfs cov
               logstart dev pid (DfracOwn (1/4)) R3 (K - 24)%nat eb b lks
               HKbo Hj Hgl (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").

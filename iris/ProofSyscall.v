@@ -399,6 +399,7 @@ Section SyscallVocab.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ===================================================================== *)
   (* syscall_env -- the union of everything the FOURTEEN wired entries need
      that is NOT one of the five explicit families (bslots/fileclose_bm/
@@ -792,13 +793,13 @@ Section SyscallVocab.
       (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
       (tgt : mword 64) (us : gset Z) :=
     (pc_is tgt ∗
-     sie_cap_gpr M av true pj ∗
+     sie_cap_gpr kt M av true pj ∗
      cpu_own 0%nat true pj true lks ∗
      kernel_text ∗
      (* the proc array and the panic arms every [acquire]/[release] in the
         cone reaches -- both persistent, both already held by the capstone,
         and between them what most table entries need beyond [proc_priv] *)
-     procs_inv γs ∗
+     procs_inv (kt := kt) γs ∗
      syscall_env γf pj bn fn ∗
      bslots bn 3 ∗
      fileclose_bm fn us ∗
@@ -819,7 +820,7 @@ Section SyscallVocab.
       (∀ (mf : regfile) (V' : pprivate) (us' : gset Z),
         ⌜ callee_saved m mf ⌝ -∗
         ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
-        sie_cap_gpr mf av true pj -∗
+        sie_cap_gpr kt mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
         bslots bn 3 -∗
         fileclose_bm fn us' -∗
@@ -921,7 +922,7 @@ Section SyscallVocab.
        E !!! Regidx r = m !!! Regidx r) ->
     (4 <= av)%nat ->
     ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ->
-    sie_cap_gpr E (av - 4)%nat true pj -∗
+    sie_cap_gpr kt E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
@@ -1018,8 +1019,8 @@ Section SyscallVocab.
     iPoseProof (syci_60 with "Htext") as "Hi60".
     iEval (rewrite HEsp -Hb1) in "Hra". iEval (rewrite HT1sp -Hb2) in "Hs0".
     iEval (rewrite HT2sp -Hb3) in "Hs1". iEval (rewrite HT3sp -Hb4) in "Hs2".
-    iAssert (stack_own sp0 4) with "[Hra Hs0 Hs1 Hs2]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hra Hs0 Hs1 Hs2]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hra". { iExists _. iExact "Hra". }
       iSplitL "Hs0". { iExists _. iExact "Hs0". }
       iSplitL "Hs1". { iExists _. iExact "Hs1". }
@@ -1259,6 +1260,7 @@ Section SyscallRet.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma sysc_ret_tail
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       (dqi : dfrac) (ip : mword 64) (pid : mword 32) (V V' : pprivate)
@@ -1271,7 +1273,7 @@ Section SyscallRet.
        E !!! Regidx r = m !!! Regidx r) ->
     (4 <= av)%nat ->
     ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ->
-    sie_cap_gpr E (av - 4)%nat true pj -∗
+    sie_cap_gpr kt E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
@@ -1355,6 +1357,7 @@ Section SyscallArms.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* PLACEHOLDER for a not-yet-specialized table entry: an honest
      [Admitted] stand-in so the dispatch machinery below can be assembled
      and validated end-to-end before every arm is filled in.  Real arms
@@ -1394,7 +1397,7 @@ Section SyscallArms.
                    = mword_of_int KernelSyms.sys_getpid) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
     (* ---- the call ---- *)
-    iApply (SysGetpid.wp_sys_getpid_sconf γf M (av - 4)%nat 0%nat true pj pid V true lks
+    iApply (SysGetpid.wp_sys_getpid_sconf kt γf M (av - 4)%nat 0%nat true pj pid V true lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpriv").
     iIntros (CIDy Hsy mf) "%Hmf Hcg Hcpu Hpc Hpriv".
@@ -1476,7 +1479,7 @@ Section SyscallArms.
     iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
       "(#Hkalloc & _)".
     (* ---- the call ---- *)
-    iApply (SysSbrk.wp_sys_sbrk_sconf γa γf M (av - 4)%nat true pj pid V v0 v1 true lks
+    iApply (SysSbrk.wp_sys_sbrk_sconf kt γa γf M (av - 4)%nat true pj pid V v0 v1 true lks
               Hv0 Hv1 ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
     iIntros (CIDy Hsy mf P' szv') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
@@ -1543,7 +1546,7 @@ Section SyscallArms.
     iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
       "(#Hkalloc & _ & _ & #Hwaitlk & _)".
     (* ---- the call ---- *)
-    iApply (SysWait.wp_sys_wait_sconf γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
+    iApply (SysWait.wp_sys_wait_sconf kt γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hpriv").
     iIntros (CIDy Hsy mf P' rv) "%Hcs %Hext Hcg Hcpu Hpc Hpriv".
@@ -1615,7 +1618,7 @@ Section SyscallArms.
     iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
       "(_ & _ & _ & _ & _ & _ & _ & #Hticks & _)".
     (* ---- the call ---- *)
-    iApply (SysUptime.wp_sys_uptime_sconf γtk M 0%nat true pj (av - 4)%nat true ∅
+    iApply (SysUptime.wp_sys_uptime_sconf kt γtk M 0%nat true pj (av - 4)%nat true ∅
               sysc_noff0 ltac:(lia) (locks_below_empty "time")
               with "Hcg Hcpu Htext Hpc Hticks").
     iIntros (CIDy Hsy mf t) "%Hmf Hcg Hcpu Hpc".
@@ -1674,7 +1677,7 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     (* ---- the call ---- *)
-    iApply (SysKill.wp_sys_kill_sconf γs M (av - 4)%nat 0%nat true pj
+    iApply (SysKill.wp_sys_kill_sconf kt γs M (av - 4)%nat 0%nat true pj
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (DfracOwn (1/4)) true ∅
               Hlen Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "proc") Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hprocs").
@@ -1735,7 +1738,7 @@ Section SyscallArms.
     iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
       "(_ & _ & _ & _ & _ & _ & _ & #Hticks & _)".
     (* ---- the call ---- *)
-    iApply (SysPause.wp_sys_pause_sconf γs j γl γtk M (av - 4)%nat true 0%nat
+    iApply (SysPause.wp_sys_pause_sconf kt γs j γl γtk M (av - 4)%nat true 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (DfracOwn (1/4)) true ∅
               Hj Hgamma eq_refl Hv0 ltac:(lia) eq_refl (locks_below_empty "time") Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hticks Hprocs").
@@ -1813,7 +1816,7 @@ Section SyscallArms.
     iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
       "(_ & _ & _ & _ & #Hftable & _)".
     (* ---- the call ---- *)
-    iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid V true ∅
+    iApply (SysDup.wp_sys_dup_sconf kt γft γf M (av - 4)%nat 0%nat true pj v0 pid V true ∅
               Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "ftable")
               with "Hcg Hcpu Htext Hdata Hpc Hftable Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpost".
@@ -1868,7 +1871,7 @@ Section SyscallArms.
     iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
       "(#Hkalloc & #Hnextpid & #Hpav & #Hwaitlk & #Hftable & #Hitable & #Hitinv & _)".
     (* ---- the call ---- *)
-    iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf γil γic γs cn γics cov logstart nib
+    iApply (SysFork.wp_sys_fork_sconf kt γa γp γw γft γf γil γic γs cn γics cov logstart nib
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
@@ -2130,7 +2133,7 @@ Section SyscallArms.
     iPoseProof (sysc_fmt_str with "Hdata") as "Hfmt".
     iDestruct (cpu_own_transport CID CIDe 0%nat true (proc_addr j) true
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Printk.wp_printk_gen_sconf (CID := CIDe) γpr γud γvd F4 (av - 4)%nat true
+    iApply (Printk.wp_printk_gen_sconf kt (CID := CIDe) γpr γud γvd F4 (av - 4)%nat true
               (proc_addr j) (dqf := DfracDiscarded) sysc_fmt
               [PkANum; PkAStr (DfracOwn 1) nm; PkANum] true ∅
               ltac:(lia) sysc_fmt_len sysc_fmt_nonul
@@ -2270,6 +2273,7 @@ Section SyscallMain.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* CAPSTONE.  The shared scaffolding (`sysc_arm_pre`/`sysc_hcont_ty`/
      `sysc_arm_goal`, the trapframe-extraction/bitvector-bridge lemmas, and
      `sysc_epilogue_tail`) is assembled here with the real PROLOGUE (frame
@@ -2287,7 +2291,7 @@ Section SyscallMain.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string)
-    : wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
+    : wp_syscall_sconf_body kt syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
   Proof.
     cbv beta delta [wp_syscall_sconf_body].
     intros pcE pj ret_tgt Hj Hgamma Hav.
@@ -2314,7 +2318,7 @@ Section SyscallMain.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.syscall + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24". iDestruct "S2c" as (vr16) "Hr16".
     iDestruct "S3c" as (vr8) "Hr8".  iDestruct "S4c" as (vr0) "Hr0".
@@ -2387,7 +2391,7 @@ Section SyscallMain.
       by (rewrite /A2 upd_ne; [exact HA1sp | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CID CID7 0%nat true pj true ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- myproc(): a0 := p, callee-saved preserved ---- *)
-    iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0%nat true pj true lks
+    iApply (Myproc.wp_myproc_sconf kt A2 (av - 4)%nat 0%nat true pj true lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".

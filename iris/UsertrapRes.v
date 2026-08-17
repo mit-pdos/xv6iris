@@ -108,6 +108,7 @@ Section UsertrapRes.
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ------------------------------------------------------------------- *)
   (* THE TRAP SIDE.  What Phase A turns into [sie_cap_gpr] + [cpu_own] +   *)
   (* [trap_csrs] once the boundary's raw cells are added to it.            *)
@@ -118,7 +119,7 @@ Section UsertrapRes.
      own premise.  [trap_res false = 0], so no reserve is owed: the disabled
      index is not holding an enabled arm's window. *)
   Definition ut_stack (ksp : mword 64) (av : nat) : iProp Σ :=
-    stack_own ksp (trap_res false + av)%nat.
+    stack_own (KTR := kt) ksp (trap_res false + av)%nat.
 
   (* [sconf] MINUS the mstatus cell AND the privilege cell is
      [IntrDefs.sconf_priv_closer], which lives beside [sconf_at] because it
@@ -144,7 +145,7 @@ Section UsertrapRes.
         SHARED tier ([KptShare.tlb_res_pt] inside), which is the whole point
         of SpecUsertrap.v's restatement *)
      strans_inv ∗
-     sie_arm false pj ∗
+     sie_arm kt false pj ∗
      kpt_on cpu_id ∗
      (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
         [user_cfg]'s cells too (uservec/userret/user-mode hold them the
@@ -182,7 +183,7 @@ Section UsertrapRes.
   Definition ut_trap_parked (pj : mword 64) (ksp : mword 64) (av : nat)
       (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
-     sie_arm false pj ∗
+     sie_arm kt false pj ∗
      strans_kpt ∗ kpt_on cpu_id ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj false lks ∗
@@ -258,7 +259,7 @@ Section UsertrapRes.
     menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
     ut_trap pj ksp av lks -∗
-      sie_cap_gpr m av false pj ∗
+      sie_cap_gpr kt m av false pj ∗
       cpu_own 0%nat false pj false lks ∗
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
@@ -270,7 +271,12 @@ Section UsertrapRes.
     apply mword1_zero_of_ne_one in Hsie.
     apply mword1_zero_of_ne_one in Hspp.
     iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Ht".
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hgh & Hcpu & Hclm)".
+    (* THE RECEIPT IS PERSISTENT, and taking it intuitionistically is what
+       lets this assembly supply the capability's tier witness for real
+       ([strans_ktier_wit_intro] below) instead of re-conjuring a KT0 one:
+       [ut_trap] carries [kpt_on cpu_id] at every tier, so the bundle it
+       builds attests the access right whatever the hart's regime is. *)
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & #Hkpt & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
     (* A named [iFrame] here still makes the tactic hunt these five atoms
        through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
@@ -283,7 +289,7 @@ Section UsertrapRes.
        The first branch is left open (empty in the bracket) so the rest of
        this proof, which is entirely about the [sie_cap_gpr] side, is
        unchanged. *)
-    iSplitR "Hcpu Hclm Hq Hkpt Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
+    iSplitR "Hcpu Hclm Hq Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
     rewrite /sie_cap_gpr. iFrame "Hhs".
     iSplitL "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
@@ -296,7 +302,7 @@ Section UsertrapRes.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
     iFrame "Hstk Hstr Harm".
-    iSplitR; [ iApply sie_cap_wit_KT0 |].
+    iSplitR; [ iApply (strans_ktier_wit_intro with "Hkpt") |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
 
@@ -368,8 +374,8 @@ Section UsertrapRes.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    trap_csrs.
+    intr_handler_spec kt (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs kt.
   Proof.
     iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
@@ -519,7 +525,7 @@ Section UsertrapRes.
       (γdk γtl : gname) (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
     (□ ∀ h : CPU,
-        devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu)%I.
+        devintr_caps (kt := kt) (CID := h) γu γv γdk γtl γs pd pav pu)%I.
 
   Global Instance devintr_caps_any_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps_any γu γv γdk γtl γs pd pav pu).
@@ -528,7 +534,7 @@ Section UsertrapRes.
   Lemma devintr_caps_any_at (h : CPU) (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
     devintr_caps_any γu γv γdk γtl γs pd pav pu -∗
-    devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu.
+    devintr_caps (kt := kt) (CID := h) γu γv γdk γtl γs pd pav pu.
   Proof.
     iIntros "#H". rewrite /devintr_caps_any.
     iPoseProof (bi.forall_elim h with "H") as "H2". iExact "H2".
@@ -548,7 +554,7 @@ Section UsertrapRes.
      ([iDestruct "Henv" as "[#Hcaps Hown]"] and the mirror) instead of a
      twenty-five-way destructure and rebuild. *)
   Definition ut_caps (N : ut_names) : iProp Σ :=
-    (procs_inv (un_s N) ∗
+    (procs_inv (kt := kt) (un_s N) ∗
      kernel_data ∗
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
@@ -1150,8 +1156,8 @@ Section UsertrapRes.
 
   Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    trap_csrs.
+    intr_handler_spec kt (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs kt.
   Proof.
     iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".
     iApply (ut_trap_csrs_fold ep sc st with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hih").
@@ -1167,7 +1173,7 @@ Section UsertrapRes.
   Definition ut_hold (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) b lks ∗
-     trap_csrs_ext b ∗
+     trap_csrs_ext kt b ∗
      cpu_claim_ext b (un_pj N) ∗
      ut_env Rsys N V)%I.
 

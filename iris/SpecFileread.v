@@ -665,7 +665,7 @@ Definition wp_fileread_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+    (kt : ktier) (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
@@ -694,7 +694,7 @@ Definition wp_fileread_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -709,7 +709,7 @@ Definition wp_fileread_sconf_body
   (* ambient, because three of the four arms copy into user memory *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* ...and what the file's TYPE selects *)
   fileread_env γf fn Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -726,7 +726,7 @@ Definition wp_fileread_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜fileread_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
@@ -742,11 +742,11 @@ Module Type FILEREAD.
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γa : gname) (γf : gname)
+      (kt : ktier) (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+      wp_fileread_sconf_body kt γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
 End FILEREAD.

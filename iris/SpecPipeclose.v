@@ -48,7 +48,7 @@ Import Defs.
 
 
 Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname)
+    (kt : ktier) (γs : list gname)
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
     (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
@@ -76,7 +76,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      the page), so entry and exit [cpu_own] carry the same [lks].  The kmem
      lock kfree takes is entirely inside kfree, after the release. *)
   locks_below lks "pipe" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr kt m av b pme -∗
   cpu_own n eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_pipe γl γp pi -∗
@@ -85,10 +85,10 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_lock γkl klk "kmem"%string (kmem_res γk kfl) -∗
   kalloc_avail γk on -∗
   (* wakeup's *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
-    sie_cap_gpr mr av b pme -∗
+    sie_cap_gpr kt mr av b pme -∗
     cpu_own n eb pme b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -101,10 +101,10 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type PIPECLOSE.
   Parameter wp_pipeclose_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname)
+      (kt : ktier) (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
       (b : bool) (lks : gset string),
-      wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks.
+      wp_pipeclose_sconf_body kt γs γl γp w γkl γk klk kfl on m n eb pme av b lks.
 End PIPECLOSE.

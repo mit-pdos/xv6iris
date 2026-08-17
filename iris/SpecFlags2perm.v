@@ -82,17 +82,17 @@ Lemma f2p_range (fl : mword 64) : 0 <= f2p fl < 512.
 Proof. destruct (f2p_cases fl) as [-> | [-> | [-> | ->]]]; lia. Qed.
 
 Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (mm : regfile) (K : nat) (b : bool) (p : mword 64) :=
+    (kt : ktier) (mm : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.flags2perm in
   let fl := mm !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_flags2perm <= K)%nat ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5)
@@ -103,6 +103,6 @@ Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
 Module Type FLAGS2PERM.
   Parameter wp_flags2perm_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (mm : regfile) (K : nat) (b : bool) (p : mword 64),
-      wp_flags2perm_sconf_body mm K b p.
+      (kt : ktier) (mm : regfile) (K : nat) (b : bool) (p : mword 64),
+      wp_flags2perm_sconf_body kt mm K b p.
 End FLAGS2PERM.

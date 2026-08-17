@@ -1415,9 +1415,10 @@ Section KernelvecHandler.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
-    kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
+    kernelvec_handler_spec_body kt γu γv γdk γtl γs pd pav pu.
   Proof.
     cbv beta delta [kernelvec_handler_spec_body].
     iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
@@ -1490,7 +1491,7 @@ Section KernelvecHandler.
            [kv_frame_slots - 32] and moves with it. ---- *)
     assert (Hkvs : (trap_res false + (trap_res true + av))%nat = (32 + (58 + av))%nat)
       by (unfold trap_res; lia).
-    iEval (rewrite Hkvs stack_own_app) in "Hstk".
+    iEval (rewrite Hkvs (stack_own_app (KTR := kt))) in "Hstk".
     iDestruct "Hstk" as "[Hstk Hdeep]".
 
     pose proof (kv_slot_addr0 Me) as Hb32.
@@ -1527,7 +1528,7 @@ Section KernelvecHandler.
     assert (Hb2 : add_vec (kv_sp1 Me) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) = pa_stk (Me !!! Regidx csp_rs1) 2)
       by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
     (* open the 32-slot frame and pull out the 17 save slots *)
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hstk".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hstk".
     iDestruct "Hstk" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 &
       S11 & S12 & S13 & S14 & S15 & S16 & S17 & S18 & S19 & S20 & S21 & S22 &
       S23 & S24 & S25 & S26 & S27 & S28 & S29 & S30 & S31 & S32 & _)".
@@ -1666,7 +1667,7 @@ Section KernelvecHandler.
       { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    iAssert (sie_cap (kv_m2 Me) (58 + av) false p)
+    iAssert (sie_cap kt (kv_m2 Me) (58 + av) false p)
       with "[Hdeep Hbit1 Htlbinv Hq0]" as "Hcapn".
     { rewrite /sie_cap. iSplitL "Hdeep". { rewrite Hsp_l. iExact "Hdeep". }
       iSplitL "Hbit1 Htlbinv".
@@ -1674,7 +1675,7 @@ Section KernelvecHandler.
       iSplitL "Hq0"; [ iExact "Hq0" |]. iExact "Hwit0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
-    iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
+    iApply (Kerneltrap.wp_kerneltrap_sconf kt γu γv γdk γtl γs pd pav pu
               (kv_m2 Me) (58 + av) p pc0 sc tv ∅
               Hgs ltac:(lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
@@ -1769,12 +1770,12 @@ Section KernelvecHandler.
     iEval (rewrite Hb4) in "Hw15".
     iEval (rewrite Hb3) in "Hw16".
     iEval (rewrite Hb2) in "Hw17".
-    iAssert (stack_own (Me !!! Regidx csp_rs1) 32)
+    iAssert (stack_own (KTR := kt) (Me !!! Regidx csp_rs1) 32)
       with "[S1 S6 S7 S8 S9 S10 S11 S12 S13 S14 S15 S24 S25 S29 S31
             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17]"
       as "Hstk".
     {
-      rewrite stack_own_slots. cbn [seq].
+      rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "S1"; [iExact "S1" |].
       iSplitL "Hw17"; [by iExists _ |].
       iSplitL "Hw16"; [by iExists _ |].
@@ -1810,11 +1811,11 @@ Section KernelvecHandler.
       done. }
     (* ...and the whole carve, exactly as it arrived: kernelvec's 32 on top,
        the callee budget underneath. *)
-    iAssert (stack_own (m !!! Regidx csp_rs1) (trap_res true + av)) with "[Hstk Hstkf]" as "Hstk".
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res true + av)) with "[Hstk Hstkf]" as "Hstk".
     { iEval (rewrite -Hsppin).
       assert (Hkvs' : (trap_res true + av)%nat = (32 + (58 + av))%nat)
         by (unfold trap_res; lia).
-      rewrite Hkvs'. iApply stack_own_app. iSplitL "Hstk"; [iExact "Hstk" |].
+      rewrite Hkvs'. iApply (stack_own_app (KTR := kt)). iSplitL "Hstk"; [iExact "Hstk" |].
       rewrite -(kv_slot_addr0 Me) -Hspf. iExact "Hstkf". }
     (* ---- instr #38: THE SRET, at the sconf tier.  It is the instruction
            that flips the SIE ghost '0' -> '1' and re-forms the enabled arm,
@@ -1832,7 +1833,7 @@ Section KernelvecHandler.
       { iExists mdvf. iFrame "Hmief Hmdlf". iPureIntro. exact Hmmf. }
       iExists MENVCFG_S. iFrame "Hmenvf". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    iAssert (sie_cap (CID := CIDn) m (trap_res true + av) false p)
+    iAssert (sie_cap kt (CID := CIDn) m (trap_res true + av) false p)
       with "[Hstk Hbit1f Htlbinvf Hq0f]" as "Hcapf".
     { rewrite /sie_cap. iSplitL "Hstk". { iExact "Hstk". }
       iSplitL "Hbit1f Htlbinvf".

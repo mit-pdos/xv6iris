@@ -172,7 +172,7 @@ Definition wp_sys_chdir_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γf : gname) (γa : gname)                          (* ftable, kalloc      *)
+    (kt : ktier) (γf : gname) (γa : gname)                          (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -214,7 +214,7 @@ Definition wp_sys_chdir_sconf_body
   (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
      carries *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here where sys_close has one: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
@@ -228,7 +228,7 @@ Definition wp_sys_chdir_sconf_body
      is threaded rather than framed because begin_op / ilock / iput /
      iunlockput / end_op each take it and each crosses at the literal
      [true].  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -253,7 +253,7 @@ Definition wp_sys_chdir_sconf_body
   (* argstr's page-table side, and namei's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   (* ---- the process, and the reference allowance its walk needs ---- *)
   iref_slots 2 -∗
   proc_priv γf pj pid V -∗
@@ -267,9 +267,9 @@ Definition wp_sys_chdir_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗
@@ -291,7 +291,7 @@ Module Type SYSCHDIR.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γa : gname)
+      (kt : ktier) (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -306,7 +306,7 @@ Module Type SYSCHDIR.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_chdir_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
+      wp_sys_chdir_sconf_body kt γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
                               size dev used dqb dqs v pid V m K eb b lks.
 End SYSCHDIR.

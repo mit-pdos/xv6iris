@@ -30,9 +30,9 @@ Module Userinit : USERINIT.
   Axiom wp_userinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γs : list gname)
+      (kt : ktier) (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64)
       (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
+      wp_userinit_sconf_body kt γa γs m0 K eb pj on v0 b lks.
 End Userinit.

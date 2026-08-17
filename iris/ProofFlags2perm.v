@@ -182,9 +182,10 @@ Section ProofFlags2perm.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_flags2perm_sconf
       (mm : regfile) (K : nat) (b : bool) (p : mword 64)
-    : wp_flags2perm_sconf_body mm K b p.
+    : wp_flags2perm_sconf_body kt mm K b p.
   Proof.
     cbv beta delta [wp_flags2perm_sconf_body].
     intros pcE fl ret_tgt HK.
@@ -230,7 +231,7 @@ Section ProofFlags2perm.
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm)
       with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (vr8) "Hras". iDestruct "S2" as (vr0) "Hs0s".
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
@@ -431,7 +432,7 @@ Section ProofFlags2perm.
                        c <> csp_rs1 -> c <> (mword_of_int 8 : mword 5) ->
                        c <> (mword_of_int 10 : mword 5) -> c <> (mword_of_int 15 : mword 5) ->
                        MM !!! Regidx c = mm !!! Regidx c) ⌝ -∗
-               sie_cap_gpr MM (K - 2)%nat b p -∗
+               sie_cap_gpr kt MM (K - 2)%nat b p -∗
                pc_is (mword_of_int (KernelSyms.flags2perm + 0x18)) -∗
                WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hras Hs0s Hi18 Hi1a Hi1c Hi1e]" as "TAIL".
@@ -473,8 +474,8 @@ Section ProofFlags2perm.
       iEval (rewrite Hpp1c) in "Hpc".
       (* rebuild the two-slot frame *)
       iEval (rewrite Hb1) in "Hras". iEval (rewrite Hb2) in "Hs0s".
-      iAssert (stack_own sp0 2) with "[Hras Hs0s]" as "Hframe".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := kt) sp0 2) with "[Hras Hs0s]" as "Hframe".
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hras"; [iExists _; iExact "Hras"|].
         iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|].
         done. }

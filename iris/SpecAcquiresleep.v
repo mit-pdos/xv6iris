@@ -70,7 +70,7 @@ Import Defs.
    (bget, ilock) takes, unchanged.  The tracked instance ([H := slh_tok γsl])
    is what makes [wp_acquiresleep_nb_body] at the foot of this file possible. *)
 Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat)
+    (kt : ktier) (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
     (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
@@ -81,22 +81,22 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   (j < NPROC)%nat ->
   (26 <= av)%nat ->
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr kt m av b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
   (* THE DEPOSIT, spent into the lock and recovered by releasesleep *)
   H q -∗
   p_pid pj ↦₄{dq} pidv -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr kt mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q -∗
@@ -108,7 +108,7 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
 
 Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat)
+    (kt : ktier) (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
@@ -124,7 +124,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      higher-level "locked" state is a separate ghost token, [sleeplocked],
      untouched by [lks]), so [lks] itself is unchanged end to end. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr kt m av b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
      and a parking thread must hand [trap_csrs] and [cpu_claim] across the
@@ -134,14 +134,14 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      instead.  At [eb = false] the push_off frees nothing and the caller
      brings the pair, holding it because the TRAP handed it over; that is the
      case iput/ilock need, and through them kexit and usertrap. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the caller's own pid (read-only fraction) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  acquiresleep PARKS (its
      wait loop sleeps), and a park moves the hart with interrupts off, so it
      has nothing to do with SIE -- the porting guide's "a PARKING function's
@@ -152,9 +152,9 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr kt mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* the lock is now HELD: token + pid field + protected resource *)
@@ -216,7 +216,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
    blocking contracts are all at [cpu_own 0], which is what makes sched's
    [noff != 1] panic unreachable from here. *)
 Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (j : nat)
+    (kt : ktier) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
        "may hold" right by the OBJECT rather than by the lock -- the icache
@@ -233,7 +233,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 4 < 2 ^ 31)%Z ->
   (* NOT a rank bound: only what the held-set insert needs. *)
   "sleep lock" ∉ lks ->
-  sie_cap_gpr m av false pj -∗
+  sie_cap_gpr kt m av false pj -∗
   cpu_own (S n) eb pj false lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R (slh_tok γt) -∗
@@ -243,7 +243,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   wp_next false pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av false pj -∗
+      sie_cap_gpr kt mf av false pj -∗
       cpu_own (S n) eb pj false lks -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q -∗
@@ -257,22 +257,22 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat)
+      (kt : ktier) (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) {dq : dfrac} (b : bool) (lks : gset string),
-      wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv av eb dq b lks.
+      wp_acquiresleep_gen_sconf_body kt γs j γl γsl s R H q m pidv av eb dq b lks.
   Parameter wp_acquiresleep_nb_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (j : nat)
+      (kt : ktier) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (γt : gname) (q : Qp)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) {dq : dfrac}
       (n : nat) (lks : gset string),
-      wp_acquiresleep_nb_body j γl γsl s R γt q m pidv av eb dq n lks.
+      wp_acquiresleep_nb_body kt j γl γsl s R γt q m pidv av eb dq n lks.
   Parameter wp_acquiresleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
-      (γs : list gname) (j : nat)
+      (kt : ktier) (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) {dq : dfrac} (b : bool) (lks : gset string),
-      wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb dq b lks.
+      wp_acquiresleep_sconf_body kt γs j γl γsl s R m pidv av eb dq b lks.
 End ACQUIRESLEEP.

@@ -33,21 +33,21 @@ Definition time_name_str : Z := 0x80007268%Z.
    Whether the lock then becomes an [is_lock] over the tick counter is the
    caller's ghost step, not trapinit's -- it need only add the invariant
    ([is_lock_intro]).  The "time" literal itself is read out of [kernel_data]. *)
-Definition wp_trapinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
+Definition wp_trapinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.trapinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.tickslock in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (4 <= K)%nat ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -58,6 +58,6 @@ Definition wp_trapinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CI
 
 Module Type TRAPINIT.
   Parameter wp_trapinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
-      wp_trapinit_sconf_body m K vlock vname vcpu b p.
+    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
+      wp_trapinit_sconf_body kt m K vlock vname vcpu b p.
 End TRAPINIT.

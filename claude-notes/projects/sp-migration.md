@@ -1083,6 +1083,12 @@ the paid park FEEDABLE means flipping that cone to KT1.
     sites, iFrame-with-variable-kt brittleness under `Typeclasses
     Opaque cur_ktier`, any spec that genuinely cannot be tier-generic),
     then the mechanical remainder.
+    **RUN, AND BLOCKED — see "F1 findings" below.** The family, the
+    fixpoint and the whole engine tier convert green; what stops it is
+    one level lower and is owed by the flip route too: the S-mode memory
+    leaves take a stack frame at the AMBIENT tier, so a frame peeled off
+    a `kt`-indexed capability cannot feed them. Do the leaf increment
+    first.
   - `stack_own` and the datum family stay instance-implicit (the data
     side, all honestly KT0); loose stack carves in post-boot proofs
     spell `(KTR := KT1)` at the carve site.
@@ -1366,6 +1372,221 @@ budgets by file count will be off by 70 %.
 4. The fixpoint's tier is still the open decision. When `ihs_*_of` take
    the binder, `WpIntrInv`'s two rebuild sites already frame the witness
    by name (`Hwit`) and need nothing further.
+
+### F1 findings — the ∀kt experiment (NOT LANDED; tree left dirty)
+
+**VERDICT: ∀kt holds up at the SPEC level and the whole ENGINE tier converts
+green, but it is blocked one level below the specs — the S-mode memory
+leaves consume a stack frame at the AMBIENT (KT0) tier, and a capability
+whose stack conjunct is at a variable `kt` cannot feed them.** That blocker
+is NOT specific to ∀kt: any tier move on the stack conjunct — the flip route
+included — hits exactly the same wall, so it is K3's first job, not an
+artefact of the experiment. Numbers below are from the tree as left dirty:
+**929 of 1164 files green, 235 red, 171 direct errors, ~152 of them (89 %)
+the one blocker**; 456 files edited, ≈ +6100/−5600 lines. The remaining ~19
+are a long tail of the same mechanical annotation kinds catalogued below.
+
+#### The family roster, and the two members that did NOT take the tier
+
+Definitions take `(kt : ktier)` as an EXPLICIT LEADING argument; every LEMMA
+about them takes it as a PLAIN IMPLICIT `{kt : ktier}` instead, which is what
+keeps ~2000 lemma applications and all 9464 `iApply (wp_…)` leaf sites
+textually unchanged. Sections supply it with `Context {kt : ktier}.`
+
+| definition | kt | why |
+|---|---|---|
+| `sie_cap_of`, `sie_cap` | yes | own the `stack_own` conjunct and the witness |
+| `sie_cap_gpr_of`, `sie_cap_gpr`, `sie_cap_gpr_at` | yes | hold the capability |
+| `sie_arm_of` | **no** | parameterized over the resource `R`, so it has NO tier-dependent conjunct at all; a binder would be a phantom (durable-notes, `co_license`) |
+| `sie_arm` | yes | its `b = true` branch holds `intr_res kt` |
+| `ires_of` | **no** | parameterized over the spec family; the recursive occurrence is tier-UNIFORM, which is the whole reason the fixpoint went through |
+| `ihs_entry_of`/`ihs_post_of`/`ihs_trap_of`/`ihs_body_of`/`ihs_of`/`ihs_pre`/`ihs`/`intr_handler_spec` | yes | the contract is stated over the bundle |
+| `intr_res` | yes | carries `▷ intr_handler_spec kt h` |
+| `trap_csrs`, `trap_csrs_pay`, `trap_csrs_ext`, `arm_pay` | yes | hold `intr_res kt` |
+| `trap_csrs_raw`, `cpu_claim_pay`/`_ext`, `intr_count`, `sconf`, `strans_inv` | **no** | tier-blind; `trap_csrs_raw` is what keeps BOOT constructible |
+
+**THE FIXPOINT DID NOT FORCE A TIER CHOICE — the escalation trigger did not
+fire.** `ihs kt := fixpoint (ihs_pre kt)`: one Banach fixpoint per tier,
+because `kt` is uniform outside the recursion (a trap on a `kt`-regime hart
+runs and resumes at `kt`). `ires_of_contractive`, `ihs_of_ne` and
+`ihs_pre_contractive` close with their scripts **unchanged**, now stated as
+`Global Instance ihs_of_ne (kt : ktier) : NonExpansive (ihs_of kt)`.
+`IntrDefs.v` needed exactly ONE proof repair beyond the restatements (see
+the `(KTR := kt)` trap below).
+
+#### `sie_cap_ktier_up` LOSES THE ENABLED ARM, and that is forced
+
+With the contract tier-indexed, `intr_res` is monotone in NEITHER direction:
+the handler contract holds the capability NEGATIVELY (`ihs_entry_of`, its
+entry package) and POSITIVELY (`ihs_post_of`'s premise, under the doubly
+negative `wp_next` continuation), so `intr_handler_spec KT0 h` neither
+implies nor is implied by `intr_handler_spec KT1 h`. The upgrade is
+therefore stated at `b = false` only:
+
+```coq
+Lemma sie_cap_ktier_up (kt kt' : ktier) `{!KtierLe kt kt'} m avail p :
+  sie_cap kt m avail false p -∗ kpt_on cpu_id -∗ sie_cap kt' m avail false p.
+```
+
+That is enough for the only caller and it is not a compromise: at `b = false`
+`sie_arm kt false p` does not mention `kt` at all, so the two arms are
+DEFINITIONALLY equal; and xv6 runs kvminithart before trapinithart and with
+SIE = 0, so there is no installed handler to upgrade — boot carries
+`trap_csrs_raw`, which is tier-blind. `sie_cap_gpr_ktier_up` follows.
+
+#### The K2a traps: one is gone, a bigger one replaces it
+
+- **The `Typeclasses Opaque cur_ktier` iFrame trap CANNOT OCCUR any more.**
+  With an explicit `kt` there is no `cur_ktier` anywhere in the family, so
+  there is nothing for `iFrame`'s `Frame` search to fail to unfold. Zero
+  instances in 456 files.
+- **THE REPLACEMENT, and it is the expensive one: the DATUM family's
+  instance-implicit tier does not compose with an explicit-tier capability.**
+  A plain `kt : ktier` variable is not a `CurKtier` INSTANCE, so inside a
+  tier-generic statement a bare `stack_own sp n` silently resolves at
+  Ktier.v's priority-100 KT0 default. Two halves, with different symptoms:
+  - **STATEMENTS are silent.** They compile; they just say KT0. Every
+    `stack_own` written in a `_body`, a leaf signature or an `iAssert` needs
+    `(KTR := kt)` — **245 sites**. Nothing warns you.
+  - **GOAL-DIRECTED APPLICATIONS fail loudly, hypothesis-directed ones do
+    not.** Measured: `rewrite L`, `iDestruct (L with "H")` and plain `apply`
+    are FINE — unification runs before typeclass resolution and pins `KTR`
+    off the hypothesis. `iApply L` / `rewrite L` against a `kt`-indexed GOAL
+    are not: **358 sites** across 170 files needed `(KTR := kt)`, and the
+    symptom is `iApply: cannot apply (stack_own ?Goal0 2)` with every
+    argument an evar, which reads like a missing hypothesis.
+
+#### THE BLOCKER: the frame slots
+
+A function peels its own frame off the capability (`sie_cap_push`), so the
+slots are at `kt`; `WpSconfMem`'s stack leaves (`wp_csdsp_s_sconf`,
+`wp_cldsp_s_sconf`, `wp_csd`/`sd`/`ld_s_sconf`, …) spell their datum
+`pa ↦₈ vold` at the ambient default. 152 of the 172 errors are this, in two
+shapes: `iExact: "Hr24" : (pa_stk sp0 1 ↦₈ vr24) does not match goal` (the
+prologue's store premise, supplied through a `[Hr24]` bracket) and
+`iSpecialize: cannot instantiate (… ↦₈ vr24 -∗ wp_next …)` (the epilogue's
+give-back).
+
+The machinery to fix it EXISTS and is unused: `wp_load_s_sconf_au_t` /
+`wp_store_s_sconf_au_t` are already two-tier (`ktd` the hart's,
+`ktd'` the datum's, `KtierLe ktd' ktd`, plus an explicit
+`sr_ktier_wit strans_regime ktd`) — the derived family is simply
+instantiated at `KT0/KT0`. Re-deriving it at `(kt, ktd)` is ~74 datum
+spellings in `WpSconfMem.v` (the bracket notations `a ↦₈[kt] dq w` /
+`a ↦ₘ[kt] dq v` already exist), and the witness can come off the capability
+now that the capability carries it.
+
+**WHAT STOPS THAT BEING MECHANICAL, measured in 30-line standalone Iris
+probes (a `cell : ktier -> nat -> PROP`, a `cap : ktier -> PROP`, the three
+`KtierLe` instances, and the leaf as an axiom — reproducible in a minute):**
+
+- A `KtierLe ?ktd kt` premise RESOLVES EAGERLY to `ktier_le_refl`, i.e.
+  `?ktd := kt`, and then every KT0-datum call site fails. The `[Hd]` bracket
+  form is what does it: the datum premise becomes a SUBGOAL, so nothing has
+  unified `?ktd` by the time instance search fires. Supplying the datum
+  directly (`with "Hcg Hd"`) works — but the tree's prologue/epilogue sites
+  are overwhelmingly the bracket form, because they carry an `iEval (rewrite
+  …)` address normalisation inside the bracket.
+- **The recipe that DOES work, verified on both call-site shapes:**
+  `Global Hint Mode KtierLe ! - : typeclass_instances` (so search refuses to
+  fire while the datum tier is an evar, letting `iExact` pin it) **plus
+  `Unshelve. all: apply _.` before the affected `Qed`** (Hint Mode alone
+  leaves the instance goal unsolved, reported only as *"Attempt to save an
+  incomplete proof"* hundreds of lines from the cause).
+- The residual risk in that recipe is the `Unshelve`: this tree has proofs
+  that legitimately shelve goals (durable-notes, `co_license`'s six phantom
+  evars), so it cannot be applied blindly to ~250 whole-function proofs.
+
+#### The two other things genericity uncovered
+
+- **`procs_inv` BECOMES TIER-INDEXED, and it is the widest ripple in the
+  increment.** It holds every parked context (`SwtchCtx.valid_context`,
+  whose record owns a `stack_own` and hands back a `sie_cap_gpr` on resume),
+  so the process-table invariant carries the tier: `procs_inv kt` says
+  *every parked thread resumes at regime `kt`*. That is a real claim, and
+  under ∀kt every spec that mentions the table now ties the global table's
+  regime to its own caller's. Same for `sched_vc`, `proc_ctx`,
+  `proc_lock_res`, `proc_slots`, `allocproc_post`, `printk_gen_contract`,
+  `fs_world`, `kfork_post` and ~20 per-file `_cont` continuation
+  definitions.
+- **A `kt` that a definition mentions only under a fixpoint or an opaque
+  layer cannot be INFERRED**, and the error names the definition, not the
+  site that should have annotated it: **397 `(kt := kt)` annotations** across
+  ~160 files. Whenever a definition's tier is load-bearing but does not
+  appear in a determining argument position, make it EXPLICIT rather than
+  implicit — the annotation tax is paid at every use either way, and
+  explicit at least fails at the definition instead of at a caller.
+
+#### Sweep statistics (the mechanical part, and it really was mechanical)
+
+| pass | sites | files |
+|---|---|---|
+| family-symbol insertions (`sie_cap kt …` &c.) | 2329 | 456 |
+| `_body` applications | 599 | — |
+| Module-Type `Parameter` + spec call sites | 846 | — |
+| `stack_own (KTR := kt)` in statements | 245 | — |
+| `(KTR := kt)` on goal-directed StackOwn lemmas | 358 | 170 |
+| `(kt := kt)` for non-inferable implicits | 397 | ~160 |
+| `_body` Definitions / Module Type Parameters given the binder | 291 / 241 | — |
+
+`WpSconfMem.v` already used the name `kt` for the DATUM tier; its 74
+occurrences were renamed `ktd` to free the name for the regime.
+
+#### Stage-1 cone: what is green
+
+**The whole engine tier converted, and that is the experiment's positive
+result.** GREEN: `IntrDefs`, `WpIntrInv`, `WpIntrOff`, `WpSmodeIntr`,
+`WpSmodeHalf`, `WpSmodeWfi`, `WpSconfCsr` (with the widened σ-callback),
+`WpSconfMem`, `WpSconfAlu`/`Btype`/`Ctl`/`Lock`/`Sret`/`Srliw`/`Timer`,
+`WpNext`, `WpPlic`, `WpAu4`, `SwtchCtx`, `SchedCtx`, `CpuOwn`, `SmodeCore`,
+`RegFile`, `UmodeCap`, `UmodeAbi`, `BootConfig`, `ProofSwtch`, and ~900
+others. Per-file cost there was binder + threading and nothing else.
+RED (235 files, of which ~90 are only blocked behind a failed
+dependency), essentially all on the frame-slot blocker: `ProofMyproc`,
+`ProofSysGetpid`, `ProofAcquire`, `ProofRelease`, `ProofKilled`,
+`ProofPushOff`, `ProofPrepareReturn`, `ProofSched`, `ProofKernelvec`,
+`ProofUsertrap(+Tail)`, `ProofMain(+Secondary)`, `ProofKvminithart`,
+`UsertrapRes`, `BootChain`, `WpSconfVc`. `BootBridge` is green, pinned
+at KT0.
+
+#### Pinned sites (concrete tiers), the complete list
+
+| site | tier | why |
+|---|---|---|
+| `IntrDefs.sie_cap_intro_bare` | KT0 | a KT1 boot capability would have to attest `kpt_on` over a Bare hart |
+| `IntrDefs.sie_cap_ktier_up` / `_gpr_ktier_up` | KT0→KT1, `b = false` only | `intr_res` is not monotone; see above |
+| `BootBridge.stack_own_phys_to_stack` | KT0 | it IS the identity map's physical→virtual step; a KT1 `stack_own` has no pin to build it from |
+| `BootBridge`'s boot-capability assembly | KT0 | built by `sie_cap_intro_bare` |
+
+#### The engine-triple widening (folded in, green)
+
+`WpSconfCsr.wp_csrr_sstatus_s_sconf` is the one S-mode leaf that takes the
+capability APART across its σ-callback; its give-back triple grew a fourth
+conjunct `sr_ktier_wit strans_regime kt`. All six `sie_cap_wit_KT0` crutch
+sites are retired and **the lemma is DELETED** — under a generic `kt` a site
+that re-conjures the witness would be closing a goal at a tier it knows
+nothing about. `UsertrapRes.ut_trap_open` now MINTS the witness from its own
+`kpt_on` (`strans_ktier_wit_intro`) instead. The rule is: thread it, or mint
+it from `kpt_on`; never re-conjure it.
+
+#### What K3 should do
+
+1. **Do the leaf increment FIRST, before any further tier work.** It is the
+   gate for the flip route as much as for ∀kt. Shape: re-derive
+   `WpSconfMem`'s ambient leaf family from the `_au_t` forms at
+   `(kt, ktd)` with `KtierLe ktd kt`, datum at `[ktd]`, witness read off the
+   capability (`sie_cap_wit`) instead of `sr_ktier_wit_KT0`. Budget the
+   `Hint Mode` + `Unshelve` recipe above and expect to touch every
+   prologue/epilogue bracket that does not already supply its slot directly.
+2. Everything in this increment other than that leaf work is mechanical and
+   is already written; the diff is on the working tree at `be219cd7`.
+3. If the leaf increment is judged too large to precede the capability move,
+   the fallback that lands ∀kt green is to leave `sie_cap`'s `stack_own`
+   conjunct at the AMBIENT tier and let `kt` index only the witness and the
+   handler contract. That is a DEVIATION from the settled design (the stack
+   conjunct is meant to be uniformly at `kt`) and it does not make the
+   KSTACK any nearer — the leaf work is still owed at the flip — but it
+   would bank the regime index and the ∀kt spec surface now.
 
 ## State
 

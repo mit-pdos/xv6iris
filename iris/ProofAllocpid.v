@@ -86,6 +86,7 @@ Section ProofAllocpid.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ai_ra := (mword_of_int 1 : mword 5).
   Notation ai_s0 := (mword_of_int 8 : mword 5).
   Notation ai_s1 := (mword_of_int 9 : mword 5).
@@ -96,7 +97,7 @@ Section ProofAllocpid.
 
   Lemma wp_allocpid_sconf (γp : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_allocpid_sconf_body γp m av n eb p b lks.
+    : wp_allocpid_sconf_body kt γp m av n eb p b lks.
   Proof.
     cbv beta delta [wp_allocpid_sconf_body].
     intros pcE ret_tgt Hn Hav Hbelow.
@@ -121,7 +122,7 @@ Section ProofAllocpid.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with M1.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.allocpid + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (v1) "Hb1". iDestruct "S2c" as (v2) "Hb2".
     iDestruct "S3c" as (v3) "Hb3". iDestruct "S4c" as (v4) "Hb4".
@@ -236,7 +237,7 @@ Section ProofAllocpid.
        hart (CID1..CID8), so acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf kt γp "nextpid"%string nextpid_res A4 n eb p (av - 4)%nat b lks
               Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
@@ -410,7 +411,7 @@ Section ProofAllocpid.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p (av - 4)%nat
+    iApply (Release.wp_release_sconf kt γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p (av - 4)%nat
               ({["nextpid"]} ∪ lks)
               Hlka ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -500,8 +501,8 @@ Section ProofAllocpid.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HE3csp; symmetry; exact Hspd4).
     iPoseProof (apdi_3a with "Htext") as "Hi3a".
-    iAssert (stack_own sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1". { iExists _. iEval (rewrite Hb1a -HE0csp). iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iEval (rewrite Hb2a -HE1csp). iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iEval (rewrite Hb3a -HE2csp). iExact "Hb3". }

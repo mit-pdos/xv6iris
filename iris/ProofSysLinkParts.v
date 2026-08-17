@@ -581,8 +581,9 @@ Definition sl_al (sp0 : mword 64) : Prop :=
 Section ProofSysLinkFrame.
   Context `{!riscvGS Σ}.
 
+  Context {kt : ktier}.
   Lemma sl_frame_carve (sp0 : mword 64) :
-    stack_own sp0 38 -∗
+    stack_own (KTR := kt) sp0 38 -∗
     ⌜sl_al sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
     (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
@@ -592,7 +593,7 @@ Section ProofSysLinkFrame.
     bytes_own (DfracOwn 1) (pa_stk sp0 22) 128 ∗
     bytes_own (DfracOwn 1) (pa_stk sp0 38) 128.
   Proof.
-    iIntros "H". rewrite stack_own_slots. cbn [seq].
+    iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                        H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                        H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
@@ -642,7 +643,7 @@ Section ProofSysLinkFrame.
     bytes_own (DfracOwn 1) (pa_stk sp0 6) 16 -∗
     bytes_own (DfracOwn 1) (pa_stk sp0 22) 128 -∗
     bytes_own (DfracOwn 1) (pa_stk sp0 38) 128 -∗
-    stack_own sp0 38.
+    stack_own (KTR := kt) sp0 38.
   Proof.
     intros (HalO & HalW & HalN). iIntros "H1 H2 H3 H4 HbN HbW HbO".
     (* the [8 * n] conversions are done INSIDE the framing braces, never on
@@ -661,7 +662,7 @@ Section ProofSysLinkFrame.
                          K13 & K12 & K11 & K10 & K9 & K8 & K7 & _)".
     iDestruct "HsO" as "(K38 & K37 & K36 & K35 & K34 & K33 & K32 & K31 & K30 &
                          K29 & K28 & K27 & K26 & K25 & K24 & K23 & _)".
-    rewrite stack_own_slots. cbn [seq].
+    rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iSplitL "H1"; [iExists w1; iExact "H1" |].
     iSplitL "H2"; [iExists w2; iExact "H2" |].
     iSplitL "H3"; [iExists w3; iExact "H3" |].
@@ -775,6 +776,7 @@ Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 Section ProofSysLinkEpilogue.
   Context `{!riscvGS Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -791,7 +793,7 @@ Section ProofSysLinkEpilogue.
     (M !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64) ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr M (K - 38) b pj -∗
+    sie_cap_gpr kt M (K - 38) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0x11a)) -∗
     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
@@ -810,7 +812,7 @@ Section ProofSysLinkEpilogue.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra5 : mword 64)⌝ -∗
-        sie_cap_gpr mf K b pj -∗
+        sie_cap_gpr kt mf K b pj -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

@@ -256,15 +256,15 @@ End WpIntrInv.
 (* funnel's assemble/disassemble dance around them are gone with it.       *)
 (* ===================================================================== *)
 Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
-    (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64) :
+    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64) :
   ret_pc pc0 = pc0 ->
-  sie_cap_gpr m av true p -∗
+  sie_cap_gpr kt m av true p -∗
   pc_is pc0 -∗
   wp_next true p (fun CID =>
     ∀ σ,
       ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
       sconf -∗
-      sie_cap m av true p -∗
+      sie_cap kt m av true p -∗
       gpr_file (tp_pin m) -∗
       pc_is pc0 -∗
       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -436,10 +436,10 @@ Proof.
       { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    iAssert (intr_res) with "[Hq4 Hstv]" as "Hires".
+    iAssert (intr_res kt) with "[Hq4 Hstv]" as "Hires".
     { iApply (intr_res_intro handler ('b"0" : mword 1) Htvd Hsb with "Hq4 Hstv").
       iNext. iExact "Hsp". }
-    iAssert (ihs_entry_of (ires_of ihs) m av p pc0 (trap_scause scause_old i)
+    iAssert (ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 (trap_scause scause_old i)
                (zeros' 64) handler)
       with "[Hhs Hsc Hstk Hbit1 Htlb Hq1 Hfile Hsppc Hsepc Hscause Hstval
              Hcells Hcnt Hclm Hires Hrcpt Hpcr Hnpc]" as "Hentry".

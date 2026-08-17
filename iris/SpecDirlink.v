@@ -457,7 +457,7 @@ Definition wp_dirlink_sconf_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -536,7 +536,7 @@ Definition wp_dirlink_sconf_body
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := kt) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -560,7 +560,7 @@ Definition wp_dirlink_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
@@ -587,7 +587,7 @@ Definition wp_dirlink_sconf_body
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -614,7 +614,7 @@ Definition wp_dirlink_sconf_body
     (n' : nat) (used' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
@@ -724,7 +724,7 @@ Definition wp_dirlink_gen_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -803,7 +803,7 @@ Definition wp_dirlink_gen_body
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := kt) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -834,7 +834,7 @@ Definition wp_dirlink_gen_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
@@ -861,7 +861,7 @@ Definition wp_dirlink_gen_body
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -888,7 +888,7 @@ Definition wp_dirlink_gen_body
     (n' : nat) (used' : gset Z) (Sb' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
@@ -1013,7 +1013,7 @@ Module Type DIRLINK.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -1032,7 +1032,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+      wp_dirlink_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                             γa γf γpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1046,7 +1046,7 @@ Module Type DIRLINK.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -1065,7 +1065,7 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+      wp_dirlink_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum
                           ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf

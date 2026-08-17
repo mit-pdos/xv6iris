@@ -69,6 +69,7 @@ Section ProofSleepPrepare.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation spr_ra := (mword_of_int 1 : mword 5).
   Notation spr_s0 := (mword_of_int 8 : mword 5).
   Notation spr_s1 := (mword_of_int 9 : mword 5).
@@ -78,7 +79,7 @@ Section ProofSleepPrepare.
   Lemma wp_sleep_prepare_sconf (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (b : bool)
       (lks : gset string)
-    : wp_sleep_prepare_sconf_body γs j γl m av n eb b lks.
+    : wp_sleep_prepare_sconf_body kt γs j γl m av n eb b lks.
   Proof.
     cbv beta delta [wp_sleep_prepare_sconf_body].
     intros pcE pj chan ret_tgt Hj Hgl Hchan Hn Hav Hno.
@@ -103,7 +104,7 @@ Section ProofSleepPrepare.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with M1.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sleep_prepare + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (v1) "Hb1". iDestruct "S2c" as (v2) "Hb2".
     iDestruct "S3c" as (v3) "Hb3". iDestruct "S4c" as (v4) "Hb4".
@@ -202,7 +203,7 @@ Section ProofSleepPrepare.
       by (rewrite /A3 upd_ne; [exact HA2s1 | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CID CID8 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb pj b
+    iApply (Myproc.wp_myproc_sconf kt A3 (av - 4)%nat n eb pj b
               _ ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID9 Hs9 ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
@@ -251,8 +252,8 @@ Section ProofSleepPrepare.
     (* ===================== acquire(&p->lock) ===================== *)
     iDestruct (cpu_own_transport CID9 CID11 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B2 n eb pj (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf kt γl "proc"%string
+              (proc_lock_res (kt := kt) γs γl (proc_addr j)) B2 n eb pj (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
@@ -332,12 +333,12 @@ Section ProofSleepPrepare.
       apply kv_addv_zero. }
     (* reassemble the lock resource: [proc_lock_res] quantifies the channel,
        so the stored value need never be named. *)
-    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchcell Hpub Hslot]" as "HR2".
+    iAssert (proc_lock_res (kt := kt) γs γl (proc_addr j)) with "[Hstate Hpg Hchcell Hpub Hslot]" as "HR2".
     { iApply (proc_lock_res_intro γs γl (proc_addr j) st chv with "Hstate Hpg Hchcell Hpub Hslot"). }
     (* ===================== release(&p->lock) ===================== *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C2 n eb pj (av - 4)%nat
+    iApply (Release.wp_release_sconf kt γl (proc_addr j) "proc"%string
+              (proc_lock_res (kt := kt) γs γl (proc_addr j)) C2 n eb pj (av - 4)%nat
               ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
@@ -423,8 +424,8 @@ Section ProofSleepPrepare.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HE3csp; symmetry; exact Hspd4).
     iPoseProof (spri_2c with "Htext") as "Hi2c".
-    iAssert (stack_own sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1". { iExists _. iEval (rewrite Hb1a -Hmrelcsp). iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iEval (rewrite Hb2a -HE0csp). iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iEval (rewrite Hb3a -HE1csp). iExact "Hb3". }

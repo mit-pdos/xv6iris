@@ -122,7 +122,7 @@ Definition wp_initlog_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -159,7 +159,7 @@ Definition wp_initlog_sconf_body
      bwrite/bunpin, write_head's bread/bwrite/brelse) never dips below
      "bcache" (4); [initlock] itself carries no order premise. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -182,7 +182,7 @@ Definition wp_initlog_sconf_body
   log_mirror_full -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -232,7 +232,7 @@ Definition wp_initlog_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -252,7 +252,7 @@ Module Type INITLOG.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -265,7 +265,7 @@ Module Type INITLOG.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
+      wp_initlog_sconf_body kt γs j γl γu γd γk pd pav pu bn γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks.

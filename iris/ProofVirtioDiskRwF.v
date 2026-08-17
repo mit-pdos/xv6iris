@@ -504,6 +504,7 @@ Notation Rs8 := (mword_of_int 24 : mword 5).
    section that FIXES [CpuId] (a section variable cannot be instantiated at
    its use site); [CID] is an ordinary binder of the lemma instead. *)
 Section VdrwfP6.
+  Context {kt : ktier}.
   (* [eb] is the literal [true] in the epilogue, so [iNext] would otherwise
      descend through [cpu_own]'s [if b then ⌜…⌝ else …] and strip a later
      that is not ours.  Keep the bundle opaque. *)
@@ -536,10 +537,10 @@ Section VdrwfP6.
        rank -- P1-P4's convention, see the note in lock-set.md; free_desc
        reaches wakeup at "proc". *)
     locks_below lks "proc" ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     cpu_own 1 eb pme false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) -∗
- procs_inv γs -∗
+ procs_inv (kt := kt) γs -∗
     d_desc_ptr ↦₈□ pd -∗
     d_desc pd i ↦₈ va -∗ pa_add pd (16 * i + 8) ↦₄ vl -∗
     pa_add pd (16 * i + 12) ↦₂ vf -∗ pa_add pd (16 * i + 14) ↦₂ vn -∗
@@ -549,7 +550,7 @@ Section VdrwfP6.
             r <> Rs1 -> r <> Rs2 -> Mf !!! Regidx r = M !!! Regidx r)
          /\ Mf !!! Regidx Rs1 = (zero_extend' 64 vf : SailStdpp.Values.mword 64)
          /\ Mf !!! Regidx Rs2 = (zero_extend' 64 vn : SailStdpp.Values.mword 64)⌝ -∗
-        sie_cap_gpr Mf av false pme -∗
+        sie_cap_gpr kt Mf av false pme -∗
         cpu_own 1 eb pme false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) -∗
         free_bundles pd (fr_upd fr i true) -∗
@@ -699,7 +700,7 @@ Section VdrwfP6.
     iEval (rewrite (free_bundles_split pd fr i Hi8)) in "Hbun".
     iDestruct "Hbun" as "[[Hcell _] Hbrest]".
     iEval (rewrite Hfri) in "Hcell".
-    iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme va vl vf vn false lks
+    iApply (FreeDesc.wp_free_desc_sconf kt γs pd i N7 av 1%nat eb pme va vl vf vn false lks
               Hav Hi8 HN7a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
               with "Hcg Hown Htext Hpc Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
     all: try lkbelow.
@@ -762,7 +763,7 @@ Section VdrwfP6.
        "proc" its free_desc/wakeup cone needs, and delivers it by
        [locks_below_mono]. *)
     locks_below lks "virtio_disk" ->
-    kernel_text -∗ procs_inv γs -∗
+    kernel_text -∗ procs_inv (kt := kt) γs -∗
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
        ours -- the claim pins [vs_perm] of our own slot, so the token the
@@ -781,9 +782,9 @@ Section VdrwfP6.
     wp_next (CID0 := CID) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K eb (proc_addr j) -∗
+        sie_cap_gpr kt mf K eb (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) eb lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext kt eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
         buf_own b bno (mword_of_int 0 : SailStdpp.Values.mword 32)
@@ -1419,7 +1420,7 @@ Section VdrwfP6.
     assert (HH3sp : H3 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64)).
     { rewrite /H3 upd_ne; [| reg_neq]. rewrite /H2 upd_ne; [| reg_neq].
       rewrite /H1 upd_ne; [| reg_neq]. exact HG3sp. }
-    iApply (Release.wp_release_sconf (CID := CIDx) γk d_lock "virtio_disk"%string
+    iApply (Release.wp_release_sconf kt (CID := CIDx) γk d_lock "virtio_disk"%string
               (disk_res γd pd pav pu) H3 0%nat eb (proc_addr j) (K - 12)%nat
               ({["virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
@@ -1651,9 +1652,9 @@ Section VdrwfP6.
                    = pa_stk (add_vec (R10 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6)))) 12)
       by (rewrite Hwv; exact HR10sp).
-    iAssert (stack_own sp0 12) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hs11 Hs12]"
+    iAssert (stack_own (KTR := kt) sp0 12) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hs11 Hs12]"
       as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hk1";  [iExists _; iExact "Hk1"|].
       iSplitL "Hk2";  [iExists _; iExact "Hk2"|].
       iSplitL "Hk3";  [iExists _; iExact "Hk3"|].
@@ -1825,6 +1826,7 @@ Section ProofVirtioDiskRwF.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Typeclasses Opaque cpu_own.
 
   (* ------------------------------------------------------------------- *)
@@ -1842,7 +1844,7 @@ Section ProofVirtioDiskRwF.
       (m : regfile) (K : nat) (eb : bool)
       (bno dsk0 : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
       (b : bool) (Q : iProp Σ) (lks : gset string)
-    : wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
+    : wp_virtio_disk_rw_sconf_body kt γs j γl γu γd γk pd pav pu
                                    m K eb bno dsk0 bs_buf bs_disk b Q lks.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].

@@ -147,6 +147,7 @@ Section ProofArgfd.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* =================================================================== *)
   (*  +0x38 .. +0x3c: [if (pfd) *pfd = fd], BOTH ways.                    *)
   (* =================================================================== *)
@@ -161,12 +162,12 @@ Section ProofArgfd.
       (p : mword 64) (b : bool) :
     Mt !!! Regidx (mword_of_int 18 : mword 5) = pfd ->
     Mt !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 wfd ->
-    sie_cap_gpr Mt nav b p -∗
+    sie_cap_gpr kt Mt nav b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.argfd + 0x38) : mword 64) -∗
     ofd_out pfd oldfd -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr Mt nav b p -∗
+      sie_cap_gpr kt Mt nav b p -∗
       pc_is (mword_of_int (KernelSyms.argfd + 0x40) : mword 64) -∗
       ofd_out pfd wfd -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -243,7 +244,7 @@ Section ProofArgfd.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> (mword_of_int 8 : mword 5) -> r <> (mword_of_int 9 : mword 5) ->
         r <> (mword_of_int 18 : mword 5) -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b p -∗
+    sie_cap_gpr kt Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.argfd + 0x46) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -255,7 +256,7 @@ Section ProofArgfd.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr kt mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -359,8 +360,8 @@ Section ProofArgfd.
     iEval (rewrite -E6) in "Hb6".
     iDestruct (stack_own_4_intro sp0 ra0 s00 s10 s20 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
     iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
-    iAssert (stack_own sp0 6) with "[Hf14 Hf56]" as "Hframe".
-    { rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hf14 Hf56]" as "Hframe".
+    { rewrite (stack_own_split (KTR := kt) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.argfd + 0x4e))
               (mword_of_int 3 : mword 6) T4 (av - 6)%nat 6 b Hpop
@@ -450,7 +451,7 @@ Section ProofArgfd.
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string)
-    : wp_argfd_sconf_body γf m av n eb p i v pid V oldfd oldf b lks.
+    : wp_argfd_sconf_body kt γf m av n eb p i v pid V oldfd oldf b lks.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].
     intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzf Hn Hav.
@@ -506,7 +507,7 @@ Section ProofArgfd.
     (* the six frame slots *)
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
-    rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
+    rewrite (stack_own_split (KTR := kt) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
     iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hs5 Hs6]".
@@ -705,7 +706,7 @@ Section ProofArgfd.
     (* [Hcpu] came in at the entry hart; nine leaf steps may have moved us, so
        re-anchor it before argint's own [cpu_own] premise can take it. *)
     iDestruct (cpu_own_transport CID CID10 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf M6 (av - 6)%nat n eb p i
+    iApply (Argint.wp_argint_sconf kt M6 (av - 6)%nat n eb p i
               (ud_tfp (pv_upt V)) (pv_tf V) v (word_hi w5) (DfracOwn (1/4)) b
               _ Hi HM6a0 Harg Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage Hs5hi").
@@ -844,7 +845,7 @@ Section ProofArgfd.
                      = add_vec_int (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) 4)
         by (rewrite /B upd_eq; reflexivity).
       iDestruct (cpu_own_transport CID11 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Myproc.wp_myproc_sconf B (av - 6)%nat n eb p b
+      iApply (Myproc.wp_myproc_sconf kt B (av - 6)%nat n eb p b
                 _ Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iIntros (CID16 Hk16 ms P) "%Hms Hcg Hcpu Hpc %HcsP".

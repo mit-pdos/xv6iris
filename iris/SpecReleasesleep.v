@@ -51,7 +51,7 @@ Import Defs.
    [wp_releasesleep_sconf] below is this at the untracked instance, where
    [H q] is [emp] and the caller's token is the fraction-free [sleeplocked]. *)
 Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname)
+    (kt : ktier) (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
     (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
@@ -60,7 +60,7 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
                    in
   (22 <= av)%nat ->
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr kt m av b pme -∗
   cpu_own 0 eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
@@ -69,11 +69,11 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   sl_pid slk ↦₄ pd -∗
   R -∗
   (* wakeup's resources *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pme -∗
+      sie_cap_gpr kt mf av b pme -∗
       cpu_own 0 eb pme b lks -∗
       pc_is ret_tgt -∗
       (* the deposit comes back, at the holder's own fraction *)
@@ -83,7 +83,7 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
 
 Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
-    (γs : list gname)
+    (kt : ktier) (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
@@ -100,7 +100,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      [cpu_own] carry the same [lks] -- because the C's single return path
      releases lk->lk; the wakeup() in between is itself balanced. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr kt m av b pme -∗
   cpu_own 0 eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
@@ -109,11 +109,11 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   sl_pid slk ↦₄ pd -∗
   R -∗
   (* wakeup's resources *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pme -∗
+      sie_cap_gpr kt mf av b pme -∗
       cpu_own 0 eb pme b lks -∗
       pc_is ret_tgt -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -122,15 +122,15 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname)
+      (kt : ktier) (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
+      wp_releasesleep_gen_sconf_body kt γs γl γsl s R H q m pd pme av eb b lks.
   Parameter wp_releasesleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
-      (γs : list gname)
+      (kt : ktier) (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb b lks.
+      wp_releasesleep_sconf_body kt γs γl γsl s R m pd pme av eb b lks.
 End RELEASESLEEP.

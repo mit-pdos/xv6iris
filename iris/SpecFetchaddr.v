@@ -107,7 +107,7 @@ Section SpecFetchaddr.
 End SpecFetchaddr.
 
 Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname)
+    (kt : ktier) (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchaddr in
@@ -115,7 +115,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (fetchaddr_stack <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   (* [n = 0]: copyin's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyin.v) *)
   cpu_own 0%nat eb p b lks -∗
@@ -127,7 +127,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗
@@ -139,7 +139,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
 Module Type FETCHADDR.
   Parameter wp_fetchaddr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
+      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string),
-      wp_fetchaddr_sconf_body γa γf m av eb p pid V oldv b lks.
+      wp_fetchaddr_sconf_body kt γa γf m av eb p pid V oldv b lks.
 End FETCHADDR.

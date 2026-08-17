@@ -75,7 +75,7 @@ Import Defs.
 
 
 Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
+    (kt : ktier) (γa : gname) (mm : regfile)
     (P : uptd) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.proc_freepagetable in
@@ -97,7 +97,7 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
   um_below sz P.(ud_um) ->
   (* proc_freepagetable -> uvmunmap/uvmfree -> kfree *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -105,7 +105,7 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -115,8 +115,8 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
 Module Type PROC_FREEPAGETABLE.
   Parameter wp_proc_freepagetable_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
+      (kt : ktier) (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
-      wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks.
+      wp_proc_freepagetable_sconf_body kt γa mm P K eb p ilvl b lks.
 End PROC_FREEPAGETABLE.

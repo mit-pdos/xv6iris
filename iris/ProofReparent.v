@@ -123,6 +123,7 @@ Section ProofReparentEnds.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* +0x00 .. +0x2a: carve the 6-slot frame, save ra/s0/s1..s4, set s0, park
      the argument in s2, materialise &proc[0] / &initproc / &proc[NPROC], and
      jump to the loop test at +0x34. *)
@@ -132,7 +133,7 @@ Section ProofReparentEnds.
     let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     (6 <= K)%nat ->
     (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-    sie_cap_gpr m K b pme -∗
+    sie_cap_gpr kt m K b pme -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.reparent) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ M : regfile,
@@ -141,7 +142,7 @@ Section ProofReparentEnds.
             (m !!! Regidx (mword_of_int 23)) (m !!! Regidx (mword_of_int 24))
             (m !!! Regidx (mword_of_int 25)) (m !!! Regidx (mword_of_int 26))
             (m !!! Regidx (mword_of_int 27)) 0 ⌝ -∗
-        sie_cap_gpr M (K - 6) b pme -∗
+        sie_cap_gpr kt M (K - 6) b pme -∗
         pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
         rp_frame spF (m !!! Regidx (mword_of_int 1)) (m !!! Regidx (mword_of_int 8))
                      (m !!! Regidx (mword_of_int 9)) (m !!! Regidx (mword_of_int 18))
@@ -178,7 +179,7 @@ Section ProofReparentEnds.
               with "Hcg Hpc Hi00").
     iIntros (CID1 Hst1) "Hcg Hframe Hpc".
     assert (Hsp0f : m !!! Regidx csp_rs1 = sp0) by reflexivity.
-    iEval (rewrite Hsp0f stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite Hsp0f (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & _)".
     iDestruct "C1" as (v1) "Hc1". iDestruct "C2" as (v2) "Hc2".
     iDestruct "C3" as (v3) "Hc3". iDestruct "C4" as (v4) "Hc4".
@@ -424,7 +425,7 @@ Section ProofReparentEnds.
     let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) in
     (6 <= K)%nat ->
     (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
-    sie_cap_gpr M (K - 6) b pme -∗
+    sie_cap_gpr kt M (K - 6) b pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
     rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
     wp_next b pme (fun (CID : CpuId) =>
@@ -444,7 +445,7 @@ Section ProofReparentEnds.
         /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
         /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
         /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-        sie_cap_gpr Mf K b pme -∗
+        sie_cap_gpr kt Mf K b pme -∗
         pc_is (ret_pc vra) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -545,8 +546,8 @@ Section ProofReparentEnds.
     { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb0 : rp_fcell spF 0 = pa_stk sp0 6).
     { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 6) with "[Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf5"; [iEval (rewrite -Hb5); iExists _; iExact "Hf5"|].
       iSplitL "Hf4"; [iEval (rewrite -Hb4); iExists _; iExact "Hf4"|].
       iSplitL "Hf3"; [iEval (rewrite -Hb3); iExists _; iExact "Hf3"|].
@@ -597,6 +598,7 @@ End ProofReparentEnds.
 Section ProofReparentLoop.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId}
       
       (γs : list gname) (spF pme pv ip : mword 64)
@@ -612,12 +614,12 @@ Section ProofReparentLoop.
        neither acquires nor releases anything itself, so [lks] -- and hence
        this bound -- is a loop INVARIANT, unchanged across every iteration. *)
     locks_below lks "proc" ->
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     (* the exit continuation: control at the epilogue entry [reparent+0x46]. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
       ∀ Mexit : regfile,
         ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
-        sie_cap_gpr Mexit av b pme -∗
+        sie_cap_gpr kt Mexit av b pme -∗
         cpu_own lvl eb pme b lks -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
         rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -626,7 +628,7 @@ Section ProofReparentLoop.
         WP (Loop : expr riscv_lang)) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜rpl_regs M spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-      sie_cap_gpr M av b pme -∗
+      sie_cap_gpr kt M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
       rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -644,14 +646,14 @@ Section ProofReparentLoop.
                    wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
                      ∀ Mexit : regfile,
                        ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
-                       sie_cap_gpr Mexit av b pme -∗
+                       sie_cap_gpr kt Mexit av b pme -∗
                        cpu_own lvl eb pme b lks -∗
                        kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
                        rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                        parents_own (rp_map pv ip ps) -∗
                        WP (Loop : expr riscv_lang)) -∗
-                   sie_cap_gpr M av b pme -∗
+                   sie_cap_gpr kt M av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -669,7 +671,7 @@ Section ProofReparentLoop.
       iAssert (wp_next (CID0 := CID0) b pme (fun (CIDt : CpuId) =>
                  ∀ Mt : regfile,
                    ⌜ rpl_regs Mt spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
-                   sie_cap_gpr Mt av b pme -∗
+                   sie_cap_gpr kt Mt av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.reparent + 0x2c)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -913,7 +915,7 @@ Section ProofReparentLoop.
            sets agree).  So both the set and wakeup's order bound [Hno] are
            pure passthroughs of the enclosing contract's -- reparent adds
            nothing to the held set, hence nothing to the premise. *)
-        iApply (Wakeup.wp_wakeup_sconf (CID := CIDp)  M40 γs
+        iApply (Wakeup.wp_wakeup_sconf kt (CID := CIDp)  M40 γs
                   pme lvl av eb b lks
                   ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom)
@@ -1043,10 +1045,11 @@ End ProofReparentLoop.
 Section ProofReparent.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb b lks.
+    : wp_reparent_sconf_body kt m γs pme ip ps dqi lvl K eb b lks.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
     intros pcE pv rettgt HK Hdom Hlen Hlvl Hno.

@@ -132,7 +132,7 @@ Definition wp_install_trans_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -174,7 +174,7 @@ Definition wp_install_trans_sconf_body
      "bcache" (4); it takes no lock of its own and calls no other function
      with a lower bound, so this is the one premise its whole cone needs. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO
      acquire/release of its own -- it delegates entirely to bread/bwrite, so
@@ -183,7 +183,7 @@ Definition wp_install_trans_sconf_body
      callee's own acquire mints what it needs) and at [eb = false] it is the
      honest pair, held because the TRAP handed it over.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -192,7 +192,7 @@ Definition wp_install_trans_sconf_body
   log_frozen logstart dev -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -245,9 +245,9 @@ Definition wp_install_trans_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -273,7 +273,7 @@ Module Type INSTALL_TRANS.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -285,7 +285,7 @@ Module Type INSTALL_TRANS.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (R : iProp Σ) (lks : gset string),
-      wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs
+      wp_install_trans_sconf_body kt γs j γl γu γd γk pd pav pu bn γfs
                                   cov logstart dev recovering n W Lw L D
                                   pidv dq m K eb b R lks.
 End INSTALL_TRANS.

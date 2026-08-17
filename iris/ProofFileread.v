@@ -295,6 +295,7 @@ Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
                      (PN : PANIC) : FILEREAD.
 
 Section ProofFileread.
+  Context {kt : ktier}.
   (* NO [!icacheG Σ]: [fileG] bundles it, and binding both gives two
      instances whose propositions print identically and do not unify.  The
      carve is what makes that visible (durable-notes.md; SpecFileread.v's
@@ -398,7 +399,7 @@ Section ProofFileread.
       (k : nat) (q : Qp) (Cf : fcontent) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+    : wp_fileread_sconf_body kt γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb Hbelow.
@@ -439,7 +440,7 @@ Section ProofFileread.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
     assert (HsprS : spr = pa_stk sp0 6) by exact Hpush.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -886,7 +887,7 @@ Section ProofFileread.
           exact (HB5thr c Hcs N2 N8 N9 N18 N19). }
         iDestruct (cpu_own_transport CID CID17 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
+        iApply (Piperead.wp_piperead_sconf kt γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb pidv V n b
                   _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
@@ -1442,7 +1443,7 @@ Section ProofFileread.
                   exact (HD9thr c Hcs N2 N8 N9 N18 N19). }
                 iDestruct (cpu_own_transport CID CID58 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
+                iApply (Consoleread.wp_consoleread_sconf kt γa γf γs j γlp
                           (frn_cons fn)
                           E2 (K - 6)%nat eb pidv V n b
                           lks Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
@@ -1797,7 +1798,7 @@ Section ProofFileread.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
-             iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Ilock.wp_ilock_sconf kt γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
                        gil gisl
@@ -2032,7 +2033,7 @@ Section ProofFileread.
                by (rewrite HJ6a4; apply rd_arg32_small; lia).
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iApply (Readi.wp_readi_sconf γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Readi.wp_readi_sconf kt γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
                        (frn_cov fn) (frn_logstart fn) icfg_dev (fc_ip Cf)
@@ -2209,7 +2210,7 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
+                iApply (Iunlock.wp_iunlock_sconf kt γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
                           ikk (ssh/2)%Qp gsh icfg_dev inm
@@ -2488,7 +2489,7 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
+                iApply (Iunlock.wp_iunlock_sconf kt γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
                           ikk (ssh/2)%Qp gsh icfg_dev inm
@@ -2641,7 +2642,7 @@ Section ProofFileread.
                             (add_vec_int (mword_of_int (FR + 0xa6) : mword 64) 4)]> P2).
              assert (Ha0msg : P3 !!! Regidx Ra0 = (mword_of_int fr_msg_a : mword 64))
                by pcw.
-             iApply (PN.wp_panic_sconf (CID := CID22) P3 (K - 6)%nat
+             iApply (PN.wp_panic_sconf kt (CID := CID22) P3 (K - 6)%nat
                        0%nat eb b pj (PkAStr DfracDiscarded fr_msg) lks
                        (fr_panic_K K HK) eq_refl fr_panic_noff
                        (fr_panic_below lks Hbelow)

@@ -40,7 +40,7 @@ Require Import ProcAvail.
    arm is licensed by the state READ being SLEEPING, which is unclaimed, so
    the proof never has to know which slot is the caller's. *)
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-     (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
+     (kt : ktier) (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -53,14 +53,14 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
      "proc"'s -- wakeup acquires and releases each proc's lock in turn, so
      this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr kt m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
- procs_inv γs -∗
+ procs_inv (kt := kt) γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b pme -∗
+      sie_cap_gpr kt Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -69,6 +69,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_wakeup_sconf_body m γs pme lvl K eb b lks.
+       (kt : ktier) (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_wakeup_sconf_body kt m γs pme lvl K eb b lks.
 End WAKEUP.

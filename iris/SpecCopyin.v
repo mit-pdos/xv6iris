@@ -80,7 +80,7 @@ Import Defs.
 
 
 Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
+    (kt : ktier) (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyin in
@@ -105,7 +105,7 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* order premise at the lowest rank this cone reaches. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -114,7 +114,7 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     proc_pt P' -∗
@@ -129,8 +129,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type COPYIN.
   Parameter wp_copyin_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
+      (kt : ktier) (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p b lks.
+      wp_copyin_sconf_body kt γa mm P szv len dst_olds K lvl eb p b lks.
 End COPYIN.

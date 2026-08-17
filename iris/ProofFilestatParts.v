@@ -629,6 +629,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Section ProofFilestatParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -689,7 +690,7 @@ Section ProofFilestatParts.
        exit never spilled them. *)
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 10)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 10)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FST + 0x56) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -705,7 +706,7 @@ Section ProofFilestatParts.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -790,9 +791,9 @@ Section ProofFilestatParts.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10)
       by (rewrite Hwv; exact HT4sp).
-    iAssert (stack_own sp0 10) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10]"
+    iAssert (stack_own (KTR := kt) sp0 10) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10]"
       as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].

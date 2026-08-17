@@ -74,20 +74,20 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Definition kernelvec_handler_spec_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+    (kt : ktier) (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64) :=
   length γs = NPROC ->
   hw_config -∗
   minstret_inv -∗
   kernel_text -∗
-  devintr_caps γu γv γdk γtl γs pd pav pu -∗
-  intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64).
+  devintr_caps (kt := kt) γu γv γdk γtl γs pd pav pu -∗
+  intr_handler_spec kt (mword_of_int KernelSyms.kernelvec : mword 64).
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+      (kt : ktier) (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64),
-      kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
+      kernelvec_handler_spec_body kt γu γv γdk γtl γs pd pav pu.
 End KERNELVEC.

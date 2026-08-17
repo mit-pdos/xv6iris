@@ -101,13 +101,14 @@ Section ProofStatiMain.
   Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !fsLogG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_stati_sconf
       (mm : regfile)
       (ip st : mword 64)
       (dev inum : mword 32) (dn : dinode)
       (dev0 ino0 : mword 32) (ty0 nl0 : mword 16) (sz0 : mword 64)
       (K : nat) (dqd dqn : dfrac) (b : bool) (p : mword 64)
-    : wp_stati_sconf_body mm ip st dev inum dn dev0 ino0 ty0 nl0 sz0
+    : wp_stati_sconf_body kt mm ip st dev inum dn dev0 ino0 ty0 nl0 sz0
                           K dqd dqn b p.
   Proof.
     cbv beta delta [wp_stati_sconf_body].
@@ -156,7 +157,7 @@ Section ProofStatiMain.
                   (add_vec (mm !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
     assert (HR1sp : sti_sp mm R1) by (rewrite /sti_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1 : mword 64)
@@ -454,9 +455,9 @@ Section ProofStatiMain.
                    = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HP2sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (mm !!! Regidx csp_rs1 : mword 64) 2)
+    iAssert (stack_own (KTR := kt) (mm !!! Regidx csp_rs1 : mword 64) 2)
       with "[Hf1 Hf2]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       done. }

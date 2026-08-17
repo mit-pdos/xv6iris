@@ -148,7 +148,7 @@ Definition wp_kexit_sconf_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
+    (kt : ktier) (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -190,7 +190,7 @@ Definition wp_kexit_sconf_body
      all higher and follow by [LockRank.locks_below_mono] /
      [locks_below_union_singleton] at each call site. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr kt m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE -- the whole
@@ -205,11 +205,11 @@ Definition wp_kexit_sconf_body
      return (see the header), so the pair is spent along with everything
      else the dead process was holding.
      See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
@@ -290,7 +290,7 @@ Module Type KEXIT.
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γft γf γw : gname)
+      (kt : ktier) (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -305,7 +305,7 @@ Module Type KEXIT.
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
-      wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_kexit_sconf_body kt γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
                           γi cn γtl bmapstart inodestart nib size dqb dqs us
                           on fn m av eb b lks pid V.

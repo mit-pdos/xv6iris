@@ -162,7 +162,7 @@ Definition wp_sys_mknod_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
+    (kt : ktier) (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -205,7 +205,7 @@ Definition wp_sys_mknod_sconf_body
   ninodes < 2 ^ 31 ->
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := kt) γpr gu gd ->
   (* ---- the reference allowance create's walk needs ---- *)
   (create_slots <= ns)%nat ->
   (j < NPROC)%nat ->
@@ -220,14 +220,14 @@ Definition wp_sys_mknod_sconf_body
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
   pv_tf V !! tf_arg_idx 2 = Some v2 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* ENTERED WITH NO LOCK HELD: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
      five callees raise is [locks_below ∅ _]. *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the two persistent credentials ialloc's printk arm needs ---- *)
@@ -256,7 +256,7 @@ Definition wp_sys_mknod_sconf_body
   (* argstr's page-table side, and create's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   (* ---- the process, whole, and the reference allowance ---- *)
   iref_slots ns -∗
   proc_priv γf pj pid V -∗
@@ -269,9 +269,9 @@ Definition wp_sys_mknod_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗
@@ -295,7 +295,7 @@ Module Type SYSMKNOD.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γa : gname) (γpr : gname)
+      (kt : ktier) (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -311,7 +311,7 @@ Module Type SYSMKNOD.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_mknod_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
+      wp_sys_mknod_sconf_body kt γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
                               ninodes size dev used ns dqb dqs dqbs dqn
                               v0 v1 v2 pid V m K eb b lks.

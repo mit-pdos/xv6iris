@@ -48,7 +48,7 @@ Import Defs.
 
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+    (kt : ktier) (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
          mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
@@ -88,7 +88,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      resumer's bundle match) and the RESUMER's [eb'] -- swtch stores nothing
      to struct cpu, so the same-eb contract is realized one level up by
      sched's own epilogue intena store + ghost retune. *)
-  sie_cap_gpr m0 av false p -∗
+  sie_cap_gpr kt m0 av false p -∗
   (* THE HELD SET IS PINNED AT THE PROC LOCK, both directions.  swtch is
      reachable only from [sched] and the scheduler, and xv6's rule for it is
      "hold p->lock across the switch" -- [sched]'s own
@@ -101,7 +101,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
   cpu_own 1 eb p false {["proc"]} -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
-  ▷ valid_context P An newc p -∗
+  ▷ valid_context (kt := kt) P An newc p -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
   P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back -∗
@@ -114,12 +114,12 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      ( ∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm Ao h⌝ -∗
          ⌜callee_img m = callee_img m0⌝ -∗
-         sie_cap_gpr (CID := h) m av false p -∗
+         sie_cap_gpr kt (CID := h) m av false p -∗
          cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
          ctx_cells oldc (callee_img m0) -∗
          (∃ (A' : ctx_adm) (cret : mword 64) (back' : bool),
-            (if back' then ▷ valid_context P A' cret p else own_ctx cret) ∗
+            (if back' then ▷ valid_context (kt := kt) P A' cret p else own_ctx cret) ∗
             P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back') -∗
          WP (LoopE gen_id h : expr riscv_lang) )
    else emp) -∗
@@ -128,10 +128,10 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (kt : ktier) (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) (back : bool),
-      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
+      wp_swtch_sconf_body kt P An Ao oldc newc m0 old_vs av eb p back.
 End SWTCH.

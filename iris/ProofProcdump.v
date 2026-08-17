@@ -61,6 +61,7 @@ Section ProofProcdumpMain.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
@@ -71,7 +72,7 @@ Section ProofProcdumpMain.
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (b : bool)
       (lks : gset string)
-    : wp_procdump_sconf_body γpr γd γv m K eb p b lks.
+    : wp_procdump_sconf_body kt γpr γd γv m K eb p b lks.
   Proof.
     cbv beta zeta delta [wp_procdump_sconf_body].
     intros HK Hpk Hlkbelow.

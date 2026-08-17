@@ -134,6 +134,7 @@ Section SpecSysWrite.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* THE ENVIRONMENT FILEWRITE'S [if] ACTUALLY ASKS FOR, out of the two
      content-independent bundles this contract owns.
      [SpecSysRead.read_env_frame]'s twin, and the whole of what the S4 opener
@@ -143,7 +144,7 @@ Section SpecSysWrite.
      not of the frame. *)
   Lemma write_env_frame (γf : gname) (fn : fwrite_names) (Cf : fcontent) :
     filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗
-    filewrite_env γf fn Cf ∗
+    filewrite_env (kt := kt) γf fn Cf ∗
     (∀ used' : gset Z, filewrite_env_out fn Cf used' -∗
        ∃ used'' : gset Z,
          filewrite_fs_out fn used'' ∗ filewrite_devsw fn).
@@ -183,7 +184,7 @@ Definition wp_sys_write_sconf_body
       !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+    (kt : ktier) (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fwrite_names)                          (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
@@ -212,7 +213,7 @@ Definition wp_sys_write_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol): every filewrite arm
      sleeps, so this syscall parks. *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr kt m av b pj -∗
   (* a syscall runs at push_off level 0 *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -223,7 +224,7 @@ Definition wp_sys_write_sconf_body
   panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
      device table's write column for whatever major the descriptor may name *)
   filewrite_fs_env γf fn -∗
@@ -235,7 +236,7 @@ Definition wp_sys_write_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_write_ret V v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr kt mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
@@ -253,11 +254,11 @@ Module Type SYSWRITE.
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γa : gname) (γf : gname)
+      (kt : ktier) (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
+      wp_sys_write_sconf_body kt γa γf γs j γlp fn pidv V v v2 m av eb b lks.
 End SYSWRITE.

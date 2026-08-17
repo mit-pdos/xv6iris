@@ -187,6 +187,7 @@ Section FsinitDefs.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
   Definition fsi_frame (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
@@ -208,7 +209,7 @@ Section FsinitDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr kt mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -280,6 +281,7 @@ Section FsinitEpilogue.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
@@ -292,7 +294,7 @@ Section FsinitEpilogue.
     used' ⊆ used ->
     fsi_sp m M ->
     fsi_thr4 m M ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fsinit + 0x58) : mword 64) -∗
@@ -312,7 +314,7 @@ Section FsinitEpilogue.
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size used' -∗
     ireg_boot -∗
-    fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
+    fsi_cont (kt := kt) (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
              size used dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
              m K b lks -∗
     WP (Loop : expr riscv_lang).
@@ -525,6 +527,7 @@ Section FsinitMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -548,7 +551,7 @@ Section FsinitMain.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
+      wp_fsinit_sconf_body kt γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            used dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
@@ -583,7 +586,7 @@ Section FsinitMain.
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
-    iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
+    iAssert (fsi_cont (kt := kt) (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size used dev v_magic v_size v_nblocks v_nlog bs_sb
                pidv dq j m K b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
@@ -637,7 +640,7 @@ Section FsinitMain.
       by (rewrite /M1 upd_ne; [reflexivity | nz]).
     assert (HM1s2 : (M1 !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64))
       by (rewrite /M1 upd_ne; [reflexivity | nz]).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(T1 & T2 & T3 & T4 & _)".
     iDestruct "T1" as (w1) "Hf1".   iDestruct "T2" as (w2) "Hf2".
     iDestruct "T3" as (w3) "Hf3".   iDestruct "T4" as (w4) "Hf4".
@@ -795,7 +798,7 @@ Section FsinitMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf kt γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               M5 (K - 4)%nat true b lks
               ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
@@ -999,7 +1002,7 @@ Section FsinitMain.
       rewrite /N6 upd_ne; [| regne]. exact (HN5thr c Hcs N2' N8 N9 N18). }
     iEval (rewrite -HN6a1) in "Hsrc".
     iEval (rewrite -HN6a0) in "Hsbold".
-    iApply (MM.wp_memmove_sconf N6 (K - 4)%nat 32%nat
+    iApply (MM.wp_memmove_sconf kt N6 (K - 4)%nat 32%nat
               (fun jj => bs_sb !!! jj) sb_old b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HN6a2
               with "Hcg Htext Hpc Hsrc Hsbold").
@@ -1163,7 +1166,7 @@ Section FsinitMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq Q1 (K - 4)%nat true (proc_addr j)
               bs_sb bsd0 d0 b lks
               ltac:(lia) Hkk HQ1a0
@@ -1385,7 +1388,7 @@ Section FsinitMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn γfs
+    iApply (IL.wp_initlog_sconf kt γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev sb_base bs_hdr L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat true b lks
@@ -1464,7 +1467,7 @@ Section FsinitMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
+    iApply (IR.wp_ireclaim_sconf kt γs j γl γu γd γk pd pav pu bn
               γlog γfs γi cn gtl γpr cov logstart bmapstart inodestart
               ninodes nib size used dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat true b lks

@@ -196,6 +196,7 @@ Section KforkB4Proof.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
@@ -237,7 +238,7 @@ Section KforkB4Proof.
        on the pointer -- a process between [p->cwd = 0] and its next chdir
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]
        with no null test, so this is the honest reading of the code. *)
-    sie_cap_gpr m (rsv + (K - 8))%nat false pme -∗
+    sie_cap_gpr kt m (rsv + (K - 8))%nat false pme -∗
     cpu_own lvl eb pme false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
@@ -256,7 +257,7 @@ Section KforkB4Proof.
         ⌜(forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
             mf !!! Regidx r = m !!! Regidx r) /\
          mf !!! Regidx Rs1 = sign_extend' 64 pid_c⌝ -∗
-        sie_cap_gpr mf (rsv + (K - 8))%nat false pme -∗
+        sie_cap_gpr kt mf (rsv + (K - 8))%nat false pme -∗
         cpu_own lvl eb pme false lks -∗
         pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
         proc_priv γf pme pid_p Vp -∗
@@ -362,7 +363,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
+    iApply (ID.wp_idup_sconf kt γil cn γfs γic cov logstart nib
               ck (cq/2)%Qp cdev cinum M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
@@ -531,7 +532,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* [ns := n = 16]: kfork owns all sixteen bytes of [p->name], so the
        source-ownership premise is [ssc_src_ok]'s first (budget) disjunct. *)
-    iApply (SS.wp_safestrcpy_sconf M6 16%nat 16%nat
+    iApply (SS.wp_safestrcpy_sconf kt M6 16%nat 16%nat
               (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
               (rsv + (K - 8))%nat (DfracOwn 1) false pme
               ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31

@@ -59,6 +59,7 @@ Proof. lia. Qed.
 Section ProofProcdumpParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -91,13 +92,13 @@ Section ProofProcdumpParts.
   Lemma wp_pd_prologue `{GEN : GenId} `{CID0 : CpuId}
       (m : regfile) (K : nat) (b : bool) (p : mword 64) :
     (48 <= K)%nat ->
-    sie_cap_gpr m K b p -∗
+    sie_cap_gpr kt m K b p -∗
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.procdump) -∗
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
       ∀ (M : regfile),
         ⌜ pd_regs_pro m M ⌝ -∗
-        sie_cap_gpr M (K - 10) b p -∗
+        sie_cap_gpr kt M (K - 10) b p -∗
         pd_frame (m !!! pdR 2) (m !!! pdR 1) (m !!! pdR 8) (m !!! pdR 9)
                  (m !!! pdR 18) (m !!! pdR 19) (m !!! pdR 20) (m !!! pdR 21)
                  (m !!! pdR 22) (m !!! pdR 23) -∗
@@ -179,7 +180,7 @@ Section ProofProcdumpParts.
                   = pa_stk (m !!! Regidx csp_rs1) 9).
     { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 & F9 & F10 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
     iDestruct "F3" as (v3) "H3". iDestruct "F4" as (v4) "H4".
@@ -331,13 +332,13 @@ Section ProofProcdumpParts.
   (* ================================================================== *)
   Lemma wp_pd_consts `{GEN : GenId} `{CID0 : CpuId}
       (M : regfile) (K' : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr M K' b p -∗
+    sie_cap_gpr kt M K' b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.procdump + 0x22)) -∗
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
       ∀ (M' : regfile),
         ⌜ pd_regs_loop M' (M !!! pdR 2) 0 /\ pd_regs_hi M M' ⌝ -∗
-        sie_cap_gpr M' K' b p -∗
+        sie_cap_gpr kt M' K' b p -∗
         pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -542,7 +543,7 @@ Section ProofProcdumpParts.
     (10 <= K)%nat ->
     Mx !!! pdR 2 = pa_stk (m !!! pdR 2 : mword 64) 10 ->
     pd_regs_hi m Mx ->
-    sie_cap_gpr Mx (K - 10) b p -∗
+    sie_cap_gpr kt Mx (K - 10) b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
     pd_frame (m !!! pdR 2) (m !!! pdR 1) (m !!! pdR 8) (m !!! pdR 9)
@@ -551,7 +552,7 @@ Section ProofProcdumpParts.
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
       ∀ (mf : regfile),
         ⌜ callee_saved m mf /\ mf !!! pdR 1 = (m !!! pdR 1 : mword 64) ⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc (m !!! pdR 1 : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -751,9 +752,9 @@ Section ProofProcdumpParts.
                    = pa_stk (add_vec (E9 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10)
       by (rewrite Hwv; exact HspE9).
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 10)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 10)
       with "[Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hc72". { iExists (m !!! Regidx Rra). iExact "Hc72". }
       iSplitL "Hc64". { iExists (m !!! Regidx Rs0). iExact "Hc64". }
       iSplitL "Hc56". { iExists (m !!! Regidx Rs1). iExact "Hc56". }

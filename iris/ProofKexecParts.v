@@ -171,6 +171,7 @@ Section ProofKexecParts.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -263,7 +264,7 @@ Section ProofKexecParts.
        have lost. *)
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 68)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 68)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -279,7 +280,7 @@ Section ProofKexecParts.
     word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
-    stack_own (pa_stk sp0 13) 55 -∗
+    stack_own (KTR := kt) (pa_stk sp0 13) 55 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -290,7 +291,7 @@ Section ProofKexecParts.
            sp pop); everything else comes through. *)
         ⌜forall r : mword 5, r <> csp_rs1 -> r <> Rra -> r <> Rs0 ->
             r <> Rs1 -> r <> Rs2 -> mf !!! Regidx r = Mt !!! Regidx r⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -388,12 +389,12 @@ Section ProofKexecParts.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (mword_of_int 544 : mword 12))) 68)
       by (rewrite Hwv; exact HT4sp).
-    iAssert (stack_own sp0 68) with
+    iAssert (stack_own (KTR := kt) sp0 68) with
       "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12 Hb13 Hrest]"
       as "Hframe".
     { change 68%nat with (13 + 55)%nat.
-      rewrite stack_own_app. iSplitR "Hrest"; [| iExact "Hrest"].
-      rewrite stack_own_slots. cbn [seq].
+      rewrite (stack_own_app (KTR := kt)). iSplitR "Hrest"; [| iExact "Hrest"].
+      rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -497,7 +498,7 @@ Section ProofKexecParts.
      (∃ w11, word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11) ∗
      (∃ w12, word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12) ∗
      (∃ w13, word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13) ∗
-     stack_own (pa_stk sp0 13) 55)%I.
+     stack_own (KTR := kt) (pa_stk sp0 13) 55)%I.
 
   (* ... AND THE SAME FRAME WITH THE LAZY SLOTS PINNED.                    *)
   (*                                                                       *)
@@ -522,7 +523,7 @@ Section ProofKexecParts.
      word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
      word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
      word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (pa_stk sp0 13) 55)%I.
+     stack_own (KTR := kt) (pa_stk sp0 13) 55)%I.
 
   Lemma kxc_frame_at_weaken (sp0 ra0 s00 s10 s20 : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 : mword 64) :
@@ -556,7 +557,7 @@ Section ProofKexecParts.
     Mt !!! Regidx csp_rs1 = pa_stk sp0 68 ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 68)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 68)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
     kxc_frame sp0 ra0 s00 s10 s20 -∗
@@ -565,7 +566,7 @@ Section ProofKexecParts.
         ⌜callee_saved m mf⌝ -∗
         ⌜forall r : mword 5, r <> csp_rs1 -> r <> Rra -> r <> Rs0 ->
             r <> Rs1 -> r <> Rs2 -> mf !!! Regidx r = Mt !!! Regidx r⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

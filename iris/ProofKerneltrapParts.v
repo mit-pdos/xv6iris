@@ -75,6 +75,7 @@ Section ProofKerneltrapParts.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
   Notation s1_idx := (mword_of_int 9 : mword 5).
@@ -180,7 +181,7 @@ Section ProofKerneltrapParts.
       (m : regfile) (av : nat) (ep sc : mword 64) :
     (6 <= av)%nat ->
     ret_pc ep = ep ->
-    sie_cap_gpr m av false p -∗
+    sie_cap_gpr kt m av false p -∗
     sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kerneltrap : mword 64) -∗
@@ -195,7 +196,7 @@ Section ProofKerneltrapParts.
         ⌜ _get_Mstatus_SPP ms0 = ('b"1" : mword 1) ⌝ -∗
         ⌜ _get_Mstatus_SPIE ms0 = ('b"1" : mword 1) ⌝ -∗
         ⌜ kt_thr m M ⌝ -∗
-        sie_cap_gpr M (av - 6) false p -∗
+        sie_cap_gpr kt M (av - 6) false p -∗
         sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
         sepc ↦ᵣ ep -∗
         scause ↦ᵣ sc -∗
@@ -234,7 +235,7 @@ Section ProofKerneltrapParts.
                     = mword_of_int (KernelSyms.kerneltrap + 0x02)) by pcw.
     iEval (rewrite Hpc02) in "Hpc".
     (* split the fresh frame into its six slots *)
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -348,13 +349,13 @@ Section ProofKerneltrapParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12").
     iApply wp_next_off_intro.
-    iIntros (ms0) "%Hms0f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie0' & Harm)".
+    iIntros (ms0) "%Hms0f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie0' & Harm & #Hwit)".
     assert (Hsie0 : _get_Mstatus_SIE ms0 = ('b"0" : mword 1))
       by (cbn [sie_bit] in Hsie0'; exact Hsie0').
     iDestruct (sconf_at_sret ms0 ('b"1") ('b"1") with "Hsc Hmir") as %[Hspp0 Hspie0].
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". iApply sie_cap_wit_KT0. }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     set (A3 := <[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2).
     change (<[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2) with A3.
     assert (HA3sp : A3 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)
@@ -445,12 +446,12 @@ Section ProofKerneltrapParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22").
     iApply wp_next_off_intro.
-    iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie1' & Harm)".
+    iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie1' & Harm & #Hwit)".
     assert (Hsie1 : _get_Mstatus_SIE ms1 = ('b"0" : mword 1))
       by (cbn [sie_bit] in Hsie1'; exact Hsie1').
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". iApply sie_cap_wit_KT0. }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     set (A7 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> A6).
     change (<[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> A6) with A7.
     assert (HA7sp : A7 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)
@@ -550,7 +551,7 @@ Section ProofKerneltrapParts.
     _get_Mstatus_SPP ms0 = ('b"1" : mword 1) ->
     _get_Mstatus_SPIE ms0 = ('b"1" : mword 1) ->
     kt_thr m0 M ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr kt M k false p -∗
     sret_bits va vb -∗
     cpu_own lvl false p false lks -∗
     kernel_text -∗
@@ -567,7 +568,7 @@ Section ProofKerneltrapParts.
         ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗
         ⌜ _get_Mstatus_SPIE ms_f = ('b"1" : mword 1) ⌝ -∗
         ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
-        sie_cap_gpr_at ms_f mf (k + 6) false p -∗
+        sie_cap_gpr_at kt ms_f mf (k + 6) false p -∗
         sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
         cpu_own lvl false p false lks -∗
         sepc ↦ᵣ ep -∗
@@ -718,8 +719,8 @@ Section ProofKerneltrapParts.
     iEval (rewrite HE2sp Hpa3) in "Hb3".
     iEval (rewrite HE3sp Hpa4) in "Hb4".
     iEval (rewrite HE4sp Hpa5) in "Hb5".
-    iAssert (stack_own sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1". { iExists _. iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iExact "Hb3". }

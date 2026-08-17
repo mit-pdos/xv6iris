@@ -141,6 +141,7 @@ Section UtEntry.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
+  Context {kt : ktier}.
   (* the trapframe page's own [page_valid], read off [proc_priv] without
      consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
      does not spend the resource (durable-notes.md), so [Hpv] is still
@@ -195,7 +196,7 @@ Section UtEntry.
        ⌜M !!! Regidx csp_rs1 = pa_stk ksp 4⌝ -∗ ⌜M !!! Regidx Rs1 = un_pj N⌝ -∗
        ⌜M !!! Regidx Ra0 = un_pj N⌝ -∗ ⌜ut_cs m M⌝ -∗ ⌜pv_upt V' = pv_upt V⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
-       sie_cap_gpr M (av - 4)%nat false (un_pj N) -∗
+       sie_cap_gpr kt M (av - 4)%nat false (un_pj N) -∗
        cpu_own 0%nat false (un_pj N) false ∅ -∗ cpu_claim (un_pj N) -∗
        ut_csrs_raw sepc_v sc_v stval_v -∗ ut_env Rsys N V' -∗
        (* THE FRAME, which this block is what CREATES: the four slots the
@@ -346,7 +347,7 @@ Section UtEntry.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iApply wp_next_off_intro.
-    iIntros (ms1) "%Hms1f Hhs Hscf Htr Hpc Hfile (Hstk & %Hsie1 & Harm)".
+    iIntros (ms1) "%Hms1f Hhs Hscf Htr Hpc Hfile (Hstk & %Hsie1 & Harm & #Hwit)".
     (* the mstatus the read SAW has the boundary's SPP, off the travelling
        sret mirror's agreement with [sconf]'s stationary tie *)
     iDestruct (sconf_at_sret ms1 ('b"0") ('b"1") with "Hscf Hsret") as %[Hspp1 Hspie1].
@@ -354,7 +355,7 @@ Section UtEntry.
     iDestruct (sie_cap_gpr_join with "Hhs Hscf [Hstk Htr Harm] Hfile") as "Hcg".
     { rewrite /sie_cap. iSplitL "Hstk"; [iExact "Hstk" |].
       iSplitL "Htr"; [iExact "Htr" |].
-      iSplitL "Harm"; [iExact "Harm" |]. iApply sie_cap_wit_KT0. }
+      iSplitL "Harm"; [iExact "Harm" |]. iExact "Hwit". }
     set (M3 := <[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2).
     change (<[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2) with M3.
     assert (HM3sp : M3 !!! Regidx csp_rs1 = pa_stk ksp 4)
@@ -471,7 +472,7 @@ Section UtEntry.
       by (rewrite /M7 upd_ne; [exact HM6sp | reg_neq]).
     assert (HM7ra : M7 !!! Regidx Rra = mword_of_int (UT + 0x26))
       by (rewrite /M7 upd_eq; pcw).
-    iApply (MP.wp_myproc_sconf M7 (av - 4)%nat 0%nat false (un_pj N) false _
+    iApply (MP.wp_myproc_sconf kt M7 (av - 4)%nat 0%nat false (un_pj N) false _
               ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
     iApply wp_next_off_intro.
@@ -661,12 +662,13 @@ Section UtDispatch.
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* [hw_config] + [minstret_inv], both persistent, out of the ambient
      bundle -- ProofMainSecondary's [ms_dup_hw], which is [Local] there.
      They are what [SpecKernelvec.kernelvec_handler_spec] consumes. *)
   Local Lemma ut_dup_hw (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr m avail b p -∗
-    hw_config ∗ minstret_inv ∗ sie_cap_gpr m avail b p.
+    sie_cap_gpr kt m avail b p -∗
+    hw_config ∗ minstret_inv ∗ sie_cap_gpr kt m avail b p.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
@@ -682,7 +684,7 @@ Section UtDispatch.
      the whole walk where [intr_handler_spec kernelvec] is needed. *)
   Local Lemma ud_hold (N : ut_names) (V : pprivate)
       (ep sc st : mword 64) :
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    intr_handler_spec kt (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     cpu_own 0%nat false (un_pj N) false ∅ -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ st -∗
@@ -714,7 +716,7 @@ Section UtDispatch.
       (m0 m : regfile) (av nx : nat)
       (ep sc st : mword 64)
       (mie_v menvcfg0 : mword 64) :
-    printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := kt) (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -729,7 +731,7 @@ Section UtDispatch.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x30)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr kt m nx false (un_pj N) -∗
     cpu_own 0%nat false (un_pj N) false ∅ -∗
     cpu_claim (un_pj N) -∗
     ut_csrs_raw ep sc st -∗
@@ -751,12 +753,12 @@ Section UtDispatch.
     iAssert (devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdca".
     { iDestruct "Hcaps" as "(_ & _ & _ & $ & _)". }
-    iAssert (devintr_caps (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+    iAssert (devintr_caps (kt := kt) (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdc".
     { iApply (devintr_caps_any_at CID with "Hdca"). }
     (* THE KERNELVEC FUNCTOR ARGUMENT, cashed here and nowhere else *)
     iDestruct (ut_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    iPoseProof (KV.kernelvec_handler_spec (un_u N) (un_v N) (un_k N) (un_tk N)
+    iPoseProof (KV.kernelvec_handler_spec kt (un_u N) (un_v N) (un_k N) (un_tk N)
                   (un_s N) (un_pd N) (un_pav N) (un_pu N) Hlen
                   with "Hhw Hmin Htext Hdc") as "#Hih".
     iDestruct "Hraw" as "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt)".
@@ -865,7 +867,7 @@ Section UtDispatch.
       assert (HcsD3 : ut_cs m0 D3)
         by (rewrite /D3; apply ut_cs_insert;
             [vm_compute; reflexivity | exact HcsD2]).
-      iApply (DE.wp_devintr_sconf (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+      iApply (DE.wp_devintr_sconf kt (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                 (un_pd N) (un_pav N) (un_pu N)
                 D3 nx 0 false (un_pj N) (DfracOwn 1) sc ∅
                 Hlen ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
@@ -1220,13 +1222,14 @@ Section UtSeal.
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* printk's contract, as the [Prop] the arms take -- from the functor
      argument, at whatever hart the call happens on. *)
   Local Lemma ut_printk (γpr : gname) (γd : uart_names) (γv : disk_names) :
-    printk_gen_contract γpr γd γv.
+    printk_gen_contract (kt := kt) γpr γd γv.
   Proof.
     intros CIDp m0 K eb pj dqf f descs b lks.
-    exact (PK.wp_printk_gen_sconf (CID := CIDp) γpr γd γv m0 K eb pj
+    exact (PK.wp_printk_gen_sconf kt (CID := CIDp) γpr γd γv m0 K eb pj
              (dqf := dqf) f descs b lks).
   Qed.
 

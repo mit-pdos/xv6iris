@@ -38,6 +38,7 @@ Section ProofStrncmp.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -150,7 +151,7 @@ Section ProofStrncmp.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b p -∗
+    sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncmp + 0x32) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -158,7 +159,7 @@ Section ProofStrncmp.
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -292,7 +293,7 @@ Section ProofStrncmp.
     M !!! Regidx Ra2 = (mword_of_int (Z.of_nat (n - t)) : mword 64) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗
+    sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncmp + 0x0a) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
@@ -303,7 +304,7 @@ Section ProofStrncmp.
         ⌜strncmp_res f g n (Mt !!! Regidx Ra0)⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b p -∗
+        sie_cap_gpr kt Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncmp + 0x32) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
@@ -1191,7 +1192,7 @@ Section ProofStrncmp.
 
   Lemma wp_strncmp_sconf (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64)
-    : wp_strncmp_sconf_body mm n f g K dq1 dq2 b p.
+    : wp_strncmp_sconf_body kt mm n f g K dq1 dq2 b p.
   Proof.
     cbv beta delta [wp_strncmp_sconf_body].
     intros pcE s1 s2 ret_tgt HK Ha2 Hn31.

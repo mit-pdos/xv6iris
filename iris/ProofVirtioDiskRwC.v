@@ -66,6 +66,7 @@ Section ProofVirtioDiskRwC.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Notation Rz  := (mword_of_int 0  : mword 5).
   Notation Rs0 := (mword_of_int 8  : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -108,7 +109,7 @@ Section ProofVirtioDiskRwC.
     M !!! Regidx Rs0 = (sp0 : SailStdpp.Values.mword 64) ->
     M !!! Regidx Rs6 = wr ->
     M !!! Regidx Rs7 = sector ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
     pa_stk sp0 12 ↦₄ (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) -∗
     d_ops h ↦₄ ty0 -∗
@@ -119,7 +120,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra0 = (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra3 = (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ec) : mword 64) -∗
         pa_stk sp0 12 ↦₄ (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) -∗
         d_ops h ↦₄ vdrw_ty wr -∗
@@ -366,7 +367,7 @@ Section ProofVirtioDiskRwC.
       (vf0 : SailStdpp.Values.mword 16) :
     M !!! Regidx Ra3 = (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64) ->
     M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64) ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ec) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
     d_desc pd h ↦₈ va0 -∗
@@ -381,7 +382,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra6 = (d_desc pd h : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra2 = pd
          /\ M1 !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x10a) : mword 64) -∗
         d_desc pd h ↦₈ (d_ops h : SailStdpp.Values.mword 64) -∗
         pa_add pd (16 * h + 8) ↦₄ Z_to_bv 32 16 -∗
@@ -624,7 +625,7 @@ Section ProofVirtioDiskRwC.
     M !!! Regidx Ra2 = pd ->
     M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64) ->
     M !!! Regidx Ra6 = (d_desc pd h : SailStdpp.Values.mword 64) ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x10a) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
     pa_add (pa_stk sp0 12) 4 ↦₄ (mword_of_int (Z.of_nat m2) : SailStdpp.Values.mword 32) -∗
@@ -640,7 +641,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra4 = (d_desc pd m2 : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra7 = pd⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x138) : mword 64) -∗
         pa_add (pa_stk sp0 12) 4 ↦₄ (mword_of_int (Z.of_nat m2)
                                        : SailStdpp.Values.mword 32) -∗
@@ -953,7 +954,7 @@ Section ProofVirtioDiskRwC.
     M !!! Regidx Ra4 = (d_desc pd m2 : SailStdpp.Values.mword 64) ->
     M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64) ->
     M !!! Regidx Ra7 = pd ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x138) : mword 64) -∗
     pa_stk sp0 11 ↦₄ (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) -∗
     pa_add pd (16 * m2 + 14) ↦₂ vn1 -∗
@@ -968,7 +969,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra6 = add_vec (disk_base : SailStdpp.Values.mword 64)
                                         (mword_of_int (16 * Z.of_nat h + 32))⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x15e) : mword 64) -∗
         pa_stk sp0 11 ↦₄ (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) -∗
         pa_add pd (16 * m2 + 14) ↦₂ Z_to_bv 16 (Z.of_nat t) -∗
@@ -1244,7 +1245,7 @@ Section ProofVirtioDiskRwC.
     M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64) ->
     M !!! Regidx Ra6 = add_vec (disk_base : SailStdpp.Values.mword 64)
                                (mword_of_int (16 * Z.of_nat h + 32)) ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x15e) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
     pa_add pd (16 * t + 8) ↦₄ vl2 -∗
@@ -1257,7 +1258,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra0 = M !!! Regidx Ra0
          /\ M1 !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
         pa_add pd (16 * t + 8) ↦₄ Z_to_bv 32 1 -∗
         pa_add pd (16 * t + 12) ↦₂ Z_to_bv 16 2 -∗
@@ -1433,7 +1434,7 @@ Section ProofVirtioDiskRwC.
       (h m2 t : nat) (dsk0 : SailStdpp.Values.mword 32) :
     (h < 8)%nat -> (m2 < 8)%nat -> (t < 8)%nat ->
     vdrw_regs M sp0 b wr sector ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
     vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
@@ -1446,7 +1447,7 @@ Section ProofVirtioDiskRwC.
                                    : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
         vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                      (mword_of_int (Z.of_nat t)) -∗

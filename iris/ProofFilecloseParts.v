@@ -326,6 +326,7 @@ Qed.
 Section ProofFilecloseParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -353,7 +354,7 @@ Section ProofFilecloseParts.
        the epilogue restores are the only ones it may have lost. *)
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat b p -∗
+    sie_cap_gpr kt Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FC + 0x8e) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -367,7 +368,7 @@ Section ProofFilecloseParts.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -435,8 +436,8 @@ Section ProofFilecloseParts.
                    = pa_stk (add_vec (T3 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8)
       by (rewrite Hwv; exact HT3sp).
-    iAssert (stack_own sp0 8) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 8) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -518,7 +519,7 @@ Section ProofFilecloseParts.
     add_vec_int (mword_of_int zd : mword 64) 2 = mword_of_int ze ->
     add_vec (mword_of_int ze : mword 64) (sign_extend' 64 jimm)
       = mword_of_int (FC + 0x8e) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr kt Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")),
@@ -545,7 +546,7 @@ Section ProofFilecloseParts.
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr kt Mr K b p -∗
         pc_is (mword_of_int (FC + 0x8e) : mword 64) -∗
         word_pointsto (pa_stk sp0 4) (DfracOwn 1) v2 -∗
         word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗

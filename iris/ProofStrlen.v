@@ -90,6 +90,7 @@ Section ProofStrlen.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -155,7 +156,7 @@ Section ProofStrlen.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b p -∗
+    sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -163,7 +164,7 @@ Section ProofStrlen.
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -296,7 +297,7 @@ Section ProofStrlen.
   Local Lemma sl_probe `{CID0 : CpuId}
       (M : regfile) (Kv : nat) (dq : dfrac) (s : mword 64) (t : nat) (bt : mword 8) (b : bool) (p : mword 64) :
     M !!! Regidx Ra5 = pa_add s (S t) ->
-    sie_cap_gpr (CID := CID0) M Kv b p -∗
+    sie_cap_gpr kt (CID := CID0) M Kv b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x12) : mword 64) -∗
     (pa_add s (S t)) ↦ₘ{dq} bt -∗
@@ -307,7 +308,7 @@ Section ProofStrlen.
         ⌜Mp !!! Regidx Ra4 = zero_extend' 64 bt⌝ -∗
         ⌜forall r : mword 5, r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
             Mp !!! Regidx r = M !!! Regidx r⌝ -∗
-        sie_cap_gpr Mp Kv b p -∗
+        sie_cap_gpr kt Mp Kv b p -∗
         pc_is (mword_of_int (KernelSyms.strlen + 0x1a) : mword 64) -∗
         (pa_add s (S t)) ↦ₘ{dq} bt -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -406,7 +407,7 @@ Section ProofStrlen.
     M !!! Regidx Ra5 = pa_add s (S t) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗
+    sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x12) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
@@ -416,7 +417,7 @@ Section ProofStrlen.
         ⌜Mt !!! Regidx Ra0 = (mword_of_int (Z.of_nat k) : mword 64)⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b p -∗
+        sie_cap_gpr kt Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -533,7 +534,7 @@ Section ProofStrlen.
   (* ================================================================== *)
   Lemma wp_strlen_sconf (mm : regfile)
       (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_strlen_sconf_body mm n k f K dq b p.
+    : wp_strlen_sconf_body kt mm n k f K dq b p.
   Proof.
     cbv beta delta [wp_strlen_sconf_body].
     intros pcE s ret_tgt HK Hkn Hcstr Hk31.

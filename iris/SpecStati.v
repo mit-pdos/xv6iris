@@ -134,7 +134,7 @@ Notation K_stati := (2%nat) (only parsing).
 Definition wp_stati_sconf_body
     `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !fsLogG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (mm : regfile)
+    (kt : ktier) (mm : regfile)
     (ip st : mword 64)
     (dev inum : mword 32) (dn : dinode)
     (dev0 ino0 : mword 32) (ty0 nl0 : mword 16) (sz0 : mword 64)
@@ -145,7 +145,7 @@ Definition wp_stati_sconf_body
   (* a0 = ip, a1 = st *)
   mm !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   mm !!! Regidx (mword_of_int 11 : mword 5) = st ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   (* the two identity cells -- READ ONLY, so any dfrac *)
@@ -158,7 +158,7 @@ Definition wp_stati_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
     ⌜callee_saved mm mr⌝ -∗
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     pc_is ret_tgt -∗
     i_dev  ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -174,11 +174,11 @@ Module Type STATI.
   Parameter wp_stati_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !fsLogG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (mm : regfile)
+      (kt : ktier) (mm : regfile)
       (ip st : mword 64)
       (dev inum : mword 32) (dn : dinode)
       (dev0 ino0 : mword 32) (ty0 nl0 : mword 16) (sz0 : mword 64)
       (K : nat) (dqd dqn : dfrac) (b : bool) (p : mword 64),
-      wp_stati_sconf_body mm ip st dev inum dn dev0 ino0 ty0 nl0 sz0
+      wp_stati_sconf_body kt mm ip st dev inum dn dev0 ino0 ty0 nl0 sz0
                           K dqd dqn b p.
 End STATI.

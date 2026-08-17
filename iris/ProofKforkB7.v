@@ -83,6 +83,7 @@ Section KforkB7.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   Notation Ra5 := (mword_of_int 15 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
   Notation Rs2 := (mword_of_int 18 : mword 5).
@@ -106,7 +107,7 @@ Section KforkB7.
       (M : regfile) (n : nat) (p : mword 64) :
     M !!! Regidx Rs4 = npa ->
     M !!! Regidx Rs5 = pme ->
-    sie_cap_gpr M n false p -∗
+    sie_cap_gpr kt M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
     proc_priv_nocwd γf npa pid_c V -∗
@@ -117,7 +118,7 @@ Section KforkB7.
           Mx !!! Regidx Rs5 = pme /\
           (forall r : mword 5, is_cs_idx r = true ->
               r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mx !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mx n false p -∗
+        sie_cap_gpr kt Mx n false p -∗
         pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
         proc_priv_nocwd γf npa pid_c (upd_pt V (pv_upt V) (<[(14%nat) := zero_reg]> (pv_tf V))) -∗
         WP (Loop : expr riscv_lang)) -∗

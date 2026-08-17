@@ -106,6 +106,7 @@ Section ProofNamexRoot.
             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -130,7 +131,7 @@ Section ProofNamexRoot.
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
+    : wp_namex_root_body kt gtl cn gfs gi cov logstart nib dev dqp
                          m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namex_root_body].
@@ -205,7 +206,7 @@ Section ProofNamexRoot.
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 12)
       by (rewrite /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -551,7 +552,7 @@ Section ProofNamexRoot.
        this walk nothing.  This is the root clause's first consumer. *)
     iAssert (iname gi gfs ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf kt gtl cn gfs gi cov logstart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
@@ -1018,9 +1019,9 @@ Section ProofNamexRoot.
     iEval (rewrite HT7) in "Hb7".   iEval (rewrite HT8) in "Hb8".
     iEval (rewrite HT9) in "Hb9".   iEval (rewrite HT10) in "Hb10".
     iEval (rewrite HT11) in "Hb11". iEval (rewrite HT12) in "Hb12".
-    iAssert (stack_own sp0 12) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]"
+    iAssert (stack_own (KTR := kt) sp0 12) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]"
       as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
       iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
       iSplitL "Hb3"; [iExists _; iExact "Hb3" |].

@@ -56,7 +56,7 @@ Definition wp_brelse_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname)
+    (kt : ktier) (γs : list gname)
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
@@ -73,14 +73,14 @@ Definition wp_brelse_sconf_body
      gets there from this one, so "bcache" (the lowest rank brelse touches)
      is the only premise stated here. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* the locked buffer being released.  [bio_locked] -- not [bio_held] --
      is THE brelse obligation: the bytes must be the block's logical
      content (unmodified since bread, or re-indexed by log_write), or the
@@ -89,7 +89,7 @@ Definition wp_brelse_sconf_body
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr kt mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
@@ -103,10 +103,10 @@ Module Type BRELSE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname)
+      (kt : ktier) (γs : list gname)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string),
-      wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
+      wp_brelse_sconf_body kt γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
 End BRELSE.

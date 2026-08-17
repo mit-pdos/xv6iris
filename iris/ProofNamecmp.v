@@ -155,10 +155,11 @@ Section ProofNamecmpMain.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_namecmp_sconf
       (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
       (b : bool) (p : mword 64)
-    : wp_namecmp_sconf_body mm f g K dq1 dq2 b p.
+    : wp_namecmp_sconf_body kt mm f g K dq1 dq2 b p.
   Proof.
     cbv beta delta [wp_namecmp_sconf_body].
     intros pcE s1 s2 ret_tgt HK.
@@ -186,7 +187,7 @@ Section ProofNamecmpMain.
                   (add_vec (mm !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
     assert (HR1sp : nc_sp mm R1) by (rewrite /nc_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1 : mword 64)
@@ -296,7 +297,7 @@ Section ProofNamecmpMain.
       rewrite /R4 upd_ne; [| regne]. exact (HR3thr c Hcs N2 N8). }
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID6) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (SC.wp_strncmp_sconf R4 14%nat f g (K - 2)%nat dq1 dq2 b p
+    iApply (SC.wp_strncmp_sconf kt R4 14%nat f g (K - 2)%nat dq1 dq2 b p
               ltac:(lia) HR4a2 ltac:(lia)
               with "Hcg Htext Hpc [Hb1] [Hb2]").
     { iEval (rewrite HR4a0). iExact "Hb1". }
@@ -395,9 +396,9 @@ Section ProofNamecmpMain.
                    = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HP2sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (mm !!! Regidx csp_rs1 : mword 64) 2)
+    iAssert (stack_own (KTR := kt) (mm !!! Regidx csp_rs1 : mword 64) 2)
       with "[Hf1 Hf2]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       done. }

@@ -88,7 +88,7 @@ Definition wp_namei_sconf_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -137,7 +137,7 @@ Definition wp_namei_sconf_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -149,7 +149,7 @@ Definition wp_namei_sconf_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -172,7 +172,7 @@ Definition wp_namei_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z)
     (ok : bool) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -208,7 +208,7 @@ Definition wp_namei_gen_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -259,7 +259,7 @@ Definition wp_namei_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -271,7 +271,7 @@ Definition wp_namei_gen_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -294,7 +294,7 @@ Definition wp_namei_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
     (ok : bool) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -331,7 +331,7 @@ Module Type NAMEI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -347,7 +347,7 @@ Module Type NAMEI.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_namei_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n
                           pidv dq dqb dqs dqc m K eb b lks.
@@ -358,7 +358,7 @@ Module Type NAMEI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -374,7 +374,7 @@ Module Type NAMEI.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_namei_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n Sb
                           pidv dq dqb dqs dqc m K eb b lks.
@@ -401,7 +401,7 @@ Definition wp_namei_root_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+    (kt : ktier) (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -418,7 +418,7 @@ Definition wp_namei_root_body
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -432,7 +432,7 @@ Definition wp_namei_root_body
     ∀ (mr : regfile) (ipv : mword 64),
       ⌜ callee_saved m mr
         /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr kt mr K b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗
@@ -446,11 +446,11 @@ Module Type NAMEI_ROOT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
              !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+      (kt : ktier) (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
-      wp_namei_root_body gtl cn gfs gi cov logstart nib dev dqp
+      wp_namei_root_body kt gtl cn gfs gi cov logstart nib dev dqp
                          m n K eb p b lks.
 End NAMEI_ROOT.

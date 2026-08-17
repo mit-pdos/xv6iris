@@ -97,6 +97,7 @@ Section VtLeaves.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -117,11 +118,11 @@ Section VtLeaves.
     uint rd <> 0 -> rd_ok rd ->
     (forall v : virtio_state, virtio_isr_ok v ->
        exists w : bv 32, virtio_read v off = Some w /\ P w) ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     pc_is pc -∗ instr pc rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     dev_inv γu γd -∗
     ( ∀ w : bv 32, ⌜ P w ⌝ -∗
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 (w : mword 32))]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 (w : mword 32))]> m) n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -167,10 +168,10 @@ Section VtLeaves.
          /\ virtio_isr_ok v'
          /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
          /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     pc_is pc -∗ instr pc rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     dev_inv γu γd -∗
-    ( sie_cap_gpr m n false p -∗
+    ( sie_cap_gpr kt m n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -213,13 +214,13 @@ Section VtLeaves.
   (* Only a4 and a5 are clobbered.                                      *)
   (* ================================================================== *)
   Lemma wp_vt_isr (γu : uart_names) (γd : disk_names) (M : regfile) (n : nat) (p : mword 64) :
-    sie_cap_gpr M n false p -∗
+    sie_cap_gpr kt M n false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x1e) : mword 64) -∗
     dev_inv γu γd -∗
     ( ∀ M' : regfile,
         ⌜ forall r : mword 5, r <> a4_idx -> r <> a5_idx ->
             M' !!! Regidx r = M !!! Regidx r ⌝ -∗
-        sie_cap_gpr M' n false p -∗
+        sie_cap_gpr kt M' n false p -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x30) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -361,6 +362,7 @@ Section VtPrologue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -375,7 +377,7 @@ Section VtPrologue.
     (* acquire's order premise -- see [wp_virtio_disk_intr_sconf] where it
        originates *)
     locks_below lks "virtio_disk" ->
-    sie_cap_gpr m av b pme -∗
+    sie_cap_gpr kt m av b pme -∗
     cpu_own n eb pme b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -388,10 +390,10 @@ Section VtPrologue.
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 r <> csp_rs1 -> r <> s0_idx -> r <> s1_idx ->
                 MA !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        sie_cap_gpr MA (trap_res b + (av - 4))%nat false pme -∗
+        sie_cap_gpr kt MA (trap_res b + (av - 4))%nat false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x1e) : mword 64) -∗
         locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-        cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
+        cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay kt n eb pme -∗
         (* the frame: ra/s0/s1's entry values and the unused fourth slot *)
         pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
         pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
@@ -425,7 +427,7 @@ Section VtPrologue.
     assert (Hpc02 : add_vec_int (mword_of_int KernelSyms.virtio_disk_intr : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_intr + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -573,7 +575,7 @@ Section VtPrologue.
       rewrite /A5 upd_ne; [| vm_compute; discriminate].
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s1. }
     iDestruct (cpu_own_transport CID CID10 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string (disk_res γd pd pav pu) A6
+    iApply (Acquire.wp_acquire_sconf kt γk "virtio_disk"%string (disk_res γd pd pav pu) A6
               n eb pme (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
@@ -632,6 +634,7 @@ Section VtEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -654,11 +657,11 @@ Section VtEpilogue.
     (* matches [wp_vt_prologue]'s order premise: needed to fold release's
        output set back down to [lks] *)
     locks_below lks "virtio_disk" ->
-    sie_cap_gpr MB (trap_res b + (av - 4))%nat false pme -∗
+    sie_cap_gpr kt MB (trap_res b + (av - 4))%nat false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-    cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
+    cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay kt n eb pme -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗
@@ -666,7 +669,7 @@ Section VtEpilogue.
     wp_next b pme (fun (CID : CpuId) =>
       ∀ MF : regfile,
         ⌜ callee_saved m MF ⌝ -∗
-        sie_cap_gpr MF av b pme -∗
+        sie_cap_gpr kt MF av b pme -∗
         cpu_own n eb pme b lks -∗
         pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -748,7 +751,7 @@ Section VtEpilogue.
        what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
+    iApply (Release.wp_release_sconf kt γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
               n eb pme (av - 4)%nat ({["virtio_disk"]} ∪ lks)
               ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
@@ -829,8 +832,8 @@ Section VtEpilogue.
                    = pa_stk (add_vec (E5 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE5csp. symmetry. exact Hspd4. }
     iPoseProof (vti_9c with "Htext") as "Hi9c".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HE3csp). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HE4csp). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HE5csp). iExact "Hr8". }
@@ -1095,6 +1098,7 @@ Section VtDevRam.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* the used-ring INDEX read: [lhu a5,2(a5)] at +0x36 and [lhu a4,2(a4)]
      at +0x82.  Drives [virtio_proto_used_idx_acc]; the value is the
      device's completed count, and what survives is the pair of bounds
@@ -1105,14 +1109,14 @@ Section VtDevRam.
       (m : regfile) (n : nat) (np nr : nat) (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pu 2%nat : mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n false p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n false p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_done_lb γd nr -∗
     ( ∀ nc : nat,
         ⌜(nr <= nc)%nat /\ (nc <= np)%nat⌝ -∗
         disk_done_lb γd nc -∗ disk_pub γd np -∗
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 (wrap16 nc : SailStdpp.Values.mword 16))]> m) n false p -∗
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 (wrap16 nc : SailStdpp.Values.mword 16))]> m) n false p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1199,12 +1203,12 @@ Section VtDevRam.
     add_vec (rget m rs1) (sign_extend' 64 imm)
       = (pa_add pu (vt_uoff p) : SailStdpp.Values.mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n false pp -∗ pc_is pc -∗
+    sie_cap_gpr kt m n false pp -∗ pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_receipt γd p sl pin -∗ disk_done_lb γd c -∗
     ( ⌜ slot_pin_ok (virtio_init_cfg pd pav pu) p sl pin ⌝ -∗
-      sie_cap_gpr (<[Regidx rd := regval_into_reg
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg
           (sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
                             : SailStdpp.Values.mword 32))]> m) n false pp -∗
       pc_is (add_vec_int pc 2) -∗
@@ -1343,14 +1347,14 @@ Section VtDevRam.
   Lemma wp_vt_entry_test (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64) (M : regfile) (n : nat)
       (np nr : nat) (p : mword 64) :
     (M !!! Regidx (mword_of_int 9 : mword 5) : mword 64) = (disk_base : mword 64) ->
-    sie_cap_gpr M n false p -∗
+    sie_cap_gpr kt M n false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x30) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_done_lb γd nr -∗ d_used_idx ↦₂ wrap16 nr -∗
     ( ( ∀ M' : regfile,
           ⌜ forall r : mword 5, r <> mword_of_int 14 -> r <> mword_of_int 15 ->
               M' !!! Regidx r = M !!! Regidx r ⌝ -∗
-          sie_cap_gpr M' n false p -∗
+          sie_cap_gpr kt M' n false p -∗
           pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
           disk_pub γd np -∗ d_used_idx ↦₂ wrap16 nr -∗
           WP (Loop : expr riscv_lang))
@@ -1359,7 +1363,7 @@ Section VtDevRam.
               M' !!! Regidx r = M !!! Regidx r ⌝ -∗
           ⌜ (nr < nc)%nat /\ (nc <= np)%nat ⌝ -∗
           disk_done_lb γd nc -∗
-          sie_cap_gpr M' n false p -∗
+          sie_cap_gpr kt M' n false p -∗
           pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
           disk_pub γd np -∗ d_used_idx ↦₂ wrap16 nr -∗
           WP (Loop : expr riscv_lang)) ) -∗
@@ -1900,6 +1904,7 @@ Section VtBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -1932,7 +1937,7 @@ Section VtBody.
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
     (nr < c)%nat -> (h < 8)%nat ->
     bv_unsigned (vr_head (vs_req sl)) = Z.of_nat h ->
-    sie_cap_gpr M n false pp -∗
+    sie_cap_gpr kt M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_receipt γd nr sl pin -∗ disk_done_lb γd c -∗
@@ -1942,7 +1947,7 @@ Section VtBody.
           /\ (forall r : mword 5, r <> a4_idx -> r <> a5_idx ->
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
         ⌜ slot_pin_ok (virtio_init_cfg pd pav pu) nr sl pin ⌝ -∗
-        sie_cap_gpr M' n false pp -∗
+        sie_cap_gpr kt M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
         d_used_idx ↦₂ wrap16 nr -∗
         disk_pub γd np -∗ disk_done_lb γd (S nr) -∗
@@ -2140,7 +2145,7 @@ Section VtBody.
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
     (M !!! Regidx a5_idx : mword 64) = (mword_of_int (Z.of_nat h) : mword 64) ->
     (h < 8)%nat ->
-    sie_cap_gpr M n false pp -∗
+    sie_cap_gpr kt M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
     disk_geom γd pd pav pu -∗
     phys_pointsto (d_info_status h) (DfracOwn 1) byte_zero -∗
@@ -2148,7 +2153,7 @@ Section VtBody.
         ⌜ M' !!! Regidx a5_idx = (mword_of_int (Z.of_nat h) : mword 64)
           /\ (forall r : mword 5, r <> a4_idx -> r <> a5_idx ->
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr M' n false pp -∗
+        sie_cap_gpr kt M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x60) : mword 64) -∗
         phys_pointsto (d_info_status h) (DfracOwn 1) byte_zero -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -2291,7 +2296,7 @@ Section VtBody.
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
     (M !!! Regidx a5_idx : mword 64) = (mword_of_int (Z.of_nat h) : mword 64) ->
     (h < 8)%nat ->
-    sie_cap_gpr M n false pp -∗
+    sie_cap_gpr kt M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x60) : mword 64) -∗
     d_info_b h ↦₈ (b : SailStdpp.Values.mword 64) -∗
     b_disk b ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
@@ -2299,7 +2304,7 @@ Section VtBody.
         ⌜ M' !!! Regidx a0_idx = (b : SailStdpp.Values.mword 64)
           /\ (forall r : mword 5, r <> a0_idx -> r <> a5_idx ->
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr M' n false pp -∗
+        sie_cap_gpr kt M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x6e) : mword 64) -∗
         d_info_b h ↦₈ (b : SailStdpp.Values.mword 64) -∗
         b_disk b ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) -∗
@@ -2439,7 +2444,7 @@ Section VtBody.
   Lemma wp_vt_advance (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64) (M : regfile) (n : nat)
       (np nr : nat) (pp : mword 64) :
     (M !!! Regidx s1_idx : mword 64) = (disk_base : mword 64) ->
-    sie_cap_gpr M n false pp -∗
+    sie_cap_gpr kt M n false pp -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x72) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_done_lb γd (S nr) -∗
@@ -2453,7 +2458,7 @@ Section VtBody.
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
         ⌜ (S nr <= nc)%nat /\ (nc <= np)%nat ⌝ -∗
         disk_done_lb γd nc -∗
-        sie_cap_gpr M' n false pp -∗
+        sie_cap_gpr kt M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x86) : mword 64) -∗
         disk_pub γd np -∗ d_used_idx ↦₂ wrap16 (S nr) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -2645,12 +2650,13 @@ Section VtLoopDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Definition vt_exit (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av lvl : nat) (eb : bool)
       (pme : mword 64) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (∀ MB : regfile,
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
-       sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
+       sie_cap_gpr kt MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
        cpu_own (S lvl) eb pme false ({["virtio_disk"]} ∪ lks) -∗
        disk_res γd pd pav pu -∗
@@ -2661,7 +2667,7 @@ Section VtLoopDefs.
       (pme : mword 64) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (∀ MB : regfile,
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
-       sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
+       sie_cap_gpr kt MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
        cpu_own (S lvl) eb pme false ({["virtio_disk"]} ∪ lks) -∗
        vt_loop_state γd pd pav pu -∗
@@ -2708,6 +2714,7 @@ Section VtLoopProof.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -2729,7 +2736,7 @@ Section VtLoopProof.
        acquire); wakeup's own order premise ("proc") is derived from this at
        the +0x6e call site via [locks_below_union_singleton]/[locks_below_mono] *)
     locks_below lks "virtio_disk" ->
-    kernel_text -∗ procs_inv γs -∗
+    kernel_text -∗ procs_inv (kt := kt) γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     vt_loop γd pd pav pu m av lvl eb pme sp0 lks.
   Proof.
@@ -2807,7 +2814,7 @@ Section VtLoopProof.
        back on top) -- "virtio_disk" (9) < "proc" (11) *)
     assert (Hwproc : locks_below ({["virtio_disk"]} ∪ lks) "proc").
     { lkbelow. }
-    iApply (Wakeup.wp_wakeup_sconf W γs pme (S lvl)
+    iApply (Wakeup.wp_wakeup_sconf kt W γs pme (S lvl)
               (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb false _ HwK HWdom Hlen Hwlvl
               Hwproc
               with "Hcg Hown Htext Hpc Hpi").
@@ -2996,6 +3003,7 @@ Section ProofVirtioDiskIntr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -3013,7 +3021,7 @@ Section ProofVirtioDiskIntr.
       (pd pav pu : mword 64)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (b : bool) (lks : gset string)
-    : wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme b lks.
+    : wp_virtio_disk_intr_sconf_body kt γs γu γd γk pd pav pu m K lvl eb pme b lks.
   Proof.
     cbv beta delta [wp_virtio_disk_intr_sconf_body].
     intros pcE ret_tgt HK Hdom Hlen Hlvl Hfresh.

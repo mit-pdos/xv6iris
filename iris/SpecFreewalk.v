@@ -69,7 +69,7 @@ Import Defs.
 
 
 Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
+    (kt : ktier) (γa : gname) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freewalk in
@@ -90,7 +90,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      -- including the recursive descent, whose own instance of this same
      contract carries the identical bound. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -98,7 +98,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -108,8 +108,8 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type FREEWALK.
   Parameter wp_freewalk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
+      (kt : ktier) (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
-      wp_freewalk_sconf_body γa mm t lvl K eb p ilvl b lks.
+      wp_freewalk_sconf_body kt γa mm t lvl K eb p ilvl b lks.
 End FREEWALK.

@@ -41,6 +41,7 @@ Section ProofRelease.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
      whole-function proof already has.  Written name-free (durable-notes: an
@@ -54,7 +55,7 @@ Section ProofRelease.
       (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
-    : wp_release_gen_sconf_body γl lka s R Dc Out m n eb p av lks.
+    : wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_gen_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
@@ -101,7 +102,7 @@ Section ProofRelease.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.release + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -196,7 +197,7 @@ Section ProofRelease.
     assert (HlkaR3 : add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5))
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
       by (rewrite Ha0R3; exact Hlka).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl lka s R Dc R3 (trap_res outb + (av - 4))%nat p
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf kt γl lka s R Dc R3 (trap_res outb + (av - 4))%nat p
               HlkaR3 ltac:(lia) Href
               with "Hcg Htext Hpc Hlock Htoken").
     iIntros (mh) "Hcg Hpc %Hmh Htoken".
@@ -292,7 +293,7 @@ Section ProofRelease.
     (* pop_off's UNWIND PREMISE, discharged exactly as the discipline says:
        the coupling gave [size lks <= S n] on the way in, the cpu-field clear
        above deleted this lock's rank, so the set now fits under [n]. *)
-    iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p _
+    iApply (PushOff.wp_pop_off_sconf kt M1 (av - 4)%nat n eb p _
               ltac:(lia)
               ltac:(exact (size_del_lt s lks n Hin Hsz))
               with "Hcg Hown Hpay Htext Hpc").
@@ -370,8 +371,8 @@ Section ProofRelease.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspE3. symmetry. exact Hspr4. }
     iPoseProof (rli_28 with "Htext") as "Hi28".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -Hcspmf). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HcspE1). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HcspE2). iExact "Hr8". }
@@ -503,17 +504,18 @@ Section OfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_release_sconf
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
-    : wp_release_sconf_body γl lka s R m n eb p av lks.
+    : wp_release_sconf_body kt γl lka s R m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γl lka s R False%I emp%I m n eb p av lks
+    iApply (G.wp_release_gen_sconf kt γl lka s R False%I emp%I m n eb p av lks
               Hlka Hav (lock_refute_False _) (lock_refute_False _)
               with "Hcg Htext Hpc [] Htoken HR [] Hown Hpay").
     { iApply (is_lock_openable with "Hlock"). }
@@ -538,17 +540,18 @@ Section CancelOfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_release_cancel_sconf
       (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
-    : wp_release_cancel_sconf_body γl lka s R D Out m n eb p av lks.
+    : wp_release_cancel_sconf_body kt γl lka s R D Out m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_cancel_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γl lka s R D
+    iApply (G.wp_release_gen_sconf kt γl lka s R D
               (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
               m n eb p av lks
               Hlka Hav Href Hrefpre

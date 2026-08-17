@@ -340,7 +340,7 @@ Definition fs_fabric
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
+    {kt : ktier} (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
     (g : log_names) (gfs : fs_names) (gi : gname) (cn : ic_names) (gtl : gname)
     (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
@@ -362,7 +362,7 @@ Definition fs_fabric
    ic_escrows cn gfs gi cov logstart ∗
    ic_sleeplocks cn ∗
    ireg_inv gi gfs inodestart nib ∗
-   procs_inv gs ∗
+   procs_inv (kt := kt) gs ∗
    dev_inv gu gd ∗
    disk_geom gd pd pav pu ∗
    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
@@ -372,8 +372,8 @@ Global Instance fs_fabric_persistent
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
-  Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    {kt : ktier} gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
+  Persistent (fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
                         cov logstart inodestart nib dev).
 Proof. apply _. Qed.
 
@@ -386,7 +386,7 @@ Definition wp_kexec_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -491,10 +491,10 @@ Definition wp_kexec_sconf_body
      [b = true]; it is kept because it is what the callee contracts quote. *)
   b = true ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+  fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -528,7 +528,7 @@ Definition wp_kexec_sconf_body
       ⌜callee_saved m mf⌝ -∗
       ⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
                 entry spv szv' na alen⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -552,7 +552,7 @@ Module Type KEXEC.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (jp : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -569,7 +569,7 @@ Module Type KEXEC.
       (dqb dqs dqa : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_kexec_sconf_body kt gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa m K eb b lks.

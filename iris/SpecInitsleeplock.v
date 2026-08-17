@@ -34,7 +34,7 @@ Import Defs.
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007568.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (m : regfile) (s : string)
+    (kt : ktier) (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
     (av : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initsleeplock in
@@ -43,7 +43,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (6 <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
@@ -58,7 +58,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
   sl_pid slk ↦₄ vpid -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr av b p -∗
+    sie_cap_gpr kt mr av b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -74,8 +74,8 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
 
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (s : string)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
       (av : nat) (b : bool) (p : mword 64),
-      wp_initsleeplock_sconf_body m s vlocked vlk vpid vlkname vcpu vname av b p.
+      wp_initsleeplock_sconf_body kt m s vlocked vlk vpid vlkname vcpu vname av b p.
 End INITSLEEPLOCK.

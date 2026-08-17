@@ -57,6 +57,7 @@ Section ProofWakeupPartsEpi.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   (* wakeup's epilogue over sconf: restore ra/s0/s1..s5 from the 8-slot frame
      (7 c.ldsp), pop it (c.addi16sp sp,+64 via wp_caddi16sp_pop_s_sconf),
      c.ret.  Frame cells at [wk_fcell spF u] = [pa_stk sp0 (8-u)] (sp0 =
@@ -64,7 +65,7 @@ Section ProofWakeupPartsEpi.
   Lemma wp_wakeup_epilogue_sconf
       (M : regfile) (K : nat)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64)
-    : wp_wakeup_epilogue_sconf_body M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
+    : wp_wakeup_epilogue_sconf_body kt M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
   Proof.
     cbv beta delta [wp_wakeup_epilogue_sconf_body].
     intros spF sp0 rettgt HK8 Hdom.
@@ -186,8 +187,8 @@ Section ProofWakeupPartsEpi.
     { unfold wk_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb0 : wk_fcell spF 0 = pa_stk sp0 8).
     { unfold wk_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iAssert (stack_own sp0 8) with "[Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 8) with "[Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf7"; [iEval (rewrite -Hb7); iExists _; iExact "Hf7"|].
       iSplitL "Hf6"; [iEval (rewrite -Hb6); iExists _; iExact "Hf6"|].
       iSplitL "Hf5"; [iEval (rewrite -Hb5); iExists _; iExact "Hf5"|].
@@ -244,13 +245,14 @@ Section ProofWakeupPartsPro.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   (* wakeup's prologue over sconf: c.addi16sp sp,-64 (wp_caddi16sp_push_s_sconf: count K -> K-8, frame handed out),
      7 c.sdsp saves (ra/s0/s1..s5), c.addi4spn s0, then loop-register setup
      (s2:=chan(a0), s1:=&proc[0], s4:=2, s5:=3, s3:=&proc[64]) and c.j to the
      loop head at wakeup+0x38. *)
   Lemma wp_wakeup_prologue_sconf
       (m : regfile) (K : nat) (b : bool) (p : mword 64)
-    : wp_wakeup_prologue_sconf_body m K b p.
+    : wp_wakeup_prologue_sconf_body kt m K b p.
   Proof.
     cbv beta delta [wp_wakeup_prologue_sconf_body].
     intros sp0 spF HK8 Hdom.
@@ -281,7 +283,7 @@ Section ProofWakeupPartsPro.
               with "Hcg Hpc Hi00").
     iIntros (CID1 Hst1) "Hcg Hframe Hpc".
     assert (Hsp0f : m !!! Regidx csp_rs1 = sp0) by reflexivity.
-    iEval (rewrite Hsp0f stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite Hsp0f (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & C7 & C8 & _)".
     iDestruct "C1" as (v1) "Hc1". iDestruct "C2" as (v2) "Hc2".
     iDestruct "C3" as (v3) "Hc3". iDestruct "C4" as (v4) "Hc4".

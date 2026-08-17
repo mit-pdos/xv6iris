@@ -195,8 +195,8 @@ Proof. intro H. apply eq_vec_false_iff. exact H. Qed.
    at +0x76, while [wp_swtch_sconf] wants the bundle and [cpu_own] at the SAME
    index. *)
 Lemma sc_retag_p `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (mm : regfile) (n : nat) (px qx : mword 64) :
-  sie_cap_gpr mm n false px ⊣⊢ sie_cap_gpr mm n false qx.
+    {kt : ktier} (mm : regfile) (n : nat) (px qx : mword 64) :
+  sie_cap_gpr kt mm n false px ⊣⊢ sie_cap_gpr kt mm n false qx.
 Proof. reflexivity. Qed.
 
 (* The scheduler's [cpu_own] is always at level 0 with an [emp] context slot,
@@ -269,6 +269,7 @@ Section ProofScheduler.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* register indices, named once *)
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
@@ -329,16 +330,16 @@ Section ProofScheduler.
         (* the tail is entered holding proc jj's lock, i.e. at noff = 1, so
            the ambient SIE index is the literal [false] (CpuOwn.cpu_own_eb_agree)
            however the ROUND's base enable [ebx] came out. *)
-        sie_cap_gpr Mt (av - 10)%nat false zero_reg -∗
+        sie_cap_gpr kt Mt (av - 10)%nat false zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x4a)) -∗
         locked γl cpu_id -∗
-        proc_lock_res γs γl (proc_addr jj) -∗
+        proc_lock_res (kt := kt) γs γl (proc_addr jj) -∗
         (* THE SET IS {proc} ON THE WAY IN AND ∅ ON THE WAY OUT: the tail IS
            the release of proc jj's lock, so it is the one place in this file
            where the held set changes.  Every other [cpu_own] here is at one
            of those two literals. *)
         cpu_own 1 ebx zero_reg false {["proc"]} -∗
-        trap_csrs -∗
+        trap_csrs kt -∗
         own_ctx (a_cpu_ctx cid_word) -∗
         ( ( ⌜(S jj < NPROC)%nat⌝ -∗ ∀ (Mn : regfile),
               ⌜ Mn !!! Regidx Rs1 = proc_addr (S jj)
@@ -349,10 +350,10 @@ Section ProofScheduler.
                 /\ neq_vec (add_vec zero_reg (Mn !!! Regidx Rs7)) zero_reg = true
                 /\ trunc32 (Mn !!! Regidx Rs8) = RUNNING ⌝ -∗
               ⌜ neq_vec (Mn !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-              sie_cap_gpr Mn n ebx zero_reg -∗
+              sie_cap_gpr kt Mn n ebx zero_reg -∗
               pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
               cpu_own 0 ebx zero_reg ebx ∅ -∗
-              (if ebx then emp else trap_csrs) -∗
+              (if ebx then emp else trap_csrs kt) -∗
               own_ctx (a_cpu_ctx cid_word) -∗
               WP (Loop : expr riscv_lang) )
           ∧ ( ∀ (Me : regfile),
@@ -361,10 +362,10 @@ Section ProofScheduler.
                 /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
                 /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
               ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-              sie_cap_gpr Me n ebx zero_reg -∗
+              sie_cap_gpr kt Me n ebx zero_reg -∗
               pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
               cpu_own 0 ebx zero_reg ebx ∅ -∗
-              (if ebx then emp else trap_csrs) -∗
+              (if ebx then emp else trap_csrs kt) -∗
               own_ctx (a_cpu_ctx cid_word) -∗
               WP (Loop : expr riscv_lang) ) ) -∗
         WP (Loop : expr riscv_lang))%I.
@@ -388,10 +389,10 @@ Section ProofScheduler.
         ⌜ neq_vec (M !!! Regidx Rs5) zero_reg = false -> ebc = false ⌝ -∗
         (* level 0: the ambient SIE index IS the base enable (cpu_own_eb_agree),
            so [ebc] and NOT a blanket [false]. *)
-        sie_cap_gpr M n ebc zero_reg -∗
+        sie_cap_gpr kt M n ebc zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
         cpu_own 0 ebc zero_reg ebc ∅ -∗
-        (if ebc then emp else trap_csrs) -∗
+        (if ebc then emp else trap_csrs kt) -∗
         own_ctx (a_cpu_ctx cid_word) -∗
         ( ∀ (Me : regfile) (eb2 : bool) (n2 : nat),
             ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
@@ -402,10 +403,10 @@ Section ProofScheduler.
             (* a dispatch may hand the round back at a DIFFERENT base enable,
                so the exit carries its own arm AND its own index. *)
             ⌜ (trap_res eb2 + n2)%nat = (av - 10)%nat ⌝ -∗
-            sie_cap_gpr Me n2 eb2 zero_reg -∗
+            sie_cap_gpr kt Me n2 eb2 zero_reg -∗
             pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
             cpu_own 0 eb2 zero_reg eb2 ∅ -∗
-            (if eb2 then emp else trap_csrs) -∗
+            (if eb2 then emp else trap_csrs kt) -∗
             own_ctx (a_cpu_ctx cid_word) -∗
             WP (Loop : expr riscv_lang) ) -∗
         WP (Loop : expr riscv_lang))%I.
@@ -418,16 +419,16 @@ Section ProofScheduler.
           /\ trunc32 (M !!! Regidx Rs8) = RUNNING ⌝ -∗
         (* the index that goes with the arm over the fixed carve [av - 10] *)
         ⌜ (trap_res eb + n)%nat = (av - 10)%nat ⌝ -∗
-        sie_cap_gpr M n eb zero_reg -∗
+        sie_cap_gpr kt M n eb zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x86)) -∗
         cpu_own 0 eb zero_reg eb ∅ -∗
-        (if eb then emp else trap_csrs) -∗
+        (if eb then emp else trap_csrs kt) -∗
         own_ctx (a_cpu_ctx cid_word) -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_scheduler_sconf
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64)
-    : wp_scheduler_sconf_body γs m av p0.
+    : wp_scheduler_sconf_body kt γs m av p0.
   Proof.
     cbv beta delta [wp_scheduler_sconf_body].
     intros pcE Hp0 Hav. subst p0.
@@ -467,7 +468,7 @@ Section ProofScheduler.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
     (* the ten frame slots *)
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 & F9 & F10 & _)".
     iDestruct "F1" as (u1) "Hf1". iDestruct "F2" as (u2) "Hf2".
     iDestruct "F3" as (u3) "Hf3". iDestruct "F4" as (u4) "Hf4".
@@ -942,7 +943,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE RELEASE TAIL, +0x4a..+0x54, over an arbitrary arrival map.      *)
     (* ================================================================== *)
-    iAssert (□ sc_tail_body γs av)%I
+    iAssert (□ sc_tail_body (kt := kt) γs av)%I
       with "[]" as "#Tail".
     { iModIntro.
       iIntros (jj γl Mt ebx n) "%Hjj %Hgl %Hn %Hpins %Htie Hcg Hpc Hlocked HR Hcpu Hcsrs Hown Hcont".
@@ -984,7 +985,7 @@ Section ProofScheduler.
       (* trap_csrs -> release's [arm_pay 0 ebx zero_reg] + the loop's
          complement.  The claim half is the IDLE one: the scheduler runs with
          [c->proc == 0], so it mints what the arm is owed for free. *)
-      iAssert (arm_pay 0 ebx zero_reg ∗ (if ebx then emp else trap_csrs))%I
+      iAssert (arm_pay kt 0 ebx zero_reg ∗ (if ebx then emp else trap_csrs kt))%I
         with "[Hcsrs]" as "[Hpay Hcsrs]".
       { rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay. destruct ebx.
         - iSplitL "Hcsrs"; [ iFrame "Hcsrs"; iApply cpu_claim_idle | done ].
@@ -996,8 +997,8 @@ Section ProofScheduler.
          the in-lock carve [av - 10]; its exit is [n], the index the tail owes
          its caller. *)
       iEval (rewrite -Hn) in "Hcg".
-      iApply (Release.wp_release_sconf γl (proc_addr jj) "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) T1 0 ebx zero_reg n
+      iApply (Release.wp_release_sconf kt γl (proc_addr jj) "proc"%string
+                (proc_lock_res (kt := kt) γs γl (proc_addr jj)) T1 0 ebx zero_reg n
                 {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1099,7 +1100,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE INNER SCAN, entry +0x58, fuel induction on the remaining count. *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ fuel : nat, sc_scan_body γs av fuel))%I
+    iAssert (□ ( ∀ fuel : nat, sc_scan_body (kt := kt) γs av fuel))%I
       with "[]" as "#Scan".
     { iModIntro. iIntros (fuel). iInduction fuel as [|fuel IH] "IH";
         iIntros (jj M ebc n) "%Hfuel %Hjj %Hn %Hpins %Htie Hcg Hpc Hcpu Hcsrs Hown Hexit".
@@ -1148,8 +1149,8 @@ Section ProofScheduler.
          contract all carry. *)
       assert (Hnoproc : locks_below (∅ : gset string) "proc")
         by (exact (locks_below_empty "proc")).
-      iApply (Acquire.wp_acquire_sconf γl "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
+      iApply (Acquire.wp_acquire_sconf kt γl "proc"%string
+                (proc_lock_res (kt := kt) γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
@@ -1174,7 +1175,7 @@ Section ProofScheduler.
       (* the claim half of [arm_pay] is dropped: the scheduler runs at
          [c->proc == 0], so what it owes back at the next intr_on is the IDLE
          claim, which [cpu_claim_idle] re-mints for free. *)
-      iAssert trap_csrs with "[Hcsrs Hpay]" as "Hcsrs".
+      iAssert trap_csrs kt with "[Hcsrs Hpay]" as "Hcsrs".
       { destruct ebc; [ iDestruct "Hpay" as "[$ _]" | iExact "Hcsrs" ]. }
       (* the callee-saved pins survive acquire *)
       assert (Hmq : forall c : mword 5, is_cs_idx c = true -> macq !!! Regidx c = M !!! Regidx c).
@@ -1238,7 +1239,7 @@ Section ProofScheduler.
                        = mword_of_int (KernelSyms.scheduler + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr4a) in "Hpc".
         (* the slot goes back UNTOUCHED *)
-        iAssert (proc_lock_res γs γl (proc_addr jj)) with "[Hstate Hpg Hchan Hpub Hslot]" as "HR".
+        iAssert (proc_lock_res (kt := kt) γs γl (proc_addr jj)) with "[Hstate Hpg Hchan Hpub Hslot]" as "HR".
         { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hpg Hchan Hpub Hslot". }
         iApply ("Tail" $! jj γl M2 ebc n with "[%] [%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown").
         { exact Hjj. }
@@ -1407,7 +1408,7 @@ Section ProofScheduler.
            [proc_addr jj]; at [b = false] the bundle does not mention it, so
            the re-tag is conversion (sc_retag_p). *)
         iEval (rewrite (sc_retag_p Mc (av - 10)%nat zero_reg (proc_addr jj))) in "Hcg".
-        iApply (Swtch.wp_swtch_sconf (p_sched γs) None (Some cpu_id)
+        iApply (Swtch.wp_swtch_sconf kt (p_sched γs) None (Some cpu_id)
                   (a_cpu_ctx cid_word) (p_context (proc_addr jj))
                   Mc ctxvs (av - 10)%nat ebc (proc_addr jj)
                   (* the scheduler ALWAYS comes back: its record is what the
@@ -1570,7 +1571,7 @@ Section ProofScheduler.
         iDestruct (pstate_whole_split (proc_addr jj) st') as "[Hwk _]".
         iDestruct ("Hwk" with "Hpg") as "[Hpg _]".
         iModIntro.
-        iAssert (proc_lock_res γs γl (proc_addr jj))
+        iAssert (proc_lock_res (kt := kt) γs γl (proc_addr jj))
           with "[Hstate Hpg Hchan Hpub Hsl]" as "HR".
         { rewrite /proc_lock_res. iExists st', ch'.
           iFrame "Hstate Hpg Hchan Hpub Hsl". }
@@ -1668,11 +1669,11 @@ Section ProofScheduler.
        either.  Left inline. *)
     iAssert (□ ( ∀ (M : regfile) (eb : bool) (nx : nat),
         ⌜ (trap_res eb + nx)%nat = (av - 10)%nat ⌝ -∗
-        sie_cap_gpr M nx eb zero_reg -∗
+        sie_cap_gpr kt M nx eb zero_reg -∗
         cpu_own 0 eb zero_reg eb ∅ -∗
-        (if eb then emp else trap_csrs) -∗
+        (if eb then emp else trap_csrs kt) -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x86)) -∗
-        ( sie_cap_gpr M (av - 10 - kv_frame_slots)%nat true zero_reg -∗
+        ( sie_cap_gpr kt M (av - 10 - kv_frame_slots)%nat true zero_reg -∗
           pc_is (mword_of_int (KernelSyms.scheduler + 0x8a)) -∗
           WP (Loop : expr riscv_lang) ) -∗
         WP (Loop : expr riscv_lang) ))%I
@@ -1715,7 +1716,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE OUTER DISPATCH LOOP, entry +0x86, by iLöb.                     *)
     (* ================================================================== *)
-    iAssert (□ sc_outer_body av)%I
+    iAssert (□ sc_outer_body (kt := kt) av)%I
       with "[]" as "#Outer".
     { iModIntro. iLöb as "IHo".
       iIntros (M eb n) "%Hpo %Hn Hcg Hpc Hcpu Hcsrs Hown".

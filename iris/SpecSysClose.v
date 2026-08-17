@@ -100,7 +100,7 @@ Definition wp_sys_close_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
+     (kt : ktier) (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
@@ -116,7 +116,7 @@ Definition wp_sys_close_sconf_body
      LOWEST rank in the table, and nothing else sys_close touches (argfd,
      myproc) carries any order premise at all. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
@@ -127,7 +127,7 @@ Definition wp_sys_close_sconf_body
      literal [true], so a hart-indexed resource held across the call could
      not be transported to the arbitrary hart it may return on.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γl γf -∗
@@ -139,8 +139,8 @@ Definition wp_sys_close_sconf_body
      untouched and comes straight back.  This is what a syscall that can
      close ANY [struct file] costs, and there is no honest way to make it
      smaller: closing an inode file writes the disk and sleeps. *)
-  fileclose_pipe_env fn on n -∗
-  fileclose_fs_env fn us n eb p -∗
+  fileclose_pipe_env (kt := kt) fn on n -∗
+  fileclose_fs_env (kt := kt) fn us n eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_close calls fileclose,
      whose FD_INODE / FD_DEVICE arm parks, so sys_close can return on another
      hart whatever SIE was doing.  The cost is the CALLER's: it must supply
@@ -149,17 +149,17 @@ Definition wp_sys_close_sconf_body
   wp_next true p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own n eb p b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_close_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* the whole environment back: the page count may have moved (the
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
-      (∃ on', fileclose_pipe_env fn on' n) -∗
-      (∃ us', fileclose_fs_env fn us' n eb p) -∗
+      (∃ on', fileclose_pipe_env (kt := kt) fn on' n) -∗
+      (∃ us', fileclose_fs_env (kt := kt) fn us' n eb p) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -168,8 +168,8 @@ Module Type SYSCLOSE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
+       (kt : ktier) (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
+      wp_sys_close_sconf_body kt γl γf fn on us m av n eb p v pid V b lks.
 End SYSCLOSE.

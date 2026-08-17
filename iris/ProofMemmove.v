@@ -152,6 +152,7 @@ Section ProofMemmove.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   (* [callee_saved] from agreement on the twelve registers the function never
      touches, plus the two frame registers it saves and restores. *)
   Local Lemma cs_from_agree (m M : regfile) :
@@ -191,13 +192,13 @@ Section ProofMemmove.
     (forall c : mword 5, is_cs_idx c = true -> c <> (mword_of_int 8 : mword 5) ->
        c <> csp_rs1 -> M !!! Regidx c = m0 !!! Regidx c) ->
     kernel_text -∗
-    sie_cap_gpr (CID := CID0) M (n - 2) b pcur -∗
+    sie_cap_gpr kt (CID := CID0) M (n - 2) b pcur -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x28)) -∗
     (pa_stk sp0 1) ↦₈ ra0 -∗
     (pa_stk sp0 2) ↦₈ s00 -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
-      sie_cap_gpr mf n b pcur -∗
+      sie_cap_gpr kt mf n b pcur -∗
       pc_is (ret_pc ra0) -∗
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
         = M !!! Regidx (mword_of_int 10 : mword 5) ⌝ -∗
@@ -264,7 +265,7 @@ Section ProofMemmove.
     { rewrite Hup. exact HspM5. }
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.memmove + 0x2c)) (mword_of_int 16 : mword 6)
               M5 (n - 2) 2 b Hpop with "Hcg Hpc Hi2c [Hb1 Hb2]").
-    { iEval (rewrite Hup). iApply (stack_own_2_intro with "Hb1 Hb2"). }
+    { iEval (rewrite Hup). iApply (stack_own_2_intro (KTR := kt) with "Hb1 Hb2"). }
     iIntros (CID3 Hs3) "Hcg Hpc".
     assert (Hp2e : add_vec_int (mword_of_int (KernelSyms.memmove + 0x2c) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -331,14 +332,14 @@ Section ProofMemmove.
     m !!! Regidx (mword_of_int 14 : mword 5) = pa_add p_dst off ->
     m !!! Regidx (mword_of_int 15 : mword 5)
       = add_vec (mword_of_int (Z.of_nat len) : mword 64) p_src ->
-    sie_cap_gpr (CID := CID0) m n b pcur -∗
+    sie_cap_gpr kt (CID := CID0) m n b pcur -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x18)) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
     wp_next (CID0 := CIDh) b pcur (fun (CID : CpuId) =>
       ∀ mf,
-      sie_cap_gpr mf n b pcur -∗
+      sie_cap_gpr kt mf n b pcur -∗
       pc_is (mword_of_int (KernelSyms.memmove + 0x28)) -∗
       ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
       ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
@@ -543,7 +544,7 @@ Section ProofMemmove.
     (forall c : mword 5, is_cs_idx c = true -> c <> (mword_of_int 8 : mword 5) ->
        c <> csp_rs1 -> M !!! Regidx c = m0 !!! Regidx c) ->
     kernel_text -∗
-    sie_cap_gpr (CID := CID0) M (n - 2) b pcur -∗
+    sie_cap_gpr kt (CID := CID0) M (n - 2) b pcur -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x0e)) -∗
     (pa_stk sp0 1) ↦₈ ra0 -∗
     (pa_stk sp0 2) ↦₈ s00 -∗
@@ -551,7 +552,7 @@ Section ProofMemmove.
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mfin,
-      sie_cap_gpr mfin n b pcur -∗
+      sie_cap_gpr kt mfin n b pcur -∗
       pc_is (ret_pc ra0) -∗
       ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
       ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
@@ -700,7 +701,7 @@ Section ProofMemmove.
   (* =================================================================== *)
   Lemma wp_memmove_sconf
       (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memmove_sconf_body m0 n len src_bytes dst_olds b pcur.
+    : wp_memmove_sconf_body kt m0 n len src_bytes dst_olds b pcur.
   Proof.
     cbv beta delta [wp_memmove_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p_dst p_src ret_tgt Hn Hlen32 Ha2.

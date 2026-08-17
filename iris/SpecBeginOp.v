@@ -83,7 +83,7 @@ Definition wp_begin_op_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -103,7 +103,7 @@ Definition wp_begin_op_sconf_body
      function needs -- [locks_below_mono] weakens it to "proc" for the
      interior sleep calls. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  begin_op's own acquire
@@ -111,14 +111,14 @@ Definition wp_begin_op_sconf_body
      [emp] and the caller brings nothing); at [eb = false] the push_off frees
      nothing and the caller brings the pair, holding it because the TRAP
      handed it over -- see SpecSleep.v / SpecAcquiresleep.v. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* threaded, never read: see the header note *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through the two sleeps *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: begin_op PARKS (its retry
      loop sleeps), and a park moves the hart with interrupts off, which has
      nothing to do with SIE (the porting guide's "a PARKING function's
@@ -126,9 +126,9 @@ Definition wp_begin_op_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -142,13 +142,13 @@ Module Type BEGIN_OP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
+      wp_begin_op_sconf_body kt γs j γl bn γ γfs cov logstart dev
                              pidv dq m K eb b lks.
 End BEGIN_OP.

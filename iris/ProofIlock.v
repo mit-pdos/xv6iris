@@ -357,6 +357,7 @@ Section IlockDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
   Definition il_frame (m : regfile) : iProp Σ :=
@@ -382,9 +383,9 @@ Section IlockDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr kt mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext kt eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -413,6 +414,7 @@ Section IlockEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
       (cn : ic_names) (s : Qp) (g : gname)
@@ -425,9 +427,9 @@ Section IlockEpilogue.
     il_sp m M ->
     il_thr5 m M ->
     (filled = true -> fresh_shape dn) ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x1e) : mword 64) -∗
@@ -443,7 +445,7 @@ Section IlockEpilogue.
     i_valid ip ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     ity_shot g (di_type dn) -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
+    il_cont (kt := kt) (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -568,9 +570,9 @@ Section IlockEpilogue.
                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
     { rewrite Hsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -663,6 +665,7 @@ Section IlockLoad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
+  Context {kt : ktier}.
   (* ------------------------------------------------------------------ *)
   (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
   (* ------------------------------------------------------------------ *)
@@ -722,16 +725,16 @@ Section IlockLoad.
        whole point of this helper (the fill arm), so it needs the premise
        threaded on its own binder list just like [wp_ilock_sconf] itself. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x36) : mword 64) -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     ireg_inv gi gfs inodestart nib -∗
-    procs_inv gs -∗
+    procs_inv (kt := kt) gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -752,7 +755,7 @@ Section IlockLoad.
        pair it already splits, and this arm SPENDS it against the record the
        [bread] returns.  [g] was already one of this lemma's parameters. *)
     ity_pending g -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
+    il_cont (kt := kt) (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1006,7 +1009,7 @@ Section IlockLoad.
     (* bread is index-generic now: ilock's own complement (untouched since
        entry -- nothing between il_load's own start and here touches it) is
        exactly what bread asks for, and it hands back the same shape. *)
-    iApply (BR.wp_bread_sconf gs j gl gu gd gk pd pav pu bn
+    iApply (BR.wp_bread_sconf kt gs j gl gu gd gk pd pav pu bn
               (fs_view gfs gd dev cov) pidv dev bno dq
               L7 (K - 4)%nat eb b
               _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
@@ -1681,7 +1684,7 @@ Section IlockLoad.
     assert (HKmm : (2 <= K - 4)%nat) by lia.
     iEval (rewrite /bb_bytes -HG3a0) in "Hdst".
     iEval (rewrite /bb_bytes -HG3a1) in "Hda".
-    iApply (MM.wp_memmove_sconf G3 (K - 4)%nat 52%nat
+    iApply (MM.wp_memmove_sconf kt G3 (K - 4)%nat 52%nat
               (fun jj => ind_bytes (di_addrs dn) !!! jj)
               (fun jj => ind_bytes l0 !!! jj)
               b (proc_addr j) HKmm Hlen32 HG3a2
@@ -1779,7 +1782,7 @@ Section IlockLoad.
        not threaded through this call -- they stay stranded at [CID9] (where
        bread last handed them back) until the wide hop below, past brelse
        and the field copies/memmove that follow it. *)
-    iApply (BL.wp_brelse_sconf gs bn (fs_view gfs gd dev cov) kk
+    iApply (BL.wp_brelse_sconf kt gs bn (fs_view gfs gd dev cov) kk
               pidv dev bno dq H1 (K - 4)%nat eb (proc_addr j)
               (diblk_bytes ds) bsd0 d0b b
               _ HKbl Hkk HH1a0
@@ -1935,7 +1938,7 @@ Section IlockLoad.
                          (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64) 4)]> PA2).
       assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int il_msg_a : mword 64))
         by pcw.
-      iApply (PN.wp_panic_sconf (CID := CIDp4) PA3 (K - 4)%nat
+      iApply (PN.wp_panic_sconf kt (CID := CIDp4) PA3 (K - 4)%nat
                 0%nat eb b (proc_addr j) (PkAStr DfracDiscarded il_msg) lks
                 (il_panic_K K HK) eq_refl il_panic_noff
                 (il_panic_below lks Hbelow)
@@ -2045,6 +2048,7 @@ Section ProofIlockMain.
             !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_ilock_sconf 
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -2058,7 +2062,7 @@ Section ProofIlockMain.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
+    : wp_ilock_sconf_body kt gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g dev inum
                           pidv dq dqs m K eb b lks.
   Proof.
@@ -2072,7 +2076,7 @@ Section ProofIlockMain.
               Href Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
-    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g cov logstart inodestart k ip
+    iAssert (il_cont (kt := kt) (CID0 := CID)  gfs gi gisl bn cn s g cov logstart inodestart k ip
                dev inum pidv dq dqs j m K eb b lks)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     iPoseProof (ili_00 with "Htext") as "Hi00".
@@ -2100,7 +2104,7 @@ Section ProofIlockMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : il_sp m R1) by (rewrite /il_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3".
@@ -2314,7 +2318,7 @@ Section ProofIlockMain.
     (* acquiresleep is index-generic now and takes the trap-CSR complement
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
-    iApply (ASL.wp_acquiresleep_gen_sconf (dq := dq) gs j gil gisl "inode"%string
+    iApply (ASL.wp_acquiresleep_gen_sconf kt (dq := dq) gs j gil gisl "inode"%string
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv (K - 4)%nat eb b lks
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is

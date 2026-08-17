@@ -147,6 +147,7 @@ Section UtArmsCommon.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
+  Context {kt : ktier}.
   (* ==================================================================== *)
   (* [ut_hold] AT THE LITERAL [false], BOTH WAYS.                          *)
   (* ==================================================================== *)
@@ -158,12 +159,12 @@ Section UtArmsCommon.
      directly is a coin flip on whether resolution unfolds the definition. *)
   Lemma ua_hold_off (N : ut_names) (V : pprivate) (lks : gset string) :
     ut_hold Rsys N V false lks -∗
-      cpu_own 0%nat false (un_pj N) false lks ∗ trap_csrs ∗
+      cpu_own 0%nat false (un_pj N) false lks ∗ trap_csrs kt ∗
       cpu_claim (un_pj N) ∗ ut_env Rsys N V.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma ua_hold_on (N : ut_names) (V : pprivate) (lks : gset string) :
-    cpu_own 0%nat false (un_pj N) false lks -∗ trap_csrs -∗
+    cpu_own 0%nat false (un_pj N) false lks -∗ trap_csrs kt -∗
     cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
     ut_hold Rsys N V false lks.
   Proof.
@@ -180,7 +181,7 @@ Section UtArmsCommon.
   (* ==================================================================== *)
   Lemma ua_pin_sie_cap_gpr (M : regfile) (avail : nat) (bb : bool)
       (pp : mword 64) :
-    sie_cap_gpr (tp_pin M) avail bb pp = sie_cap_gpr M avail bb pp.
+    sie_cap_gpr kt (tp_pin M) avail bb pp = sie_cap_gpr kt M avail bb pp.
   Proof.
     unfold sie_cap_gpr, sie_cap.
     rewrite (tp_pin_id (tp_pin M) (rget_tp M)).
@@ -208,6 +209,7 @@ Section Ut56.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
+  Context {kt : ktier}.
   (* ==================================================================== *)
   (* +0x56 .. +0x82: THE UNEXPECTED-SCAUSE ARM.                            *)
   (* ==================================================================== *)
@@ -223,7 +225,7 @@ Section Ut56.
   Lemma ut_56 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
-    printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := kt) (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -237,7 +239,7 @@ Section Ut56.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr kt m nx false (un_pj N) -∗
     ut_hold Rsys N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -259,7 +261,7 @@ Section Ut56.
     (* the four persistent members this block needs, read WITHOUT consuming
        [Hcaps] (durable-notes: destructuring an intuitionistic hypothesis
        eats the name, and the exit hands [ut_env] back). *)
-    iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
+    iAssert (procs_inv (kt := kt) (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
     { iDestruct "Hcaps" as "(_ & $ & _)". }
@@ -570,7 +572,7 @@ Section Ut56.
       by (rewrite /MC upd_ne; [exact HMBs1 | reg_neq]).
     assert (HcsMC : ut_cs m0 MC)
       by (rewrite /MC; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsMB]).
-    iApply (SK.wp_setkilled_sconf (un_s N) (un_j N) (un_l N) MC nx 0%nat false
+    iApply (SK.wp_setkilled_sconf kt (un_s N) (un_j N) (un_l N) MC nx 0%nat false
               (un_pj N) false lks HMCa0 Hj Hjl ltac:(vm_compute; reflexivity)
               ltac:(lia) with "Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
@@ -625,6 +627,7 @@ Section UtD0.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
+  Context {kt : ktier}.
   (* ==================================================================== *)
   (* +0xd0 .. +0xe8: THE VMFAULT ARM.                                      *)
   (* ==================================================================== *)
@@ -650,7 +653,7 @@ Section UtD0.
   Lemma ut_d0 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
-    printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := kt) (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -664,7 +667,7 @@ Section UtD0.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr kt m nx false (un_pj N) -∗
     ut_hold Rsys N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -878,7 +881,7 @@ Section UtD0.
       by (rewrite (ua_pin_lookup M7 Rs1 ltac:(reg_neq)); exact HM7s1).
     assert (HcsP7 : ut_cs m0 (tp_pin M7)) by exact (ua_pin_cs m0 M7 HcsM7).
     iEval (rewrite <- (ua_pin_sie_cap_gpr M7 nx false (un_pj N))) in "Hcg".
-    iApply (VM.wp_vmfault_sconf (un_kl N) (tp_pin M7) (pv_upt V) (pv_sz V) nx
+    iApply (VM.wp_vmfault_sconf kt (un_kl N) (tp_pin M7) (pv_upt V) (pv_sz V) nx
               0%nat false (un_pj N) false lks
               ltac:(lia) (rget_tp M7) HP7a0 HP7a1 Hszb
               ltac:(vm_compute; reflexivity)
@@ -900,7 +903,7 @@ Section UtD0.
       by exact (ut_cs_trans m0 (tp_pin M7) mr HcsP7
                   (ut_cs_of_callee_saved _ _ Hvfcs)).
     (* the trap CSR bundle, closed: nothing below reads a cell. *)
-    iAssert (trap_csrs) with "[Hsepc Hscause Hstval Hsret Hres Hkpt]"
+    iAssert (trap_csrs kt) with "[Hsepc Hscause Hstval Hsret Hres Hkpt]"
       as "Hcsrs".
     { rewrite /trap_csrs.
       iSplitL "Hsepc"; [iExact "Hsepc"|].
@@ -1001,6 +1004,7 @@ Section UtE8.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
+  Context {kt : ktier}.
   (* ==================================================================== *)
   (* +0xea .. +0xf2: THE DEVICE ARM'S killed CHECK.                        *)
   (* ==================================================================== *)
@@ -1031,7 +1035,7 @@ Section UtE8.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr kt m nx false (un_pj N) -∗
     ut_hold Rsys N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -1050,7 +1054,7 @@ Section UtE8.
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
        order premises need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
-    iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
+    iAssert (procs_inv (kt := kt) (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iPoseProof (uti_0ea with "Htext") as "Hiea".
     iPoseProof (uti_0ec with "Htext") as "Hiec".
@@ -1100,7 +1104,7 @@ Section UtE8.
       by (rewrite /M2 upd_ne; [exact HM1s1 | reg_neq]).
     assert (HcsM2 : ut_cs m0 M2)
       by (rewrite /M2; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM1]).
-    iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N) M2 nx 0%nat false
+    iApply (KI.wp_killed_sconf kt (un_s N) (un_j N) (un_l N) M2 nx 0%nat false
               (un_pj N) false lks HM2a0 Hj Hjl ltac:(vm_compute; reflexivity)
               ltac:(lia) with "Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.

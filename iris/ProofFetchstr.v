@@ -110,6 +110,7 @@ Section ProofFetchstr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -147,7 +148,7 @@ Section ProofFetchstr.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b p -∗
+    sie_cap_gpr kt Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fetchstr + 0x30) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -159,7 +160,7 @@ Section ProofFetchstr.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr kt mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -276,8 +277,8 @@ Section ProofFetchstr.
                    = pa_stk (add_vec (T5 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
       by (rewrite Hwv; exact HT5sp).
-    iAssert (stack_own sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -379,7 +380,7 @@ Section ProofFetchstr.
   Lemma wp_fetchstr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_fetchstr_sconf_body γa γf m av n eb p pid V maxn buf_olds b lks.
+    : wp_fetchstr_sconf_body kt γa γf m av n eb p pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
     intros pcE buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
@@ -429,7 +430,7 @@ Section ProofFetchstr.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M1 upd_eq; apply stk_push_48).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & _)".
     iDestruct "C1" as (u1) "Hs1".
     iDestruct "C2" as (u2) "Hs2".
@@ -613,7 +614,7 @@ Section ProofFetchstr.
        may have moved us to a different one, so it must be transported before
        it can be fed to [myproc]'s own [cpu_own] premise. *)
     iDestruct (cpu_own_transport CID CID11 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p b lks
+    iApply (Myproc.wp_myproc_sconf kt M6 (av - 6)%nat n eb p b lks
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID12 Hk12 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -792,7 +793,7 @@ Section ProofFetchstr.
        back a descriptor P' EXTENDING the one it was given.  None of the four
        can be supplied from [wp_fetchstr_sconf_body] as it stands. *)
     iDestruct (cpu_own_transport CID12 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Copyinstr.wp_copyinstr_sconf γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
+    iApply (Copyinstr.wp_copyinstr_sconf kt γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
               (av - 6)%nat n eb p b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
@@ -884,7 +885,7 @@ Section ProofFetchstr.
         apply Nat2Z.inj_lt. exact Hkmax. }
       iEval (rewrite -HB2a0) in "Hbuf".
       (* ---- strlen(buf) ---- *)
-      iApply (Strlen.wp_strlen_sconf B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
+      iApply (Strlen.wp_strlen_sconf kt B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
                 ltac:(lia) Hkmax Hcstr Hk31
                 with "Hcg Htext Hpc Hbuf").
       iIntros (CID22 Hk22 msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".

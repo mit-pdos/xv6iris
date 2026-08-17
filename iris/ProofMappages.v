@@ -42,6 +42,7 @@ Section ProofMappages.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -71,7 +72,7 @@ Section ProofMappages.
      on. *)
   Lemma sie_cap_gpr_settp `{CID0 : CpuId} (m : regfile) (n : nat) (b : bool)
       (p0 v : mword 64) :
-    sie_cap_gpr m n b p0 -∗ sie_cap_gpr (<[Regidx Rtp := v]> m) n b p0.
+    sie_cap_gpr kt m n b p0 -∗ sie_cap_gpr kt (<[Regidx Rtp := v]> m) n b p0.
   Proof.
     assert (Hsp : <[Regidx Rtp := v]> m !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (apply upd_ne; reg_neq).
@@ -114,7 +115,7 @@ Section ProofMappages.
     ((k = npages /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
      \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1)
          /\ avail_zero (avail_sub on q))) ->
-    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
+    sie_cap_gpr kt Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x9c)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -131,7 +132,7 @@ Section ProofMappages.
     kalloc_env γa (avail_sub on q) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗
+      sie_cap_gpr kt mr K b p -∗ cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -320,8 +321,8 @@ Section ProofMappages.
     assert (Hpop : E9 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
     { rewrite Hwv HspE9. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 10) with "[Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 10) with "[Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hc72". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc72". }
       iSplitL "Hc64". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc64". }
       iSplitL "Hc56". { iExists (mm !!! Regidx (mword_of_int 9)). iExact "Hc56". }
@@ -453,7 +454,7 @@ Section ProofMappages.
     pt_nodes tk = (pt_nodes t + consumed)%nat ->
     (consumed + pt_missing tk (vpn_at vpn0 k) (npages - k) <= pt_missing t vpn0 npages)%nat ->
     locks_below lks "kmem" ->
-    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
+    sie_cap_gpr kt Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x3e)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -470,7 +471,7 @@ Section ProofMappages.
     kalloc_env γa (avail_sub on consumed) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗
+      sie_cap_gpr kt mr K b p -∗ cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -616,7 +617,7 @@ Section ProofMappages.
     iDestruct (cpu_own_transport CID0 CIDa4 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* the walk call *)
-    iApply (Walk.wp_walk_sconf γa W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p (avail_sub on consumed) b
+    iApply (Walk.wp_walk_sconf kt γa W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p (avail_sub on consumed) b
               _ Hlvl ltac:(lia)
               HW4'a0 HW4'a2
               ltac:(rewrite HW4'a1; rewrite uint_unsigned; rewrite Hvak_u; lia)
@@ -1160,7 +1161,7 @@ Section ProofMappages.
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_mappages_sconf_body γa mm t m npages perm lvl K eb p on b lks.
+    : wp_mappages_sconf_body kt γa mm t m npages perm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -1240,7 +1241,7 @@ Section ProofMappages.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm) with W1.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (v72) "Hc72". iDestruct "S2" as (v64) "Hc64".
     iDestruct "S3" as (v56) "Hc56". iDestruct "S4" as (v48) "Hc48".

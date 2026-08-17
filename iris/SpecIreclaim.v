@@ -188,7 +188,7 @@ Definition wp_ireclaim_sconf_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -232,7 +232,7 @@ Definition wp_ireclaim_sconf_body
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
   (* THE ORPHAN ARM'S FIRST CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := kt) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev: the RV64 ABI's sign extension of an [int] *)
@@ -246,7 +246,7 @@ Definition wp_ireclaim_sconf_body
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -285,7 +285,7 @@ Definition wp_ireclaim_sconf_body
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle and the disk fabric *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -308,7 +308,7 @@ Definition wp_ireclaim_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -339,7 +339,7 @@ Module Type IRECLAIM.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -353,7 +353,7 @@ Module Type IRECLAIM.
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ireclaim_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
                              used dev pidv dq dqb dqs dqn m K eb b lks.
 End IRECLAIM.

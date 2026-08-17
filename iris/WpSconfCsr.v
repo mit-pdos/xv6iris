@@ -46,6 +46,9 @@ Require Import StackOwn.
 Require Import HartTp WpNext.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
+(* [sr_ktier_wit]: the capability's tier witness, which this file's sstatus
+   read has to carry ACROSS its σ-callback -- see the give-back below. *)
+Require Import SRegime.
 (* [tlb_res_pt_satp_acc]: the satp borrow the csrr-satp leaf takes out of the
    translation slot's KPT arm.  [IntrDefs] already names [tlb_res_pt], so this
    adds no edge to the require graph -- only the import. *)
@@ -577,6 +580,7 @@ Section WpSconfCsr.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
@@ -586,7 +590,7 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -611,10 +615,20 @@ Section WpSconfCsr.
          [kv_frame_slots + n] (what an arm-blind reserve made it) this
          statement is FALSE at [b = false]: the [destruct b] in the proof
          below shows that arm handing back a carve it never received. *)
-      ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m
+      (* THE TIER WITNESS RIDES WITH THE PIECES, AND UNDER A GENERIC [kt] IT
+         HAS TO.  This is the ONE leaf in the S-mode engines that takes the
+         capability APART across the σ-callback (every other leaf hands
+         [sie_cap_gpr] back folded), so it is the one place the fourth
+         conjunct of [IntrDefs.sie_cap] could be lost -- and a caller that
+         lost it could only close its re-fold by CONJURING a witness at a
+         [kt] it knows nothing about.  It is persistent
+         ([SRegime.sr_ktier_wit_persistent]), so carrying it costs the
+         callback side nothing and the give-back is free. *)
+      ( stack_own (KTR := kt) (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m
                      !!! Regidx csp_rs1) (trap_res b + n) ∗
         ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝ ∗
-        sie_arm b p ) -∗
+        sie_arm kt b p ∗
+        sr_ktier_wit strans_regime kt ) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -683,23 +697,31 @@ Section WpSconfCsr.
        includes the ghost NAME: [sie_gname] is [sie_name cpu_id], so an
        unannotated occurrence names the ENTRY hart's ghost while [Hhalf] came
        from the callback at the rebound one. *)
+    (* [Hwit] IS ALREADY AT THE REBOUND HART, so no [sie_ktier_wit_rebind] is
+       needed: [wp_instr_s_sconf]'s σ-callback delivers the whole [sie_cap]
+       at the hart it rebound to, and this witness was destructed out of
+       THAT.  (WpSconfMem's leaves need the rebind because their witness is
+       an explicit PREMISE, supplied at the caller's own hart.)  It is
+       persistent, so it stays in the intuitionistic context and needs no
+       mention in the selection below. *)
     iAssert ( ghost_var (sie_gname (CID := CID)) (1/2) (_get_Mstatus_SIE ms0) ∗
-              ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
+              ( stack_own (KTR := kt) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
                              !!! Regidx csp_rs1) (trap_res b + n) ∗
                 ⌜ _get_Mstatus_SIE ms0 = sie_bit b ⌝ ∗
-                sie_arm (CID := CID) b p ) )%I
+                sie_arm kt (CID := CID) b p ∗
+                sr_ktier_wit (CID := CID) (strans_regime (CID := CID)) kt ) )%I
       with "[Hstk Harm Hhalf]" as "[Hhalf Hpair]".
     { destruct b.
       - iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
         iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iSplitR. { iPureIntro. exact Hb. }
-        iFrame "Hq1 Hhx Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu".
+        iFrame "Hq1 Hhx Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcpu Hwit".
       - iDestruct "Harm" as "Hq0".
         iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iSplitR. { iPureIntro. exact Hb. }
-        iExact "Hq0". }
+        iFrame "Hq0 Hwit". }
     iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
     iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hspp Hmiex Hmenvx] Htr
                           [$Hpc' $Hnpc] [Hfmap] Hpair").
@@ -840,7 +862,7 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     intr_count_pre b k eb -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
@@ -848,10 +870,10 @@ Section WpSconfCsr.
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       ⌜ k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb ⌝ -∗
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)
                   (trap_res b + n)%nat false p -∗
       intr_count (S k) eb -∗
-      trap_csrs_pay k eb -∗
+      trap_csrs_pay kt k eb -∗
       cpu_claim_pay k eb p -∗
       cpu_priv_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
@@ -953,7 +975,7 @@ Section WpSconfCsr.
          re-expressing at the new mstatus -- no ghost movement. *)
       iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
       tp_refold Hrdtp "Hfmap".
-      iAssert (sie_cap (CID := CID) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
+      iAssert (sie_cap kt (CID := CID) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
                        (trap_res true + n)%nat false p)
         with "[Hstk Htr Hq]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
@@ -1018,7 +1040,7 @@ Section WpSconfCsr.
       iEval (rewrite Lnpc) in "Hpc'".
       tp_refold Hrdtp "Hfmap".
       iDestruct (intr_count_push_off k eb with "Hq0 Hcnt") as "(%Heb0 & Hq0 & Hcnt)".
-      iAssert (sie_cap (CID := CID0) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
+      iAssert (sie_cap kt (CID := CID0) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
                        (trap_res false + n)%nat false p)
         with "[Hstk Htr Hq0]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
@@ -1121,9 +1143,9 @@ Section WpSconfCsr.
   Lemma wp_csrsi_sstatus_x0_s_sconf
       (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m (trap_res true + n)%nat b p -∗
+    sie_cap_gpr kt m (trap_res true + n)%nat b p -∗
     intr_count 1 true -∗
-    trap_csrs -∗
+    trap_csrs kt -∗
     cpu_priv 0 true p ∅ -∗
     cpu_claim p -∗
     pc_is pc -∗
@@ -1131,7 +1153,7 @@ Section WpSconfCsr.
     wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m (trap_res b + n)%nat true p -∗
+      sie_cap_gpr kt m (trap_res b + n)%nat true p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1219,7 +1241,7 @@ Section WpSconfCsr.
        true + n)] going in, [trap_res true + (trap_res false + n)] coming
        out, both [kv_frame_slots + n] by conversion -- so [iExact] on the
        untouched [Hstk] closes it with no split and no arithmetic. *)
-    iAssert (sie_cap m (trap_res false + n)%nat true p)
+    iAssert (sie_cap kt m (trap_res false + n)%nat true p)
       with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iFrame "Htr Hwit".
@@ -1349,13 +1371,13 @@ Section WpSconfCsr.
   (* ------------------------------------------------------------------- *)
   Lemma wp_csrsi_sstatus_x0_idem_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) :
-    sie_cap_gpr m n true p -∗
+    sie_cap_gpr kt m n true p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
     wp_next true p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m n true p -∗
+      sie_cap_gpr kt m n true p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1397,7 +1419,7 @@ Section WpSconfCsr.
        that pins the live bit at '1'. *)
     iDestruct "Hcap" as "(Hstk & Htr & (Hq1 & Harest) & #Hwit)".
     iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-    iAssert (sie_cap (CID := CID) m n true p) with "[Hstk Htr Hq1 Harest]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n true p) with "[Hstk Htr Hq1 Harest]" as "Hcap".
     { iFrame "Hstk Htr Hq1 Harest Hwit". }
     destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
@@ -1440,9 +1462,9 @@ Section WpSconfCsr.
      indices are then literally these. *)
   Lemma wp_csrsi_sstatus_x0_enable_s_sconf
       (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
-    sie_cap_gpr m (trap_res true + n)%nat eb p -∗
+    sie_cap_gpr kt m (trap_res true + n)%nat eb p -∗
     (if eb then emp else intr_count 0 false) -∗
-    (if eb then emp else trap_csrs) -∗
+    (if eb then emp else trap_csrs kt) -∗
     (if eb then emp else cpu_priv 0 true p ∅) -∗
     cpu_claim_ext eb p -∗
     pc_is pc -∗
@@ -1450,7 +1472,7 @@ Section WpSconfCsr.
     wp_next eb p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m (trap_res eb + n)%nat true p -∗
+      sie_cap_gpr kt m (trap_res eb + n)%nat true p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1502,16 +1524,16 @@ Section WpSconfCsr.
      scheduler's inlined intr_off() freeing its own reserve. *)
   Lemma wp_csrci_sstatus_x0_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     intr_count_pre b 0 true -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m (trap_res b + n)%nat false p -∗
+      sie_cap_gpr kt m (trap_res b + n)%nat false p -∗
       intr_count 0 false -∗
-      trap_csrs -∗
+      trap_csrs kt -∗
       (* THE RUNNING CLAIM, out of the arm along with the trap CSRs.  It used
          to be DROPPED here, which made this leaf lose a resource its
          push_off sibling [wp_csrci_sstatus_s_sconf] hands back (as
@@ -1610,7 +1632,7 @@ Section WpSconfCsr.
     (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
        re-expressing at the new mstatus -- no ghost movement. *)
     iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
-    iAssert (sie_cap (CID := CID) m (trap_res true + n)%nat false p) with "[Hstk Htr Hq]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m (trap_res true + n)%nat false p) with "[Hstk Htr Hq]" as "Hcap".
     { iSplitL "Hstk"; [iExact "Hstk" |].
       iFrame "Htr Hwit". iExact "Hq". }
     iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
@@ -1649,13 +1671,13 @@ Section WpSconfCsr.
   (* ------------------------------------------------------------------- *)
   Lemma wp_csrci_sstatus_x0_idem_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) :
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
     wp_next false p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr m n false p -∗
+      sie_cap_gpr kt m n false p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1689,7 +1711,7 @@ Section WpSconfCsr.
        at '0', which is what makes the write idempotent. *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (ghost_var_agree with "Hhalf Harm") as %Hb0.
-    iAssert (sie_cap (CID := CID) m n false p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n false p) with "[Hstk Htr Harm]" as "Hcap".
     { iFrame "Hstk Htr Harm Hwit". }
     destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
@@ -1793,12 +1815,12 @@ Section WpSconfCsr.
     uint rs1 <> 0 ->
     rget m rs1 = wval ->
     trapVectorMode_forwards (_get_Mtvec_Mode wval) <> TV_Reserved ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     stvec ↦ᵣ tv0 -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr m n false p -∗
+      sie_cap_gpr kt m n false p -∗
       stvec ↦ᵣ wval -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1918,7 +1940,7 @@ Section WpSconfCsr.
     _get_Sstatus_FS  wval = extStatus_map_forwards Off ->
     _get_Sstatus_VS  wval = extStatus_map_forwards Off ->
     _get_Sstatus_XS  wval = extStatus_map_forwards Off ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     (* THE TRAVELLING SPP HALF.  This is the one instruction that MOVES SPP,
        so it needs both halves: the tie inside [sconf] and this one, which
        interrupts-off code holds (it rides in [trap_csrs]). *)
@@ -1930,7 +1952,7 @@ Section WpSconfCsr.
       ⌜ _get_Mstatus_SIE  msf = sie_bit false ⌝ -∗
       ⌜ _get_Mstatus_SPP  msf = _get_Sstatus_SPP  wval ⌝ -∗
       ⌜ _get_Mstatus_SPIE msf = _get_Sstatus_SPIE wval ⌝ -∗
-      sie_cap_gpr_at msf m n false p -∗
+      sie_cap_gpr_at kt msf m n false p -∗
       sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2044,7 +2066,7 @@ Section WpSconfCsr.
     rget m rs1 = sstatus_read ms0 ->
     sconf_ms_facts ms0 ->
     _get_Mstatus_SIE ms0 = sie_bit false ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     sret_bits vspp vspie -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)) -∗
@@ -2053,7 +2075,7 @@ Section WpSconfCsr.
       ⌜ _get_Mstatus_SIE  msf = _get_Mstatus_SIE  ms0 ⌝ -∗
       ⌜ _get_Mstatus_SPP  msf = _get_Mstatus_SPP  ms0 ⌝ -∗
       ⌜ _get_Mstatus_SPIE msf = _get_Mstatus_SPIE ms0 ⌝ -∗
-      sie_cap_gpr_at msf m n false p -∗
+      sie_cap_gpr_at kt msf m n false p -∗
       sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2110,12 +2132,12 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) (ep0 wval : mword 64) :
     uint rs1 <> 0 ->
     rget m rs1 = wval ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     sepc ↦ᵣ ep0 -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)) -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr m n false p -∗
+      sie_cap_gpr kt m n false p -∗
       sepc ↦ᵣ mepc_val wval -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2237,12 +2259,12 @@ Section WpSconfCsr.
                   set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                     (regval_into_reg
                        (f (register_lookup (R_bitvector_64 rg) s.(sregs))))) ) ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     R_bitvector_64 rg ↦ᵣ{dq} v -∗
     pc_is pc -∗
     instr pc false (CSRReg (csrn, zreg, Regidx rd, CSRRS)) -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (f v)]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (f v)]> m) n false p -∗
       R_bitvector_64 rg ↦ᵣ{dq} v -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2332,12 +2354,12 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) (dq : dfrac) (sc : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     scause ↦ᵣ{dq} sc -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_scause, zreg, Regidx rd, CSRRS)) -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg sc]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg sc]> m) n false p -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2361,12 +2383,12 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) (dq : dfrac) (tv : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     stval ↦ᵣ{dq} tv -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stval, zreg, Regidx rd, CSRRS)) -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg tv]> m) n false p -∗
       stval ↦ᵣ{dq} tv -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2388,12 +2410,12 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) (dq : dfrac) (ep : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     sepc ↦ᵣ{dq} ep -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sepc, zreg, Regidx rd, CSRRS)) -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n false p -∗
       sepc ↦ᵣ{dq} ep -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2438,7 +2460,7 @@ Section WpSconfCsr.
       (pc : mword 64) (rd : mword 5) (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     kpt_on cpu_id -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_satp, zreg, Regidx rd, CSRRS)) -∗
@@ -2449,7 +2471,7 @@ Section WpSconfCsr.
           = (mword_of_int 0 : mword 16) ⌝ -∗
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
           = root ⌝ -∗
-      sie_cap_gpr (<[Regidx rd := regval_into_reg sp0]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg sp0]> m) n false p -∗
       kpt_on cpu_id -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗

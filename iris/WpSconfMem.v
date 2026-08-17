@@ -99,16 +99,17 @@ Section SconfKtierRebind.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* EVERY hart is spelled EXPLICITLY here, [CID] included.  The binder [h]
      is itself a [CpuId] instance, so it SHADOWS the section variable for
      every unannotated hart-indexed term in this statement -- an unadorned
      [cpu_id] would silently mean [h] and the guard would degrade to
      [h = h].  (Same family as WpNext's [wp_next_at] note.) *)
-  Lemma sie_ktier_wit_rebind (kt : ktier) (b : bool) (px : mword 64) (h : CpuId) :
+  Lemma sie_ktier_wit_rebind (ktd : ktier) (b : bool) (px : mword 64) (h : CpuId) :
     (b = false \/ px = zero_reg -> (h : CPU) = (CID : CPU)) ->
-    sr_ktier_wit (CID := CID) (strans_regime (CID := CID)) kt -∗
-    sie_arm (CID := h) b px -∗
-    sie_arm (CID := h) b px ∗ sr_ktier_wit (CID := h) (strans_regime (CID := h)) kt.
+    sr_ktier_wit (CID := CID) (strans_regime (CID := CID)) ktd -∗
+    sie_arm kt (CID := h) b px -∗
+    sie_arm kt (CID := h) b px ∗ sr_ktier_wit (CID := h) (strans_regime (CID := h)) ktd.
   Proof.
     intros Hs. iIntros "#Hwit Harm". destruct b.
     - iEval (rewrite /sie_arm) in "Harm".
@@ -116,7 +117,7 @@ Section SconfKtierRebind.
       iSplitL "Hbit Hres Hsep Hsca Hstv Hspp Hclm Hcpu".
       + rewrite /sie_arm.
         iFrame "Hbit Hres Hkpt Hsep Hsca Hstv Hspp Hclm Hcpu".
-      + destruct kt; [ done | iExact "Hkpt" ].
+      + destruct ktd; [ done | iExact "Hkpt" ].
     - (* the funnel's guard: at SIE=0 the step cannot migrate, so the
          caller's own-hart witness IS the one the absorption needs.
          [rewrite], not [subst]: the equation crosses [CpuId]/[CPU] by
@@ -131,6 +132,7 @@ Section WpSconfMem.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
@@ -144,7 +146,7 @@ Section WpSconfMem.
   (* TIER-INDEXED through its bytes (sp-migration phase D): the [CurKtier]
      instance argument rides along, so every ambient spelling
      [wordw_pointsto width a dq w] is unchanged and an explicit-tier one is
-     [wordw_pointsto (KTR := kt) width a dq w]. *)
+     [wordw_pointsto (KTR := ktd) width a dq w]. *)
   Definition wordw_pointsto `{KTR : !CurKtier} (width : Z) (a : Arch.pa) (dq : dfrac) (w : mword (8*width)) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
      [∗ list] j ∈ seq 0 (Z.to_nat width), mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
@@ -280,20 +282,20 @@ Section WpSconfMem.
   (* only inside a tactic-driven [iApply] that the failure is shelved.)    *)
   (* ==================================================================== *)
   (* ==================================================================== *)
-  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [kt'] is  *)
-  (* the DATUM's tier and [kt] the accessing hart's; [KtierLe kt' kt] is    *)
-  (* the whole access condition and [sr_ktier_wit strans_regime kt] --      *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [ktd'] is  *)
+  (* the DATUM's tier and [ktd] the accessing hart's; [KtierLe ktd' ktd] is    *)
+  (* the whole access condition and [sr_ktier_wit strans_regime ktd] --      *)
   (* persistent, and [emp] at KT0 -- is what the hart shows for it.  At KT0 *)
   (* the datum's own identity pin discharges admissibility ([sr_adm_id]);   *)
   (* at KT1 the regime's all-claims witness does ([sr_absorb_wit]).  Both   *)
   (* go through [SRegime.sr_absorb_ktier], so the body is the pre-phase-D   *)
   (* proof with two lines respelled.  The witness is stated at the leaf's   *)
   (* OWN hart and crossed to the rebound one by [sie_ktier_wit_rebind]      *)
-  (* above.  TIER-PRESERVING: the datum comes back at [kt'].  The KT0/KT0   *)
+  (* above.  TIER-PRESERVING: the datum comes back at [ktd'].  The KT0/KT0   *)
   (* corollary after [Qed] is the pre-phase-D statement (modulo the [pa] -> *)
   (* [ea] binder rename), so no consumer sees the generalization.           *)
   (* ==================================================================== *)
-  Lemma wp_load_s_sconf_au_t (kt kt' : ktier) `{!KtierLe kt' kt} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+  Lemma wp_load_s_sconf_au_t (ktd ktd' : ktier) `{!KtierLe ktd' ktd} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
       `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (Ψ : mword (8*width) -> iProp Σ) (Em : coPset) (b : bool) {dqm : dfrac} :
@@ -320,16 +322,16 @@ Section WpSconfMem.
        mask (claude-notes/completed/kpt-share.md).  Every supplier's [Em] is
        [⊤ ∖ ↑minstretN] minus device/lock namespaces, so [solve_ndisj]. *)
     ↑kptN ⊆ Em ->
-    sr_ktier_wit strans_regime kt -∗
-    sie_cap_gpr m n b p -∗
+    sr_ktier_wit strans_regime ktd -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
-       wordw_pointsto (KTR := kt') width ea dqm v ∗
-       (wordw_pointsto (KTR := kt') width ea dqm v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
+       wordw_pointsto (KTR := ktd') width ea dqm v ∗
+       (wordw_pointsto (KTR := ktd') width ea dqm v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
     ( ∀ v : mword (8*width),
       wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
         Ψ v -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -372,7 +374,7 @@ Section WpSconfMem.
     iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
-    iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
+    iDestruct (sie_ktier_wit_rebind (CID := CID0) ktd b p CID Hs with "Hwit Harm")
       as "[Harm #HwitC]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -392,7 +394,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := ktd') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 ea)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -444,7 +446,7 @@ Section WpSconfMem.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
     iDestruct (sr_tmode (CID := CID) strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime kt kt' (Load Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime ktd ktd' (Load Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
             (or_intror (or_introl eq_refl)) I
             (lo_canonical ea Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
@@ -465,7 +467,7 @@ Section WpSconfMem.
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
     assert (Hoff' : (bv_unsigned (subrange_vec_dec ea 11 0) + Z.of_nat (Z.to_nat width) <= 4096)%Z)
       by (rewrite Z2Nat.id; [ exact Hoff | lia ]).
-    iDestruct (s_mem_chunk (KTR := kt') s_tr ea ea 0 (Z.to_nat width) (Z.to_nat width) (nth_byte v) ppn dqm
+    iDestruct (s_mem_chunk (KTR := ktd') s_tr ea ea 0 (Z.to_nat width) (Z.to_nat width) (nth_byte v) ppn dqm
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff' Hcan
                  with "Hmem Hk Hbytes") as %(Hbytesf & Hram0 & Hraml & _).
     assert (Hbytesf_tr : forall j : nat, (N.of_nat j < Z.to_N width)%N ->
@@ -517,7 +519,7 @@ Section WpSconfMem.
     { rewrite (gpr_pt_nz (CID := CID) rd _ Hrd). iExact "Hrdc". }
     iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     (* hand the (unchanged) cell back and collect the caller's payload *)
-    iAssert (wordw_pointsto (KTR := kt') width ea dqm v)%I with "[Hbytes]" as "Hbw".
+    iAssert (wordw_pointsto (KTR := ktd') width ea dqm v)%I with "[Hbytes]" as "Hbw".
     { rewrite /wordw_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign. }
     iMod ("Hcl" with "Hbw") as "HPsi".
     iModIntro.
@@ -541,7 +543,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf Hspp".
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
@@ -587,7 +589,7 @@ Section WpSconfMem.
        mask (claude-notes/completed/kpt-share.md).  Every supplier's [Em] is
        [⊤ ∖ ↑minstretN] minus device/lock namespaces, so [solve_ndisj]. *)
     ↑kptN ⊆ Em ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
@@ -595,7 +597,7 @@ Section WpSconfMem.
        (wordw_pointsto width ea dqm v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
     ( ∀ v : mword (8*width),
       wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
         Ψ v -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -633,12 +635,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     wordw_pointsto width pa dqm v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -688,12 +690,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, false, width)) -∗
     wordw_pointsto width pa dqm v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -726,12 +728,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, true, width)) -∗
     wordw_pointsto width pa dqm v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -789,12 +791,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     pa ↦ₘ{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -848,10 +850,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) -∗ pa ↦₄{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -875,10 +877,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗ pa ↦₈{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -902,10 +904,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗ pa ↦₈{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -929,10 +931,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗ pa ↦₄{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -956,10 +958,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗ pa ↦₄{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -991,20 +993,20 @@ Section WpSconfMem.
      two independent instance arguments, resolved independently (no
      combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   (* ==================================================================== *)
-  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [kt'] is  *)
-  (* the DATUM's tier and [kt] the accessing hart's; [KtierLe kt' kt] is    *)
-  (* the whole access condition and [sr_ktier_wit strans_regime kt] --      *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [ktd'] is  *)
+  (* the DATUM's tier and [ktd] the accessing hart's; [KtierLe ktd' ktd] is    *)
+  (* the whole access condition and [sr_ktier_wit strans_regime ktd] --      *)
   (* persistent, and [emp] at KT0 -- is what the hart shows for it.  At KT0 *)
   (* the datum's own identity pin discharges admissibility ([sr_adm_id]);   *)
   (* at KT1 the regime's all-claims witness does ([sr_absorb_wit]).  Both   *)
   (* go through [SRegime.sr_absorb_ktier], so the body is the pre-phase-D   *)
   (* proof with two lines respelled.  The witness is stated at the leaf's   *)
   (* OWN hart and crossed to the rebound one by [sie_ktier_wit_rebind]      *)
-  (* above.  TIER-PRESERVING: the datum comes back at [kt'].  The KT0/KT0   *)
+  (* above.  TIER-PRESERVING: the datum comes back at [ktd'].  The KT0/KT0   *)
   (* corollary after [Qed] is the pre-phase-D statement (modulo the [pa] -> *)
   (* [ea] binder rename), so no consumer sees the generalization.           *)
   (* ==================================================================== *)
-  Lemma wp_store_s_sconf_au_t (kt kt' : ktier) `{!KtierLe kt' kt} (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
+  Lemma wp_store_s_sconf_au_t (ktd ktd' : ktier) `{!KtierLe ktd' ktd} (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
       `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     0 < width -> width <= 8 -> vmem_width width ->
@@ -1019,15 +1021,15 @@ Section WpSconfMem.
     (* see [wp_load_s_sconf_au]: the absorb runs with the accessor open *)
     ↑kptN ⊆ Em ->
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    sr_ktier_wit strans_regime kt -∗
-    sie_cap_gpr m n b p -∗
+    sr_ktier_wit strans_regime ktd -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword (8*width),
-       wordw_pointsto (KTR := kt') width ea (DfracOwn 1) vold ∗
-       (wordw_pointsto (KTR := kt') width ea (DfracOwn 1) sv ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
+       wordw_pointsto (KTR := ktd') width ea (DfracOwn 1) vold ∗
+       (wordw_pointsto (KTR := ktd') width ea (DfracOwn 1) sv ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       Ψ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1071,7 +1073,7 @@ Section WpSconfMem.
     iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
-    iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
+    iDestruct (sie_ktier_wit_rebind (CID := CID0) ktd b p CID Hs with "Hwit Harm")
       as "[Harm #HwitC]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -1091,7 +1093,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := ktd') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 ea)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1146,7 +1148,7 @@ Section WpSconfMem.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
     iDestruct (sr_tmode (CID := CID) strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime kt kt' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime ktd ktd' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical ea Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
@@ -1167,7 +1169,7 @@ Section WpSconfMem.
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
     assert (Hoff' : (bv_unsigned (subrange_vec_dec ea 11 0) + Z.of_nat (Z.to_nat width) <= 4096)%Z)
       by (rewrite Z2Nat.id; [ exact Hoff | lia ]).
-    iDestruct (s_mem_chunk (KTR := kt') s_tr ea ea 0 (Z.to_nat width) (Z.to_nat width) (nth_byte vold) ppn (DfracOwn 1)
+    iDestruct (s_mem_chunk (KTR := ktd') s_tr ea ea 0 (Z.to_nat width) (Z.to_nat width) (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff' Hcan
                  with "Hmem Hk Hbytes") as %(_ & Hram0 & Hraml & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn ea) width
@@ -1211,7 +1213,7 @@ Section WpSconfMem.
       rewrite Lv2 ?Lpin_rs2 in H0.
       rewrite Hsv in H0.
       exact H0. }
-    iMod (wordw_pointsto_write_c (KTR := kt') width s_tr.(mem) ea ppn vold sv Hw0 Hcan Hoff with "Hk Hmem [Hbytes]")
+    iMod (wordw_pointsto_write_c (KTR := ktd') width s_tr.(mem) ea ppn vold sv Hw0 Hcan Hoff with "Hk Hmem [Hbytes]")
       as "[Hmem Hbytes]".
     { rewrite /wordw_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign. }
     (* hand the WRITTEN cell back and collect the caller's payload *)
@@ -1237,7 +1239,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf Hspp".
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -1263,14 +1265,14 @@ Section WpSconfMem.
     (* see [wp_load_s_sconf_au]: the absorb runs with the accessor open *)
     ↑kptN ⊆ Em ->
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword (8*width),
        wordw_pointsto width ea (DfracOwn 1) vold ∗
        (wordw_pointsto width ea (DfracOwn 1) sv ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       Ψ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1300,12 +1302,12 @@ Section WpSconfMem.
     (autocast (T := mword) (subrange_vec_dec (rget m rs2) (width*8-1) 0)
      : mword (8*width)) = sv ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
     wordw_pointsto width pa (DfracOwn 1) vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa (DfracOwn 1) sv -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1361,10 +1363,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := rget m rs2 in
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗ pa ↦₈ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1395,10 +1397,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := rget m rs2 in
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗ pa ↦₈ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1428,10 +1430,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (rget m rs2) in
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗ pa ↦₄ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1461,10 +1463,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (rget m rs2) in
-    sie_cap_gpr m n b p -∗ pc_is pc -∗
+    sie_cap_gpr kt m n b p -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗ pa ↦₄ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1552,33 +1554,33 @@ Section WpSconfMem.
      two independent instance arguments, resolved independently (no
      combinatorics).  See the family note above [wp_load_s_sconf_au]. *)
   (* ==================================================================== *)
-  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [kt'] is  *)
-  (* the DATUM's tier and [kt] the accessing hart's; [KtierLe kt' kt] is    *)
-  (* the whole access condition and [sr_ktier_wit strans_regime kt] --      *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [ktd'] is  *)
+  (* the DATUM's tier and [ktd] the accessing hart's; [KtierLe ktd' ktd] is    *)
+  (* the whole access condition and [sr_ktier_wit strans_regime ktd] --      *)
   (* persistent, and [emp] at KT0 -- is what the hart shows for it.  At KT0 *)
   (* the datum's own identity pin discharges admissibility ([sr_adm_id]);   *)
   (* at KT1 the regime's all-claims witness does ([sr_absorb_wit]).  Both   *)
   (* go through [SRegime.sr_absorb_ktier], so the body is the pre-phase-D   *)
   (* proof with two lines respelled.  The witness is stated at the leaf's   *)
   (* OWN hart and crossed to the rebound one by [sie_ktier_wit_rebind]      *)
-  (* above.  TIER-PRESERVING: the datum comes back at [kt'].  The KT0/KT0   *)
+  (* above.  TIER-PRESERVING: the datum comes back at [ktd'].  The KT0/KT0   *)
   (* corollary after [Qed] is the pre-phase-D statement (modulo the [pa] -> *)
   (* [ea] binder rename), so no consumer sees the generalization.           *)
   (* ==================================================================== *)
-  Lemma wp_sb_s_sconf_t (kt kt' : ktier) `{!KtierLe kt' kt}
+  Lemma wp_sb_s_sconf_t (ktd ktd' : ktier) `{!KtierLe ktd' ktd}
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 8) (b : bool) :
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (rget m rs2) in
-    sr_ktier_wit strans_regime kt -∗
-    sie_cap_gpr m n b p -∗
+    sr_ktier_wit strans_regime ktd -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-    ea ↦ₘ[kt'] vold -∗
+    ea ↦ₘ[ktd'] vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      ea ↦ₘ[kt'] storeval -∗
+      ea ↦ₘ[ktd'] storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1617,7 +1619,7 @@ Section WpSconfMem.
     iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
-    iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
+    iDestruct (sie_ktier_wit_rebind (CID := CID0) ktd b p CID Hs with "Hwit Harm")
       as "[Harm #HwitC]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -1629,7 +1631,7 @@ Section WpSconfMem.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     (* the byte's OWN claim + canonicality + region (refold to keep) *)
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hram0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := ktd') with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hram0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hbyte".
     destruct (pma_all_ram Hpma_all (pa_of ppn ea) 1
                (pma_access_ram_byte (pa_of ppn ea) Hram0)) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
@@ -1685,7 +1687,7 @@ Section WpSconfMem.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
     iDestruct (sr_tmode (CID := CID) strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime kt kt' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime ktd ktd' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical ea Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
@@ -1732,7 +1734,7 @@ Section WpSconfMem.
                     (addr_is_ram_not_dev _ Hram0)) as H0.
       rewrite Lv2 ?Lpin_rs2 in H0.
       exact H0. }
-    iMod (mem_pointsto_write_c (KTR := kt') s_tr.(mem) ea ppn vold storeval Hcan with "Hk Hmem Hbyte") as "[Hmem Hbyte]".
+    iMod (mem_pointsto_write_c (KTR := ktd') s_tr.(mem) ea ppn vold storeval Hcan with "Hk Hmem Hbyte") as "[Hmem Hbyte]".
     iModIntro.
     iExists (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn ea) 1 storeval) s_tr.(mdev)).
     iSplitR.
@@ -1756,7 +1758,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf Hspp".
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -1772,12 +1774,12 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 8) (b : bool) :
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (rget m rs2) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
     ea ↦ₘ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       ea ↦ₘ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1800,12 +1802,12 @@ Section WpSconfMem.
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
     pa ↦₈{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1851,12 +1853,12 @@ Section WpSconfMem.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let storeval := rget m rs2 in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
     pa ↦₈ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1889,33 +1891,33 @@ Section WpSconfMem.
      literal, so it needs nothing.  See the family note above
      [wp_load_s_sconf_au]. *)
   (* ==================================================================== *)
-  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [kt'] is  *)
-  (* the DATUM's tier and [kt] the accessing hart's; [KtierLe kt' kt] is    *)
-  (* the whole access condition and [sr_ktier_wit strans_regime kt] --      *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [ktd'] is  *)
+  (* the DATUM's tier and [ktd] the accessing hart's; [KtierLe ktd' ktd] is    *)
+  (* the whole access condition and [sr_ktier_wit strans_regime ktd] --      *)
   (* persistent, and [emp] at KT0 -- is what the hart shows for it.  At KT0 *)
   (* the datum's own identity pin discharges admissibility ([sr_adm_id]);   *)
   (* at KT1 the regime's all-claims witness does ([sr_absorb_wit]).  Both   *)
   (* go through [SRegime.sr_absorb_ktier], so the body is the pre-phase-D   *)
   (* proof with two lines respelled.  The witness is stated at the leaf's   *)
   (* OWN hart and crossed to the rebound one by [sie_ktier_wit_rebind]      *)
-  (* above.  TIER-PRESERVING: the datum comes back at [kt'].  The KT0/KT0   *)
+  (* above.  TIER-PRESERVING: the datum comes back at [ktd'].  The KT0/KT0   *)
   (* corollary after [Qed] is the pre-phase-D statement (modulo the [pa] -> *)
   (* [ea] binder rename), so no consumer sees the generalization.           *)
   (* ==================================================================== *)
-  Lemma wp_sd_zero_s_sconf_t (kt kt' : ktier) `{!KtierLe kt' kt}
+  Lemma wp_sd_zero_s_sconf_t (ktd ktd' : ktier) `{!KtierLe ktd' ktd}
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
-    sr_ktier_wit strans_regime kt -∗
-    sie_cap_gpr m n b p -∗
+    sr_ktier_wit strans_regime ktd -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
-    ea ↦₈[kt'] vold -∗
+    ea ↦₈[ktd'] vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      ea ↦₈[kt'] storeval -∗
+      ea ↦₈[ktd'] storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1925,7 +1927,7 @@ Section WpSconfMem.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
       by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "#Hwit Hcg Hpc Hinstr Hbytes Hcont".
-    iDestruct (word_pointsto_aligned_p (KTR := kt') with "Hbytes") as %Hpalign4.
+    iDestruct (word_pointsto_aligned_p (KTR := ktd') with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr ea) 8 = true) by exact Hpalign4.
     iApply (wp_instr_s_sconf m n b pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
@@ -1949,7 +1951,7 @@ Section WpSconfMem.
     iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
-    iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
+    iDestruct (sie_ktier_wit_rebind (CID := CID0) ktd b p CID Hs with "Hwit Harm")
       as "[Harm #HwitC]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -1969,11 +1971,11 @@ Section WpSconfMem.
     assert (Hmsp : rf_to_gmap (tp_pin (CID := CID) m) !! Regidx rs1 = Some (tp_pin (CID := CID) m !!! Regidx rs1))
       by (apply rf_to_gmap_lookup).
     (* the word's OWN base claim + canonicality (peek byte 0 of its bytes) *)
-    iDestruct (word_pointsto_bytes (KTR := kt') with "Hbytes") as "Hb".
+    iDestruct (word_pointsto_bytes (KTR := ktd') with "Hbytes") as "Hb".
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := ktd') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 ea)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hb".
@@ -2015,7 +2017,7 @@ Section WpSconfMem.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
     iDestruct (sr_tmode (CID := CID) strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime kt kt' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime ktd ktd' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical ea Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
@@ -2034,7 +2036,7 @@ Section WpSconfMem.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (s_mem_chunk (KTR := kt') s_tr ea ea 0 8 8 (nth_byte vold) ppn (DfracOwn 1)
+    iDestruct (s_mem_chunk (KTR := ktd') s_tr ea ea 0 8 8 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hb") as %(_ & Hram0 & Hram7 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn ea) 8
@@ -2077,8 +2079,8 @@ Section WpSconfMem.
                (addr_is_ram_not_dev _ Hram0)) as H0.
       rewrite H0. do 3 f_equal;
       first [ reflexivity | f_equal; apply bv_eq; vm_compute; reflexivity ]. }
-    iDestruct (word_pointsto_intro (KTR := kt') ea (DfracOwn 1) vold Hpalign4 with "Hb") as "Hbytes".
-    iMod (word_pointsto_write_c (KTR := kt') s_tr.(mem) ea ppn vold storeval Hcan Hoff with "Hk Hmem Hbytes")
+    iDestruct (word_pointsto_intro (KTR := ktd') ea (DfracOwn 1) vold Hpalign4 with "Hb") as "Hbytes".
+    iMod (word_pointsto_write_c (KTR := ktd') s_tr.(mem) ea ppn vold storeval Hcan Hoff with "Hk Hmem Hbytes")
       as "[Hmem Hbytes]".
     iModIntro.
     iExists (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn ea) 8 storeval) s_tr.(mdev)).
@@ -2102,7 +2104,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf Hspp".
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -2118,12 +2120,12 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
     ea ↦₈ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       ea ↦₈ storeval -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -2140,33 +2142,33 @@ Section WpSconfMem.
      literal, so it needs nothing.  See the family note above
      [wp_load_s_sconf_au]. *)
   (* ==================================================================== *)
-  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [kt'] is  *)
-  (* the DATUM's tier and [kt] the accessing hart's; [KtierLe kt' kt] is    *)
-  (* the whole access condition and [sr_ktier_wit strans_regime kt] --      *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4/§5).  [ktd'] is  *)
+  (* the DATUM's tier and [ktd] the accessing hart's; [KtierLe ktd' ktd] is    *)
+  (* the whole access condition and [sr_ktier_wit strans_regime ktd] --      *)
   (* persistent, and [emp] at KT0 -- is what the hart shows for it.  At KT0 *)
   (* the datum's own identity pin discharges admissibility ([sr_adm_id]);   *)
   (* at KT1 the regime's all-claims witness does ([sr_absorb_wit]).  Both   *)
   (* go through [SRegime.sr_absorb_ktier], so the body is the pre-phase-D   *)
   (* proof with two lines respelled.  The witness is stated at the leaf's   *)
   (* OWN hart and crossed to the rebound one by [sie_ktier_wit_rebind]      *)
-  (* above.  TIER-PRESERVING: the datum comes back at [kt'].  The KT0/KT0   *)
+  (* above.  TIER-PRESERVING: the datum comes back at [ktd'].  The KT0/KT0   *)
   (* corollary after [Qed] is the pre-phase-D statement (modulo the [pa] -> *)
   (* [ea] binder rename), so no consumer sees the generalization.           *)
   (* ==================================================================== *)
-  Lemma wp_sw_zero_s_sconf_t (kt kt' : ktier) `{!KtierLe kt' kt}
+  Lemma wp_sw_zero_s_sconf_t (ktd ktd' : ktier) `{!KtierLe ktd' ktd}
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 32) (b : bool) :
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (mword_of_int 0 : mword 32) in
-    sr_ktier_wit strans_regime kt -∗
-    sie_cap_gpr m n b p -∗
+    sr_ktier_wit strans_regime ktd -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
-    ea ↦₄[kt'] vold -∗
+    ea ↦₄[ktd'] vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      ea ↦₄[kt'] storeval -∗
+      ea ↦₄[ktd'] storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2200,7 +2202,7 @@ Section WpSconfMem.
     iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
-    iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
+    iDestruct (sie_ktier_wit_rebind (CID := CID0) ktd b p CID Hs with "Hwit Harm")
       as "[Harm #HwitC]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -2223,7 +2225,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := ktd') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 ea)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -2265,7 +2267,7 @@ Section WpSconfMem.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
     iDestruct (sr_tmode (CID := CID) strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime kt kt' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier (CID := CID) strans_regime ktd ktd' (Store Data) ea (pa_of ppn ea) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical ea Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
@@ -2284,7 +2286,7 @@ Section WpSconfMem.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (s_mem_chunk (KTR := kt') s_tr ea ea 0 4 4 (nth_byte vold) ppn (DfracOwn 1)
+    iDestruct (s_mem_chunk (KTR := ktd') s_tr ea ea 0 4 4 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(_ & Hram0 & Hram3 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn ea) 4
@@ -2326,8 +2328,8 @@ Section WpSconfMem.
                (addr_is_ram_not_dev _ Hram0)) as H0.
       rewrite H0. do 3 f_equal;
       first [ reflexivity | f_equal; apply bv_eq; vm_compute; reflexivity ]. }
-    iDestruct (word4_pointsto_intro (KTR := kt') ea (DfracOwn 1) vold Hpalign4 with "Hbytes") as "Hbytes".
-    iMod (word4_pointsto_write_c (KTR := kt') s_tr.(mem) ea ppn vold storeval Hcan Hoff with "Hk Hmem Hbytes")
+    iDestruct (word4_pointsto_intro (KTR := ktd') ea (DfracOwn 1) vold Hpalign4 with "Hbytes") as "Hbytes".
+    iMod (word4_pointsto_write_c (KTR := ktd') s_tr.(mem) ea ppn vold storeval Hcan Hoff with "Hk Hmem Hbytes")
       as "[Hmem Hbytes]".
     iModIntro.
     iExists (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn ea) 4 storeval) s_tr.(mdev)).
@@ -2346,13 +2348,13 @@ Section WpSconfMem.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (ea ↦₄[kt'] storeval)%I with "[Hbytes]" as "Hbw"; [ iExact "Hbytes" |].
+    iAssert (ea ↦₄[ktd'] storeval)%I with "[Hbytes]" as "Hbw"; [ iExact "Hbytes" |].
     iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf Hspp".
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -2368,12 +2370,12 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 32) (b : bool) :
     let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (mword_of_int 0 : mword 32) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     ea ↦₄ vold -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       ea ↦₄ storeval -∗
       WP (Loop : expr riscv_lang)) -∗

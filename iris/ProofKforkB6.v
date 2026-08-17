@@ -97,6 +97,7 @@ Section KforkPrologue.
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -246,11 +247,11 @@ Section KforkPrologue.
        already held, but rank above "proc" follows by [locks_below_mono]
        and its own contract does not yet expose the premise. *)
     locks_below lks "proc" ->
-    sie_cap_gpr m K b pme -∗
+    sie_cap_gpr kt m K b pme -∗
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
@@ -277,7 +278,7 @@ Section KforkPrologue.
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
-        sie_cap_gpr Mt (K - 8)%nat b pme -∗
+        sie_cap_gpr kt Mt (K - 8)%nat b pme -∗
         (* [cpu_own] is handed on, not dropped.  Both of allocproc_post's
            not-found arms return it at the CALLER's level and index, and
            [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
@@ -329,7 +330,7 @@ Section KforkPrologue.
            carries the trap reserve of the arm the caller will eventually
            return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
            index, propagated. *)
-        sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+        sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
         (* slot 6 PINNED: s4 was spilled at +0x1a and the uvmcopy-failure
@@ -346,7 +347,7 @@ Section KforkPrologue.
         FdSlots.fd_slots FDSPARE -∗
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
-        IntrDefs.arm_pay lvl eb pme -∗
+        IntrDefs.arm_pay kt lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         R -∗
@@ -385,7 +386,7 @@ Section KforkPrologue.
            carries the trap reserve of the arm the caller will eventually
            return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
            index, propagated. *)
-        sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+        sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
         (* all three lazy slots PINNED here: by +0x4a s2, s3 and s4 have all
@@ -421,7 +422,7 @@ Section KforkPrologue.
                 other copy.  The two are [mword_of_int KernelSyms.forkret]
                 either way, hence convertible, and [iApply] bridges them. *)
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
-        IntrDefs.arm_pay lvl eb pme -∗
+        IntrDefs.arm_pay kt lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -476,7 +477,7 @@ Section KforkPrologue.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0
               (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> m) with M0'.
     assert (HM0sp : M0' !!! Regidx csp_rs1 = pa_stk sp0 8) by (rewrite /M0' upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -585,7 +586,7 @@ Section KforkPrologue.
       by (rewrite /M2 upd_eq; reflexivity).
     (* ---- myproc(): a0 = pme ---- *)
     iDestruct (cpu_own_transport CID0 CID7 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme b _
+    iApply (Myproc.wp_myproc_sconf kt M2 K1 lvl eb pme b _
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -652,7 +653,7 @@ Section KforkPrologue.
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)
       by (rewrite /M5 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on None b lks
+    iApply (Allocproc.wp_allocproc_core kt γa γp γf γs M5 lvl K1 eb pme on None b lks
               ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpav").
     all: try lkbelow.
@@ -899,7 +900,7 @@ Section KforkPrologue.
       assert (Hpinid5 : tp_pin N5p = tp_pin N5) by (rewrite /N5p; apply (tp_pin_id (tp_pin N5) (rget_tp N5))).
       assert (Hn5psp : N5p !!! Regidx csp_rs1 = N5 !!! Regidx csp_rs1)
         by (rewrite /N5p; exact (tp_pin_sp N5)).
-      assert (Hgpreq5 : sie_cap_gpr N5 (trap_res b + K1)%nat false pme = sie_cap_gpr N5p (trap_res b + K1)%nat false pme)
+      assert (Hgpreq5 : sie_cap_gpr kt N5 (trap_res b + K1)%nat false pme = sie_cap_gpr kt N5p (trap_res b + K1)%nat false pme)
         by (unfold sie_cap_gpr, sie_cap; rewrite Hn5psp Hpinid5; reflexivity).
       iEval (rewrite Hgpreq5) in "Hcg".
       assert (HN5pne : forall r : mword 5, r <> Rtp -> N5p !!! Regidx r = N5 !!! Regidx r).
@@ -938,7 +939,7 @@ Section KforkPrologue.
       iMod (kalloc_env_seal with "Henv'") as "Henv'".
       iModIntro.
       iDestruct "Henv'" as "#Henv'".
-      iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme (S lvl) false
+      iApply (Uvmcopy.wp_uvmcopy_sconf kt γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme (S lvl) false
                 ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)

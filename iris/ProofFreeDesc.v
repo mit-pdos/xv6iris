@@ -197,6 +197,7 @@ Section ProofFreeDesc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -218,7 +219,7 @@ Section ProofFreeDesc.
       (b0 : bv 8) (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :
     (i < 8)%nat ->
     (M !!! Regidx a0_idx : mword 64) = mword_of_int (Z.of_nat i) ->
-    sie_cap_gpr M n b pme -∗
+    sie_cap_gpr kt M n b pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.free_desc + 0x1e) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
     d_free_cell i ↦ₘ b0 -∗
@@ -230,7 +231,7 @@ Section ProofFreeDesc.
       ∀ M' : regfile,
         ⌜ forall r : mword 5, r <> a0_idx -> r <> a3_idx -> r <> a4_idx -> r <> a5_idx ->
             M' !!! Regidx r = M !!! Regidx r ⌝ -∗
-        sie_cap_gpr M' n b pme -∗
+        sie_cap_gpr kt M' n b pme -∗
         pc_is (mword_of_int (KernelSyms.free_desc + 0x4a) : mword 64) -∗
         d_free_cell i ↦ₘ Z_to_bv 8 1 -∗
         d_desc pd i ↦₈ (zero_reg : mword 64) -∗
@@ -513,7 +514,7 @@ Section ProofFreeDesc.
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string)
-    : wp_free_desc_sconf_body γs pd i m K lvl eb pme va vl vf vn b lks.
+    : wp_free_desc_sconf_body kt γs pd i m K lvl eb pme va vl vf vn b lks.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
     intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl Hbelow.
@@ -806,7 +807,7 @@ Section ProofFreeDesc.
     (* ===================== wakeup(&disk.free[0]) ===================== *)
     iDestruct (cpu_own_transport CID CIDd15 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15)  E2 γs
+    iApply (Wakeup.wp_wakeup_sconf kt (CID := CIDd15)  E2 γs
               pme lvl (K - 2)%nat eb b
               _ HKw HE2dom Hlen Hlvl
               Hbelow

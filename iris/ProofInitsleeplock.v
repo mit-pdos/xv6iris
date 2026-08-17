@@ -60,11 +60,12 @@ Section ProofInitsleeplock.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Lemma wp_initsleeplock_sconf
       (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
       (av : nat) (b : bool) (p : mword 64)
-    : wp_initsleeplock_sconf_body m s vlocked vlk vpid vlkname vcpu vname av b p.
+    : wp_initsleeplock_sconf_body kt m s vlocked vlk vpid vlkname vcpu vname av b p.
   Proof.
     cbv beta delta [wp_initsleeplock_sconf_body].
     intros pcE slk name ret_tgt Hav.
@@ -108,7 +109,7 @@ Section ProofInitsleeplock.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.initsleeplock + 0x02)) by (unfold pcE; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -291,7 +292,7 @@ Section ProofInitsleeplock.
     (* the cpu-word cell in initlock's [add_vec lk (sext 0x10)] form *)
     iEval (rewrite /sl_lkcpu) in "Hcpu".
     (* ===== jal initlock: initlock(&lk->lk, "sleep lock") ===== *)
-    iApply (Initlock.wp_initlock_sconf A7 vlk vlkname vcpu "sleep lock"%string (av - 4) b p
+    iApply (Initlock.wp_initlock_sconf kt A7 vlk vlkname vcpu "sleep lock"%string (av - 4) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlk] [Hlkname] [Hcpu]").
     { iEval (rewrite HA7a1). iExact "Hstr". }
@@ -419,8 +420,8 @@ Section ProofInitsleeplock.
     assert (Hpop : E4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspE4. symmetry. exact Hspd4. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3). iExact "Hr8". }

@@ -62,6 +62,7 @@ Section WpPlic.
 Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
 (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
    bundle like the register map.  Implicit, so no call site changes. *)
 Context {p : mword 64}.
@@ -139,11 +140,11 @@ Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5
   kpt_dev_vpn (svpn_of a8) ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
-  sie_cap_gpr m n false p -∗
+  sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   plic_inv -∗
   wp_next false p (fun (CID : CpuId) =>
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -292,7 +293,7 @@ Proof.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap kt m n false p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
@@ -315,11 +316,11 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   kpt_dev_vpn (svpn_of a8) ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
-  sie_cap_gpr m n false p -∗
+  sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γd γv -∗
   wp_next false p (fun (CID : CpuId) =>
-    sie_cap_gpr m n false p -∗
+    sie_cap_gpr kt m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -361,13 +362,13 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   rd_ok rd ->
   (forall p, plic_ok p ->
      exists v p', plic_read p (uint a8 - plic_base)%Z = Some (v, p') /\ plic_ok p' /\ P v) ->
-  sie_cap_gpr m n false p -∗
+  sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γd γv -∗
   ( ∀ v : bv 32,
     ⌜ P v ⌝ -∗
     wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n false p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ldval v)]> m) n false p -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       WP (Loop : expr riscv_lang))) -∗
   WP (Loop : expr riscv_lang).
@@ -522,7 +523,7 @@ Proof.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap kt m n false p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".

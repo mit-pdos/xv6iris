@@ -31,6 +31,7 @@ Section TrapinithartBody.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -47,7 +48,7 @@ Section TrapinithartBody.
 
   Lemma wp_trapinithart_sconf_proof (mm : regfile) (K : nat)
       (tv0 : mword 64) (p : mword 64) :
-    wp_trapinithart_sconf_body mm K tv0 p.
+    wp_trapinithart_sconf_body kt mm K tv0 p.
   Proof.
     cbv beta delta [wp_trapinithart_sconf_body].
     intros pcE ret_tgt HK.
@@ -83,7 +84,7 @@ Section TrapinithartBody.
     iIntros "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /W1 upd_eq; reflexivity).
@@ -185,8 +186,8 @@ Section TrapinithartBody.
     { rewrite HL2sp. apply frame_cancel_16. }
     assert (Hpop : L2 !!! Regidx csp_rs1 = pa_stk (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HL2sp. exact Hpush. }
-    iAssert (stack_own (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
-    { rewrite stack_own_slots; cbn [seq].
+    iAssert (stack_own (KTR := kt) (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)); cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }
@@ -223,8 +224,8 @@ End TrapinithartBody.
 Module TrapinithartProof : TRAPINITHART.
   Definition wp_trapinithart_sconf
       `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (mm : regfile) (K : nat)
+      {kt : ktier} (mm : regfile) (K : nat)
       (tv0 : mword 64) (p : mword 64)
-      : wp_trapinithart_sconf_body mm K tv0 p :=
+      : wp_trapinithart_sconf_body kt mm K tv0 p :=
     wp_trapinithart_sconf_proof mm K tv0 p.
 End TrapinithartProof.

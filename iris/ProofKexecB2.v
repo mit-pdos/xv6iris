@@ -240,6 +240,7 @@ Section KexecB2Body.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -304,7 +305,7 @@ Section KexecB2Body.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :
-    kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_bad324_body kt gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
@@ -417,7 +418,7 @@ Section KexecB2Body.
     iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (PFP.wp_proc_freepagetable_sconf ga T3 P (K - 68)%nat true
+    iApply (PFP.wp_proc_freepagetable_sconf kt ga T3 P (K - 68)%nat true
               (proc_addr jp) 0%nat true lks
               ltac:(lia) kxc_lvl0 HT3a0
               ltac:(rewrite HT3a1 uint_unsigned;
@@ -688,6 +689,7 @@ Section KexecB2Loops.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -783,7 +785,7 @@ Section KexecB2Loops.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string) :
-    kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_ls_body kt gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
@@ -947,7 +949,7 @@ Section KexecB2Loops.
     assert (HN5get : forall r : mword 5, is_cs_idx r = true ->
               N5 !!! Regidx r = Ml !!! Regidx r).
     { intros r Hr. rewrite /N5 upd_ne; [| lregne]. exact (HN4get r Hr). }
-    iApply (Walkaddr.wp_walkaddr_sconf N5 t m_ad (K - 68)%nat (DfracOwn 1)
+    iApply (Walkaddr.wp_walkaddr_sconf kt N5 t m_ad (K - 68)%nat (DfracOwn 1)
               true (proc_addr jp) ltac:(lia) HN5a0 Hrep
               with "Hcg Htext Hpc Hptree").
     iIntros (CIDw Hsw mr) "Hcg Hpc Hptree %Hwacs %Hwapay".
@@ -1037,7 +1039,7 @@ Section KexecB2Loops.
                        (add_vec_int (mword_of_int (KXB + 0xd6) : mword 64) 4)]> Np2).
       assert (Ha0msg : Np3 !!! Regidx Ra0 = (mword_of_int kxc_msg_a : mword 64))
         by lpcw.
-      iApply (PN.wp_panic_sconf (CID := CIDp3) Np3 (K - 68)%nat
+      iApply (PN.wp_panic_sconf kt (CID := CIDp3) Np3 (K - 68)%nat
                 0%nat true true (proc_addr jp) (PkAStr DfracDiscarded kxc_msg) lks
                 (kxc_panic_K K HK) eq_refl kxc_panic_noff
                 (kxc_panic_below lks Hlkempty)
@@ -1149,7 +1151,7 @@ Section KexecB2Loops.
                  Md !!! Regidx Ra2 = page_base (pte_ppn w0) /\
                  (forall r : mword 5, is_cs_idx r = true -> r <> Rs2 ->
                     Md !!! Regidx r = Ml !!! Regidx r)⌝ -∗
-               sie_cap_gpr Md (K - 68)%nat true (proc_addr jp) -∗
+               sie_cap_gpr kt Md (K - 68)%nat true (proc_addr jp) -∗
                cpu_own (CID := CIDd) 0 true (proc_addr jp) true lks -∗
                pc_is (mword_of_int (KXB + 0xda) : mword 64) -∗
                WP (Loop : expr riscv_lang))%I
@@ -1343,7 +1345,7 @@ Section KexecB2Loops.
       iEval (rewrite -HD6a2) in "Hdst".
       iDestruct (cpu_own_transport CIDd CIDd6 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
+      iApply (Readi.wp_readi_sconf kt gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat true
                 true lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb

@@ -150,7 +150,7 @@ Definition prepare_return_tf (ws : list (mword 64))
 Definition wp_prepare_return_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
+    (kt : ktier) (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (av : nat) (p : mword 64)
     (epc : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.prepare_return in
@@ -161,11 +161,11 @@ Definition wp_prepare_return_sconf_body
   (* ENTERED AT PUSH_OFF LEVEL 0, AT EITHER SIE INDEX -- see the header.
      [cpu_own]'s base-enable is [b] because at level 0 the two agree
      ([CpuOwn.cpu_own_eb_agree]); writing anything else would be vacuous. *)
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own 0%nat b p b lks -∗
   (* the trap CSRs, from the caller at [b = false] and [emp] at [b = true],
      where the function's own [intr_off] produces them ([trap_csrs_ext]). *)
-  trap_csrs_ext b -∗
+  trap_csrs_ext kt b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the process: [p] is what myproc() returns, i.e. [cpus[cid].proc] *)
   is_kstack p ks -∗
@@ -184,7 +184,7 @@ Definition wp_prepare_return_sconf_body
       (* INTERRUPTS ARE OFF, and the reserve the enabled arm was holding is
          now usable stack -- the standard csrci index move.  At [b = false]
          there was no arm and no reserve, and [trap_res false + av = av]. *)
-      sie_cap_gpr mf (trap_res b + av)%nat false p -∗
+      sie_cap_gpr kt mf (trap_res b + av)%nat false p -∗
       (* THE PER-CPU BUNDLE, REASSEMBLED AT THE DISABLED INDEX.  [cpu_own] at
          [b = true] is the pure fact plus the caller's frame [C] -- the cells
          and the counting token live inside [sie_arm true], and the [csrci]
@@ -234,8 +234,8 @@ Module Type PREPARE_RETURN.
   Parameter wp_prepare_return_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
+      (kt : ktier) (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
       (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string),
-      wp_prepare_return_sconf_body γf ks pid V m av p epc b lks.
+      wp_prepare_return_sconf_body kt γf ks pid V m av p epc b lks.
 End PREPARE_RETURN.

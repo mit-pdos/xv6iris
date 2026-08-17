@@ -70,7 +70,7 @@ From Kernel Require KernelSyms.
 
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
-Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (lvl K : nat)
+Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (mm : regfile) (lvl K : nat)
     (root : mword 44)
     (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
@@ -78,7 +78,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
   (2 <= K)%nat ->
-  sie_cap_gpr mm K false p -∗
+  sie_cap_gpr kt mm K false p -∗
   strans_pending -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -90,7 +90,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   (* the shared table, likewise persistent *)
   kpt_inv root -∗
   ( ∀ (mr : regfile),
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr kt mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     kpt_on cpu_id -∗
@@ -100,8 +100,8 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
 
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (lvl K : nat)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64),
-      wp_kvminithart_sconf_body mm lvl K root tlbvec0 p.
+      wp_kvminithart_sconf_body kt mm lvl K root tlbvec0 p.
 End KVMINITHART.

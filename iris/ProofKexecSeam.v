@@ -389,6 +389,7 @@ Section KexecBFrame.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* the elf slots as 64 NAMED bytes, with the per-slot 8-alignment facts kept
      as a PURE side product: a byte run does not carry alignment and
      [bytes_own_slotsn] demands it back.  [ProofKexecA.kxc_elf_acc] is the
@@ -396,7 +397,7 @@ Section KexecBFrame.
      alignment as DATA, because the naming survives into the loop invariant
      while the giveback happens much later. *)
   Lemma kxc_elf_take (sp0 : mword 64) :
-    stack_own (pa_stk sp0 46) 8 ⊢
+    stack_own (KTR := kt) (pa_stk sp0 46) 8 ⊢
     ⌜forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
     ∃ f : nat -> bv 8,
@@ -414,7 +415,7 @@ Section KexecBFrame.
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ g j)
-    ⊢ stack_own (pa_stk sp0 46) 8.
+    ⊢ stack_own (KTR := kt) (pa_stk sp0 46) 8.
   Proof.
     intro Hal. iIntros "Hg".
     iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
@@ -484,6 +485,7 @@ Section KexecBFrameB.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
+  Context {kt : ktier}.
   (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
      they travel named, see the file header -- and (b) slots 5..13 and 67
      PINNED, because from here on every one of them holds a value some later
@@ -506,8 +508,8 @@ Section KexecBFrameB.
      word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
      word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
      word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (pa_stk sp0 13) 33 ∗
-     stack_own (pa_stk sp0 54) 9 ∗
+     stack_own (KTR := kt) (pa_stk sp0 13) 33 ∗
+     stack_own (KTR := kt) (pa_stk sp0 54) 9 ∗
      word_pointsto (pa_stk sp0 64) (DfracOwn 1) av ∗
      (∃ w65, word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65) ∗
      word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv ∗
@@ -523,6 +525,7 @@ Section KexecBSeam.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come
+  Context {kt : ktier}.
               from [fileG] -- ProofKexecA.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
   Context `{GEN : GenId} `{CID0 : CpuId}.
@@ -611,7 +614,7 @@ Section KexecBSeam.
        um_below (mword_of_int 0 : mword 64) P.(ud_um) /\
        um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -694,7 +697,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -758,7 +761,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -810,7 +813,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
@@ -853,10 +856,10 @@ Section KexecBSeam.
      word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
      word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
      word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (pa_stk sp0 13) (33 - c) ∗
+     stack_own (KTR := kt) (pa_stk sp0 13) (33 - c) ∗
      ([∗ list] j ∈ seq 0 c,
         pa_stk sp0 (46 - j) ↦₈ (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) ∗
-     stack_own (pa_stk sp0 54) 9 ∗
+     stack_own (KTR := kt) (pa_stk sp0 54) 9 ∗
      word_pointsto (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) ∗
      (∃ w65, word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65) ∗
      word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv ∗
@@ -928,7 +931,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
@@ -982,7 +985,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
@@ -1060,7 +1063,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x2a6) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_d_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa

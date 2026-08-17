@@ -120,6 +120,7 @@ Section ProofSysClose.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* the frame's sp is sound: read the bound out of the ambient capability's
      own stack carve (the conclusion is pure, so the bundle survives). *)
   Local Ltac reg_neq :=
@@ -138,11 +139,11 @@ Section ProofSysClose.
   Lemma sc_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
-    sie_cap_gpr m k b pp -∗
+    sie_cap_gpr kt m k b pp -∗
     ⌜(8 <= uint (m !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
+    iApply (stack_own_sp_bounds (KTR := kt) _ (trap_res b + k)%nat with "Hstk").
     destruct b; unfold trap_res; lia.
   Qed.
 
@@ -168,7 +169,7 @@ Section ProofSysClose.
     Mt !!! Regidx (mword_of_int 15 : mword 5) = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> (mword_of_int 8 : mword 5) -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 4)%nat b pp -∗
+    sie_cap_gpr kt Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_close + 0x3a) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -178,7 +179,7 @@ Section ProofSysClose.
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
-        sie_cap_gpr mf av b pp -∗
+        sie_cap_gpr kt mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -331,7 +332,7 @@ Section ProofSysClose.
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
+    : wp_sys_close_sconf_body kt γl γf fn on us m av n eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow.
@@ -544,7 +545,7 @@ Section ProofSysClose.
     iEval (rewrite -HM6a2) in "Hs4".
     (* ---- argfd(0, &fd, &f) ---- *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p 0%nat v
+    iApply (Argfd.wp_argfd_sconf kt γf M6 (av - 4)%nat n eb p 0%nat v
               pid V (word_hi w3) w4 b lks
               ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
               ltac:(lia)
@@ -679,7 +680,7 @@ Section ProofSysClose.
                      = add_vec_int (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) 4)
         by (rewrite /B upd_eq; reflexivity).
       iDestruct (cpu_own_transport CID9 CID12 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Myproc.wp_myproc_sconf B (av - 4)%nat n eb p b lks
+      iApply (Myproc.wp_myproc_sconf kt B (av - 4)%nat n eb p b lks
                 Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iIntros (CID13 Hs13 ms P) "%Hms Hcg Hcpu Hpc %HcsP".
@@ -852,7 +853,7 @@ Section ProofSysClose.
          keep the other ([fileclose_env_split]). *)
       iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
+      iApply (Fileclose.wp_fileclose_sconf kt γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
                 ltac:(lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hfcenv").

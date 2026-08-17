@@ -92,6 +92,7 @@ Section ProofPrepareReturn.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -135,7 +136,7 @@ Section ProofPrepareReturn.
   Lemma wp_prepare_return_sconf (γf : gname) (ks : mword 64) (pid : mword 32)
       (V : pprivate) (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string)
-    : wp_prepare_return_sconf_body γf ks pid V m av p epc b lks.
+    : wp_prepare_return_sconf_body kt γf ks pid V m av p epc b lks.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.
@@ -277,7 +278,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hentry) in "Hpc".
     iDestruct (cpu_own_transport CID CID5 0%nat b p b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p b lks
+    iApply (Myproc.wp_myproc_sconf kt M3 (av - 2)%nat 0%nat b p b lks
               prr_n0 ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hk6 msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -777,10 +778,10 @@ Section ProofPrepareReturn.
     iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile Harm".
     set (U12 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11).
     change (<[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11) with U12.
-    iDestruct "Harm" as "(Hstk & %Hsie1 & Harm)".
-    iAssert (sie_cap U12 (trap_res b + (av - 2))%nat false p)
+    iDestruct "Harm" as "(Hstk & %Hsie1 & Harm & #Hwit)".
+    iAssert (sie_cap kt U12 (trap_res b + (av - 2))%nat false p)
       with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". iApply sie_cap_wit_KT0. }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
     assert (Hsie1' : _get_Mstatus_SIE ms1 = ('b"0" : mword 1))
@@ -991,8 +992,8 @@ Section ProofPrepareReturn.
                    = pa_stk sp0 2) by (rewrite -Haddr0; exact Hpa2).
     iEval (rewrite Hpb1) in "Hbra".
     iEval (rewrite Hpb0) in "Hbs0".
-    iAssert (stack_own sp0 2) with "[Hbra Hbs0]" as "Hframe".
-    { iApply (stack_own_2_intro with "Hbra Hbs0"). }
+    iAssert (stack_own (KTR := kt) sp0 2) with "[Hbra Hbs0]" as "Hframe".
+    { iApply (stack_own_2_intro (KTR := kt) with "Hbra Hbs0"). }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (PRR + 0x70)) (mword_of_int 16 : mword 6)
               U18 (trap_res b + (av - 2))%nat 2 false Hpop

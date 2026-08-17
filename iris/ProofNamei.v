@@ -149,6 +149,7 @@ Section ProofNameiMain.
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)
 
   Lemma nam_slots_bytes (sp0 : mword 64) (w1 w2 : bv 64) :
@@ -233,7 +234,7 @@ Section ProofNameiMain.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_namei_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n Sb
                           pidv dq dqb dqs dqc m K eb b lks.
@@ -281,7 +282,7 @@ Section ProofNameiMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : nam_sp m R1) by (rewrite /nam_sp /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -426,7 +427,7 @@ Section ProofNameiMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (NX.wp_namex_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
               plen pfun nfun false n Sb pidv dq dqb dqs dqc R5 (K - 4)%nat eb b
               _ Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
@@ -513,8 +514,8 @@ Section ProofNameiMain.
                    = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HP2sp; reflexivity).
-    iAssert (stack_own sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -635,7 +636,7 @@ Section ProofNameiMain.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_namei_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n
                           pidv dq dqb dqs dqc m K eb b lks.

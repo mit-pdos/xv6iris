@@ -503,7 +503,7 @@ Definition wp_create_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -564,7 +564,7 @@ Definition wp_create_sconf_body
   16 * Z.of_nat nib <= 2 ^ 16 ->
   bv_unsigned ty <> 0 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := kt) γpr γu γd ->
   (* ---- THE TWO LEDGERS (see the header) ---- *)
   (create_units <= u)%nat ->
   (create_slots <= ns)%nat ->
@@ -579,7 +579,7 @@ Definition wp_create_sconf_body
   m !!! Regidx (mword_of_int 13 : mword 5) = (sign_extend' 64 minor : mword 64) ->
   (* PARKING PREMISE (hart-generic scheduler protocol) *)
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two persistent credentials ialloc's printk arm needs, and the
@@ -613,7 +613,7 @@ Definition wp_create_sconf_body
      caller ran argstr into its own frame) ---- *)
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -630,7 +630,7 @@ Definition wp_create_sconf_body
     (dn : dinode) (bm : blkmap)
     (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
@@ -696,7 +696,7 @@ Module Type CREATE.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -714,7 +714,7 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+      wp_create_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
                            ninodes size dev used plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.

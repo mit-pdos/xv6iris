@@ -62,6 +62,7 @@ Section ProofMemcpy.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -91,7 +92,7 @@ Section ProofMemcpy.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b p -∗
+    sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memcpy + 0x0c) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -99,7 +100,7 @@ Section ProofMemcpy.
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -223,7 +224,7 @@ Section ProofMemcpy.
   (* =================================================================== *)
   Lemma wp_memcpy_sconf
       (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64)
-    : wp_memcpy_sconf_body m0 n len src_bytes dst_olds b p.
+    : wp_memcpy_sconf_body kt m0 n len src_bytes dst_olds b p.
   Proof.
     cbv beta delta [wp_memcpy_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p_dst p_src ret_tgt Hn Hlen32 Ha2.
@@ -347,7 +348,7 @@ Section ProofMemcpy.
     assert (HKmm : (2 <= n - 2)%nat) by lia.
     iEval (rewrite -HR3a1) in "Hsrc".
     iEval (rewrite -HR3a0) in "Hdst".
-    iApply (MM.wp_memmove_sconf R3 (n - 2)%nat len src_bytes dst_olds b p
+    iApply (MM.wp_memmove_sconf kt R3 (n - 2)%nat len src_bytes dst_olds b p
               HKmm Hlen32 HR3a2
               with "Hcg Htext Hpc Hsrc Hdst").
     iIntros (CID6 Hs6 mM) "Hcg Hpc Hsrc Hdst %HmMa0 %HcsM".

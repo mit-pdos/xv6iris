@@ -170,6 +170,7 @@ Module KkillProof (Acquire : ACQUIRE) (Release : RELEASE) : KKILL.
 
 Section ProofKkill.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context {kt : ktier}.
   (* NO section [CpuId]: the loop lemma is applied at the hart the prologue
      hands back, which a section variable could not express. *)
 
@@ -195,19 +196,19 @@ Section ProofKkill.
        below "proc"'s rank (LockRank.v); [locks_below_not_elem] gives the
        per-slot non-membership the ghost step needs. *)
     locks_below lks "proc" ->
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     (* the exit continuation: control at the epilogue entry [kkill+0x52],
        at whatever hart the scan ended on, with a0 = 0 or -1. *)
     wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
       ∀ (Mx : regfile) (rv : mword 64),
         ⌜ kk_exit_regs Mx mb spd rv ⌝ -∗
-        sie_cap_gpr Mx av b pme -∗
+        sie_cap_gpr kt Mx av b pme -∗
         cpu_own lvl eb pme b lks -∗
         pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜kkl_regs M mb spd pidv k⌝ -∗
-      sie_cap_gpr M av b pme -∗
+      sie_cap_gpr kt M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
       WP (Loop : expr riscv_lang).
@@ -226,11 +227,11 @@ Section ProofKkill.
                    wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
                      ∀ (Mx : regfile) (rv : mword 64),
                        ⌜ kk_exit_regs Mx mb spd rv ⌝ -∗
-                       sie_cap_gpr Mx av b pme -∗
+                       sie_cap_gpr kt Mx av b pme -∗
                        cpu_own lvl eb pme b lks -∗
                        pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
                        WP (Loop : expr riscv_lang)) -∗
-                   sie_cap_gpr M av b pme -∗
+                   sie_cap_gpr kt M av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
@@ -283,8 +284,8 @@ Section ProofKkill.
       (* ---- acquire(&p->lock) ---- *)
       iDestruct (cpu_own_transport CIDk CIDb lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf (CID := CIDb) γk "proc"%string
-                (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme av b lks
+      iApply (Acquire.wp_acquire_sconf kt (CID := CIDb) γk "proc"%string
+                (proc_lock_res (kt := kt) γs γk (proc_addr k)) M22 lvl eb pme av b lks
                 ltac:(lia) ltac:(lia) Hno
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
@@ -359,9 +360,9 @@ Section ProofKkill.
                    ⌜ Mr !!! Regidx Rs1 = proc_addr k /\
                      Mr !!! Regidx csp_rs1 = spd /\
                      kk_cs_rest Mr mb ⌝ -∗
-                   sie_cap_gpr (CID := CIDf) Mr (trap_res b + av)%nat false pme -∗
+                   sie_cap_gpr kt (CID := CIDf) Mr (trap_res b + av)%nat false pme -∗
                    pc_is (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x4a)) -∗
-                   locked γk CIDf -∗ proc_lock_res γs γk (proc_addr k) -∗
+                   locked γk CIDf -∗ proc_lock_res (kt := kt) γs γk (proc_addr k) -∗
                    WP (LoopE gen_id CIDf : expr riscv_lang))%I
           with "[Hown Hpay Hqx]" as "Hret0".
         { iIntros (Mr) "%Hmr Hcg Hpc Htok HR".
@@ -420,8 +421,8 @@ Section ProofKkill.
              brings the release's [match lvl]-phrased continuation back to [b],
              which is what the code after the call is written against. *)
           iEval (rewrite Hbmatch) in "Hcg".
-          iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
-                    (proc_lock_res γs γk (proc_addr k)) Mr4c lvl eb pme av
+          iApply (Release.wp_release_sconf kt (CID := CIDf) γk (proc_addr k) "proc"%string
+                    (proc_lock_res (kt := kt) γs γk (proc_addr k)) Mr4c lvl eb pme av
                     ({["proc"]} ∪ lks)
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
@@ -708,8 +709,8 @@ Section ProofKkill.
         (* Nested release: same [b] vs [match lvl] reserve-spelling step as the
            +0x4c site above -- see the comment there. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
-                  (proc_lock_res γs γk (proc_addr k)) M2e lvl eb pme av
+        iApply (Release.wp_release_sconf kt (CID := CIDf) γk (proc_addr k) "proc"%string
+                  (proc_lock_res (kt := kt) γs γk (proc_addr k)) M2e lvl eb pme av
                   ({["proc"]} ∪ lks)
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
@@ -850,6 +851,7 @@ Section ProofKkillMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -859,7 +861,7 @@ Section ProofKkillMain.
 
   Lemma wp_kkill_sconf  (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_kkill_sconf_body γs m av n eb p b lks.
+    : wp_kkill_sconf_body kt γs m av n eb p b lks.
   Proof.
     cbv beta delta [wp_kkill_sconf_body].
     intros pcE ret_tgt Hlen Hn Hav Hno.
@@ -896,7 +898,7 @@ Section ProofKkillMain.
       by (rewrite /M1 upd_eq; apply stk_push_48).
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
-    rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
+    rewrite (stack_own_split (KTR := kt) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
     iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hb1 & Hb2 & Hb3 & Hb4)".
     iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hb5 Hb6]".
@@ -1091,7 +1093,7 @@ Section ProofKkillMain.
     iAssert (wp_next (CID0 := CID12) b p (fun (CIDq : CpuId) =>
                ∀ (Mx : regfile) (rv : mword 64),
                  ⌜ kk_exit_regs Mx m (pa_stk sp0 6) rv ⌝ -∗
-                 sie_cap_gpr Mx (av - 6)%nat b p -∗
+                 sie_cap_gpr kt Mx (av - 6)%nat b p -∗
                  cpu_own n eb p b lks -∗
                  pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
                  WP (Loop : expr riscv_lang)))%I
@@ -1192,8 +1194,8 @@ Section ProofKkillMain.
       iDestruct (stack_own_4_intro sp0 (m !!! Regidx Rra) (m !!! Regidx Rs0)
                    (m !!! Regidx Rs1) (m !!! Regidx Rs2) with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
       iDestruct (stack_own_2_intro (pa_stk sp0 4) (m !!! Regidx Rs3) w6 with "Hb5 Hb6") as "Hf56".
-      iAssert (stack_own sp0 6) with "[Hf14 Hf56]" as "Hframe".
-      { rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
+      iAssert (stack_own (KTR := kt) sp0 6) with "[Hf14 Hf56]" as "Hframe".
+      { rewrite (stack_own_split (KTR := kt) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
       iEval (rewrite -Hwv) in "Hframe".
       iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.kkill + 0x5c)) (mword_of_int 3 : mword 6)
                 T5 (av - 6)%nat 6 b Hpop with "Hcg Hpc Hi5c Hframe").

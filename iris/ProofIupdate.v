@@ -122,6 +122,7 @@ Section IupdateDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
+  Context {kt : ktier}.
   (* iupdate's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iu_frame (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
@@ -314,9 +315,9 @@ Section IupdateDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr kt mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext kt eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -397,6 +398,7 @@ Section IupdateTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
+  Context {kt : ktier}.
   Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names)
@@ -421,19 +423,19 @@ Section IupdateTail.
        the lower of the two, so one premise at its rank covers both via
        [locks_below_mono]. *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     (* THE COMPLEMENT, PURE PASS-THROUGH: log_write and brelse are not in the
        ALREADY-GENERALIZED set, so neither touches it -- it rides untouched
        from here to the final [Hcont] specialization (one wide transport,
        not three narrow ones, per claude-notes/completed/eb-generic-sweep.md). *)
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.iupdate + 0x66) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv γs -∗
+    procs_inv (kt := kt) γs -∗
     iu_frame m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
@@ -460,7 +462,7 @@ Section IupdateTail.
     iu_region_au γ γfs inodestart inum dn ds e0 Pout -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
-    iu_cont (CID0 := CID0) γfs bn γ inodestart ip inum dn bm
+    iu_cont (kt := kt) (CID0 := CID0) γfs bn γ inodestart ip inum dn bm
             (if cru then S u else u)
             (Sb ∪ {[IBLOCK inum inodestart]}) v Pout
             dev pidv dq dqd dqn dqs j m K eb b lks -∗
@@ -544,7 +546,7 @@ Section IupdateTail.
        spells it [uint bno].  [Hbno] is that one equation. *)
     iAssert (log_credit γ cru Sb e0 (uint bno)) as "#Hcrd";
       [rewrite Hbno; iExact "Hcrd0" |].
-    iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
+    iApply (LW.wp_log_write_au kt bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               cru Sb e0 v (⊤ ∖ ↑iregN) Pout
               T1 0%nat eb (proc_addr j) (K - 4)%nat b
@@ -624,7 +626,7 @@ Section IupdateTail.
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
-    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq T3 (K - 4)%nat eb (proc_addr j)
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
               lks HKbl Hkk HT3a0
@@ -769,9 +771,9 @@ Section IupdateTail.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -869,6 +871,7 @@ Section ProofIupdateMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* THE GENERIC CREDITED CORE: [eb] and its complement [trap_csrs_ext]/
      [cpu_claim_ext] are REAL parameters (eb-generic-sweep.md), and [cru] is
      the absorption credit (fs-sysfile S5a finding 3), threaded straight into
@@ -909,9 +912,9 @@ Section ProofIupdateMain.
          ("bcache", 4) -- "log" is the lowest, so one premise there covers
          the whole cone via [locks_below_mono]. *)
       locks_below lks "log" ->
-      sie_cap_gpr m K b pj -∗
+      sie_cap_gpr kt m K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       kernel_text -∗ kernel_data -∗ pc_is pcE -∗
       panic_env -∗
@@ -932,7 +935,7 @@ Section ProofIupdateMain.
          and why the premise quantifies over it. *)
       iu_region_step γ γfs γi inodestart inum dn dn0 e0 Pout -∗
       p_pid pj ↦₄{dq} pidv -∗
-      procs_inv γs -∗
+      procs_inv (kt := kt) γs -∗
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
       is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -943,9 +946,9 @@ Section ProofIupdateMain.
       wp_next true pj (fun (CID : CpuId) =>
       ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
-          sie_cap_gpr mf K b pj -∗
+          sie_cap_gpr kt mf K b pj -∗
           cpu_own 0 eb pj b lks -∗
-          trap_csrs_ext eb -∗
+          trap_csrs_ext kt eb -∗
           cpu_claim_ext eb pj -∗
           pc_is ret_tgt -∗
           p_pid pj ↦₄{dq} pidv -∗
@@ -996,7 +999,7 @@ Section ProofIupdateMain.
        once, used only to guard the [_ext_transport]s below -- [b] is never
        [subst]ed, it is spelled by name in dozens of leaf-instruction calls. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
-    iAssert (iu_cont (CID0 := CID) γfs bn γ inodestart ip inum dn bm
+    iAssert (iu_cont (kt := kt) (CID0 := CID) γfs bn γ inodestart ip inum dn bm
                (if cru then S u else u)
                (Sb ∪ {[IBLOCK inum inodestart]}) v Pout
                dev pidv dq dqd dqn dqs j m K eb b lks)%I with "[Hcont]" as "Hcont";
@@ -1028,7 +1031,7 @@ Section ProofIupdateMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : iu_sp m R1) by (rewrite /iu_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -1328,7 +1331,7 @@ Section ProofIupdateMain.
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
-    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf kt γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               RA (K - 4)%nat eb b
               lks HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
@@ -1876,7 +1879,7 @@ Section ProofIupdateMain.
     assert (HKmm : (2 <= K - 4)%nat) by lia.
     iEval (rewrite -HG3a1) in "Hsrc".
     iEval (rewrite /bb_bytes -HG3a0) in "Hda".
-    iApply (MM.wp_memmove_sconf G3 (K - 4)%nat 52%nat
+    iApply (MM.wp_memmove_sconf kt G3 (K - 4)%nat 52%nat
               (fun jj => ind_bytes (bm_cells bm) !!! jj)
               (fun jj => ind_bytes (di_addrs (ds !!! islot inum)) !!! jj)
               b (proc_addr j) HKmm Hlen32 HG3a2
@@ -1959,7 +1962,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_iupdate_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks.
   Proof.
@@ -2024,7 +2027,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_iupdate_credgen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks.
   Proof.
@@ -2072,7 +2075,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_iupdate_cred_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks.
   Proof.
@@ -2134,7 +2137,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_iupdate_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks.
   Proof.
@@ -2191,7 +2194,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_iupdate_link_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
                            pidv dq dqd dqn dqs m K eb b lks.
   Proof.
@@ -2257,7 +2260,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_iupdate_unlink_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
                              pidv dq dqd dqn dqs m K eb b lks.
   Proof.

@@ -109,7 +109,7 @@ Section SpecEitherCopyout.
 End SpecEitherCopyout.
 
 Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname)
+    (kt : ktier) (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
@@ -128,7 +128,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
   (* either_copyout -> copyout -> walkaddr -> walk *)
   locks_below lks "kmem" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kalloc_env γa None -∗
@@ -139,7 +139,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
@@ -151,9 +151,9 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
 Module Type EITHER_COPYOUT.
   Parameter wp_either_copyout_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
+      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_either_copyout_sconf_body γa γf m av lvl eb p pid V user len
+      wp_either_copyout_sconf_body kt γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
 End EITHER_COPYOUT.

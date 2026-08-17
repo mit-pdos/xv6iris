@@ -67,7 +67,7 @@ Definition wp_bread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names) (V : bio_view Σ)
@@ -97,7 +97,7 @@ Definition wp_bread_sconf_body
      is stated at the LOWER rank -- [locks_below_mono] (4 <= 6) lifts it to
      cover the acquiresleep call too, so one premise suffices for both. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  This function acquires at
@@ -117,7 +117,7 @@ Definition wp_bread_sconf_body
      sleepers need can only come from here, and the caller holds it because
      the TRAP handed it over.  See claude-notes/completed/sched-hart-generic.md
      and claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -125,7 +125,7 @@ Definition wp_bread_sconf_body
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -143,9 +143,9 @@ Definition wp_bread_sconf_body
   ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -160,13 +160,13 @@ Module Type BREAD.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
+      wp_bread_sconf_body kt γs j γl γu γd γk pd pav pu bn V
                           pidv dev bno dq m K eb b lks.
 End BREAD.

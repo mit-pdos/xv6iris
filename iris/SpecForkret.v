@@ -165,7 +165,7 @@ Definition wp_forkret_gen_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Pfirst : iProp Σ)
+    (kt : ktier) (Pfirst : iProp Σ)
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -207,9 +207,9 @@ Definition wp_forkret_gen_body
   (* THE [first] PREMISE -- see the header, and the two readings above *)
   Pfirst -∗
   (* ---- the running kernel thread, as swtch left it ---- *)
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr kt m av false p -∗
   cpu_own 1%nat eb p false {[s]} -∗
-  trap_csrs -∗
+  trap_csrs kt -∗
   cpu_claim p -∗
   (* ---- p->lock, still held from scheduler() ---- *)
   is_lock γl p s Rlk -∗
@@ -231,12 +231,12 @@ Definition wp_forkret_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (kt : ktier) (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
-  wp_forkret_gen_body
+  wp_forkret_gen_body kt
     (first_addr ↦₄{DfracDiscarded} (mword_of_int 0 : mword 32))
     URes pt j γl γf s Rlk pid V ks m av av2 eb.
 
@@ -251,12 +251,12 @@ Definition wp_forkret_nf_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (kt : ktier) (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
-  wp_forkret_gen_body emp
+  wp_forkret_gen_body kt emp
     URes pt j γl γf s Rlk pid V ks m av av2 eb.
 
 (* the no-[first] reading IS stronger, mechanically: the only difference is
@@ -268,13 +268,13 @@ Lemma wp_forkret_body_of_nf
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    {kt : ktier} (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
-  wp_forkret_nf_body URes pt j γl γf s Rlk pid V ks m av av2 eb ->
-  wp_forkret_body URes pt j γl γf s Rlk pid V ks m av av2 eb.
+  wp_forkret_nf_body kt URes pt j γl γf s Rlk pid V ks m av av2 eb ->
+  wp_forkret_body kt URes pt j γl γf s Rlk pid V ks m av av2 eb.
 Proof.
   rewrite /wp_forkret_body /wp_forkret_nf_body /wp_forkret_gen_body.
   intros Hnf Hj Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw.
@@ -294,11 +294,11 @@ Module Type FORKRET.
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (pt : uptd) (j : nat)
+      (kt : ktier) (pt : uptd) (j : nat)
       (γl γf : gname) (s : string) (Rlk : iProp Σ)
       (pid : mword 32) (V : pprivate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      wp_forkret_body kt (fun h : CpuId => usertrap_res_bare (CID := h))
         pt j γl γf s Rlk pid V ks m av av2 eb.
 End FORKRET.
 
@@ -316,10 +316,10 @@ Module Type FORKRET_NF.
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (pt : uptd) (j : nat)
+      (kt : ktier) (pt : uptd) (j : nat)
       (γl γf : gname) (s : string) (Rlk : iProp Σ)
       (pid : mword 32) (V : pprivate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_nf_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      wp_forkret_nf_body kt (fun h : CpuId => usertrap_res_bare (CID := h))
         pt j γl γf s Rlk pid V ks m av av2 eb.
 End FORKRET_NF.

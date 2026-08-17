@@ -243,6 +243,7 @@ Section ProofDirlookupMain.
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
@@ -287,7 +288,7 @@ Section ProofDirlookupMain.
       (CIDt : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (uu10 : mword 64) (dnew : nat -> bv 8),
        ⌜dlk_tregs m sp0 Mt⌝ -∗
-       sie_cap_gpr Mt (K - 12)%nat b pj -∗
+       sie_cap_gpr kt Mt (K - 12)%nat b pj -∗
        pc_is (mword_of_int (DL + 0x96)) -∗
        (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
        (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
@@ -304,7 +305,7 @@ Section ProofDirlookupMain.
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
            ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
-           sie_cap_gpr mf K b pj -∗
+           sie_cap_gpr kt mf K b pj -∗
            pc_is ret_tgt -∗
            WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
@@ -323,7 +324,7 @@ Section ProofDirlookupMain.
       (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
        ⌜callee_saved m mf⌝ -∗
-       sie_cap_gpr mf K b pj -∗
+       sie_cap_gpr kt mf K b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is ret_tgt -∗
        i_dev ip ↦₄{dqd} dev -∗
@@ -363,7 +364,7 @@ Section ProofDirlookupMain.
        ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
        ⌜dir_first data i s = None⌝ -∗
        ⌜dlk_regs m sp0 ip nb pf (16 * i) Ml⌝ -∗
-       sie_cap_gpr Ml (K - 12)%nat b pj -∗
+       sie_cap_gpr kt Ml (K - 12)%nat b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is (mword_of_int (DL + 0x5c)) -∗
        (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
@@ -403,7 +404,7 @@ Section ProofDirlookupMain.
     (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
        ⌜dlk_regs m sp0 ip nb pf (16 * i) Mp⌝ -∗
        ⌜dir_first data (S i) s = None⌝ -∗
-       sie_cap_gpr Mp (K - 12)%nat b pj -∗
+       sie_cap_gpr kt Mp (K - 12)%nat b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is (mword_of_int (DL + 0x52)) -∗
        (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
@@ -450,7 +451,7 @@ Section ProofDirlookupMain.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
+    : wp_dirlookup_sconf_body kt gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
                               ga gf cov logstart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks.
   Proof.
@@ -512,7 +513,7 @@ Section ProofDirlookupMain.
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 12)
       by (rewrite /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -890,7 +891,7 @@ Section ProofDirlookupMain.
     (* ================================================================= *)
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iAssert (□ wp_next (CID0 := CID) true pj (fun CIDt : CpuId =>
-               dl_tail_body m sp0 pj ret_tgt K b CIDt))%I with "[]" as "#Htail".
+               dl_tail_body (kt := kt) m sp0 pj ret_tgt K b CIDt))%I with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt uu10 dnew) "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                                       Hb8 Hb9 Hb10 Hde Hqc".
@@ -1049,9 +1050,9 @@ Section ProofDirlookupMain.
       (* ---- the [de] buffer goes back to being two frame slots ---- *)
       iDestruct (dlk_name_bytes with "Hde") as "Hdeb2".
       iDestruct (dlk_bytes_slots sp0 Hal12 Hal11 with "Hdeb2") as (w12 w11) "[Hc12 Hc11]".
-      iAssert (stack_own sp0 12) with
+      iAssert (stack_own (KTR := kt) sp0 12) with
         "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hc11 Hc12]" as "Hstk".
-      { rewrite stack_own_slots. cbn [seq].
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
         iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
         iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
@@ -1238,7 +1239,7 @@ Section ProofDirlookupMain.
       (* =============================================================== *)
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
-          dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks
+          dl_loop_body (kt := kt) nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks
             dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -1261,7 +1262,7 @@ Section ProofDirlookupMain.
         assert (Hoffs : Z.of_nat (16 * S i) = Z.of_nat (16 * i) + 16) by lia.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
-                   dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
+                   dl_latch_body (kt := kt) nrec dn data s m sp0 ip nb pf pj ret_tgt K b
                      eb hasp lks dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
@@ -1591,7 +1592,7 @@ Section ProofDirlookupMain.
         { iEval (rewrite HL6a2 Hpjd). iFrame. }
         iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb pj b 
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (RD.wp_readi_sconf gs j gl gu gd gk pd pav pu bn gfs ga gf
+        iApply (RD.wp_readi_sconf kt gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol dlk_dummyV
                   pidv dq dqd L6 (K - 12)%nat eb b lks
@@ -1702,7 +1703,7 @@ Section ProofDirlookupMain.
                           (add_vec_int (mword_of_int (DL + 0x4e) : mword 64) 4)]> PA2).
           assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int dlk_msg_a : mword 64))
             by pcw.
-          iApply (PN.wp_panic_sconf (CID := CIDpa4) PA3 (K - 12)%nat
+          iApply (PN.wp_panic_sconf kt (CID := CIDpa4) PA3 (K - 12)%nat
                     0%nat eb b pj (PkAStr DfracDiscarded dlk_msg) lks
                     (dlk_panic_K K HK) eq_refl dlk_panic_noff
                     (dlk_panic_below lks Hbelow)
@@ -1856,7 +1857,7 @@ Section ProofDirlookupMain.
             by (rewrite /N4; apply upd_eq).
           iEval (rewrite -HN4a0) in "Hnm".
           iEval (rewrite -HN4a1) in "Hdenm".
-          iApply (NC.wp_namecmp_sconf N4 fn (dir_name data i) (K - 12)%nat
+          iApply (NC.wp_namecmp_sconf kt N4 fn (dir_name data i) (K - 12)%nat
                     dqn (DfracOwn 1) b pj ltac:(lia)
                     with "Hcg Htext Hpc Hnm Hdenm").
           iIntros (CIDnc Hsnc mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
@@ -1904,11 +1905,11 @@ Section ProofDirlookupMain.
                       (sign_extend' 64 (mword_of_int 8 : mword 13))
                       = mword_of_int (DL + 0x86)) by pcw.
             (* +0x7e beq s7,x0 / +0x82 sw s1,0(s7) : the optional [*poff = off] *)
-            iAssert (sie_cap_gpr mnc (K - 12)%nat b pj -∗
+            iAssert (sie_cap_gpr kt mnc (K - 12)%nat b pj -∗
                      pc_is (mword_of_int (DL + 0x7e)) -∗
                      (if hasp then pf ↦₄ pofv else emp) -∗
                      wp_next (CID0 := CIDB13) true pj (fun CIDs : CpuId =>
-                       sie_cap_gpr mnc (K - 12)%nat b pj -∗
+                       sie_cap_gpr kt mnc (K - 12)%nat b pj -∗
                        pc_is (mword_of_int (DL + 0x86)) -∗
                        (if hasp
                         then pf ↦₄ (mword_of_int (Z.of_nat (16 * i)) : mword 32)
@@ -2084,7 +2085,7 @@ Section ProofDirlookupMain.
                 iExists (LinkedL fl). rewrite /iname Hzu.
                 iSplitL "Hp"; [iExact "Hp" |].
                 iIntros "Hp". iFrame "Hdi". iApply ("Hback" with "Hp"). }
-            iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
+            iApply (IG.wp_iget_sconf kt gtl cn gfs gi cov logstart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks

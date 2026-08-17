@@ -104,7 +104,7 @@ End ConsoleCaps.
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
+     (kt : ktier) (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
     (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (consoleintr_stack <= K)%nat ->
@@ -122,16 +122,16 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
      see the proof file's report for why that is not this function's
      obligation to supply. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr kt m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
- procs_inv γs -∗
+ procs_inv (kt := kt) γs -∗
   dev_inv γu γv -∗
   console_caps γu -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b pme -∗
+      sie_cap_gpr kt Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -141,7 +141,7 @@ Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
+       (kt : ktier) (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks.
+      wp_consoleintr_sconf_body kt γu γv m γs pme lvl K eb b lks.
 End CONSOLEINTR.

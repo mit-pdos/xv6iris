@@ -610,6 +610,7 @@ Section VdrwdLeaves.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ---- the avail-ring INDEX read: [lhu rd,2(rs1)] with rs1 = disk.avail.
      Drives [virtio_proto_avail_idx_acc]: the value is the driver's OWN
      published count, so nothing new is learned about it -- what the read is
@@ -622,13 +623,13 @@ Section VdrwdLeaves.
       (m : regfile) (n : nat) (np nr : nat) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n false pme -∗ pc_is pc -∗
+    sie_cap_gpr kt m n false pme -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_done_lb γd nr -∗
     ( ⌜(nr <= np)%nat⌝ -∗
       disk_pub γd np -∗
-      sie_cap_gpr (<[Regidx rd := regval_into_reg
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg
           (zero_extend' 64 (wrap16 np : SailStdpp.Values.mword 16))]> m) n false pme -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -710,11 +711,11 @@ Section VdrwdLeaves.
     slot_pin_ok (virtio_init_cfg pd pav pu) np sl pin ->
     dom wrb = slot_wr sl ->
     slot_wr sl ## dom pin ->
-    sie_cap_gpr m n false pme -∗ pc_is pc -∗
+    sie_cap_gpr kt m n false pme -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ phys_map pin -∗ phys_map wrb -∗ slot_pend_res γd sl -∗
-    ( sie_cap_gpr m n false pme -∗
+    ( sie_cap_gpr kt m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
       disk_pub γd (S np) -∗ disk_receipt γd np sl pin -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1435,6 +1436,7 @@ Section VdrwdP4.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra3 := (mword_of_int 13 : mword 5).
@@ -1467,7 +1469,7 @@ Section VdrwdP4.
     (bv_unsigned sector * 512)%Z = sec_off ->
     M !!! Regidx Ra0 = (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 64) ->
     M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64) ->
-    sie_cap_gpr M av false pme -∗
+    sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     vdrw_body γd pd pav np nr fl pk tr fr -∗
@@ -1488,7 +1490,7 @@ Section VdrwdP4.
                              (vdrwd_bufwin b wr bs_buf))
          /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                      (vdrwd_bufwin b wr bs_buf))⌝ -∗
-        sie_cap_gpr M1 av false pme -∗
+        sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
         vdrw_body γd pd pav (S np) nr
                   (<[ np := DClaim b (vdrwd_slot kq b h wr sector

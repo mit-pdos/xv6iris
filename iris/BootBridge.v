@@ -152,6 +152,12 @@ Qed.
 Section BootStack.
   Context `{!riscvGS Σ}.
 
+  (* PINNED AT KT0, AND FORCED.  This bridge turns a PHYSICAL stack region
+     into a virtual one, which is exactly the boot identity map's own step:
+     a KT1 [stack_own] carries no identity pin, so there is nothing to build
+     it out of.  Boot is Bare until kvminithart, so the pin costs nothing --
+     and it is one of the two places in the tree where a concrete tier is a
+     FACT rather than a parameter (the other is [sie_cap_intro_bare]). *)
   Lemma phys_word_to_word (a : mword 64) (dq : dfrac) (w : bv 64) :
     (forall j : nat, (j < 8)%nat -> addr_is_kdata (pa_add a j)) ->
     kmap_static_claims -∗ a ↦ₚ₈{dq} w -∗ a ↦₈{dq} w.
@@ -173,7 +179,7 @@ Section BootStack.
   Lemma stack_own_phys_to_stack (sp : mword 64) (n : nat) :
     (forall k : nat, (0 < k)%nat -> (k <= n)%nat ->
        forall j : nat, (j < 8)%nat -> addr_is_kdata (pa_add (pa_stk sp k) j)) ->
-    kmap_static_claims -∗ stack_own_phys sp n -∗ stack_own sp n.
+    kmap_static_claims -∗ stack_own_phys sp n -∗ stack_own (KTR := KT0) sp n.
   Proof.
     iIntros (Hkd) "#Hcl H".
     rewrite /stack_own_phys /stack_own.
@@ -247,6 +253,8 @@ Section BootBridge.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* NO [kt] BINDER: the boot capability is at KT0 by construction
+     ([sie_cap_intro_bare]); see the note in [Section BootStack] above. *)
   (* [mmode_config]'s two persistent conjuncts, kept while the bundle is
      handed to [wp_entry_boot] (which consumes it and never gives it back).
      This is how the corollary sources the bridge's [hw_config] /
@@ -394,7 +402,7 @@ Section BootBridge.
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
-      sie_cap_gpr mf (kv_frame_slots + K) false p0 ∗
+      sie_cap_gpr KT0 mf (kv_frame_slots + K) false p0 ∗
       cpu_ctx_free ∗
       cpu_own 0 false p0 false ∅ ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
@@ -433,7 +441,7 @@ Section BootBridge.
                 with "Hpcf Hpad"). }
     (* --- the capability, at the final register file --- *)
     iDestruct "Hstv" as (stv0) "Hstv".
-    iAssert (stack_own (Mf !!! Regidx csp_rs1) (kv_frame_slots + K))
+    iAssert (stack_own (KTR := KT0) (Mf !!! Regidx csp_rs1) (kv_frame_slots + K))
       with "[Hstk]" as "Hstk".
     { rewrite Hsp mb_frame_pa_stk. iExact "Hstk". }
     (* [sie_cap_intro_bare]'s stack premise is PLAIN [avail], so it is

@@ -308,7 +308,7 @@ Definition namex_post
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
+    {kt : ktier} (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
@@ -319,7 +319,7 @@ Definition namex_post
   (∀ (mf : regfile) (n' : nat) (used' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
@@ -362,7 +362,7 @@ Definition namex_postS
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
+    {kt : ktier} (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
@@ -373,7 +373,7 @@ Definition namex_postS
   (∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
@@ -426,7 +426,7 @@ Definition wp_namex_sconf_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -494,7 +494,7 @@ Definition wp_namex_sconf_body
   eb = true ->
   (* ORDER PREMISE: same cone, same bound, as the _gen body below. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -511,7 +511,7 @@ Definition wp_namex_sconf_body
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -544,7 +544,7 @@ Definition wp_namex_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
-    namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
+    namex_post (kt := kt) (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
                g gfs bn cov logstart bmapstart inodestart size used cwdv
                plen pfun npar n pidv dq dqb dqs dqc) -∗
   WP (Loop : expr riscv_lang).
@@ -572,7 +572,7 @@ Definition wp_namex_gen_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -646,7 +646,7 @@ Definition wp_namex_gen_body
      iget/iput/idup all state their bound there; ilock's "sleep lock" (6)
      and the bcache/log ranks above it follow by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -663,7 +663,7 @@ Definition wp_namex_gen_body
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -696,7 +696,7 @@ Definition wp_namex_gen_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
-    namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
+    namex_postS (kt := kt) (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
                 g gfs bn cov logstart bmapstart inodestart size used cwdv
                 plen pfun npar n Sb pidv dq dqb dqs dqc) -∗
   WP (Loop : expr riscv_lang).
@@ -707,7 +707,7 @@ Module Type NAMEX.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -725,7 +725,7 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_namex_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n
                           pidv dq dqb dqs dqc m K eb b lks.
@@ -736,7 +736,7 @@ Module Type NAMEX.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -754,7 +754,7 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_namex_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used cwdv plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqc m K eb b lks.
@@ -803,7 +803,7 @@ Definition wp_namex_root_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+    (kt : ktier) (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -824,7 +824,7 @@ Definition wp_namex_root_body
   m !!! Regidx (mword_of_int 11 : mword 5) = (zero_reg : mword 64) ->
   (* iget acquires and releases "itable" internally *)
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -839,7 +839,7 @@ Definition wp_namex_root_body
     ∀ (mr : regfile) (ipv : mword 64),
       ⌜ callee_saved m mr
         /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr kt mr K b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗
@@ -853,11 +853,11 @@ Module Type NAMEX_ROOT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
              !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+      (kt : ktier) (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
-      wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
+      wp_namex_root_body kt gtl cn gfs gi cov logstart nib dev dqp
                          m n K eb p b lks.
 End NAMEX_ROOT.

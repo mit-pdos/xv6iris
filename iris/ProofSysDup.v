@@ -126,6 +126,7 @@ Section ProofSysDup.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1  : mword 5).
   Notation Rs0  := (mword_of_int 8  : mword 5).
   Notation Rs1  := (mword_of_int 9  : mword 5).
@@ -148,11 +149,11 @@ Section ProofSysDup.
   Lemma sd_sp_bounds `{CID0 : CpuId} (mm : regfile) (k : nat)
       (bb : bool) (pp : mword 64) :
     (0 < k)%nat ->
-    sie_cap_gpr mm k bb pp -∗
+    sie_cap_gpr kt mm k bb pp -∗
     ⌜(8 <= uint (mm !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res bb + k)%nat with "Hstk").
+    iApply (stack_own_sp_bounds (KTR := kt) _ (trap_res bb + k)%nat with "Hstk").
     destruct bb; unfold trap_res; lia.
   Qed.
 
@@ -174,7 +175,7 @@ Section ProofSysDup.
     Mt !!! Regidx Ra5 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b p -∗
+    sie_cap_gpr kt Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_dup + 0x3c) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -186,7 +187,7 @@ Section ProofSysDup.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr kt mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -264,8 +265,8 @@ Section ProofSysDup.
     iEval (rewrite -E6) in "Hb6".
     iDestruct (stack_own_4_intro sp0 ra0 s00 w3 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
     iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
-    iAssert (stack_own sp0 6) with "[Hf14 Hf56]" as "Hframe".
-    { rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hf14 Hf56]" as "Hframe".
+    { rewrite (stack_own_split (KTR := kt) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x42))
               (mword_of_int 3 : mword 6) T2 (av - 6)%nat 6 b Hpop
@@ -338,7 +339,7 @@ Section ProofSysDup.
   Lemma wp_sys_dup_sconf (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_dup_sconf_body γl γf m av n eb p v pid V b lks.
+    : wp_sys_dup_sconf_body kt γl γf m av n eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hftno.
@@ -390,7 +391,7 @@ Section ProofSysDup.
       by (rewrite /M1 upd_eq; apply stk_push_48).
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
-    rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
+    rewrite (stack_own_split (KTR := kt) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
     iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hs5 Hs6]".
@@ -553,7 +554,7 @@ Section ProofSysDup.
     iEval (rewrite -HM6a2) in "Hs5".
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p 0%nat v pid V
+    iApply (Argfd.wp_argfd_sconf kt γf M6 (av - 6)%nat n eb p 0%nat v pid V
               (word_lo w5) w5 b lks
               ltac:(unfold NARG; lia) HM6a0' Harg Hs5nz Hn
               ltac:(lia)
@@ -744,7 +745,7 @@ Section ProofSysDup.
       as (k q Cf) "([%Hfvk %Hklt] & Href & Hcore & Hof)".
     iDestruct (cpu_own_transport CID9 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
+    iApply (Fdalloc.wp_fdalloc_sconf kt γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
               ltac:(rewrite HB4a0 Hfvk; reflexivity) Hklt Hn
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
@@ -992,7 +993,7 @@ Section ProofSysDup.
     iDestruct (cpu_own_transport CID17 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     (* THE UNIT fdalloc RELEASED IS WHAT PAYS FOR THE HIGHER COUNT *)
-    iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p (av - 6)%nat b lks
+    iApply (Filedup.wp_filedup_sconf kt γl γf k q Cf G2 n eb p (av - 6)%nat b lks
               ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
               with "Hcg Hcpu Htext Hpc Hftab Hunit Href").
     all: try lkbelow.

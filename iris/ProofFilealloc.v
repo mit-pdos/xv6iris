@@ -81,6 +81,7 @@ Section ProofFilealloc.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   (* register indices, named once *)
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -100,7 +101,7 @@ Section ProofFilealloc.
      two independent presentations of the same SIE state; see
      ProofFiledup.v's identical helper for the full comment. *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr kt m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -165,13 +166,13 @@ Section ProofFilealloc.
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> mword_of_int 9 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
+        sie_cap_gpr kt (CID := CID0) mj (K - 4)%nat b p -∗
         pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
         cpu_own (CID := CID0) n eb p b lks -∗
         filealloc_post γf res -∗
         wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
           ∀ mfin,
-          sie_cap_gpr mfin K b p -∗
+          sie_cap_gpr kt mfin K b p -∗
           cpu_own n eb p b lks -∗
           pc_is ret_tgt -∗
           ⌜ callee_saved m mfin ⌝ -∗
@@ -182,7 +183,7 @@ Section ProofFilealloc.
   Lemma wp_filealloc_sconf
       (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
-    : wp_filealloc_sconf_body γl γf m n eb p K b lks.
+    : wp_filealloc_sconf_body kt γl γf m n eb p K b lks.
   Proof.
     cbv beta delta [wp_filealloc_sconf_body].
     intros pcE ret_tgt HK HnZ Hbelow.
@@ -217,7 +218,7 @@ Section ProofFilealloc.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -329,7 +330,7 @@ Section ProofFilealloc.
        moved us to CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γl "ftable"%string (ftable_res γf) mA
+    iApply (Acquire.wp_acquire_sconf kt γl "ftable"%string (ftable_res γf) mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -431,7 +432,7 @@ Section ProofFilealloc.
        closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
        at each concrete call site, is the one who both knows the full
        chain back to entry and holds the real [Hcont]. *)
-    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p n eb ret_tgt CID0 lks)%I
+    iAssert (∀ (CID0 : CpuId), fa_epi_body (kt := kt) γf m spr K b p n eb ret_tgt CID0 lks)%I
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hepi".
     { iIntros (CID0 mj res) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hpc Hcnt Hpost Kont".
       (* +0x52 c.mv a0,s1 *)
@@ -502,8 +503,8 @@ Section ProofFilealloc.
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HP4sp. unfold spr, sp0, pa_stk, add_vec_int.
         apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-      iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hr24"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr24"|].
         iSplitL "Hr16"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr16"|].
         iSplitL "Hr8";  [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr8"|].
@@ -587,14 +588,14 @@ Section ProofFilealloc.
           /\ Mi !!! Regidx Rs1 = fnode i
           /\ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
                 Mi !!! Regidx c = macq !!! Regidx c) ⌝ -∗
-        sie_cap_gpr Mi (trap_res b + (K - 4))%nat false p -∗
+        sie_cap_gpr kt Mi (trap_res b + (K - 4))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x42)) -∗
         ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         WP (Loop : expr riscv_lang))%I).
     set (Cfull := (∀ (Mf : regfile),
         ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
              Mf !!! Regidx c = macq !!! Regidx c) ⌝ -∗
-        sie_cap_gpr Mf (trap_res b + (K - 4))%nat false p -∗
+        sie_cap_gpr kt Mf (trap_res b + (K - 4))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x32)) -∗
         ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         WP (Loop : expr riscv_lang))%I).
@@ -605,7 +606,7 @@ Section ProofFilealloc.
           /\ M !!! Regidx Ra4 = fnode NFILE
           /\ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
                 M !!! Regidx c = macq !!! Regidx c) ⌝ -∗
-        sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
+        sie_cap_gpr kt M (trap_res b + (K - 4))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x26)) -∗
         ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         (* the two exits are conjoined, NOT separated: exactly one is taken,
@@ -890,7 +891,7 @@ Section ProofFilealloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) F4
+      iApply (Release.wp_release_sconf kt γl ftable_addr "ftable"%string (ftable_res γf) F4
                 n eb p (K - 4)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
@@ -997,7 +998,7 @@ Section ProofFilealloc.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) G3
+      iApply (Release.wp_release_sconf kt γl ftable_addr "ftable"%string (ftable_res γf) G3
                 n eb p (K - 4)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)

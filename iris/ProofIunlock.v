@@ -113,6 +113,7 @@ Section ProofIunlockMain.
             !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iul_frame (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
@@ -128,7 +129,7 @@ Section ProofIunlockMain.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr kt mf K b p -∗
         cpu_own 0 eb p b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid p ↦₄{dq} pidv -∗
@@ -146,7 +147,7 @@ Section ProofIunlockMain.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
+    : wp_iunlock_sconf_body kt gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p b lks.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
@@ -185,7 +186,7 @@ Section ProofIunlockMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : iul_sp m R1) by (rewrite /iul_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -372,7 +373,7 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (HS.wp_holdingsleep_gen_sconf (dq := dq) gil gisl "inode"%string
+    iApply (HS.wp_holdingsleep_gen_sconf kt (dq := dq) gil gisl "inode"%string
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
@@ -528,7 +529,7 @@ Section ProofIunlockMain.
     (* the descriptor pins the fraction and the identity: the share comes back
        at exactly [s], with no existential (§14.8) *)
     iDestruct "Hrefout" as "[_ Href]".
-    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string
+    iApply (RS.wp_releasesleep_gen_sconf kt gs gil gisl "inode"%string
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
@@ -679,9 +680,9 @@ Section ProofIunlockMain.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].

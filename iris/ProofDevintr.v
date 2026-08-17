@@ -77,6 +77,7 @@ Section ProofDevintr.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -130,7 +131,7 @@ Section ProofDevintr.
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     M !!! Regidx a0_idx = retv ->
     di_thr m0 M ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr kt M k false p -∗
     cpu_own lvl eb p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x22) : mword 64) -∗
@@ -141,7 +142,7 @@ Section ProofDevintr.
     pa_stk sp0 4 ↦₈ v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = retv ⌝ -∗
-        sie_cap_gpr mf (k + 4) false p -∗
+        sie_cap_gpr kt mf (k + 4) false p -∗
         cpu_own lvl eb p false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
@@ -267,7 +268,7 @@ Section ProofDevintr.
         r <> csp_rs1 -> r <> (mword_of_int 8 : mword 5) ->
         r <> (mword_of_int 9 : mword 5) -> M !!! Regidx r = m0 !!! Regidx r ) ->
     devintr_ret sc = (mword_of_int 1 : mword 64) ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr kt M k false p -∗
     cpu_own lvl eb p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) -∗
@@ -279,7 +280,7 @@ Section ProofDevintr.
     pa_stk sp0 4 ↦₈ v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = devintr_ret sc ⌝ -∗
-        sie_cap_gpr mf (k + 4) false p -∗
+        sie_cap_gpr kt mf (k + 4) false p -∗
         cpu_own lvl eb p false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
@@ -317,7 +318,7 @@ Section ProofDevintr.
                     = add_vec_int (mword_of_int (KernelSyms.devintr + 0x64) : mword 64) 4)
       by (rewrite /T1 upd_eq; reflexivity).
     (* ===================== plic_complete(irq) ===================== *)
-    iApply (PlicComplete.wp_plic_complete_sconf γu γv T1 k p
+    iApply (PlicComplete.wp_plic_complete_sconf kt γu γv T1 k p
               (di_tp_bound T1) ltac:(lia)
               with "Hcg Htext Hpc Hdev").
     iIntros (MC) "Hcg Hpc %HcsC".
@@ -401,7 +402,7 @@ Section ProofDevintr.
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (dq : dfrac) (sc : mword 64) (lks : gset string)
-    : wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p dq sc lks.
+    : wp_devintr_sconf_body kt γu γv γdk γtl γs pd pav pu m av lvl eb p dq sc lks.
   Proof.
     cbv beta delta [wp_devintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
@@ -625,7 +626,7 @@ Section ProofDevintr.
                       = add_vec_int (mword_of_int (KernelSyms.devintr + 0x2c) : mword 64) 4)
         by (rewrite /B0 upd_eq; reflexivity).
       (* ===================== plic_claim() ===================== *)
-      iApply (PlicClaim.wp_plic_claim_sconf γu γv B0 (av - 4)%nat p
+      iApply (PlicClaim.wp_plic_claim_sconf kt γu γv B0 (av - 4)%nat p
                 (di_tp_bound B0) ltac:(lia)
                 with "Hcg Htext Hpc Hdev").
       iIntros (MK) "Hcg Hpc %HcsK".
@@ -871,7 +872,7 @@ Section ProofDevintr.
         assert (HU0ra : U0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
           by (rewrite /U0 upd_eq; reflexivity).
-        iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p false
+        iApply (Uartintr.wp_uartintr_sconf kt γu γv γs U0 (av - 4)%nat lvl eb p false
                   _ Hlen ltac:(lia) ltac:(lia)
                   with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps").
         all: try lkbelow.
@@ -979,7 +980,7 @@ Section ProofDevintr.
         assert (HV1ra : V1 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x4e) : mword 64) 4)
           by (rewrite /V1 upd_eq; reflexivity).
-        iApply (VirtioDiskIntr.wp_virtio_disk_intr_sconf γs γu γv γdk pd pav pu
+        iApply (VirtioDiskIntr.wp_virtio_disk_intr_sconf kt γs γu γv γdk pd pav pu
                   V1 (av - 4)%nat lvl eb p false lks
                   ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
@@ -1142,7 +1143,7 @@ Section ProofDevintr.
         assert (HK0ra : K0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x6e) : mword 64) 4)
           by (rewrite /K0 upd_eq; reflexivity).
-        iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p (av - 4)%nat lks
+        iApply (Clockintr.wp_clockintr_sconf kt γtl γs K0 lvl eb p (av - 4)%nat lks
                   ltac:(lia) ltac:(lia) ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Htcap Htk").
         all: try lkbelow.

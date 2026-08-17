@@ -836,8 +836,9 @@ Definition so_al (sp0 : mword 64) : Prop :=
 Section ProofSysOpenFrame.
   Context `{!riscvGS Σ}.
 
+  Context {kt : ktier}.
   Lemma so_frame_carve (sp0 : mword 64) :
-    stack_own sp0 24 -∗
+    stack_own (KTR := kt) sp0 24 -∗
     ⌜so_al sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
     (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
@@ -849,7 +850,7 @@ Section ProofSysOpenFrame.
     (∃ w : mword 64, (pa_stk sp0 23) ↦₈ w) ∗
     (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w).
   Proof.
-    iIntros "H". rewrite stack_own_slots. cbn [seq].
+    iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                        H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                        H20 & H21 & H22 & H23 & H24 & _)".
@@ -878,7 +879,7 @@ Section ProofSysOpenFrame.
     (pa_stk sp0 5) ↦₈ w5 -∗ (pa_stk sp0 6) ↦₈ w6 -∗
     bytes_own (DfracOwn 1) (pa_stk sp0 22) 128 -∗
     (pa_stk sp0 23) ↦₈ w23 -∗ (pa_stk sp0 24) ↦₈ w24 -∗
-    stack_own sp0 24.
+    stack_own (KTR := kt) sp0 24.
   Proof.
     intro HalP. iIntros "H1 H2 H3 H4 H5 H6 HbP H23 H24".
     (* the [8 * n] conversion is done INSIDE the framing braces, never on the
@@ -890,7 +891,7 @@ Section ProofSysOpenFrame.
     cbn [seq].
     iDestruct "HsP" as "(K22 & K21 & K20 & K19 & K18 & K17 & K16 & K15 & K14 &
                          K13 & K12 & K11 & K10 & K9 & K8 & K7 & _)".
-    rewrite stack_own_slots. cbn [seq].
+    rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iSplitL "H1"; [iExists w1; iExact "H1" |].
     iSplitL "H2"; [iExists w2; iExact "H2" |].
     iSplitL "H3"; [iExists w3; iExact "H3" |].
@@ -993,6 +994,7 @@ Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 Section ProofSysOpenEpilogue.
   Context `{!riscvGS Σ, !sieG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -1010,7 +1012,7 @@ Section ProofSysOpenEpilogue.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr M (K - 24) b pj -∗
+    sie_cap_gpr kt M (K - 24) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SO + 0xca)) -∗
     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
@@ -1030,7 +1032,7 @@ Section ProofSysOpenEpilogue.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra0 : mword 64)⌝ -∗
-        sie_cap_gpr mf K b pj -∗
+        sie_cap_gpr kt mf K b pj -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

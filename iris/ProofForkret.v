@@ -138,11 +138,11 @@ Theorem wp_forkret
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (pt : uptd) (j : nat)
+    {kt : ktier} (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
-    wp_forkret_body (fun h : CpuId => usertrap_res_bare (CID := h))
+    wp_forkret_body kt (fun h : CpuId => usertrap_res_bare (CID := h))
       pt j γl γf s Rlk pid V ks m av av2 eb.
 Proof.
   cbv beta delta [wp_forkret_body wp_forkret_gen_body].
@@ -287,7 +287,7 @@ Proof.
                       (sign_extend' 64 (mword_of_int 2097092 : mword 21))
                     = mword_of_int KernelSyms.myproc) by pcw.
   iEval (rewrite Hmyproc) in "Hpc".
-  iApply (MP.wp_myproc_sconf M3 (trap_res eb + av2)%nat 1%nat eb p false {[s]}
+  iApply (MP.wp_myproc_sconf kt M3 (trap_res eb + av2)%nat 1%nat eb p false {[s]}
             fkr_n1 ltac:(lia) with "Hcg Hcpu Htext Hpc").
   iApply wp_next_off_intro. iIntros (msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
   destruct HcsA as [HcsA HAa0].
@@ -342,7 +342,7 @@ Proof.
     by (rewrite HM5a0; apply addv_sext0).
   (* the arm splits: what release wants and what prepare_return will *)
   iDestruct (arm_pay_ext_split eb p with "Htc Hclm") as "[Hpay [Hext Hcx]]".
-  iApply (RL.wp_release_sconf γl p s Rlk M5 0%nat eb p av2 {[s]}
+  iApply (RL.wp_release_sconf kt γl p s Rlk M5 0%nat eb p av2 {[s]}
             Hlka ltac:(lia) with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
   iIntros (CIDr Hkr mr) "Hcg Hpc %Hcsr Hcpu".
   assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (FR + 0x14))
@@ -478,7 +478,7 @@ Proof.
   iDestruct (cpu_claim_ext_transport CID CID7 eb p
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   iDestruct (ut_epc_exists with "Hpv") as %[epc Hepc].
-  iApply (PR.wp_prepare_return_sconf γf ks pid V T5 av2 p epc eb ∅
+  iApply (PR.wp_prepare_return_sconf kt γf ks pid V T5 av2 p epc eb ∅
             Hpr Hepc with "Hcg Hcpu Hext Htext Hpc Hks Hpv").
   iIntros (CIDf Hkf mf ksat kroot0 vb)
     "%Hcsf %HksatM %Hksata %Hksatp Hcg Hcpu Hcpay Hsepc Hscause Hstval
@@ -841,14 +841,14 @@ Proof.
     rewrite /S2 upd_ne; [| reg_neq]. rewrite /S1 upd_ne; [| reg_neq].
     rewrite /S0 upd_ne; [| reg_neq]. exact Hmfsp. }
   iEval (rewrite HSEsp) in "Hstk".
-  iAssert (stack_own ksp 4) with "[Hbra Hbs0 Hbs1 Hbsc]" as "Hf14".
-  { iApply (stack_own_4_intro ksp with "Hbra Hbs0 Hbs1 Hbsc"). }
-  iAssert (stack_own ksp 6) with "[Hf14 Hf56]" as "Hf16".
-  { iApply (stack_own_split_2 ksp 4 6 ltac:(lia)).
+  iAssert (stack_own (KTR := kt) ksp 4) with "[Hbra Hbs0 Hbs1 Hbsc]" as "Hf14".
+  { iApply (stack_own_4_intro (KTR := kt) ksp with "Hbra Hbs0 Hbs1 Hbsc"). }
+  iAssert (stack_own (KTR := kt) ksp 6) with "[Hf14 Hf56]" as "Hf16".
+  { iApply (stack_own_split_2 (KTR := kt) ksp 4 6 ltac:(lia)).
     iSplitL "Hf14"; [iExact "Hf14" | iExact "Hf56"]. }
-  iAssert (stack_own ksp av) with "[Hstk Hf16]" as "Hstack".
+  iAssert (stack_own (KTR := kt) ksp av) with "[Hstk Hf16]" as "Hstack".
   { rewrite Havsum.
-    iApply (bi.equiv_entails_1_2 _ _ (stack_own_app ksp 6 (trap_res eb + av2))).
+    iApply (bi.equiv_entails_1_2 _ _ (stack_own_app (KTR := kt) ksp 6 (trap_res eb + av2))).
     iSplitL "Hf16"; [iExact "Hf16" | iExact "Hstk"]. }
   (* ---- the trap-side residue, and the table it hands userret ---- *)
   iAssert (ut_trap p ksp av ∅)

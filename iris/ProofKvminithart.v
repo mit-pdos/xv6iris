@@ -36,6 +36,7 @@ Section KvminithartBody.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -44,7 +45,7 @@ Section KvminithartBody.
   Lemma wp_kvminithart_sconf_proof (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (pcur : mword 64) :
-    wp_kvminithart_sconf_body mm lvl K root tlbvec0 pcur.
+    wp_kvminithart_sconf_body kt mm lvl K root tlbvec0 pcur.
   Proof.
     unfold wp_kvminithart_sconf_body.
     intros Hlvl HK.
@@ -78,7 +79,7 @@ Section KvminithartBody.
     iIntros "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /W1 upd_eq; reflexivity).
@@ -312,7 +313,7 @@ Section KvminithartBody.
     { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
     iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
     iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
-    iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word root)).
     iSplitR.
@@ -376,7 +377,7 @@ Section KvminithartBody.
                  (tlb_ok_pt_empty (mword_of_int 0) kt3 tlbz3 (fun vpn' => Hnone3 _ (tlb_hash_range vpn')))
                  with "Hsatp Htlbc Hlb3 Hpmp Hkinv3") as "Htlbinv".
     iDestruct (strans_inv_intro root_ppn with "Hbit1 Htlbinv") as "Htr".
-    iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap kt S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iModIntro. iExists (set_reg s_pc3 tlb tlbz3).
     iSplitR.
@@ -435,8 +436,8 @@ Section KvminithartBody.
     { rewrite HL2sp. apply frame_cancel_16. }
     assert (Hpop : L2 !!! Regidx csp_rs1 = pa_stk (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HL2sp. exact Hpush. }
-    iAssert (stack_own (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
-    { rewrite stack_own_slots; cbn [seq].
+    iAssert (stack_own (KTR := kt) (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)); cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }
@@ -478,9 +479,9 @@ End KvminithartBody.
 Module KvminithartProof : KVMINITHART.
   Definition wp_kvminithart_sconf
       `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (mm : regfile) (lvl K : nat)
+      {kt : ktier} (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (pcur : mword 64)
-      : wp_kvminithart_sconf_body mm lvl K root tlbvec0 pcur :=
+      : wp_kvminithart_sconf_body kt mm lvl K root tlbvec0 pcur :=
     wp_kvminithart_sconf_proof mm lvl K root tlbvec0 pcur.
 End KvminithartProof.

@@ -263,7 +263,7 @@ Definition wp_bmap_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -293,7 +293,7 @@ Definition wp_bmap_sconf_body
   (* balloc's out-of-blocks arm calls the GENERAL printk path; its contract
      rides as a hypothesis, never a functor, so that neither balloc nor bmap
      inherits LinkPrintk's Axiom.  See SpecBalloc.v's header. *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := kt) γpr γu γd ->
   (* KILLS THE PANIC ARM *)
   (fbn < MAXFILE)%nat ->
   blkmap_wf cov logstart bm ->
@@ -305,7 +305,7 @@ Definition wp_bmap_sconf_body
   (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
      the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bmap holds no lock of its
      own -- every push_off/pop_off pair that can mint or spend an
@@ -318,7 +318,7 @@ Definition wp_bmap_sconf_body
      because the TRAP handed it over.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two PERSISTENT printk credentials, forwarded to balloc *)
@@ -347,7 +347,7 @@ Definition wp_bmap_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_res γfs bmapstart cov logstart size used -∗
   (* the running-thread bundle *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -401,9 +401,9 @@ Definition wp_bmap_sconf_body
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -451,7 +451,7 @@ Definition wp_bmap_gen_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -472,7 +472,7 @@ Definition wp_bmap_gen_body
   (bmap_need cr (bmap_ind fbn) <= n)%nat ->
   log_geom_ok cov logstart ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := kt) γpr γu γd ->
   (* THE CREDIT'S PREMISE: claiming the bitmap block is already paid for
      means claiming this op has already logged it.  There is only one. *)
   (cr = true -> bmapstart ∈ Sb) ->
@@ -494,7 +494,7 @@ Definition wp_bmap_gen_body
   (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
      the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_bmap_sconf_body] above -- required so that a LOOPING caller (e.g.
@@ -503,7 +503,7 @@ Definition wp_bmap_gen_body
      counted/sconf form, which has no [cr]/[Sb] at all) can reach this
      contract at [eb = false] too.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
@@ -518,7 +518,7 @@ Definition wp_bmap_gen_body
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_res γfs bmapstart cov logstart size used -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -541,9 +541,9 @@ Definition wp_bmap_gen_body
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -601,7 +601,7 @@ Module Type BMAP.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -613,7 +613,7 @@ Module Type BMAP.
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_bmap_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr ip bm data fbn n
                          pidv dq dqd dqb dqs m K eb b lks.
 
@@ -625,7 +625,7 @@ Module Type BMAP.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -637,7 +637,7 @@ Module Type BMAP.
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_bmap_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs
                        cov logstart bmapstart size dev used γpr ip bm data fbn
                        n cr Sb
                        pidv dq dqd dqb dqs m K eb b lks.
@@ -686,7 +686,7 @@ Definition wp_bmap_noalloc_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -714,12 +714,12 @@ Definition wp_bmap_noalloc_sconf_body
   (* the NO-ALLOC bmap never reaches log_write, so its floor is just the
      bread/brelse one -- requiring "log" of its callers would be over-strong. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- see the allocating
      contract above; the no-alloc arm still sleeps (bread), so it is a
      pure pass-through here too. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -729,7 +729,7 @@ Definition wp_bmap_noalloc_sconf_body
   inode_blocks γfs bm data -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle: bmap still SLEEPS, in bread *)
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -750,9 +750,9 @@ Definition wp_bmap_noalloc_sconf_body
       (* the block the map already named, and nothing else happened *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
          = sign_extend' 64 (blkmap_get bm fbn : mword 32)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -769,7 +769,7 @@ Module Type BMAP_NOALLOC.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname) (j : nat) (γl : gname)
+      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -779,7 +779,7 @@ Module Type BMAP_NOALLOC.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_bmap_noalloc_sconf_body γs j γl γu γd γk pd pav pu bn γfs
+      wp_bmap_noalloc_sconf_body kt γs j γl γu γd γk pd pav pu bn γfs
                                  cov logstart dev ip bm data fbn pidv dq dqd
                                  m K eb b lks.
 End BMAP_NOALLOC.

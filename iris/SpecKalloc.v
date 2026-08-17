@@ -24,7 +24,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
 
-Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
+Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (14 <= K)%nat ->
@@ -34,14 +34,14 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "kmem"'s rank. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -51,6 +51,6 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 
 Module Type KALLOC.
   Parameter wp_kalloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
-      wp_kalloc_sconf_body γl γk fl m on n eb p K b lks.
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
+      wp_kalloc_sconf_body kt γl γk fl m on n eb p K b lks.
 End KALLOC.

@@ -95,6 +95,7 @@ Section ProofPlicClaim.
 
 
 
+  Context {kt : ktier}.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plic_claim(), entry to return.    *)
   (*  Interrupts-off (see SpecPlicClaim.v's header): no [b] binder, no     *)
@@ -104,7 +105,7 @@ Section ProofPlicClaim.
   (*  own contract likewise has no wrapper to collapse. *)
   (* =================================================================== *)
   Lemma wp_plic_claim_sconf (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plic_claim_sconf_body γd γv m0 n p.
+    : wp_plic_claim_sconf_body kt γd γv m0 n p.
   Proof.
     cbv beta delta [wp_plic_claim_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hhart Hn.
@@ -188,7 +189,7 @@ Section ProofPlicClaim.
        [b = false]-only (SpecCpuid.v) with no [wp_next] wrapper, matching
        plic_claim's own now-[b = false] contract exactly -- so the call
        produces its continuation directly, with nothing to collapse. ---- *)
-    iApply (Cpuid.wp_call_cpuid_sconf_cs (mword_of_int (KernelSyms.plic_claim + 0x08))
+    iApply (Cpuid.wp_call_cpuid_sconf_cs kt (mword_of_int (KernelSyms.plic_claim + 0x08))
               (mword_of_int 2081474 : mword 21) R2 (n - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

@@ -81,7 +81,7 @@ Definition plic_senable_word : bv 32 := Z_to_bv 32 plic_dev_irq_mask.
    [b], with no [wp_next] wrapper (it would collapse via [wp_next_off]
    anyway, since the hart cannot move). *)
 Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
+    (kt : ktier) (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let pcE := mword_of_int KernelSyms.plicinithart in
@@ -91,11 +91,11 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ,
   (* plicinithart's own max depth: its 16-byte frame (2 slots) plus the two
      slots cpuid's frame needs below it. *)
   (4 <= n)%nat ->
-  sie_cap_gpr m0 n false p -∗
+  sie_cap_gpr kt m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   ( ∀ m' : regfile,
-    sie_cap_gpr m' n false p -∗
+    sie_cap_gpr kt m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -104,6 +104,6 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ,
 Module Type PLICINITHART.
   Parameter wp_plicinithart_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plicinithart_sconf_body γd γv m0 n p.
+      (kt : ktier) (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plicinithart_sconf_body kt γd γv m0 n p.
 End PLICINITHART.

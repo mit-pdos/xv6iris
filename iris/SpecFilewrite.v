@@ -323,6 +323,7 @@ Section SpecFilewrite.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ---- the FD_DEVICE arm's environment ---- *)
 
   (* WHAT THE CALLEE NEEDS, as opposed to what the DISPATCH needs.  The cell
@@ -445,7 +446,7 @@ Section SpecFilewrite.
                      (fwn_size fn)⌝ ∗
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
-     ⌜printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
+     ⌜printk_gen_contract (kt := kt) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
      bio_ctx (fwn_bio fn)
        (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
@@ -574,7 +575,7 @@ Definition wp_filewrite_sconf_body
       !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+    (kt : ktier) (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
@@ -608,7 +609,7 @@ Definition wp_filewrite_sconf_body
      ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -624,9 +625,9 @@ Definition wp_filewrite_sconf_body
   (* ambient, because three of the four arms copy FROM user memory *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   (* ...and what the file's TYPE selects *)
-  filewrite_env γf fn Cf -∗
+  filewrite_env (kt := kt) γf fn Cf -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
      [true] unconditionally -- a swtch moves the hart whatever SIE was doing.
@@ -639,7 +640,7 @@ Definition wp_filewrite_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
@@ -655,11 +656,11 @@ Module Type FILEWRITE.
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γa : gname) (γf : gname)
+      (kt : ktier) (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+      wp_filewrite_sconf_body kt γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
 End FILEWRITE.

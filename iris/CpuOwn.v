@@ -61,6 +61,7 @@ Section CpuOwn.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) : iProp Σ :=
     (if b then ⌜ n = 0%nat /\ eb = true /\ lks = ∅ ⌝ else cpu_hart n eb p lks)%I.
@@ -110,7 +111,7 @@ Section CpuOwn.
 
   Lemma cpu_own_arm_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)
       (lks : gset string) :
-    sie_arm true p -∗ cpu_own n' eb' p' false lks -∗ False.
+    sie_arm kt true p -∗ cpu_own n' eb' p' false lks -∗ False.
   Proof.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hh) Hh'".
     iApply (cpu_hart_excl with "Hh Hh'").
@@ -143,7 +144,7 @@ Section CpuOwn.
      unconditionally and there is nothing to derive. *)
   Lemma cpu_own_eb_agree (m : regfile) (K : nat) (n : nat) (eb : bool)
       (p : mword 64) (b : bool) {lks : gset string} :
-    sie_cap_gpr m K b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr kt m K b p -∗ cpu_own n eb p b lks -∗
     ⌜ match n with O => eb | S _ => false end = b ⌝.
   Proof.
     iIntros "Hcg Hown". destruct b.
@@ -165,7 +166,7 @@ Section CpuOwn.
      every level-0/enabled-base contract: there is no [b = false] instance. *)
   Lemma cpu_own_forces_on (m : regfile) (K : nat) (p : mword 64)
       (b : bool) {lks : gset string} :
-    sie_cap_gpr m K b p -∗ cpu_own 0 true p b lks -∗ ⌜ b = true ⌝.
+    sie_cap_gpr kt m K b p -∗ cpu_own 0 true p b lks -∗ ⌜ b = true ⌝.
   Proof.
     destruct b; [ by iIntros "_ _" |].
     iIntros "Hcg Hown".

@@ -88,10 +88,11 @@ Section WpSconfSret.
 
   Context {p : mword 64}.
 
+  Context {kt : ktier}.
   Lemma wp_sret_s_sconf
       (pc : mword 64)
       (m : regfile) (n : nat) (sepc0 : mword 64) :
-    sie_cap_gpr m (trap_res true + n)%nat false p -∗
+    sie_cap_gpr kt m (trap_res true + n)%nat false p -∗
     (* THE TRAVELLING TIE, at the values a trap taken from S-mode with
        interrupts enabled left behind.  This is what makes the sret's SIE
        land on '1' and its privilege land on Supervisor -- see (1) above. *)
@@ -108,7 +109,7 @@ Section WpSconfSret.
     sepc ↦ᵣ sepc0 -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_res -∗
+    intr_res kt -∗
     (* THE KPT RECEIPT, [trap_csrs]' sixth member (IntrDefs §6b), piecewise
        here like the rest.  This leaf RE-ENABLES interrupts, so it is exactly
        the place that has to show the kernel table is installed -- the arm it
@@ -124,7 +125,7 @@ Section WpSconfSret.
     cpu_claim p -∗
     pc_is pc -∗
     instr pc false (SRET tt) -∗
-    ( sie_cap_gpr m n true p -∗
+    ( sie_cap_gpr kt m n true p -∗
       pc_is (ret_pc sepc0) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -264,7 +265,7 @@ Section WpSconfSret.
          sides -- [trap_res false + (trap_res true + n)] going in,
          [trap_res true + n] coming out, both [kv_frame_slots + n] by
          conversion -- so [iExact] closes the stack with no arithmetic. ---- *)
-    iAssert (sie_cap m n true p)
+    iAssert (sie_cap kt m n true p)
       with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iFrame "Htr Hwit".

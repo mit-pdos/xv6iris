@@ -55,6 +55,7 @@ Section Au4Leaves.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
+  Context {kt : ktier}.
   (* ==================================================================== *)
   (* [SrcOk] ON BOTH LEAVES BELOW.  These two are ~15-line wrappers over    *)
   (* [WpSconfMem.wp_{load,store}_s_sconf_au], and their address base (and,  *)
@@ -86,7 +87,7 @@ Section Au4Leaves.
     uint rd <> 0 ->
     rd_ok rd ->
     ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
+    sie_cap_gpr kt m av b p -∗
     pc_is pc -∗
     instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
@@ -95,7 +96,7 @@ Section Au4Leaves.
           ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
     ( ∀ v : mword 32,
       wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
         pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
         Ψ v -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -124,7 +125,7 @@ Section Au4Leaves.
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
+    sie_cap_gpr kt m av b p -∗
     pc_is pc -∗
     instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
@@ -132,7 +133,7 @@ Section Au4Leaves.
        (add_vec (rget m rs1) (sign_extend' 64 imm)
           ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m av b p -∗
+      sie_cap_gpr kt m av b p -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
       Ψ -∗
       WP (Loop : expr riscv_lang)) -∗

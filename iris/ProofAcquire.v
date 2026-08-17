@@ -79,6 +79,7 @@ Section ProofAcquire.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ------------------------------------------------------------------- *)
   (* The amoswap spin loop (KernelSyms.acquire+0x1a..0x22) over the funnel leaves: a      *)
   (* genuine Löb loop -- the c.bnez back edge hands its step's later out. *)
@@ -99,12 +100,12 @@ Section ProofAcquire.
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
     M0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk ->
     (⊢ Tc -∗ Dc -∗ False) ->
-    sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) n false p -∗
+    sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) n false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.acquire + 0x1a)) -∗
     lock_openable γl lk s R Dc -∗
     Tc -∗
     ( Tc -∗
-      sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
+      sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
       locked_pre γl cpu_id -∗ R -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -219,7 +220,7 @@ Section ProofAcquire.
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
-    : wp_acquire_gen_fresh_sconf_body γl s R Tc Dc m n eb p av b lks.
+    : wp_acquire_gen_fresh_sconf_body kt γl s R Tc Dc m n eb p av b lks.
   Proof.
     cbv beta delta [wp_acquire_gen_fresh_sconf_body wp_acquire_gen_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
@@ -255,7 +256,7 @@ Section ProofAcquire.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -345,7 +346,7 @@ Section ProofAcquire.
       exact HcspA0. }
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (PushOff.wp_push_off_sconf A3 (av - 4)%nat n eb p b _
+    iApply (PushOff.wp_push_off_sconf kt A3 (av - 4)%nat n eb p b _
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
@@ -415,7 +416,7 @@ Section ProofAcquire.
        is handed over and comes straight back; [cpu_own] is rebuilt at the
        SAME set, so nothing else in this proof notices. *)
     iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz0 Hownback0]]".
-    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 s R Tc Dc B2 (trap_res b + (av - 4))%nat p lks
+    iApply (Holding.wp_holding_lockinv_s_sconf kt γl lk0 s R Tc Dc B2 (trap_res b + (av - 4))%nat p lks
               Hlkb ltac:(lia) Hfresh Href
               with "Hcg Htext Hpc Hlock HTc Hlks").
     iIntros (mh) "HTc Hlks Hcg Hpc %Hmh".
@@ -489,7 +490,7 @@ Section ProofAcquire.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
     iPoseProof (aqi_24 with "Htext") as "Hi24".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcdc : mword 21) B8 (trap_res b + (av - 4))%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcdc : mword 21) B8 (trap_res b + (av - 4))%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi24").
@@ -610,8 +611,8 @@ Section ProofAcquire.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspE3. symmetry. exact Hspd4. }
     iPoseProof (aqi_30 with "Htext") as "Hi30".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HcspC). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HcspE1). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HcspE2). iExact "Hr8". }
@@ -790,7 +791,7 @@ Section ProofAcquire.
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
-    : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p av b lks.
+    : wp_acquire_gen_sconf_body kt γl s R Tc Dc m n eb p av b lks.
   Proof.
     exact (wp_acquire_gen_pre_weaken γl s R Tc Dc m n eb p av b lks
              (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
@@ -809,6 +810,7 @@ Section OfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* The [Tc := emp] / [Dc := False] instantiation is PREMISE-AGNOSTIC, so it
      is done once, at the FRESH tier, and the BELOW tier follows by the same
      weakening as at the generic level.  Doing it the other way round would
@@ -818,12 +820,12 @@ Section OfGen.
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
       (lks : gset string)
-    : wp_acquire_fresh_sconf_body γl s R m n eb p av b lks.
+    : wp_acquire_fresh_sconf_body kt γl s R m n eb p av b lks.
   Proof.
     cbv beta delta [wp_acquire_fresh_sconf_body wp_acquire_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hlock Hcont".
-    iApply (G.wp_acquire_gen_fresh_sconf γl s R emp%I False%I m n eb p av b lks
+    iApply (G.wp_acquire_gen_fresh_sconf kt γl s R emp%I False%I m n eb p av b lks
               Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
               with "Hcg Hown Htext Hpc [] []").
     { iApply (is_lock_openable with "Hlock"). }
@@ -838,7 +840,7 @@ Section OfGen.
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
       (lks : gset string)
-    : wp_acquire_sconf_body γl s R m n eb p av b lks.
+    : wp_acquire_sconf_body kt γl s R m n eb p av b lks.
   Proof.
     exact (wp_acquire_pre_weaken γl s R m n eb p av b lks
              (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)

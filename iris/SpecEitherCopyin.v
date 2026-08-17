@@ -84,7 +84,7 @@ Section SpecEitherCopyin.
 End SpecEitherCopyin.
 
 Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname)
+    (kt : ktier) (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
@@ -103,7 +103,7 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
   (* order premise at the lowest rank this cone reaches. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kalloc_env γa None -∗
@@ -114,7 +114,7 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       either_copyin_post user γf p pid V dst src len src_bytes
@@ -125,9 +125,9 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
 Module Type EITHER_COPYIN.
   Parameter wp_either_copyin_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
+      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_either_copyin_sconf_body γa γf m av lvl eb p pid V user len
+      wp_either_copyin_sconf_body kt γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
 End EITHER_COPYIN.

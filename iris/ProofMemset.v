@@ -49,6 +49,7 @@ Section ProofMemset.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
      whole-function proof already has.  Written name-free (durable-notes: an
@@ -104,7 +105,7 @@ Section ProofMemset.
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5)
       `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13)
       (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
-    : wp_memset_loop_sconf_body N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
+    : wp_memset_loop_sconf_body kt N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
@@ -229,7 +230,7 @@ Section ProofMemset.
 
   Lemma wp_memset_suffix_sconf
       (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_suffix_sconf_body M n ra0e s00e b pcur.
+    : wp_memset_suffix_sconf_body kt M n ra0e s00e b pcur.
   Proof.
     cbv beta delta [wp_memset_suffix_sconf_body].
     intros spd sp0up ret_tgt.
@@ -285,7 +286,7 @@ Section ProofMemset.
               n 2 b Hpop
               with "Hcg Hpc Hi2c [Hp8 Hp0]").
     { iEval (rewrite Hwv).
-      iApply (stack_own_2_intro with "[Hp8] [Hp0]").
+      iApply (stack_own_2_intro (KTR := kt) with "[Hp8] [Hp0]").
       - iEval (rewrite Hb1u). iExact "Hp8".
       - iEval (rewrite Hb2u -Hsp4). iExact "Hp0". }
     iIntros (CID3 Hs3) "Hcg Hpc".
@@ -322,7 +323,7 @@ Section ProofMemset.
   (* =================================================================== *)
   Lemma wp_memset_head_sconf
       (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8) (b : bool) (pcur : mword 64)
-    : wp_memset_head_sconf_body m0 n imm_entry nzimm_s0 b pcur.
+    : wp_memset_head_sconf_body kt m0 n imm_entry nzimm_s0 b pcur.
   Proof.
     cbv beta delta [wp_memset_head_sconf_body].
     intros ra_idx s0_idx pcE sp0 sp' pa_ra pa_s0 ra0 s00 m1 m2 Hn2 Hsp'.
@@ -381,7 +382,7 @@ Section ProofMemset.
   (* =================================================================== *)
   Lemma wp_memset_skip_sconf
       (M : regfile) (n : nat) (imm8_beqz : mword 8) (b : bool) (pcur : mword 64)
-    : wp_memset_skip_sconf_body M n imm8_beqz b pcur.
+    : wp_memset_skip_sconf_body kt M n imm8_beqz b pcur.
   Proof.
     cbv beta delta [wp_memset_skip_sconf_body].
     intros a2_idx pcE Hz Htgt.
@@ -409,7 +410,7 @@ Section ProofMemset.
   Lemma wp_memset_setup_sconf
       (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8)
       (wval_add : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_setup_sconf_body M n shamt_l shamt_r imm8_beqz wval_add b pcur.
+    : wp_memset_setup_sconf_body kt M n shamt_l shamt_r imm8_beqz wval_add b pcur.
   Proof.
     cbv beta delta [wp_memset_setup_sconf_body].
     intros a0_idx a2_idx a4_idx a5_idx pcE m3 m4 m5 m6 Hn0 Hvalue_add.

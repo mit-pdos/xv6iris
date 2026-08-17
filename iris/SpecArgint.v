@@ -58,7 +58,7 @@ Import Defs.
 Notation arg_int32 := trunc32.
 
 Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+    (kt : ktier) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argint in
@@ -72,7 +72,7 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (18 <= av)%nat ->
   (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
@@ -81,7 +81,7 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
@@ -92,8 +92,8 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 
 Module Type ARGINT.
   Parameter wp_argint_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string),
-      wp_argint_sconf_body m av n eb p i tfp ws v old dqt b lks.
+      wp_argint_sconf_body kt m av n eb p i tfp ws v old dqt b lks.
 End ARGINT.

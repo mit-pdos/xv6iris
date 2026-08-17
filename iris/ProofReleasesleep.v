@@ -71,11 +71,12 @@ Section ProofReleasesleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_releasesleep_gen_sconf
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
+    : wp_releasesleep_gen_sconf_body kt γs γl γsl s R H q m pd pme av eb b lks.
   Proof.
     cbv beta delta [wp_releasesleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hno.
@@ -113,7 +114,7 @@ Section ProofReleasesleep.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -235,7 +236,7 @@ Section ProofReleasesleep.
        moved to a fresh one, so acquire wants it at CID10. *)
     iDestruct (cpu_own_transport CID CID10 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) Kacq
+    iApply (Acquire.wp_acquire_sconf kt γl "sleep lock"%string (sl_res_gen γsl slk R H) Kacq
               0%nat b pme (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -309,7 +310,7 @@ Section ProofReleasesleep.
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
     (* wakeup runs INSIDE the sleeplock's inner critical section, so the set
        it threads (unchanged -- wakeup is balanced) is the acquired one. *)
-    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs pme 1%nat (trap_res b + (av - 4))%nat b false
+    iApply (Wakeup.wp_wakeup_sconf kt (CID := CIDacq)  Cwk γs pme 1%nat (trap_res b + (av - 4))%nat b false
               ({["sleep lock"%string]} ∪ lks)
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
@@ -375,7 +376,7 @@ Section ProofReleasesleep.
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
     iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
+    iApply (Release.wp_release_sconf kt γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
@@ -463,8 +464,8 @@ Section ProofReleasesleep.
                    = pa_stk (add_vec (Q32 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HspQ32. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr8"|].
@@ -552,7 +553,7 @@ Section ProofReleasesleep.
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb b lks.
+    : wp_releasesleep_sconf_body kt γs γl γsl s R m pd pme av eb b lks.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Hav Hno.

@@ -125,6 +125,7 @@ Section EitherCopyEpilogue.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -158,7 +159,7 @@ Section EitherCopyEpilogue.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b p -∗
+    sie_cap_gpr kt Mt (av - 6)%nat b p -∗
     instr q2a true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) -∗
     instr q2c true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) -∗
     instr q2e true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) -∗
@@ -177,7 +178,7 @@ Section EitherCopyEpilogue.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr kt mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -289,8 +290,8 @@ Section EitherCopyEpilogue.
                    = pa_stk (add_vec (T6 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
       by (rewrite Hwv; exact HT6sp).
-    iAssert (stack_own sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
       iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
       iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
@@ -388,6 +389,7 @@ Section ProofEitherCopyout.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -409,7 +411,7 @@ Section ProofEitherCopyout.
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyout_sconf_body γa γf m av lvl eb p pid V user len
+    : wp_either_copyout_sconf_body kt γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
@@ -473,7 +475,7 @@ Section ProofEitherCopyout.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.either_copyout + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hk1". iDestruct "S2" as (u2) "Hk2".
     iDestruct "S3" as (u3) "Hk3". iDestruct "S4" as (u4) "Hk4".
@@ -683,7 +685,7 @@ Section ProofEitherCopyout.
        of an ordinary leaf's own footprint), so it is still anchored at the
        ENTRY hart -- re-anchor it at [CID13] before crossing into myproc. *)
     iDestruct (cpu_own_transport CID CID13 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p b
+    iApply (Myproc.wp_myproc_sconf kt R7 (av - 6)%nat lvl eb p b
               _ Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID14 Hs14 ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -880,7 +882,7 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyout.wp_copyout_sconf γa U5 (pv_upt V) (pv_sz V) len src_bytes
+      iApply (Copyout.wp_copyout_sconf kt γa U5 (pv_upt V) (pv_sz V) len src_bytes
                 (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
@@ -1024,7 +1026,7 @@ Section ProofEitherCopyout.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hsrc".
       iEval (rewrite -HK4a0) in "Hres".
-      iApply (Memmove.wp_memmove_sconf K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf kt K4 (av - 6)%nat len src_bytes dst_olds b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hsrc Hres").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
@@ -1104,6 +1106,7 @@ Section ProofEitherCopyin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -1125,7 +1128,7 @@ Section ProofEitherCopyin.
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyin_sconf_body γa γf m av lvl eb p pid V user len
+    : wp_either_copyin_sconf_body kt γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
@@ -1189,7 +1192,7 @@ Section ProofEitherCopyin.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.either_copyin + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hk1". iDestruct "S2" as (u2) "Hk2".
     iDestruct "S3" as (u3) "Hk3". iDestruct "S4" as (u4) "Hk4".
@@ -1398,7 +1401,7 @@ Section ProofEitherCopyin.
        of an ordinary leaf's own footprint), so it is still anchored at the
        ENTRY hart -- re-anchor it at [CID13] before crossing into myproc. *)
     iDestruct (cpu_own_transport CID CID13 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p b _
+    iApply (Myproc.wp_myproc_sconf kt R7 (av - 6)%nat lvl eb p b _
               Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID14 Hs14 ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -1589,7 +1592,7 @@ Section ProofEitherCopyin.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyin. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyin.wp_copyin_sconf γa U5 (pv_upt V) (pv_sz V) len dst_olds
+      iApply (Copyin.wp_copyin_sconf kt γa U5 (pv_upt V) (pv_sz V) len dst_olds
                 (av - 6)%nat lvl eb p b
                 _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
@@ -1735,7 +1738,7 @@ Section ProofEitherCopyin.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hres".
       iEval (rewrite -HK4a0) in "Hdst".
-      iApply (Memmove.wp_memmove_sconf K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf kt K4 (av - 6)%nat len src_bytes dst_olds b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hres Hdst").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".

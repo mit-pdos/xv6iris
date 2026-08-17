@@ -93,6 +93,7 @@ Section SwtchCtx.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* ================================================================== *)
   (* struct context: ownership of its 14 saved-register cells.           *)
   (* ================================================================== *)
@@ -223,11 +224,11 @@ Section SwtchCtx.
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
-      stack_own (nth 1 vs (mword_of_int 0)) av ∗
+      stack_own (KTR := kt) (nth 1 vs (mword_of_int 0)) av ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr (CID := h) m av false p -∗
+         sie_cap_gpr kt (CID := h) m av false p -∗
          cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗

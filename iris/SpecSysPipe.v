@@ -162,7 +162,7 @@ Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname)  (γfl γf : gname)
+    (kt : ktier) (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
@@ -183,7 +183,7 @@ Definition wp_sys_pipe_sconf_body
      three fileclose calls (inside [sp_close2]), whose own lowest rank is
      "ftable" (1).  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
@@ -196,7 +196,7 @@ Definition wp_sys_pipe_sconf_body
      to be threaded rather than framed -- a hart-indexed resource held across
      a [true] crossing could not be transported back.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -216,8 +216,8 @@ Definition wp_sys_pipe_sconf_body
      it only ever closes pipes is true and unusable: the knowledge of what a
      descriptor names is going to be per-[ofile] ghost state, not something
      recoverable from the file table. *)
-  fileclose_pipe_env fn on 0%nat -∗
-  fileclose_fs_env fn us 0%nat eb p -∗
+  fileclose_pipe_env (kt := kt) fn on 0%nat -∗
+  fileclose_fs_env (kt := kt) fn us 0%nat eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_pipe calls pipealloc
      and fileclose, and both cross at [true] -- fileclose's FS arm parks -- so
      sys_pipe can return on another hart.  The cost is the CALLER's: it must
@@ -226,17 +226,17 @@ Definition wp_sys_pipe_sconf_body
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)
-      (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-      (∃ us', fileclose_fs_env fn us' 0%nat eb p) -∗
+      (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
+      (∃ us', fileclose_fs_env (kt := kt) fn us' 0%nat eb p) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -245,9 +245,9 @@ Module Type SYSPIPE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γfl γf : gname)
+      (kt : ktier) (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p v pid V b lks.
+      wp_sys_pipe_sconf_body kt γa γfl γf fn on us m av eb p v pid V b lks.
 End SYSPIPE.

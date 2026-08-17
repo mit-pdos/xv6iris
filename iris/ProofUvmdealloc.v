@@ -85,6 +85,7 @@ Section ProofUvmdealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -127,7 +128,7 @@ Section ProofUvmdealloc.
         c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> mj !!! Regidx c = mm !!! Regidx c) ->
     ( ((uint newsz >= uint oldsz)%Z /\ res = oldsz)
       \/ ((uint newsz < uint oldsz)%Z /\ res = newsz) ) ->
-    sie_cap_gpr mj (K - 4)%nat b p -∗
+    sie_cap_gpr kt mj (K - 4)%nat b p -∗
     cpu_own 0%nat eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmdealloc + 0x26) : mword 64) -∗
@@ -153,7 +154,7 @@ Section ProofUvmdealloc.
        wherever this particular call site's leaf chain landed. *)
     wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr kt mr K b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
@@ -267,8 +268,8 @@ Section ProofUvmdealloc.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3sp. symmetry. exact Hspd4. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3). iExact "Hr8". }
@@ -337,7 +338,7 @@ Section ProofUvmdealloc.
   Lemma wp_uvmdealloc_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_uvmdealloc_sconf_body γa mm P K eb p b lks.
+    : wp_uvmdealloc_sconf_body kt γa mm P K eb p b lks.
   Proof.
     cbv beta delta [wp_uvmdealloc_sconf_body].
     intros pcE oldsz newsz ret_tgt HK Hroot Hob Hlkbelow.
@@ -394,7 +395,7 @@ Section ProofUvmdealloc.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm) with A0.
     assert (HA0sp : A0 !!! Regidx csp_rs1 = spd) by (rewrite /A0 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -1057,7 +1058,7 @@ Section ProofUvmdealloc.
        hart crossing). *)
     iDestruct (cpu_own_transport CID CID23 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmunmap.wp_uvmunmap_sconf γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p 0%nat b lks
+    iApply (Uvmunmap.wp_uvmunmap_sconf kt γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p 0%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv").
     all: try lkbelow.

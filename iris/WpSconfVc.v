@@ -441,6 +441,7 @@ Section WpSconfVc.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
@@ -546,11 +547,11 @@ Section WpSconfVc.
       (k : nat) :
     sval_is64 v' = true ->
     sval_den ρ v' = pa_stk sp0 k ->
-    stack_own sp0 k ⊣⊢
+    stack_own (KTR := kt) sp0 k ⊣⊢
     vframe_own ρ ((fun j => sval_addZ v' (8 * Z.of_nat j)) <$> seq 0 k).
   Proof.
     intros Hv64 Hbase.
-    rewrite stack_own_base /vframe_own big_sepL_fmap.
+    rewrite (stack_own_base (KTR := kt)) /vframe_own big_sepL_fmap.
     apply big_sepL_proper. intros i j _.
     rewrite (sval_den_addZ_avi ρ v' _ Hv64) Hbase. done.
   Qed.
@@ -561,8 +562,8 @@ Section WpSconfVc.
     sval_den ρ v = pa_stk spN k ->
     ([∗ list] j ∈ seq 0 k, ∃ w : bv 64,
        word_pointsto (add_vec_int (sval_den ρ v) (8 * Z.of_nat j)) (DfracOwn 1) w)
-    ⊢ stack_own spN k.
-  Proof. intro Hb. rewrite stack_own_base Hb. done. Qed.
+    ⊢ stack_own (KTR := kt) spN k.
+  Proof. intro Hb. rewrite (stack_own_base (KTR := kt)) Hb. done. Qed.
 
   (* ==================================================================== *)
   (* 4. THE block lemma: one symbolic run = one WP, sp moves included.     *)
@@ -576,7 +577,7 @@ Section WpSconfVc.
     (vsx st' <= n)%nat ->
     gpr_matches ρ (vsb st).(vregs) m ->
     agree_off (vsb st).(vregs) m m0 ->
-    sie_cap_gpr m (n - vsu st) b p -∗
+    sie_cap_gpr kt m (n - vsu st) b p -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
     vheap_own ρ (vsb st).(vheap) -∗
@@ -585,7 +586,7 @@ Section WpSconfVc.
     wp_next b p (fun (CID : CpuId) =>
       (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m0 ⌝ -∗
-      sie_cap_gpr mf (n - vsu st') b p -∗
+      sie_cap_gpr kt mf (n - vsu st') b p -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
@@ -1193,7 +1194,7 @@ Section WpSconfVc.
     (vsu st <= vsx st)%nat ->
     (vsx st' <= n)%nat ->
     gpr_matches ρ (vsb st).(vregs) m ->
-    sie_cap_gpr m (n - vsu st) b p -∗
+    sie_cap_gpr kt m (n - vsu st) b p -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
     vheap_own ρ (vsb st).(vheap) -∗
@@ -1202,7 +1203,7 @@ Section WpSconfVc.
     wp_next b p (fun (CID : CpuId) =>
       (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m ⌝ -∗
-      sie_cap_gpr mf (n - vsu st') b p -∗
+      sie_cap_gpr kt mf (n - vsu st') b p -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗

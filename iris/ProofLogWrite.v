@@ -304,6 +304,7 @@ Local Ltac regne := reg_ne_side.
 Section LogWriteDefs.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  Context {kt : ktier}.
   (* [Fb] is THE CALLER'S RECEIPT for the logged view -- opaque here, and
      threaded through every block exactly like [Bud].  The whole-function
      proof instantiates it with the atomic update's [Φfsb]; the derived
@@ -317,7 +318,7 @@ Section LogWriteDefs.
       (b : bool) (lks : gset string) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr kt mr K b p -∗
       cpu_own n eb p b lks -∗
       pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
       ⌜ callee_saved m mr ⌝ -∗
@@ -463,6 +464,7 @@ End LogWriteDefs.
 Section LogWriteBlocks.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  Context {kt : ktier}.
   (* ================================================================== *)
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
   (*  Both paths converge here with [log_res] already reassembled.       *)
@@ -482,17 +484,17 @@ Section LogWriteBlocks.
        into the non-membership that makes the release's set difference collapse
        back onto [lks]. *)
     locks_below lks "log" ->
-    sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
+    sie_cap_gpr kt M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0xae) : mword 64) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
-    arm_pay n eb p -∗
+    arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     lw_frame m -∗
     lw_res bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud -∗
-    lw_cont (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
+    lw_cont (kt := kt) (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbeq (Hsp & Hs1v & Hthr) Hno.
@@ -595,7 +597,7 @@ Section LogWriteBlocks.
        what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf (ln_lk γ) log_addr "log"%string
+    iApply (Release.wp_release_sconf kt (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) E3 n eb p (K - 4)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HE3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -674,9 +676,9 @@ Section LogWriteBlocks.
                    = pa_stk (add_vec (P3 !!! Regidx csp_rs1 : mword 64)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP3sp Hsp Hpush. reflexivity. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3); iExists _; iExact "Hr8"|].
@@ -763,20 +765,20 @@ Section LogWriteBlocks.
        [{[rank "log"]} ∪ lks] and calls bpin, which acquires "bcache" on top
        of that.  ONE bound covers both: see the derivation in the proof. *)
     locks_below lks "log" ->
-    sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
+    sie_cap_gpr kt M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x66) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
-    arm_pay n eb p -∗
+    arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
     lw_closeP γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl -∗
-    lw_cont (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
+    lw_cont (kt := kt) (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hnoff Hbeq Hk Hnl Ha0 Hregs Hno.
@@ -839,7 +841,7 @@ Section LogWriteBlocks.
     { intros c Hcs.
       rewrite /A2 upd_ne; [| regne].
       rewrite /A1 upd_ne; [reflexivity | regne]. }
-    iApply (Bpin.wp_bpin_sconf bn (fs_view γfs γd dev cov) k A2 (S n) eb p
+    iApply (Bpin.wp_bpin_sconf kt bn (fs_view γfs γd dev cov) k A2 (S n) eb p
               (trap_res b + (K - 4))%nat false ({["log"]} ∪ lks)
               ltac:(lia)
               ltac:(rewrite Nat2Z.inj_succ; lia) Hk HA2a0 Hnobc2
@@ -1006,13 +1008,13 @@ Section LogWriteBlocks.
     M !!! Regidx Ra2 = (mword_of_int (Z.of_nat nl) : mword 64) ->
     (* both exits need it: [lw_pin] calls bpin, [lw_rel] releases "log" *)
     locks_below lks "log" ->
-    sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
+    sie_cap_gpr kt M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x94) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
-    arm_pay n eb p -∗
+    arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
@@ -1023,7 +1025,7 @@ Section LogWriteBlocks.
         lw_closeP γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl)
      ∧ (⌜i <> nl⌝ -∗ lh_block i ↦₄ bno -∗
         lw_closeR γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl)) -∗
-    lw_cont (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
+    lw_cont (kt := kt) (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hnoff Hbeq Hk Hnl Hinl Ha0 Hregs Ha5v Ha2v Hno.
@@ -1277,13 +1279,13 @@ Section LogWriteBlocks.
     M !!! Regidx Ra2 = (mword_of_int (Z.of_nat nl) : mword 64) ->
     (* this block falls into [lw_pin], which needs the bound for bpin too *)
     locks_below lks "log" ->
-    sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
+    sie_cap_gpr kt M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x52) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
-    arm_pay n eb p -∗
+    arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
@@ -1292,7 +1294,7 @@ Section LogWriteBlocks.
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
     (lh_block nl ↦₄ bno -∗
        lw_closeP γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl) -∗
-    lw_cont (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
+    lw_cont (kt := kt) (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hnoff Hbeq Hk Hnl Ha0 Hregs Ha2v Hno.
@@ -1503,13 +1505,13 @@ Section LogWriteBlocks.
     M !!! Regidx Ra4 = lh_block i ->
     M !!! Regidx Ra2 = (mword_of_int (Z.of_nat nl) : mword 64) ->
     M !!! Regidx Ra1 = sign_extend' 64 bno ->
-    sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
+    sie_cap_gpr kt M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x44) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
-    arm_pay n eb p -∗
+    arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
@@ -1519,7 +1521,7 @@ Section LogWriteBlocks.
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
     (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl W
      ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl W) -∗
-    lw_cont (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
+    lw_cont (kt := kt) (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hnoff Hbeq Hk Hnl HnW Ha0 Hno.
@@ -1753,6 +1755,7 @@ Section ProofLogWrite.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* THE WHOLE-FUNCTION PROOF, at the most general (atomic-update) contract.
      [wp_log_write_gen] below is its degenerate instance at a held [fsblock],
      and [wp_log_write_sconf] the set-forgetting instance of that. *)
@@ -1766,7 +1769,7 @@ Section ProofLogWrite.
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
+    : wp_log_write_au_body kt bn γ γfs γd cov logstart dev k pidv bno
                            bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p K b lks.
   Proof.
     cbv beta delta [wp_log_write_au_body].
@@ -1781,7 +1784,7 @@ Section ProofLogWrite.
     iDestruct "Hlctx" as "#Hlctx2".
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx"; [iExact "Hlctx2"|].
     iDestruct "Hlctx2" as "(#Hlock & #Hdevc & #Hstc)".
-    iAssert (lw_cont (CID0 := CID) bn γ γfs γd cov dev k pidv bno bs bsd Φfsb Bud
+    iAssert (lw_cont (kt := kt) (CID0 := CID) bn γ γfs γd cov dev k pidv bno bs bsd Φfsb Bud
                      m K n eb p b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /lw_cont; iExact "Hcont"|].
     iPoseProof (lwi_00 with "Htext") as "Hi00".
@@ -1812,7 +1815,7 @@ Section ProofLogWrite.
                     = add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -1957,7 +1960,7 @@ Section ProofLogWrite.
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (lw_cont_shift (CIDa := CID) (CIDb := CID9) bn γ γfs γd cov dev k pidv bno
                  bs bsd Φfsb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string
+    iApply (Acquire.wp_acquire_sconf kt (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) mA n eb p (K - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -2745,7 +2748,7 @@ Section ProofLogWrite.
       (cr : bool) (Sb : gset Z) (e0 : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
+    : wp_log_write_gene_body kt bn γ γfs γd cov logstart dev k pidv bno
                              bs bsl bsd d u cr Sb e0 m n eb p K b lks.
   Proof.
     cbv beta delta [wp_log_write_gene_body].
@@ -2790,7 +2793,7 @@ Section ProofLogWrite.
       (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_log_write_gen_body bn γ γfs γd cov logstart dev k pidv bno
+    : wp_log_write_gen_body kt bn γ γfs γd cov logstart dev k pidv bno
                             bs bsl bsd d u cr Sb m n eb p K b lks.
   Proof.
     cbv beta delta [wp_log_write_gen_body].
@@ -2834,7 +2837,7 @@ Section ProofLogWrite.
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_log_write_sconf_body bn γ γfs γd cov logstart dev k pidv bno
+    : wp_log_write_sconf_body kt bn γ γfs γd cov logstart dev k pidv bno
                               bs bsl bsd d u m n eb p K b lks.
   Proof.
     cbv beta delta [wp_log_write_sconf_body].

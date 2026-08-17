@@ -341,6 +341,7 @@ Section ProofProcdumpLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rsp := (mword_of_int 2 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -385,12 +386,12 @@ Section ProofProcdumpLoop.
        wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
          ∀ (Mx : regfile),
            ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-           sie_cap_gpr Mx K' b p -∗
+           sie_cap_gpr kt Mx K' b p -∗
            cpu_own 0%nat eb p b lks -∗
            pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
            procdump_view -∗
            WP (Loop : expr riscv_lang)) -∗
-       sie_cap_gpr M K' b p -∗
+       sie_cap_gpr kt M K' b p -∗
        cpu_own 0%nat eb p b lks -∗
        pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
        ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
@@ -405,12 +406,12 @@ Section ProofProcdumpLoop.
        wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
          ∀ (Mx : regfile),
            ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-           sie_cap_gpr Mx K' b p -∗
+           sie_cap_gpr kt Mx K' b p -∗
            cpu_own 0%nat eb p b lks -∗
            pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
            procdump_view -∗
            WP (Loop : expr riscv_lang)) -∗
-       sie_cap_gpr Ma K' b p -∗
+       sie_cap_gpr kt Ma K' b p -∗
        cpu_own 0%nat eb p b lks -∗
        pc_is (mword_of_int (KernelSyms.procdump + 0x66)) -∗
        ([∗ list] k ∈ seq 0 (S j), proc_dump_slot (proc_addr k)) -∗
@@ -430,12 +431,12 @@ Section ProofProcdumpLoop.
        wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
          ∀ (Mx : regfile),
            ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-           sie_cap_gpr Mx K' b p -∗
+           sie_cap_gpr kt Mx K' b p -∗
            cpu_own 0%nat eb p b lks -∗
            pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
            procdump_view -∗
            WP (Loop : expr riscv_lang)) -∗
-       sie_cap_gpr Mp K' b p -∗
+       sie_cap_gpr kt Mp K' b p -∗
        cpu_own 0%nat eb p b lks -∗
        pc_is (mword_of_int (KernelSyms.procdump + 0x56)) -∗
        p_state (proc_addr j) ↦₄{dq1} st2 -∗
@@ -449,7 +450,7 @@ Section ProofProcdumpLoop.
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool)
       (lks : gset string) :
-    printk_gen_contract γpr γd γv ->
+    printk_gen_contract (kt := kt) γpr γd γv ->
     (48 <= K')%nat ->
     (* procdump's own cone touches no lock directly -- printk (rank "pr") is
        the only callee, and it is the whole order premise. *)
@@ -459,14 +460,14 @@ Section ProofProcdumpLoop.
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
       ∀ (Mx : regfile),
         ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
-        sie_cap_gpr Mx K' b p -∗
+        sie_cap_gpr kt Mx K' b p -∗
         cpu_own 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
         procdump_view -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (j : nat) (M : regfile),
       ⌜ (j < NPROC)%nat ⌝ -∗ ⌜ pd_regs_loop M spv j /\ pd_regs_hi m0 M ⌝ -∗
-      sie_cap_gpr M K' b p -∗
+      sie_cap_gpr kt M K' b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
       ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
@@ -477,7 +478,7 @@ Section ProofProcdumpLoop.
     iIntros "#Hkt #Hkd #Hpenv Hqexit".
     iAssert (∀ (fuel : nat),
       wp_next (CID0 := CID0) b p (fun (CIDf : CpuId) =>
-        pdl_loop_body CID0 spv p m0 K' eb b lks fuel CIDf))%I
+        pdl_loop_body (kt := kt) CID0 spv p m0 K' eb b lks fuel CIDf))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDf Hsf j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
@@ -511,7 +512,7 @@ Section ProofProcdumpLoop.
       (* THE ADVANCE JOIN, +0x66 .. +0x6a                                  *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDa : CpuId) =>
-        pdl_adv_body CID0 spv p m0 K' eb b lks j CIDa))%I
+        pdl_adv_body (kt := kt) CID0 spv p m0 K' eb b lks j CIDa))%I
         with "[]" as "#Hadv".
       { iModIntro. iIntros (CIDa Hsa Ma) "%Hra Hqx2 Hcg Hown Hpc Hpre2 Hsuf2".
         destruct Hra as [Hral Hrah].
@@ -596,7 +597,7 @@ Section ProofProcdumpLoop.
       (* THE PRINT JOIN, +0x56 .. +0x64                                    *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDp : CpuId) =>
-        pdl_print_body CID0 spv p m0 K' eb b lks j CIDp))%I
+        pdl_print_body (kt := kt) CID0 spv p m0 K' eb b lks j CIDp))%I
         with "[]" as "#Hprint".
       { iModIntro.
         iIntros (CIDp Hsp Mp sptr ss nm2 dq1 dq2 dq3 st2 pid2)

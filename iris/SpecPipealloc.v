@@ -141,7 +141,7 @@ End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ, !uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
+    (kt : ktier) (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
     (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
@@ -166,7 +166,7 @@ Definition wp_pipealloc_sconf_body
      filealloc/fileclose; kalloc's "kmem" (13) is reached from this one
      by [LockRank.locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
@@ -177,7 +177,7 @@ Definition wp_pipealloc_sconf_body
      hart-indexed resource cannot be framed across such a call -- it has to be
      handed over and given back.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
@@ -201,9 +201,9 @@ Definition wp_pipealloc_sconf_body
      continuation hart-generically. *)
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own n eb p b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext kt eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -221,8 +221,8 @@ Definition wp_pipealloc_sconf_body
    derived lemma's statement. *)
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
-      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks.
+      wp_pipealloc_sconf_body kt γfl γf γkl γk fl m v0 v1 on n eb p K b lks.
 End PIPEALLOC.

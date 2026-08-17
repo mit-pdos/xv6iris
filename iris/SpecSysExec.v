@@ -184,7 +184,7 @@ Definition wp_sys_exec_sconf_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (γf : gname) (γa : gname)                           (* ftable, kalloc      *)
+    (kt : ktier) (γf : gname) (γa : gname)                           (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -230,7 +230,7 @@ Definition wp_sys_exec_sconf_body
      page [proc_priv] carries *)
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   (* ENTERED WITH NO LOCK HELD: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
      callees raise -- kexec's whole FS cone at "log"/"bcache"/"sleep lock",
@@ -238,12 +238,12 @@ Definition wp_sys_exec_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], which this
      contract's own premise forces, so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext kt eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
-  fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
+  fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -264,9 +264,9 @@ Definition wp_sys_exec_sconf_body
          fetchstr's copy-in faults user pages in.  [uptd_ext] is their own
          report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext kt eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -289,7 +289,7 @@ Module Type SYSEXEC.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γa : gname)
+      (kt : ktier) (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -304,7 +304,7 @@ Module Type SYSEXEC.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
+      wp_sys_exec_sconf_body kt γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                              cn gtl cov logstart bmapstart inodestart nib
                              size dev used dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

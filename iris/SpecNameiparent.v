@@ -87,7 +87,7 @@ Definition wp_nameiparent_sconf_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -138,7 +138,7 @@ Definition wp_nameiparent_sconf_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -150,7 +150,7 @@ Definition wp_nameiparent_sconf_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -174,7 +174,7 @@ Definition wp_nameiparent_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -212,7 +212,7 @@ Definition wp_nameiparent_gen_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -265,7 +265,7 @@ Definition wp_nameiparent_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr kt m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -277,7 +277,7 @@ Definition wp_nameiparent_gen_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
-  procs_inv gs -∗
+  procs_inv (kt := kt) gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -301,7 +301,7 @@ Definition wp_nameiparent_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr kt mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -346,7 +346,7 @@ Module Type NAMEIPARENT.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -363,7 +363,7 @@ Module Type NAMEIPARENT.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_nameiparent_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n
                                 pidv dq dqb dqs dqc m K eb b lks.
@@ -374,7 +374,7 @@ Module Type NAMEIPARENT.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (gs : list gname) (j : nat) (gl : gname)
+      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -391,7 +391,7 @@ Module Type NAMEIPARENT.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_nameiparent_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n Sb
                                 pidv dq dqb dqs dqc m K eb b lks.

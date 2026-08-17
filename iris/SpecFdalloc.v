@@ -218,7 +218,7 @@ Section SpecFdalloc.
 End SpecFdalloc.
 
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (k : nat) (D : gset nat)
+    (kt : ktier) (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fdalloc in
@@ -229,7 +229,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   (* push_off's transient noff increment stays in int range (myproc) *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (fdalloc_stack <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the block SPLIT at the fd table: fdalloc needs the core only to reach
@@ -239,7 +239,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core p pid V -∗
@@ -249,8 +249,8 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
 
 Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname) (k : nat) (D : gset nat)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_fdalloc_sconf_body γf k D m av n eb p pid V b lks.
+      wp_fdalloc_sconf_body kt γf k D m av n eb p pid V b lks.
 End FDALLOC.

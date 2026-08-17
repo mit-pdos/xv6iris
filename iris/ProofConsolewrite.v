@@ -122,6 +122,7 @@ Section CwBodies.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
+  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1  : mword 5).
   Notation Rs0  := (mword_of_int 8  : mword 5).
   Notation Rs1  := (mword_of_int 9  : mword 5).
@@ -177,10 +178,10 @@ Section CwBodies.
     bytes_own (DfracOwn 1) (pa_stk sp0 16) 32.
 
   Lemma cw_frame_back (sp0 : mword 64) (m0 : regfile) :
-    cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own sp0 16.
+    cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own (KTR := kt) sp0 16.
   Proof.
     iIntros "(H1 & H2 & H3) Hr".
-    rewrite stack_own_slots /cw_rest.
+    rewrite (stack_own_slots (KTR := kt)) /cw_rest.
     change (seq 1 16) with ((seq 1 3 ++ seq 4 13)%list).
     rewrite big_sepL_app. iSplitR "Hr"; [| iExact "Hr"].
     cbn [seq]. iSplitL "H1"; [by iExists _|].
@@ -278,7 +279,7 @@ Section CwBodies.
          ⌜uptd_ext (pv_upt V) P'⌝ -∗
          ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
-         sie_cap_gpr mf av true (proc_addr jp) -∗
+         sie_cap_gpr kt mf av true (proc_addr jp) -∗
          cpu_own 0%nat eb (proc_addr jp) true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
@@ -319,7 +320,7 @@ Section CwBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 16)%nat true pj -∗
+    sie_cap_gpr kt M (av - 16)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x96)) -∗
     proc_priv_core pj pid V -∗
@@ -515,7 +516,7 @@ Section CwBodies.
        is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 16)%nat true pj -∗
+    sie_cap_gpr kt M (av - 16)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x6c)) -∗
     proc_priv_core pj pid V -∗
@@ -738,7 +739,7 @@ Section CwBodies.
        is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 16)%nat true pj -∗
+    sie_cap_gpr kt M (av - 16)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x84)) -∗
     proc_priv_core pj pid V -∗
@@ -968,14 +969,14 @@ Section CwBodies.
          cone, current and anticipated. *)
       locks_below lks "proc" ->
       kernel_text -∗
-      sie_cap_gpr M (av - 16)%nat true (proc_addr jp) -∗
+      sie_cap_gpr kt M (av - 16)%nat true (proc_addr jp) -∗
       cpu_own 0%nat eb (proc_addr jp) true lks -∗
       pc_is (mword_of_int (CW + 0x5e)) -∗
       proc_priv_core (proc_addr jp) pid V -∗
       kalloc_env γa None -∗
       dev_inv γu γv -∗
       is_txlock γl γu -∗
-      procs_inv γs -∗
+      procs_inv (kt := kt) γs -∗
       cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
       cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
       WP (Loop : expr riscv_lang).
@@ -1017,7 +1018,7 @@ Section CwBodies.
                ⌜Mb !!! Regidx Rs2 = (mword_of_int nn : mword 64)⌝ -∗
                ⌜Mb !!! Regidx Rs11 = m0 !!! Regidx Rs11⌝ -∗
                ⌜(true = false \/ pj = zero_reg -> (CIDb : CPU) = CID0)⌝ -∗
-               sie_cap_gpr Mb (av - 16)%nat true pj -∗
+               sie_cap_gpr kt Mb (av - 16)%nat true pj -∗
                pc_is (mword_of_int (CW + 0x38)) -∗
                WP (Loop : expr riscv_lang))%I
       with "[Hcnt Hpriv Hsaved Hspill Hbuf Hcont]" as "BODY".
@@ -1132,7 +1133,7 @@ Section CwBodies.
       iDestruct (bytes_own_name nnN buf with "Hb1") as (fb) "Hb1".
      iDestruct (cpu_own_transport CIDb CIDc6 0%nat eb pj true 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (EitherCopyin.wp_either_copyin_sconf γa γf B6 (av - 16)%nat 0%nat
+      iApply (EitherCopyin.wp_either_copyin_sconf kt γa γf B6 (av - 16)%nat 0%nat
                 eb pj pid V true nnN (fun _ => bv_0 8) fb true lks
                 ltac:(lia)
                 ltac:(rewrite HB6a1; vm_compute; reflexivity)
@@ -1254,7 +1255,7 @@ Section CwBodies.
         iDestruct (cw_priv_pid pj pid (upd_upt V P1) with "Hpriv") as "[Hpid Hpback]".
         iDestruct (cpu_own_transport CIDc7 CIDcb 0%nat eb pj true 
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (Uartwrite.wp_uartwrite_sconf γu γv γs jp γlp γl D3 (av - 16)%nat
+        iApply (Uartwrite.wp_uartwrite_sconf kt γu γv γs jp γlp γl D3 (av - 16)%nat
                   eb nnN fb' (DfracOwn 1) true pid (DfracOwn (1/2)) lks
                   Hj Hjlp ltac:(rewrite HD3a1 HnnN; reflexivity)
                   ltac:(rewrite HnnN; lia)
@@ -1520,7 +1521,7 @@ Section CwBodies.
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string)
-    : wp_consolewrite_sconf_body γa γf γs jp γlp γu γv γl m av eb pid V n b lks.
+    : wp_consolewrite_sconf_body kt γa γf γs jp γlp γu γv γl m av eb pid V n b lks.
   Proof.
     cbv beta delta [wp_consolewrite_sconf_body].
     (* [Hbelow] is SpecConsolewrite.v's own [locks_below lks (lock_rank
@@ -1557,7 +1558,7 @@ Section CwBodies.
       by (rewrite /A0 upd_eq Hpush; reflexivity).
     assert (P02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (CW + 0x2)) by pcw.
     iEval (rewrite P02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 &
                             F9 & F10 & F11 & F12 & F13 & F14 & F15 & F16 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".

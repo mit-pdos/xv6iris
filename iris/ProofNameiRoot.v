@@ -109,6 +109,7 @@ Section ProofNameiRoot.
             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -121,7 +122,7 @@ Section ProofNameiRoot.
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_namei_root_body gtl cn gfs gi cov logstart nib dev dqp
+    : wp_namei_root_body kt gtl cn gfs gi cov logstart nib dev dqp
                          m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namei_root_body].
@@ -152,7 +153,7 @@ Section ProofNameiRoot.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : nmr_sp m R1) by (rewrite /nmr_sp /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -286,7 +287,7 @@ Section ProofNameiRoot.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID7)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_root gtl cn gfs gi cov logstart nib dev dqp
+    iApply (NX.wp_namex_root kt gtl cn gfs gi cov logstart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
@@ -362,8 +363,8 @@ Section ProofNameiRoot.
                      = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HP2sp; reflexivity).
-    iAssert (stack_own sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].

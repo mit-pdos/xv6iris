@@ -167,6 +167,7 @@ Section ProofCopyout.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rtp  := (mword_of_int 4 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -222,14 +223,14 @@ Section ProofCopyout.
     (uint va0 < 2 ^ 38)%Z ->
     pt_rep0 t m_ad ->
     m_ad !! svpn_of va0 <> None ->
-    sie_cap_gpr (CID:=CID0) M n b pcur -∗
+    sie_cap_gpr kt (CID:=CID0) M n b pcur -∗
     kernel_text -∗
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.copyout + 0x78) : mword 64) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     wp_next (CID0:=CID0) b pcur (fun (CID : CpuId) =>
       ∀ (Mf : regfile) (wr : bool),
         ⌜callee_saved M Mf⌝ -∗
-        sie_cap_gpr Mf n b pcur -∗
+        sie_cap_gpr kt Mf n b pcur -∗
         pc_is (if wr then (mword_of_int (KernelSyms.copyout + 0x88) : mword 64)
                     else (mword_of_int (KernelSyms.copyout + 0xc2) : mword 64)) -∗
         ptree_own 2 (DfracOwn 1) t -∗
@@ -311,7 +312,7 @@ Section ProofCopyout.
       apply callee_saved_insert_r; [vm_compute; reflexivity |].
       apply callee_saved_insert_r; [vm_compute; reflexivity |].
       apply callee_saved_refl. }
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf G4 t m_ad n (DfracOwn 1) b pcur
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf kt G4 t m_ad n (DfracOwn 1) b pcur
               Hn HG4a0 HG4a2 ltac:(rewrite HG4a1; exact Hva0b) Hrep
               with "Hcg Htext Hpc Hptree").
     iIntros (CID5 Hsk5 mw) "Hcg Hpc Hptree %Hwcs %Hwpay".
@@ -410,7 +411,7 @@ Section ProofCopyout.
   (* ([tp_pin] is idempotent and the pin never touches sp). *)
   (* ------------------------------------------------------------------ *)
   Local Lemma co_pin_sie_cap_gpr `{CID0 : CpuId} (M : regfile) (avail : nat) (bb : bool) (pp : mword 64) :
-    sie_cap_gpr (tp_pin M) avail bb pp = sie_cap_gpr M avail bb pp.
+    sie_cap_gpr kt (tp_pin M) avail bb pp = sie_cap_gpr kt M avail bb pp.
   Proof.
     unfold sie_cap_gpr, sie_cap.
     rewrite (tp_pin_id (tp_pin M) (rget_tp M)).
@@ -447,7 +448,7 @@ Section ProofCopyout.
        /\ Md !!! Regidx Rs8 = (mword_of_int 4096 : mword 64)
        /\ Md !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
        /\ Md !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
-     sie_cap_gpr (CID:=CIDh) Md (K - 14)%nat b p -∗
+     sie_cap_gpr kt (CID:=CIDh) Md (K - 14)%nat b p -∗
      cpu_own (CID:=CIDh) lvl eb p b lks -∗
      pc_is (CID:=CIDh) (mword_of_int (KernelSyms.copyout + 0x88) : mword 64) -∗
      page_own pa0 -∗
@@ -459,7 +460,7 @@ Section ProofCopyout.
            /\ mj !!! Regidx Ra0 = res
            /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
            /\ uptd_ext_sz szv P P' ⌝ -∗
-         sie_cap_gpr mj (K - 14)%nat b p -∗
+         sie_cap_gpr kt mj (K - 14)%nat b p -∗
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
          proc_pt P' -∗
@@ -486,7 +487,7 @@ Section ProofCopyout.
        /\ Mn !!! Regidx Rs8 = (mword_of_int 4096 : mword 64)
        /\ Mn !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
        /\ Mn !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
-     sie_cap_gpr (CID:=CIDc) Mn (K - 14)%nat b p -∗
+     sie_cap_gpr kt (CID:=CIDc) Mn (K - 14)%nat b p -∗
      cpu_own (CID:=CIDc) lvl eb p b lks -∗
      pc_is (CID:=CIDc) (mword_of_int (KernelSyms.copyout + 0x36) : mword 64) -∗
      page_own pa0 -∗
@@ -498,7 +499,7 @@ Section ProofCopyout.
            /\ mj !!! Regidx Ra0 = res
            /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
            /\ uptd_ext_sz szv P P' ⌝ -∗
-         sie_cap_gpr mj (K - 14)%nat b p -∗
+         sie_cap_gpr kt mj (K - 14)%nat b p -∗
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
          proc_pt P' -∗
@@ -532,7 +533,7 @@ Section ProofCopyout.
     M !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64) ->
     M !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ->
     locks_below lks "kmem" ->
-    sie_cap_gpr (CID:=CID0) M (K - 14)%nat b p -∗
+    sie_cap_gpr kt (CID:=CID0) M (K - 14)%nat b p -∗
     cpu_own (CID:=CID0) lvl eb p b lks -∗
     kernel_text -∗
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.copyout + 0x54) : mword 64) -∗
@@ -545,7 +546,7 @@ Section ProofCopyout.
           /\ mj !!! Regidx Ra0 = res
           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
           /\ uptd_ext_sz szv P P' ⌝ -∗
-        sie_cap_gpr mj (K - 14)%nat b p -∗
+        sie_cap_gpr kt mj (K - 14)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
         proc_pt P' -∗
@@ -668,7 +669,7 @@ Section ProofCopyout.
     assert (Hnavz : Z.of_nat navail = 4096 - Z.of_nat off).
     { unfold navail. rewrite Nat2Z.inj_sub; [reflexivity | lia]. }
     iAssert (∀ (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64),
-        co_tail_body b p K lvl eb lks szv P spr va0 dstva src rem done len
+        co_tail_body (kt := kt) b p K lvl eb lks szv P spr va0 dstva src rem done len
           src_bytes CIDh Pd Md pa0)%I
       as "Htail".
     { iIntros (CIDh Pd Md pa0)
@@ -716,7 +717,7 @@ Section ProofCopyout.
       iPoseProof (coi_42 with "Htext") as "Hi42".
       (* both arms reach +0x36 with s2 = n; factor the rest over [nn] *)
       iAssert (∀ (CIDc : CpuId) (Mn : regfile) (nn : nat),
-          co_copy_body b p K lvl eb lks szv P spr va0 dstva src rem done navail
+          co_copy_body (kt := kt) b p K lvl eb lks szv P spr va0 dstva src rem done navail
             len src_bytes Pd pa0 CIDc Mn nn)%I
         as "Hcopy".
       { iIntros (CIDc Mn nn)
@@ -841,7 +842,7 @@ Section ProofCopyout.
           by (unfold navail in *; lia).
         iEval (rewrite (bb_split3 pa0 off nn (navail - nn) 4096 fpg Hpsplit)) in "Hpg".
         iDestruct "Hpg" as "(HpA & HpB & HpC)".
-        iApply (Memmove.wp_memmove_sconf U5 (K - 14)%nat nn
+        iApply (Memmove.wp_memmove_sconf kt U5 (K - 14)%nat nn
                   (fun j => src_bytes (done + j)%nat) (fun j => fpg (off + j)%nat) b p
                   ltac:(lia) ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia)
                   HU5a2
@@ -1190,7 +1191,7 @@ Section ProofCopyout.
     assert (HV4root : V4 !!! Regidx Ra0
                       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
     { rewrite HV4a0 Hbase Hrootc. reflexivity. }
-    iApply (Walkaddr.wp_walkaddr_sconf V4 t m_ad (K - 14)%nat (DfracOwn 1) b p
+    iApply (Walkaddr.wp_walkaddr_sconf kt V4 t m_ad (K - 14)%nat (DfracOwn 1) b p
               ltac:(lia) HV4root Hrep
               with "Hcg Htext Hpc Hptree").
     iIntros (CIDg4 Hsg4 mr) "Hcg Hpc Hptree %Hwacs %Hwapay".
@@ -1349,7 +1350,7 @@ Section ProofCopyout.
       iEval (rewrite <- (co_pin_sie_cap_gpr F5 (K - 14)%nat b p)) in "Hcg".
       iDestruct (cpu_own_transport CID0 CIDm5 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 14)%nat lvl eb p b lks
+      iApply (Vmfault.wp_vmfault_sconf kt γa (tp_pin F5) Pc szv (K - 14)%nat lvl eb p b lks
                 ltac:(lia) (rget_tp F5) HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
       all: try lkbelow.
@@ -1669,7 +1670,7 @@ Section ProofCopyout.
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p b lks.
+    : wp_copyout_sconf_body kt γa mm P szv len src_bytes K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_copyout_sconf_body].
     intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
@@ -1749,7 +1750,7 @@ Section ProofCopyout.
     assert (HR1o : forall c : mword 5, Regidx c <> Regidx csp_rs1 ->
               R1 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc. rewrite /R1. rewrite upd_ne; [reflexivity | exact Hc]. }
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & S13 & S14 & _)".
     iDestruct "S1" as (u1) "Hk1".   iDestruct "S2" as (u2) "Hk2".
     iDestruct "S3" as (u3) "Hk3".   iDestruct "S4" as (u4) "Hk4".
@@ -2186,7 +2187,7 @@ Section ProofCopyout.
           /\ mj !!! Regidx Ra0 = res
           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
           /\ uptd_ext_sz szv P P' ⌝ -∗
-        sie_cap_gpr mj (K - 14)%nat b p -∗
+        sie_cap_gpr kt mj (K - 14)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
         proc_pt P' -∗
@@ -2380,9 +2381,9 @@ Section ProofCopyout.
                      = pa_stk (add_vec (E13 !!! Regidx csp_rs1)
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 7 : mword 6)))) 14).
       { rewrite Hwv HspE13. symmetry. exact Hsprstk. }
-      iAssert (stack_own sp0 14)
+      iAssert (stack_own (KTR := kt) sp0 14)
         with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12 Hk13 Hk14]" as "Hframe14".
-      { rewrite stack_own_slots. cbn [seq].
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
         iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
         iSplitL "Hk3"; [iExists _; iExact "Hk3" |].

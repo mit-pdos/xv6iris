@@ -136,6 +136,7 @@ Section ProofProcPagetable.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -227,7 +228,7 @@ Section ProofProcPagetable.
   Lemma wp_proc_pagetable_core (γa : gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
       (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_pagetable_core_body γa mm tf dqtf lvl K eb p on b lks.
+    : wp_proc_pagetable_core_body kt γa mm tf dqtf lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_core_body].
     intros pp tfp ret_tgt Hlvl HK Htfal Htfb Hlkbelow.
@@ -289,7 +290,7 @@ Section ProofProcPagetable.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     iDestruct "S3" as (v3) "Hc3". iDestruct "S4" as (v4) "Hc4".
@@ -353,7 +354,7 @@ Section ProofProcPagetable.
         ⌜ me !!! Regidx csp_rs1 = spr
           /\ me !!! Regidx (mword_of_int 9 : mword 5) = rv
           /\ ppt_thr mm me ⌝ -∗
-        sie_cap_gpr me (K - 4)%nat b p -∗
+        sie_cap_gpr kt me (K - 4)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.proc_pagetable + 0x4c) : mword 64) -∗
         p_trapframe pp ↦₈{dqtf} tf -∗
@@ -434,8 +435,8 @@ Section ProofProcPagetable.
       assert (Hpop : E4 !!! Regidx csp_rs1
                      = pa_stk (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HE4sp. symmetry. exact Hsprstk. }
-      iAssert (stack_own sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := kt) sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
         iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
         iSplitL "Hc3". { iExists (mm !!! Regidx (mword_of_int 9)). iExact "Hc3". }
@@ -526,7 +527,7 @@ Section ProofProcPagetable.
     { rewrite /Jp. apply (tp_pin_id (tp_pin J) (rget_tp J)). }
     assert (Hjpsp : Jp !!! Regidx csp_rs1 = J !!! Regidx csp_rs1).
     { rewrite /Jp. exact (tp_pin_sp J). }
-    assert (Hgpreq : sie_cap_gpr J (K - 4)%nat b p = sie_cap_gpr Jp (K - 4)%nat b p).
+    assert (Hgpreq : sie_cap_gpr kt J (K - 4)%nat b p = sie_cap_gpr kt Jp (K - 4)%nat b p).
     { unfold sie_cap_gpr, sie_cap. rewrite Hjpsp Hpinidem. reflexivity. }
     iEval (rewrite Hgpreq) in "Hcg".
     assert (HcidJp : Jp !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
@@ -551,7 +552,7 @@ Section ProofProcPagetable.
        so uvmcreate wants [Hcnt] at CID8. *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (UV.wp_uvmcreate_sconf γa Jp lvl (K - 4)%nat eb p on b
+    iApply (UV.wp_uvmcreate_sconf kt γa Jp lvl (K - 4)%nat eb p on b
               _ Hlvl Hc18 HcidJp
               with "Hcg Hcnt Htext Hpc Henv").
     all: try lkbelow.
@@ -727,7 +728,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages wants [Hcnt] at CID18. *)
     iDestruct (cpu_own_transport CIDuv CID18 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf γa M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
+    iApply (MP.wp_mappages_sconf kt γa M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
               _ Hlvl Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
@@ -831,7 +832,7 @@ Section ProofProcPagetable.
         iMod (kalloc_env_seal with "Henv") as "#Henv0".
         iDestruct (cpu_own_transport CIDmp1 CIDa4 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (UF.wp_uvmfree_sconf γa T3 b0 ∅ (K - 4)%nat eb p lvl b
+        iApply (UF.wp_uvmfree_sconf kt γa T3 b0 ∅ (K - 4)%nat eb p lvl b
                   _ Hc36 Hlvl HT3a0
                   ltac:(rewrite HT3a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
@@ -982,7 +983,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages#2 wants [Hcnt] at CID27. *)
     iDestruct (cpu_own_transport CIDmp1 CID27 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf γa N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
+    iApply (MP.wp_mappages_sconf kt γa N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
               _ Hlvl Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)
@@ -1137,7 +1138,7 @@ Section ProofProcPagetable.
         iMod (kalloc_env_seal with "Henv") as "#Henv0".
         iDestruct (cpu_own_transport CIDmp2 CIDb8 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (UUF.wp_uvmunmap_fixed_sconf γa V7 upt_fixed_tramp b0 ∅ tramp_vpn
+        iApply (UUF.wp_uvmunmap_fixed_sconf kt γa V7 upt_fixed_tramp b0 ∅ tramp_vpn
                   (K - 4)%nat eb p lvl b
                   _ Hc22 Hlvl HV7a0
                   ltac:(rewrite HV7a1; apply bv_eq; vm_compute; reflexivity)
@@ -1203,7 +1204,7 @@ Section ProofProcPagetable.
           by (rewrite /W6 upd_eq; reflexivity).
         iDestruct (cpu_own_transport CIDb9 CIDc3 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (UF.wp_uvmfree_sconf γa W6 b0 ∅ (K - 4)%nat eb p lvl b
+        iApply (UF.wp_uvmfree_sconf kt γa W6 b0 ∅ (K - 4)%nat eb p lvl b
                   _ Hc36 Hlvl HW6a0
                   ltac:(rewrite HW6a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
@@ -1306,16 +1307,17 @@ Section SealProcPagetable.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_proc_pagetable_sconf (γa : gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
       (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_pagetable_sconf_body γa mm tf dqtf lvl K eb p on b lks.
+    : wp_proc_pagetable_sconf_body kt γa mm tf dqtf lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_sconf_body].
     intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb Hlkbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hcont".
-    iApply (Core.wp_proc_pagetable_core γa mm tf dqtf lvl K eb p (Some nb) b lks
+    iApply (Core.wp_proc_pagetable_core kt γa mm tf dqtf lvl K eb p (Some nb) b lks
               Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv [Hcont]").
     all: try lkbelow.
     iIntros (CIDr Hsr mr) "Hcg Hcnt Hpc Htfcell Hpost %Hcs".

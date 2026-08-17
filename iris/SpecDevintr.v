@@ -113,6 +113,7 @@ Section DevintrCaps.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   (* Everything the five handlers ask of a caller, in the order the branches
      reach them:
 
@@ -150,8 +151,8 @@ Section DevintrCaps.
       disk_geom γv pd pav pu ∗
       is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
       timer_cap ∗
-      tick_keeper γtl γs ∗
-      procs_inv γs )%I.
+      tick_keeper (kt := kt) γtl γs ∗
+      procs_inv (kt := kt) γs )%I.
 
   Global Instance devintr_caps_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps γu γv γdk γtl γs pd pav pu).
@@ -166,7 +167,7 @@ Notation devintr_stack := (52%nat) (only parsing).
 Definition wp_devintr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+    (kt : ktier) (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (dq : dfrac) (sc : mword 64) (lks : gset string) :=
@@ -186,14 +187,14 @@ Definition wp_devintr_sconf_body
      Trivial at every real call site: devintr always runs at trap entry,
      where [lks = ∅]. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr kt m av false p -∗
   cpu_own lvl eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
-  devintr_caps γu γv γdk γtl γs pd pav pu -∗
+  devintr_caps (kt := kt) γu γv γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
-      sie_cap_gpr mf av false p -∗
+      sie_cap_gpr kt mf av false p -∗
       cpu_own lvl eb p false lks -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is ret_tgt -∗
@@ -204,9 +205,9 @@ Module Type DEVINTR.
   Parameter wp_devintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+      (kt : ktier) (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (dq : dfrac) (sc : mword 64) (lks : gset string),
-      wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p dq sc lks.
+      wp_devintr_sconf_body kt γu γv γdk γtl γs pd pav pu m av lvl eb p dq sc lks.
 End DEVINTR.

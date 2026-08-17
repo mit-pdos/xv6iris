@@ -33,9 +33,10 @@ Section ProofMemsetPage.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_memset_page_sconf
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_page_sconf_body m0 n cval b pcur.
+    : wp_memset_page_sconf_body kt m0 n cval b pcur.
   Proof.
     cbv beta delta [wp_memset_page_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2.
@@ -48,7 +49,7 @@ Section ProofMemsetPage.
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* --- apply the general memset spec at len = 4096 --- *)
-    iApply (MemsetArray.wp_memset_sconf m0 n 4096 cval olds b pcur
+    iApply (MemsetArray.wp_memset_sconf kt m0 n 4096 cval olds b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }

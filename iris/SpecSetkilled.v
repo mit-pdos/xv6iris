@@ -56,7 +56,7 @@ Import Defs.
 
 
 Definition wp_setkilled_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γs : list gname) (j : nat) (γl : gname)
+     (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.setkilled in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -77,14 +77,14 @@ Definition wp_setkilled_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      setkilled is BALANCED -- both the entry and the exit [cpu_own] carry the
      same [lks] -- because the C releases p->lock on its only return path. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γs -∗
+  procs_inv (kt := kt) γs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr kt mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -93,7 +93,7 @@ Definition wp_setkilled_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type SETKILLED.
   Parameter wp_setkilled_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γs : list gname) (j : nat) (γl : gname)
+       (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_setkilled_sconf_body γs j γl m av n eb p b lks.
+      wp_setkilled_sconf_body kt γs j γl m av n eb p b lks.
 End SETKILLED.

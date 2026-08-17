@@ -1003,6 +1003,7 @@ Section ProofDirlinkMain.
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
@@ -1045,7 +1046,7 @@ Section ProofDirlinkMain.
       (CIDt : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (w3 w5 w6 : mword 64) (dnew : nat -> bv 8),
        ⌜dl_tregs m sp0 Mt⌝ -∗
-       sie_cap_gpr Mt (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr kt Mt (K - 10)%nat b (proc_addr j) -∗
        pc_is (mword_of_int (DK + 0x9c)) -∗
        (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
        (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
@@ -1060,7 +1061,7 @@ Section ProofDirlinkMain.
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
            ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
-           sie_cap_gpr mf K b (proc_addr j) -∗
+           sie_cap_gpr kt mf K b (proc_addr j) -∗
            pc_is ret_tgt -∗
            WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
@@ -1081,7 +1082,7 @@ Section ProofDirlinkMain.
        ⌜dl_pregs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64)
           (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Mp⌝ -∗
-       sie_cap_gpr Mp (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr kt Mp (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (DK + 0x70)) -∗
        (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
@@ -1116,7 +1117,7 @@ Section ProofDirlinkMain.
            (dn' dn0' : dinode) (n' : nat) (used' : gset Z) (Sb' : gset Z)
            (tot : nat),
              ⌜callee_saved m mf⌝ -∗
-             sie_cap_gpr mf K b (proc_addr j) -∗
+             sie_cap_gpr kt mf K b (proc_addr j) -∗
              cpu_own 0 eb (proc_addr j) b lks -∗
              pc_is ret_tgt -∗
              i_dev ip ↦₄{dqd} dev -∗
@@ -1196,7 +1197,7 @@ Section ProofDirlinkMain.
        ⌜dir_free_first data i = None⌝ -∗
        ⌜dl_regs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64) (16 * i)%nat Ml⌝ -∗
-       sie_cap_gpr Ml (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr kt Ml (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (DK + 0x30)) -∗
        (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
@@ -1232,7 +1233,7 @@ Section ProofDirlinkMain.
            (dn' dn0' : dinode) (n' : nat) (used' : gset Z) (Sb' : gset Z)
            (tot : nat),
              ⌜callee_saved m mf⌝ -∗
-             sie_cap_gpr mf K b (proc_addr j) -∗
+             sie_cap_gpr kt mf K b (proc_addr j) -∗
              cpu_own 0 eb (proc_addr j) b lks -∗
              pc_is ret_tgt -∗
              i_dev ip ↦₄{dqd} dev -∗
@@ -1313,7 +1314,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_dirlink_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf gpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum
                           ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
@@ -1401,7 +1402,7 @@ Section ProofDirlinkMain.
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -1579,7 +1580,7 @@ Section ProofDirlinkMain.
     (*  they get here, which is what [dl_tregs] says.                     *)
     (* ================================================================= *)
     iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDt : CpuId =>
-               dl_tail_body j m sp0 ret_tgt K b CIDt))%I
+               dl_tail_body (kt := kt) j m sp0 ret_tgt K b CIDt))%I
       with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt w3 w5 w6 dnew)
@@ -1673,9 +1674,9 @@ Section ProofDirlinkMain.
       (* ---- the [de] buffer goes back to being two frame slots ---- *)
       iDestruct (dlk_name_bytes with "Hde") as "Hdeb2".
       iDestruct (dl_bytes_slots sp0 Hal10 Hal9 with "Hdeb2") as (w10 w9) "[Hc10 Hc9]".
-      iAssert (stack_own sp0 10) with
+      iAssert (stack_own (KTR := kt) sp0 10) with
         "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".
-      { rewrite stack_own_slots. cbn [seq].
+      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
         iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
         iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
         iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
@@ -1791,7 +1792,7 @@ Section ProofDirlinkMain.
     iDestruct (dl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
    iDestruct (cpu_own_transport CID CID12 0%nat eb (proc_addr j) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
+    iApply (DL.wp_dirlookup_sconf kt gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
               ga gf cov logstart nib dev ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
               pidv dq dqd dqn R7 (K - 10)%nat eb b _
@@ -1881,7 +1882,7 @@ Section ProofDirlinkMain.
          The birth epoch is opened for the reservation and never named
          again: at [crz = false] iput makes no epoch-ordered claim. *)
       iDestruct (log_opS_named with "Hop") as (edl) "Hop".
-      iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (IP.wp_iput_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev used
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
                 ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb b lks
@@ -2042,7 +2043,7 @@ Section ProofDirlinkMain.
       (*  own continuation.                                                 *)
       (* ================================================================= *)
       iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
-                 dl_after_body j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
+                 dl_after_body (kt := kt) j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
                    data dqn fn dqs inodestart dqbs size dqb bmapstart cov
                    logstart used gi dq pidv bn g ncount Sb K b eb k0 inum
                    nrec s ret_tgt CIDa lks))%I
@@ -2157,7 +2158,7 @@ Section ProofDirlinkMain.
         iDestruct "Hde" as "[Hdehi Hdenm]".
         iEval (rewrite -HW4a0) in "Hdenm".
         iEval (rewrite -HW4a1) in "Hnm".
-        iApply (SNC.wp_strncpy_sconf W4 14%nat fn (fun jj => dolz (2 + jj)%nat)
+        iApply (SNC.wp_strncpy_sconf kt W4 14%nat fn (fun jj => dolz (2 + jj)%nat)
                   (K - 10)%nat dqn b (proc_addr j)
                   ltac:(exact HK2) HW4a2 ltac:(vm_compute; reflexivity)
                   with "Hcg Htext Hpc Hnm Hdenm").
@@ -2364,7 +2365,7 @@ Section ProofDirlinkMain.
            call's own window -- same offset, same booleans, same entry set,
            because dirlookup's readi prefix and the scan above log NOTHING
            and so the count and the set here are still the caller's. *)
-        iApply (WI.wp_writei_gen gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
+        iApply (WI.wp_writei_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
                   cov logstart inodestart nib bmapstart size dev used gpr
                   ip dinum bm data dn dn0
                   false (16 * k0)%nat 16%nat
@@ -2798,7 +2799,7 @@ Section ProofDirlinkMain.
         (* =============================================================== *)
         iAssert (∀ fuel : nat,
           wp_next (CID0 := CID) true (proc_addr j) (fun CIDl : CpuId =>
-            dl_scan_body j nrec dn data m sp0 ip nb inum K b eb dev dqf
+            dl_scan_body (kt := kt) j nrec dn data m sp0 ip nb inum K b eb dev dqf
               dinum gfs bm dqn fn dqs inodestart dqbs size dqb bmapstart cov
               logstart used gi dn0 dq pidv bn g ncount Sb k0 s ret_tgt dqd
               fuel CIDl lks))%I
@@ -2990,7 +2991,7 @@ Section ProofDirlinkMain.
           { iEval (rewrite HL6a2). iFrame. }
           iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (RD.wp_readi_sconf gs j gl gu gd gk pd pav pu bn gfs ga gf
+          iApply (RD.wp_readi_sconf kt gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol dl_dummyV
                     pidv dq dqd L6 (K - 10)%nat eb b lks
@@ -3107,7 +3108,7 @@ Section ProofDirlinkMain.
                             (add_vec_int (mword_of_int (DK + 0x68) : mword 64) 4)]> PB2).
             assert (Ha0msg3 : PB3 !!! Regidx Ra0 = (mword_of_int dl_msg_a : mword 64))
               by pcw.
-            iApply (PN.wp_panic_sconf (CID := CIDpa4) PB3 (K - 10)%nat
+            iApply (PN.wp_panic_sconf kt (CID := CIDpa4) PB3 (K - 10)%nat
                       0%nat eb b (proc_addr j) (PkAStr DfracDiscarded dl_msg) lks
                       (dl_panic_K K HK) eq_refl dl_panic_noff
                       (dl_panic_below lks Hbelow)
@@ -3517,7 +3518,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_dirlink_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                             ga gf gpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf

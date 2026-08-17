@@ -47,7 +47,7 @@ Import Defs.
    so it needs 2 of the [n] available stack slots and returns them (avail [n]
    preserved). *)
 Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64) :=
+    (kt : ktier) (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -59,13 +59,13 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
   (2 <= n)%nat ->
   (Z.of_nat len < 2 ^ 32)%Z ->
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
-  sie_cap_gpr m0 n b p -∗
+  sie_cap_gpr kt m0 n b p -∗
   kernel_text -∗ pc_is pcE -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mfin,
-    sie_cap_gpr mfin n b p -∗
+    sie_cap_gpr kt mfin n b p -∗
     pc_is ret_tgt -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
@@ -76,6 +76,6 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type MEMMOVE.
   Parameter wp_memmove_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
-      wp_memmove_sconf_body m0 n len src_bytes dst_olds b p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
+      wp_memmove_sconf_body kt m0 n len src_bytes dst_olds b p.
 End MEMMOVE.

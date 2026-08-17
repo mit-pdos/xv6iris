@@ -223,8 +223,8 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret_nf (CID := h) (pv_upt V) j γl γf "proc"%string
-            (proc_lock_res γs γl (proc_addr j)) pid V ks m av
+  iApply (FR.wp_forkret_nf kt (CID := h) (pv_upt V) j γl γf "proc"%string
+            (proc_lock_res (kt := kt) γs γl (proc_addr j)) pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hbud Hpr Hut Hsp eq_refl Hnorm Hptwf Hgap Hkw
           with "Htext Hwire Hkmap Hpc [] Hcg Hcpu Htc Hclm Hlk Hlocked HR Hks Hpriv Hclose").
