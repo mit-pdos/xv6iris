@@ -2949,7 +2949,7 @@ Section ProofSysUnlinkBody.
     iPoseProof (suli_11c with "Htext") as "Hi11c".
     iPoseProof (suli_120 with "Htext") as "Hi120".
     (* ===== +0x11c lhu a5,-232(s0) -- de.inum ===== *)
-    iApply (wp_lhu_s_sconf (CID := CID9) (mword_of_int (SU + 0x11c)) Ra5 Rs0
+    iApply (wp_lhu_s_sconf (CID := CID9) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x11c)) Ra5 Rs0
               (mword_of_int 3864 : mword 12) N7 (K - 30)%nat
               (dir_inum dati jj : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi11c [Hhalf]").
@@ -3779,7 +3779,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
     iEval (rewrite /i_nlink) in "Hinli".
-    iApply (wp_lh_s_sconf (CID := CID3) (mword_of_int (SU + 0x78)) Ra5 Rs2
+    iApply (wp_lh_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x78)) Ra5 Rs2
               (mword_of_int 74 : mword 12) mil (K - 30)%nat
               (di_nlink dni : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi78 [Hinli]").
@@ -3837,7 +3837,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
     iEval (rewrite /i_type) in "Hityi".
-    iApply (wp_lh_s_sconf (CID := CID5) (mword_of_int (SU + 0x80)) Ra4 Rs2
+    iApply (wp_lh_s_sconf (CID := CID5) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x80)) Ra4 Rs2
               (mword_of_int 68 : mword 12) M3 (K - 30)%nat
               (di_type dni : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi80 [Hityi]").
@@ -4898,7 +4898,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
     iEval (rewrite /i_type) in "Hityi".
-    iApply (wp_lh_s_sconf (CID := D15) (mword_of_int (SU + 0xae)) Ra4 Rs2
+    iApply (wp_lh_s_sconf (CID := D15) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xae)) Ra4 Rs2
               (mword_of_int 68 : mword 12) C1 (K - 30)%nat
               (di_type dni : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hiae [Hityi]").
@@ -5022,7 +5022,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
     iEval (rewrite /i_nlink) in "Hinli".
-    iApply (wp_lhu_s_sconf (CID := D21) (mword_of_int (SU + 0xbe)) Ra5 Rs2
+    iApply (wp_lhu_s_sconf (CID := D21) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xbe)) Ra5 Rs2
               (mword_of_int 74 : mword 12) mup (K - 30)%nat
               (di_nlink dni : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hibe [Hinli]").
@@ -5066,7 +5066,7 @@ Section ProofSysUnlinkBody.
                     = mword_of_int (SU + 0xc4)) by pcw.
     iEval (rewrite Hppc4) in "Hpc".
     (* ===== +0xc4 sh a5,74(s2) -- the decrement lands ===== *)
-    iApply (wp_sh_s_sconf (CID := D23) (mword_of_int (SU + 0xc4))
+    iApply (wp_sh_s_sconf (CID := D23) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xc4))
               Ra5 Rs2 (mword_of_int 74 : mword 12) C7 (K - 30)%nat
               (di_nlink dni : mword 16) b with "Hcg Hpc Hic4 [Hinli]").
     { iEval (rgne; rewrite (su_regs_s2 _ _ _ _ _ _ HC7regs)).
@@ -6511,7 +6511,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
     iEval (rewrite /i_type) in "Hityi".
-    iApply (wp_lh_s_sconf (CID := D15) (mword_of_int (SU + 0xae)) Ra4 Rs2
+    iApply (wp_lh_s_sconf (CID := D15) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xae)) Ra4 Rs2
               (mword_of_int 68 : mword 12) C1 (K - 30)%nat
               (di_type dni : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hiae [Hityi]").
@@ -6566,7 +6566,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetad".
     iDestruct "Hmetad" as "(Hityd & Himad & Himid & Hinld & Hiszd)".
     iEval (rewrite /i_nlink) in "Hinld".
-    iApply (wp_lhu_s_sconf (CID := T1) (mword_of_int (SU + 0x146)) Ra5 Rs1
+    iApply (wp_lhu_s_sconf (CID := T1) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x146)) Ra5 Rs1
               (mword_of_int 74 : mword 12) C3 (K - 30)%nat
               (di_nlink dnW : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi146 [Hinld]").
@@ -6610,7 +6610,7 @@ Section ProofSysUnlinkBody.
                      = mword_of_int (SU + 0x14c)) by pcw.
     iEval (rewrite Hpp14c) in "Hpc".
     (* ===== +0x14c sh a5,74(s1) -- the parent's decrement lands ===== *)
-    iApply (wp_sh_s_sconf (CID := T3) (mword_of_int (SU + 0x14c))
+    iApply (wp_sh_s_sconf (CID := T3) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x14c))
               Ra5 Rs1 (mword_of_int 74 : mword 12) G2 (K - 30)%nat
               (di_nlink dnW : mword 16) b with "Hcg Hpc Hi14c [Hinld]").
     { iEval (rgne; rewrite (su_regs_s1 _ _ _ _ _ _ HG2regs)).
@@ -6840,7 +6840,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
     iEval (rewrite /i_nlink) in "Hinli".
-    iApply (wp_lhu_s_sconf (CID := D21) (mword_of_int (SU + 0xbe)) Ra5 Rs2
+    iApply (wp_lhu_s_sconf (CID := D21) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xbe)) Ra5 Rs2
               (mword_of_int 74 : mword 12) mup (K - 30)%nat
               (di_nlink dni : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hibe [Hinli]").
@@ -6884,7 +6884,7 @@ Section ProofSysUnlinkBody.
                     = mword_of_int (SU + 0xc4)) by pcw.
     iEval (rewrite Hppc4) in "Hpc".
     (* ===== +0xc4 sh a5,74(s2) -- the decrement lands ===== *)
-    iApply (wp_sh_s_sconf (CID := D23) (mword_of_int (SU + 0xc4))
+    iApply (wp_sh_s_sconf (CID := D23) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xc4))
               Ra5 Rs2 (mword_of_int 74 : mword 12) C7 (K - 30)%nat
               (di_nlink dni : mword 16) b with "Hcg Hpc Hic4 [Hinli]").
     { iEval (rgne; rewrite (su_regs_s2 _ _ _ _ _ _ HC7regs)).

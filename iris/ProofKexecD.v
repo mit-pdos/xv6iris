@@ -312,7 +312,7 @@ Section KexecDName.
                         = pa_add pv (S i))
       by (rewrite HN1a5; apply pa_add_pred).
     iEval (rewrite -Hloadaddr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
               (mword_of_int 4095 : mword 12) N1 n (pfun (S i)) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c2 Hbyte").
     iIntros (CID2 Hs2) "Hcg Hpc Hbyte".
@@ -1202,7 +1202,7 @@ Section KexecDCommit.
                       = p_pagetable (proc_addr jp))
       by (rewrite HF0s5; reflexivity).
     iEval (rewrite -Hppaddr) in "Hppt".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2e0)) Ra0 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e0)) Ra0 Rs5
               (mword_of_int 80 : mword 12) mr (K - 68)%nat
               (page_base (ud_root (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2e0 Hppt").

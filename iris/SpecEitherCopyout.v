@@ -116,7 +116,7 @@ End SpecEitherCopyout.
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
 Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (ktb kts : ktier) `{!KtierLe ktb KT1} `{!KtierLe kts KT1} (γa : gname) (γf : gname)
+    (ktb : ktier) `{!KtierLe ktb KT1} (kts : ktier) `{!KtierLe kts KT1} (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
@@ -158,7 +158,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
 Module Type EITHER_COPYOUT.
   Parameter wp_either_copyout_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (ktb kts : ktier) `{!KtierLe ktb KT1} `{!KtierLe kts KT1} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
+      (ktb : ktier) `{!KtierLe ktb KT1} (kts : ktier) `{!KtierLe kts KT1} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string),
       wp_either_copyout_sconf_body ktb kts γa γf m av lvl eb p pid V user len

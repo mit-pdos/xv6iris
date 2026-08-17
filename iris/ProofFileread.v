@@ -1066,7 +1066,7 @@ Section ProofFileread.
                          = a_fmajor k).
           { rewrite (rget_ne B6 Ra0 ltac:(vm_compute; discriminate)) HB6a0. reflexivity. }
           iEval (rewrite -Hpmj) in "Hcmaj".
-          iApply (wp_lh_s_sconf (mword_of_int (FR + 0x72)) Ra5 Ra0
+          iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x72)) Ra5 Ra0
                     (mword_of_int 36 : mword 12) B6 (K - 6)%nat (fc_major Cf : mword 16) b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hi72 Hcmaj").

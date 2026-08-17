@@ -2926,7 +2926,7 @@ Section ProofCreateMain.
       iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
       iEval (rewrite /i_nlink) in "Hinl".
       (* ===== +0x2a lh a5,74(s1) : dp->nlink -- THE GUARD (9da28f5) ==== *)
-      iApply (wp_lh_s_sconf (mword_of_int (CK + 0x2a)) Ra5 Rs1
+      iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x2a)) Ra5 Rs1
                 (mword_of_int 74 : mword 12) mil (K - 10)%nat
                 (di_nlink dnl : mword 16) b ltac:(nz) ltac:(rdok)
                 with "Hcg Hpc Hi02a [Hinl]").
@@ -3808,7 +3808,7 @@ Section ProofCreateMain.
              iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
              iEval (rewrite /i_type) in "Hcity".
              (* ===== +0x60 lhu a5,68(s2) : ip->type, ZERO-extended ==== *)
-             iApply (wp_lhu_s_sconf (mword_of_int (CK + 0x60)) Ra5 Rs2
+             iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x60)) Ra5 Rs2
                        (mword_of_int 68 : mword 12) F6 (K - 10)%nat
                        (di_type dnc : mword 16) b ltac:(nz) ltac:(rdok)
                        with "Hcg Hpc Hi060 [Hcity]").
@@ -4754,7 +4754,7 @@ Section ProofCreateMain.
       iPoseProof (cri_0c8 with "Htext") as "Hi0c8".
       iPoseProof (cri_0ca with "Htext") as "Hi0ca".
       (* ===== +0xb4 sh s5,70(s3) : ip->major = major ================== *)
-      iApply (wp_sh_s_sconf (mword_of_int (CK + 0xb4)) Rs5 Rs3
+      iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0xb4)) Rs5 Rs3
                 (mword_of_int 70 : mword 12) Mo (K - 10)%nat (di_major dnc) b
                 with "Hcg Hpc Hi0b4 [Hcimaj]").
       { iEval (rgne; rewrite M19). iExact "Hcimaj". }
@@ -4764,7 +4764,7 @@ Section ProofCreateMain.
                       = mword_of_int (CK + 0xb8)) by pcw.
       iEval (rewrite Hq0b8) in "Hpc".
       (* ===== +0xb8 sh s6,72(s3) : ip->minor = minor ================== *)
-      iApply (wp_sh_s_sconf (mword_of_int (CK + 0xb8)) Rs6 Rs3
+      iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0xb8)) Rs6 Rs3
                 (mword_of_int 72 : mword 12) Mo (K - 10)%nat (di_minor dnc) b
                 with "Hcg Hpc Hi0b8 [Hcimin]").
       { iEval (rgne; rewrite M19). iExact "Hcimin". }
@@ -4794,7 +4794,7 @@ Section ProofCreateMain.
                       = mword_of_int (CK + 0xbe)) by pcw.
       iEval (rewrite Hq0be) in "Hpc".
       (* ===== +0xbe sh a4,74(s3) : ip->nlink = 1 ===================== *)
-      iApply (wp_sh_s_sconf (mword_of_int (CK + 0xbe)) Ra4 Rs3
+      iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0xbe)) Ra4 Rs3
                 (mword_of_int 74 : mword 12) W1 (K - 10)%nat (di_nlink dnc) b
                 with "Hcg Hpc Hi0be [Hcinl]").
       { iEval (rgne; rewrite HW1s3). iExact "Hcinl". }
@@ -6078,7 +6078,7 @@ Section ProofCreateMain.
     iEval (rewrite /i_nlink) in "Hcinl".
     iDestruct (sie_cap_gpr_x0 Mx (K - 10)%nat b (proc_addr j) Rz
                  ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-    iApply (wp_sh_s_sconf (mword_of_int (CK + 0x146)) Rz Rs3
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x146)) Rz Rs3
               (mword_of_int 74 : mword 12) Mx (K - 10)%nat
               (mword_of_int 1 : mword 16) b
               with "Hcg Hpc Hi146 [Hcinl]").
@@ -6866,7 +6866,7 @@ Section ProofCreateMain.
     iEval (rewrite /i_nlink) in "Hcinl".
     iDestruct (sie_cap_gpr_x0 Mx (K - 10)%nat b (proc_addr j) Rz
                  ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-    iApply (wp_sh_s_sconf (mword_of_int (CK + 0x146)) Rz Rs3
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x146)) Rz Rs3
               (mword_of_int 74 : mword 12) Mx (K - 10)%nat
               (di_nlink dc : mword 16) b
               with "Hcg Hpc Hi146 [Hcinl]").
@@ -8522,7 +8522,7 @@ Section ProofCreateMain.
           iEval (rewrite /inode_meta) in "Hmeta".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_nlink) in "Hinl".
-          iApply (wp_lhu_s_sconf (mword_of_int (CK + 0x134)) Ra5 Rs1
+          iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x134)) Ra5 Rs1
                     (mword_of_int 74 : mword 12) md3 (K - 10)%nat
                     (di_nlink dp3) b ltac:(nz) ltac:(rdok)
                     with "Hcg Hpc Hi134 [Hinl]").
@@ -8573,7 +8573,7 @@ Section ProofCreateMain.
                           = mword_of_int (CK + 0x13a)) by pcw.
           iEval (rewrite Hq13a) in "Hpc".
           (* ===== +0x13a sh a5,74(s1) : dp->nlink++ ================== *)
-          iApply (wp_sh_s_sconf (mword_of_int (CK + 0x13a)) Ra5 Rs1
+          iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x13a)) Ra5 Rs1
                     (mword_of_int 74 : mword 12) V2 (K - 10)%nat
                     (di_nlink dp3) b with "Hcg Hpc Hi13a [Hinl]").
           { iEval (rgne; rewrite HV2s1). iExact "Hinl". }

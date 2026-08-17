@@ -2731,7 +2731,7 @@ Section IreclaimScan.
                      = pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat).
       { rgne. rewrite HWBa5. apply iu_off0. }
       iEval (rewrite -Hlh0) in "Hd0".
-      iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x9e)) Ra4 Ra5
+      iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x9e)) Ra4 Ra5
                 (mword_of_int 0 : mword 12) WB (K - 8)%nat
                 (di_type (ds !!! DinodeEnc.islot inum) : mword 16) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9e Hd0").
@@ -2832,7 +2832,7 @@ Section IreclaimScan.
                                    (64 * DinodeEnc.islot inum)%nat) 6).
         { rgne. rewrite HWCa5. apply iu_disp; [lia | lia | reflexivity]. }
         iEval (rewrite -Hlh6) in "Hd6".
-        iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xa4)) Ra5 Ra5
+        iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0xa4)) Ra5 Ra5
                   (mword_of_int 6 : mword 12) WC (K - 8)%nat
                   (di_nlink (ds !!! DinodeEnc.islot inum) : mword 16) b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia4 Hd6").

@@ -296,8 +296,8 @@ Section ProofStrncmp.
     sie_cap_gpr KT1 (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncmp + 0x0a) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ[ktf]{dq1} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ[ktg]{dq2} g j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ Mt : regfile,
         ⌜Mt !!! Regidx csp_rs1 = pa_stk sp0 2⌝ -∗
@@ -306,8 +306,8 @@ Section ProofStrncmp.
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
         sie_cap_gpr KT1 Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncmp + 0x32) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ[ktf]{dq1} f j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ[ktg]{dq2} g j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

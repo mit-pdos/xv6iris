@@ -1690,7 +1690,7 @@ Section ProofPiperead.
           by (rewrite H3s1; reflexivity).
         (* 0x92 lw a5,536(s1) *)
         iPoseProof (pri_92 with "Htext") as "Hi92".
-        iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x92)) Ra5 Rs1 (mword_of_int 536 : mword 12)
+        iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.piperead + 0x92)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                   M3 (trap_res true + (av - 12))%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi92 [Hnr]").
         { rgall. iEval (rewrite Hnra). iExact "Hnr". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra) in "Hnr".
@@ -1705,7 +1705,7 @@ Section ProofPiperead.
           by (rewrite HK1s1; reflexivity).
         (* 0x96 lw a4,540(s1) *)
         iPoseProof (pri_96 with "Htext") as "Hi96".
-        iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x96)) Ra4 Rs1 (mword_of_int 540 : mword 12)
+        iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.piperead + 0x96)) Ra4 Rs1 (mword_of_int 540 : mword 12)
                   K1 (trap_res true + (av - 12))%nat nw false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi96 [Hnw]").
         { rgall. iEval (rewrite Hnwa). iExact "Hnw". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa) in "Hnw".

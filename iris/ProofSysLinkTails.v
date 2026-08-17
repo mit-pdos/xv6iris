@@ -1219,7 +1219,7 @@ Section ProofSysLinkTails.
             with "Hireg Hdiat Hilink") as "(%Hnz & Hdiat & Hilink)".
     iModIntro.
     (* ===== +0xfa lhu a5,74(s1) ===== *)
-    iApply (wp_lhu_s_sconf (CID := CID3) (mword_of_int (SL + 0xfa)) Ra5 Rs1
+    iApply (wp_lhu_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0xfa)) Ra5 Rs1
               (mword_of_int 74 : mword 12) mil (K - 38)%nat
               (di_nlink dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi2 [Hinl]").
@@ -1271,7 +1271,7 @@ Section ProofSysLinkTails.
                     = mword_of_int (SL + 0x100)) by pcw.
     iEval (rewrite Hpp100) in "Hpc".
     (* ===== +0x100 sh a5,74(s1) ===== *)
-    iApply (wp_sh_s_sconf (CID := CID5) (mword_of_int (SL + 0x100)) Ra5 Rs1
+    iApply (wp_sh_s_sconf (CID := CID5) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x100)) Ra5 Rs1
               (mword_of_int 74 : mword 12) P2 (K - 38)%nat
               (di_nlink dn : mword 16) b with "Hcg Hpc Hi4 [Hinl]").
     { iEval (rgne; rewrite HP2s1). iExact "Hinl". }

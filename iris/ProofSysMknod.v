@@ -421,7 +421,7 @@ End ProofSysMknodFrame.
 (*                                                                        *)
 (*  argint writes an [int] ([↦₄]); create's [short major, short minor]    *)
 (*  are read back by the [lh]s at +0x32 / +0x36, whose leaf                *)
-(*  ([WpSmodeHalf.wp_lh_s_sconf]) takes a [↦₂].  The tree has the 8 -> 4  *)
+(*  ([WpSmodeHalf.wp_lh_s_sconf (kt := KT1) (ktd := KT0)]) takes a [↦₂].  The tree has the 8 -> 4  *)
 (*  pair ([InstrBytes.word_pointsto_split4] / [_join4]) and NOT the 4 -> 2 *)
 (*  one, because every other [lh] in the kernel reads an inode field,      *)
 (*  which [inode_meta] already hands out at [↦₂].  This is the twin, in    *)
@@ -1535,7 +1535,7 @@ Section ProofSysMknodBody.
       { rewrite (rget_ne (CID := CID21) N0 Rs0 ltac:(vm_compute; discriminate))
                 HN0s0. apply mn_maj. }
       iEval (rewrite -Hamaj) in "Hmajlo".
-      iApply (wp_lh_s_sconf (CID := CID21) (mword_of_int (MN + 0x36)) Ra2 Rs0
+      iApply (wp_lh_s_sconf (CID := CID21) (kt := KT1) (ktd := KT0) (mword_of_int (MN + 0x36)) Ra2 Rs0
                 (mword_of_int 3948 : mword 12) N0 (K - 20)%nat
                 (hw_lo (arg_int32 v1)) b (dqm := DfracOwn 1)
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi36 Hmajlo").

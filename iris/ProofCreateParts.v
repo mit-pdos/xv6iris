@@ -308,7 +308,7 @@ Proof.
 Qed.
 
 (* THE WORD THE THREE ALU LEAVES LEAVE IN a5, at their own output shapes:
-   [wp_lhu_s_sconf] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
+   [wp_lhu_s_sconf (kt := KT1) (ktd := KT0)] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
    [sign_extend' 64 (subrange_vec_dec (add_vec _ (sign_extend' 64
    (sign_extend' 12 imm))) 31 0)], and [wp_cslli_s_sconf] /
    [wp_csrli_s_sconf] give [shift_bits_left] / [shift_bits_right] at

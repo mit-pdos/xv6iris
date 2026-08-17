@@ -3130,7 +3130,7 @@ Section ProofNamexMain.
                    iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
                    iEval (rewrite /i_type) in "Hity".
                    (* +0xc6 lh a5,68(s4) : ip->type *)
-                   iApply (wp_lh_s_sconf (mword_of_int (NX + 0xc6)) Ra5 Rs4
+                   iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0xc6)) Ra5 Rs4
                              (mword_of_int 68 : mword 12) mil (K - 12)%nat
                              (di_type dnl : mword 16) b
                              ltac:(nz) ltac:(rdok)
@@ -3192,7 +3192,7 @@ Section ProofNamexMain.
                      iPoseProof (nxi_0ce with "Htext") as "Hjnlk".
                      iPoseProof (nxi_0d2 with "Htext") as "Hjnlz".
                      iEval (rewrite /i_nlink) in "Hinl".
-                     iApply (wp_lh_s_sconf (mword_of_int (NX + 0xce)) Ra5 Rs4
+                     iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0xce)) Ra5 Rs4
                                (mword_of_int 74 : mword 12) V3 (K - 12)%nat
                                (di_nlink dnl : mword 16) b
                                ltac:(nz) ltac:(rdok)

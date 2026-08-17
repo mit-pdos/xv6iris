@@ -1365,7 +1365,7 @@ Section IlockLoad.
                      = pa_add (b_data (bpa kk)) (64 * islot inum)%nat).
     { rgne. rewrite HB6a1. apply iu_off0. }
     iEval (rewrite -Hs0adr) in "Hd0".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ilock + 0x5c)) Ra5 Ra1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x5c)) Ra5 Ra1
               (mword_of_int 0 : mword 12) B6 (K - 4)%nat (di_type dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi5c Hd0").
     iIntros (CID16 Hq16) "Hcg Hpc Hd0".
@@ -1392,7 +1392,7 @@ Section IlockLoad.
                        (sign_extend' 64 (mword_of_int 68 : mword 12)) = i_type ip).
     { rgne. rewrite HF0s1. reflexivity. }
     iEval (rewrite -Htyadr) in "Hmty".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.ilock + 0x60)) Ra5 Rs1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x60)) Ra5 Rs1
               (mword_of_int 68 : mword 12) F0 (K - 4)%nat
               (di_type d0 : mword 16) b with "Hcg Hpc Hi60 Hmty").
     iIntros (CID17 Hq17) "Hcg Hpc Hmty".
@@ -1405,7 +1405,7 @@ Section IlockLoad.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 2).
     { rgne. rewrite HF0a1. apply (iu_disp _ 2 2%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs2adr) in "Hd2".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ilock + 0x64)) Ra5 Ra1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x64)) Ra5 Ra1
               (mword_of_int 2 : mword 12) F0 (K - 4)%nat (di_major dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi64 Hd2").
     iIntros (CID18 Hq18) "Hcg Hpc Hd2".
@@ -1432,7 +1432,7 @@ Section IlockLoad.
                        (sign_extend' 64 (mword_of_int 70 : mword 12)) = i_major ip).
     { rgne. rewrite HF1s1. reflexivity. }
     iEval (rewrite -Hmjadr) in "Hmmaj".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.ilock + 0x68)) Ra5 Rs1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x68)) Ra5 Rs1
               (mword_of_int 70 : mword 12) F1 (K - 4)%nat
               (di_major d0 : mword 16) b with "Hcg Hpc Hi68 Hmmaj").
     iIntros (CID19 Hq19) "Hcg Hpc Hmmaj".
@@ -1445,7 +1445,7 @@ Section IlockLoad.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 4).
     { rgne. rewrite HF1a1. apply (iu_disp _ 4 4%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs4adr) in "Hd4".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ilock + 0x6c)) Ra5 Ra1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x6c)) Ra5 Ra1
               (mword_of_int 4 : mword 12) F1 (K - 4)%nat (di_minor dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi6c Hd4").
     iIntros (CID20 Hq20) "Hcg Hpc Hd4".
@@ -1472,7 +1472,7 @@ Section IlockLoad.
                        (sign_extend' 64 (mword_of_int 72 : mword 12)) = i_minor ip).
     { rgne. rewrite HF2s1. reflexivity. }
     iEval (rewrite -Hmnadr) in "Hmmin".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.ilock + 0x70)) Ra5 Rs1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x70)) Ra5 Rs1
               (mword_of_int 72 : mword 12) F2 (K - 4)%nat
               (di_minor d0 : mword 16) b with "Hcg Hpc Hi70 Hmmin").
     iIntros (CID21 Hq21) "Hcg Hpc Hmmin".
@@ -1485,7 +1485,7 @@ Section IlockLoad.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 6).
     { rgne. rewrite HF2a1. apply (iu_disp _ 6 6%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs6adr) in "Hd6".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ilock + 0x74)) Ra5 Ra1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x74)) Ra5 Ra1
               (mword_of_int 6 : mword 12) F2 (K - 4)%nat (di_nlink dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi74 Hd6").
     iIntros (CID22 Hq22) "Hcg Hpc Hd6".
@@ -1512,7 +1512,7 @@ Section IlockLoad.
                        (sign_extend' 64 (mword_of_int 74 : mword 12)) = i_nlink ip).
     { rgne. rewrite HF3s1. reflexivity. }
     iEval (rewrite -Hnladr) in "Hmnl".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.ilock + 0x78)) Ra5 Rs1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x78)) Ra5 Rs1
               (mword_of_int 74 : mword 12) F3 (K - 4)%nat
               (di_nlink d0 : mword 16) b with "Hcg Hpc Hi78 Hmnl").
     iIntros (CID23 Hq23) "Hcg Hpc Hmnl".
@@ -1848,7 +1848,7 @@ Section IlockLoad.
                         (sign_extend' 64 (mword_of_int 68 : mword 12)) = i_type ip).
     { rgne. rewrite HV0s1. reflexivity. }
     iEval (rewrite -Htyadr2) in "Hmty".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ilock + 0x98)) Ra5 Rs1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x98)) Ra5 Rs1
               (mword_of_int 68 : mword 12) V0 (K - 4)%nat (di_type dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi98 Hmty").
     iIntros (CID36 Hq36) "Hcg Hpc Hmty".

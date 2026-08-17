@@ -792,7 +792,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID10) (mword_of_int (SO + 0xae)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID10) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0xae)) Ra4 Rs1
               (mword_of_int 68 : mword 12) N6 (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hiae [Hity]").
@@ -1512,7 +1512,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID10) (mword_of_int (SO + 0x74)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID10) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x74)) Ra4 Rs1
               (mword_of_int 68 : mword 12) M4 (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi74 [Hity]").
@@ -1606,7 +1606,7 @@ Section ProofSysOpenBody.
       iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
       iDestruct (so_maj_acc with "Hmeta") as "[Himaj Hmback]".
       iEval (rewrite /i_major) in "Himaj".
-      iApply (wp_lh_s_sconf (CID := CID14) (mword_of_int (SO + 0x144)) Ra5 Rs1
+      iApply (wp_lh_s_sconf (CID := CID14) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x144)) Ra5 Rs1
                 (mword_of_int 70 : mword 12) M6 (K - 24)%nat
                 (di_major dn : mword 16) b ltac:(nz) ltac:(rdok)
                 with "Hcg Hpc Hi144 [Himaj]").
@@ -1640,7 +1640,7 @@ Section ProofSysOpenBody.
       iEval (rewrite Hpp144) in "Hpc".
       (* ===== +0x148 sh a5,36(s2) -- f->major = ip->major ===== *)
       iEval (rewrite /a_fmajor /foff_of) in "Hfmaj".
-      iApply (wp_sh_s_sconf (CID := CID15) (mword_of_int (SO + 0x148)) Ra5 Rs2
+      iApply (wp_sh_s_sconf (CID := CID15) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x148)) Ra5 Rs2
                 (mword_of_int 36 : mword 12) M7 (K - 24)%nat (fc_major Cf) b
                 with "Hcg Hpc Hi148 [Hfmaj]").
       { iEval (rgne; rewrite HM7s2). iExact "Hfmaj". }
@@ -1914,7 +1914,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID0) (mword_of_int (SO + 0x4a)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID0) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x4a)) Ra4 Rs1
               (mword_of_int 68 : mword 12) M (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi4a [Hity]").
@@ -2014,7 +2014,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_maj_acc with "Hmeta") as "[Himaj Hmback]".
     iEval (rewrite /i_major) in "Himaj".
-    iApply (wp_lhu_s_sconf (CID := CID3) (mword_of_int (SO + 0x54)) Ra4 Rs1
+    iApply (wp_lhu_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x54)) Ra4 Rs1
               (mword_of_int 70 : mword 12) M2 (K - 24)%nat
               (di_major dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi54 [Himaj]").
@@ -3108,7 +3108,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID7) (mword_of_int (SO + 0xec)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID7) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0xec)) Ra4 Rs1
               (mword_of_int 68 : mword 12) mil (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hiec [Hity]").

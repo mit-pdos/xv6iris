@@ -622,7 +622,7 @@ Section VdrwfP6.
     assert (Hfaddr : add_vec (N3 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 12 : mword 12))
                      = (pa_add pd (16 * i + 12)%nat : SailStdpp.Values.mword 64))
       by (rewrite HN3a5; apply vdrwc_desc_flags).
-    iApply (wp_lhu_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1fe) : mword 64) Rs1 Ra5
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1fe) : mword 64) Rs1 Ra5
               (mword_of_int 12 : mword 12) N3 av vf false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1dc [Hd12]").
@@ -661,7 +661,7 @@ Section VdrwfP6.
     assert (Hnaddr : add_vec (N5 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 14 : mword 12))
                      = (pa_add pd (16 * i + 14)%nat : SailStdpp.Values.mword 64))
       by (rewrite HN5a5; apply vdrwc_desc_next).
-    iApply (wp_lhu_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x204) : mword 64) Rs2 Ra5
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x204) : mword 64) Rs2 Ra5
               (mword_of_int 14 : mword 12) N5 av vn false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e2 [Hd14]").

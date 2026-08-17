@@ -380,10 +380,12 @@ Proof. vm_compute. reflexivity. Qed.
 (*  (2) THE READ-ONLY BYTE WINDOW inside a checked-out buffer             *)
 (* ===================================================================== *)
 
-Section ReadiRes.
+(* THE BYTE-WINDOW SPLITTERS ARE TIER-GENERIC, and they need their own
+   section for it: readi splits its DESTINATION (a caller buffer at [ktb])
+   with the same lemmas that split the bio block window (static, KT0), and
+   a section variable can only be instantiated from OUTSIDE the section. *)
+Section ReadiBytes.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
-  (* the byte-window splitters ride the CALLER's regime: readi's destination
-     is a caller buffer ([ktb]) while the bio block window is static. *)
   Context `{KTR : !CurKtier}.
 
   (* --- conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so the call
@@ -440,6 +442,11 @@ Section ReadiRes.
     iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|]. iExact "H3".
   Qed.
 
+End ReadiBytes.
+
+Section ReadiRes.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+
   (* A [len]-byte WINDOW of a checked-out buffer's data area, borrowed at
      offset [o] and handed back UNCHANGED -- readi's copy reads it, so the
      buffer is reconstructed at the same bytes and the [bio_locked] the
@@ -452,15 +459,15 @@ Section ReadiRes.
     (o + len <= BSIZE)%nat ->
     buf_own pb bno dsk bs -∗
       ⌜length bs = BSIZE⌝ ∗
-      ([∗ list] i ∈ seq 0 len, pa_add (pa_add (b_data pb) o) i ↦ₘ (bs !!! (o + i)%nat)) ∗
-      (([∗ list] i ∈ seq 0 len, pa_add (pa_add (b_data pb) o) i ↦ₘ (bs !!! (o + i)%nat)) -∗
+      ([∗ list] i ∈ seq 0 len, pa_add (pa_add (b_data pb) o) i ↦ₘ[KT0] (bs !!! (o + i)%nat)) ∗
+      (([∗ list] i ∈ seq 0 len, pa_add (pa_add (b_data pb) o) i ↦ₘ[KT0] (bs !!! (o + i)%nat)) -∗
        buf_own pb bno dsk bs).
   Proof.
     intros Hol.
     iIntros "(Hb & Hd & %Hlen & Hby)".
     assert (HlenB : length bs = BSIZE) by exact Hlen.
-    iDestruct (rd_bytes_of_list (b_data pb) bs BSIZE HlenB with "Hby") as "Hby".
-    iDestruct (rd_split3 (b_data pb) o len (BSIZE - o - len)%nat BSIZE
+    iDestruct (rd_bytes_of_list (KTR := KT0) (b_data pb) bs BSIZE HlenB with "Hby") as "Hby".
+    iDestruct (rd_split3 (KTR := KT0) (b_data pb) o len (BSIZE - o - len)%nat BSIZE
                  (fun j => bs !!! j) ltac:(lia) with "Hby") as "(Hpre & Hmid & Hsuf)".
     iSplitR; [iPureIntro; exact HlenB|].
     iSplitL "Hmid"; [iExact "Hmid"|].
@@ -468,8 +475,8 @@ Section ReadiRes.
     rewrite /buf_own.
     iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hd"; [iExact "Hd"|].
     iSplitR; [iPureIntro; exact HlenB|].
-    iApply (rd_list_of_bytes (b_data pb) bs BSIZE HlenB).
-    iApply (rd_join3 (b_data pb) o len (BSIZE - o - len)%nat BSIZE
+    iApply (rd_list_of_bytes (KTR := KT0) (b_data pb) bs BSIZE HlenB).
+    iApply (rd_join3 (KTR := KT0) (b_data pb) o len (BSIZE - o - len)%nat BSIZE
               (fun j => bs !!! j) ltac:(lia) with "Hpre Hmid Hsuf").
   Qed.
 

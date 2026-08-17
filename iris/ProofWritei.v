@@ -2900,7 +2900,7 @@ Section WriteiLoop.
         { destruct user.
           - iSplitL "Hsrc"; [iExact "Hsrc" | done].
           - iDestruct "Hsrc" as "[Hsrc Hppid]".
-            iDestruct (ProofWriteiParts.wi_split3 (m !!! Regidx Ra2 : mword 64)
+            iDestruct (ProofWriteiParts.wi_split3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                          tot mm (n - tot - mm)%nat n (fun i => src_bytes i)
                          ltac:(lia) with "Hsrc") as "(Hp & Hq & Hr)".
             iSplitL "Hq"; [iExact "Hq"|]. iSplitL "Hp"; [iExact "Hp"|].

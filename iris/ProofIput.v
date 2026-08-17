@@ -1661,7 +1661,7 @@ Section ProofIput.
                     = i_nlink (ientry k)).
     { rewrite (rget_ne F1 Rs1 ltac:(nz)) HF1s1. reflexivity. }
     iEval (rewrite -Hpa40) in "Hmnl".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.iput + 0x40)) Ra5 Rs1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iput + 0x40)) Ra5 Rs1
               (mword_of_int 74 : mword 12) F1 (trap_res eb + (K - 4))%nat (di_nlink dn) false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi40 Hmnl").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hmnl".
@@ -2270,7 +2270,7 @@ Section ProofIput.
                     = i_type (ientry k)).
     { rewrite (rget_ne mfi Rs1 ltac:(nz)) Hmfis1. reflexivity. }
     iEval (rewrite -Hpa66) in "Hmty".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iput + 0x66)) Rz Rs1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iput + 0x66)) Rz Rs1
               (mword_of_int 68 : mword 12) mfi (K - 4)%nat
               (di_type (di_trunc dn)) eb with "Hcg Hpc Hi66 Hmty [-]").
     iIntros (CIDsh Hssh) "Hcg Hpc Hmty".

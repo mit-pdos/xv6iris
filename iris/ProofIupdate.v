@@ -1560,7 +1560,7 @@ Section ProofIupdateMain.
                        (sign_extend' 64 (mword_of_int 68 : mword 12)) = i_type ip).
     { rgne. rewrite HB5s1. reflexivity. }
     iEval (rewrite -Htyadr) in "Hmty".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x32)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x32)) Ra4 Rs1
               (mword_of_int 68 : mword 12) B5 (K - 4)%nat (di_type dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 Hmty").
     iIntros (CID22 Hq22) "Hcg Hpc Hmty".
@@ -1587,7 +1587,7 @@ Section ProofIupdateMain.
                      = pa_add (b_data (bpa kk)) (64 * islot inum)%nat).
     { rgne. rewrite HF0a5. apply iu_off0. }
     iEval (rewrite -Hs0adr) in "Hd0".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x36)) Ra4 Ra5
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x36)) Ra4 Ra5
               (mword_of_int 0 : mword 12) F0 (K - 4)%nat
               (di_type (ds !!! islot inum) : mword 16) b with "Hcg Hpc Hi36 Hd0").
     iIntros (CID23 Hq23) "Hcg Hpc Hd0".
@@ -1600,7 +1600,7 @@ Section ProofIupdateMain.
                        (sign_extend' 64 (mword_of_int 70 : mword 12)) = i_major ip).
     { rgne. rewrite HF0s1. reflexivity. }
     iEval (rewrite -Hmjadr) in "Hmmaj".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x3a)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x3a)) Ra4 Rs1
               (mword_of_int 70 : mword 12) F0 (K - 4)%nat (di_major dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi3a Hmmaj").
     iIntros (CID24 Hq24) "Hcg Hpc Hmmaj".
@@ -1627,7 +1627,7 @@ Section ProofIupdateMain.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 2).
     { rgne. rewrite HF1a5. apply (iu_disp _ 2 2%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs2adr) in "Hd2".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x3e)) Ra4 Ra5
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x3e)) Ra4 Ra5
               (mword_of_int 2 : mword 12) F1 (K - 4)%nat
               (di_major (ds !!! islot inum) : mword 16) b with "Hcg Hpc Hi3e Hd2").
     iIntros (CID25 Hq25) "Hcg Hpc Hd2".
@@ -1640,7 +1640,7 @@ Section ProofIupdateMain.
                        (sign_extend' 64 (mword_of_int 72 : mword 12)) = i_minor ip).
     { rgne. rewrite HF1s1. reflexivity. }
     iEval (rewrite -Hmnadr) in "Hmmin".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x42)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x42)) Ra4 Rs1
               (mword_of_int 72 : mword 12) F1 (K - 4)%nat (di_minor dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 Hmmin").
     iIntros (CID26 Hq26) "Hcg Hpc Hmmin".
@@ -1667,7 +1667,7 @@ Section ProofIupdateMain.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 4).
     { rgne. rewrite HF2a5. apply (iu_disp _ 4 4%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs4adr) in "Hd4".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x46)) Ra4 Ra5
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x46)) Ra4 Ra5
               (mword_of_int 4 : mword 12) F2 (K - 4)%nat
               (di_minor (ds !!! islot inum) : mword 16) b with "Hcg Hpc Hi46 Hd4").
     iIntros (CID27 Hq27) "Hcg Hpc Hd4".
@@ -1680,7 +1680,7 @@ Section ProofIupdateMain.
                        (sign_extend' 64 (mword_of_int 74 : mword 12)) = i_nlink ip).
     { rgne. rewrite HF2s1. reflexivity. }
     iEval (rewrite -Hnladr) in "Hmnl".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x4a)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x4a)) Ra4 Rs1
               (mword_of_int 74 : mword 12) F2 (K - 4)%nat (di_nlink dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a Hmnl").
     iIntros (CID28 Hq28) "Hcg Hpc Hmnl".
@@ -1707,7 +1707,7 @@ Section ProofIupdateMain.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 6).
     { rgne. rewrite HF3a5. apply (iu_disp _ 6 6%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs6adr) in "Hd6".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iupdate + 0x4e)) Ra4 Ra5
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x4e)) Ra4 Ra5
               (mword_of_int 6 : mword 12) F3 (K - 4)%nat
               (di_nlink (ds !!! islot inum) : mword 16) b with "Hcg Hpc Hi4e Hd6").
     iIntros (CID29 Hq29) "Hcg Hpc Hd6".

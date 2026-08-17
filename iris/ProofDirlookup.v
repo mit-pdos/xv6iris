@@ -252,7 +252,7 @@ Section ProofDirlookupMain.
   Lemma dlk_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)
-    ⊣⊢ a ↦₂ dir_inum data i
+    ⊣⊢ a ↦₂[KT1] dir_inum data i
        ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[KT1] dir_name data i jj).
   Proof.
     intro Hal.
@@ -643,7 +643,7 @@ Section ProofDirlookupMain.
                     = mword_of_int (DL + 0x16)) by pcw.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 lh a4,68(a0) : ip->type ===== *)
-    iApply (wp_lh_s_sconf (mword_of_int (DL + 0x16)) Ra4 Ra0
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x16)) Ra4 Ra0
               (mword_of_int 68 : mword 12) R2 (K - 12)%nat (di_type dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 [Hity]").
     { iEval (rgne; rewrite HR2a0). iExact "Hity". }
@@ -1738,7 +1738,7 @@ Section ProofDirlookupMain.
                         = mword_of_int (DL + 0x6e)) by pcw.
         iEval (rewrite Hbb6e) in "Hpc".
         (* +0x6e lhu a5,-96(s0) : de.inum *)
-        iApply (wp_lhu_s_sconf (mword_of_int (DL + 0x6e)) Ra5 Rs0
+        iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DL + 0x6e)) Ra5 Rs0
                   (mword_of_int 4000 : mword 12) mrd (K - 12)%nat
                   (dir_inum data i) b ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi6e [Hdehi]").
@@ -1950,7 +1950,7 @@ Section ProofDirlookupMain.
             iApply ("Hpoffst" with "Hcg Hpc Hpoff").
             iIntros (CIDB14 HqB14) "Hcg Hpc Hpoff".
             (* +0x86 lhu a1,-96(s0) : the inum again *)
-            iApply (wp_lhu_s_sconf (mword_of_int (DL + 0x86)) Ra1 Rs0
+            iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x86)) Ra1 Rs0
                       (mword_of_int 4000 : mword 12) mnc (K - 12)%nat
                       (dir_inum data i) b ltac:(nz) ltac:(rdok)
                       with "Hcg Hpc Hi86 [Hdehi]").

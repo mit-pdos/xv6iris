@@ -251,7 +251,7 @@
      +0x54 [wp_cld_s_sconf] a0 := f->pipe ; +0x56 [wp_jal_s_sconf] disp 516
      +0x5a [wp_cj_s_sconf]  sext21 (2 * 81) = +0xa2 -> +0xfc   [fw_epi]
      --- FD_DEVICE ---
-     +0x5c [wp_lh_s_sconf] (NOT compressed, and it does NOT live in the
+     +0x5c [wp_lh_s_sconf (kt := KT1) (ktd := KT0)] (NOT compressed, and it does NOT live in the
              [WpSconf*] four: it is in [WpSmodeHalf.v], which
              [ProofFilewriteParts.v] does not import -- the walk must
              [Require Import WpSmodeHalf] itself, as [ProofFileread.v] does)
@@ -3204,7 +3204,7 @@ Section ProofFilewrite.
                          = a_fmajor k).
           { rewrite (rget_ne G6 Ra0 ltac:(vm_compute; discriminate)) HG6a0. reflexivity. }
           iEval (rewrite -Hpmj) in "Hcmaj".
-          iApply (wp_lh_s_sconf (mword_of_int (FW + 0x5c)) Ra5 Ra0
+          iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x5c)) Ra5 Ra0
                     (mword_of_int 36 : mword 12) G6 (K - 12)%nat (fc_major Cf : mword 16) b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hi5c Hcmaj").

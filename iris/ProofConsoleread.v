@@ -2331,7 +2331,7 @@ Section ProofConsoleread.
                     (sign_extend' 64 (mword_of_int 152 : mword 12)) = a_cons_r)
       by (rewrite Hs1; reflexivity).
     iPoseProof (cnri_03c with "Ht") as "Hi3c".
-    iApply (wp_lw_s_sconf (mword_of_int (CR + 0x3c)) Ra5 Rs1 (mword_of_int 152 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x3c)) Ra5 Rs1 (mword_of_int 152 : mword 12)
               M (trap_res true + (av - 12))%nat rr false ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi3c [Hrc]").
     { rgall. iEval (rewrite Hra). iExact "Hrc". }
@@ -2346,7 +2346,7 @@ Section ProofConsoleread.
                     (sign_extend' 64 (mword_of_int 156 : mword 12)) = a_cons_w)
       by (rewrite HD1s1; reflexivity).
     iPoseProof (cnri_040 with "Ht") as "Hi40".
-    iApply (wp_lw_s_sconf (mword_of_int (CR + 0x40)) Ra4 Rs1 (mword_of_int 156 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x40)) Ra4 Rs1 (mword_of_int 156 : mword 12)
               D1 (trap_res true + (av - 12))%nat ww false ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi40 [Hwc]").
     { rgall. iEval (rewrite Hwa). iExact "Hwc". }

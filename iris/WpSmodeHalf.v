@@ -158,14 +158,15 @@ Section WpSmodeHalf.
      fractional share of a virtq index) loads exactly as an owned one. *)
   Lemma wp_lhu_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac}
+      {ktd : ktier} `{!KtierLe ktd kt} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
     sie_cap_gpr kt m n b p -∗ pc_is pc -∗
-    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗ pa ↦₂{ dqm } v -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗ pa ↦₂[ktd]{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
+      pc_is (add_vec_int pc 4) -∗ pa ↦₂[ktd]{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -177,7 +178,7 @@ Section WpSmodeHalf.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen_u (kt := kt) (ktd := KT0) 2 false true pc rd rs1 imm m n v (zero_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen_u (kt := kt) (ktd := ktd) 2 false true pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -187,14 +188,15 @@ Section WpSmodeHalf.
      generic; xv6's virtio driver only uses lhu). *)
   Lemma wp_lh_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
-      (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac}
+      {ktd : ktier} `{!KtierLe ktd kt} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
     sie_cap_gpr kt m n b p -∗ pc_is pc -∗
-    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 2)) -∗ pa ↦₂{ dqm } v -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 2)) -∗ pa ↦₂[ktd]{ dqm } v -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
+      pc_is (add_vec_int pc 4) -∗ pa ↦₂[ktd]{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -206,7 +208,7 @@ Section WpSmodeHalf.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen_u (kt := kt) (ktd := KT0) 2 false false pc rd rs1 imm m n v (sign_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen_u (kt := kt) (ktd := ktd) 2 false false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -218,14 +220,15 @@ Section WpSmodeHalf.
      storeval. *)
   Lemma wp_sh_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-      (m : regfile) (n : nat) (vold : mword 16) (b : bool) :
+      (m : regfile) (n : nat) (vold : mword 16) (b : bool)
+      {ktd : ktier} `{!KtierLe ktd kt} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc16 (rget m rs2) in
     sie_cap_gpr kt m n b p -∗ pc_is pc -∗
-    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗ pa ↦₂ vold -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗ pa ↦₂[ktd] vold -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
-      pc_is (add_vec_int pc 4) -∗ pa ↦₂ storeval -∗
+      pc_is (add_vec_int pc 4) -∗ pa ↦₂[ktd] storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -239,7 +242,7 @@ Section WpSmodeHalf.
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen (kt := kt) (ktd := KT0) 2 false pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
+    iApply (wp_store_s_sconf_gen (kt := kt) (ktd := ktd) 2 false pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2 (store_ext_2 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").

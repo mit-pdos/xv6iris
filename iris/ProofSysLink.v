@@ -1369,7 +1369,7 @@ Section ProofSysLinkBody.
           iEval (rewrite /i_type) in "Hity".
           iEval (rewrite /i_nlink) in "Hinl".
           (* ===== +0x46 lh a4,68(s1) -- ip->type ===== *)
-          iApply (wp_lh_s_sconf (CID := CID28) (mword_of_int (SL + 0x46)) Ra4 Rs1
+          iApply (wp_lh_s_sconf (CID := CID28) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x46)) Ra4 Rs1
                     (mword_of_int 68 : mword 12) mil (K - 38)%nat
                     (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
                     with "Hcg Hpc Hi46 [Hity]").
@@ -1496,7 +1496,7 @@ Section ProofSysLinkBody.
                              = mword_of_int (SL + 0x50)) by pcw.
              iEval (rewrite Hpp50) in "Hpc".
              (* ===== +0x50 lh a5,74(s1) -- ip->nlink, SIGN extended ===== *)
-             iApply (wp_lh_s_sconf (CID := CID31) (mword_of_int (SL + 0x50)) Ra5 Rs1
+             iApply (wp_lh_s_sconf (CID := CID31) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x50)) Ra5 Rs1
                        (mword_of_int 74 : mword 12) R2 (K - 38)%nat
                        (di_nlink dn : mword 16) b ltac:(nz) ltac:(rdok)
                        with "Hcg Hpc Hi50 [Hinl]").
@@ -1715,7 +1715,7 @@ Section ProofSysLinkBody.
                                 = mword_of_int (SL + 0x60)) by pcw.
                 iEval (rewrite Hpp60) in "Hpc".
                 (* ===== +0x60 sh a5,74(s1) ===== *)
-                iApply (wp_sh_s_sconf (CID := CID37) (mword_of_int (SL + 0x60))
+                iApply (wp_sh_s_sconf (CID := CID37) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x60))
                           Ra5 Rs1 (mword_of_int 74 : mword 12) S0 (K - 38)%nat
                           (di_nlink dn : mword 16) b with "Hcg Hpc Hi60 [Hinl]").
                 { iEval (rgne; rewrite HS0s1). iExact "Hinl". }
@@ -2193,7 +2193,7 @@ Section ProofSysLinkBody.
                    iDestruct "Hmetad" as "(Hityd & Himajd & Himind & Hinld & Hiszd)".
                    iEval (rewrite /i_nlink) in "Hinld".
                    (* ===== +0x84 lh a5,74(s2) : dp->nlink ===== *)
-                   iApply (wp_lh_s_sconf (CID := CID52) (mword_of_int (SL + 0x84))
+                   iApply (wp_lh_s_sconf (CID := CID52) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x84))
                              Ra5 Rs2 (mword_of_int 74 : mword 12) mild
                              (K - 38)%nat (di_nlink dnd : mword 16) b
                              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 [Hinld]").

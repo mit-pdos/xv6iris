@@ -1058,7 +1058,7 @@ Section KexitPark.
     iPoseProof (kxi_76 with "Htext") as "Hi76".
     assert (Hrgr19 : rget (CID := CIDa) Mrp (mword_of_int 19 : mword 5)
                      = Mrp !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
-    iApply (wp_ld_s_sconf (CID := CIDa) (mword_of_int (KX + 0x72))
+    iApply (wp_ld_s_sconf (CID := CIDa) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x72))
               (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 56 : mword 12)
               Mrp (trap_res b + av)%nat w false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi72 [Hpcell]").
@@ -1216,7 +1216,7 @@ Section KexitPark.
     assert (Hxaddr : add_vec (rget (CID := CIDa) mlk (mword_of_int 19 : mword 5))
                        (sign_extend' 64 (mword_of_int 44 : mword 12)) = p_xstate pj)
       by (rewrite Hrgl19 Hlk_s3; apply p_xstate_sext).
-    iApply (wp_sw_s_sconf (CID := CIDa) (mword_of_int (KX + 0x80))
+    iApply (wp_sw_s_sconf (CID := CIDa) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x80))
               (mword_of_int 20 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 44 : mword 12)
               mlk (trap_res b + av)%nat xs false with "Hcg Hpc Hi80 [Hxstate]").
     { iEval (rewrite Hxaddr). iExact "Hxstate". }

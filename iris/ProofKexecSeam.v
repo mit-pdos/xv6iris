@@ -427,13 +427,13 @@ Section KexecBFrame.
   Lemma kxc_win2 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 2 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 2 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₂ (Z_to_bv 16 (le_at f o 2) : mword 16)) ∗
-    ((pa_add a o ↦₂ (Z_to_bv 16 (le_at f o 2) : mword 16)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢
+    (pa_add a o ↦₂[KT1] (Z_to_bv 16 (le_at f o 2) : mword 16)) ∗
+    ((pa_add a o ↦₂[KT1] (Z_to_bv 16 (le_at f o 2) : mword 16)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
-    rewrite (bb_split3 a o 2 r n f Hn).
+    rewrite (bb_split3 (KTR := KT1) a o 2 r n f Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (word2_pointsto_intro _ _ _ Hal).

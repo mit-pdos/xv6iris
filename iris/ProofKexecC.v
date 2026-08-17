@@ -484,7 +484,7 @@ Section KexecCSetup.
                           (sign_extend' 64 (mword_of_int 72 : mword 12))
                         = p_sz (proc_addr jp)) by (rewrite HT1a0; reflexivity).
     iEval (rewrite -Hpszaddr) in "Hsz".
-    iApply (wp_ld_s_sconf (mword_of_int (KXC + 0x1b4)) Rs10 Ra0
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXC + 0x1b4)) Rs10 Ra0
               (mword_of_int 72 : mword 12) T1 (K - 68)%nat (pv_sz V) true
               (dqm := DfracOwn 1) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi1b4 Hsz").
@@ -1334,7 +1334,7 @@ Section KexecCSetup.
                         = pa_add av (8 * 0)).
       { rewrite HW3a5. unfold pa_add, add_vec_int. f_equal. }
       iEval (rewrite -Ha0addr) in "Ha0".
-      iApply (wp_cld_s_sconf (mword_of_int (KXC + 0x20a)) Ra0 Ra5
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXC + 0x20a)) Ra0 Ra5
                 (mword_of_int 0 : mword 12) W3 (K - 68)%nat (avf 0%nat) true
                 (dqm := dqa) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi20a Ha0").
       iIntros (CID27 Hs27) "Hcg Hpc Ha0". iEval (rewrite Ha0addr) in "Ha0".

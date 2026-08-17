@@ -1590,7 +1590,7 @@ Section ProofSysChdirBody.
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
         (* ============ +0x38 lh a4,68(s1) -- ip->type ============ *)
-        iApply (wp_lh_s_sconf (CID := CID24) (mword_of_int (SC + 0x38)) Ra4 Rs1
+        iApply (wp_lh_s_sconf (CID := CID24) (kt := KT1) (ktd := KT0) (mword_of_int (SC + 0x38)) Ra4 Rs1
                   (mword_of_int 68 : mword 12) mil (K - 20)%nat
                   (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi38 [Hity]").

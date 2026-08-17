@@ -2907,7 +2907,7 @@ Section ProofPipewrite.
                  assert (Hnwaddr2 : add_vec (mr !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 540 : mword 12)) = a_pnwrite pi)
                    by (rewrite Rs1f; reflexivity).
                  iPoseProof (pwi_c2 with "Htext") as "Hic2".
-                 iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xc2)) Ra5 Rs1 (mword_of_int 540 : mword 12)
+                 iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.pipewrite + 0xc2)) Ra5 Rs1 (mword_of_int 540 : mword 12)
                            mr (trap_res true + (av - 14))%nat nw false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic2 [Hnw]").
                  { rgall. iEval (rewrite Hnwaddr2). iExact "Hnw". }
                  iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall.

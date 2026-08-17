@@ -1667,7 +1667,7 @@ Section VdrwdP4.
                       (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = (d_ring pav (np `mod` 8) : SailStdpp.Values.mword 64))
       by (rewrite HN5a3; apply vdrwd_ring_addr).
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64) Ra0 Ra3
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64) Ra0 Ra3
               (mword_of_int 4 : mword 12) N5 av w0 false with "Hcg Hpc Hi16e [Hcell]").
     { rgall. iEval (rewrite Hring). iExact "Hcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell". rgall.

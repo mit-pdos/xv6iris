@@ -413,7 +413,7 @@ Section ProofFreeDesc.
               trunc16 (rget (CID := CID') V7 z_idx) = (mword_of_int 0 : mword 16)).
     { intros CID'; rgne. rewrite Hz0. exact fd_trunc16_zero. }
     iPoseProof (fdi_3a with "Htext") as "Hi3a".
-    iApply (wp_sh_s_sconf (CID := CIDc9) (mword_of_int (KernelSyms.free_desc + 0x3a)) z_idx a4_idx
+    iApply (wp_sh_s_sconf (CID := CIDc9) (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.free_desc + 0x3a)) z_idx a4_idx
               (mword_of_int 12 : mword 12) V7 n vf b
               with "Hcg Hpc Hi3a [Hvf]").
     { iEval (rewrite (Haddr12 CIDc9)). iExact "Hvf". }
@@ -428,7 +428,7 @@ Section ProofFreeDesc.
               = (pa_add pd (16 * i + 14)%nat : mword 64)).
     { intros CID'; rgne. rewrite HV7a4 fd_sext_14. apply fd_desc_addr14. }
     iPoseProof (fdi_3e with "Htext") as "Hi3e".
-    iApply (wp_sh_s_sconf (CID := CIDc10) (mword_of_int (KernelSyms.free_desc + 0x3e)) z_idx a4_idx
+    iApply (wp_sh_s_sconf (CID := CIDc10) (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.free_desc + 0x3e)) z_idx a4_idx
               (mword_of_int 14 : mword 12) V7 n vn b
               with "Hcg Hpc Hi3e [Hvn]").
     { iEval (rewrite (Haddr14 CIDc10)). iExact "Hvn". }

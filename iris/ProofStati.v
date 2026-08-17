@@ -281,7 +281,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".
     (* ===== +0x10 lh a5,68(a0) : ip->type ===== *)
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.stati + 0x10)) Ra5 Ra0
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x10)) Ra5 Ra0
               (mword_of_int 68 : mword 12) R4 (K - 2)%nat (di_type dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10 [Hity]").
     { iEval (rgne; rewrite HR4a0). iExact "Hity". }
@@ -305,7 +305,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x14)) by pcw.
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 sh a5,8(a1) : st->type ===== *)
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.stati + 0x14)) Ra5 Ra1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x14)) Ra5 Ra1
               (mword_of_int 8 : mword 12) R5 (K - 2)%nat ty0 b
               with "Hcg Hpc Hi14 [Hsty]").
     { iEval (rgne; rewrite HR5a1). iExact "Hsty". }
@@ -315,7 +315,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x18)) by pcw.
     iEval (rewrite Hpp18) in "Hpc".
     (* ===== +0x18 lh a5,74(a0) : ip->nlink ===== *)
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.stati + 0x18)) Ra5 Ra0
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x18)) Ra5 Ra0
               (mword_of_int 74 : mword 12) R5 (K - 2)%nat (di_nlink dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18 [Hinl]").
     { iEval (rgne; rewrite HR5a0). iExact "Hinl". }
@@ -339,7 +339,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x1c)) by pcw.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c sh a5,10(a1) : st->nlink ===== *)
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.stati + 0x1c)) Ra5 Ra1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x1c)) Ra5 Ra1
               (mword_of_int 10 : mword 12) R6 (K - 2)%nat nl0 b
               with "Hcg Hpc Hi1c [Hsnl]").
     { iEval (rgne; rewrite HR6a1). iExact "Hsnl". }

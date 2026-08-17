@@ -1393,7 +1393,7 @@ Section VtDevRam.
                       (sign_extend' 64 (mword_of_int 32 : mword 12)) = (d_used_idx : mword 64)).
     { rgne. rewrite HC0s1 vt_sext_32. reflexivity. }
     iPoseProof (vti_32 with "Htext") as "Hi32".
-    iApply (wp_lhu_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x32)) (mword_of_int 14 : mword 5)
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x32)) (mword_of_int 14 : mword 5)
               (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12) C0 n (wrap16 nr) false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1988,7 +1988,7 @@ Section VtBody.
                     = (d_used_idx : mword 64)).
     { rgne. rewrite HK0s1 vt_sext_32. reflexivity. }
     iPoseProof (vti_44 with "Htext") as "Hi44".
-    iApply (wp_lhu_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x44)) a5_idx s1_idx
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x44)) a5_idx s1_idx
               (mword_of_int 32 : mword 12) K0 n (wrap16 nr) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi44 [Hidx]").
@@ -2467,7 +2467,7 @@ Section VtBody.
                     = (d_used_idx : mword 64)).
     { rgne. rewrite HMs1 vt_sext_32. reflexivity. }
     iPoseProof (vti_72 with "Htext") as "Hi72".
-    iApply (wp_lhu_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x72)) a5_idx s1_idx
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x72)) a5_idx s1_idx
               (mword_of_int 32 : mword 12) M n (wrap16 nr) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi72 [Hidx]").
@@ -2564,7 +2564,7 @@ Section VtBody.
                      = (d_used_idx : mword 64)).
     { rgne. rewrite HD3s1 vt_sext_32. reflexivity. }
     iPoseProof (vti_7c with "Htext") as "Hi7c".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x7c)) a5_idx s1_idx
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x7c)) a5_idx s1_idx
               (mword_of_int 32 : mword 12) D3 n (wrap16 nr) false
               with "Hcg Hpc Hi7c [Hidx]").
     { iEval (rewrite Huidx3). iExact "Hidx". }

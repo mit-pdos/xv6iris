@@ -1362,7 +1362,7 @@ Section IallocClaim.
                      = (pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat)).
     { rgne. rewrite HmMs3. apply iu_off0. }
     iEval (rewrite -Hs0adr) in "Hd0".
-    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.ialloc + 0x94)) Rs6 Rs3
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0x94)) Rs6 Rs3
               (mword_of_int 0 : mword 12) mM (K - 8)%nat
               (di_type ia_dzero : mword 16) b with "Hcg Hpc Hi94 Hd0").
     iIntros (CID6 Hq6) "Hcg Hpc Hd0".
@@ -2417,7 +2417,7 @@ Section IallocScan.
                        = pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat).
       { rgne. rewrite HG9s3. apply iu_off0. }
       iEval (rewrite -Hlhadr) in "Hd0".
-      iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ialloc + 0x4e)) Ra5 Rs3
+      iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0x4e)) Ra5 Rs3
                 (mword_of_int 0 : mword 12) G9 (K - 8)%nat
                 (di_type (ds !!! DinodeEnc.islot inum) : mword 16) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4e Hd0").

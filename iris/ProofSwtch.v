@@ -179,7 +179,8 @@ Section ProofSwtch.
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+              (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hcode [Holdcells Hnewcells] []").
     { rewrite /vheap_own /swtch_heap0 big_sepL_app.

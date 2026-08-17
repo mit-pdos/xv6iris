@@ -527,7 +527,7 @@ Proof.
     by (rgne; rewrite Hmfs1; reflexivity).
   iEval (rewrite -Haddrpg) in "Hpgt".
   (* ---- +0x68: c.ld a0,80(s1) ---- *)
-  iApply (wp_cld_s_sconf (mword_of_int (FR + 0x68)) Ra0 Rs1
+  iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x68)) Ra0 Rs1
             (mword_of_int 80 : mword 12) mf (trap_res eb + av2)%nat
             (page_base (ud_root (pv_upt V'))) false
             ltac:(vm_compute; discriminate) ltac:(rdok)

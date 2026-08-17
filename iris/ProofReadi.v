@@ -1798,7 +1798,7 @@ Section ReadiLoop.
           iSplitR; [iPureIntro; exact HextI|].
           iSplitR; [iPureIntro; left; exact Hr|].
           iSplitR "Hppid"; [| iExact "Hppid"].
-          iApply (rd_join3 (m !!! Regidx Ra2 : mword 64)
+          iApply (rd_join3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                     tot mm (n - tot - mm)%nat n
                     (fun i => rd_delivered data dst_olds off (tot + mm)%nat i)
                     ltac:(lia) with "[Hp] [Hmid] [Hq]").

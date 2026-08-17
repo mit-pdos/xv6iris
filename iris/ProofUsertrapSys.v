@@ -324,7 +324,7 @@ Section UtSysBlock.
         by (rewrite HS1a4; apply prr_tf_addr_24).
       (* ---- +0x98: c.ld a5,24(a4) -- a5 := epc ---- *)
       iEval (rewrite -Haddrw) in "Hword".
-      iApply (wp_cld_s_sconf (mword_of_int (UT + 0x98)) Ra5 Ra4
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x98)) Ra5 Ra4
                 (mword_of_int 24 : mword 12) S1 nx uepc false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi98 Hword [-]").

@@ -593,7 +593,7 @@ Definition wp_dirlookup_tree_body
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's [f]) ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- poff: a 4-byte cell, or nothing ---- *)
-  (if hasp then pf ↦₄ pofv else emp) -∗
+  (if hasp then pf ↦₄[KT1] pofv else emp) -∗
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
@@ -639,14 +639,14 @@ Definition wp_dirlookup_tree_body
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
             (if hasp
-             then pf ↦₄ (mword_of_int (Z.of_nat (16 * k)) : mword 32)
+             then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * k)) : mword 32)
              else emp)
        else ⌜ents !! s = None⌝ ∗
             ⌜dir_first data nrec s = None
              /\ mf !!! Regidx (mword_of_int 10 : mword 5)
                 = (mword_of_int 0 : mword 64)⌝ ∗
             iref_slot ∗
-            (if hasp then pf ↦₄ pofv else emp)) -∗
+            (if hasp then pf ↦₄[KT1] pofv else emp)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

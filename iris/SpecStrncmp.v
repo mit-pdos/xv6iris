@@ -73,7 +73,7 @@ Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type STRNCMP.
   Parameter wp_strncmp_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (ktf ktg : ktier) (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64),
       wp_strncmp_sconf_body ktf ktg mm n f g K dq1 dq2 b p.

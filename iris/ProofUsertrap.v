@@ -526,7 +526,7 @@ Section UtEntry.
                       = p_trapframe (un_pj N))
       by (rgne; rewrite HS1a0; apply prr_p_trapframe).
     iEval (rewrite -Haddrtf) in "Htfc".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0x28)) Ra5 Ra0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x28)) Ra5 Ra0
               (mword_of_int 88 : mword 12) S1 (av - 4)%nat
               (page_base (ud_tfp (pv_upt V))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
