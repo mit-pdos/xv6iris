@@ -24,31 +24,30 @@ and recount; the numbers here have gone stale before.
 GREEN: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`, `WpMmodeAddiw`,
 `WpMmodeMul`, `WpMmodeUtype`, `WpMmodeJal`, `WpMmodeJalr`, `WpGprCsrwA` (4
 leaves), `WpGprCsrrCommon`, `WpGprCsrrA` (3), `WpGprCsrrB` (3),
-`WpGprCsrwB` (4), `WpInstrRun`, `WpInstr`, `WpInstrConfig`, and `ProofSpin`
-(a whole-function proof, by Löb — the wrapper survives Löb, which was worth
-knowing).
+`WpGprCsrwB` (4), `WpGprCsrwC` (2), `WpInstrRun`, `WpInstr`, `WpInstrConfig`,
+and `ProofSpin` (a whole-function proof, by Löb — the wrapper survives Löb,
+which was worth knowing).  **Sixteen CSR leaves in all**, which is every CSR
+instruction this kernel executes except `csrw stimecmp`.
 
 RED ROOTS, with what each needs:
 | file | needs |
 |---|---|
 | `WpGprCsrwStimecmp` | the cycle rule's post-file as a PREDICATE, so a leaf may write mip — see §"the two cells a leaf cannot have" |
 | `WpMmodeMret` | the MRET walk: ~15 nodes, plus a value-preserving write rule for elp — same § |
-| `WpGprCsrwC` | ordinary porting; its two `_raw` leaves' wrapper (`wp_instr_config`) now exists |
 | `WpMmodeLoad`, `WpMmodeStore` | width-**8** sweep of `HartMStore` (37 sites hardcoded to 4) |
-| `SmodeCore` | the S-mode twin; reuses `swp_exec_step_decode_execute` verbatim, needs its own `s_cycle` and fetch |
+| `SmodeCore` | the S-mode twin: `wp_exec_step_decode_execute_inv_priv` (3 call sites — `TrampStepPt`, `SmodeCorePt` ×2) is the exec-shaped rule and has to become an `s_cycle` + an S-mode FETCH.  Reuses `swp_exec_step_decode_execute` verbatim; the fetch is the real work, since S-mode's goes through Sv39 translation and the TLB rather than `swp_fetch_ram`.  **This is the main event of the port, not a leaf sweep** — the whole point of per-node stepping is that a page walk can interleave |
 
 **IMMEDIATE NEXT STEPS, in the order I would do them:**
-1. **`WpGprCsrwC`** — no new machinery: two `_raw` leaves on `wp_instr_config`
-   plus whatever else that file holds.  Cheapest remaining.
-2. **Load/Store** — volume, no new machinery: every leaf is a width-8 access
+1. **Load/Store** — volume, no new machinery: every leaf is a width-8 access
    and `HartMStore`'s chain is hardcoded to 4 (`mem_write_ea`, the
    `split_on_page_boundary .. 4 = (4,0)` premise, `subrange_vec_dec d 31 0`,
    the 4-alignment side conditions).  `swp_vmem_write_gen` already takes the
    address stretch as an obligation, which was the part blocked on the
    wrapper's shape.
-3. **The cycle-rule generalization**, then `stimecmp`.
-4. **MRET**, which is independent of (3) and needs only the elp rule.
-5. **`SmodeCore`** — biggest lever (600–700 dependents) and biggest job.
+2. **The cycle-rule generalization**, then `stimecmp`.
+3. **MRET**, which is independent of (2) and needs only the elp rule.
+4. **`SmodeCore`** — biggest lever (600–700 dependents) and biggest job; plan
+   it as its own effort, with the S-mode fetch as the first piece.
 
 ### The two cells a leaf cannot have
 
@@ -281,9 +280,16 @@ Evidence:
    which reads `menvcfg` — the leaf's variable — can never go that route.  A
    `goodbw` that tracked writes would NOT have helped; I proposed it and was
    wrong.
-2. It is not COMPUTABLE when the certified term carries symbolic data
-   (`vm_compute`/`cbv`/`lazy` all diverge).  Fix: `goodb_bind`, assembling the
-   certificate from data-free pieces.
+2. It is not COMPUTABLE when the certified term's CONTROL FLOW depends on
+   symbolic data (`vm_compute`/`cbv`/`lazy` all diverge).  Hit three times now
+   — `write_CSR csr_menvcfg`'s legalization, satp's (it branches on the MODE, a
+   field of the written value), mstatus's (it branches on MPP, via
+   `have_nominal_privLevel`, which branches on the privilege bits).  Two fixes,
+   and which one applies is visible in the term: `goodb_bind` when the
+   dependence is on a CALLEE's result (assemble the certificate from data-free
+   pieces), a plain `destruct` of the scrutinee when it is a branch (then each
+   arm is closed).  Measured on mstatus: naive `vm_compute` does not finish in
+   5 minutes, the assembled proof takes 7 seconds.
 
 ## THE LEAF SWEEP: state, and the rule that makes it cheap
 

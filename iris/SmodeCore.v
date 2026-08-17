@@ -1006,7 +1006,8 @@ Section SmodeCoreIris.
   Proof.
     iIntros "H".
     iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hk)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        Hk & _)".
     iExact "Hk".
   Qed.
 
