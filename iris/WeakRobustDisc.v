@@ -1,5 +1,5 @@
 (** * WeakRobustDisc.v — COVERAGE FROM RELEASE/ACQUIRE SITE FACTS
-      (premise discharge, Track A, items A1–A3)
+      (premise discharge, Track A, items A1–A6)
 
     [claude-notes/design/weak-memory-premise-discharge.md] splits the
     discharge of [WeakRobustMain.main_premises] into three tracks.  This
@@ -41,6 +41,23 @@
     directly.  [chain_ok] / [chain_end] fold the hops; [chain_lt]
     iterates; [covered_of_release_two_hops] is the fence-free two-hop
     spelling, with no [hop] records in sight.
+
+    A4 [excl_byte_of_rmw] / [sw_byte_of_log_single_writer] /
+    [handoff_of_sync_chains] / [ptraces_bytes_ok_of_arms]:
+    [WeakRobustSer]'s per-byte premises.  The chain's contribution to
+    [handoff] is EXACTLY its one order conjunct [tr ≤ t_star]; the four
+    structural conjuncts are site facts, and [handoff] demands ONE sync
+    byte shared by the two endpoint agents — see the note there.
+
+    A5 [dev_dom] / [dev_epoch_ok_of_dom] / [dev_dom_of_dev_epoch_ok] /
+    [dev_epoch_ok_devfree_reader]: the EXACT characterization of
+    [WeakRobustOrd.dev_epoch_ok] as a DOMINATION condition, and the
+    machine-checked reason it is not dischargeable — see the A5 header
+    below.  This is the honest residue of Track A.
+
+    A6 [tc_min] / [bad_wf_of_acyclic] / [bad_wf_of_no_bad]: constructive
+    finite-ancestry minimality, and [WeakRobustMain.bad_wf] from
+    [gdep3_acyclic] — with the circularity spelled out at the A6 header.
 
     A3 [ee_ok_fence_cover] / [ee_ok_waw_cover] / [ee_ok_zero_floor].  The
     three arms of [WeakRobustAcyc2.ee_ok]'s comment, each proved from
@@ -86,7 +103,8 @@ From xv6iris Require Import WeakAxiomatic.
 From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakRobustTrace
                             WeakRobustGraph WeakRobust WeakRobustProv
                             WeakRobustAcyc WeakRobustLin WeakRobustOrd
-                            WeakRobustAcyc2.
+                            WeakRobustSer WeakRobustAcyc2 WeakRobustSim
+                            WeakRobustMain.
 
 Local Open Scope Z_scope.
 
@@ -737,7 +755,473 @@ Section disc.
         [exact Hra|exact HT|exact Hag|lia|exact Hcov|exact Hy].
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (** ** DELIVERABLE A4: THE PER-BYTE PREMISES ([WeakRobustSer])
+
+      [ptraces_bytes_ok TS sync] asks, for every byte, one of [sw_byte]
+      (single writer), [excl_byte] (rmw-chained) or [handoff] (the
+      release/acquire shape) — and, for the SYNC bytes, one of the first
+      two only (the stratification note in [WeakRobustSer]'s header: sync
+      bytes are closed FIRST, so they may not appeal to [handoff]). *)
+
+  (** (i) EXCLUSIVITY, from the label alone: a byte whose every writing
+      event is an [LRmw].  The rmw's read half AUTOMATICALLY covers the
+      byte its write half writes — same [base], and [length tvs = length
+      data] is a conjunct of [astep_ok]'s [LRmw] arm — so the caller owes
+      only "the label is an rmw", never a range calculation. *)
+  Definition rmw_written (a : Z) : Prop :=
+    ∀ e t, writes_b TS a e t →
+      ∃ aq rl base tvs data, gev_lb TS e = Some (LRmw aq rl base tvs data).
+
+  Theorem excl_byte_of_rmw a : rmw_written a → excl_byte TS a.
+  Proof.
+    intros Hrmw e t Hw. right.
+    destruct (Hrmw e t Hw) as (aq & rl & base & tvs & data & Hlb).
+    have Hw' := Hw. destruct Hw' as (Hts & m0 & Hm0 & Hb0).
+    rewrite /gev_lb in Hlb.
+    destruct (gev_ev TS e) as [ev|] eqn:Hev; simpl in Hlb; [|done].
+    injection Hlb as Hlbe.
+    rewrite /gev_ts Hev /= in Hts.
+    destruct (gev_step pstep TS e ev Hwf Hev)
+      as (T & ag & ag' & st' & f & HT & Hag & Hag' & _ & Hok & _).
+    rewrite Hlbe Hts /= in Hok.
+    destruct Hok as (ts' & kc & Hlen & _ & Hlog & _ & _ & _ & _ & Heq).
+    injection Heq as <-.
+    rewrite Hlog in Hm0. injection Hm0 as <-.
+    rewrite /msg_byte /= in Hb0.
+    case_bool_decide as Hle; [|by destruct Hb0].
+    destruct Hb0 as [v Hv].
+    have Hjlt : (Z.to_nat (a - base) < length tvs)%nat.
+    { rewrite Hlen. by eapply lookup_lt_Some. }
+    have [[tr v'] Htv] : is_Some (tvs !! Z.to_nat (a - base))
+      by apply lookup_lt_is_Some_2.
+    exists tr, (LRmw aq rl base tvs data).
+    split; [by rewrite /gev_lb Hev /= Hlbe|].
+    simpl. apply elem_of_tvs_reads.
+    exists (Z.to_nat (a - base)), v'. split; [exact Htv|].
+    rewrite Z2Nat.id; lia.
+  Qed.
+
+  (** (ii) SINGLE WRITER, from the LOG: every message that writes the
+      byte is authored by one agent.  (Stated on the log rather than on
+      the events because that is the form an ownership argument produces,
+      and because [writes_b]'s author IS the message's [wm_tid] —
+      [WeakRobustSer.writes_b_author].) *)
+  Definition log_single_writer (a : Z) (i : agent) : Prop :=
+    ∀ t m, Log !! (t - 1)%nat = Some m → is_Some (msg_byte m a) →
+      wm_tid m = Some i.
+
+  Theorem sw_byte_of_log_single_writer a i :
+    log_single_writer a i → sw_byte TS a.
+  Proof.
+    intros H e1 e2 t1 t2 Hw1 Hw2.
+    destruct (writes_b_author pstep TS a e1 t1 Hwf Hw1)
+      as (m1 & Hm1 & Hb1 & Ht1).
+    destruct (writes_b_author pstep TS a e2 t2 Hwf Hw2)
+      as (m2 & Hm2 & Hb2 & Ht2).
+    have E1 := H t1 m1 Hm1 Hb1. have E2 := H t2 m2 Hm2 Hb2.
+    rewrite Ht1 in E1. rewrite Ht2 in E2. by simplify_eq.
+  Qed.
+
+  (** (iii) HANDOFF, from release/acquire CHAINS.
+
+      READ [handoff] CAREFULLY BEFORE READING THIS.  It demands, for a
+      cross-author co-consecutive pair, ONE sync byte [b] written by
+      [e1]'s OWN agent at or po-after [e1] and read by [e2]'s OWN agent
+      at or po-before [e2], at a timestamp [t_star ≥ tr].  It demands NO
+      fence, NO discipline and NO coverage: the ordering content is
+      entirely in the single inequality [tr ≤ t_star].
+
+      THE CHAIN'S JOB IS EXACTLY THAT INEQUALITY.  Intermediate agents
+      may re-release [b] (or any byte) any number of times; [chain_lt]
+      says the chain's END timestamp is at least its START timestamp,
+      because each hop ACQUIRED its predecessor's timestamp and then
+      fulfilled strictly above it ([acquire_release_lt], i.e. coverage
+      plus EXT).  So the reader may read a much later value of [b] and
+      the handoff still holds.
+
+      WHAT THE CHAIN DOES *NOT* GIVE: the four STRUCTURAL conjuncts
+      ([sync b], [writes_b TS b er tr], the two agent identities and the
+      two po bounds).  Those are pure site facts about the release and
+      acquire instructions and must come from Track B.  In particular
+      [handoff] insists that the SAME byte [b] be written by [e1]'s agent
+      and read by [e2]'s agent, so a chain that routes through a
+      DIFFERENT sync byte at each hop does not instantiate it — the
+      endpoints' byte is the one that must be shared. *)
+  Theorem handoff_of_sync_chains (sync : Z → Prop) a :
+    (∀ e1 e2 t1 t2,
+       writes_b TS a e1 t1 → writes_b TS a e2 t2 →
+       e1.1 ≠ e2.1 → (t1 < t2)%nat → co_consec TS a t1 t2 →
+       ∃ b er tr hs elast tlast rr t_star,
+         sync b ∧
+         writes_b TS b er tr ∧ er.1 = e1.1 ∧ (e1.2 ≤ er.2)%nat ∧
+         chain_ok er tr hs ∧ chain_end er tr hs = (elast, tlast) ∧
+         gev_reads TS rr b t_star ∧ rr.1 = e2.1 ∧ (rr.2 ≤ e2.2)%nat ∧
+         (tlast ≤ t_star)%nat) →
+    handoff TS sync a.
+  Proof.
+    intros Hsite e1 e2 t1 t2 Hw1 Hw2 Hne Hlt Hcc.
+    destruct (Hsite e1 e2 t1 t2 Hw1 Hw2 Hne Hlt Hcc)
+      as (b & er & tr & hs & elast & tlast & rr & t_star &
+          Hsync & Her & Hag1 & Hpo1 & Hch & Hend & Hrr & Hag2 & Hpo2 & Hle).
+    destruct (chain_lt er tr hs Hch) as [Hchle _].
+    rewrite Hend /= in Hchle.
+    exists b, er, tr, rr, t_star.
+    split_and!; [done|done|done|done|done|done|done|lia].
+  Qed.
+
+  (** THE ZERO-HOP INSTANCE, spelled out: a DIRECT release/acquire needs
+      no chain at all, because [chain_ok er tr []] is just "[er] fulfils
+      [tr]", which [writes_b] already says. *)
+  Corollary handoff_of_direct_sync (sync : Z → Prop) a :
+    (∀ e1 e2 t1 t2,
+       writes_b TS a e1 t1 → writes_b TS a e2 t2 →
+       e1.1 ≠ e2.1 → (t1 < t2)%nat → co_consec TS a t1 t2 →
+       ∃ b er tr rr t_star,
+         sync b ∧
+         writes_b TS b er tr ∧ er.1 = e1.1 ∧ (e1.2 ≤ er.2)%nat ∧
+         gev_reads TS rr b t_star ∧ rr.1 = e2.1 ∧ (rr.2 ≤ e2.2)%nat ∧
+         (tr ≤ t_star)%nat) →
+    handoff TS sync a.
+  Proof.
+    intros Hsite. apply handoff_of_sync_chains.
+    intros e1 e2 t1 t2 Hw1 Hw2 Hne Hlt Hcc.
+    destruct (Hsite e1 e2 t1 t2 Hw1 Hw2 Hne Hlt Hcc)
+      as (b & er & tr & rr & t_star &
+          Hsync & Her & Hag1 & Hpo1 & Hrr & Hag2 & Hpo2 & Hle).
+    exists b, er, tr, [], er, tr, rr, t_star.
+    split_and!; [done|done|done|done| |done|done|done|done|done].
+    by destruct Her.
+  Qed.
+
+  (** …and the packaging [ptraces_bytes_ok] wants. *)
+  Theorem ptraces_bytes_ok_of_arms (sync : Z → Prop) :
+    (∀ b, sync b → sw_byte TS b ∨ excl_byte TS b) →
+    (∀ a, sw_byte TS a ∨ excl_byte TS a ∨ handoff TS sync a) →
+    ptraces_bytes_ok TS sync.
+  Proof. intros H1 H2. split; [exact H1|exact H2]. Qed.
+
 End disc.
+
+(* ------------------------------------------------------------------ *)
+(** ** DELIVERABLE A5: [dev_epoch_ok] — WHAT IT ACTUALLY DEMANDS
+
+    [WeakRobustOrd.depoch DS e] is the witness position just past the
+    LAST fabric-touching event OF [e]'S OWN AGENT at or before [e] in
+    that agent's trace (0 if that agent has touched the fabric not at
+    all before [e]).  [dev_epoch_ok TS DS] says no [grf] and no [gE]
+    edge LOWERS it.
+
+    THE EXACT CONTENT, machine-checked below as an IFF ([dev_dom] /
+    [depoch_le_of_dom] / [dom_of_depoch_le]): [dev_epoch_ok] is a
+    DOMINATION condition, not an ordering one.  Per edge [e1 → e2] it
+    says
+
+      every fabric access of the WRITER's agent po-before [e1] is
+      matched by a fabric access of the READER's agent po-before [e2]
+      at a witness index that is at least as large.
+
+    TWO CONSEQUENCES, both proved below.
+
+    (1) It is not about promise reads.  [dev_epoch_ok_devfree_reader]:
+        if the READER's agent has made no fabric access before its read,
+        the premise FORCES the writer's agent to have made none before
+        its write.  So the completely ordinary, promise-free, SC-looking
+        bundle
+
+          agent A:  <fabric access>  ;  store x = 1
+          agent B:  load x  (reads 1)
+
+        already falsifies [dev_epoch_ok] — the rf edge is forward in
+        real time, nothing is read early, and yet [depoch] drops from 1
+        to 0.  The recorded G5a counterexample (a promise read across a
+        device epoch) is therefore not the only failure mode, and not
+        the smallest one.
+
+    (2) Coverage cannot help.  A1/A2 constrain TIMESTAMPS; the missing
+        ingredient here is EXISTENTIAL — the reader must HAVE a fabric
+        access — and no amount of release/acquire discipline creates
+        one.  Neither does a real-time embedding: even under the
+        (refuted) W7 hypothesis "every rf edge is forward in behavior
+        time", the reader may simply never touch the fabric.
+
+    WHAT WOULD DISCHARGE IT, exactly: [dev_dom] at every rf/gE edge.
+    That is a real condition on xv6 only if every agent that READS a
+    message written after a fabric access has itself performed at least
+    as many fabric accesses — e.g. if every fabric access sits inside a
+    critical section of one device lock AND every cross-agent flow out
+    of a fabric-touching agent passes through that same lock, with the
+    reader's own fabric access inside its own critical section BEFORE
+    the read.  The disk agent breaks even that: its acquire read of
+    [avail->idx] is po-AFTER its fabric-read start event, so for an
+    edge INTO that read the reader (the disk) does have an earlier
+    fabric access — but for an edge OUT of the disk into a hart that has
+    never touched the fabric, the domination fails outright.
+
+    HONEST CONCLUSION: A5 is NOT dischargeable as stated, and the
+    obstruction is in the DEFINITION of [depoch] (per-agent), not in the
+    bundle.  The two natural repairs are (a) rank by a GLOBAL device
+    counter that every event inherits along [gdep3] rather than by the
+    agent's own last access, or (b) replace the rank argument for
+    [gdep3]-acyclicity altogether.  Both are changes to
+    [WeakRobustOrd], hence out of scope for this file; what is in scope
+    is the precise statement of the obligation, which is what follows. *)
+
+Section devepoch.
+  Context {P D : Type}.
+  Context (TS : ptraces P D).
+
+  Implicit Types DS : pdevs D.
+
+  (** The witness position that ACHIEVES the epoch, when it is nonzero.
+      ([WeakRobustOrd] proves the lower bound [depoch_lb] and the
+      listed-event value [depoch_dev]; the WITNESSING form — the upper
+      bound in existential shape — is what the characterization needs
+      and is not there.) *)
+  Lemma dep_go_witness l e m :
+    dep_go l e m = 0%nat ∨
+    ∃ i e', l !! i = Some e' ∧ e'.1 = e.1 ∧ (e'.2 ≤ e.2)%nat ∧
+            dep_go l e m = S (m + i).
+  Proof.
+    revert m. induction l as [|x l IH]; intros m; [by left|].
+    simpl. case_bool_decide as Hb.
+    - destruct (IH (S m)) as [Hz|(i & e' & Hi & Hag & Hle & Heq)].
+      + right. exists 0%nat, x. destruct Hb as [Hagx Hlex].
+        split_and!; [done|done|done|]. rewrite Hz. lia.
+      + right. exists (S i), e'. split_and!; [done|done|done|].
+        rewrite Heq. lia.
+    - destruct (IH (S m)) as [Hz|(i & e' & Hi & Hag & Hle & Heq)].
+      + left. rewrite Hz. lia.
+      + right. exists (S i), e'. split_and!; [done|done|done|].
+        rewrite Heq. lia.
+  Qed.
+
+  Lemma depoch_witness DS e :
+    depoch DS e = 0%nat ∨
+    ∃ m e', pd_ord DS !! m = Some e' ∧ e'.1 = e.1 ∧ (e'.2 ≤ e.2)%nat ∧
+            depoch DS e = S m.
+  Proof.
+    rewrite /depoch.
+    destruct (dep_go_witness (pd_ord DS) e 0%nat)
+      as [Hz|(i & e' & Hi & Hag & Hle & Heq)]; [by left|].
+    right. exists i, e'. split_and!; [done|done|done|]. rewrite Heq. lia.
+  Qed.
+
+  (** THE DOMINATION CONDITION: [e2]'s agent's fabric history dominates
+      [e1]'s, position by position, in the witness order. *)
+  Definition dev_dom DS (e1 e2 : gev) : Prop :=
+    ∀ m ep, pd_ord DS !! m = Some ep → ep.1 = e1.1 → (ep.2 ≤ e1.2)%nat →
+      ∃ m' ep', pd_ord DS !! m' = Some ep' ∧ ep'.1 = e2.1 ∧
+                (ep'.2 ≤ e2.2)%nat ∧ (m ≤ m')%nat.
+
+  Lemma depoch_le_of_dom DS e1 e2 :
+    dev_dom DS e1 e2 → (depoch DS e1 ≤ depoch DS e2)%nat.
+  Proof.
+    intros Hd.
+    destruct (depoch_witness DS e1) as [Hz|(m & ep & Hm & Hag & Hle & Heq)];
+      [rewrite Hz; lia|].
+    destruct (Hd m ep Hm Hag Hle) as (m' & ep' & Hm' & Hag' & Hle' & Hmm).
+    have := depoch_lb DS e2 m' ep' Hm' Hag' Hle'. lia.
+  Qed.
+
+  Lemma dom_of_depoch_le DS e1 e2 :
+    (depoch DS e1 ≤ depoch DS e2)%nat → dev_dom DS e1 e2.
+  Proof.
+    intros Hle m ep Hm Hag Hlp.
+    have Hlb := depoch_lb DS e1 m ep Hm Hag Hlp.
+    destruct (depoch_witness DS e2) as [Hz|(m' & ep' & Hm' & Hag' & Hle' & Heq)];
+      [lia|].
+    exists m', ep'. split_and!; [done|done|done|lia].
+  Qed.
+
+  (** THE CHARACTERIZATION, both directions. *)
+  Theorem dev_epoch_ok_of_dom DS :
+    (∀ e1 e2, (grf TS e1 e2 ∨ gE TS e1 e2) → dev_dom DS e1 e2) →
+    dev_epoch_ok TS DS.
+  Proof. intros H e1 e2 He. by apply depoch_le_of_dom, H. Qed.
+
+  Theorem dev_dom_of_dev_epoch_ok DS :
+    dev_epoch_ok TS DS →
+    ∀ e1 e2, (grf TS e1 e2 ∨ gE TS e1 e2) → dev_dom DS e1 e2.
+  Proof. intros H e1 e2 He. by apply dom_of_depoch_le, H. Qed.
+
+  (** THE FAILURE MODE, machine-checked: a reader with no fabric history
+      forces the writer to have none either. *)
+  Corollary dev_epoch_ok_devfree_reader DS e1 e2 :
+    dev_epoch_ok TS DS → (grf TS e1 e2 ∨ gE TS e1 e2) →
+    depoch DS e2 = 0%nat → depoch DS e1 = 0%nat.
+  Proof. intros H He Hz. have := H e1 e2 He. lia. Qed.
+
+  (** THE ONE ARM THAT IS FREE (besides the empty witness): if no edge
+      SOURCE has a fabric access behind it, there is nothing to
+      dominate. *)
+  Theorem dev_epoch_ok_of_devfree_sources DS :
+    (∀ e1 e2, (grf TS e1 e2 ∨ gE TS e1 e2) → depoch DS e1 = 0%nat) →
+    dev_epoch_ok TS DS.
+  Proof. intros H e1 e2 He. rewrite (H e1 e2 He). lia. Qed.
+
+End devepoch.
+
+(* ------------------------------------------------------------------ *)
+(** ** DELIVERABLE A6: [bad_wf] FROM FINITE ANCESTRY
+
+    [WeakRobustMain.bad_wf]: whenever a bad edge exists, SOME bad edge's
+    target is [bad_min] — no bad edge's target is a strict
+    [tc (gdep3)]-ancestor of it.  That is exactly "the bad targets have
+    a [tc gdep3]-minimal element", and over a FINITE event set an
+    acyclic relation has minimal elements.
+
+    THE GENERIC MACHINERY, constructive.  [WeakRobustMain]'s [anc] is a
+    COMPUTED ancestor list (no [Decision (tc R)] needed), so
+    [length (anc R carrier x)] is a legitimate measure: it strictly
+    decreases along [tc R] ([anc_mu_lt]) as soon as [tc R] is
+    irreflexive.  Strong induction on that measure then produces the
+    minimal element — CONSTRUCTIVELY, but only for a DECIDABLE predicate
+    [Q]: "is there a [Q]-element strictly below me" has to be answered,
+    and over a finite carrier that is a decidable [Exists].
+
+    THE CIRCULARITY, stated plainly.  [gdep3_acyclic TS DS] is what
+    [WeakRobustMain.robust_main] is trying to establish, and it
+    establishes it THROUGH [bad_wf] (pick a minimal bad edge, replay its
+    cone, refute it with φ).  So [bad_wf_of_acyclic] cannot be used to
+    remove [bad_wf] from [main_premises]: it says only that [bad_wf] is
+    free for a bundle already known acyclic on independent grounds.  The
+    two situations where that is genuinely useful:
+      - a bundle satisfying the STRONG per-edge premise [rf_edges_ok]
+        (plus [ee_ok], [dev_epoch_ok]) has no bad edges at all, and then
+        [bad_wf] is vacuous — [bad_wf_of_no_bad];
+      - a re-derivation of [main_premises] for a bundle whose acyclicity
+        was obtained by [gdep2_acyclic_edges_ok] + [gdep3_acyclic_epoch].
+
+    WHAT AN INDEPENDENT ARGUMENT WOULD HAVE TO LOOK LIKE.  [bad_wf] is
+    morally "the bad-target ancestry is well-founded".  Acyclicity is the
+    only bundle-level fact that gives it generically, so an independent
+    argument must supply a WELL-FOUNDED MEASURE that strictly decreases
+    along a [gdep3] path FROM one bad target TO another.  Neither
+    Layer-1 measure works: [WeakRobustAcyc2.mile_mu_gain] needs
+    [rf_edges_ok]/[ee_ok] at every milestone, and a bad edge is exactly
+    a milestone where they fail.  The measure therefore has to come from
+    the OWNERSHIP structure ("ownership only ever transfers through
+    synchronization", the design's own justification): a rank on
+    owned-unpublished messages that drops at every ownership transfer.
+    That is a Track-B/C fact about the kernel, not a Layer-1 theorem. *)
+
+Section wfmin.
+  Context {A : Type} `{!EqDecision A}.
+  Context (R : A → A → Prop) `{!RelDecision R}.
+  Context (carrier : list A).
+  Context (Hcar : ∀ x y, R x y → x ∈ carrier).
+  Context (Hnd : NoDup carrier).
+  Context (Hacyc : ∀ x, ¬ tc R x x).
+
+  Lemma anc_sub x y :
+    x ∈ carrier → y ∈ carrier → tc R y x →
+    ∀ z, z ∈ anc R carrier y → z ∈ anc R carrier x.
+  Proof.
+    intros Hx Hy Htc z Hz.
+    apply (elem_of_anc R carrier y Hy Hcar Hnd) in Hz as [->|Hzy];
+      apply (elem_of_anc R carrier x Hx Hcar Hnd); right; [done|].
+    by eapply tc_transitive.
+  Qed.
+
+  Lemma anc_mu_lt x y :
+    x ∈ carrier → y ∈ carrier → tc R y x →
+    (length (anc R carrier y) < length (anc R carrier x))%nat.
+  Proof.
+    intros Hx Hy Htc.
+    have Hxnin : x ∉ anc R carrier y.
+    { intros Hin.
+      apply (elem_of_anc R carrier y Hy Hcar Hnd) in Hin as [Heq|Hxy].
+      - subst. by eapply Hacyc; exact Htc.
+      - apply (Hacyc x). eapply tc_transitive; [exact Hxy|exact Htc]. }
+    have Hnd' : NoDup (x :: anc R carrier y).
+    { apply list_relations.NoDup_cons. split; [exact Hxnin|].
+      apply (anc_iter_nodup R carrier y Hnd). }
+    have Hle : (length (x :: anc R carrier y)
+                ≤ length (anc R carrier x))%nat.
+    { apply list_relations.submseteq_length,
+            list_relations.NoDup_submseteq; [exact Hnd'|].
+      intros z Hz. apply elem_of_cons in Hz as [->|Hz].
+      - apply (elem_of_anc R carrier x Hx Hcar Hnd). by left.
+      - by eapply anc_sub. }
+    simpl in Hle. lia.
+  Qed.
+
+  (** THE MINIMAL ELEMENT.  [Q] must be decidable: the search "is some
+      [Q]-element strictly below me" is what the induction step answers,
+      and there is no constructive way around it. *)
+  Theorem tc_min (Q : A → Prop) `{!∀ x, Decision (Q x)} :
+    (∀ x, Q x → x ∈ carrier) →
+    ∀ x, Q x → ∃ y, Q y ∧ ∀ z, Q z → ¬ tc R z y.
+  Proof.
+    intros HQc.
+    have Hgen : ∀ n x, Q x → (length (anc R carrier x) ≤ n)%nat →
+                  ∃ y, Q y ∧ ∀ z, Q z → ¬ tc R z y.
+    { induction n as [|n IH]; intros x Hx Hmu.
+      - exfalso.
+        have Hin : x ∈ anc R carrier x by apply root_in_anc.
+        destruct (anc R carrier x) as [|u l];
+          [by apply elem_of_nil in Hin|simpl in Hmu; lia].
+      - destruct (decide (Exists (λ z, Q z ∧ z ∈ anc R carrier x ∧ z ≠ x)
+                            carrier)) as [Hex|Hnex].
+        + apply list_relations.Exists_exists in Hex
+            as (z & Hzc & HQz & Hzanc & Hzne).
+          have Htc : tc R z x.
+          { apply (elem_of_anc R carrier x (HQc x Hx) Hcar Hnd) in Hzanc
+              as [->|?]; [done|done]. }
+          apply (IH z HQz).
+          have := anc_mu_lt x z (HQc x Hx) (HQc z HQz) Htc. lia.
+        + exists x. split; [exact Hx|]. intros z HQz Htc.
+          apply Hnex, list_relations.Exists_exists. exists z.
+          split_and!; [by apply HQc|exact HQz| |].
+          * apply (elem_of_anc R carrier x (HQc x Hx) Hcar Hnd). by right.
+          * intros Heq. rewrite Heq in Htc.
+            by eapply Hacyc; exact Htc. }
+    intros x Hx. by eapply (Hgen (length (anc R carrier x))).
+  Qed.
+
+End wfmin.
+
+Section badwf.
+  Context {P D : Type}.
+  Context (TS : ptraces P D).
+  Context (DS : pdevs D).
+
+  (** "[e] is the TARGET of some bad edge" — the predicate [bad_min]
+      quantifies over. *)
+  Definition bad_target (nh : nat) (e : gev) : Prop :=
+    ∃ f1, bad nh TS DS f1 e.
+
+  (** No bad edges at all ⟹ [bad_wf] vacuously.  (This is the shape a
+      bundle satisfying the STRONG [rf_edges_ok] is in.) *)
+  Lemma bad_wf_of_no_bad nh :
+    (∀ e1 e2, ¬ bad nh TS DS e1 e2) → bad_wf nh TS DS.
+  Proof. intros H e1 e2 Hb. by destruct (H e1 e2 Hb). Qed.
+
+  (** …and the finite-ancestry derivation.  Note what it consumes:
+      [gdep3_acyclic], which is the CONCLUSION of the theorem [bad_wf] is
+      a premise of — see the header's circularity note. *)
+  Theorem bad_wf_of_acyclic nh :
+    ptraces_wit TS DS →
+    gdep3_acyclic TS DS →
+    (∀ e, Decision (bad_target nh e)) →
+    bad_wf nh TS DS.
+  Proof.
+    intros Hwit Hacyc Hdec e1 e2 Hbad.
+    have Hcar : ∀ x y, gdep3 TS DS x y → x ∈ gev_enum TS.
+    { intros x y Hd. apply elem_of_gev_enum.
+      by destruct (gdep3_wf TS DS x y Hwit Hd). }
+    have HQc : ∀ e, bad_target nh e → e ∈ gev_enum TS.
+    { intros e (f1 & Hb). apply elem_of_gev_enum.
+      destruct Hb as ((ts & a & _ & Hrd) & _). by eapply gev_reads_wf. }
+    destruct (tc_min (gdep3 TS DS) (gev_enum TS) Hcar (NoDup_gev_enum TS)
+                Hacyc (bad_target nh) HQc e2 (ex_intro _ e1 Hbad))
+      as (y & (g1 & Hg) & Hmin).
+    exists g1, y. split; [exact Hg|].
+    intros f1 f2 Hb Htc. eapply (Hmin f2); [by exists f1|exact Htc].
+  Qed.
+
+End badwf.
 
 (* ------------------------------------------------------------------ *)
 (** ** What Track B and Track C inherit from this file
@@ -769,5 +1253,28 @@ End disc.
       [ee_arm] / [ee_ok_of_arms]: A3, [WeakRobustAcyc2.ee_ok] reduced to
       a per-triple choice among three trace-local conditions.
 
-    NOT here: A4 ([ptraces_bytes_ok]), A5 ([dev_epoch_ok]) and A6
-    ([bad_wf]) of the design's Track A, and every Track-B export. *)
+    - [rmw_written] / [excl_byte_of_rmw], [log_single_writer] /
+      [sw_byte_of_log_single_writer], [handoff_of_sync_chains] /
+      [handoff_of_direct_sync] / [ptraces_bytes_ok_of_arms]: A4, the
+      per-byte premises of [WeakRobustSer].  The rmw arm asks the caller
+      only for "the label is an [LRmw]" — the byte-range calculation is
+      done here.  The handoff arm splits cleanly: the CHAIN discharges
+      the order conjunct [tr ≤ t_star] (through [chain_lt], i.e.
+      coverage plus EXT at every hop), the four structural conjuncts are
+      Track-B site facts, and the endpoints' sync byte must be shared.
+
+    - [dev_dom] / [dev_epoch_ok_of_dom] / [dev_dom_of_dev_epoch_ok] /
+      [dev_epoch_ok_devfree_reader] / [dev_epoch_ok_of_devfree_sources]:
+      A5.  NOT a discharge — a characterization plus a refutation.  The
+      finding, in one line: [dev_epoch_ok] forces the READER to have a
+      fabric history at least as long as the WRITER's, which ordinary
+      promise-free bundles violate.
+
+    - [tc_min] (generic, constructive) and [anc_mu_lt]: an acyclic
+      relation over a finite carrier has minimal elements of any
+      DECIDABLE predicate, measured by [WeakRobustMain.anc]'s computed
+      ancestor list.  [bad_wf_of_acyclic] / [bad_wf_of_no_bad]: A6, with
+      the circularity note at its header.
+
+    NOT here: every Track-B export (the site facts these lemmas
+    consume), and Track C's composition. *)
