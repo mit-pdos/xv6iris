@@ -90,6 +90,39 @@ which for an RMW is after its own aq read — re-prove S1/the walk with it, and
 only then discharge.  The weaker premise makes `robust_main` STRONGER (fewer
 obligations), so it is a pure improvement of Layer 1.
 
+**LANDED (A0), 2026-08-17.**  The relativization is built and green.
+`WeakRobustAcyc.v` adds `fulfil_vext ws l` (the state a fulfilling
+`astep_ok` checks EXT on: `pa_ws ag` for an `LStore`, the post-load
+`load_post_run (pa_ws ag) aq base tvs.*1` for an `LRmw`, reduced by
+`fulfil_vpre`), the relativized coverage `fcov T k' ts` ("the fulfil at
+`k'` checks EXT at a view ≥ `ts`") and `edge_ok_f T k k' ts :=
+disciplined T k k' ∨ fcov T k' ts`, with `covered_fcov` /
+`edge_ok_edge_ok_f` the implications from the pre-A0 shape (views only
+grow; `fulfil_vext_vwNew`).  The segment lemma is re-proved as
+`atrace_S1_f` / `atrace_S1_le_f` — the `fcov` arm is now the SHORT one
+(EXT closes it with no view arithmetic at all) — and the old
+`atrace_S1` / `atrace_S1_le` survive verbatim as corollaries.
+`WeakRobustAcyc2.v` adds `rf_edges_ok_ms` and `WeakRobustMain.v`
+`edges_split_ms` / `rf_edges_ok_on_ms`: same quantification as before,
+plus the requirement that the later fulfil `k'` be a MILESTONE SOURCE
+(`∃ y, gmile TS (e2.1, k') y`), with `edge_ok_f` in the conclusion.
+`main_premises` now carries `edges_split_ms`; `robust_main`,
+`robust_main_bundle` and `WeakEvCapstone.xv6_ev_weak_robust` keep their
+statements and are STRICTLY STRONGER (`edges_split_edges_split_ms`, which
+needs only `ptraces_wf`, recovers the old premise).  **The rmw case
+`k' = e2.2` is excluded from the premise entirely and needed nothing**:
+`atrace_S1_le_f`'s `k = k'` arm already gets `ts < ts'` from
+`astep_ok_read_fulfil_lt` — the rmw's own COH conjunct, checked on the
+post-`load_post_run` state.  The two xv6 discharge shapes are in
+`WeakRobustDisc.v`: `fcov_of_aq_rmw` (the fulfil IS an `aq` RMW whose
+read half read `ts_s ≥ ts` — `load_post_run_vwNew_aq` puts the gain
+inside the very state `fulfil_ok` is checked on, so `holding()`'s plain
+read followed by `amoswap.w.aq` is covered with NO trace history) and
+`fcov_of_acquire_before` (an acquire of `ts_s ≥ ts` po-before the
+fulfil — `disciplined_covered` + monotonicity), plus
+`edge_ok_f_of_release_acquire`, the `edge_ok_f` restatement of A1's
+`edge_ok_of_release_acquire`.
+
 ## 2c. FINDINGS from Track A4–A6 (2026-08-17, `WeakRobustDisc.v` `db0dfe81`)
 
 - **`dev_epoch_ok` (G5a) is REFUTED for ordinary xv6 bundles.**  Machine-checked

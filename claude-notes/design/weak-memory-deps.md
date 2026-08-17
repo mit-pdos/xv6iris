@@ -161,6 +161,25 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
   distinction (RCpc vs RCsc) is today's `aq` for the `vrn/vwn` raise and
   the `vrel` join — re-audit `load_vpre`/`load_post` against the two `ifc`s
   when D2 is written and record the outcome here.
+- **D-7 (THE FORWARD BANK — a genuine STRENGTHENING in today's machine, to be
+  fixed by D2; found 2026-08-17 while auditing containment).**
+  `WeakMem.store_post` records `w_fwd[a] := (t, w_vwNew ws)`, so a forwarded
+  read (a load reading the agent's own latest store to `a`) gets post-view
+  `vpre ⊔ w_vwNew(at store time)`; PARM's `FwdItem` records
+  `view_loc ⊔ view_val` (the store's ADDRESS/DATA dependency views — RVWMO
+  ppo 12, "a load reading an intermediate store inherits that store's
+  dependencies"), which is `bot` in a dependency-free machine.  Ours is
+  LARGER, i.e. STRONGER than PARM/RVWMO: `fence rw,w; st x; ld x (fwd);
+  fence r,r; ld y` forces `ld y` above the pre-fence accesses in our machine
+  but not in RVWMO (`fence rw,w` orders no later LOAD, and the forwarded
+  `ld x` is ordered only through the store's dependencies).  Exotic and
+  vacuous for xv6's proofs (owned bytes read deterministically), but a real
+  behavior-REDUCING deviation, so `WeakCompose` §6(5)'s "weaker than PARM"
+  claim was wrong on this axis.  D2 replaces the recorded view by PARM's
+  `V(asrc) ⊔ V(dsrc)`; if D2 is delayed, change it to `0` now (the
+  dependency-free PARM value; a one-line change to `store_post` plus the
+  `fwd_view` lemma family — check that no leaf DERIVES a view lower bound
+  from a forwarded read; none should).
 - **D-6 (the disk agent).** `virtio_prog`'s events carry empty `srcs`; its
   ordering is aq/fence-based — WEAKER than a hart with the same accesses
   (free), and exact for what the driver relies on.
