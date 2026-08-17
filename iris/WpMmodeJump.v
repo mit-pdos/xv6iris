@@ -38,10 +38,10 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
-        HartRegNode RegFile WpGpr.
+        HartSpanChar HartRegNode HartMCycle RegFile WpGpr.
 Require Import ColdBoot.
-Require Import RiscvFetchExec WpMmodeLeafBase HartMFrame ExecCommon
-        HartMRun HartGoodb WpDecodeBridge.
+Require Import RiscvExtras RiscvFetchExec WpMmodeLeafBase HartMFrame
+        ExecCommon HartMRun HartGoodb WpDecodeBridge.
 Local Open Scope Z_scope.
 
 (* collapse the closed [Z.eqb] tests of the model's rX/wX cascades *)
@@ -226,3 +226,318 @@ Lemma jr_Df_sec dq : jr_Df dq mseccfg = DfracDiscarded.
 Proof. jrdf. Qed.
 Lemma jr_Df_priv dq : jr_Df dq cur_privilege = dq.
 Proof. jrdf. Qed.
+
+(* the post-file of the jump: [jump_to] writes nextPC, and the resulting
+   [register_set] agrees with the tower that simply NAMES the new value *)
+Lemma jr_set_agree (npc0 target : SailStdpp.Values.mword 64) :
+  reg_agree_on (jr_Drw ∪ jr_Dro)
+    (register_set (R_bitvector_64 nextPC) target (jr_rs npc0)) (jr_rs target).
+Proof.
+  intros r Hr. rewrite /jr_Drw /jr_Dro in Hr.
+  repeat (apply elem_of_union in Hr as [Hr|Hr]);
+    apply elem_of_singleton in Hr; subst r.
+  - etransitivity; [apply register_lookup_set|]. symmetry. apply jr_rs_nPC.
+  - etransitivity;
+      [apply irrelevant_register_set; vm_compute; reflexivity|].
+    etransitivity; [apply jr_rs_priv|]. symmetry. apply jr_rs_priv.
+  - etransitivity;
+      [apply irrelevant_register_set; vm_compute; reflexivity|].
+    etransitivity; [apply jr_rs_sec|]. symmetry. apply jr_rs_sec.
+  - etransitivity;
+      [apply irrelevant_register_set; vm_compute; reflexivity|].
+    etransitivity; [apply jr_rs_misa|]. symmetry. apply jr_rs_misa.
+Qed.
+
+Section jump.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* ---- cells <-> the four-cell frame ---- *)
+  Lemma jr_frames (dq : dfrac) (npc0 : SailStdpp.Values.mword 64) :
+    (hreg_frame (jr_rs npc0) jr_Drw ∗
+     hreg_frame_ro (jr_Df dq) (jr_rs npc0) jr_Dro : iProp Σ)
+    ⊣⊢ ((R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+        reg_pointsto cur_privilege dq Machine ∗
+        reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+        reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    rewrite /hreg_frame /hreg_frame_ro /jr_Drw /jr_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite jr_rs_nPC jr_rs_priv jr_rs_sec jr_rs_misa.
+    rewrite (jr_Df_priv dq) (jr_Df_sec dq) (jr_Df_misa dq).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma jr_frames_in (dq : dfrac) (npc0 : SailStdpp.Values.mword 64) :
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (jr_rs npc0) jr_Drw ∗
+     hreg_frame_ro (jr_Df dq) (jr_rs npc0) jr_Dro : iProp Σ).
+  Proof.
+    iIntros "H1 H2 H3 H4". rewrite jr_frames. iFrame.
+  Qed.
+
+  Lemma jr_frames_out (dq : dfrac) (npc0 : SailStdpp.Values.mword 64) :
+    (hreg_frame (jr_rs npc0) jr_Drw ∗
+     hreg_frame_ro (jr_Df dq) (jr_rs npc0) jr_Dro : iProp Σ) -∗
+    ((R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+     reg_pointsto cur_privilege dq Machine ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof. rewrite jr_frames. iIntros "H". iExact "H". Qed.
+
+  Lemma jr_rw_ext (rs rs' : regstate) :
+    reg_agree_on jr_Drw rs rs' ->
+    hreg_frame rs jr_Drw -∗ (hreg_frame rs' jr_Drw : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ jr_Drw Hag).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma jr_ro_ext (dq : dfrac) (rs rs' : regstate) :
+    reg_agree_on jr_Dro rs rs' ->
+    hreg_frame_ro (jr_Df dq) rs jr_Dro -∗
+    (hreg_frame_ro (jr_Df dq) rs' jr_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext (jr_Df dq) _ _ jr_Dro Hag).
+    iIntros "H". iExact "H".
+  Qed.
+
+  (* ---- THE TWO LEAF-FACING RULES, at cells ---- *)
+
+  Lemma swp_jump_to_zca (dq : dfrac)
+      (target npc0 : SailStdpp.Values.mword 64) :
+    eq_vec (access_vec_dec target 0) zerobit = true ->
+    gen_cert -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    swp (jump_to target)
+      (fun r => ⌜r = RETIRE_SUCCESS⌝ ∗
+                (R_bitvector_64 nextPC) ↦ᵣ target ∗
+                reg_pointsto cur_privilege dq Machine ∗
+                reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Halign. iIntros "#Hcert HnPC Hpriv Hsec Hmisa".
+    iDestruct (jr_frames_in dq npc0 with "HnPC Hpriv Hsec Hmisa")
+      as "[Hrw Hro]".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_hfrun 6 jr_Drw jr_Dro (jr_Df dq) (jr_rs npc0)
+                   (register_set (R_bitvector_64 nextPC) target (jr_rs npc0))
+                   (jump_to target) RETIRE_SUCCESS jr_disj
+                   (hfrun_jump_to_zca (jr_Drw ∪ jr_Dro) jr_Drw (jr_rs npc0)
+                      target jr_in_misa jr_w_nPC Halign
+                      ltac:(rewrite jr_rs_misa; vm_compute; reflexivity))
+                   with "Hcert Hrw Hro") ].
+    iIntros (r) "(-> & Hrw & Hro)".
+    iDestruct (jr_rw_ext _ _
+                 (reg_agree_l _ _ _ _ (jr_set_agree npc0 target))
+                 with "Hrw") as "Hrw".
+    iDestruct (jr_ro_ext dq _ _
+                 (reg_agree_r _ _ _ _ (jr_set_agree npc0 target))
+                 with "Hro") as "Hro".
+    iDestruct (jr_frames_out dq target with "[$Hrw $Hro]")
+      as "(HnPC & Hpriv & Hsec & Hmisa)".
+    iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma swp_update_elp_state (dq : dfrac) (ra : SailStdpp.Values.mword 5)
+      (npc0 : SailStdpp.Values.mword 64) :
+    gen_cert -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    swp (update_elp_state (Regidx ra))
+      (fun _ => (R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+                reg_pointsto cur_privilege dq Machine ∗
+                reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    iIntros "#Hcert HnPC Hpriv Hsec Hmisa".
+    iDestruct (jr_frames_in dq npc0 with "HnPC Hpriv Hsec Hmisa")
+      as "[Hrw Hro]".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_span jr_Drw jr_Dro (jr_Df dq) (jr_rs npc0) (jr_rs npc0)
+                   (update_elp_state (Regidx ra)) tt jr_disj
+                   (hval_update_elp_state (jr_Drw ∪ jr_Dro) jr_Drw
+                      (jr_rs npc0) ra jr_in_priv jr_in_sec jr_in_misa
+                      (jr_rs_priv npc0) (jr_rs_sec npc0) (jr_rs_misa npc0))
+                   with "Hcert Hrw Hro") ].
+    iIntros (u) "(_ & Hrw & Hro)".
+    iDestruct (jr_frames_out dq npc0 with "[$Hrw $Hro]")
+      as "(HnPC & Hpriv & Hsec & Hmisa)".
+    iFrame.
+  Qed.
+
+  (* a write to x0 is discarded: the model's [wX_bits] cascade returns at
+     index 0 without a node *)
+  Lemma swp_wX_zero (i : SailStdpp.Values.mword 5)
+      (v : SailStdpp.Values.mword 64) (P : iProp Σ) :
+    uint i = 0 -> P -∗ swp (wX_bits (Regidx i) v) (fun _ => P).
+  Proof.
+    intros Hz. iIntros "HP". unfold wX_bits, wX. rewrite Hz. cbn match.
+    iApply swp_ret. iExact "HP".
+  Qed.
+
+  (* ==================================================================== *)
+  (* execute_JALR at rd = x0 -- the compressed RET.  The swp twin of        *)
+  (* [WpMmodeLeafBase.exec_execute_JALR_ret_zca], peeled at the ONE node    *)
+  (* the walkers cannot take: [rX_bits] at a symbolic index.                *)
+  (* ==================================================================== *)
+  Lemma swp_execute_JALR_ret_zca (dq : dfrac)
+      (imm : SailStdpp.Values.mword 12)
+      (ra rdz : SailStdpp.Values.mword 5)
+      (m : regfile) (npc0 : SailStdpp.Values.mword 64) :
+    uint rdz = 0 ->
+    eq_vec (access_vec_dec
+              (update_vec_dec
+                 (add_vec (m !!! Regidx ra) (sign_extend' 64 imm)) 0 zerobit)
+              0) zerobit = true ->
+    gen_cert -∗
+    gpr_file m -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    swp (execute_JALR imm (Regidx ra) (Regidx rdz))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
+                (R_bitvector_64 nextPC) ↦ᵣ
+                  (update_vec_dec
+                     (add_vec (m !!! Regidx ra) (sign_extend' 64 imm)) 0
+                     zerobit) ∗
+                reg_pointsto cur_privilege dq Machine ∗
+                reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hrdz Halign. iIntros "#Hcert Hf HnPC Hpriv Hsec Hmisa".
+    unfold execute_JALR. cbn match.
+    (* [m >> n >>= f] parses as [(m >> n) >>= f], so the elp gate and the link
+       read are ONE first component of the outer bind. *)
+    iApply (swp_bind_use
+              (Defs.bind0 (update_elp_state (Regidx ra)) (get_next_pc tt)) _
+              (fun link => ⌜link = npc0⌝ ∗
+                 (R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+                 reg_pointsto cur_privilege dq Machine ∗
+                 reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                 reg_pointsto misa DfracDiscarded MISA_C)%I _
+              with "[HnPC Hpriv Hsec Hmisa] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => (R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+                   reg_pointsto cur_privilege dq Machine ∗
+                   reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                   reg_pointsto misa DfracDiscarded MISA_C)%I _
+                with "[HnPC Hpriv Hsec Hmisa] [-]").
+      { iApply (swp_update_elp_state dq ra npc0
+                  with "Hcert HnPC Hpriv Hsec Hmisa"). }
+      iIntros (u) "(HnPC & Hpriv & Hsec & Hmisa)".
+      unfold get_next_pc.
+      iApply (swp_mono with "[Hpriv Hsec Hmisa] [-]");
+        [| iApply (swp_read_reg_cell (R_bitvector_64 nextPC) npc0
+                     with "Hcert HnPC") ].
+      iIntros (link) "[-> HnPC]". iSplitR; [done|]. iFrame. }
+    iIntros (link) "(-> & HnPC & Hpriv & Hsec & Hmisa)".
+    (* 3. the ONE symbolic-index node *)
+    iApply (swp_bind_use (rX_bits (Regidx ra)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file ra m with "Hcert Hf"). }
+    iIntros (w) "[-> Hf]".
+    (* 4. the jump *)
+    iApply (swp_bind_use _ _ _ _ with "[HnPC Hpriv Hsec Hmisa] [-]").
+    { iApply (swp_jump_to_zca dq _ npc0 Halign
+                with "Hcert HnPC Hpriv Hsec Hmisa"). }
+    iIntros (r) "(-> & HnPC & Hpriv & Hsec & Hmisa)". cbn match.
+    (* 5. the discarded write to x0 *)
+    iApply (swp_bind0_use _ _ (fun _ => gpr_file m)%I _ with "[Hf] [-]").
+    { iApply (swp_wX_zero rdz _ (gpr_file m) Hrdz with "Hf"). }
+    iIntros (u2) "Hf". iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* the form a leaf states: the target spelled as [ret_pc], and the alignment
+     side condition discharged from [ret_pc]'s own construction *)
+  Lemma swp_execute_JALR_ret (dq : dfrac)
+      (ra rdz : SailStdpp.Values.mword 5) (m : regfile)
+      (npc0 : SailStdpp.Values.mword 64) :
+    uint rdz = 0 ->
+    gen_cert -∗
+    gpr_file m -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    swp (execute_JALR (zeros' 12) (Regidx ra) (Regidx rdz))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
+                (R_bitvector_64 nextPC) ↦ᵣ (ret_pc (m !!! Regidx ra)) ∗
+                reg_pointsto cur_privilege dq Machine ∗
+                reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hrdz. iIntros "#Hcert Hf HnPC Hpriv Hsec Hmisa".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_execute_JALR_ret_zca dq (zeros' 12) ra rdz m npc0 Hrdz
+                   ltac:(rewrite ret_pc_jalr; apply ret_pc_aligned)
+                   with "Hcert Hf HnPC Hpriv Hsec Hmisa") ].
+    iIntros (e) "(-> & Hf & HnPC & Hpriv & Hsec & Hmisa)".
+    rewrite ret_pc_jalr. iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* ==================================================================== *)
+  (* execute_JAL -- reads nextPC (the link) and PC (the base), jumps, and    *)
+  (* links into rd.  PC is read-only here, which is why [wp_instr]'s          *)
+  (* obligation lends it rather than keeping it in the frame.                *)
+  (* ==================================================================== *)
+  Lemma swp_execute_JAL (dq : dfrac) (imm : SailStdpp.Values.mword 21)
+      (rd : SailStdpp.Values.mword 5) (m : regfile)
+      (pc npc0 : SailStdpp.Values.mword 64) :
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) zerobit
+      = true ->
+    gen_cert -∗
+    gpr_file m -∗
+    (R_bitvector_64 PC) ↦ᵣ pc -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    swp (execute_JAL imm (Regidx rd))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                gpr_file (<[Regidx rd := regval_into_reg npc0]> m) ∗
+                (R_bitvector_64 PC) ↦ᵣ pc ∗
+                (R_bitvector_64 nextPC) ↦ᵣ (add_vec pc (sign_extend' 64 imm)) ∗
+                reg_pointsto cur_privilege dq Machine ∗
+                reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hrd Halign. iIntros "#Hcert Hf HPC HnPC Hpriv Hsec Hmisa".
+    unfold execute_JAL. cbn match.
+    (* 1. the link address *)
+    iApply (swp_bind_use (get_next_pc tt) _
+              (fun link => ⌜link = npc0⌝ ∗
+                 (R_bitvector_64 nextPC) ↦ᵣ npc0)%I _
+              with "[HnPC] [-]").
+    { unfold get_next_pc.
+      iApply (swp_read_reg_cell (R_bitvector_64 nextPC) npc0
+                with "Hcert HnPC"). }
+    iIntros (link) "[-> HnPC]".
+    (* 2. the base *)
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC)) _
+              (fun w => ⌜w = pc⌝ ∗ (R_bitvector_64 PC) ↦ᵣ pc)%I _
+              with "[HPC] [-]").
+    { iApply (swp_read_reg_cell (R_bitvector_64 PC) pc with "Hcert HPC"). }
+    iIntros (w0) "[-> HPC]".
+    (* 3. the jump *)
+    iApply (swp_bind_use _ _ _ _ with "[HnPC Hpriv Hsec Hmisa] [-]").
+    { iApply (swp_jump_to_zca dq _ npc0 Halign
+                with "Hcert HnPC Hpriv Hsec Hmisa"). }
+    iIntros (r) "(-> & HnPC & Hpriv & Hsec & Hmisa)". cbn match.
+    (* 4. the link write *)
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m npc0 Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
+
+End jump.

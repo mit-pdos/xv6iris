@@ -287,6 +287,37 @@ Section swpbase.
     iIntros (u) "Hf". iApply swp_ret. by iFrame.
   Qed.
 
+  (* read PC, write rd (AUIPC).  PC is a plain owned cell here -- the
+     obligation lends it -- so this is [swp_read_reg_cell], not a frame. *)
+  Lemma swp_execute_pcw (rd : SailStdpp.Values.mword 5) (m : regfile)
+      (mo : M ExecutionResult) (x : ExecutionResult)
+      (pc : SailStdpp.Values.mword 64)
+      (g : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64) :
+    mo = Defs.bind
+           (Defs.bind (Defs.read_reg (R_bitvector_64 PC))
+              (fun w => returnM (g w)))
+           (fun v => Defs.bind0 (wX_bits (Regidx rd) v) (returnM x)) ->
+    uint rd <> 0 ->
+    gen_cert -∗ gpr_file m -∗ (R_bitvector_64 PC) ↦ᵣ pc -∗
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd := regval_into_reg (g pc)]> m) ∗
+       (R_bitvector_64 PC) ↦ᵣ pc).
+  Proof.
+    intros Hred Hrd. iIntros "#Hcert Hf HPC". rewrite Hred.
+    iApply (swp_bind_use _ _
+              (fun v => ⌜v = g pc⌝ ∗ gpr_file m ∗
+                        (R_bitvector_64 PC) ↦ᵣ pc)%I _ with "[Hf HPC] [-]").
+    { iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC)) _
+                (fun w => ⌜w = pc⌝ ∗ (R_bitvector_64 PC) ↦ᵣ pc)%I _
+                with "[HPC] [-]").
+      { iApply (swp_read_reg_cell (R_bitvector_64 PC) pc with "Hcert HPC"). }
+      iIntros (w) "[-> HPC]". iApply swp_ret. by iFrame. }
+    iIntros (v) "(-> & Hf & HPC)".
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m _ Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
+  Qed.
+
   (* the RTYPE binops, as one-line instances of the read/read/write shape *)
   Definition swp_execute_RTYPE_bin (rs2 rs1 rd : SailStdpp.Values.mword 5)
       (m : regfile) (op : rop)

@@ -42,48 +42,23 @@ Section WpAuipcGpr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
-    iApply (wp_instr pc false (UTYPE (imm, Regidx rd, AUIPC)) pmpcfg0
-              Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    (* tick nextPC; PC is unchanged, still [pc] *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (Hpcv : register_lookup PC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    (* write rd (rd <> 0, so its entry is the real register points-to) *)
-    iDestruct (gpr_file_insert_acc m (Regidx rd)
-                 (regval_into_reg (add_vec pc (auipc_off imm))) with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec pc (auipc_off imm)))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec pc (auipc_off imm)))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      rewrite (exec_execute_UTYPE_AUIPC_gpr rd imm (set_reg σ nextPC (add_vec_int pc 4))).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      rewrite Hpcv. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    (* continuation: PC/nextPC are both pc+4; hand everything back *)
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec pc (auipc_off imm)))).(sregs)
-             = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg.
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc Hpc Hf Hinstr Hcont".
+    iDestruct (mmode_config_cert with "Hmm") as "[#Hcert Hmm]".
+    iApply (wp_instr pc (add_vec_int pc 4) false
+              (UTYPE (imm, Regidx rd, AUIPC)) m
+              (<[Regidx rd := regval_into_reg (add_vec pc (auipc_off imm))]> m)
+              pmpcfg0 emp%I Hpmp Hstat
+              with "Hmm Hpmpc Hpc Hf Hinstr [] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iApply (swp_mono with "[HnPC] [Hf HPC]");
+        [| iApply (swp_execute_pcw rd m
+                     (execute (UTYPE (imm, Regidx rd, AUIPC)))
+                     RETIRE_SUCCESS pc
+                     (fun w => add_vec w (auipc_off imm)) eq_refl Hrd
+                     with "Hcert Hf HPC") ].
+      iIntros (e) "(-> & Hf & HPC)". iSplitR; [done|]. iFrame "Hf HPC HnPC".
+    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End WpAuipcGpr.
 
