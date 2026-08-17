@@ -961,6 +961,17 @@ Section InstrBytes.
     iExact "Hc".
   Qed.
 
+  (* [gen_cert] out of the bundle without consuming it: every leaf's [swp]
+     obligation needs it (any register or memory node does), and the bundle it
+     rode in on has been handed to [wp_instr] by then.  Persistent, so this is
+     a duplication. *)
+  Lemma mmode_config_cert (dq : dfrac) :
+    mmode_config dq -∗ gen_cert ∗ mmode_config dq.
+  Proof.
+    iIntros "H". iDestruct "H" as "(#Hhw & Hrest)".
+    iSplitR "Hrest"; [by iApply hw_config_cert|]. by iFrame "Hhw Hrest".
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* ... and back.  The read-only cells [misa]/[mseccfg]/[pma_regions]/  *)
   (* [htif]/[elp]/[senvcfg] in the returned frame are DISCARDED, so they *)

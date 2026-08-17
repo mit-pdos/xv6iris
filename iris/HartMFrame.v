@@ -494,6 +494,44 @@ Section gpr.
          end.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* GPR ACCESS AT [gpr_file], which is what a leaf actually holds.        *)
+  (*                                                                      *)
+  (* Stated over the WHOLE file rather than three [gpr_pt] cells on        *)
+  (* purpose: an instruction may name the same register twice (or write    *)
+  (* its own source), and three separately-owned cells cannot express      *)
+  (* that.  Going through [gpr_file_lookup_acc] / [gpr_file_insert_acc]    *)
+  (* one access at a time is aliasing-proof for free -- it is the same     *)
+  (* discipline the exec-based leaves already used.                        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_rX_file (i : SailStdpp.Values.mword 5) (m : regfile) :
+    gen_cert -∗ gpr_file m -∗
+    swp (rX_bits (Regidx i))
+      (fun w => ⌜w = m !!! Regidx i⌝ ∗ gpr_file m).
+  Proof.
+    iIntros "#Hcert Hf".
+    iDestruct (gpr_file_lookup_acc m (Regidx i) with "Hf") as "[Hpt Hcl]".
+    iApply (swp_mono with "[Hcl] [-]");
+      [| iApply (swp_rX_bits i (m (Regidx i)) with "Hcert Hpt") ].
+    iIntros (w) "[-> Hpt]". iSplitR; [by rewrite rf_lookup|].
+    iApply ("Hcl" with "Hpt").
+  Qed.
+
+  Lemma swp_wX_file (i : SailStdpp.Values.mword 5) (m : regfile)
+      (w : SailStdpp.Values.mword 64) :
+    uint i <> 0 ->
+    gen_cert -∗ gpr_file m -∗
+    swp (wX_bits (Regidx i) w)
+      (fun _ => gpr_file (<[Regidx i := regval_into_reg w]> m)).
+  Proof.
+    intros Hnz. iIntros "#Hcert Hf".
+    iDestruct (gpr_file_insert_acc m (Regidx i) (regval_into_reg w)
+                 with "Hf") as "[Hpt Hcl]".
+    iApply (swp_mono with "[Hcl] [-]");
+      [| iApply (swp_wX_bits i (m (Regidx i)) w Hnz with "Hcert Hpt") ].
+    iIntros (u) "Hpt". iApply ("Hcl" with "Hpt").
+  Qed.
+
   (* THE DFRAC ASSIGNMENT for the read-only frame: [hw_config]'s six cells
      are persistent, the rest fractional at the caller's [q]. *)
   (* dfrac-generic, because [wp_instr] takes its fraction as a [dfrac]

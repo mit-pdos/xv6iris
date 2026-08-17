@@ -82,6 +82,7 @@ WpGprMret.v
 WpGprMretWp.v
 ZicondGpr.v
 WpMmodeLeafBase.v
+WpMmodeSwpBase.v
 MbootVocab.v
 MemAccessGen.v
 WpMmodeItype.v
