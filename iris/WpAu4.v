@@ -112,7 +112,7 @@ Section Au4Leaves.
               = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au (ktd := KT0) 4 cmp false pc rd rs1 imm m av
+    iApply (wp_load_s_sconf_au (kt := kt) (ktd := KT0) 4 cmp false pc rd rs1 imm m av
               (fun w => sign_extend' 64 w) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -149,7 +149,7 @@ Section Au4Leaves.
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au (ktd := KT0) 4 cmp pc rs2 rs1 imm m av
+    iApply (wp_store_s_sconf_au (kt := kt) (ktd := KT0) 4 cmp pc rs2 rs1 imm m av
               (trunc32 (rget m rs2)) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)

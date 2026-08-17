@@ -165,7 +165,7 @@ Module Type PUSHOFF.
       (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_push_off_sconf_body kt m av n eb p b lks.
   Parameter wp_pop_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (lks : gset string),
       wp_pop_off_sconf_body kt m av n eb p lks.
 End PUSHOFF.

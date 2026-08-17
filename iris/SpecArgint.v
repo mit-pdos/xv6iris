@@ -18,11 +18,11 @@
 
    argint is a thin wrapper: it holds [ip] in the callee-saved s1 across the
    argraw call and narrows the 64-bit result to the [int] cell with a
-   [c.sw].  So its postcondition is [ip ↦₄ trunc32 v] where [v] is argraw's
+   [c.sw].  So its postcondition is [ip ↦₄[kt] trunc32 v] where [v] is argraw's
    result -- the low 32 bits of the trapframe slot, which is exactly C's
    [int] conversion.
 
-   Resources are argraw's, plus the caller's destination cell [ip ↦₄ old].
+   Resources are argraw's, plus the caller's destination cell [ip ↦₄[kt] old].
    Nothing about [proc_priv] appears: see SpecArgraw.v for why the trapframe
    pointer travels as a bare fraction. *)
 From Stdlib Require Import ZArith Lia List.
@@ -77,7 +77,7 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
-  ip ↦₄ old -∗
+  ip ↦₄[kt] old -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
@@ -86,7 +86,7 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
-      ip ↦₄ arg_int32 v -∗
+      ip ↦₄[kt] arg_int32 v -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

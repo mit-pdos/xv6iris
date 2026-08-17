@@ -100,9 +100,9 @@ Section SpecFetchaddr.
 
   (* fetchaddr's result, keyed by the returned a0 (the [argfd_post] shape). *)
   Definition fetchaddr_post (ip oldv addr szv r : mword 64) : iProp Σ :=
-    (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈ oldv
+    (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[kt] oldv
      ∨ ⌜(r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64))
-        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈ w)%I.
+        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[kt] w)%I.
 
 End SpecFetchaddr.
 
@@ -122,7 +122,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  ip ↦₈ oldv -∗
+  ip ↦₈[kt] oldv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗

@@ -68,7 +68,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
 
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+       (m : regfile) (γs : list gname) (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
       wp_wakeup_sconf_body kt m γs pme lvl K eb b lks.
 End WAKEUP.
