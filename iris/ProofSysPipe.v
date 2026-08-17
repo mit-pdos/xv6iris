@@ -122,7 +122,6 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecIput.
 Require Import SpecMyproc SpecArgaddr SpecPipealloc SpecFdalloc SpecFileclose SpecCopyout.
 Require Import IrefSlots InodeRegion.
 Require Import SpecSysPipe.

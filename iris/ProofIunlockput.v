@@ -46,8 +46,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import CodeIunlockput.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import SpecIunlock SpecIput.
 Require Import SpecIunlockput.
 From Kernel Require KernelSyms.

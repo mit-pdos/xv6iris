@@ -80,9 +80,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.          (* [fsCrashG] -- filewrite's extra class *)
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import SpecWritei.
 (* [consolewrite_stack] -- the stack budget unfolds to it *)
-Require Import SpecConsolewrite.
 Require Import SpecArgfd SpecArgint SpecArgaddr SpecFilewrite.
 (* [Require Import] is NOT transitive for the Import half, so SpecSysRead has
    to be named here even though SpecSysWrite requires it: [sys_rw_count],

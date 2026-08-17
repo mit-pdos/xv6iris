@@ -143,7 +143,6 @@ Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import FileInvDefs.

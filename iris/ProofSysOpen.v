@@ -71,7 +71,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.

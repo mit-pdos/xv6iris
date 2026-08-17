@@ -93,7 +93,7 @@ Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecDevintr SpecVmfault.
 Require Import SpecPrintk.
 Require Import SpecKernelvec.
-Require Import SpecSyscall SpecSysExit.
+Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
 Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import ProcPtOwn.  (* [proc_pt] / [ud_norm] -- the bare residue drops the address space *)

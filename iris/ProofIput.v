@@ -129,12 +129,9 @@ Require Import InodeRegion.
 Require Export FastSetSolver.
 Require Import IrefSlots.
 Require Import IcacheInv.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import FdSlots.
 Require Import CodeIput.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecAcquiresleep SpecReleasesleep.
 Require Import SpecItrunc SpecIupdate.

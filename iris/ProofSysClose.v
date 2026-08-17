@@ -54,9 +54,7 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import KernelDataInv.
-Require Import SpecPanic.
-Require Import SpecMyproc SpecArgfd SpecIput SpecFileclose.
+Require Import SpecMyproc SpecArgfd SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecSysClose.
 Require Import CodeSysClose.

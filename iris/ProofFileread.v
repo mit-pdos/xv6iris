@@ -86,7 +86,6 @@ Require Import ConsoleInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
                                 carve's slot selects out of the family. *)

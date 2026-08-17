@@ -98,7 +98,6 @@ Require Import CodeUsertrap.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecVmfault.
 Require Import SpecPrintk.
-Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts.
 Require Import UsertrapAux.

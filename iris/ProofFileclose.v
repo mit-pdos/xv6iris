@@ -68,8 +68,6 @@ Require Import IrefSlots.
 Require Import WpUart DiskPtsto FsBlocks LogInv FsCrash.
 Require Import BioDefs.
 Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
 Require Import IrefSlots InodeRegion.

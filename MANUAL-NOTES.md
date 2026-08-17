@@ -80,9 +80,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 
 Big things that still need to be done/explored:
 
-- liveness, or at least deadlock avoidance
-  - acquire currently calls panic if already holding lock on same CPU
-  - lock ordering could solve deadlock and acquire's panic
+- liveness
 - user process verification
   - who owns user process memory?
     - want points-to for user code, but kernel may need to reclaim on kill

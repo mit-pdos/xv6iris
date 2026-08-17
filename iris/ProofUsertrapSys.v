@@ -62,7 +62,7 @@ Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit.
+Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
