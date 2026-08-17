@@ -425,19 +425,18 @@ Section BootBundles.
      [InstrBytes.mmode_config_rebuild]. *)
   Lemma mmode_config_intro (dq : dfrac) :
     hw_config -∗
-    minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Machine -∗
     mstatus ↦ᵣ{ dq } boot_w64 0xA00000000 -∗
     mmode_config dq.
   Proof.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms".
+    iIntros "#Hhw Hhs Hpriv Hms".
     iApply (mmode_config_rebuild dq (boot_w64 0xA00000000)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               mstatus_reset_kernel_facts
-              with "Hhw Hinv Hhs Hpriv Hms").
+              with "Hhw Hhs Hpriv Hms").
   Qed.
 
 End BootBundles.

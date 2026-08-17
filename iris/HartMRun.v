@@ -74,6 +74,22 @@ Proof.
   apply hfrun_ret.
 Qed.
 
+(* the landing-pad gate: generic, and needed by every arm below (it was
+   sitting in the pilot file, which no other caller can reach) *)
+Lemma hfrun_lpad (D Drw : gset register) (rs : regstate) :
+  (elp : register) ∈ D ->
+  eq_vec (register_lookup elp rs)
+    (landing_pad_bits_backwards LP_EXPECTED) = false ->
+  hfrun 8 D Drw rs (is_landing_pad_expected tt) = Some (false, rs).
+Proof.
+  intros HD Help. unfold is_landing_pad_expected.
+  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+    Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD) Help.
+  cbn beta iota zeta delta [Defs.returnm returnM].
+  apply hfrun_ret.
+Qed.
+
 Section run.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

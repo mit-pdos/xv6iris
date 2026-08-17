@@ -11,8 +11,8 @@ From iris.base_logic.lib Require Import ghost_map.
 From iris.program_logic Require Import language.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords.
-Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
-        HartMCycle HartMRun HartMFrame.
+Require Import HartSwp HartLift HartLift2 HartSpan HartSpanChar
+        HartRegNode HartMCycle HartMRun HartMFrame.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -641,69 +641,11 @@ Section InstrBytes.
      [r] decodes to [i], and [i] is not a landing pad.  The read-only fetch
      config (PC / privilege / PMP / PMA / htif / misa) is threaded in and, being
      used only to prove [⌜..⌝], is returned to the caller unchanged. *)
-  Lemma instr_lift
-      (σ : mstate) (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (misa0 mseccfg0 : mword 64) {dqp dqc dqa dqh dqm dqs : dfrac} :
-    pmp_allows_all pmpcfg0 ->
-    pma_allows_all pmar0 ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_A misa0) ('b"1") = true ->
-    misa0 = MISA_C ->
-    mseccfg0 = mword_of_int 0 ->
-    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
-    mstate_interp σ -∗
-    PC ↦ᵣ pc -∗
-    cur_privilege ↦ᵣ{ dqp } Machine -∗
-    pmpcfg_n ↦ᵣ{ dqc } pmpcfg0 -∗
-    pma_regions ↦ᵣ{ dqa } pmar0 -∗
-    htif_tohost_base ↦ᵣ{ dqh } None -∗
-    misa ↦ᵣ{ dqm } misa0 -∗
-    mseccfg ↦ᵣ{ dqs } mseccfg0 -∗
-    kmap_static_claims -∗
-    instr pc is_rvc i -∗
-    ⌜ if is_rvc
-      then ∃ (h : half) (i0 : instruction),
-             exec (fetch tt) σ = Some (F_RVC h, σ) /\
-             exec (decode_fetch (F_RVC h)) σ = Some (i0, σ) /\
-             is_lpad_instruction i0 = false /\
-             (forall s : mstate, exec (execute i0) s = Some (ExecuteAs i, s))
-      else ∃ w : word,
-             exec (fetch tt) σ = Some (F_Base w, σ) /\
-             exec (decode_fetch (F_Base w)) σ = Some (i, σ) /\
-             is_lpad_instruction i = false ⌝.
-  Proof.
-    iIntros (Hpmp Hpma HmisaC HmisaA Hmisaval Hmseccfgval Hstat) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg #Hbundle Hinstr".
-    iDestruct "Hinstr" as "[%Hnlpad Hr]".
-    iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iDestruct (state_interp_reg_dq σ cur_privilege dqp Machine
-                 with "Hsi Hpriv") as %Lpriv.
-    iDestruct (state_interp_reg_dq σ misa dqm misa0
-                 with "Hsi Hmisa") as %Lmisa.
-    iDestruct (state_interp_reg_dq σ mseccfg dqs mseccfg0
-                 with "Hsi Hmseccfg") as %Lmseccfg.
-    iDestruct (fetch_from_instr_bytes σ pc r pmpcfg0 pmar0 misa0
-                 Hpmp Hpma HmisaC Hstat
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbundle Hbytes") as %Hfetch.
-    iDestruct ("Hdec" $! σ with "Hsi") as %Hdec0.
-    specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)
-                      ltac:(rewrite Lmisa; exact HmisaA)
-                      ltac:(rewrite Lmisa; exact Hmisaval)
-                      ltac:(unfold cfg_ok; left; split; [ exact Lpriv | rewrite Lmseccfg; exact Hmseccfgval ])).
-    destruct r as [e | w | h | erx].
-    - (* F_Ext_Error: instr_bytes is 2-aligned ∗ False *)
-      iDestruct "Hbytes" as %[_ []].
-    - (* F_Base w : fetch_is_rvc = false, so is_rvc = false; direct decode *)
-      cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc. iPureIntro.
-      exists w. split; [exact Hfetch | split; [exact Hdec0 | exact Hnlpad]].
-    - (* F_RVC h : fetch_is_rvc = true, so is_rvc = true; indirect decode *)
-      cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc.
-      destruct Hdec0 as (i0 & Hdec & Hnlpad0 & Hexp). iPureIntro.
-      exists h, i0.
-      split; [exact Hfetch | split; [exact Hdec | split; [exact Hnlpad0 | exact Hexp]]].
-    - (* F_Error: instr_bytes is 2-aligned ∗ False *)
-      iDestruct "Hbytes" as %[_ []].
-  Qed.
+  (* [instr_lift] IS GONE.  It took [mstate_interp σ] and produced [exec]-
+     shaped fetch/decode facts; both halves are superseded.  The fetch is
+     now [HartMFetch]'s three shape rules over [text_fetch_obl] above, and
+     the decode is [instr]'s own [decode_hval], which is footprinted and
+     needs no σ at all. *)
 
   (* wp_exec_step_decode_execute_inv IS GONE.  It handed the caller the whole
      machine state and asked for a successor in ONE fupd, which is unsound
@@ -915,203 +857,38 @@ Section InstrBytes.
       by iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv".
   Qed.
 
-  (* wp_instr -- the [instr]-driven variant of wp_exec_step_decode_execute_inv.
-     The caller no longer proves fetch / decode / not-a-landing-pad NOR
-     [dispatchInterrupt = None]: it supplies [instr pc is_rvc i] (packaging the
-     former, pinning the width bool [is_rvc]) and [mmode_config] (the ambient
-     config), and this lemma discharges all of those via [instr_lift],
-     reg_valid off [hw_config], and [dispatchInterrupt_none_from_regs].  What
-     remains for the caller: a SINGLE execute fact for [i] -- the TARGET
-     instruction -- at nextPC := pc + (2 or 4 by [is_rvc]).  For a compressed
-     instruction the ExecuteAs first stage is discharged HERE from the [instr]
-     fact's indirect decode arm (the state-generic expansion), so the caller
-     never sees [ExecuteAs].  [PC] is owned here (read for the fetch, returned
-     to the underlying WP), and [mmode_config] is handed back to the
-     continuation. *)
-  Lemma wp_instr (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
-    pmp_allows_all pmpcfg0 ->
-    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
-    mmode_config dq -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    PC ↦ᵣ pc -∗
-    instr pc is_rvc i -∗
-    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (s_exec : mstate),
-         ⌜ exec (execute i)
-                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
-                                     (if is_rvc then 2 else 4)))
-             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         mstate_interp s_exec ∗
-         (mmode_config dq -∗
-          pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
+  (* ------------------------------------------------------------------ *)
+  (* The fetch obligation, from [instr_bytes]'s persistent text bytes.    *)
+  (* Persistent, so it is re-provable every cycle -- which is what makes  *)
+  (* a LOOP out of a leaf.                                                *)
+  (* ------------------------------------------------------------------ *)
+  Lemma text_fetch_obl (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
+    ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add pa j) ↦ₓ□ nth_byte w j) -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+       ⌜read_bytes σ.(mem) pa n = Some w⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ)).
   Proof.
-    iIntros (Hpmp Hstat) "Hmm Hpmpc Hpc Hinstr H".
-    iDestruct "Hmm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL & %HKF)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_exec_step_decode_execute_inv with "Hinv Hhs").
-    iIntros (σ) "Hsi".
-    iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
-                 Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0 Hstat
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hkmapb Hinstr") as %Hlift.
-    iDestruct (dispatchInterrupt_none_from_regs σ misa0 mstatus0 HmisaS HmIE
-                 with "Hsi Hmisa Hmstatus") as %Hdisp.
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σ.
-    iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σ.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σ.
-    iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
-    iMod ("H" $! σ Lpc with "[$Hreg $Hmem]")
-      as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
-    iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
-    (* Reassemble [mmode_config dq] + pmpcfg for the caller's continuation.
-       cur_privilege / mstatus / pmpcfg / hart_state are all held at fraction
-       [dq] and only read, so the step can't touch them.  The continuation now
-       lands on [▷ WP Loop] (the later exposed by the step rules below). *)
-    iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-             PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang))%I
-      with "[Hcont Hpriv Hmstatus Hpmpc]" as "Hcont'".
-    { iIntros "Hhs' Hpc'". iApply ("Hcont" with "[- Hpc' Hpmpc] Hpmpc Hpc'").
-      iFrame "Hhw Hinv Hhs' Hpriv".
-      iExists mstatus0. iFrame "Hmstatus".
-        iSplitR; [ iPureIntro; exact HmIE | ]. iSplitR; [ iPureIntro; exact HMPRV | ].
-        iSplitR; iPureIntro; [ exact HSXL | exact HKF ]. }
-    iDestruct "Hexec" as %Hexec.
-    destruct is_rvc.
-    - (* RVC: instr_lift gives F_RVC h decoding to i0 with the state-generic
-         [ExecuteAs i] expansion; the first stage is discharged here, the
-         caller's Hexec is the TARGET execute (second stage). *)
-      destruct Hlift as (h & i0 & Hfetch & Hdec & Hnlpad0 & Hexp).
-      iModIntro. iExists (F_RVC h), i0, s_exec.
-      iSplitR; [iPureIntro; exact Hpriv_σ |].
-      iSplitR; [iPureIntro; exact Hdisp |].
-      iSplitR; [iPureIntro; exact Hfetch |].
-      iSplitR; [iPureIntro; exact Hdec |].
-      iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitR.
-      { iSplitR; [iPureIntro; rewrite Hmisa_σ; exact HmisaC |].
-        iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
-      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
-    - (* F_Base: instr_lift gives F_Base w; caller's Hexec is the base execute *)
-      destruct Hlift as (w & Hfetch & Hdec & Hnlpad).
-      iModIntro. iExists (F_Base w), i, s_exec.
-      iSplitR; [iPureIntro; exact Hpriv_σ |].
-      iSplitR; [iPureIntro; exact Hdisp |].
-      iSplitR; [iPureIntro; exact Hfetch |].
-      iSplitR; [iPureIntro; exact Hdec |].
-      iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitR.
-      { iSplitR; [iPureIntro; exact Hnlpad |]. iPureIntro; exact Hexec. }
-      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
+    iIntros "#Htext" (σ) "Hσ". rewrite /mstate_interp.
+    iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
+    iDestruct (text_read_bytes σ.(mem) pa n w with "Hmem Htext") as %Hrb.
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
+    iSplitR; [done|]. iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
   Qed.
 
-  (* wp_instr_config -- the [wp_instr] variant for CONFIG-WRITING instructions
-     (csrw mstatus / csrw pmpcfg0 / mret): instructions that write the very
-     cells [mmode_config] bundles, so [wp_instr]'s "hand the same bundle back"
-     contract is wrong for them.  Differences from [wp_instr]:
-       - takes the UNBUNDLED config cells at FULL ownership, with the mstatus
-         VALUE [ms0] an explicit parameter (a caller holding the opaque
-         [mmode_config (DfracOwn 1)] first applies [mmode_config_unbundle] and
-         destructs the existential, so [ms0] is pinned in ITS proof context --
-         this keeps the value visible across the engine, which a
-         universally-quantified fupd binder would not);
-       - only the MIE fact is required (it discharges [dispatchInterrupt]);
-       - the engine itself does not touch mstatus / cur_privilege / pmpcfg: it
-         reads them (for [instr_lift] / [dispatchInterrupt_none_from_regs]) and
-         then passes the three points-to INTO the caller's fupd, so the CALLER
-         can [reg_update] them alongside its other writes when exhibiting
-         [s_exec];
-       - the continuation receives only the RAW hart_state cell back (plus the
-         stepped PC); everything else lives in the caller's closure.  A caller
-         that re-establishes the invariant facts on its final mstatus value can
-         rebuild [mmode_config (DfracOwn 1)] via [mmode_config_rebuild]
-         (hw_config / minstret_inv are persistent, hence re-derivable). *)
-  Lemma wp_instr_config (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (pmpcfg0 : type_of_register pmpcfg_n) (ms0 : mword 64) :
-    pmp_allows_all pmpcfg0 ->
-    eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
-    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Machine -∗
-    mstatus ↦ᵣ ms0 -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    PC ↦ᵣ pc -∗
-    instr pc is_rvc i -∗
-    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       cur_privilege ↦ᵣ Machine -∗
-       mstatus ↦ᵣ ms0 -∗
-       pmpcfg_n ↦ᵣ pmpcfg0 -∗
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (s_exec : mstate),
-         ⌜ exec (execute i)
-                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
-                                     (if is_rvc then 2 else 4)))
-             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         mstate_interp s_exec ∗
-         (hart_state ↦ᵣ HART_ACTIVE tt -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hpmp HmIE Hstat) "#Hhw #Hinv Hhs Hpriv Hmstatus Hpmpc Hpc Hinstr H".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_exec_step_decode_execute_inv with "Hinv Hhs").
-    iIntros (σ) "Hsi".
-    iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
-                 Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0 Hstat
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hkmapb Hinstr") as %Hlift.
-    iDestruct (dispatchInterrupt_none_from_regs σ misa0 ms0 HmisaS HmIE
-                 with "Hsi Hmisa Hmstatus") as %Hdisp.
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σ.
-    iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σ.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σ.
-    iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
-    iMod ("H" $! σ Lpc
-            with "Hpriv Hmstatus Hpmpc [$Hreg $Hmem]")
-      as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
-    iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
-    iDestruct "Hexec" as %Hexec.
-    destruct is_rvc.
-    - (* RVC: instr_lift gives F_RVC h decoding to i0 with the state-generic
-         [ExecuteAs i] expansion; caller's Hexec is the TARGET execute. *)
-      destruct Hlift as (h & i0 & Hfetch & Hdec & Hnlpad0 & Hexp).
-      iModIntro. iExists (F_RVC h), i0, s_exec.
-      iSplitR; [iPureIntro; exact Hpriv_σ |].
-      iSplitR; [iPureIntro; exact Hdisp |].
-      iSplitR; [iPureIntro; exact Hfetch |].
-      iSplitR; [iPureIntro; exact Hdec |].
-      iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitR.
-      { iSplitR; [iPureIntro; rewrite Hmisa_σ; exact HmisaC |].
-        iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
-      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
-    - (* F_Base: instr_lift gives F_Base w; caller's Hexec is the base execute *)
-      destruct Hlift as (w & Hfetch & Hdec & Hnlpad).
-      iModIntro. iExists (F_Base w), i, s_exec.
-      iSplitR; [iPureIntro; exact Hpriv_σ |].
-      iSplitR; [iPureIntro; exact Hdisp |].
-      iSplitR; [iPureIntro; exact Hfetch |].
-      iSplitR; [iPureIntro; exact Hdec |].
-      iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitR.
-      { iSplitR; [iPureIntro; exact Hnlpad |]. iPureIntro; exact Hexec. }
-      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
-  Qed.
+  (* ==================================================================== *)
+  (* wp_instr -- THE WRAPPER THE 135 LEAF CALL SITES SEE.                  *)
+  (*                                                                      *)
+  (* Same surface as before: [mmode_config] / [pmpcfg_n] / [pc_is] /       *)
+  (* [gpr_file] / [instr] in, the same four back in the continuation.      *)
+  (* What changed is the OBLIGATION -- one [swp] over [execute i] at the   *)
+  (* caller's own resources, instead of handing the caller ALL of sigma    *)
+  (* and asking for a successor state in one fupd, which per-node          *)
+  (* stepping invalidates.                                                 *)
+  (*                                                                      *)
+  (* The obligation is UNIFORM across all four fetch shapes because        *)
+  (* [decode_hval]'s RVC arm already carries the [ExecuteAs] expansion:    *)
+  (* the caller supplies [execute i] and never sees [execute i0].          *)
+  (* ==================================================================== *)
 
 End InstrBytes.
 

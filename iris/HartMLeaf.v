@@ -495,19 +495,7 @@ Proof.
   apply hfrun_ret.
 Qed.
 
-Lemma ml_hfrun_lpad (D Drw : gset register) (rs : regstate) :
-  (elp : register) ∈ D ->
-  eq_vec (register_lookup elp rs)
-    (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  hfrun 8 D Drw rs (is_landing_pad_expected tt) = Some (false, rs).
-Proof.
-  intros HD Help. unfold is_landing_pad_expected.
-  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
-    Defs.returnm returnM].
-  rewrite hfrun_read (bool_decide_eq_true_2 _ HD) Help.
-  cbn beta iota zeta delta [Defs.returnm returnM].
-  apply hfrun_ret.
-Qed.
+
 
 Lemma t_ram_pc : addr_is_ram hp_pc.
 Proof.
@@ -1157,7 +1145,7 @@ Section leaf.
       assert (Help2 : eq_vec (register_lookup elp mlb_rs1)
                         (landing_pad_bits_backwards LP_EXPECTED) = false)
         by (pk; exact Help).
-      pose proof (ml_hfrun_lpad (ml_Drw ∪ ml_Dro) ml_Drw mlb_rs1
+      pose proof (hfrun_lpad (ml_Drw ∪ ml_Dro) ml_Drw mlb_rs1
                     ml_in_elp Help2) as Hlpad.
       assert (Hx14 : register_lookup (R_bitvector_64 x14) mlb_rs2
                      = SailStdpp.Values.mword_of_int 1)
