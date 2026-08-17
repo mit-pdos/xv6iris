@@ -166,21 +166,29 @@ Definition ep_init (gen : nat) : epool :=
 Lemma epool_list_init gen : epool_list (ep_init gen) = epower_fork gen.
 Proof. reflexivity. Qed.
 
-(** A hart's PROGRAM state is exactly what its expression holds: the residual
-    monad and the parked fence ([ELoop] = the boundary, i.e. no residual).
-    There is no [sp_dev] and no [sp_irq] — that is the whole point. *)
+(** A hart's PROGRAM state is exactly what its expression holds: THE CPU (the
+    PLIC wire's hart index is program-visible data), the residual monad and
+    the parked fence.  There is no [option (M unit)]: since G5c1 the BOUNDARY
+    IS [Interface.Ret tt] ([WeakEvLang.ELoop]), so [ehst]'s [None] maps to
+    [Interface.Ret tt] and the hart's program state is total.  There is no
+    [sp_dev] and no [sp_irq] — that is the whole point. *)
 Inductive pexv6 :=
-| PHart (m : option (M unit)) (rs : regstate)
+| PHart (cpu : CPU) (m : M unit) (rs : regstate)
         (fn : option (bool * bool * bool * bool))
 | PDisk (pend : list wmsg).
 
-Definition ehart_res (h : ehst) : option (M unit) :=
-  match h with Some (m, _) => Some m | None => None end.
+Definition ehart_m (h : ehst) : M unit :=
+  match h with Some (m, _) => m | None => Interface.Ret tt end.
 Definition ehart_fn (h : ehst) : option (bool * bool * bool * bool) :=
   match h with Some (_, fn) => fn | None => None end.
 
+(** ... and the expression IS that program state, constructor for
+    constructor: [ehexp] is [Sail] of the two projections. *)
+Lemma ehexp_sail gen c h : ehexp gen c h = Sail gen c (ehart_m h) (ehart_fn h).
+Proof. by destruct h as [[m fn]|]. Qed.
+
 Definition ehart_ag (P : epool) (σ : wgstate) (c : CPU) : wpagent pexv6 :=
-  WPAgent (PHart (ehart_res (ep_h P c)) (wgregs σ c) (ehart_fn (ep_h P c)))
+  WPAgent (PHart c (ehart_m (ep_h P c)) (wgregs σ c) (ehart_fn (ep_h P c)))
           (wgws σ c) ∅.
 
 Definition edisk_ag (P : epool) : wpagent pexv6 :=
