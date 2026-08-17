@@ -157,18 +157,20 @@ Section csrw.
     by rewrite !bi.sep_assoc.
   Qed.
 
-  (* the read-only prefix, transported by [goodb] from the exec stack's fact *)
-  Lemma hval_check_CSR_result_csrw (D Drw : gset register) (rs : regstate)
-      (csr : SailStdpp.Values.mword 12) :
+  (* the read-only prefix, transported by [goodb] from the exec stack's fact.
+     Access-type-generic: the legality check reads the same three cells at
+     CSRRead as at CSRWrite, and nothing in the transport looks at the type. *)
+  Lemma hval_check_CSR_result (D Drw : gset register) (rs : regstate)
+      (csr : SailStdpp.Values.mword 12) (at_ : CSRAccessType) :
     (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
     (misa : register) ∈ D ->
     register_lookup cur_privilege rs = Machine ->
     register_lookup mseccfg rs = Values.mword_of_int 0 ->
     register_lookup misa rs = MISA_C ->
-    goodb D_m (check_CSR_result csr Machine CSRWrite) dstateM = true ->
-    exec (check_CSR_result csr Machine CSRWrite) dstateM
+    goodb D_m (check_CSR_result csr Machine at_) dstateM = true ->
+    exec (check_CSR_result csr Machine at_) dstateM
       = Some (CSR_Check_OK tt, dstateM) ->
-    hval D Drw rs (check_CSR_result csr Machine CSRWrite)
+    hval D Drw rs (check_CSR_result csr Machine at_)
       (CSR_Check_OK tt) rs.
   Proof.
     intros HD1 HD2 HD3 Hp Hs Hm Hgb Hex.
@@ -241,7 +243,7 @@ Section csrw.
     iApply (swp_bind_use (check_CSR_result csr Machine CSRWrite) _ _ _
               with "[Hrw Hro] [-]").
     { iApply (swp_span Drw Dro Df rs rs _ (CSR_Check_OK tt) Hdisj
-                (hval_check_CSR_result_csrw (Drw ∪ Dro) Drw rs csr HDpriv
+                (hval_check_CSR_result (Drw ∪ Dro) Drw rs csr CSRWrite HDpriv
                    HDsec HDmisa Hpriv Hsec Hmisa Hgb Hex)
                 with "Hcert Hrw Hro"). }
     iIntros (w1) "(-> & Hrw & Hro)". cbn match.
@@ -337,6 +339,453 @@ Section csrw.
                    cfinal Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa Hext
                    Hgb Hex Hmip Hcb with "Hcert Hrw Hro Hwr") ].
     iIntros (e) "(-> & Hrw & Hro)". iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE READ-SIDE FOOTPRINT.  A csrr writes no register at all: the CSR   *)
+  (* is read and rd lives in [gpr_file], which is outside every frame.     *)
+  (* So the writable half is EMPTY and the read set is the three config    *)
+  (* pins plus the CSR cell -- i.e. exactly [cw_Drw r ∪ cw_Dro], the same  *)
+  (* set the csrw side reads, with the CSR moved to the read-only side.    *)
+  (*                                                                      *)
+  (* Two fractions, not one: the config pins arrive as a fraction of       *)
+  (* [mmode_config] the leaf kept back, while the CSR cell is whatever the *)
+  (* leaf happens to hold (full, for a cell of its own).                   *)
+  (* ------------------------------------------------------------------ *)
+  Definition cr_Dro (r : register) : gset register := cw_Drw r ∪ cw_Dro.
+
+  Definition cr_Df (dqp dqc : dfrac) (r : register) : register -> dfrac :=
+    fun r' =>
+      if decide (r' = (misa : register)) then DfracDiscarded
+      else if decide (r' = (mseccfg : register)) then DfracDiscarded
+      else if decide (r' = r) then dqc else dqp.
+
+  Lemma cw_fresh_ne (r : register) :
+    cw_fresh r ->
+    (misa : register) <> r /\ (mseccfg : register) <> r /\
+    (cur_privilege : register) <> r.
+  Proof.
+    intros (H1 & H2 & H3). split_and!; intro Heq; rewrite -Heq in H1, H2, H3;
+      first [ vm_compute in H1; discriminate
+            | vm_compute in H2; discriminate
+            | vm_compute in H3; discriminate ].
+  Qed.
+
+  Lemma cr_disj (r : register) : (∅ : gset register) ## cr_Dro r.
+  Proof. set_solver. Qed.
+
+  Lemma cr_in_r (r : register) : r ∈ (∅ : gset register) ∪ cr_Dro r.
+  Proof. rewrite /cr_Dro /cw_Drw. set_solver. Qed.
+  Lemma cr_in_priv (r : register) :
+    (cur_privilege : register) ∈ (∅ : gset register) ∪ cr_Dro r.
+  Proof. rewrite /cr_Dro /cw_Dro. set_solver. Qed.
+  Lemma cr_in_sec (r : register) :
+    (mseccfg : register) ∈ (∅ : gset register) ∪ cr_Dro r.
+  Proof. rewrite /cr_Dro /cw_Dro. set_solver. Qed.
+  Lemma cr_in_misa (r : register) :
+    (misa : register) ∈ (∅ : gset register) ∪ cr_Dro r.
+  Proof. rewrite /cr_Dro /cw_Dro. set_solver. Qed.
+
+  (* the empty writable frame, which is what "writes nothing" costs *)
+  Lemma hreg_frame_empty (rs : regstate) :
+    ⊢ (hreg_frame rs ∅ : iProp Σ).
+  Proof. rewrite /hreg_frame big_sepS_empty. auto. Qed.
+
+  Lemma cr_Df_misa dqp dqc r : cr_Df dqp dqc r misa = DfracDiscarded.
+  Proof. rewrite /cr_Df. repeat case_decide; congruence. Qed.
+  Lemma cr_Df_sec dqp dqc r : cr_Df dqp dqc r mseccfg = DfracDiscarded.
+  Proof. rewrite /cr_Df. repeat case_decide; congruence. Qed.
+  Lemma cr_Df_priv dqp dqc r :
+    cw_fresh r -> cr_Df dqp dqc r cur_privilege = dqp.
+  Proof.
+    intros Hfr. pose proof (cw_fresh_ne r Hfr) as (_ & _ & Npriv).
+    rewrite /cr_Df. repeat case_decide; congruence.
+  Qed.
+  Lemma cr_Df_r dqp dqc r : cw_fresh r -> cr_Df dqp dqc r r = dqc.
+  Proof.
+    intros Hfr. pose proof (cw_fresh_ne r Hfr) as (Nmisa & Nsec & _).
+    rewrite /cr_Df. repeat case_decide; congruence.
+  Qed.
+
+  Lemma cr_frames (dqp dqc : dfrac) (r : register) (v0 : type_of_register r) :
+    cw_fresh r ->
+    (hreg_frame_ro (cr_Df dqp dqc r) (cw_rs r v0) (cr_Dro r) : iProp Σ)
+    ⊣⊢ (reg_pointsto r dqc v0 ∗
+        reg_pointsto cur_privilege dqp Machine ∗
+        reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+        reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hfr.
+    rewrite /hreg_frame_ro /cr_Dro.
+    rewrite (big_sepS_union _ (cw_Drw r) cw_Dro (cw_disj r Hfr)).
+    rewrite /cw_Drw /cw_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite cw_rs_r (cw_rs_priv r v0 Hfr) (cw_rs_sec r v0 Hfr)
+      (cw_rs_misa r v0 Hfr).
+    rewrite (cr_Df_r dqp dqc r Hfr) (cr_Df_priv dqp dqc r Hfr)
+      (cr_Df_sec dqp dqc r) (cr_Df_misa dqp dqc r).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE THREE PINS ALONE, for a csrr whose CSR cell the leaf does NOT     *)
+  (* own ([time]).  The read of that cell is then UNPINNED -- outside       *)
+  (* [Drw ∪ Dro] -- which the span allows and [swp_read_reg_any] takes.     *)
+  (* ------------------------------------------------------------------ *)
+  Definition cr0_rs : regstate :=
+    register_set misa MISA_C
+      (register_set mseccfg (Values.mword_of_int 0)
+         (register_set cur_privilege Machine init_regstate)).
+
+  Lemma cr0_rs_misa : register_lookup misa cr0_rs = MISA_C.
+  Proof. rewrite /cr0_rs. apply register_lookup_set. Qed.
+  Lemma cr0_rs_sec : register_lookup mseccfg cr0_rs = Values.mword_of_int 0.
+  Proof.
+    rewrite /cr0_rs.
+    etransitivity; [apply irrelevant_register_set; vm_compute; reflexivity|].
+    apply register_lookup_set.
+  Qed.
+  Lemma cr0_rs_priv : register_lookup cur_privilege cr0_rs = Machine.
+  Proof.
+    rewrite /cr0_rs.
+    etransitivity; [apply irrelevant_register_set; vm_compute; reflexivity|].
+    etransitivity; [apply irrelevant_register_set; vm_compute; reflexivity|].
+    apply register_lookup_set.
+  Qed.
+
+  Lemma cr0_disj : (∅ : gset register) ## cw_Dro.
+  Proof. set_solver. Qed.
+  Lemma cr0_in_priv : (cur_privilege : register) ∈ (∅ : gset register) ∪ cw_Dro.
+  Proof. rewrite /cw_Dro. set_solver. Qed.
+  Lemma cr0_in_sec : (mseccfg : register) ∈ (∅ : gset register) ∪ cw_Dro.
+  Proof. rewrite /cw_Dro. set_solver. Qed.
+  Lemma cr0_in_misa : (misa : register) ∈ (∅ : gset register) ∪ cw_Dro.
+  Proof. rewrite /cw_Dro. set_solver. Qed.
+
+  Lemma cr0_frames (dqp : dfrac) :
+    (hreg_frame_ro (cw_Df dqp) cr0_rs cw_Dro : iProp Σ)
+    ⊣⊢ (reg_pointsto cur_privilege dqp Machine ∗
+        reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+        reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    rewrite /hreg_frame_ro /cw_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite cr0_rs_priv cr0_rs_sec cr0_rs_misa.
+    rewrite (cw_Df_priv dqp) (cw_Df_sec dqp) (cw_Df_misa dqp).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma cr0_frames_in (dqp : dfrac) :
+    reg_pointsto cur_privilege dqp Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame cr0_rs ∅ ∗
+     hreg_frame_ro (cw_Df dqp) cr0_rs cw_Dro : iProp Σ).
+  Proof.
+    iIntros "H1 H2 H3". iSplitR; [iApply hreg_frame_empty|].
+    rewrite (cr0_frames dqp). iFrame.
+  Qed.
+
+  Lemma cr0_frames_out (dqp : dfrac) :
+    (hreg_frame_ro (cw_Df dqp) cr0_rs cw_Dro : iProp Σ) -∗
+    (reg_pointsto cur_privilege dqp Machine ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof. rewrite (cr0_frames dqp). iIntros "H". iExact "H". Qed.
+
+  Lemma cr_frames_in (dqp dqc : dfrac) (r : register)
+      (v0 : type_of_register r) :
+    cw_fresh r ->
+    reg_pointsto r dqc v0 -∗
+    reg_pointsto cur_privilege dqp Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (cw_rs r v0) ∅ ∗
+     hreg_frame_ro (cr_Df dqp dqc r) (cw_rs r v0) (cr_Dro r) : iProp Σ).
+  Proof.
+    intros Hfr. iIntros "H1 H2 H3 H4".
+    iSplitR; [iApply hreg_frame_empty|].
+    rewrite (cr_frames dqp dqc r v0 Hfr). iFrame.
+  Qed.
+
+  Lemma cr_frames_out (dqp dqc : dfrac) (r : register)
+      (v0 : type_of_register r) :
+    cw_fresh r ->
+    (hreg_frame_ro (cr_Df dqp dqc r) (cw_rs r v0) (cr_Dro r) : iProp Σ) -∗
+    (reg_pointsto r dqc v0 ∗
+     reg_pointsto cur_privilege dqp Machine ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hfr. rewrite (cr_frames dqp dqc r v0 Hfr). iIntros "H". iExact "H".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* TWO [hval] PEELS, for the stretches [hfrun] cannot walk.              *)
+  (*                                                                      *)
+  (* [hfrun] answers a read from the pinned file, so every register it      *)
+  (* reads must be in [D] -- i.e. owned.  A stretch whose RESULT does not   *)
+  (* depend on what it read needs neither: the span's read case is          *)
+  (* ungated, so the value is simply ∀-quantified.  This is the [tk_peel_   *)
+  (* any] move of [HartMCycle.tick_clock_hvalE], as a lemma rather than an  *)
+  (* Ltac.  (Both belong in HartSpanChar once a second family wants them.)  *)
+  (* ------------------------------------------------------------------ *)
+  Lemma hval_ret {X : Type} (D Drw : gset register) (rs : regstate) (x : X) :
+    hval D Drw rs (Interface.Ret x) x rs.
+  Proof.
+    intros rs0 l Hag Hchain Hstop.
+    rewrite (hspan_stop_refl D Drw (Interface.Ret x) rs0 l
+               (eq_refl : hspan_stops Drw (Interface.Ret x) = true) Hchain).
+    cbn.
+    split; [reflexivity | exact Hag].
+  Qed.
+
+  Lemma hval_read_any {X : Type} (D Drw : gset register) (r : register)
+      (rs : regstate) (m : M X) (x : X) (rs' : regstate) :
+    hregread_at r m = true ->
+    (forall v : type_of_register r,
+       hval D Drw rs (hregread_resume r v m) x rs') ->
+    hval D Drw rs m x rs'.
+  Proof.
+    intros Hat Hrest rs0 l Hag Hchain Hstop.
+    assert (Hns : hspan_stops Drw m = false).
+    { destruct (hregread_at_inv r m Hat) as (ak & K & -> & _). reflexivity. }
+    apply hspan_peel in Hchain; [| exact Hns | exact Hstop].
+    destruct Hchain as (c & Hstep & Hchain).
+    destruct (hspani_read_any_inv D Drw r m rs0 c Hat Hstep)
+      as (v & rs1 & Hag1 & ->).
+    apply (Hrest v rs1 l); [| exact Hchain | exact Hstop].
+    intros q Hq. rewrite (Hag1 q Hq). exact (Hag q Hq).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* [doCSR] at CSRRS with rs1 = x0 -- a plain [csrr rd, csr].            *)
+  (*                                                                      *)
+  (* [swp_doCSR_csrw]'s mirror, and the CSR READ is an obligation for the  *)
+  (* same reason the write is one.  [read_CSR] is read-only, so [goodb]    *)
+  (* certifies its SHAPE -- but its VALUE is the caller's own register     *)
+  (* content, and [hval_of_goodb] transports only reads whose values are   *)
+  (* pinned at the reference state.  So the lemma stops naming what the    *)
+  (* CSR reads, exactly as the csrw one stops naming how the write         *)
+  (* happens.                                                             *)
+  (*                                                                      *)
+  (* [rs1_val] is universally quantified: the read path never uses it, so  *)
+  (* the caller need not know what x0 reads as.                           *)
+  (*                                                                      *)
+  (* The rd write is INSIDE [doCSR] on this path (unlike csrw, where it is *)
+  (* at x0 and vanishes), so [gpr_file] is threaded through here.          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_doCSR_csrr_gen (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (m : regfile) (csr : SailStdpp.Values.mword 12)
+      (rd : SailStdpp.Values.mword 5)
+      (rs1_val : SailStdpp.Values.mword 64)
+      (Q : SailStdpp.Values.mword 64 -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    uint rd <> 0 ->
+    ext_check_CSR csr Machine CSRRead = true ->
+    (* THE LEGALITY CHECK, as an [hval] rather than as a [goodb] transport:
+       [time]'s check reads the counter-enable cells, which no leaf owns, so
+       its route into [hval] is a ∀-peel and not the reference-state
+       transport.  The engine only needs the conclusion. *)
+    hval (Drw ∪ Dro) Drw rs (check_CSR_result csr Machine CSRRead)
+      (CSR_Check_OK tt) rs ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    (forall x, csr_id_read_callback csr x = Defs.returnm tt) ->
+    gen_cert -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_CSR csr)
+         (fun x => Q x ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (doCSR csr rs1_val (Regidx rd) CSRRS CSRRead)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                ∃ x : SailStdpp.Values.mword 64, Q x ∗
+                gpr_file (<[Regidx rd := regval_into_reg x]> m) ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hrd Hext Hchk H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hrdcsr".
+    unfold doCSR.
+    (* 1. cur_privilege *)
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs cur_privilege Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (p) "(-> & Hrw & Hro)". rewrite Hpriv.
+    (* 2. the legality check, goodb-transported *)
+    iApply (swp_bind_use (check_CSR_result csr Machine CSRRead) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ (CSR_Check_OK tt) Hdisj Hchk
+                with "Hcert Hrw Hro"). }
+    iIntros (w1) "(-> & Hrw & Hro)". cbn match.
+    (* 3. cur_privilege again, then the pure gate *)
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs cur_privilege Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (p2) "(-> & Hrw & Hro)". rewrite Hpriv Hext.
+    change (Riscv.rv64d.not true) with false. cbn match.
+    (* 4. the CSR read -- the caller's obligation *)
+    replace (if Instances.generic_neq CSRRead CSRWrite then read_CSR csr
+             else returnM (zeros' 64))
+      with (read_CSR csr : M (SailStdpp.Values.mword 64)) by reflexivity.
+    iApply (swp_bind_use (read_CSR csr) _ _ _ with "[Hrdcsr Hrw Hro] [-]").
+    { iApply ("Hrdcsr" with "Hrw Hro"). }
+    iIntros (rv) "(HQ & Hrw & Hro)".
+    (* 5. NOT mip/sip, so [dest_val] is the value just read *)
+    rewrite H344 H144.
+    iApply (swp_bind_use (returnM rv : M (SailStdpp.Values.mword 64)) _
+              (fun x => ⌜x = rv⌝ ∗ hreg_frame rs Drw ∗
+                        hreg_frame_ro Df rs Dro)%I _ with "[Hrw Hro] [-]").
+    { iApply swp_ret. by iFrame. }
+    iIntros (dv) "(-> & Hrw & Hro)".
+    replace (Instances.generic_eq CSRRead CSRRead) with true
+      by reflexivity. cbn match.
+    (* 6. the pure callback, then the rd write *)
+    iApply (swp_bind0_use _ _
+              (fun _ => gpr_file (<[Regidx rd := regval_into_reg rv]> m) ∗
+                        hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+              with "[Hf Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => gpr_file m ∗
+                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+                with "[Hf Hrw Hro] [-]").
+      { rewrite (Hcb rv). iApply swp_ret. by iFrame. }
+      iIntros (u) "(Hf & Hrw & Hro)".
+      iApply (swp_mono with "[Hrw Hro] [-]");
+        [| iApply (swp_wX_file rd m rv Hrd with "Hcert Hf") ].
+      iIntros (u2) "Hf". by iFrame. }
+    iIntros (u3) "(Hf & Hrw & Hro)". iApply swp_ret.
+    iSplitR; [done|]. iExists rv. iFrame.
+  Qed.
+
+  (* [execute_CSRReg csr x0 rd CSRRS]: peel the x0 source read and hand the
+     rest to [swp_doCSR_csrr_gen].  The value read is irrelevant (see above),
+     so nothing here needs to know that x0 reads as zero. *)
+  Lemma swp_execute_CSRReg_csrr_gen (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (m : regfile)
+      (csr : SailStdpp.Values.mword 12) (rd : SailStdpp.Values.mword 5)
+      (Q : SailStdpp.Values.mword 64 -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    uint rd <> 0 ->
+    ext_check_CSR csr Machine CSRRead = true ->
+    (* THE LEGALITY CHECK, as an [hval] rather than as a [goodb] transport:
+       [time]'s check reads the counter-enable cells, which no leaf owns, so
+       its route into [hval] is a ∀-peel and not the reference-state
+       transport.  The engine only needs the conclusion. *)
+    hval (Drw ∪ Dro) Drw rs (check_CSR_result csr Machine CSRRead)
+      (CSR_Check_OK tt) rs ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    (forall x, csr_id_read_callback csr x = Defs.returnm tt) ->
+    gen_cert -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_CSR csr)
+         (fun x => Q x ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (execute_CSRReg csr zreg (Regidx rd) CSRRS)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                ∃ x : SailStdpp.Values.mword 64, Q x ∗
+                gpr_file (<[Regidx rd := regval_into_reg x]> m) ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hrd Hext Hchk H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hrdcsr".
+    unfold execute_CSRReg.
+    (* [csr_access_type]'s arguments are (rd = x0, rs1 = x0): here rs1 IS x0,
+       and CSRRS with a zero SOURCE is a read whatever rd is. *)
+    replace (csr_access_type CSRRS (Instances.generic_eq (Regidx rd) zreg)
+               (Instances.generic_eq zreg zreg))
+      with CSRRead
+      by (replace (Instances.generic_eq zreg zreg) with true by reflexivity;
+          destruct (Instances.generic_eq (Regidx rd) zreg); reflexivity).
+    (* the x0 SOURCE read, peeled at [cli_rs1] (the zero index by name --
+       [WpMmodeLeafBase]; the literal syntax is not available in this import
+       context, see the csr344 note above) *)
+    change zreg with (Regidx cli_rs1).
+    iApply (swp_bind_use (rX_bits (Regidx cli_rs1)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file cli_rs1 m with "Hcert Hf"). }
+    iIntros (v) "[-> Hf]".
+    iApply (swp_doCSR_csrr_gen Drw Dro Df rs m csr rd _ Q Hdisj HDpriv
+              Hpriv Hrd Hext Hchk H344 H144 Hcb
+              with "Hcert Hf Hrw Hro Hrdcsr").
+  Qed.
+
+  (* the PINNED corollary, which is what a leaf holding the CSR cell wants:
+     the read value is named, so the continuation's GPR file is concrete and
+     no existential reaches the leaf statement. *)
+  Lemma swp_execute_CSRReg_csrr (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (m : regfile)
+      (csr : SailStdpp.Values.mword 12) (rd : SailStdpp.Values.mword 5)
+      (readval : SailStdpp.Values.mword 64) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    uint rd <> 0 ->
+    ext_check_CSR csr Machine CSRRead = true ->
+    (* THE LEGALITY CHECK, as an [hval] rather than as a [goodb] transport:
+       [time]'s check reads the counter-enable cells, which no leaf owns, so
+       its route into [hval] is a ∀-peel and not the reference-state
+       transport.  The engine only needs the conclusion. *)
+    hval (Drw ∪ Dro) Drw rs (check_CSR_result csr Machine CSRRead)
+      (CSR_Check_OK tt) rs ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    (forall x, csr_id_read_callback csr x = Defs.returnm tt) ->
+    gen_cert -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_CSR csr)
+         (fun x => ⌜x = readval⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (execute_CSRReg csr zreg (Regidx rd) CSRRS)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                gpr_file (<[Regidx rd := regval_into_reg readval]> m) ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hrd Hext Hchk H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hrdcsr".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_execute_CSRReg_csrr_gen Drw Dro Df rs m csr rd
+                   (fun x => ⌜x = readval⌝)%I Hdisj HDpriv
+                   Hpriv Hrd Hext Hchk H344 H144 Hcb
+                   with "Hcert Hf Hrw Hro Hrdcsr") ].
+    iIntros (e) "(-> & H)".
+    iDestruct "H" as (x) "(-> & Hf & Hrw & Hro)". by iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* READING A REGISTER NOBODY OWNS.  [swp_read_reg_cell] reads a cell the *)
+  (* leaf holds and pins the value; [swp_read_reg_pinned] does the same at  *)
+  (* a frame.  A csrr of [time] can do neither: mtime is written by the     *)
+  (* clock tick, so it lives in the WRAPPER's writable frame and no leaf     *)
+  (* can hold a fraction of it.  The node still steps -- the span's read     *)
+  (* case is ungated -- it just returns a value the leaf cannot name, which  *)
+  (* is exactly why [wp_csrr_time_gpr]'s continuation quantifies it.         *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_read_reg_any (r : register) (Φ : type_of_register r -> iProp Σ) :
+    gen_cert -∗ (∀ v : type_of_register r, Φ v) -∗ swp (Defs.read_reg r) Φ.
+  Proof.
+    iIntros "#Hcert HΦ".
+    iApply (swp_hart_regread with "Hcert").
+    { cbn [hregread_at]. apply bool_decide_eq_true_2. reflexivity. }
+    iIntros (σ) "Hsi".
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hcl". iNext. iMod "Hcl" as "_". iModIntro. iFrame "Hsi".
+    rewrite hregread_resume_red.
+    iApply swp_ret. iApply "HΦ".
   Qed.
 
   (* the post-write file: [write_CSR] leaves a [register_set], which agrees

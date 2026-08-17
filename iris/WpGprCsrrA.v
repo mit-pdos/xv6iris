@@ -13,6 +13,24 @@ From iris.base_logic.lib Require Import invariants.
 From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 Require Import WpGprCsrrCommon.
+Require Import WpMmodeCsrSwp.   (* swp_execute_CSRReg_csrr + the cr_* footprint *)
+Require Import HartSwp HartSpan HartSpanChar HartGoodb WpDecodeBridge.
+
+(* [read_CSR csr_csrr] IS the mhartid read -- the whole 4096-way dispatch
+   collapses by conversion at a literal CSR number, which is why
+   [ExecCommon.exec_read_CSR_csrr] is one [exact].  So the walker takes it
+   with one node of fuel and no pruning tactic at all. *)
+Lemma hfrun_read_CSR_csrr (D Drw : gset register) (rs : regstate) :
+  (R_bitvector_64 mhartid : register) ∈ D ->
+  hfrun 2 D Drw rs (read_CSR csr_csrr)
+  = Some (register_lookup (R_bitvector_64 mhartid) rs, rs).
+Proof.
+  intros HD.
+  change (read_CSR csr_csrr)
+    with (Defs.read_reg (R_bitvector_64 mhartid) : M (mword 64)).
+  cbn beta iota zeta delta [Defs.read_reg].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD). apply hfrun_ret.
+Qed.
 
 (* ====================================================================== *)
 (* Register-generic CSR-read execute: csrr rd, mhartid (= csrrs rd,mhartid,x0).*)
@@ -105,6 +123,38 @@ Proof.
   apply exec_returnM.
 Qed.
 
+(* the walker's twin of [exec_read_CSR_mstatus]: the same two guard
+   collapses, done at the TERM so both interpreters can use it.  Concluding at
+   the RAW register value rather than the subrange (they are equal by
+   [subrange64_id]) is what keeps the leaf statement free of the projection. *)
+Lemma read_CSR_mstatus_red :
+  read_CSR csr_mstatus
+  = (Defs.bind (Defs.read_reg mstatus)
+       (fun v : mword 64 => returnM (subrange_vec_dec v (Z.sub xlen 1) 0))
+     : M (mword 64)).
+Proof.
+  unfold read_CSR, csr_mstatus.
+  replace (eq_vec (Ox"300" : mword 12) (Ox"301")) with false
+    by (vm_compute; reflexivity).
+  cbn match.
+  replace (andb (Z.eqb xlen 64) (eq_vec (Ox"300" : mword 12) (Ox"300")))
+    with true by (vm_compute; reflexivity).
+  cbn match. reflexivity.
+Qed.
+
+Lemma hfrun_read_CSR_mstatus (D Drw : gset register) (rs : regstate) :
+  (R_bitvector_64 mstatus : register) ∈ D ->
+  hfrun 3 D Drw rs (read_CSR csr_mstatus)
+  = Some (register_lookup (R_bitvector_64 mstatus) rs, rs).
+Proof.
+  intros HD. rewrite read_CSR_mstatus_red.
+  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+    Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+  cbn beta iota zeta delta [Defs.returnm returnM].
+  rewrite hfrun_ret subrange64_id. reflexivity.
+Qed.
+
 Lemma exec_check_CSR_result_mstatus s :
   exec (check_CSR_result csr_mstatus Machine CSRRead) s = Some (CSR_Check_OK tt, s).
 Proof.
@@ -146,6 +196,25 @@ Lemma exec_read_CSR_mcounteren s :
   exec (read_CSR (Ox"306")) s
     = Some (zero_extend' 64 (register_lookup mcounteren s.(sregs)), s).
 Proof. drive_csr. rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcounteren s)). apply exec_returnM. Qed.
+
+Lemma read_CSR_mcounteren_red :
+  read_CSR (Ox"306")
+  = (Defs.bind (Defs.read_reg mcounteren)
+       (fun v : mword 32 => returnM (zero_extend' 64 v)) : M (mword 64)).
+Proof. drive_csr_term. reflexivity. Qed.
+
+Lemma hfrun_read_CSR_mcounteren (D Drw : gset register) (rs : regstate) :
+  (R_bitvector_32 mcounteren : register) ∈ D ->
+  hfrun 3 D Drw rs (read_CSR (Ox"306"))
+  = Some (zero_extend' 64 (register_lookup (R_bitvector_32 mcounteren) rs), rs).
+Proof.
+  intros HD. rewrite read_CSR_mcounteren_red.
+  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+    Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+  cbn beta iota zeta delta [Defs.returnm returnM].
+  apply hfrun_ret.
+Qed.
 
 (* ===== mcounteren (0x306): Ext_U-gated, read = zero_extend' 64 mcounteren ===== *)
 Definition csr_mcounteren : mword 12 := Ox"306".
@@ -238,71 +307,86 @@ Section WpCsrrMhartidGpr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hmh Hinstr Hcont".
-    (* keep half of [mmode_config] to read cur_privilege at the execute state *)
-    iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc Hpc Hfmap Hmh Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 mhartid))
+      by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
+    assert (Hchk : exec (check_CSR_result csr_csrr Machine CSRRead) dstateM
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
+    (* keep half of [mmode_config]: the CSR legality check reads
+       cur_privilege, and the wrapper has the other half *)
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) pmpcfg0
-              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    (* read cur_privilege (kept half) and mhartid off their points-to (against σ) *)
-    iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hmh") as %Lmh.
-    (* tick nextPC; PC/cur_privilege/mhartid unchanged *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (LprivS : register_lookup cur_privilege
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (LmhS : register_lookup mhartid
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = mhartid_in).
-    { rewrite mhartid_set_nextPC. exact Lmh. }
-    (* write rd (rd <> 0, so its entry is the real register points-to) *)
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg mhartid_in)
-                 with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg mhartid_in)
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg mhartid_in)).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)))
-        with (execute_CSRReg csr_csrr zreg (Regidx rd) CSRRS).
-      rewrite (exec_execute_CSRReg_gpr rd (set_reg σ nextPC (add_vec_int pc 4)) Hrd LprivS).
-      rewrite LmhS. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    (* continuation: PC/nextPC are both pc+4; reassemble mmode_config and hand
-       everything back *)
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg mhartid_in)).(sregs)
-             = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg.
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    (* rebuild the kept half of mmode_config and recombine with the returned half *)
-    iAssert (mmode_config (DfracOwn (q/2)))%I
-      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
-    iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
-    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hmh").
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr pc (add_vec_int pc 4) false
+              (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) m
+              (<[Regidx rd := regval_into_reg mhartid_in]> m) pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
+               mhartid ↦ᵣ mhartid_in)%I
+              Hpmp Hstat
+              with "Hmm_wp Hpmpc_wp Hpc Hfmap Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k Hmh] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iDestruct (cr_frames_in (DfracOwn (q/2)) (DfracOwn 1)
+                   (R_bitvector_64 mhartid) mhartid_in Hfresh
+                   with "Hmh Hpriv_k Hmseccfg Hmisa") as "[Hrw Hro]".
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro]");
+        [| iApply (swp_execute_CSRReg_csrr ∅ (cr_Dro (R_bitvector_64 mhartid))
+                     (cr_Df (DfracOwn (q/2)) (DfracOwn 1)
+                        (R_bitvector_64 mhartid))
+                     (cw_rs (R_bitvector_64 mhartid) mhartid_in) m
+                     csr_csrr rd mhartid_in
+                     (cr_disj (R_bitvector_64 mhartid))
+                     (cr_in_priv (R_bitvector_64 mhartid))
+                     (cw_rs_priv (R_bitvector_64 mhartid) mhartid_in Hfresh)
+                     Hrd
+                     ltac:(vm_compute; reflexivity)
+                     (hval_check_CSR_result _ ∅ _ csr_csrr CSRRead
+                        (cr_in_priv (R_bitvector_64 mhartid)) (cr_in_sec (R_bitvector_64 mhartid))
+                        (cr_in_misa (R_bitvector_64 mhartid))
+                        (cw_rs_priv (R_bitvector_64 mhartid) mhartid_in Hfresh)
+                        (cw_rs_sec (R_bitvector_64 mhartid) mhartid_in Hfresh)
+                        (cw_rs_misa (R_bitvector_64 mhartid) mhartid_in Hfresh)
+                        ltac:(vm_compute; reflexivity) Hchk)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(intros ?; vm_compute; reflexivity)
+                     with "Hcert Hf Hrw Hro [Hcert]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (cr_frames_out (DfracOwn (q/2)) (DfracOwn 1)
+                     (R_bitvector_64 mhartid) mhartid_in Hfresh with "Hro")
+          as "(Hmh & Hpriv_k & _ & _)".
+        iSplitR; [done|]. iFrame "Hf HPC HnPC".
+        iSplitL "Hhs_k Hpriv_k Hmst_k".
+        { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+        iFrame "Hpmpc_k Hmh".
+      + (* the CSR read: [read_CSR csr_csrr] IS the mhartid read *)
+        iIntros "Hrw Hro".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_hfrun 2 ∅ (cr_Dro (R_bitvector_64 mhartid))
+                       (cr_Df (DfracOwn (q/2)) (DfracOwn 1)
+                          (R_bitvector_64 mhartid))
+                       (cw_rs (R_bitvector_64 mhartid) mhartid_in) _ _ _
+                       (cr_disj (R_bitvector_64 mhartid))
+                       (hfrun_read_CSR_csrr
+                          (∅ ∪ cr_Dro (R_bitvector_64 mhartid)) ∅
+                          (cw_rs (R_bitvector_64 mhartid) mhartid_in)
+                          (cr_in_r (R_bitvector_64 mhartid)))
+                       with "Hcert Hrw Hro") ].
+        iIntros (x) "(-> & Hrw & Hro)".
+        rewrite (cw_rs_r (R_bitvector_64 mhartid) mhartid_in).
+        iSplitR; [done|]. iFrame.
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmh')".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hmh'").
   Qed.
 End WpCsrrMhartidGpr.
 (* ====================================================================== *)
@@ -347,64 +431,81 @@ Section WpCsrrGprA.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
-    iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc Hpc Hfmap Hcsr Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 mstatus))
+      by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
+    assert (Hchk : exec (check_CSR_result csr_mstatus Machine CSRRead) dstateM
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr pc false (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) pmpcfg0
-              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hcsr") as %Lcsr.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (LprivS : register_lookup cur_privilege
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (Hrv : mstatus_rdval (set_reg σ nextPC (add_vec_int pc 4))
-             = mstatus_in).
-    { rewrite mstatus_rdval_set_nextPC. unfold mstatus_rdval. rewrite Lcsr. apply subrange64_id. }
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (mstatus_in))
-                 with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (mstatus_in))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (mstatus_in))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)))
-        with (execute_CSRReg csr_mstatus zreg (Regidx rd) CSRRS).
-      rewrite (exec_execute_csrr_mstatus_gpr rd
-                 (set_reg σ nextPC (add_vec_int pc 4)) Hrd LprivS).
-      rewrite Hrv. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (mstatus_in))).(sregs)
-             = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (q/2)))%I
-      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
-    iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
-    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr pc (add_vec_int pc 4) false
+              (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) m
+              (<[Regidx rd := regval_into_reg mstatus_in]> m) pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
+               mstatus ↦ᵣ{dqm} mstatus_in)%I
+              Hpmp Hstat
+              with "Hmm_wp Hpmpc_wp Hpc Hfmap Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k Hcsr] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iDestruct (cr_frames_in (DfracOwn (q/2)) dqm
+                   (R_bitvector_64 mstatus) mstatus_in Hfresh
+                   with "Hcsr Hpriv_k Hmseccfg Hmisa") as "[Hrw Hro]".
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro]");
+        [| iApply (swp_execute_CSRReg_csrr ∅ (cr_Dro (R_bitvector_64 mstatus))
+                     (cr_Df (DfracOwn (q/2)) dqm (R_bitvector_64 mstatus))
+                     (cw_rs (R_bitvector_64 mstatus) mstatus_in) m
+                     csr_mstatus rd mstatus_in
+                     (cr_disj (R_bitvector_64 mstatus))
+                     (cr_in_priv (R_bitvector_64 mstatus))
+                     (cw_rs_priv (R_bitvector_64 mstatus) mstatus_in Hfresh)
+                     Hrd
+                     ltac:(vm_compute; reflexivity)
+                     (hval_check_CSR_result _ ∅ _ csr_mstatus CSRRead
+                        (cr_in_priv (R_bitvector_64 mstatus)) (cr_in_sec (R_bitvector_64 mstatus))
+                        (cr_in_misa (R_bitvector_64 mstatus))
+                        (cw_rs_priv (R_bitvector_64 mstatus) mstatus_in Hfresh)
+                        (cw_rs_sec (R_bitvector_64 mstatus) mstatus_in Hfresh)
+                        (cw_rs_misa (R_bitvector_64 mstatus) mstatus_in Hfresh)
+                        ltac:(vm_compute; reflexivity) Hchk)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(intros ?; vm_compute; reflexivity)
+                     with "Hcert Hf Hrw Hro [Hcert]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (cr_frames_out (DfracOwn (q/2)) dqm
+                     (R_bitvector_64 mstatus) mstatus_in Hfresh with "Hro")
+          as "(Hcsr & Hpriv_k & _ & _)".
+        iSplitR; [done|]. iFrame "Hf HPC HnPC".
+        iSplitL "Hhs_k Hpriv_k Hmst_k".
+        { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+        iFrame "Hpmpc_k Hcsr".
+      + iIntros "Hrw Hro".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_hfrun 3 ∅ (cr_Dro (R_bitvector_64 mstatus))
+                       (cr_Df (DfracOwn (q/2)) dqm (R_bitvector_64 mstatus))
+                       (cw_rs (R_bitvector_64 mstatus) mstatus_in) _ _ _
+                       (cr_disj (R_bitvector_64 mstatus))
+                       (hfrun_read_CSR_mstatus
+                          (∅ ∪ cr_Dro (R_bitvector_64 mstatus)) ∅
+                          (cw_rs (R_bitvector_64 mstatus) mstatus_in)
+                          (cr_in_r (R_bitvector_64 mstatus)))
+                       with "Hcert Hrw Hro") ].
+        iIntros (x) "(-> & Hrw & Hro)".
+        rewrite (cw_rs_r (R_bitvector_64 mstatus) mstatus_in).
+        iSplitR; [done|]. iFrame.
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
   Qed.
 
   (* mcounteren (0x306): Ext_U-gated; misa.U recovered from hw_config. *)
@@ -428,67 +529,87 @@ Section WpCsrrGprA.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
-    iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc Hpc Hfmap Hcsr Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_32 mcounteren))
+      by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
+    (* the Ext_U gate needs no premise here: the check is transported from the
+       reference state, where misa IS [MISA_C] and misa.U is set -- the same
+       pin [hw_config] carries. *)
+    assert (Hchk : exec (check_CSR_result csr_mcounteren Machine CSRRead) dstateM
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) pmpcfg0
-              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid with "Hreg Hcsr") as %Lcsr.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (LprivS : register_lookup cur_privilege
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (HUS : eq_vec (_get_Misa_U (register_lookup misa
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs))) ('b"1") = true).
-    { rewrite misa_set_nextPC. rewrite Lmisa. exact HmisaU. }
-    assert (Hrv : mcounteren_rdval (set_reg σ nextPC (add_vec_int pc 4))
-             = zero_extend' 64 mcen_in).
-    { rewrite mcounteren_rdval_set_nextPC. unfold mcounteren_rdval. rewrite Lcsr. reflexivity. }
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (zero_extend' 64 mcen_in))
-                 with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (zero_extend' 64 mcen_in))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (zero_extend' 64 mcen_in))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)))
-        with (execute_CSRReg csr_mcounteren zreg (Regidx rd) CSRRS).
-      rewrite (exec_execute_csrr_mcounteren_gpr rd
-                 (set_reg σ nextPC (add_vec_int pc 4)) Hrd LprivS HUS).
-      rewrite Hrv. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (zero_extend' 64 mcen_in))).(sregs)
-             = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (q/2)))%I
-      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
-    iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
-    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr pc (add_vec_int pc 4) false
+              (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) m
+              (<[Regidx rd := regval_into_reg (zero_extend' 64 mcen_in)]> m)
+              pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
+               mcounteren ↦ᵣ mcen_in)%I
+              Hpmp Hstat
+              with "Hmm_wp Hpmpc_wp Hpc Hfmap Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k Hcsr] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iDestruct (cr_frames_in (DfracOwn (q/2)) (DfracOwn 1)
+                   (R_bitvector_32 mcounteren) mcen_in Hfresh
+                   with "Hcsr Hpriv_k Hmseccfg Hmisa") as "[Hrw Hro]".
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro]");
+        [| iApply (swp_execute_CSRReg_csrr ∅
+                     (cr_Dro (R_bitvector_32 mcounteren))
+                     (cr_Df (DfracOwn (q/2)) (DfracOwn 1)
+                        (R_bitvector_32 mcounteren))
+                     (cw_rs (R_bitvector_32 mcounteren) mcen_in) m
+                     csr_mcounteren rd (zero_extend' 64 mcen_in)
+                     (cr_disj (R_bitvector_32 mcounteren))
+                     (cr_in_priv (R_bitvector_32 mcounteren))
+                     (cw_rs_priv (R_bitvector_32 mcounteren) mcen_in Hfresh)
+                     Hrd
+                     ltac:(vm_compute; reflexivity)
+                     (hval_check_CSR_result _ ∅ _ csr_mcounteren CSRRead
+                        (cr_in_priv (R_bitvector_32 mcounteren)) (cr_in_sec (R_bitvector_32 mcounteren))
+                        (cr_in_misa (R_bitvector_32 mcounteren))
+                        (cw_rs_priv (R_bitvector_32 mcounteren) mcen_in Hfresh)
+                        (cw_rs_sec (R_bitvector_32 mcounteren) mcen_in Hfresh)
+                        (cw_rs_misa (R_bitvector_32 mcounteren) mcen_in Hfresh)
+                        ltac:(vm_compute; reflexivity) Hchk)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(intros ?; vm_compute; reflexivity)
+                     with "Hcert Hf Hrw Hro [Hcert]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (cr_frames_out (DfracOwn (q/2)) (DfracOwn 1)
+                     (R_bitvector_32 mcounteren) mcen_in Hfresh with "Hro")
+          as "(Hcsr & Hpriv_k & _ & _)".
+        iSplitR; [done|]. iFrame "Hf HPC HnPC".
+        iSplitL "Hhs_k Hpriv_k Hmst_k".
+        { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+        iFrame "Hpmpc_k Hcsr".
+      + iIntros "Hrw Hro".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_hfrun 3 ∅ (cr_Dro (R_bitvector_32 mcounteren))
+                       (cr_Df (DfracOwn (q/2)) (DfracOwn 1)
+                          (R_bitvector_32 mcounteren))
+                       (cw_rs (R_bitvector_32 mcounteren) mcen_in) _ _ _
+                       (cr_disj (R_bitvector_32 mcounteren))
+                       (hfrun_read_CSR_mcounteren
+                          (∅ ∪ cr_Dro (R_bitvector_32 mcounteren)) ∅
+                          (cw_rs (R_bitvector_32 mcounteren) mcen_in)
+                          (cr_in_r (R_bitvector_32 mcounteren)))
+                       with "Hcert Hrw Hro") ].
+        iIntros (x) "(-> & Hrw & Hro)".
+        rewrite (cw_rs_r (R_bitvector_32 mcounteren) mcen_in).
+        iSplitR; [done|]. iFrame.
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
   Qed.
 End WpCsrrGprA.
