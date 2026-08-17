@@ -9,8 +9,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode ExecCommon WpGpr RegFile.
 Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
-Require Import HartSwp HartSpan HartSpanChar HartMCycle HartMFrame
-        HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
+Require Import HartSwp HartLift HartSpan HartSpanChar HartMCycle
+        HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Local Open Scope Z_scope.
 Require Import WpGprCsrwCommon.
 
@@ -913,8 +913,8 @@ Section WpCsrwGprNewA.
     assert (Hfresh : cw_fresh medeleg)
       by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
     assert (Hchk : exec (check_CSR_result csr_medeleg Machine CSRWrite) dstateM
-                   = Some (CSR_Check_OK tt, dstateM)).
-    { vm_compute; reflexivity. }
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
@@ -933,11 +933,48 @@ Section WpCsrwGprNewA.
               with "Hmm_wp Hpmpc_wp Hpc Hf Hinstr
                     [Hhs_k Hpriv_k Hmst_k Hpmpc_k Hcsr] [Hcont]").
     - iIntros "Hf HPC HnPC".
+      (* the write obligation, stated at the NAMED post-file so nothing after
+         it has to convert a [register_set] *)
+      iAssert (hreg_frame (cw_rs medeleg medeleg0) (cw_Drw medeleg) -∗
+               hreg_frame_ro (cw_Df (DfracOwn (q/2))) (cw_rs medeleg medeleg0)
+                 cw_Dro -∗
+               swp (write_CSR csr_medeleg (m !!! Regidx rs1))
+                 (fun x => ⌜x = Values.Ok
+                     (legalize_medeleg medeleg0 (m !!! Regidx rs1))⌝ ∗
+                   hreg_frame (cw_rs medeleg
+                     (legalize_medeleg medeleg0 (m !!! Regidx rs1)))
+                     (cw_Drw medeleg) ∗
+                   hreg_frame_ro (cw_Df (DfracOwn (q/2))) (cw_rs medeleg
+                     (legalize_medeleg medeleg0 (m !!! Regidx rs1)))
+                     cw_Dro))%I as "Hwr".
+      { iIntros "Hrw Hro".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_hfrun 8 (cw_Drw medeleg) cw_Dro
+                       (cw_Df (DfracOwn (q/2))) (cw_rs medeleg medeleg0) _ _ _
+                       (cw_disj medeleg Hfresh)
+                       (hfrun_write_CSR_medeleg (cw_Drw medeleg ∪ cw_Dro)
+                          (cw_Drw medeleg) (cw_rs medeleg medeleg0)
+                          (m !!! Regidx rs1) (cw_in_r medeleg)
+                          (cw_w_r medeleg))
+                       with "Hcert Hrw Hro") ].
+        iIntros (x) "(-> & Hrw & Hro)".
+        rewrite (cw_rs_r medeleg medeleg0).
+        iDestruct (cw_rw_ext medeleg _ _
+                     (reg_agree_l _ _ _ _
+                        (cw_set_agree medeleg medeleg0 _ Hfresh))
+                     with "Hrw") as "Hrw".
+        iDestruct (cw_ro_ext (DfracOwn (q/2)) _ _
+                     (reg_agree_r _ _ _ _
+                        (cw_set_agree medeleg medeleg0 _ Hfresh))
+                     with "Hro") as "Hro".
+        iSplitR; [done|]. iFrame. }
       iDestruct (cw_frames_in (DfracOwn (q/2)) medeleg medeleg0 Hfresh
                    with "Hcsr Hpriv_k Hmseccfg Hmisa") as "[Hrw Hro]".
-      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro]");
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro Hwr]");
         [| iApply (swp_execute_CSRReg_csrw (cw_Drw medeleg) cw_Dro
-                     (cw_Df (DfracOwn (q/2))) (cw_rs medeleg medeleg0) _ m
+                     (cw_Df (DfracOwn (q/2))) (cw_rs medeleg medeleg0)
+                     (cw_rs medeleg
+                        (legalize_medeleg medeleg0 (m !!! Regidx rs1))) m
                      csr_medeleg rs1 _ (cw_disj medeleg Hfresh)
                      (cw_in_priv medeleg) (cw_in_sec medeleg)
                      (cw_in_misa medeleg)
@@ -948,21 +985,9 @@ Section WpCsrwGprNewA.
                      ltac:(vm_compute; reflexivity)
                      Hchk
                      ltac:(vm_compute; reflexivity)
-                     (hfrun_write_CSR_medeleg (cw_Drw medeleg ∪ cw_Dro)
-                        (cw_Drw medeleg) (cw_rs medeleg medeleg0)
-                        (m !!! Regidx rs1) (cw_in_r medeleg) (cw_w_r medeleg))
                      ltac:(vm_compute; reflexivity)
-                     with "Hcert Hf Hrw Hro") ].
+                     with "Hcert Hf Hrw Hro Hwr") ].
       iIntros (e) "(-> & Hf & Hrw & Hro)".
-      rewrite (cw_rs_r medeleg medeleg0).
-      iDestruct (cw_rw_ext medeleg _ _
-                   (reg_agree_l _ _ _ _
-                      (cw_set_agree medeleg medeleg0 _ Hfresh))
-                   with "Hrw") as "Hrw".
-      iDestruct (cw_ro_ext (DfracOwn (q/2)) _ _
-                   (reg_agree_r _ _ _ _
-                      (cw_set_agree medeleg medeleg0 _ Hfresh))
-                   with "Hro") as "Hro".
       iDestruct (cw_frames_out (DfracOwn (q/2)) medeleg _ Hfresh
                    with "[$Hrw $Hro]") as "(Hcsr & Hpriv_k & _ & _)".
       iSplitR; [done|]. iFrame "Hf HPC HnPC".
@@ -1000,8 +1025,8 @@ Section WpCsrwGprNewA.
     assert (Hfresh : cw_fresh mcounteren)
       by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
     assert (Hchk : exec (check_CSR_result csr_mcounteren Machine CSRWrite) dstateM
-                   = Some (CSR_Check_OK tt, dstateM)).
-    { vm_compute; reflexivity. }
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
@@ -1020,11 +1045,48 @@ Section WpCsrwGprNewA.
               with "Hmm_wp Hpmpc_wp Hpc Hf Hinstr
                     [Hhs_k Hpriv_k Hmst_k Hpmpc_k Hcsr] [Hcont]").
     - iIntros "Hf HPC HnPC".
+      (* the write obligation, stated at the NAMED post-file so nothing after
+         it has to convert a [register_set] *)
+      iAssert (hreg_frame (cw_rs mcounteren mcounteren0) (cw_Drw mcounteren) -∗
+               hreg_frame_ro (cw_Df (DfracOwn (q/2))) (cw_rs mcounteren mcounteren0)
+                 cw_Dro -∗
+               swp (write_CSR csr_mcounteren (m !!! Regidx rs1))
+                 (fun x => ⌜x = Values.Ok (zero_extend' 64
+                     (legalize_mcounteren mcounteren0 (m !!! Regidx rs1)))⌝ ∗
+                   hreg_frame (cw_rs mcounteren
+                     (legalize_mcounteren mcounteren0 (m !!! Regidx rs1)))
+                     (cw_Drw mcounteren) ∗
+                   hreg_frame_ro (cw_Df (DfracOwn (q/2))) (cw_rs mcounteren
+                     (legalize_mcounteren mcounteren0 (m !!! Regidx rs1)))
+                     cw_Dro))%I as "Hwr".
+      { iIntros "Hrw Hro".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_hfrun 8 (cw_Drw mcounteren) cw_Dro
+                       (cw_Df (DfracOwn (q/2))) (cw_rs mcounteren mcounteren0) _ _ _
+                       (cw_disj mcounteren Hfresh)
+                       (hfrun_write_CSR_mcounteren (cw_Drw mcounteren ∪ cw_Dro)
+                          (cw_Drw mcounteren) (cw_rs mcounteren mcounteren0)
+                          (m !!! Regidx rs1) (cw_in_r mcounteren)
+                          (cw_w_r mcounteren))
+                       with "Hcert Hrw Hro") ].
+        iIntros (x) "(-> & Hrw & Hro)".
+        rewrite (cw_rs_r mcounteren mcounteren0).
+        iDestruct (cw_rw_ext mcounteren _ _
+                     (reg_agree_l _ _ _ _
+                        (cw_set_agree mcounteren mcounteren0 _ Hfresh))
+                     with "Hrw") as "Hrw".
+        iDestruct (cw_ro_ext (DfracOwn (q/2)) _ _
+                     (reg_agree_r _ _ _ _
+                        (cw_set_agree mcounteren mcounteren0 _ Hfresh))
+                     with "Hro") as "Hro".
+        iSplitR; [done|]. iFrame. }
       iDestruct (cw_frames_in (DfracOwn (q/2)) mcounteren mcounteren0 Hfresh
                    with "Hcsr Hpriv_k Hmseccfg Hmisa") as "[Hrw Hro]".
-      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro]");
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro Hwr]");
         [| iApply (swp_execute_CSRReg_csrw (cw_Drw mcounteren) cw_Dro
-                     (cw_Df (DfracOwn (q/2))) (cw_rs mcounteren mcounteren0) _ m
+                     (cw_Df (DfracOwn (q/2))) (cw_rs mcounteren mcounteren0)
+                     (cw_rs mcounteren
+                        (legalize_mcounteren mcounteren0 (m !!! Regidx rs1))) m
                      csr_mcounteren rs1 _ (cw_disj mcounteren Hfresh)
                      (cw_in_priv mcounteren) (cw_in_sec mcounteren)
                      (cw_in_misa mcounteren)
@@ -1035,21 +1097,9 @@ Section WpCsrwGprNewA.
                      ltac:(vm_compute; reflexivity)
                      Hchk
                      ltac:(vm_compute; reflexivity)
-                     (hfrun_write_CSR_mcounteren (cw_Drw mcounteren ∪ cw_Dro)
-                        (cw_Drw mcounteren) (cw_rs mcounteren mcounteren0)
-                        (m !!! Regidx rs1) (cw_in_r mcounteren) (cw_w_r mcounteren))
                      ltac:(vm_compute; reflexivity)
-                     with "Hcert Hf Hrw Hro") ].
+                     with "Hcert Hf Hrw Hro Hwr") ].
       iIntros (e) "(-> & Hf & Hrw & Hro)".
-      rewrite (cw_rs_r mcounteren mcounteren0).
-      iDestruct (cw_rw_ext mcounteren _ _
-                   (reg_agree_l _ _ _ _
-                      (cw_set_agree mcounteren mcounteren0 _ Hfresh))
-                   with "Hrw") as "Hrw".
-      iDestruct (cw_ro_ext (DfracOwn (q/2)) _ _
-                   (reg_agree_r _ _ _ _
-                      (cw_set_agree mcounteren mcounteren0 _ Hfresh))
-                   with "Hro") as "Hro".
       iDestruct (cw_frames_out (DfracOwn (q/2)) mcounteren _ Hfresh
                    with "[$Hrw $Hro]") as "(Hcsr & Hpriv_k & _ & _)".
       iSplitR; [done|]. iFrame "Hf HPC HnPC".

@@ -210,18 +210,26 @@ Section csrw.
     (if eq_vec csr csr344 then read_mip IncludePlatformInterrupts
      else if eq_vec csr csr144 then read_sip IncludePlatformInterrupts
      else returnM (zeros' 64)) = (returnM (zeros' 64) : M (SailStdpp.Values.mword 64)) ->
-    hfrun 8 (Drw ∪ Dro) Drw rs (write_CSR csr v) = Some (Values.Ok cfinal, rs') ->
     csr_id_write_callback csr cfinal = Defs.returnm tt ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
+    (* the write as an OBLIGATION, not an [hfrun] fact: medeleg and mcounteren
+       are three nodes at one register and discharge it by [swp_hfrun], but
+       menvcfg and mepc wrap a READ-ONLY legalization several [hartSupports] /
+       [currentlyEnabled] levels deep around their store -- goodb territory --
+       and since that sits INSIDE a function that writes, goodb cannot take
+       [write_CSR] whole.  So the lemma stops naming HOW the write happens. *)
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (write_CSR csr v)
+         (fun x => ⌜x = Values.Ok cfinal⌝ ∗
+                   hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)) -∗
     swp (doCSR csr v zreg CSRRW CSRWrite)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                 hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
   Proof.
-    intros Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa Hext Hgb Hex Hmip
-      Hwr Hcb.
-    iIntros "#Hcert Hrw Hro".
+    intros Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa Hext Hgb Hex Hmip Hcb.
+    iIntros "#Hcert Hrw Hro Hwr".
     unfold doCSR.
     (* 1. cur_privilege *)
     iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
@@ -261,9 +269,8 @@ Section csrw.
     replace (Instances.generic_eq CSRWrite CSRRead) with false
       by reflexivity. cbn match.
     (* 4. the write -- a computed walk at the ONE concrete CSR *)
-    iApply (swp_bind_use (write_CSR csr v) _ _ _ with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 8 Drw Dro Df rs rs' _ _ Hdisj Hwr
-                with "Hcert Hrw Hro"). }
+    iApply (swp_bind_use (write_CSR csr v) _ _ _ with "[Hwr Hrw Hro] [-]").
+    { iApply ("Hwr" with "Hrw Hro"). }
     iIntros (wres) "(-> & Hrw & Hro)". cbn match.
     (* 5. the discarded x0 write and the pure callback *)
     iApply (swp_bind0_use _ _
@@ -301,20 +308,21 @@ Section csrw.
     (if eq_vec csr csr344 then read_mip IncludePlatformInterrupts
      else if eq_vec csr csr144 then read_sip IncludePlatformInterrupts
      else returnM (zeros' 64)) = (returnM (zeros' 64) : M (SailStdpp.Values.mword 64)) ->
-    hfrun 8 (Drw ∪ Dro) Drw rs (write_CSR csr (m !!! Regidx rs1))
-      = Some (Values.Ok cfinal, rs') ->
     csr_id_write_callback csr cfinal = Defs.returnm tt ->
     gen_cert -∗
     gpr_file m -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (write_CSR csr (m !!! Regidx rs1))
+         (fun x => ⌜x = Values.Ok cfinal⌝ ∗
+                   hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)) -∗
     swp (execute_CSRReg csr (Regidx rs1) zreg CSRRW)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
                 hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
   Proof.
-    intros Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa Hext Hgb Hex Hmip
-      Hwr Hcb.
-    iIntros "#Hcert Hf Hrw Hro".
+    intros Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa Hext Hgb Hex Hmip Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hwr".
     unfold execute_CSRReg.
     replace (csr_access_type CSRRW (Instances.generic_eq zreg zreg)
                (Instances.generic_eq (Regidx rs1) zreg))
@@ -324,10 +332,10 @@ Section csrw.
     iApply (swp_bind_use (rX_bits (Regidx rs1)) _ _ _ with "[Hf] [-]").
     { iApply (swp_rX_file rs1 m with "Hcert Hf"). }
     iIntros (v) "[-> Hf]".
-    iApply (swp_mono with "[Hf] [Hrw Hro]");
+    iApply (swp_mono with "[Hf] [Hrw Hro Hwr]");
       [| iApply (swp_doCSR_csrw Drw Dro Df rs rs' csr (m !!! Regidx rs1)
                    cfinal Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa Hext
-                   Hgb Hex Hmip Hwr Hcb with "Hcert Hrw Hro") ].
+                   Hgb Hex Hmip Hcb with "Hcert Hrw Hro Hwr") ].
     iIntros (e) "(-> & Hrw & Hro)". iSplitR; [done|]. iFrame.
   Qed.
 

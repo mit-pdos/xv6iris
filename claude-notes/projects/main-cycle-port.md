@@ -184,6 +184,69 @@ Evidence:
 - `iris/HartPilot.v` — the Phase B pilot at parity: one instruction at a
   concrete state, 3.6 s file, 0.2 s instantiation.
 
+## THE LEAF SWEEP: state, and the rule that makes it cheap
+
+Nine leaf files plus `ProofSpin` are converted to the `swp` obligation, **14
+statements verified byte-identical** (mechanically, against the pre-sweep
+commit).  Green: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`,
+`WpMmodeAddiw`, `WpMmodeMul`, `WpMmodeUtype`, `WpMmodeJal`, `WpMmodeJalr`,
+`ProofSpin`.  Red roots: `WpMmodeLoad`, `WpMmodeStore`, `WpMmodeMret`,
+`WpGprCsrrCommon`, `WpGprCsrwA` (2 of 4 leaves done), `WpGprCsrwB`,
+`SmodeCore`.
+
+**THE RULE, and it decides every case: ask whether the stretch WRITES.**
+
+- **READ-ONLY, however deep its recursion → `HartGoodb.hval_of_goodb`.**
+  `goodb` is `vm_compute`d at `dstateM` and the `exec` fact is the one the
+  exec-based stack already proved.  This is what makes
+  `currentlyEnabled Ext_Zicfilp` (four levels of guarded recursion) and
+  `check_CSR_result` (ditto) free instead of a reduction project.  Their read
+  sets are both inside `WpDecodeBridge.D_m` = {cur_privilege, mseccfg, misa},
+  which is why `cw_Dro` is exactly those three.
+- **WRITES → hand-walk with `hfrun`.**  `goodb` rejects writes outright.
+  `jump_to` and `write_CSR` went this way; both are a handful of nodes at
+  CONCRETE registers once the spine is reduced with a whitelisted `cbn`.
+  `try_catch` is a Fixpoint over the term, not a node, so it pushes THROUGH
+  reads and writes and vanishes — `catch_early_return` costs nothing.
+- **A SYMBOLIC register index is the only thing no walker takes.**
+  `rX_bits`/`wX_bits` at a quantified operand is where every leaf peels:
+  `HartMFrame.swp_rX_file` / `swp_wX_file` (at `gpr_file`, so operand
+  aliasing is free), or `WpMmodeJump.swp_wX_zero` when the destination is x0.
+
+**WHEN A LEMMA'S PREMISE IS AN `hfrun` FACT, IT ONLY WORKS AT CONCRETE
+OPERANDS.**  Twice now the fix was the same: make it a `swp` OBLIGATION and
+keep the `hfrun` form as a corollary for the pilot.  `swp_vmem_write_gen`
+(address computation) and `swp_doCSR_csrw` (the CSR write) both did this, and
+`swp_execute_STORE` still wants it.  An abstract rider `Q` carries `gpr_file`
+through such an obligation; the GPRs stay OUT of every footprint.
+
+**WHAT REMAINS, per family:**
+- `WpGprCsrwA/B`, `WpGprCsrrCommon` (8 leaves): substitution, plus one write
+  peel each.  Same-shaped CSRs (read old / write legalized / read back) are
+  PURE SUBSTITUTION — `mcounteren` was `medeleg` with the name changed.
+  `menvcfg`/`mepc` wrap a read-only legalization (`legalize_menvcfg`,
+  `legalize_xepc`) around their store: goodb the legalization, cell-write the
+  store.  There is NO per-CSR legality lemma — `check_CSR_result` at
+  `dstateM` is `vm_compute; reflexivity` for every csr.
+- `WpMmodeLoad`/`WpMmodeStore` (6 leaves): every one is **width 8** and
+  `HartMStore`'s chain is hardcoded to 4 (37 sites: `mem_write_ea`,
+  `split_on_page_boundary .. 4 = (4,0)`, `subrange_vec_dec d 31 0`, the
+  4-alignment side conditions).  A width sweep of the same kind the 2-byte
+  fetch needed.
+- `WpMmodeMret`: the only leaf that pushes on the obligation.  It WRITES
+  mstatus and cur_privilege, so the `mmode_config_split` trick that carried
+  JALR/JAL/CSR does not apply — it needs those cells exclusively.
+- `SmodeCore`: reuses `HartMCycle.swp_exec_step_decode_execute` verbatim (that
+  rule is mode-agnostic on purpose); needs its own ~30-line `s_cycle` and its
+  own fetch.
+
+**THE DOWNSTREAM CLAIM IS UNVERIFIED.**  770 of 1179 files sit behind the red
+roots, so no whole-function proof has been re-checked.  Leaf statements being
+identical is necessary, not sufficient.  Known exposure: 6 files DESTRUCTURE
+`pc_is` (`WpIntrInv`, `WpSmodeIntr`, `WpSmodeWfi`, `UserKernelBridge`, …) and
+each needs the one-line fix `ProofSpin` needed, because `pc_is` now carries
+`minstret_res ∗ clock_res`.
+
 ## Left, in order
 
 1. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
