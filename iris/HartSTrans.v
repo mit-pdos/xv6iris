@@ -34,7 +34,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
+        RiscvFetchExec.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb.
 Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree.
 Local Open Scope Z_scope.
@@ -151,5 +152,115 @@ Section strans.
                  HDb Hag Hchk Hpure Hupd Hpb)
               with "Hcert Hrw Hro").
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* [translate] on a MISS.  Assembly only: the lookup is the footprinted  *)
+  (* node above, the walk and the install are CommonWalk's converted        *)
+  (* chain.  The walk's per-PTE hypotheses are threaded positionally, the   *)
+  (* same way KptTree threads them on the exec side.                       *)
+  (*                                                                      *)
+  (* This is the first rule in the S-mode translation whose POST-FILE       *)
+  (* differs from its pre-file: the miss installs a TLB entry.             *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_translate_miss (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate)
+      (vpn : mword 27) (root : mword 44) (asid : mword 16)
+      (pte2 pte1 pte0 : mword 64) (menvcfg0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (slot : option TLB_Entry) :
+    (* the walk's own hypotheses, in the section's order *)
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                      (ext_bits_of_PTE pte2)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte2 7 0)) = true ->
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                      (ext_bits_of_PTE pte1)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte1 7 0)) = true ->
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                      (ext_bits_of_PTE pte0)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte0 7 0)) = false ->
+    (forall s, exec (check_PTE_permission acc p mxr do_sum
+                       (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                       (ext_bits_of_PTE pte0) tt) s
+               = Some (PTE_Check_Success tt, s)) ->
+    eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE pte0)) ('b"1") = false ->
+    (forall Db s, goodb Db (pte_is_invalid
+                     (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                     (ext_bits_of_PTE pte1)) s = true) ->
+    (forall Db s, goodb Db (pte_is_invalid
+                     (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                     (ext_bits_of_PTE pte2)) s = true) ->
+    (forall Db s, goodb Db (pte_is_invalid
+                     (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                     (ext_bits_of_PTE pte0)) s = true) ->
+    (forall Db s, goodb Db (check_PTE_permission acc p mxr do_sum
+                     (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                     (ext_bits_of_PTE pte0) tt) s = true) ->
+    (* the lookup misses: the slot is empty, or holds a foreign entry *)
+    Drw ## Dro ->
+    (tlb : register) ∈ Drw ∪ Dro ->
+    (tlb : register) ∈ Drw ->
+    register_lookup tlb rs = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = slot ->
+    match slot with
+    | None => True
+    | Some e => match_TLB_Entry e asid (sign_extend' (57 - 12) vpn) = false
+    end ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = None ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8)
+         (fun r => ⌜r = Values.Ok pte2⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr (u_pte_addr (u_next_base pte2)
+                        (subrange_vec_dec vpn 17 9))) 8)
+         (fun r => ⌜r = Values.Ok pte1⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr (u_pte_addr (u_next_base pte1)
+                        (subrange_vec_dec vpn 8 0))) 8)
+         (fun r => ⌜r = Values.Ok pte0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (translate 39 asid root vpn acc p mxr do_sum tt)
+      (fun r => ⌜r = Values.Ok (autocast (T := mword)
+                       ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44),
+                     PBMT_PMA, tt)⌝ ∗
+                hreg_frame (register_set tlb
+                    (vec_update_dec (register_lookup tlb rs)
+                       (tlb_hash (__id 39) vpn)
+                       (Some (u_walk_entry vpn pte2 pte1 pte0 asid))) rs) Drw ∗
+                hreg_frame_ro Df (register_set tlb
+                    (vec_update_dec (register_lookup tlb rs)
+                       (tlb_hash (__id 39) vpn)
+                       (Some (u_walk_entry vpn pte2 pte1 pte0 asid))) rs) Dro).
+  Proof.
+    intros H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N H1ig H2ig H0ig Hchk0g
+      Hdisj HDtlb HWtlb Htlb Hvec Hslot HD Hag Hmisa Hmenv HPBMTE Hnoupd.
+    iIntros "#Hcert Hrw Hro Hrd2 Hrd1 Hrd0".
+    unfold translate.
+    iApply (swp_bind_use (lookup_TLB 39 asid vpn) _ _ _ with "[Hrw Hro] [-]").
+    { destruct slot as [e |].
+      - iApply (swp_hfrun 2 Drw Dro Df rs rs _ _ Hdisj
+                  (hfrun_lookup_TLB_nomatch (Drw ∪ Dro) Drw rs vpn asid e tlbvec
+                     HDtlb Htlb Hvec Hslot)
+                  with "Hcert Hrw Hro").
+      - iApply (swp_hfrun 2 Drw Dro Df rs rs _ _ Hdisj
+                  (hfrun_lookup_TLB_empty (Drw ∪ Dro) Drw rs vpn asid tlbvec
+                     HDtlb Htlb Hvec)
+                  with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    iApply (swp_translate_TLB_miss_user vpn root pte2 pte1 pte0 acc p mxr do_sum
+              H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N H1ig H2ig H0ig Hchk0g
+              Drw Dro Df rs dst asid menvcfg0 Hdisj HD Hag HWtlb Hmisa Hmenv
+              HPBMTE Hnoupd with "Hcert Hrw Hro Hrd2 Hrd1 Hrd0").
+  Qed.
+
 
 End strans.
