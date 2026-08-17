@@ -18,8 +18,9 @@ access of one instruction can interleave with other harts.
 **zero leaf statement changes** (18 verified byte-identical against the
 pre-sweep commit `0bac621b`).
 
-Do not trust a `.vo` count in this file — rerun `make -f CoqMakefile -jN -k`
-and recount; the numbers here have gone stale before.
+Last counted: **450 of 1183 `.vo`, seven red roots.**  Do not trust that —
+rerun `make -f CoqMakefile -jN -k` and recount; the numbers here have gone
+stale before.
 
 GREEN: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`, `WpMmodeAddiw`,
 `WpMmodeMul`, `WpMmodeUtype`, `WpMmodeJal`, `WpMmodeJalr`, `WpGprCsrwA` (4
