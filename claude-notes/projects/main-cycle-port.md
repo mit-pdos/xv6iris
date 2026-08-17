@@ -9,52 +9,75 @@ measured ways to make a proof take minutes instead of milliseconds.
 
 ## CHECKPOINT
 
-Branch `hart-node-port` (off `main`). The port replaces the whole-instruction
-hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
-access of one instruction can interleave with other harts.
+Branch `hart-node-port` (off `main`), HEAD `e79d99b3`.  The port replaces the
+whole-instruction hart step with a per-node one, so a page walk, a TLB fill, a
+fetch and a data access of one instruction can interleave with other harts.
 
-**The tree is RED from `InstrBytes.v` up — 993 of 1181 `.vo` targets — and
-stays red until item 2 lands.**  (It was `MinstretInv.v`/994; that file is
-now green, which freed exactly ONE file — itself.  Turning a root green does
-not free the tree, it moves the root up one rung.  Expect the same shape all
-the way up.) This is by design (design doc §6):
-`wp_exec_step`'s whole-instruction, one-σ witness is unsound under per-node
-interleaving, and the rungs that were built on it come off one at a time.
-Confirmed by full `make -k` at each step: there is always exactly ONE red
-root.  `MinstretInv.v` was the first (`wp_exec_step`); `InstrBytes.v:695` is
-the second (`wp_exec_step_decode_execute_inv`, which wants `minstret_inv` and
-forwards to `wp_exec_step_hart_active_inv`).  The 994 is the
-transitive closure of `MinstretInv.vo` in `.CoqMakefile.d` — recount it
-there rather than trusting this number, which has already been stale once.  Iterate with single-file
-`coqc` or `make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a
-milestone (and `-k`, or it stops at the first red root).
+**THE WRAPPER IS DONE AND THE LEAF SWEEP IS MOSTLY DONE.**  `wp_instr` is proved
+for all four fetch shapes with no admits and at exactly the 5 rv64d platform
+axioms.  Ten leaf files plus `ProofSpin` are converted, **18 leaf statements
+verified byte-identical** (checked mechanically against the pre-sweep commit
+`0bac621b`), and the sweep has needed **zero statement changes**.
 
-**A `.vo` on disk does NOT mean the file is green.**  Measured: 1110 of the
-1173 `.v` have a `.vo`, but only 65 of the 994 red ones are actually
-missing — the other ~929 carry PRE-PORT `.vo` artifacts that `make` never
-touched, because it does not rebuild dependents of a target that failed.
-`coqc` on anything importing one reports *"makes inconsistent assumptions
-over library X"*, which is the real signal and is easy to misread as a
-fresh breakage.  When that appears, rebuild the named dependency; do not
-debug the file.
+Tree: **416 of 1179 `.vo`**, **6 red roots**.  Do not trust these numbers — rerun
+`make -f CoqMakefile -j16 -k` and recount; they have been stale before.
 
-**The whole-cycle leaf is back.**  `HartMLeaf.wp_word_main_b0` is
-`WP Loop ⊢ WP Loop` for one real kernel instruction (`c.sw a4,0(a5)` at
-`main+0xb0`), at BOTH ticks, with **no admits** and at **exactly the 5 rv64d
-platform axioms** — the same statement altitude the pre-port tree had, now
-discharged through the per-node language.  17 s for the file.
+GREEN leaf files: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`,
+`WpMmodeAddiw`, `WpMmodeMul`, `WpMmodeUtype`, `WpMmodeJal`, `WpMmodeJalr`,
+`WpGprCsrwA` (all 4 CSR leaves), `ProofSpin` (a whole-function proof, by Löb —
+the wrapper survives Löb, which was worth knowing).
 
-Everything listed under "What exists" is proven with no admits and at the
-same 5 axioms (several files are fully closed).  What is NOT yet done: any
-leaf with its **old statement byte-identical** — see item 1 and the honest
-scope note there.
+RED ROOTS, with the first error and what each needs:
+| file | error | needs |
+|---|---|---|
+| `WpGprCsrrCommon` :193 | `iIntuitionistic` | ordinary leaf conversion; owns nothing, writes only rd — cheapest left |
+| `WpGprCsrwB` :805 | `iIntuitionistic` | 4 leaves on existing machinery + `stimecmp` (see §mip below) |
+| `WpMmodeLoad` :61 | `iIntuitionistic` | width-8 sweep of `HartMStore` (37 sites) |
+| `WpMmodeStore` :64 | `iIntuitionistic` | ditto |
+| `WpMmodeMret` :69 | `wp_instr_config` not found | rebuild `wp_instr_config` (raw-cell wrapper, config may CHANGE) |
+| `SmodeCore` | not yet diagnosed past imports | the S-mode twin; reuses `swp_exec_step_decode_execute` verbatim |
 
-Where a fresh agent should start reading: design doc §§2–5 — §5 items 6 and
-7 are the interface and the two ways into it, and §5 item 1 is the list of
-measured ways to make a proof take minutes instead of milliseconds.  Then
-`iris/HartMCycle.v` (the computed route, end to end and small) and
-`iris/HartMDispatch.v` (the peeled route, and the `swp` corollary every
-caller uses).
+`WpGprCsrwC` is NOT green — it is blocked behind `WpGprCsrwB`, and it has 4 uses
+of `wp_instr_config`, so it lands with MRET.
+
+**IMMEDIATE NEXT STEPS, in the order I would do them:**
+1. **`wp_instr_config`** — a raw-cell twin of `wp_instr`.  `wp_mret_gpr` and
+   `WpGprCsrwC`'s two `_raw` leaves take `hw_config` + `hart_state` /
+   `cur_privilege` / `mstatus` at FULL ownership, not `mmode_config`, and MRET
+   *changes* cur_privilege (Machine→Supervisor) and mstatus — so the bundle is
+   not invariant across the instruction and `wp_instr`'s hand-in-take-back shape
+   cannot serve them.  The old stack had this wrapper for exactly these sites;
+   deleting it in this port was premature.
+2. **`WpGprCsrrCommon`** — cheapest; owns nothing.
+3. **The `tk_clock3`-agreement generalization**, then `stimecmp`, then
+   `WpGprCsrwB`'s other four (`mideleg`/`satp` take the menvcfg recipe verbatim;
+   `sie`/`pmpaddr0` own what they write).  Then `WpGprCsrwC` follows from (1).
+4. **Load/Store** last — the only remaining item needing no new machinery, just
+   volume: every leaf is a width-**8** access and `HartMStore`'s chain is
+   hardcoded to 4 across 37 sites (`mem_write_ea`, the
+   `split_on_page_boundary .. 4 = (4,0)` premise, `subrange_vec_dec d 31 0`, the
+   4-alignment side conditions).  `swp_vmem_write_gen` already took the address
+   stretch as an obligation, which was the part blocked on the wrapper's shape.
+
+**`minstret_inv := emp`, PERSISTENT, ON PURPOSE (MinstretInv.v).**  The Iris
+invariant is gone — counter facts are owned resources in `pc_is`'s
+`minstret_res` — but three leaves still take it as a premise and deleting it
+would have been the sweep's only statement change.  It carries no information.
+**Delete it once the tree is green**, as a standalone premise-removal commit.
+
+**THE DOWNSTREAM CLAIM IS STILL UNVERIFIED.**  ~760 of 1179 files sit behind the
+red roots, so no whole-function proof has been re-checked.  Identical leaf
+statements are necessary, not sufficient.  Known exposure: 6 files DESTRUCTURE
+`pc_is` (`WpIntrInv`, `WpSmodeIntr`, `WpSmodeWfi`, `UserKernelBridge`, …) and
+each needs the one-line fix `ProofSpin` needed, because `pc_is` now carries
+`minstret_res ∗ clock_res`.
+
+Where to read next: the "THE LEAF SWEEP" section below (the rule that decides
+every remaining case, and the per-family costs), then `iris/WpInstr.v`
+(`wp_instr` + `mm_cycle`), `iris/HartMCycle.v`
+(`swp_exec_step_decode_execute`, mode-agnostic on purpose),
+`iris/WpMmodeSwpBase.v` (the node shapes), `iris/WpMmodeJump.v` and
+`iris/WpMmodeCsrSwp.v` (the two worked non-template families).
 
 ## What exists
 
@@ -183,6 +206,47 @@ Evidence:
 
 - `iris/HartPilot.v` — the Phase B pilot at parity: one instruction at a
   concrete state, 3.6 s file, 0.2 s instantiation.
+
+## MACHINERY INVENTORY (what this port added, and where)
+
+| where | what | why it exists |
+|---|---|---|
+| `HartMCycle.swp_exec_step_decode_execute` | the cycle rule: resources in, ONE obligation, resources back with PC at the new value | replaces `wp_exec_step_decode_execute_inv`.  **MODE-AGNOSTIC ON PURPOSE** — no privilege, misa or mstatus.  S-mode reuses it verbatim; baking M-mode in here was a bug I had to undo |
+| `HartMCycle.swp_step_ex` | introduces the fetched word's existential | the word must be existential in the obligation, or a caller that dispatches on fetch SHAPE cannot instantiate it per branch |
+| `HartMCycle.reg_agree_l/_r` | footprint weakening | |
+| `HartMCycle.wrap_pre_*` / `wrap_post_*` | cell-by-cell reads of the tick's pre/post files | |
+| `WpInstr.wp_instr` | THE leaf wrapper, all four fetch shapes | takes `npc` explicitly (the old one recovered it from `s_exec`); lends PC read-only for AUIPC/JAL |
+| `WpInstr.mm_cycle` | the M-mode instance of the cycle rule | adds only the two bundle↔frame bridges |
+| `HartMFrame.swp_rX_file` / `swp_wX_file` | GPR access at `gpr_file`, not at three cells | operand ALIASING is free this way; an instruction may name the same register twice |
+| `HartMFrame.swp_read_reg_cell` / `swp_write_reg_cell` | register nodes at ONE owned cell | `HartSpanChar`'s pair is frame-shaped, right for the wrapper, wrong for a leaf |
+| `HartMFrame.mm_rw_ext` / `mm_ro_ext` / `mm_rw_open` / `mm_rw_close` | DIRECTED frame bridges | a `⊣⊢` rewrite in a proofmode goal cost ~110 s at one site; these are free |
+| `HartMFrame.mm_rs_agree`, `mm_rs_ro_agree`, `mm_npc_agree`, `mm_ro_nPC` | tower transports | see the two-tower trap in `optimization.md` |
+| `WpMmodeSwpBase` | the NODE SHAPES: `swp_execute_rw`/`rw2`/`rrw`/`rrw2`/`w`/`pure_w`/`pcw` | every register-only instruction is one of these; each takes the model's reduction as a hypothesis discharged by `eq_refl`, so an instruction family is one-line corollaries |
+| `WpMmodeJump` | `hfrun_jump_to_zca`, `hval_update_elp_state`, `swp_jump_to_zca`, `swp_execute_JALR_ret`, `swp_execute_JAL`, `swp_execute_JAL_zreg`, `swp_wX_zero`, the `cw_Drw`/`cw_Dro` footprint | the first family needing both routes |
+| `WpMmodeCsrSwp` | `swp_doCSR_csrw`, `swp_execute_CSRReg_csrw`, `cw_rs`/`cw_fresh`/`cw_frames`/`cw_set_agree` | one lemma for all ten CSR writes; the write is an OBLIGATION, not an `hfrun` fact |
+| `WpDecodeBridge.goodb_bind` / `goodb_bind0` | **goodb COMPOSES along a bind** | the key to certifying a stretch that carries SYMBOLIC data — assemble the certificate instead of computing it |
+| `HartMStore.swp_vmem_write_gen` | `vmem_write` with the address computation as an obligation + an abstract rider `Q` | an `hfrun` premise only discharges at CONCRETE operands; `Q` carries `gpr_file` through |
+| `InstrBytes.mmode_config_cert` | `gen_cert` out of the bundle without consuming it | every leaf's obligation needs it and the bundle is gone by then |
+| `MinstretInv.minstret_inv := emp` | a persistent no-op | so three upstream leaves keep their statements; **delete when green** |
+
+**THE RULE THAT DECIDES EVERY REMAINING CASE — ask whether the stretch WRITES:**
+- **read-only, any depth → `goodb`** at `dstateM`, transported by agreement.
+  Free.  Made `currentlyEnabled Ext_Zicfilp` and `check_CSR_result` (both four
+  levels of guarded recursion) cost nothing.
+- **writes → hand-walk with `hfrun`.**  `goodb` rejects writes.  A few nodes at
+  concrete registers once the spine is `cbn`'d with a whitelist.
+- **a SYMBOLIC register index is the only thing no walker takes** — that is where
+  every leaf peels (`swp_rX_file` / `swp_wX_file` / `swp_wX_zero`).
+
+**TWO LIMITS OF `goodb`, both isolated the hard way:**
+1. It transports only stretches whose reads have REFERENCE-PINNED values (its
+   premise is pointwise agreement with `dstateM`).  So `write_CSR csr_menvcfg`,
+   which reads `menvcfg` — the leaf's variable — can never go that route.  A
+   `goodbw` that tracked writes would NOT have helped; I proposed it and was
+   wrong.
+2. It is not COMPUTABLE when the certified term carries symbolic data
+   (`vm_compute`/`cbv`/`lazy` all diverge).  Fix: `goodb_bind`, assembling the
+   certificate from data-free pieces.
 
 ## THE LEAF SWEEP: state, and the rule that makes it cheap
 
