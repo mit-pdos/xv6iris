@@ -29,25 +29,59 @@ and `ProofSpin` (a whole-function proof, by Löb — the wrapper survives Löb,
 which was worth knowing).  **Sixteen CSR leaves in all**, which is every CSR
 instruction this kernel executes except `csrw stimecmp`.
 
-RED ROOTS, with what each needs:
-| file | needs |
-|---|---|
-| `WpGprCsrwStimecmp` | the cycle rule's post-file as a PREDICATE, so a leaf may write mip — see §"the two cells a leaf cannot have" |
-| `WpMmodeMret` | the MRET walk: ~15 nodes, plus a value-preserving write rule for elp — same § |
-| `WpMmodeLoad`, `WpMmodeStore` | width-**8** sweep of `HartMStore` (37 sites hardcoded to 4) |
-| `SmodeCore` | the S-mode twin: `wp_exec_step_decode_execute_inv_priv` (3 call sites — `TrampStepPt`, `SmodeCorePt` ×2) is the exec-shaped rule and has to become an `s_cycle` + an S-mode FETCH.  Reuses `swp_exec_step_decode_execute` verbatim; the fetch is the real work, since S-mode's goes through Sv39 translation and the TLB rather than `swp_fetch_ram`.  **This is the main event of the port, not a leaf sweep** — the whole point of per-node stepping is that a page walk can interleave |
+RED ROOTS, with what each needs and what it GATES (dependent counts off
+`.CoqMakefile.d`; rerun the count, do not trust it):
+
+| file | dependents | needs |
+|---|---|---|
+| `WpIntrCore` | 711 | THE INTERRUPT-ENTRY ENGINE.  Built on `wp_exec_step_minstret`, which went with the invariant.  This is the OTHER arm of `try_step`: `swp_exec_step_decode_execute` covers the arm where `dispatchInterrupt` returns None, and this is the one where it returns Some and the step takes the trap.  Also blocks `WpSmodeWfi` and `UserStepFull`, which use that rule directly |
+| `SmodeCorePt` | 464 | the S-MODE FETCH (Sv39 + TLB), then `wp_instr_s` / `s_cycle` on it.  `TrampStepPt` (19) is the same story |
+| `WpMmodeLoad` | 8 | width-8 sweep of `HartMStore` |
+| `WpMmodeStore` | 7 | ditto |
+| `WpGprCsrwStimecmp` | 7 | the cycle rule's post-file as a PREDICATE, so a leaf may write mip — see §"the two cells a leaf cannot have" |
+| `WpMmodeMret` | 6 | the MRET walk plus a value-preserving write rule for elp — same § |
+| `RiscvAdequacy` | 2 | one `discriminate` over the language's step relation ("No primitive equality found" at line 907) |
+
+**TWO ENGINES GATE THE TREE; THE LEAVES DO NOT.**  The four M-mode leaf roots
+are worth 6–8 files each.  `WpIntrCore` is worth 711 and `SmodeCorePt` 464.
+**Do not judge the remaining work by the number of red roots** — it is three
+ENGINES (fetch/execute, done; interrupt entry; the S-mode fetch) and then
+everything else follows.
+
+`SmodeCore.v` itself is green now: its blocker was the dead engine
+`wp_exec_step_decode_execute_inv_priv`, deleted for the reason the M-mode one
+was — it hands the caller the whole machine state and asks for a successor in
+one fupd.  Deleting it turned 22 more files green and revealed the two real
+gates above.
 
 **IMMEDIATE NEXT STEPS, in the order I would do them:**
-1. **Load/Store** — volume, no new machinery: every leaf is a width-8 access
+0. **THE INTERRUPT-ENTRY ENGINE** (`WpIntrCore`, 711 files).  Biggest lever, and
+   probably the smaller of the two engines: no fetch is involved.  It is the
+   `dispatchInterrupt = Some` arm of `try_step`, where the M-mode wrapper
+   assumes None (`swp_try_step_gen`'s `dispatchInterrupt_none_from_regs`), so
+   the pieces to write are that arm plus the trap-handler walk — and
+   `WpIntrCore` already has the whole `exec`-side reduction chain
+   (`exec_riscv_step_interrupt`, `exec_trap_handler_S_intr`, …) to mirror.
+1. **The S-MODE FETCH** — `swp_fetch_ram`'s twin through Sv39 and the TLB.
+   Everything else on that side reuses M-mode machinery: the cycle rule
+   (`swp_exec_step_decode_execute`) is already privilege-agnostic, the four
+   fetch SHAPES are `WpInstrRun.swp_run_hart_active_instr`'s business, and
+   `instr` itself is privilege-generic by construction.  What is genuinely new
+   is one fetch that WALKS, and it is the reason the port exists — a page walk
+   interleaving with other harts is the thing whole-instruction stepping could
+   not express.
+2. **`wp_instr_s` + `s_cycle`** on top of it (the `mm_cycle` / `wp_instr` pair,
+   with the S-mode bundle), then the three call sites.
+3. **Load/Store** — volume, no new machinery: every leaf is a width-8 access
    and `HartMStore`'s chain is hardcoded to 4 (`mem_write_ea`, the
    `split_on_page_boundary .. 4 = (4,0)` premise, `subrange_vec_dec d 31 0`,
-   the 4-alignment side conditions).  `swp_vmem_write_gen` already takes the
-   address stretch as an obligation, which was the part blocked on the
-   wrapper's shape.
-2. **The cycle-rule generalization**, then `stimecmp`.
-3. **MRET**, which is independent of (2) and needs only the elp rule.
-4. **`SmodeCore`** — biggest lever (600–700 dependents) and biggest job; plan
-   it as its own effort, with the S-mode fetch as the first piece.
+   the 4-alignment side conditions).  Generalize over the width with the
+   arithmetic facts as PREMISES — width 4 is still live (it is the
+   `HartMLeaf` pilot's `c.sw`), so this is a generalization and not a
+   conversion.  `swp_vmem_write_gen` already takes the address stretch as an
+   obligation, which was the part blocked on the wrapper's shape.
+4. **The cycle-rule generalization**, then `stimecmp`.
+5. **MRET**, independent of (4), needs only the elp rule.
 
 ### The two cells a leaf cannot have
 

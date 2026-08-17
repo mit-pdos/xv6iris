@@ -1239,77 +1239,23 @@ Section SmodeCoreIris.
   (* identity on kernel text), executing [fetch] yields exactly [r] with  *)
   (* NO state change.                                                     *)
   (* =================================================================== *)
-
+  (* 9. THE PRIVILEGE-GENERIC STEP ENGINE IS GONE, for the reason the      *)
+  (* M-mode one is (InstrBytes' note on                                    *)
+  (* [wp_exec_step_decode_execute_inv]): it handed the caller the whole    *)
+  (* machine state and asked for a successor in ONE fupd, and per-node     *)
+  (* stepping invalidates that -- other harts step between an              *)
+  (* instruction's nodes, so a successor computed from the sigma you saw   *)
+  (* is stale unless you can name what you depend on, i.e. a FOOTPRINT.    *)
+  (*                                                                      *)
+  (* Its replacement is [HartMCycle.swp_exec_step_decode_execute], which   *)
+  (* is already privilege-agnostic -- it reads NOTHING about the regime    *)
+  (* beyond the one [cur_privilege] lookup [try_step] itself makes -- plus *)
+  (* an S-mode FETCH.  The fetch is the work: M-mode's                     *)
+  (* [HartMFetch.swp_fetch_ram] translates identically, while S-mode goes  *)
+  (* through Sv39 and the TLB, which is exactly the interleaving this      *)
+  (* whole port exists to allow.  See the worklist                         *)
+  (* (claude-notes/projects/main-cycle-port.md).                           *)
   (* =================================================================== *)
-  (* 9. The privilege-generic decode/execute step engine, with the        *)
-  (* post-fetch state THREADED: the caller supplies fetch = Some (r, σf)  *)
-  (* (σf = σ on a TLB hit; σf = the TLB-filled state on a walk), decode   *)
-  (* at σf, and the execute obligations from σf.  The M-mode              *)
-  (* wp_exec_step_decode_execute_inv (semantically) the p := Machine,  *)
-  (* σf := σ instance.                                                    *)
-  (* =================================================================== *)
-  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (r : FetchResult) (i : instruction) (σf s_exec : mstate),
-         ⌜ register_lookup cur_privilege σ.(sregs) = p ⌝ ∗
-         ⌜ exec (dispatchInterrupt p) σ = Some (None, σ) ⌝ ∗
-         ⌜ exec (fetch tt) σ = Some (r, σf) ⌝ ∗
-         ⌜ exec (decode_fetch r) σf = Some (i, σf) ⌝ ∗
-         ⌜ eq_vec (register_lookup elp σf.(sregs))
-                  (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
-         (match r with
-          | F_Base w =>
-              ⌜ is_lpad_instruction i = false ⌝ ∗
-              ⌜ exec (execute i)
-                     (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 4))
-                  = Some (RETIRE_SUCCESS, s_exec) ⌝
-          | F_RVC h =>
-              ⌜ exec (currentlyEnabled Ext_Zca) σf = Some (true, σf) ⌝ ∗
-              ∃ other : instruction,
-                ⌜ exec (execute i)
-                       (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 2))
-                    = Some (ExecuteAs other,
-                            set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 2)) ⌝ ∗
-                ⌜ exec (execute other)
-                       (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 2))
-                    = Some (RETIRE_SUCCESS, s_exec) ⌝
-          | _ => False
-          end) ∗
-         PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         mstate_interp s_exec ∗
-         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "Hinv Hhs H".
-    iApply (wp_exec_step_hart_active_inv with "Hinv Hhs").
-    iIntros (σ) "Hsi".
-    iMod ("H" $! σ with "Hsi") as (r i σf s_exec)
-      "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
-    destruct r as [e | w | h | erx].
-    - (* F_Ext_Error: unreachable *) iDestruct "Hrest" as %[].
-    - (* F_Base w *)
-      iDestruct "Hrest" as "[%Hnotlpad %Hexec]".
-      iModIntro. iExists (zero_extend' 32 w), s_exec. iSplitR.
-      { iPureIntro.
-        exact (exec_hart_active_progress_base_gen p σ σf s_exec w i
-                 (register_lookup PC σf.(sregs)) RETIRE_SUCCESS
-                 Hpriv Hdisp Hfetch Hdec Hlpad Hnotlpad eq_refl Hexec I). }
-      iFrame "Hpc Hsi_exec". iExact "Hcont".
-    - (* F_RVC h *)
-      iDestruct "Hrest" as "[%Hzca Hrest]".
-      iDestruct "Hrest" as (other) "[%Hexec %Hexec2]".
-      iModIntro. iExists (zero_extend' 32 h), s_exec. iSplitR.
-      { iPureIntro.
-        exact (exec_hart_active_progress_RVC_gen p σ σf s_exec h i other
-                 (register_lookup PC σf.(sregs)) RETIRE_SUCCESS
-                 Hpriv Hdisp Hfetch Hdec Hlpad eq_refl Hzca Hexec Hexec2). }
-      iFrame "Hpc Hsi_exec". iExact "Hcont".
-    - (* F_Error: unreachable *) iDestruct "Hrest" as %[].
-  Qed.
 
   (* =================================================================== *)
   (* 10. instr_lift_s -- the S-mode lift of [instr]: the SAME predicate   *)
