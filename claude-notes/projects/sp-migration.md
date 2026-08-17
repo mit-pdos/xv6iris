@@ -2181,6 +2181,128 @@ the general recipe for the remaining `_s_r` consumers: check the regime's
   `grep -n 'sie_cap_gpr KT1' Spec*.v` now audits the post-boot surface
   directly.
 
+### K5 findings — THE TEXT TIER (LANDED, tree GREEN)
+
+Phase C's datum surgery transplanted onto `text_pointsto`, plus the F2/F3
+leaf treatment on the fetch path, plus the TRAMPOLINE mint. **Eight files**
+(`RiscvPtsto.v`, `KMap.v`, `InstrBytes.v`, `KernelText.v`, `SmodeCorePt.v`,
+`WpSmodeWfi.v`, `_CoqProject`, and `TrampText.v` new). Every `Spec*` file,
+every `Code*` file, every function proof, the whole boot carve and the whole
+adequacy image are byte-identical.
+
+#### The text family's roster
+
+| what | shape after K5 |
+|---|---|
+| `text_pointsto` (`RiscvPtsto.v`) | `` `{KTR : !CurKtier} `` after the `riscvGS` binder; the 4th conjunct is `⌜ktier_pin cur_ktier ppn va⌝` in place of `⌜pa_of ppn va = va⌝` |
+| notations | the three ambient rows (`↦ₓ{dq}` / `↦ₓ□` / `↦ₓ`) UNCHANGED, plus ONE explicit-tier row `a ↦ₓ[ kt ] dq v` through Iris's custom `dfrac` entry (all four dfrac spellings) |
+| suite, tier-generic in place, statements character-identical | `text_pointsto_acc`, `text_canonical`, `code_text`, `code_ram`, `text_valid`, `text_pointsto_persist`, `text_pointsto_pin` — they sit in `Section Bridge`, which already had `Context `{KTR : !CurKtier}`, so they became generic with no edit beyond the three conjunct spellings |
+| instances, DECLARED TWICE (F3) | `text_pointsto_discarded_persistent`/`'`, `text_pointsto_timeless`/`'` |
+| NEW | `text_ktier_mono` (weakening along `KtierLe`), `text_pointsto_agree` (`{kt1 kt2}` heterogeneous — this is what reconciles a KT1 trampoline byte with the KT0 image byte it was minted from) |
+| `KMap.v` | `text_ident_phys` needed NOTHING (it reads the identity off `pa_of_id`, never off the datum); `phys_ident_text` is tier-generic with its exact old signature, its `reflexivity` becoming `ktier_pin_of_id` — the same one-line change `phys_ident_mem` took in phase C |
+
+**No text strengthening lemma was added.** `mem_ktier_pin_intro` exists
+because a datum genuinely round-trips through a KT1 context; nothing does
+that to code yet. Add it (same four lines, `kmap_static … KP_rx`) when a
+consumer needs it.
+
+#### The fetch-site roster, and the one judgement call
+
+| file | what changed | why |
+|---|---|---|
+| `InstrBytes.v` | `instr_bytes` gains `` `{KTR : !CurKtier} `` | it is the fetch WINDOW; its tier is the window's tier |
+| `KernelText.v` | `instr_bytes_base`, `instr_bytes_rvc_any` gain the same binder | pure repackaging of a window into the footprint — free, and it is what a KT1 window will be handed to |
+| `SmodeCorePt.v` | `s_fetch_chunk` gains the binder (statement identical); `s_regime_fetch` gains the binder AND the premise `sr_ktier_wit R cur_ktier`; its five `sr_absorb …(sr_adm_id R … Hid)… "Hk …"` become `sr_absorb_ktier R cur_ktier cur_ktier … Hid … "Hwit Hk …"`; `tlb_inv_pt_fetch` gains the binder | the F2 merge: ONE name per rule, the two arms reconciled once inside `sr_absorb_ktier` |
+| `WpSmodeWfi.v` | one `iPoseProof (sr_ktier_wit_KT0 strans_regime)` + one hypothesis name in the `with` clause; one added `Require Import SRegime` | it is the only out-of-file `s_regime_fetch` caller |
+
+**THE WITNESS COST IS ZERO AT EVERY EXISTING CALLER, which is what made
+the merge (rather than a `_t` twin) the right call here — unlike the
+`_s_r_t` family.** Four call sites exist; two discharge it with
+`sr_ktier_wit_KT0` (`emp` at the ambient default) and `tlb_inv_pt_fetch`
+discharges it with `sr_ktier_wit_kpt_share` (`emp` at BOTH tiers, because
+`kpt_share_regime`'s `sr_kwit` is `emp`) — so `tlb_inv_pt_fetch` is itself
+tier-generic for free and `WpSmodeIntr.v`, its only consumer, did not move.
+This is F3's block-executor recipe again: **check the regime's `sr_kwit`
+before assuming a witness has to be threaded.**
+
+**`instr` IS DELIBERATELY NOT INDEXED, and that is the gap the uservec
+project inherits.** `instr` bundles `instr_bytes` with the decode
+obligation and is named in **284 files** (every `Code*.v`); indexing it is
+statement-identical but it is a 284-file blast radius, i.e. outside K5's
+fence. The consequence is precise: `wp_instr_s_regime` /
+`wp_instr_s_config_regime` / `wp_instr_s_config_tlbinv_pt` — everything
+that takes `instr` — stay KT0, and a KT1 fetch must go through
+`s_regime_fetch` (or `tlb_inv_pt_fetch`) with `(KTR := KT1)` directly, or
+index `instr` first. Do the latter as its OWN increment.
+
+#### The TRAMPOLINE mint (`TrampText.v`, new — a leaf, nothing imports it)
+
+```coq
+Definition tramp_page_va (va : mword 64) : Prop :=
+  (274877902848 <= uint va < 274877906944)%Z.   (* 2^38-4096 .. 2^38 *)
+
+Lemma tramp_text_mint (va : mword 64) (b : bv 8) :
+  tramp_page_va va ->
+  kmap_at tramp_vpn tramp_ppn KP_rx -∗
+  (kpt_exec_pa va) ↦ₓ[KT0]□ b -∗
+  va ↦ₓ[KT1]□ b.
+```
+
+plus `tramp_text_window` (the same pointwise over `[∗ list] j ∈ seq 0 W`,
+i.e. exactly the shape `instr_bytes_base`/`instr_bytes_rvc_any` consume)
+and `tramp_text_dup` (the statement of persistence a consumer can point
+at). **BOTH INPUTS ARE PERSISTENT, so the output is, and that is the whole
+design:** the identity image keeps every byte it had, the same byte is now
+ALSO owned at the high va, and there is no ownership conflict because text
+is `DfracDiscarded` — there is no writable text. So the mint needed **no
+boot seam at all**: it is a lemma applied wherever the trampoline claim is
+in scope (i.e. everywhere after `kvminithart`), NOT a one-off mint placed
+in `ProofMain`. Record that as the choice: a boot-time mint would have had
+to decide the window in advance, and the consumer does not know it yet.
+
+The pure side conditions come from `KptExecMap`, not re-derived:
+`kpt_exec_pa`/`kpt_exec_pa_tramp` IS the va→pa map, so the mint's pa
+relationship is `pa_of tramp_ppn va = kpt_exec_pa va` and the file's §1
+proves it, the canonicality (`uint va < 2^38`, exact — the page ends AT the
+top of the positive half) and `addr_is_text (kpt_exec_pa va)` (the
+trampoline page is 0x80006000, the LAST page below `text_end`).
+
+#### Two tactic traps in the new leaf, both from ssreflect's `rewrite`
+
+`iris.proofmode` loads ssreflect, so in ANY file that imports it:
+
+- **`rewrite H1, H2` does not parse** — the comma form is stock Coq's;
+  ssreflect wants `rewrite H1 H2`. The error is
+  `Syntax error: [ltac_use_default] expected after [tactic]` pointing at
+  the comma's column, which reads like a broken tactic name.
+- **`rewrite H by tac` does not parse either.** Use
+  `rewrite H; [main | side]` — a conditional `rewrite`'s side condition is
+  the goal AFTER the rewritten one.
+- And an orientation note that is not ssreflect's fault: `Z.div_unique_pos`
+  / `Z.mod_unique_pos` conclude `q = a / b` / `r = a mod b`, i.e. BACKWARDS
+  from the goal you have. Take them as a term (`exact (eq_sym (Z.…
+  ltac:(lia) ltac:(lia)))`) rather than relying on `symmetry` — the `ltac:`
+  splices are safe here because every argument is given explicitly, so
+  nothing is an evar at splice time.
+
+#### Build evidence
+
+Full VM build `MAKEEXIT=0`, 1165/1165 `.vo`, zero `Error` lines; a second
+full `make` emits **0 compile lines**; and a fixpoint scan of
+`.CoqMakefile.d` reports **0 of 1165** `.vo` older than a `.vo` it depends
+on (the check the durable notes ask for, since "nothing to be done" alone
+is not evidence).
+
+`Print Assumptions s_regime_fetch` — the representative touched fetch
+lemma — is `rv64d.plat_term_write` **alone**, the minimal set for anything
+that touches the model's `fetch`; `sr_absorb_ktier` is the same, so the
+transplant added nothing. `tramp_text_mint` / `tramp_text_window` /
+`text_pointsto_acc` are **closed under the global context**.
+`tlb_inv_pt_fetch` picked up the standard `functional_extensionality_dep`
+when its one-line `exact` became a three-line `iApply`; that is a strict
+subset of what its own (untouched) consumer
+`wp_instr_s_config_tlbinv_pt` already carried.
+
 ## State
 
 - Phases A-D, K1, K2a, F1-F3 (the ∀kt experiment + THE PINNING) and K3a
@@ -2190,11 +2312,26 @@ the general recipe for the remaining `_s_r` consumers: check the regime's
   `stack_own (KTR := KT1)` — SATISFIABLE at a KSTACK va, and now
   FEEDABLE (a slot owns its page, allocproc hands it out, the exit path
   gives it back).
-- NEXT: **K5 — the text tier**. K4 (retire `FORKRET_PARK`) is BLOCKED on
-  a resource that is not this campaign's: `UsertrapRes.ut_own_nopt`
-  claims `fileclose_bm` — the FS block bitmap — PER PROCESS, and there
-  is exactly one. See "K4 findings". K5 does not depend on it.
+- **K5 (the text tier) is LANDED.** `text_pointsto` is ktier-indexed on
+  the same ambient-instance convention as `mem_pointsto`; the S-mode
+  fetch engine (`s_fetch_chunk`, `s_regime_fetch`, `tlb_inv_pt_fetch`,
+  `instr_bytes`, KernelText's two footprint constructors) is
+  tier-generic under its original names; and `TrampText.tramp_text_mint`
+  turns the persistent trampoline claim plus the identity kernel-text
+  byte into `va ↦ₓ[KT1]□ b` at the TRAMPOLINE va.
+- K4 (retire `FORKRET_PARK`) is BLOCKED on a resource that is not this
+  campaign's: `UsertrapRes.ut_own_nopt` claims `fileclose_bm` — the FS
+  block bitmap — PER PROCESS, and there is exactly one. See "K4
+  findings".
+- NEXT, and it is the mint's first consumer: **the uservec/userret fetch
+  project.** It needs (i) `instr` indexed — a statement-identical but
+  284-file sweep, do it as its own increment (see "K5 findings"), and
+  (ii) the KT1 witness at the trampoline fetch, which is
+  `sr_ktier_wit strans_regime KT1` = `kpt_on cpu_id`, already available
+  off the capability (`IntrDefs.sie_cap_ktier_wit` /
+  `trap_csrs_ktier_wit`).
 - Cleanup debt, non-blocking: `VcGenS`'s blanket `Unshelve` (may be a
   no-op now); `ProofFilestatParts`' ambient `CurKtier` pin (the only
-  file pinned by instance rather than literals).
-- `text_pointsto` (`↦ₓ`) still carries its own identity conjunct (K5).
+  file pinned by instance rather than literals); no text STRENGTHENING
+  lemma (`text_ktier_pin_intro`) exists yet — add it when something
+  round-trips code through KT1.
