@@ -138,7 +138,7 @@ Section UtSysBlock.
     ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) SY.syscall_env) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) SY.syscall_env (kt := kt)) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -246,7 +246,7 @@ Section UtSysBlock.
                        (sign_extend' 64 (mword_of_int 2095532 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
-      iApply (T.ut_kexit SY.syscall_env N V
+      iApply (T.ut_kexit SY.syscall_env (kt := kt) N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
                 nx false lks Hwf' ltac:(lia)
@@ -458,7 +458,7 @@ Section UtSysBlock.
       (* rebuilt via the dedicated lemma, not an inline [rewrite; iFrame] --
          see [UsertrapRes.ut_own_rebuild_us]'s header on why that inline
          shape degenerates in a proof state this large. *)
-      iPoseProof (ut_own_rebuild_us SY.syscall_env N V2 us2
+      iPoseProof (ut_own_rebuild_us SY.syscall_env (kt := kt) N V2 us2
                     with "Hbs Hbm Hip Hfd Hir Hpv Hsy") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
@@ -468,7 +468,7 @@ Section UtSysBlock.
                        ltac:(vm_compute; reflexivity)); exact HS4s1).
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
-      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N2 V2 pt ksp m0 mg av
+      iApply (T.ut_a6 (CID := CID2) SY.syscall_env (kt := kt) N2 V2 pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)

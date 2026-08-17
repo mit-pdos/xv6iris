@@ -278,9 +278,6 @@ Ltac vdrw_hi_peel :=
 Section VdrwDefs.
   Context `{!riscvGS Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  (* the frame bundles below are STACK slots, so they ride the accessing
-     hart's regime (StackOwn.v's KTR discipline). *)
-  Context `{KTR : !CurKtier}.
 
   Notation Rra := (mword_of_int 1  : mword 5).
   Notation Rtp := (mword_of_int 4  : mword 5).
@@ -305,7 +302,10 @@ Section VdrwDefs.
      lives at [s0-96 .. s0-85] and is therefore SPLIT across the low slot
      (idx[0], idx[1]) and the high one (idx[2] plus four padding bytes).
      That is the "C local taken by address" recipe of durable-notes.md. *)
-  Definition vdrw_saved (sp0 : Arch.pa) (m : regfile) : iProp Σ :=
+  (* a STACK bundle: it rides the accessing hart's regime, so the tier is a
+     binder here rather than a section Context -- the device definitions in
+     this section are KT0 and must not move with it. *)
+  Definition vdrw_saved `{KTR : !CurKtier} (sp0 : Arch.pa) (m : regfile) : iProp Σ :=
     (pa_stk sp0 1  ↦₈ (m !!! Regidx Rra) ∗
      pa_stk sp0 2  ↦₈ (m !!! Regidx Rs0) ∗
      pa_stk sp0 3  ↦₈ (m !!! Regidx Rs1) ∗
@@ -327,11 +327,17 @@ Section VdrwDefs.
   Proof. reflexivity. Qed.
 
   (* the two scratch slots, contents irrelevant until P2 stores into them *)
-  Definition vdrw_scratch (sp0 : Arch.pa) : iProp Σ :=
+  (* a STACK bundle: it rides the accessing hart's regime, so the tier is a
+     binder here rather than a section Context -- the device definitions in
+     this section are KT0 and must not move with it. *)
+  Definition vdrw_scratch `{KTR : !CurKtier} (sp0 : Arch.pa) : iProp Σ :=
     (∃ w11 w12 : mword 64, pa_stk sp0 11 ↦₈ w11 ∗ pa_stk sp0 12 ↦₈ w12)%I.
 
   (* [idx[0..2]] once P2 has stored the three descriptor indices *)
-  Definition vdrw_idx (sp0 : Arch.pa) (i0 i1 i2 : mword 32) : iProp Σ :=
+  (* a STACK bundle: it rides the accessing hart's regime, so the tier is a
+     binder here rather than a section Context -- the device definitions in
+     this section are KT0 and must not move with it. *)
+  Definition vdrw_idx `{KTR : !CurKtier} (sp0 : Arch.pa) (i0 i1 i2 : mword 32) : iProp Σ :=
     (pa_stk sp0 12 ↦₄ i0 ∗
      pa_add (pa_stk sp0 12) 4 ↦₄ i1 ∗
      pa_stk sp0 11 ↦₄ i2 ∗

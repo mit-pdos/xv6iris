@@ -593,7 +593,7 @@ Section ProofSysUnlinkBody.
   Lemma su_half_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[kt] file_byte data (16 * i + j)%nat)
-    ⊣⊢ a ↦₂ dir_inum data i.
+    ⊣⊢ a ↦₂[kt] dir_inum data i.
   Proof.
     intro Hal.
     rewrite (bb_ext (KTR := kt) a 2 (fun j => file_byte data (16 * i + j)%nat)
@@ -619,7 +619,7 @@ Section ProofSysUnlinkBody.
   Lemma su_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat)
-    ⊣⊢ a ↦₂ dir_inum data i
+    ⊣⊢ a ↦₂[kt] dir_inum data i
        ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[kt] dir_name data i jj).
   Proof.
     intro Hal.

@@ -150,7 +150,7 @@ Section SpecForkret.
      which is the caller's to supply, and the reason this is a wand. *)
   Definition forkret_yield (γf : gname) (p ksp : mword 64) (pid : mword 32)
       (av : nat) (V : pprivate) : iProp Σ :=
-    (ut_trap_parked p ksp av ∅ ∗ proc_priv_nopt γf p pid V)%I.
+    (ut_trap_parked (kt := kt) p ksp av ∅ ∗ proc_priv_nopt γf p pid V)%I.
 
 End SpecForkret.
 

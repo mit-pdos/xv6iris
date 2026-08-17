@@ -728,7 +728,7 @@ Section ProofVirtioDiskRw.
                           (sign_extend' 64 (mword_of_int 24 : mword 12))
                         = (d_free_cell k : mword 64))
            by (rewrite Ha4; apply vdrw_free_addr).
-    all: iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x068) : mword 64) Ra3 Ra4
+    all: iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x068) : mword 64) Ra3 Ra4
                    (mword_of_int 24 : mword 12) M av
                    (if fr k then Z_to_bv 8 1 else byte_zero) false
                    ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1110,7 +1110,7 @@ Section ProofVirtioDiskRw.
       assert (Hz8 : trunc8 (Q6 !!! Regidx (mword_of_int 0 : mword 5)) = byte_zero)
         by (rewrite Hz0; apply bv_eq; vm_compute; reflexivity).
       iPoseProof (rwi_04a with "Htext") as "Hi04a".
-      iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x04a) : mword 64)
+      iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x04a) : mword 64)
                 (mword_of_int 0 : mword 5) Ra4 (mword_of_int 24 : mword 12) Q6 av
                 (Z_to_bv 8 1) false with "Hcg Hpc Hi04a [Hcell]").
                 iClear "Hi04a".
@@ -1130,7 +1130,7 @@ Section ProofVirtioDiskRw.
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = (idxa : mword 64))
         by (rewrite HQ6a1; apply vdrw_addv_sext0).
       iPoseProof (rwi_04e with "Htext") as "Hi04e".
-      iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x04e) : mword 64) Ra5 Ra1
+      iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x04e) : mword 64) Ra5 Ra1
                 (mword_of_int 0 : mword 12) Q6 av v0 false with "Hcg Hpc Hi04e [Hidx]").
                 iClear "Hi04e".
       { rgall. iEval (rewrite Hswa). iExact "Hidx". }
@@ -1218,7 +1218,7 @@ Section ProofVirtioDiskRw.
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = (idxa : mword 64))
         by (rewrite HQ5a1; apply vdrw_addv_sext0).
       iPoseProof (rwi_076 with "Htext") as "Hi076".
-      iApply (wp_sw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x076) : mword 64) Rs8 Ra1
+      iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x076) : mword 64) Rs8 Ra1
                 (mword_of_int 0 : mword 12) Q5 av v0 false with "Hcg Hpc Hi076 [Hidx]").
                 iClear "Hi076".
       { rgall. iEval (rewrite Hswa). iExact "Hidx". }

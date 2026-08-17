@@ -647,7 +647,7 @@ Section DlBuf.
      built out of, so [nth_byte_assemble_len] gives the two readings. *)
   Lemma dl_bytes_half (a : Arch.pa) (g : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[kt] g j) ⊢ ∃ w : bv 16, a ↦₂ w.
+    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[kt] g j) ⊢ ∃ w : bv 16, a ↦₂[kt] w.
   Proof.
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
@@ -1012,7 +1012,7 @@ Section ProofDirlinkMain.
   Lemma dl_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat)
-    ⊣⊢ a ↦₂ dir_inum data i
+    ⊣⊢ a ↦₂[kt] dir_inum data i
        ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[kt] dir_name data i jj).
   Proof.
     intro Hal.

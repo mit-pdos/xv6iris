@@ -555,6 +555,7 @@ Qed.
 
 Section HalfWords.
   Context `{!riscvGS Σ}.
+  Context `{KTR : !CurKtier}.
 
   Local Lemma big_sepL_seq_shift2 (P : nat -> iProp Σ) (o n : nat) :
     ([∗ list] jj ∈ seq o n, P jj) ⊣⊢ ([∗ list] jj ∈ seq 0 n, P ((o + jj)%nat)).
