@@ -1,6 +1,10 @@
 # The event-granular weak language — design (supersedes the two-machine lift)
 
-**Status (2026-08-14): DESIGN, spike COMPLETE and PASSED
+**Status (2026-08-17): BUILT END TO END — the one-machine capstone
+`iris/WeakEvCapstone.xv6_ev_weak_robust` is closed
+([`../projects/weak-memory-soundness.md`](../projects/weak-memory-soundness.md));
+the disk thread runs the M5 device program
+([`weak-memory-m5.md`](weak-memory-m5.md)).  Historic status: DESIGN, spike COMPLETE and PASSED
 ([`projects/weak-memory-event-lang.md`](../projects/weak-memory-event-lang.md)).
 The instruction-atomic architecture it supersedes is retained side by side
 — [`weak-memory.md`](weak-memory.md), the lift record

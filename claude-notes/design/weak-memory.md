@@ -435,7 +435,10 @@ statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
 
 ## Decision 6: devices, MMIO, DMA, fetch, translation
 
-- **Disk DMA gets a view.** The disk agent's `wstate` advances when the hart
+- **Disk DMA gets a view.**  SUPERSEDED (2026-08-17) by
+  [`weak-memory-m5.md`](weak-memory-m5.md): the device is a program that
+  acquire-loads `avail->idx` and reads/writes at its own view; the notify
+  carries NOTHING.  Historic text follows. The disk agent's `wstate` advances when the hart
   writes the queue-notify MMIO register: the notify transaction carries the
   writing hart's current view floors to the device, and `DiskStepDma`'s
   `mem_view` reads through the device's view (per-byte staleness allowed

@@ -151,9 +151,17 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`weak-memory-m5.md`](design/weak-memory-m5.md)** — M5, the disk as a
+  weak-memory AGENT (LANDED 2026-08-17): the virtio device is a small
+  program in a read/write/fence monad (`iris/VirtioProg.v`) that
+  acquire-loads `avail->idx`, reads the ring/descriptors/buffer at its own
+  view, stores the completion, fences, stores `used->idx`; driver/device
+  synchronization is message passing through the rings, QUEUE_NOTIFY/ISR
+  are hints; Layer 1's only change is the fabric-marker label `LDev`.
+  Read it for the device-side assumptions the final theorem carries.
 - **[`weak-memory-soundness.md`](projects/weak-memory-soundness.md)** — THE
-  CURRENT PLAN OF RECORD (2026-08-17) for closing the one-machine soundness
-  capstone: Phase B (the event language as a Layer-1 instance, hart side)
+  ONE-MACHINE SOUNDNESS CAPSTONE, CLOSED 2026-08-17
+  (`iris/WeakEvCapstone.xv6_ev_weak_robust`, 5 rv64d axioms): the record of Phase B (the event language as a Layer-1 instance, hart side)
   and Phase C (M5 device views: the disk's DMA becomes view-based reads
   through a read-monad device program; the fabric carries a view).  Read it
   for the two findings that shaped it (`ev_dma_harmless` is false for xv6;

@@ -514,6 +514,21 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 6′. WHERE THE LIVE COMPOSITION IS (2026-08-17)
+
+    The seam record below describes the ARCHIVED instruction-atomic route.
+    The composition in force is [WeakEvCapstone.xv6_ev_weak_robust]: the
+    event-granular language ([WeakEvLang]) is a Layer-1 INSTANCE in both
+    directions ([WeakEvCapstone] §§2–3, at [P := pexv6], [D := dev_state]),
+    the disk is a view-based agent running [VirtioProg.virtio_prog]
+    (claude-notes/design/weak-memory-m5.md), and the theorem's premises are
+    the WP package, four fresh-era facts about σ0 and [main_premises] at
+    canonical bundles — on exactly the five rv64d axioms.  Items (1), (2),
+    (3′), (4) and (6) below are therefore CLOSED for the live route; (3)
+    ([main_premises]) and (5) (the PARM containment note) remain the
+    ledger.  Everything below is kept verbatim as the record of the
+    archived route. *)
+
 (** ** 6. THE SEAM RECORD
 
     What follows is the complete, precise list of what remains DECLARED

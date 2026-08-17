@@ -7,6 +7,12 @@ bottom: half of the G5c2 blocker (the free class binder) is CLOSED by
 G6a's fulfil-time pinning, and the other half (the disk's flat memory) is
 REFUTED, i.e. it cannot be closed by any change to `pstep`'s signature.
 The successor effort must retarget, not retry.**
+**UPDATE 2026-08-17: RETARGETED AND CLOSED by
+[`weak-memory-soundness.md`](weak-memory-soundness.md) — the instance and the
+one-machine capstone LANDED (`iris/WeakEvCapstone.xv6_ev_weak_robust`) once
+the disk became a view-based agent (M5, `design/weak-memory-m5.md`).  This
+file is now history + the G-series findings; move to `completed/` at the next
+tidy.**
 The event-language spike PASSED
 ([`weak-memory-event-lang.md`](weak-memory-event-lang.md)); its one
 architectural debt is the S2 finding: `WeakPromise.wpcfg` has exactly two

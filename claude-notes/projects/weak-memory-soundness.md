@@ -1,6 +1,12 @@
 # The one-machine soundness capstone — worklist (Phase B: the instance; Phase C: M5 device views)
 
-**Status (2026-08-17): PLAN OF RECORD, user-approved; work starting.**
+**Status (2026-08-17): THE CAPSTONE IS CLOSED — `WeakEvCapstone.xv6_ev_weak_robust`
+on exactly the 5 rv64d axioms (B1–B4, C1–C3 all landed the same day; see
+the per-item records below and `git log --oneline 4f636d09..HEAD`).  What
+remains open is listed under "After the capstone": C4 (the disk thread's
+per-node EWP rules + the driver proof that `DWild` is unreachable — needed to
+DISCHARGE the WP package for the disk thread, not to state the theorem), the
+phase-2 discharge of `main_premises`, and the RVWMO containment upgrade.**
 Supersedes the open tail of
 [`weak-memory-fabric.md`](weak-memory-fabric.md) (G6b) — read that file's
 G5c2/G6 findings first; nothing there is retried here.
@@ -61,7 +67,7 @@ arity (mechanical), the PLIC hart index (trivial) and THE DISK'S DMA READ.
   register-file twin `cfg_eqv` changes the program state); and the reverse
   bridge's `exec_cls_ok` is now indexed by the initial program list `ps`.
   Print Assumptions on the six capstones byte-identical; `lemma_diff` clean.
-- **B2** `WeakEvPf`: `pexv6.PHart` gains the CPU; `pstep_ev`/`pcls_ev`/
+- **B2** DONE (2026-08-17, inside B3.1/C3) `WeakEvPf`: `pexv6.PHart` gains the CPU; `pstep_ev`/`pcls_ev`/
   `pdev_ev` over `D := dev_state`; `pcls_ev` reads the access kind off the
   `MemWrite` node (`wm_class_of (classify ak) ws`), `WCexcl` at `LRmw`,
   `WCplain` for the disk.  Disk burst arm = the archived existential-memory
@@ -185,7 +191,7 @@ barrier protocol); QUEUE_NOTIFY/ISR are hints (the device polls — a
 superset).  Layer 1's ONLY change is the fabric-marker label `LDev`.  The
 FENCE I/O-bit issue (Sail drops the bits) is MOOT for safety under this
 model; recorded as assumption 3 of the design.
-- **C1** `VirtioModel`: `DM`, `dres`, `virtio_prog`, and the equivalence
+- **C1** DONE (2026-08-17, `iris/VirtioProg.v`): `DM`, `dres`, `virtio_prog`, and the equivalence
   lemma with `virtio_req_step`/`virtio_stalled` over a flat `mv`.
 - **C2** DONE (2026-08-17) `WeakEvLang`: `EDisk gen (dp : option (DM dres))
   dws`; the eight arms of the design (start / `DRead` / `DWrite` / `DFence`
