@@ -604,12 +604,12 @@ Section SysExecFrame.
      [fetchstr] reports: kexec reads the prefix, the rest rides through. *)
   Lemma sx_bytes_name (a : mword 64) (N : nat) :
     bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := kt) a N). Qed.
 
   Lemma sx_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := kt) a N f). Qed.
 
   Lemma sx_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->

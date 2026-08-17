@@ -139,6 +139,7 @@ Section SpecForkret.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
      trap-side residue with the translation slot dropped (the switch inside

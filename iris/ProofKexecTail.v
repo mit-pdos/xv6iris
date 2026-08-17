@@ -379,12 +379,12 @@ Section KexecAFrame.
     iDestruct (kxc_elf_slots_of_stack with "H") as "H".
     iDestruct (kxc_slots_elf sp0 with "H") as "[%Hal Hb]".
     iSplitL "Hb".
-    - iApply (bb_any_named (pa_stk sp0 54) 64). rewrite /bytes_own /byte_any.
+    - iApply (bb_any_named (KTR := kt) (pa_stk sp0 54) 64). rewrite /bytes_own /byte_any.
       iExact "Hb".
     - iIntros (g) "Hg".
       iApply kxc_stack_of_elf_slots.
       iApply (kxc_bytes_elf sp0 Hal).
-      rewrite /bytes_own. iApply (bb_named_any with "Hg").
+      rewrite /bytes_own. iApply (bb_named_any (KTR := kt) with "Hg").
   Qed.
 
   (* ---- the first four bytes of a named run ARE the 4-byte cell the [lw]
@@ -584,7 +584,7 @@ Section KexecA.
      values -- the epilogue reads none of slots 14..68. *)
   Lemma kxc_frameA_epi (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     kxc_frameA sp0 ra0 s00 s10 s20 pv av -∗
-    kxc_frame sp0 ra0 s00 s10 s20.
+    kxc_frame (kt := kt) sp0 ra0 s00 s10 s20.
   Proof.
     rewrite /kxc_frameA /kxc_frame.
     iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9 & A10 & A11 & A12 &

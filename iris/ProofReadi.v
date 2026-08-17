@@ -159,7 +159,7 @@ Section ReadiDefs.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   (* readi's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
      [sp_new + (112 - 8k)]:
@@ -311,7 +311,7 @@ Section ReadiRet.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Lemma rd_ret `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
@@ -345,11 +345,11 @@ Section ReadiRet.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V P')
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P')
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -633,7 +633,7 @@ Section ReadiJoin.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Lemma rd_join `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
@@ -666,11 +666,11 @@ Section ReadiJoin.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V P')
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P')
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -779,7 +779,7 @@ Section ReadiExit.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Lemma rd_exit `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
@@ -835,11 +835,11 @@ Section ReadiExit.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V P')
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P')
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1024,7 +1024,7 @@ Section ReadiLoop.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq := vm_compute; discriminate.
 
@@ -1124,11 +1124,11 @@ Section ReadiLoop.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V PI)
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V PI)
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1785,7 +1785,7 @@ Section ReadiLoop.
                  ⌜(mE !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
                   \/ ((mE !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64) /\ user = true)⌝ ∗
-                 rd_dst γf j pidv dq user (upd_upt V P2)
+                 rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P2)
                         (m !!! Regidx Ra2 : mword 64) n
                         (rd_delivered data dst_olds off (tot + mm)%nat))%I
         with "[Hpost Hdstrest]" as "Hnorm".
@@ -2237,7 +2237,7 @@ Section ReadiLoop.
         iEval (rewrite Hpp) in "Hpc". clear Hpp.
         (* the destination claim reverts to [tot]: on this arm [user] is
            [true], so both readings are the same [proc_priv]. *)
-        iAssert (rd_dst γf j pidv dq user (upd_upt V P2)
+        iAssert (rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P2)
                         (m !!! Regidx Ra2 : mword 64) n
                         (rd_delivered data dst_olds off tot))%I
           with "[Hdst2]" as "Hdst3".
@@ -2386,7 +2386,7 @@ Section ReadiMain.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq := vm_compute; discriminate.
   Local Ltac lkp :=
@@ -2484,7 +2484,7 @@ Section ReadiMain.
        a3 is read before the test. *)
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev
               Hmeta Hmap Hblocks Hdst #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
-    iAssert (rd_cont (kt := kt) (CID0 := CID) γfs bn γf dev ip bm data dn user off n
+    iAssert (rd_cont (ktb := ktb) (kt := kt) (CID0 := CID) γfs bn γf dev ip bm data dn user off n
                dst_olds V pidv dq dqd j m K eb b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /rd_cont /rd_dst; iExact "Hcont"|].
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -2594,7 +2594,7 @@ Section ReadiMain.
         iSplitL "Hmt"; [iExact "Hmt"|]. iSplitL "Hmj"; [iExact "Hmj"|].
         iSplitL "Hmn"; [iExact "Hmn"|]. iSplitL "Hml"; [iExact "Hml"|].
         iExact "Hmz". }
-      iAssert (rd_dst γf j pidv dq user (upd_upt V (pv_upt V))
+      iAssert (rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V (pv_upt V))
                       (m !!! Regidx Ra2 : mword 64) n
                       (rd_delivered data dst_olds off 0%nat))%I
         with "[Hdst]" as "Hdst".
@@ -2644,7 +2644,7 @@ Section ReadiMain.
     (* ---- everything past this point holds the destination at [tot = 0]
        and the descriptor at [pv_upt V] ---- *)
     assert (HVid : upd_upt V (pv_upt V) = V) by apply rd_upd_upt_id.
-    iAssert (rd_dst γf j pidv dq user (upd_upt V (pv_upt V))
+    iAssert (rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V (pv_upt V))
                     (m !!! Regidx Ra2 : mword 64) n
                     (rd_delivered data dst_olds off 0%nat))%I
       with "[Hdst]" as "Hdst".

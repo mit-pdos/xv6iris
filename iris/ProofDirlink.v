@@ -651,8 +651,8 @@ Section DlBuf.
   Proof.
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
-    iApply (word2_pointsto_intro a (DfracOwn 1) _ Hal).
-    rewrite (bb_ext a 2 g
+    iApply (word2_pointsto_intro (KTR := kt) a (DfracOwn 1) _ Hal).
+    rewrite (bb_ext (KTR := kt) a 2 g
                (fun j => nth_byte (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])) j)).
     - iExact "H".
     - intros j Hj. destruct j as [| [| j]]; [| | exfalso; lia].
@@ -2194,19 +2194,19 @@ Section ProofDirlinkMain.
                         = mword_of_int (DK + 0x80)) by pcw.
         iEval (rewrite Hqq80) in "Hpc".
         (* ---- the sixteen bytes ARE [dirent_bytes (de_of_name inum s)] ---- *)
-        iDestruct (word2_pointsto_bytes with "Hdehi") as "Hdehi".
+        iDestruct (word2_pointsto_bytes (KTR := kt) with "Hdehi") as "Hdehi".
         iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
                    ↦ₘ[kt] (dirent_bytes (de_of_name inum s) !!! jj))%I
           with "[Hdehi Hdenm]" as "Hsrc".
         { rewrite (dlk_de_split (pa_stk sp0 10)
                      (fun jj => dirent_bytes (de_of_name inum s) !!! jj)).
           iSplitL "Hdehi".
-          - rewrite (bb_ext (pa_stk sp0 10) 2
+          - rewrite (bb_ext (KTR := kt) (pa_stk sp0 10) 2
                        (fun jj => nth_byte inum jj)
                        (fun jj => dirent_bytes (de_of_name inum s) !!! jj)
                        (fun jj Hjj => eq_sym (dl_rec_hi fn inum jj Hjj))).
             iExact "Hdehi".
-          - rewrite (bb_ext (pa_add (pa_stk sp0 10) 2) 14 hh
+          - rewrite (bb_ext (KTR := kt) (pa_add (pa_stk sp0 10) 2) 14 hh
                        (fun jj => dirent_bytes (de_of_name inum s) !!! (2 + jj)%nat)
                        (fun jj Hjj => eq_sym (dl_rec_nm fn hh inum jj Hsnc Hjj))).
             iExact "Hdenm". }
@@ -3127,7 +3127,7 @@ Section ProofDirlinkMain.
             by (rewrite Hra0rd Htot; pcw).
           (* the delivered bytes ARE the file's bytes, split into the two views *)
           iEval (rewrite HL6a2 Htot
-                   (bb_ext (pa_stk sp0 10) 16
+                   (bb_ext (KTR := kt) (pa_stk sp0 10) 16
                       (fun jj => rd_delivered data dol (16 * i) 16 jj)
                       (fun jj => file_byte data (16 * i + jj)%nat)
                       (fun jj Hjj => dlk_rd_delivered data dol i jj Hjj))

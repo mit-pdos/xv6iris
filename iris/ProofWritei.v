@@ -384,7 +384,7 @@ Section WriteiDefs.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   (* writei's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
      [sp_new + (112 - 8k)]:
@@ -599,7 +599,7 @@ Section WriteiRet.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Lemma wi_ret `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
@@ -680,7 +680,7 @@ Section WriteiRet.
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ n' Sb' -∗
-    wi_cont (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+    wi_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -986,7 +986,7 @@ Section WriteiJoin.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Lemma wi_join `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1090,7 +1090,7 @@ Section WriteiJoin.
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ (S u) SbC -∗
-    wi_cont (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+    wi_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -1378,7 +1378,7 @@ Section WriteiSize.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Lemma wi_size `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1475,7 +1475,7 @@ Section WriteiSize.
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ (S u) SbC -∗
-    wi_cont (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+    wi_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -1981,7 +1981,7 @@ Section WriteiLoop.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq := vm_compute; discriminate.
 
@@ -2129,7 +2129,7 @@ Section WriteiLoop.
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ nI SI -∗
-    wi_cont (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+    wi_cont (ktb := ktb) (kt := kt) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -3992,7 +3992,7 @@ Section WriteiMain.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq := vm_compute; discriminate.
   Local Ltac lkp :=
@@ -4055,7 +4055,7 @@ Section WriteiMain.
        contract quantifies the bitmap's FINAL set with [used ⊆ used'], while
        everything below carries the bundle at the fixed entry index.  Written
        once here rather than at every interior continuation. *)
-    iAssert (wi_cont (kt := kt) (CID0 := CID) γfs γi bn γ γf cov logstart inodestart nib dev
+    iAssert (wi_cont (ktb := ktb) (kt := kt) (CID0 := CID) γfs γi bn γ γf cov logstart inodestart nib dev
                ip inum bm data dn dn0 user off n src_bytes V ncount Sb
                pidv dq dqd dqn dqs A j m K eb b lks)%I with "[Hcont]" as "Hcont".
     { rewrite /wi_cont. iEval (rewrite /wp_next).

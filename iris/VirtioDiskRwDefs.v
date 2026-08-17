@@ -278,6 +278,9 @@ Ltac vdrw_hi_peel :=
 Section VdrwDefs.
   Context `{!riscvGS Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  (* the frame bundles below are STACK slots, so they ride the accessing
+     hart's regime (StackOwn.v's KTR discipline). *)
+  Context `{KTR : !CurKtier}.
 
   Notation Rra := (mword_of_int 1  : mword 5).
   Notation Rtp := (mword_of_int 4  : mword 5).

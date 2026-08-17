@@ -12,7 +12,7 @@
    conversions between them:
 
    * [StackOwn.stack_own] hands the frame out as 8-byte WORDS with existential
-     contents.  [StackBytes.slots3_bytes_own (KTR := kt)] already turns three of them into
+     contents.  [StackBytes.slots3_bytes_own] already turns three of them into
      a 24-byte run ([bytes_own]); what is missing is the split of that run into
      the FIVE TYPED CELLS [SpecStati.stat_at] is stated over, plus the four
      loose bytes of the alignment hole.  That is [fst_bytes_stat] below.
@@ -186,7 +186,7 @@ Qed.
 (* Four (resp. two) arbitrary owned bytes at an aligned address are a [↦₄]
    (resp. [↦₂]) cell holding SOME value -- which is all filestat needs going
    in, since stati overwrites every one of them.  [nth_byte_assemble_len] at
-   width 32 and 16, exactly as [bytes_own_slot (KTR := kt)] uses it at 64. *)
+   width 32 and 16, exactly as [bytes_own_slot] uses it at 64. *)
 Lemma fst_nth_byte4 (b0 b1 b2 b3 : bv 8) (j : nat) :
   (j < 4)%nat ->
   nth_byte (Z_to_bv 32 (assemble_bytes [b0;b1;b2;b3]) : bv 32) j
@@ -256,7 +256,7 @@ Section FilestatParts.
     intros Ha0 Ha8 Ha16.
     (* 24 = 4 + (4 + (2 + (2 + (4 + 8)))) *)
     (* the run splits 4/4/2/2/4/8; each [change] is what lets [bytes_own_app]
-       see a [_ + _] where the goal holds a numeral (the [bytes_own_slots3 (KTR := kt)]
+       see a [_ + _] where the goal holds a numeral (the [bytes_own_slots3]
        discipline). *)
     assert (E4  : pa_add (pa_add st 4)  4 = pa_add st 8)
       by (rewrite pa_add_add; reflexivity).
@@ -296,7 +296,7 @@ Section FilestatParts.
     iDestruct (fst_bytes_w4 _ A4 with "Bino") as (ino) "Hino".
     iDestruct (fst_bytes_w2 _ A8 with "Bty") as (ty) "Hty".
     iDestruct (fst_bytes_w2 _ A10 with "Bnl") as (nl) "Hnl".
-    iDestruct (bytes_own_slot (KTR := kt) _ Ha16 with "Bsz") as (sz) "Hsz".
+    iDestruct (bytes_own_slot _ Ha16 with "Bsz") as (sz) "Hsz".
     iExists dev, ino, ty, nl, sz. iFrame "Bhole".
     rewrite /stat_at fst_pa_dev fst_pa_ino fst_pa_type fst_pa_nlink fst_pa_size.
     rewrite pa_add_0. iFrame.
@@ -310,7 +310,7 @@ Section FilestatParts.
   (* NOT re-indexed piece by piece into one naming function: copyout is
      PARAMETRIC in [src_bytes], so an EXISTENTIAL naming function is all the
      call site needs, and going through the anonymous [bytes_own] form makes
-     the join the same [bytes_own_app (KTR := kt)] chain as the split -- run backwards.
+     the join the same [bytes_own_app] chain as the split -- run backwards.
      Naming the 24 bytes explicitly would mean re-anchoring five sub-lists
      from [seq 0 n] onto [seq o n], which buys nothing here. *)
   Lemma fst_w4_bytes (a : Arch.pa) (w : mword 32) :
@@ -351,7 +351,7 @@ Section FilestatParts.
     iDestruct (fst_w4_bytes with "Hino") as "Hino".
     iDestruct (fst_w2_bytes with "Hty") as "Hty".
     iDestruct (fst_w2_bytes with "Hnl") as "Hnl".
-    iDestruct (slot_bytes_own (KTR := kt) with "Hsz") as "[_ Hsz]".
+    iDestruct (slot_bytes_own with "Hsz") as "[_ Hsz]".
     change 24%nat with (4 + 20)%nat.
     rewrite bytes_own_app. iSplitL "Hdev"; [iExact "Hdev" |].
     change 20%nat with (4 + 16)%nat.
@@ -402,7 +402,7 @@ End FilestatParts.
    [callee_saved] for s2/s3 from a PREMISE about the incoming map, exactly as
    fileread's does for its lazily-spilled s1/s3.
 
-   [struct stat] occupies slots 9/8/7 -- [StackBytes.slots3_bytes_own (KTR := kt)] at
+   [struct stat] occupies slots 9/8/7 -- [StackBytes.slots3_bytes_own] at
    [k = 9] -- and the epilogue takes those three as arbitrary words too: what
    stati wrote into them is dead by then.
 

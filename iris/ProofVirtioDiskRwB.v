@@ -257,7 +257,7 @@ Section ProofVirtioDiskRwB.
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
        free_slot_res pd h -∗ free_slot_res pd m2 -∗ free_slot_res pd t -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -280,7 +280,7 @@ Section ProofVirtioDiskRwB.
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc) : mword 64) -∗
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
-       vdrw_scratch sp0 -∗
+       vdrw_scratch (KTR := kt) sp0 -∗
        vdrw_p2_exit CID0 γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -310,7 +310,7 @@ Section ProofVirtioDiskRwB.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗
     disk_res γd pd pav pu -∗
-    vdrw_scratch sp0 -∗
+    vdrw_scratch (KTR := kt) sp0 -∗
     vdrw_p2_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -527,7 +527,7 @@ Section ProofVirtioDiskRwB.
                   pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x094) : mword 64) -∗
                   locked γk cpu_id -∗
                   free_bundles pd fr -∗
-                  vdrw_scratch sp0 -∗
+                  vdrw_scratch (KTR := kt) sp0 -∗
                   vdrw_p2_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
                   WP (Loop : expr riscv_lang))%I
         with "[Hpub Hlb Hcl Huidx Hflight Hparked Hring IH]" as "Hsleep".

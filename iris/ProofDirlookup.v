@@ -259,7 +259,7 @@ Section ProofDirlookupMain.
     intro Hal.
     rewrite -(dlk_half_acc data i a Hal).
     rewrite -(dlk_name_acc data i (pa_add a 2)).
-    exact (dlk_de_split a (fun jj => file_byte data (16 * i + jj)%nat)).
+    exact (dlk_de_split (KTR := kt) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
   (* the [V] slot of readi's contract is dead on the kernel arm *)

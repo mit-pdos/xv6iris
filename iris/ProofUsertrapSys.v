@@ -27,7 +27,7 @@
    * the trap-CSR set must ALREADY be folded when this block is entered: the
      [csrsi] consumes [trap_csrs] whole (it re-forms [intr_res] inside the
      arm), and so does the [kexit(-1)] on the killed path.  Both are covered
-     by taking [ut_hold] at [false], whose [trap_csrs_ext false] IS the bundle.
+     by taking [ut_hold (kt := kt)] at [false], whose [trap_csrs_ext false] IS the bundle.
 
    The [j +0x96] after the [jal kexit] at +0xca is DEAD and never decoded:
    kexit has no continuation. *)
@@ -134,11 +134,11 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr kt m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N V false lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) (SY.syscall_env (kt := kt)) N V false lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) SY.syscall_env) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.

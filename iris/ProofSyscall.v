@@ -930,7 +930,7 @@ Section SyscallVocab.
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots bn 3 -∗ fileclose_bm fn us' -∗
-    (mword_of_int KernelSyms.initproc : mword 64) ↦₈[kt]{dqi} ip -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
     syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
     pc_is (mword_of_int (KernelSyms.syscall + 0x58) : mword 64) -∗
@@ -1281,11 +1281,11 @@ Section SyscallRet.
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots bn 3 -∗ fileclose_bm fn us' -∗
-    (mword_of_int KernelSyms.initproc : mword 64) ↦₈[kt]{dqi} ip -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
     syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
     pc_is (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) -∗
-    sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_hcont_ty (kt := kt) γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HEsp HEs2 Hrest Hav4 Hud.
@@ -1370,7 +1370,7 @@ Section SyscallArms.
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
     (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Admitted.
 
   (* ------------------------------------------------------------------- *)
@@ -1384,7 +1384,7 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 11 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 11 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1453,7 +1453,7 @@ Section SyscallArms.
       (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 12 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 12 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1523,7 +1523,7 @@ Section SyscallArms.
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 3 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 3 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1602,7 +1602,7 @@ Section SyscallArms.
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 14 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 14 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1657,7 +1657,7 @@ Section SyscallArms.
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 6 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 6 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1716,7 +1716,7 @@ Section SyscallArms.
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 13 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 13 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1795,7 +1795,7 @@ Section SyscallArms.
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 10 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 10 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1855,7 +1855,7 @@ Section SyscallArms.
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 1 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) 1 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
@@ -1925,7 +1925,7 @@ Section SyscallArms.
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
     (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal (kt := kt) k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     intro Hk.
     destruct (decide (k = 1%nat)) as [-> | _].
@@ -1991,14 +1991,14 @@ Section SyscallArms.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        M !!! Regidx r = m !!! Regidx r) ->
     (K_syscall <= av)%nat ->
-    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M
+    sysc_arm_pre (kt := kt) γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M
       (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) us -∗
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
-    sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_hcont_ty (kt := kt) γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hpj HMsp HMs1 HMother Hav.
@@ -2038,7 +2038,7 @@ Section SyscallArms.
     assert (Ha44 : add_vec (rget F0 Rs1) (sign_extend' 64 (mword_of_int 48 : mword 12))
                    = p_pid (proc_addr j)).
     { rgne. rewrite HF0s1. reflexivity. }
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.syscall + 0x44)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.syscall + 0x44)) Ra1 Rs1
               (mword_of_int 48 : mword 12) F0 (av - 4)%nat pid true
               (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2193,7 +2193,7 @@ Section SyscallArms.
     assert (Ha52 : add_vec (rget mf Rs1) (sign_extend' 64 (mword_of_int 88 : mword 12))
                    = p_trapframe (proc_addr j)).
     { rgne. rewrite Hmfs1. reflexivity. }
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.syscall + 0x52)) Ra5 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.syscall + 0x52)) Ra5 Rs1
               (mword_of_int 88 : mword 12) mf (av - 4)%nat (page_base tfp) true
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2421,7 +2421,7 @@ Section SyscallMain.
     iPoseProof (syci_12 with "Htext") as "Hi12".
     assert (Ha12 : add_vec (B0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 88 : mword 12)) = p_trapframe pj).
     { rewrite HB0a0. reflexivity. }
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.syscall + 0x12)) Rs2 Ra0 (mword_of_int 88 : mword 12)
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.syscall + 0x12)) Rs2 Ra0 (mword_of_int 88 : mword 12)
               B0 (av - 4)%nat (page_base (ud_tfp (pv_upt V))) true
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2454,7 +2454,7 @@ Section SyscallMain.
     assert (Ha16 : add_vec (B1 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 168 : mword 12)) = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat 21%nat)).
     { rewrite HB1s2 (tf_pa_eq_pa_add8 (ud_tfp (pv_upt V)) 21%nat ltac:(lia)).
       unfold pa_add, add_vec_int. f_equal; apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.syscall + 0x16)) Ra5 Rs2 (mword_of_int 168 : mword 12)
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.syscall + 0x16)) Ra5 Rs2 (mword_of_int 168 : mword 12)
               B1 (av - 4)%nat RAWNUM true
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2653,7 +2653,7 @@ Section SyscallMain.
       assert (Ha34 : add_vec (C3 !!! Regidx Ra5) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                      = mword_of_int (KernelSyms.syscalls + 8 * Z.of_nat k)).
       { rewrite HC3a5. apply kv_addv_zero. }
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.syscall + 0x34)) Ra5 Ra5
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.syscall + 0x34)) Ra5 Ra5
                 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) C3 (av - 4)%nat
                 (mword_of_int (sysc_target k) : mword 64) true
                 (dqm := DfracDiscarded)

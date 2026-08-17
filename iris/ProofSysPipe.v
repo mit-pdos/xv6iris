@@ -2215,7 +2215,7 @@ Section ProofSysPipe.
     iEval (rewrite -HA6a3) in "Hbufhi".
     iDestruct (cpu_own_transport CID48 CID60 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Copyout.wp_copyout_sconf kt KT0 γa A6
+    iApply (Copyout.wp_copyout_sconf kt kt γa A6
               (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
@@ -2540,7 +2540,7 @@ Section ProofSysPipe.
     assert (Hszb2 : add_vec (rget C4 Rs1) (sign_extend' 64 (mword_of_int 72 : mword 12))
                     = p_sz p) by (rgne; rewrite HC4s1; reflexivity).
     iEval (rewrite -Hszb2) in "Hszc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x72)) Ra1 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x72)) Ra1 Rs1
               (mword_of_int 72 : mword 12) C4 (av - 8)%nat
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2562,7 +2562,7 @@ Section ProofSysPipe.
     assert (Hptb : add_vec (rget C5 Rs1) (sign_extend' 64 (mword_of_int 80 : mword 12))
                    = p_pagetable p) by (rgne; rewrite HC5s1; reflexivity).
     iEval (rewrite -Hptb) in "Hptc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x74)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x74)) Ra0 Rs1
               (mword_of_int 80 : mword 12) C5 (av - 8)%nat
               (page_base (ud_root (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2654,7 +2654,7 @@ Section ProofSysPipe.
     iEval (rewrite -HC7a3) in "Hbuflo".
     iDestruct (cpu_own_transport CID61 CID75 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Copyout.wp_copyout_sconf kt KT0 γa C7 Pa
+    iApply (Copyout.wp_copyout_sconf kt kt γa C7 Pa
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
               (av - 8)%nat 0%nat eb p b lks

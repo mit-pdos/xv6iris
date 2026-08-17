@@ -46,7 +46,7 @@
    writes a 4-byte cell; create's parameters are [short], so the [lh]s at
    +0x32 / +0x36 read the LOW HALFWORD of each [int].  Slot 19 is therefore
    carved twice -- [InstrBytes.word_pointsto_split4] into the two [int]
-   cells, then [word4_pointsto_split2] (this file's, see its banner) into
+   cells, then [word4_pointsto_split2 (KTR := kt)] (this file's, see its banner) into
    halves -- and rejoined on the way to the epilogue.  This is sys_close's
    "a C local taken by address" one level further down.
 
@@ -1501,8 +1501,8 @@ Section ProofSysMknodBody.
                       = mword_of_int (MN + 0x32)) by pcw.
       iEval (rewrite Hpp32) in "Hpc".
       (* each [int] cell, halved: the [lh]s read the LOW half of each *)
-      iDestruct (word4_pointsto_split2 with "Hmin") as "[Hminlo Hminhi]".
-      iDestruct (word4_pointsto_split2 with "Hmaj") as "[Hmajlo Hmajhi]".
+      iDestruct (word4_pointsto_split2 (KTR := kt) with "Hmin") as "[Hminlo Hminhi]".
+      iDestruct (word4_pointsto_split2 (KTR := kt) with "Hmaj") as "[Hmajlo Hmajhi]".
       (* ============ +0x32 lh a3,-152(s0) : minor ============ *)
       assert (Hamin : add_vec (rget (CID := CID20) mas Rs0)
                         (sign_extend' 64 (mword_of_int 3944 : mword 12))
@@ -1563,9 +1563,9 @@ Section ProofSysMknodBody.
                       = mword_of_int (MN + 0x3a)) by pcw.
       iEval (rewrite Hpp3a) in "Hpc".
       (* the two cells, rejoined for the epilogue: nothing below reads them *)
-      iDestruct (word4_pointsto_join2 _ _ _ _
+      iDestruct (word4_pointsto_join2 (KTR := kt) _ _ _ _
                    (aligned8_aligned4 _ Hal19) with "Hminlo Hminhi") as "Hmin".
-      iDestruct (word4_pointsto_join2 _ _ _ _
+      iDestruct (word4_pointsto_join2 (KTR := kt) _ _ _ _
                    (aligned8_aligned4_hi _ Hal19) with "Hmajlo Hmajhi") as "Hmaj".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)

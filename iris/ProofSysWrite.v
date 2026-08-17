@@ -143,11 +143,11 @@ Module SysWriteProof (Argaddr : ARGADDR) (Argint : ARGINT) (Argfd : ARGFD)
                     (Filewrite : FILEWRITE) : SYSWRITE.
 
 Section ProofSysWrite.
-  Context {kt : ktier}.
   (* NO [!icacheG Σ]: [fileG] bundles it (SpecFilewrite.v's note). *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context {kt : ktier}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

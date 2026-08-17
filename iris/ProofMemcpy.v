@@ -64,7 +64,7 @@ Section ProofMemcpy.
 
   Context {kt : ktier}.
   (* the source's and the destination's own tiers -- see SpecMemmove.v's note *)
-  Context (kts ktw : ktier).
+  Context {kts ktw : ktier}.
   Context `{!KtierLe kts kt} `{!KtierLe ktw kt}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

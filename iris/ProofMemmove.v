@@ -154,7 +154,7 @@ Section ProofMemmove.
 
   Context {kt : ktier}.
   (* the source's and the destination's own tiers -- see SpecMemmove.v's note *)
-  Context (kts ktw : ktier).
+  Context {kts ktw : ktier}.
   Context `{!KtierLe kts kt} `{!KtierLe ktw kt}.
   (* [callee_saved] from agreement on the twelve registers the function never
      touches, plus the two frame registers it saves and restores. *)

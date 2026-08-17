@@ -160,8 +160,8 @@ Section ProofVirtioDiskRw.
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
         locked γk cpu_id -∗
         disk_res γd pd pav pu -∗
-        vdrw_saved sp0 m -∗
-        vdrw_scratch sp0 -∗
+        vdrw_saved (KTR := kt) sp0 m -∗
+        vdrw_scratch (KTR := kt) sp0 -∗
         b_blockno bp ↦₄{DfracOwn (1/2)} bno -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -607,7 +607,7 @@ Section ProofVirtioDiskRw.
         rewrite /R9 upd_ne; [| reg_neq]. exact HR8s7. }
     (* NB: [callee_saved m M] is NOT available here and must not be claimed --
        rw's prologue CLOBBERS s0..s8 and only the epilogue (P6) restores them
-       out of [vdrw_saved].  What travels is the frame, not the registers. *)
+       out of [vdrw_saved (KTR := kt)].  What travels is the frame, not the registers. *)
     assert (HR11hi : vdrw_hi R11 m).
     { vdrw_hi_peel. apply vdrw_hi_refl. }
     iSpecialize ("Hcont" $! CIDaq with "[%]"); [wp_next_chain|].
@@ -1262,7 +1262,7 @@ Section ProofVirtioDiskRw.
   (* =================================================================== *)
 
   Lemma vdrw_scratch_split (sp0 : Arch.pa) :
-    vdrw_scratch sp0 -∗
+    vdrw_scratch (KTR := kt) sp0 -∗
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ ∗
     (∃ v0 v1 v2 vp : mword 32,
@@ -1293,13 +1293,13 @@ Section ProofVirtioDiskRw.
       (M' : regfile) : iProp Σ :=
     (( ⌜M' !!! Regidx Rs2 = (mword_of_int (Z.of_nat 0) : mword 64)⌝ ∗
        free_bundles pd fr ∗
-       (∃ v0 v1 v2 : mword 32, vdrw_idx sp0 v0 v1 v2))
+       (∃ v0 v1 v2 : mword 32, vdrw_idx (KTR := kt) sp0 v0 v1 v2))
      ∨ (∃ h : nat,
           ⌜(h < 8)%nat /\ fr h = true
            /\ M' !!! Regidx Rs2 = (mword_of_int (Z.of_nat 1) : mword 64)⌝ ∗
           free_bundles pd (fr_upd fr h false) ∗ free_slot_res pd h ∗
           (∃ v1 v2 : mword 32,
-             vdrw_idx sp0 (mword_of_int (Z.of_nat h)) v1 v2))
+             vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h)) v1 v2))
      ∨ (∃ h m2 : nat,
           ⌜(h < 8)%nat /\ (m2 < 8)%nat /\ h <> m2
            /\ fr h = true /\ fr m2 = true
@@ -1307,7 +1307,7 @@ Section ProofVirtioDiskRw.
           free_bundles pd (fr_upd (fr_upd fr h false) m2 false) ∗
           free_slot_res pd h ∗ free_slot_res pd m2 ∗
           (∃ v2 : mword 32,
-             vdrw_idx sp0 (mword_of_int (Z.of_nat h))
+             vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h))
                           (mword_of_int (Z.of_nat m2)) v2)))%I.
 
   Definition vdrw_alloc_out (pd sp0 : Arch.pa) (fr : nat -> bool)
@@ -1317,7 +1317,7 @@ Section ProofVirtioDiskRw.
          /\ h <> m2 /\ h <> t /\ m2 <> t
          /\ fr h = true /\ fr m2 = true /\ fr t = true⌝ ∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) ∗
-        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+        vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                      (mword_of_int (Z.of_nat t)) ∗
         free_slot_res pd h ∗ free_slot_res pd m2 ∗ free_slot_res pd t ∗
         free_bundles pd (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false))
@@ -1333,7 +1333,7 @@ Section ProofVirtioDiskRw.
     sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc) : mword 64) -∗
     free_bundles pd fr -∗
-    vdrw_scratch sp0 -∗
+    vdrw_scratch (KTR := kt) sp0 -∗
     (* the continuation is UNDER A LATER: the driver's outer sleep-retry
        iLoeb closes its back edge through this call, and the [c.j] at
        +0x0c2 -- the first instruction this lemma runs after the loop head --

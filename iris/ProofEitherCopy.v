@@ -130,7 +130,7 @@ Section EitherCopyEpilogue.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -400,7 +400,7 @@ Section ProofEitherCopyout.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -1123,7 +1123,7 @@ Section ProofEitherCopyin.
      [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
      instance search, so every OTHER leaf in this file has to name its own
      datum tier out loud (the blanket [(ktd := kt)] below). *)
-  Context (ktb : ktier).
+  Context {ktb : ktier}.
   Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

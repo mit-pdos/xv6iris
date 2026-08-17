@@ -596,21 +596,21 @@ Section ProofSysUnlinkBody.
     ⊣⊢ a ↦₂ dir_inum data i.
   Proof.
     intro Hal.
-    rewrite (bb_ext a 2 (fun j => file_byte data (16 * i + j)%nat)
+    rewrite (bb_ext (KTR := kt) a 2 (fun j => file_byte data (16 * i + j)%nat)
                         (fun j => nth_byte (dir_inum data i) j)
                (fun j Hj => eq_sym (su_half_bytes_eq data i j Hj))).
     iSplit.
     - iIntros "H".
-      iApply (word2_pointsto_intro a (DfracOwn 1) (dir_inum data i) Hal).
+      iApply (word2_pointsto_intro (KTR := kt) a (DfracOwn 1) (dir_inum data i) Hal).
       iExact "H".
-    - iIntros "H". iApply (word2_pointsto_bytes with "H").
+    - iIntros "H". iApply (word2_pointsto_bytes (KTR := kt) with "H").
   Qed.
 
   Lemma su_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] file_byte data (16 * i + (2 + j))%nat)
     ⊣⊢ ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] dir_name data i j).
   Proof.
-    apply (bb_ext a 14 (fun j => file_byte data (16 * i + (2 + j))%nat)
+    apply (bb_ext (KTR := kt) a 14 (fun j => file_byte data (16 * i + (2 + j))%nat)
                        (dir_name data i)
              (fun j _ => su_name_shift data i j)).
   Qed.
@@ -636,7 +636,7 @@ Section ProofSysUnlinkBody.
     ⊣⊢ ([∗ list] jj ∈ seq 0 16,
           pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat).
   Proof.
-    apply (bb_ext a 16
+    apply (bb_ext (KTR := kt) a 16
              (fun jj => rd_delivered data olds (16 * i)%nat 16 jj)
              (fun jj => file_byte data (16 * i + jj)%nat)
              (fun jj Hj => su_rdd_eq data olds (16 * i)%nat jj Hj)).

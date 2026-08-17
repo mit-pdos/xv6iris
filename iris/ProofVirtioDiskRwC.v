@@ -1437,7 +1437,7 @@ Section ProofVirtioDiskRwC.
     sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
-    vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+    vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                  (mword_of_int (Z.of_nat t)) -∗
     free_slot_res pd h -∗ free_slot_res pd m2 -∗ free_slot_res pd t -∗
     b_disk b ↦₄ dsk0 -∗
@@ -1449,7 +1449,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
         sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
-        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+        vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                      (mword_of_int (Z.of_nat t)) -∗
         vdrw_chain pd b h m2 t wr sector -∗
         WP (Loop : expr riscv_lang)) -∗
