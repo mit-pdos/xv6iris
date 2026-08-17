@@ -561,6 +561,23 @@ Section machine.
     - intros i T HT. by apply Hlst.
   Qed.
 
+  (** ... AND THE SAME WITH THE DEVICE WITNESS (M5/B4).  [DS] is untouched:
+      the witness is a pure ORDER on trace positions, and every clause of
+      [ptraces_dev_of] beyond [ptraces_of] reads only [pt_trs] (through
+      [ev_at]/[ev_din]/[ev_dout]/[dev_at]) and [pc_dev] — none of which the
+      retag moves, since it rewrites [pt_log]/[pc_log] alone.  Needed
+      because a capstone that retag-precomposes must carry its whole
+      decomposition, witness included, across the retag. *)
+  Lemma ptraces_dev_of_retag f TS DS mid c :
+    ptraces_dev_of pstep pdev TS DS mid c →
+    ptraces_dev_of pstep pdev (retag_traces f TS) DS
+      (retag_cfg f mid) (retag_cfg f c).
+  Proof.
+    intros (Hof & Hd & HW1 & HW2 & HW3 & HW4 & HW5 & HW6).
+    split_and!; [by apply ptraces_of_retag|exact Hd|exact HW1|exact HW2
+                |exact HW3|exact HW4|exact HW5|exact HW6].
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (** ** 5. THE CANONICAL RETAG
 

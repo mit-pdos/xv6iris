@@ -66,14 +66,110 @@ arity (mechanical), the PLIC hart index (trivial) and THE DISK'S DMA READ.
   `MemWrite` node (`wm_class_of (classify ak) ws`), `WCexcl` at `LRmw`,
   `WCplain` for the disk.  Disk burst arm = the archived existential-memory
   form FOR NOW (Phase C replaces it).
-- **B3** the factorization, arm by arm: ⇐ (`epf_step i l ρ ρ' → wp_pf_step
-  pstep_ev pcls_ev i l (ecfg_of ρ) (ecfg_of ρ')`) for ALL arms, and ⇒
-  (`wp_pf_step … i l (ecfg_of P σ) c' → ∃ ρ', epf_step i l (P,σ) ρ' ∧
-  ecfg_of ρ' = c'`) for every arm EXCEPT the disk burst, which is the one
-  named exception in the statement.  Plus `lat_free_prog`, `ts_oblivious`,
-  `pdev_ok`, `pcls_obl` for the instance, and `ecfg_of (ep_init gen) σ0 =
-  wp_init …` at a fresh era.
-- **B4** the capstone STATED with the burst arm as its single open case.
+- **B3.1** DONE (2026-08-17) the LANGUAGE-SIDE factorization
+  (`WeakEvInst`): `ecycle_step_factor`, `eplic_step_factor`,
+  `euart_step_factor`, `edisk_step_factor` — all ↔, all arms.
+- **B3.2** DONE (2026-08-17, `WeakEvCapstone` §§0–6) the INSTANCE:
+  * ⇒ `wp_pf_step_epf_step` : `ethread_live σ (ep_gen P) → wp_pf_step
+    pstep_ev pcls_ev i l (ecfg_of P σ) c' → ∃ P' σ', epf_step i l (P,σ)
+    (P',σ') ∧ ecfg_of P' σ' = c'` — EVERY arm, no exception (M5 removed the
+    disk-burst one), plus the run level `wp_pf_rtc_epf_rtc`.
+  * ⇐ `epf_run_wp_pf_run` / `epf_rtc_wp_pf_rtc` : `epf_run ρ ρ' →
+    wp_pf_run pstep_ev pcls_ev (ecfg_of ρ) (ecfg_of ρ')`, and the step form
+    `epf_step_wp_pf_step` with an EXISTENTIAL label.  **FINDING (recorded,
+    not a gap): the per-label ⇐ is FALSE, and that is a property of
+    `WeakEvPf.epf_step`, not of the instance** — its label is only
+    constrained by `elabel_ok`, which under-determines it.  Witness:
+    `fence.i`, whose language arm re-inserts the hart's `wstate` unchanged,
+    so `elabel_ok σ c LSilent σ'` holds there while the program half emits
+    the inert `LFence false false false false`.  Every consumer of
+    `epf_step` quantifies the label existentially (`epf_run`,
+    `epf_violation_free_hart`, `epf_step_erased`), so the run-level form is
+    the exact statement and nothing needs the other.
+  * the uniform shape of a pf step (`pf_ok`/`pf_log`/`pf_ws`/`pf_cfg` +
+    `wp_pf_step_intro`/`wp_pf_step_inv`), which is what collapses "six pf
+    arms × two agent kinds" to one shape — and which IS `WeakEvInst`'s
+    memory half at the projection (`pf_ok_hart`/`pf_log_hart`/`pf_ws_hart`,
+    `pf_ok_disk`/`pf_log_disk`/`pf_ws_disk`).
+  * the layout (`eags_lookup_inv`, `eags_upd_hart`, `eags_upd_disk`,
+    `eags_eq`, `ecfg_of_hart_upd`, `ecfg_of_disk_upd`, `ecfg_of_dev`,
+    `ecfg_of_reg`, `ecfg_of_hset`).
+  * the initial configuration: `eps_init σ` and `ecfg_of_init : wglog σ = []
+    → (∀ c, wgws σ c = ws_init) → ecfg_of (ep_init gen) σ = wp_init
+    (img_z (wgimg σ)) (wgdev σ) (eps_init σ)`.
+  * the Layer-1 side conditions: `pstep_ev_lat_free_prog`,
+    `pstep_ev_ts_oblivious`, `pcls_ev_obl`, `WeakEvInst.pdev_ev_ok`; and the
+    transport `epf_pf_violation_free : epf_violation_free_hart (ep_init gen,
+    σ) → pf_violation_free_hart cls_of pub_of n_disk pstep_ev pcls_ev …`.
+- **B4** DONE (2026-08-17) **THE ONE-MACHINE CAPSTONE**
+  `WeakEvCapstone.xv6_ev_weak_robust`, verbatim:
+
+  ```coq
+  Theorem xv6_ev_weak_robust Σ `{!riscvGpreS Σ, !weakGpreS Σ}
+      (gen : nat) (σ0 : wgstate) (D : CPU -> gset register)
+      (c : wpcfg pexv6 dev_state)
+      (Hgen : gen = 0%nat)
+      (Hpow : wgpow σ0 = true) (Hgen0 : wggen σ0 = 0%nat)
+      (Hlog : wglog σ0 = [])
+      (Hws : forall cc : CPU, wgws σ0 cc = ws_init) :
+    (forall (HR : riscvGS Σ) (HW : weakGS Σ),
+       ⊢ ([∗ set] cc ∈ (fin_to_set CPU : gset CPU),
+            [∗ set] r ∈ D cc,
+              reg_pointsto_at cc r (DfracOwn 1)
+                (register_lookup r (wgregs σ0 cc))) ∗
+         ([∗ map] a ↦ b ∈ wgimg σ0,
+            wlat_pointsto (pa_z a) (DfracOwn 1) 0%nat b) ∗
+         ([∗ set] cc ∈ (fin_to_set CPU : gset CPU), hart_view cc) ∗
+         wlog_lb [] ∗
+         uart_frag (wgdev σ0).(duart) ∗ plic_frag (wgdev σ0).(dplic) ∗
+         virtio_frag (wgdev σ0).(dvirtio)
+         ={⊤}=∗ ([∗ list] e ∈ epower_fork gen, EWP e @ ⊤)) ->
+    wp_behavior pstep_ev (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0) c ->
+    (forall cb mid TS DS,
+       wp_behavior pstep_ev (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0) cb ->
+       rtc (wp_promise_step (P:=pexv6) (D:=dev_state))
+         (wp_init (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0)) mid ->
+       ptraces_dev_of pstep_ev pdev_ev TS DS mid cb ->
+       cls_canonical pcls_ev TS ->
+       main_premises n_disk TS DS) ->
+    exists cf,
+      rtc (wp_pf_run pstep_ev pcls_ev)
+        (wp_init (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0)) cf /      prog_of cf = prog_of c /\ (forall a, mem_of cf a = mem_of c a) /      exists P' σ', rtc epf_run (ep_init gen, σ0) (P', σ') /                    ecfg_of P' σ' = cf.
+  ```
+
+  **THE PREMISE LEDGER, in full** — and nothing else:
+  1. four machine facts about a booted σ0 (fresh era, power on, empty log,
+     fresh views);
+  2. THE WP PACKAGE (the only Iris-side obligation), verbatim
+     `WeakEvAdequacy.weak_ev_pf_violation_free`'s;
+  3. the behavior under consideration;
+  4. `WeakRobustMain.main_premises n_disk TS DS` served at CANONICAL traced
+     bundles of any behavior of the same program — the genuine Layer-1
+     robustness content (per-edge split, bad-SCC residue, E-edge
+     obligation, device-epoch residue, byte classification), whose
+     exhibit-level discharge is `weak-memory-premises.md` phase 2;
+  5. the 5 `rv64d` axioms (machine-checked: `Print Assumptions
+     xv6_ev_weak_robust` = exactly those five, nothing else).
+
+  GONE relative to the archived instruction-atomic capstone
+  (`WeakComposeLang.xv6_weak_robust_lifted`): `rv64d_axiom_shapes`,
+  `rv64d_live_residue`, `img_total`, `xv6_cone_premises`, `cone_liftable`,
+  `Hcq`, `Hseip`, `Hpriv`, `sail_shaped`, `sail_live`, the oracle streams —
+  and `cls_canonical`, which the retag discharges inside the proof.
+
+  TWO SHAPE DEVIATIONS FROM THE COMMISSIONED SKETCH, both forced and both
+  matching the archive: (i) the `main_premises` supplier is quantified over
+  the behavior `cb` as well, because the capstone RETAGS the behavior
+  before running Layer 1 on it (`cls_canonical` is obtainable only for a
+  bundle one already holds, so the bundle Layer 1 consumes belongs to
+  `retag_cfg _ c`); in exchange the supplier MAY ASSUME canonicity.
+  (ii) `WeakRobustMain` gained `robust_main_bundle` — `robust_main`'s body
+  with the traced decomposition as an ARGUMENT rather than produced
+  internally — because `robust_main`'s own `cls_canonical` hypothesis
+  quantifies over EVERY bundle of the behavior, which no retag can supply.
+  `robust_main` is unchanged in statement and is now derived from it in
+  three lines.  `WeakRetag` gained `ptraces_dev_of_retag` (the witness is a
+  pure order on trace positions, so the retag leaves it alone).
 
 ## Phase C — M5: the disk as a weak-memory AGENT (design: `design/weak-memory-m5.md`)
 

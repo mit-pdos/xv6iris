@@ -1410,34 +1410,40 @@ Section main.
       and [cls_canonical pcls TS] is discharged at the capstone by
       [WeakRetag]'s retag — neither belongs in the per-bundle package
       the caller assembles from the graph obligations. *)
-  Theorem robust_main nh img d0 ps c :
-    pdev_ok pstep pdev →
+  (** THE BUNDLE FORM (M5/B4).  [robust_main]'s body with the traced
+      decomposition taken as an ARGUMENT rather than produced internally
+      by [wp_behavior_fulfil_once_dev].  Factored out because the
+      class-canonicity premise is discharged by [WeakRetag]'s retag, and
+      the retag can only canonicalise ONE bundle — the one the caller
+      already holds — whereas [robust_main]'s [cls_canonical] hypothesis
+      quantifies over every bundle of the behavior.  A caller that
+      retag-precomposes therefore needs exactly this entry point.
+      ([pdev_ok] is NOT needed here: it was only what
+      [wp_behavior_fulfil_once_dev] consumed.) *)
+  Lemma robust_main_bundle nh img d0 ps c mid TS DS :
     lat_free_prog pstep → ts_oblivious pstep →
     pcls_obl pcls →
-    wp_behavior pstep img d0 ps c →
-    (** THE PREMISE PACKAGE, PER TRACED BUNDLE *AND WITNESS* (G5b): the
-        factorization hands out [(mid, TS, DS)] and every clause of the
-        package that mentions the fabric mentions [DS]. *)
-    (∀ mid TS DS,
-       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
-       ptraces_dev_of pstep pdev TS DS mid c →
-       main_premises nh TS DS) →
-    (∀ mid TS DS,
-       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
-       ptraces_dev_of pstep pdev TS DS mid c →
-       cls_canonical pcls TS) →
+    rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+    ptraces_dev_of pstep pdev TS DS mid c →
+    (** the FULFIL ACCOUNTING of [wp_behavior_fulfil_once_dev], verbatim:
+        every log position authored by agent [i] is fulfilled exactly once
+        across agent [i]'s trace *)
+    (∀ p m i, pc_log mid !! p = Some m → wm_tid m = Some i →
+       ∃ T, pt_trs TS !! i = Some T ∧
+         (∃ k ev, at_evs T !! k = Some ev ∧ ae_ts ev = Some (S p)) ∧
+         (∀ k1 k2 ev1 ev2,
+            at_evs T !! k1 = Some ev1 → ae_ts ev1 = Some (S p) →
+            at_evs T !! k2 = Some ev2 → ae_ts ev2 = Some (S p) → k1 = k2)) →
+    main_premises nh TS DS →
+    cls_canonical pcls TS →
     pf_violation_free_hart cls_of pub_of nh pstep pcls img d0 ps →
     ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
   Proof.
-    intros Hpok Hlf Hobl Hclsobl Hb Hprem Hpcan Hvf.
-    destruct (wp_behavior_fulfil_once_dev pstep pdev img d0 ps c Hpok Hlf Hb)
-      as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
+    intros Hlf Hobl Hclsobl Hprom Hofd Hacct Hpkg Hcls Hvf.
     have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
     have Hdinit : pd_init DS = pc_dev mid by destruct Hofd as (_ & ? & _).
-    destruct (Hprem mid TS DS Hprom Hofd)
-      as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
-    have Hcls : cls_canonical pcls TS by apply (Hpcan mid TS DS Hprom Hofd).
+    destruct Hpkg as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
     destruct Hofd as (Hof & _).
     (* the derived bundle facts — as in [wp_behavior_robust] *)
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
@@ -1487,6 +1493,37 @@ Section main.
     - by rewrite Hlog0 Hclogc.
     - by rewrite Hclenc Hplen /wp_init /= length_map.
     - exact Hlst.
+  Qed.
+
+  (** THE LAYER-1 ROBUSTNESS THEOREM, in its original per-behavior form:
+      the bundle lemma composed with the accounting decomposition. *)
+  Theorem robust_main nh img d0 ps c :
+    pdev_ok pstep pdev →
+    lat_free_prog pstep → ts_oblivious pstep →
+    pcls_obl pcls →
+    wp_behavior pstep img d0 ps c →
+    (** THE PREMISE PACKAGE, PER TRACED BUNDLE *AND WITNESS* (G5b): the
+        factorization hands out [(mid, TS, DS)] and every clause of the
+        package that mentions the fabric mentions [DS]. *)
+    (∀ mid TS DS,
+       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+       ptraces_dev_of pstep pdev TS DS mid c →
+       main_premises nh TS DS) →
+    (∀ mid TS DS,
+       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+       ptraces_dev_of pstep pdev TS DS mid c →
+       cls_canonical pcls TS) →
+    pf_violation_free_hart cls_of pub_of nh pstep pcls img d0 ps →
+    ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
+          prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
+  Proof.
+    intros Hpok Hlf Hobl Hclsobl Hb Hprem Hpcan Hvf.
+    destruct (wp_behavior_fulfil_once_dev pstep pdev img d0 ps c Hpok Hlf Hb)
+      as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
+    eapply (robust_main_bundle nh img d0 ps c mid TS DS);
+      [done|done|done|done|done|done
+      |by apply (Hprem mid TS DS Hprom Hofd)
+      |by apply (Hpcan mid TS DS Hprom Hofd)|done].
   Qed.
 
   (* ---------------------------------------------------------------- *)
