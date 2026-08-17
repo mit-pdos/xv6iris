@@ -290,6 +290,51 @@ expected type is still an evar at splice time.
   you only ever pass along should be destructured for READING and
   reconstructed from the SAVED original, never from its pieces.
 
+## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
+
+When a class is a *definitional* one used as an INDEX rather than as a
+capability — `Class CurKtier := cur_ktier : ktier`, whose inhabitants are
+just values — a term of that index type reaches a goal by one of two
+routes, and `simple apply` (hence `typeclasses eauto`) will NOT unfold the
+class to reconcile them:
+
+- through the AMBIENT INSTANCE, so the argument has the CLASS type
+  (`curktier_default : CurKtier`);
+- written out at a LITERAL, so it has the UNDERLYING type (`KT1 : ktier`).
+
+An instance whose index binder is the backtick class form
+(`` `{KTR : !CurKtier} ``, which is what a section `Context` gives you)
+is worse than either: the binder becomes an instance-SEARCH argument, so
+the only index it can ever produce is the default — it silently refuses
+every goal at a literal, reported as **`no match for (Persistent …), N
+possibilities`**, naming nothing about the index. A plain
+`(k : TheClass)` binder covers the ambient route and reports **"Unable to
+unify ktier with CurKtier"** on the literals; a plain `(k : Underlying)`
+binder covers the literals and reports the mirror image.
+
+**So declare each such instance TWICE** — once at the class type, once at
+the underlying type, the second `exact`ing the first — and do the same for
+any auxiliary class indexed by it (an order class `KtierLe` needs `_c`
+twins for exactly the same reason: a goal `KtierLe KTR KTR` over a section
+variable matches none of the underlying-typed instances). The symptom that
+identifies the trap: a `Persistent` / `Timeless` / order goal that fails
+ONLY in the files that name a literal, or ONLY in the ones that do not.
+
+Two neighbours of the same shape:
+
+- **A SECTION VARIABLE CANNOT BE INSTANTIATED FROM INSIDE ITS OWN
+  SECTION.** `Context `{KTR : !CurKtier}` makes the section's lemmas
+  index-generic *for callers*; inside the section the index is fixed, so a
+  lemma that must be at one index cannot sit beside one that must be
+  generic. Split the section. The tell is **`Wrong argument name KTR`** at
+  a `(KTR := …)` written in the defining file.
+- **A CLASS HYPOTHESIS IN A SECTION BEATS A GLOBAL INSTANCE.** Adding
+  `Context `{!KtierLe ktb kt}` for one two-index callee makes every OTHER
+  application in the file resolve its index to `ktb` instead of the
+  default the global `refl` instance would have given — so a whole file's
+  worth of unrelated goals break at once, and each has to name its index
+  out loud. Put the note at the `Context`, not at the failures.
+
 ## Typeclass sweeps: the three traps that do not look like typeclass problems
 
 Adding a class constraint to a bottom-of-the-tree predicate (e.g. giving
