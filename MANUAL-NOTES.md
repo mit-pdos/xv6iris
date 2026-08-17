@@ -5,7 +5,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - predicates capturing config registers (mmode_config, smode_config)
 + ghost_var to track interesting config register bits (SIE)
 - instr predicate (instr memory points-to, abstract 2-byte vs 4-byte, decode)
-- tlb_inv
++ tlb_inv
 + minstret_inv (invariant counting retired instructions in minstret register), clock_inv
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
 + interrupt handling with a WP for the address in stvec (kernelvec)
@@ -15,12 +15,12 @@ Some high-level ideas that might be interesting for some eventual paper:
 + acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
 + kalloc/kfree separation-logic-style specs
 + kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None (same for allocproc)
-- re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
++ re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
 + background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
 + user-mode exec: predicate for all possible decode results (4-byte and 2-byte), then proof for every instruction in that predicate
 + shared CLAUDE.md memory in repo
-- device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
++ device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
 + UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write; should allow concurrent rx + tx
 + user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 + start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
@@ -29,7 +29,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
 - push_off returns intr_count counting token, which is needed to call pop_off to ensure no panic
 + use fable to state specs, opus to prove them
-- kernel ptsto: PA own + VA map fact via kmap_at (code RX, data RW), monotonic for Bare-to-Sv39
++ kernel ptsto: PA own + VA map fact via kmap_at (code RX, data RW), monotonic for Bare-to-Sv39
 - page tables need to track kmap_at for intermediate PT pages, to reconstruct data ptsto
 - MMIO just needs mapping fact, no memory points-to (because it's not memory)
 - kvminithart: need strans_bit to track whether satp is currently Bare or Sv39
@@ -63,7 +63,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - ghost var for SPP flag in sstatus: owned when interrupts disabled, otherwise in sie invariant
 - unsynchronized access to ip->ref in ilock, could be tricky to prove under weak memory
 - proved intr_handler_spec is contractive to enable recursive defn (inside sie_cap_gpr)
-- interesting sharing pattern: multiple struct file holders need to share access to single inode ref
++ interesting sharing pattern: multiple struct file holders need to share access to single inode ref
 - weak memory: monotone view resource to hide view-advance at each instruction, with duplicable lb facts at fences etc
 - weak memory: objective points-to for SC-like memory, fractional for SC-like read-only sharing
 - weak memory: lock invariant is vProp; refers to different view inside lock vs after acquiring lock
