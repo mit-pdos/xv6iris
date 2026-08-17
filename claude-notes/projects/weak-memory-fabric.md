@@ -158,6 +158,22 @@ than assumed globally (so route (3) was not needed).  In
   exhibit has no global acyclicity to spend.  `tc_gdep3_epoch` is the
   shared split.
 
+> **SUPERSEDED AS A PREMISE (A0′, 2026-08-17).**  `main_premises` no
+> longer carries `dev_epoch_ok`: it is a per-agent DOMINATION condition
+> and is REFUTED for ordinary xv6 bundles (`WeakRobustDisc` §A5).  The
+> landed clause is `WeakRobustOrd.dev_wit_ok` — "the witness order is
+> `gdep2`-consistent": no `gdep2` path from a LATER fabric access back to
+> an EARLIER one.  That is EXACTLY what `gdep3` acyclicity needs, with no
+> rank at all: `gdev` is the witness's successor chain, so splitting a
+> `gdep3` cycle at its `gdev` edges leaves a `gdep2` run that walks the
+> witness index back down.  New lemmas: `dev_wit_ok`, `dev_wit_ok_nil` /
+> `_short` / `_devfree`, `dev_wit_ok_of_epoch` (the old premise implies
+> the new one — everything below is still a SUFFICIENT condition),
+> `tc_gdep3_wit` (the split), `gdep3_acyclic_at_wit` (pointwise, for the
+> cone), `gdep3_acyclic_of_wit` (global).  Everything in this subsection
+> stays in the file; only the premise moved.  See
+> `design/weak-memory-premise-discharge.md` §2c "LANDED (A0′)".
+
 **WHY THE RESIDUE CANNOT BE DISCHARGED (the G3 finding one level down).**
 An `grf` edge genuinely may lower the epoch, and nothing in the bundle
 forbids it.  The refutation, recorded at the definition:
@@ -192,7 +208,8 @@ gap is smallest, and the gap is exactly `dev_epoch_ok`.
   `ptraces_dev_of` (via `wp_behavior_fulfil_once_dev`).
 - `main_premises nh TS DS` = `edges_split ∧ bad_wf ∧ ee_ok ∧
   dev_epoch_ok ∧ ∃ sync, ptraces_bytes_ok`; `main_premises_nil` is the
-  dev-free packaging.
+  dev-free packaging.  (A0′: the fourth clause is now `dev_wit_ok`, and
+  `Section exhibit`'s context variable with it — see the box in G5a.)
 - **DEVIATION (forced, recorded at the definition):** `bad`'s
   "no publishing ancestor" conjunct, and `bad_min`, are over `gdep3`, not
   `gdep2`.  The exhibit replays the `gdep3` cone, so the ¬pub arm finds

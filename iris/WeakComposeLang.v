@@ -1986,7 +1986,7 @@ Theorem robust_main_no_bad {P D : Type}
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
   intros Hlf Hobl Hclsobl Hprom Hof Hacct Hprem Hcanon Hdf Hnb.
-  destruct Hprem as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
+  destruct Hprem as (Hsplit & Hbwf & Hee & Hwok & (sync & Hbytes)).
   (* the derived bundle facts — verbatim [robust_main]'s *)
   have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
   have Hla : log_authored (pc_log mid).

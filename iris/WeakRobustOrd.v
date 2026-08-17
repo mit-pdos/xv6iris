@@ -517,6 +517,13 @@ Section ord.
   (** ** THE DEVICE EPOCH — the rank that discharges the criterion for
          [gpo] and [gdev], and NAMES the residue (G5a)
 
+      SUPERSEDED AS A PREMISE (A0'): [dev_epoch_ok] below is no longer
+      the clause [WeakRobustMain.main_premises] carries — it is STRICTLY
+      STRONGER than what acyclicity needs (see [dev_wit_ok] further down,
+      and [dev_wit_ok_of_epoch] for the implication).  Everything here
+      stays: it is the sufficient condition with the per-edge shape, and
+      [WeakRobustDisc] §A5's characterization is of it.
+
       THE ROUTE (worklist G5a, preference (1)).  The criterion
       [gdep3_acyclic_of_rank] wants a rank that [gdep2] never lowers and
       [gdev] always raises.  There is one canonical candidate — THE
@@ -707,6 +714,177 @@ Section ord.
   Proof.
     intros Hwit Hok Hac e.
     by eapply (gdep3_acyclic_at_epoch TS DS e Hwit Hok (Hac e)).
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** A0′: [dev_wit_ok] — THE EXACT CONDITION ACYCLICITY NEEDS
+         (this SUPERSEDES [dev_epoch_ok] as the premise; the epoch stays
+         as a sufficient condition, see [dev_wit_ok_of_epoch])
+
+      WHY THE EPOCH WAS TOO STRONG.  [dev_epoch_ok] is a per-edge
+      DOMINATION condition ([WeakRobustDisc] §A5 proves
+      [dev_epoch_ok ↔ dev_dom]): it forces the READER of every rf edge to
+      have a fabric access of its OWN dominating the writer's.  A bundle
+      as ordinary as
+
+          agent A: fabric access; store x      agent B: load x
+
+      falsifies it — B never touches the fabric, so B's epoch is [0] and
+      the rf edge A→B lowers it — even though the fabric-ordered graph is
+      plainly acyclic (there is only ONE fabric event, hence no [gdev]
+      edge at all).
+
+      WHAT ACYCLICITY ACTUALLY NEEDS.  [gdev] is the SUCCESSOR relation
+      on [pd_ord DS], i.e. the total chain over the witness in witness
+      order, so it can only ever RAISE the witness index, by exactly one.
+      Split a [gdep3] cycle at its [gdev] edges: the [gdev] hops walk the
+      witness index up, so somewhere a [gdep2] run must walk it back
+      DOWN — from a fabric event of higher witness index to one of lower
+      (or, degenerately, back to the same one, which is a [gdep2] cycle).
+      Forbidding exactly that is [dev_wit_ok]: THE WITNESS ORDER IS
+      [gdep2]-CONSISTENT.  It quantifies over pairs of LISTED events
+      only, so it is free whenever the witness has fewer than two entries
+      ([dev_wit_ok_short], [dev_wit_ok_nil]) — in particular on the
+      refuting bundle above — and free outright on a dev-free bundle
+      ([dev_wit_ok_devfree]).
+
+      It is not per-edge (it mentions [tc (gdep2 TS)]), which is the
+      honest price of being exactly the right condition; but it is
+      implied by the old per-edge one ([dev_wit_ok_of_epoch]), so nothing
+      that discharged [dev_epoch_ok] is lost. *)
+
+  Definition dev_wit_ok TS (DS : pdevs D) : Prop :=
+    ∀ m1 m2 e1 e2, (m1 < m2)%nat →
+      pd_ord DS !! m1 = Some e1 → pd_ord DS !! m2 = Some e2 →
+      ¬ tc (gdep2 TS) e2 e1.
+
+  Lemma dev_wit_ok_nil TS (d : D) : dev_wit_ok TS (PDevs d []).
+  Proof. intros m1 m2 e1 e2 _ Hm1. by rewrite lookup_nil in Hm1. Qed.
+
+  (** FREE ON THE §A5 REFUTING BUNDLE: it has a single fabric access, and
+      one entry admits no pair [m1 < m2]. *)
+  Lemma dev_wit_ok_short TS (DS : pdevs D) :
+    (length (pd_ord DS) ≤ 1)%nat → dev_wit_ok TS DS.
+  Proof.
+    intros Hlen m1 m2 e1 e2 Hlt _ Hm2.
+    (* NOTE: spell the bound out over [pd_ord DS] — reading it off [Hm2]
+       gives [@length gev] and [lia] does not identify the two atoms. *)
+    have Hb : (m2 < length (pd_ord DS))%nat by eapply lookup_lt_Some.
+    lia.
+  Qed.
+
+  (** FREE ON A DEV-FREE BUNDLE: (W1) says a listed position is a
+      fabric-touching event, and there are none. *)
+  Lemma dev_wit_ok_devfree TS DS :
+    ptraces_wit TS DS →
+    (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
+       ae_dev ev = None) →
+    dev_wit_ok TS DS.
+  Proof.
+    intros (HW1 & _) Hdf m1 m2 e1 e2 _ Hm1 _.
+    destruct (HW1 m1 e1 Hm1) as (ev & Hev & Hs).
+    rewrite /ev_at in Hev.
+    destruct (pt_trs TS !! e1.1) as [T|] eqn:HT; simpl in Hev; [|done].
+    rewrite (Hdf e1.1 T e1.2 ev HT Hev) in Hs. by destruct Hs.
+  Qed.
+
+  (** THE OLD PREMISE IMPLIES THE NEW ONE (so the new one is weaker, and
+      every discharge route for the epoch still applies): the epoch never
+      falls along a [gdep2] PATH under [dev_epoch_ok], and a listed
+      event's epoch is [S] its own witness index ([depoch_dev]). *)
+  Lemma depoch_tc_gdep2_le TS DS e1 e2 :
+    dev_epoch_ok TS DS → tc (gdep2 TS) e1 e2 →
+    (depoch DS e1 ≤ depoch DS e2)%nat.
+  Proof.
+    intros Hok. induction 1 as [x y Hxy|x y z Hxy _ IH].
+    - by eapply depoch_gdep2_le.
+    - have := depoch_gdep2_le TS DS x y Hok Hxy. lia.
+  Qed.
+
+  Lemma dev_wit_ok_of_epoch TS DS :
+    ptraces_wit TS DS → dev_epoch_ok TS DS → dev_wit_ok TS DS.
+  Proof.
+    intros Hwit Hok m1 m2 e1 e2 Hlt Hm1 Hm2 Hc.
+    have Hle := depoch_tc_gdep2_le TS DS e2 e1 Hok Hc.
+    rewrite (depoch_dev TS DS m1 e1 Hwit Hm1)
+            (depoch_dev TS DS m2 e2 Hwit Hm2) in Hle. lia.
+  Qed.
+
+  (** THE SPLIT, the [dev_wit_ok] analogue of [tc_gdep3_epoch]: a
+      [gdep3] path is a [gdep2] path, or it ENTERS the witness at some
+      position [m1] and LEAVES it at a STRICTLY LATER one [m2], with
+      plain [gdep2] runs on either side.
+
+      The invariant [m1 < m2] is what [dev_wit_ok] buys, and it is bought
+      in the [gdev]-prefix case: the [gdep2] run leaving the new edge's
+      target (witness index [S m]) reaches the old entry point [e1]
+      (witness index [m1]), so [m1 < S m] would be a [gdep2] path from a
+      LATER listed event to an EARLIER one. *)
+  Lemma tc_gdep3_wit TS DS x y :
+    ptraces_wit TS DS → dev_wit_ok TS DS →
+    tc (gdep3 TS DS) x y →
+    tc (gdep2 TS) x y ∨
+    ∃ m1 m2 e1 e2,
+      pd_ord DS !! m1 = Some e1 ∧ pd_ord DS !! m2 = Some e2 ∧
+      (m1 < m2)%nat ∧ rtc (gdep2 TS) x e1 ∧ rtc (gdep2 TS) e2 y.
+  Proof.
+    intros Hwit Hok. induction 1 as [x y Hxy|x z y Hxz _ IH].
+    - destruct Hxy as [H2|(m & Hm & Hsm)].
+      + left. by apply tc_once.
+      + right. exists m, (S m), x, y.
+        split_and!; [exact Hm|exact Hsm|lia|apply rtc_refl|apply rtc_refl].
+    - destruct Hxz as [H2|(m & Hm & Hsm)].
+      + destruct IH as [Hzy|(m1 & m2 & e1 & e2 & Hm1 & Hm2 & Hlt & Hze1 & He2y)].
+        * left. by eapply tc_l.
+        * right. exists m1, m2, e1, e2.
+          split_and!; [exact Hm1|exact Hm2|exact Hlt| |exact He2y].
+          by eapply rtc_l.
+      + destruct IH as [Hzy|(m1 & m2 & e1 & e2 & Hm1 & Hm2 & Hlt & Hze1 & He2y)].
+        * right. exists m, (S m), x, z.
+          split_and!; [exact Hm|exact Hsm|lia|apply rtc_refl|by apply tc_rtc].
+        * have Hle : (S m ≤ m1)%nat.
+          { apply rtc_tc in Hze1 as [Heq|Htc].
+            - rewrite Heq in Hsm.
+              have Heq' : S m = m1 by eapply pd_ord_index_inj;
+                [exact Hwit|exact Hsm|exact Hm1].
+              lia.
+            - destruct (decide (m1 < S m)%nat) as [Hlt'|Hge]; [|lia].
+              by destruct (Hok m1 (S m) e1 z Hlt' Hm1 Hsm Htc). }
+          right. exists m, m2, x, e2.
+          split_and!; [exact Hm|exact Hm2|lia|apply rtc_refl|exact He2y].
+  Qed.
+
+  (** POINTWISE, the form the EXHIBIT's cone consumes: an event off every
+      [gdep2] cycle is off every [gdep3] cycle.  (The "leaves the witness
+      later than it entered" branch is outright contradictory on a CYCLE:
+      it closes a [gdep2] run from the later listed event back to the
+      earlier one, which is what [dev_wit_ok] forbids — and if the two
+      listed events coincide the witness indices do too.) *)
+  Lemma gdep3_acyclic_at_wit TS DS e :
+    ptraces_wit TS DS → dev_wit_ok TS DS →
+    ¬ tc (gdep2 TS) e e → ¬ tc (gdep3 TS DS) e e.
+  Proof.
+    intros Hwit Hok Hac Hc.
+    destruct (tc_gdep3_wit TS DS e e Hwit Hok Hc)
+      as [Hc2|(m1 & m2 & e1 & e2 & Hm1 & Hm2 & Hlt & Hee1 & He2e)];
+      [by apply Hac|].
+    have He21 : rtc (gdep2 TS) e2 e1 by etrans.
+    apply rtc_tc in He21 as [Heq|Htc].
+    - rewrite Heq in Hm2.
+      have Heq' : m1 = m2 by eapply pd_ord_index_inj;
+        [exact Hwit|exact Hm1|exact Hm2].
+      lia.
+    - by destruct (Hok m1 m2 e1 e2 Hlt Hm1 Hm2 Htc).
+  Qed.
+
+  (** …and the global theorem: THE criterion the fabric-ordered graph is
+      landed on (A0′). *)
+  Theorem gdep3_acyclic_of_wit TS DS :
+    ptraces_wit TS DS → gdep2_acyclic TS → dev_wit_ok TS DS →
+    gdep3_acyclic TS DS.
+  Proof.
+    intros Hwit Hac Hok e.
+    by eapply (gdep3_acyclic_at_wit TS DS e Hwit Hok (Hac e)).
   Qed.
 
   (* ---------------------------------------------------------------- *)

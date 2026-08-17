@@ -51,7 +51,9 @@
 
     A5 [dev_dom] / [dev_epoch_ok_of_dom] / [dev_dom_of_dev_epoch_ok] /
     [dev_epoch_ok_devfree_reader]: the EXACT characterization of
-    [WeakRobustOrd.dev_epoch_ok] as a DOMINATION condition, and the
+    [WeakRobustOrd.dev_epoch_ok] — the premise A0′ SUPERSEDED, now a
+    sufficient condition for [WeakRobustOrd.dev_wit_ok] — as a
+    DOMINATION condition, and the
     machine-checked reason it is not dischargeable — see the A5 header
     below.  This is the honest residue of Track A.
 
@@ -1005,6 +1007,21 @@ End disc.
 (* ------------------------------------------------------------------ *)
 (** ** DELIVERABLE A5: [dev_epoch_ok] — WHAT IT ACTUALLY DEMANDS
 
+    THE PREMISE CHARACTERIZED HERE IS NOW SUPERSEDED (A0′).  This
+    section's finding — that [dev_epoch_ok] is a DOMINATION condition,
+    refuted by the ordinary bundle in (1) below — is what forced the
+    repair: [WeakRobustMain.main_premises] now carries
+    [WeakRobustOrd.dev_wit_ok] (the fabric-order witness is
+    [gdep2]-consistent), which is EXACTLY what [gdep3] acyclicity needs
+    and which the refuting bundle satisfies outright (one fabric access,
+    hence no pair of witness positions at all —
+    [WeakRobustOrd.dev_wit_ok_short]).  Everything below stands as the
+    characterization of the SUFFICIENT condition [dev_epoch_ok]
+    ([WeakRobustOrd.dev_wit_ok_of_epoch] transports it to the new
+    clause), and the discharge routes it names carry over through that
+    implication ([dev_wit_ok_of_dom],
+    [dev_wit_ok_of_devfree_sources] below).
+
     [WeakRobustOrd.depoch DS e] is the witness position just past the
     LAST fabric-touching event OF [e]'S OWN AGENT at or before [e] in
     that agent's trace (0 if that agent has touched the fabric not at
@@ -1062,9 +1079,13 @@ End disc.
     bundle.  The two natural repairs are (a) rank by a GLOBAL device
     counter that every event inherits along [gdep3] rather than by the
     agent's own last access, or (b) replace the rank argument for
-    [gdep3]-acyclicity altogether.  Both are changes to
-    [WeakRobustOrd], hence out of scope for this file; what is in scope
-    is the precise statement of the obligation, which is what follows. *)
+    [gdep3]-acyclicity altogether.  REPAIR (b) IS WHAT LANDED (A0′,
+    [WeakRobustOrd.gdep3_acyclic_of_wit]): no rank at all, just the
+    observation that [gdev] is the witness's successor chain, so the only
+    [gdep3] cycles that are not [gdep2] cycles run a [gdep2] path from a
+    LATER fabric access back to an EARLIER one.  What is in scope here is
+    the precise statement of the OLD obligation, which is what
+    follows. *)
 
 Section devepoch.
   Context {P D : Type}.
@@ -1159,6 +1180,27 @@ Section devepoch.
     dev_epoch_ok TS DS.
   Proof. intros H e1 e2 He. rewrite (H e1 e2 He). lia. Qed.
 
+  (** THE TRANSPORT TO THE LANDED PREMISE (A0′): both discharge routes
+      above still discharge [WeakRobustOrd.dev_wit_ok], through
+      [dev_wit_ok_of_epoch].  (The converse fails — [dev_wit_ok] is
+      strictly weaker; the §A5 refuting bundle satisfies it and not
+      [dev_epoch_ok].) *)
+  Corollary dev_wit_ok_of_dom DS :
+    ptraces_wit TS DS →
+    (∀ e1 e2, (grf TS e1 e2 ∨ gE TS e1 e2) → dev_dom DS e1 e2) →
+    dev_wit_ok TS DS.
+  Proof.
+    intros Hwit H. by apply dev_wit_ok_of_epoch, dev_epoch_ok_of_dom.
+  Qed.
+
+  Corollary dev_wit_ok_of_devfree_sources DS :
+    ptraces_wit TS DS →
+    (∀ e1 e2, (grf TS e1 e2 ∨ gE TS e1 e2) → depoch DS e1 = 0%nat) →
+    dev_wit_ok TS DS.
+  Proof.
+    intros Hwit H. by apply dev_wit_ok_of_epoch, dev_epoch_ok_of_devfree_sources.
+  Qed.
+
 End devepoch.
 
 (* ------------------------------------------------------------------ *)
@@ -1187,10 +1229,10 @@ End devepoch.
     free for a bundle already known acyclic on independent grounds.  The
     two situations where that is genuinely useful:
       - a bundle satisfying the STRONG per-edge premise [rf_edges_ok]
-        (plus [ee_ok], [dev_epoch_ok]) has no bad edges at all, and then
+        (plus [ee_ok], [dev_wit_ok]) has no bad edges at all, and then
         [bad_wf] is vacuous — [bad_wf_of_no_bad];
       - a re-derivation of [main_premises] for a bundle whose acyclicity
-        was obtained by [gdep2_acyclic_edges_ok] + [gdep3_acyclic_epoch].
+        was obtained by [gdep2_acyclic_edges_ok] + [gdep3_acyclic_of_wit].
 
     WHAT AN INDEPENDENT ARGUMENT WOULD HAVE TO LOOK LIKE.  [bad_wf] is
     morally "the bad-target ancestry is well-founded".  Acyclicity is the
@@ -1363,7 +1405,9 @@ End badwf.
       Track-B site facts, and the endpoints' sync byte must be shared.
 
     - [dev_dom] / [dev_epoch_ok_of_dom] / [dev_dom_of_dev_epoch_ok] /
-      [dev_epoch_ok_devfree_reader] / [dev_epoch_ok_of_devfree_sources]:
+      [dev_epoch_ok_devfree_reader] / [dev_epoch_ok_of_devfree_sources]
+      (+ the A0′ transports [dev_wit_ok_of_dom] /
+      [dev_wit_ok_of_devfree_sources]):
       A5.  NOT a discharge — a characterization plus a refutation.  The
       finding, in one line: [dev_epoch_ok] forces the READER to have a
       fabric history at least as long as the WRITER's, which ordinary

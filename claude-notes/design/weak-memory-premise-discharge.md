@@ -18,7 +18,7 @@ every FULL-machine behavior of the image (`WeakRobustMain.v`):
 | `edges_split` | every cross-agent rf edge from a hart write `e1` (ts) to a hart read `e2` with a later fulfil is `edge_ok` — the reader is DISCIPLINED (aq read, or a `pr∧sw` fence between the read and its next fulfil) or COVERED (reader's `w_vwNew` ≥ ts already at the read) — or `bad` (the message is owned/`WCplain` and no publish by the author reaches `e2`) | lock words are read by aq-AMOs (disciplined); `started`/`first` are `lw; fence r,rw` (disciplined); every other cross-hart flow is lock/context-switch mediated: the reader's acquire raised its `w_vwNew` above the writer's release, which is above the writer's earlier stores (`covered` — MACHINE arithmetic once the release/acquire site facts are known) |
 | `bad_wf` | if bad edges exist, some bad edge is minimal (no bad target strictly among its ancestors) | excludes thin-air ownership cycles; true because ownership only ever transfers through synchronization |
 | `ee_ok` | for a floor-protection edge (`gE`: reader `r` of byte `a` with floor F, writer's later fulfil `y`), F < ts(y): FENCE-COVER (a `pw∧sw` fence po-between the writer's two events), WAW-COVER (writer's `w_vwNew` already ≥ F), or F = 0 | release sites fence before the flag store; ownership-transfer WAW is covered by the acquire |
-| `dev_epoch_ok` | no rf/gE edge lowers the device epoch (no read of a promise across a device access) | the only cross-agent flows are the disciplined ones above; the disk's reads are aq-covered ring reads |
+| `dev_wit_ok` (A0′; was `dev_epoch_ok`) | no `gdep2` path runs from a LATER fabric access back to an EARLIER one, in the fabric-order witness | `gpo`/`gE` never go backward in behavior time, so this needs an rf edge that DOES — a promise read — crossing a fabric access; those are the LB shapes the dependency-tracking design excludes.  (The G5a clause `dev_epoch_ok` is SUPERSEDED — refuted, see §2c — and survives only as a sufficient condition, `dev_wit_ok_of_epoch`.) |
 | `∃ sync, ptraces_bytes_ok` | every byte is single-writer, or written only by RMWs (`excl_byte` — lock words, PTE A/D), or HANDOFF (its writers are ordered through sync bytes) | lock words/PTE-A/D are RMW-only; everything else is written under a lock or by one hart at a time (context switch = handoff through the lock word) |
 
 Two facts shape any discharge:
@@ -145,6 +145,61 @@ fulfil — `disciplined_covered` + monotonicity), plus
   precise per bundle; a mixed `gdev`/`gdep2` cycle then contradicts
   `EXT`/coverage.  Design before building; it re-lands G5a's acyclicity
   lemma with the new rank.
+- **LANDED (A0′, `WeakRobustOrd.v` / `WeakRobustMain.v`): `dev_epoch_ok` is
+  REPLACED in `main_premises` by `dev_wit_ok` — the witness order is
+  `gdep2`-consistent.**  The clause is
+
+  ```coq
+  Definition dev_wit_ok TS (DS : pdevs D) : Prop :=
+    ∀ m1 m2 e1 e2, (m1 < m2)%nat →
+      pd_ord DS !! m1 = Some e1 → pd_ord DS !! m2 = Some e2 →
+      ¬ tc (gdep2 TS) e2 e1.
+  ```
+
+  "no dependency path runs from a LATER fabric access back to an EARLIER
+  one".  It quantifies over pairs of LISTED (fabric-touching) events only.
+
+  *Why it is exactly what acyclicity needs* (no rank, so no `depoch`):
+  `gdev` is the SUCCESSOR relation on `pd_ord DS`, i.e. the total chain
+  over the witness in witness order, and it raises the witness index by
+  exactly one.  Split a `gdep3` cycle at its `gdev` edges: the hops walk
+  the index up, so some `gdep2` run must walk it back down — to a strictly
+  earlier listed event (forbidden by `dev_wit_ok`) or to the same one
+  (`pd_ord_index_inj`, and then the run is a `gdep2` cycle).  Machine
+  checked as `tc_gdep3_wit` (the split: a `gdep3` path is a `gdep2` path,
+  or it ENTERS the witness at `m1` and LEAVES it at `m2 > m1` with plain
+  `gdep2` runs on either side — the invariant `m1 < m2` is what
+  `dev_wit_ok` buys, in the `gdev`-prefix case), then `gdep3_acyclic_at_wit`
+  (pointwise, for the cone) and `gdep3_acyclic_of_wit` (global).
+  `main_premises`/`robust_main`/`robust_main_bundle`/
+  `WeakEvCapstone.xv6_ev_weak_robust` keep their statements; the G5a epoch
+  machinery stays in `WeakRobustOrd.v`, marked SUPERSEDED as a premise and
+  kept as a SUFFICIENT condition (`dev_wit_ok_of_epoch` — so every
+  discharge route named in this section still discharges the new clause,
+  see `WeakRobustDisc.dev_wit_ok_of_dom` /
+  `dev_wit_ok_of_devfree_sources`).
+
+  *The refuting bundle above satisfies it* — vacuously: it has ONE fabric
+  access, so there is no pair `m1 < m2` at all (`dev_wit_ok_short`, for
+  `length (pd_ord DS) ≤ 1`; `dev_wit_ok_nil` for the empty witness;
+  `dev_wit_ok_devfree` for a dev-free bundle, by W1).  The domination
+  reading is gone: the new clause never asks the READER to have a fabric
+  access of its own.
+
+  *Discharge sketch for xv6.*  `gdep2 = gpo ∪ grf ∪ gE`.  A `gdep2` path
+  from a later fabric event to an earlier one must at some point go
+  BACKWARD in behavior time; `gpo` never does, and `gE` (floor
+  protection) is forward on the co-order, so the only source is an `rf`
+  edge that is backward in behavior time — a READ OF A PROMISE — crossing
+  a fabric access.  Those are exactly the LB-shaped cases the
+  dependency-tracking design already targets: xv6's fabric accesses (the
+  disk/virtio and PLIC/UART agents) sit in critical sections whose reads
+  are address/control-dependent on the lock acquire, and a promise read
+  can never be dependency-ordered after the write that fulfils it.  So the
+  obligation reduces to "no LB shape through a fabric-touching agent",
+  which is a Track-B/C site fact about the disk and PLIC drivers rather
+  than a Layer-1 residue — and, unlike `dev_epoch_ok`, it is TRUE of the
+  ordinary bundles.
 - **`edges_split`**: see 2b (relativize to the walk's fulfils; Track A0).
 - **`bad_wf`**: derivable from `gdep3_acyclic` (`bad_wf_of_acyclic`, needs
   decidability of `bad_target`), but that is CIRCULAR inside `robust_main`
@@ -180,8 +235,11 @@ Prove, in a new `WeakRobustDisc.v` over an arbitrary bundle:
   WAW-cover from A1's `w_vwNew` bound.
 - **A4 `bytes_ok`**: `excl_byte` for bytes only ever written by `LRmw`;
   `handoff` for bytes whose writers are chained through A1 hops.
-- **A5 `dev_epoch_ok`**: from A1 (an rf edge into a covered read has both
-  ends' epochs ordered) plus the disk program's definitional discipline.
+- **A5 `dev_wit_ok`** (the A0′ clause; the old `dev_epoch_ok` is refuted,
+  §2c): from A1 — an rf edge into a COVERED read is forward in behavior
+  time, so it cannot be the backward hop a `dev_wit_ok` violation needs —
+  plus the disk program's definitional discipline.  A1 discharges the old
+  clause too if wanted, through `dev_wit_ok_of_epoch`/`dev_wit_ok_of_dom`.
 - **A6 `bad_wf`**: from `bad_min` of the FIRST bad target in… ⚑ open:
   needs a well-founded order on bad edges; candidate: the reader's fulfil
   timestamp.  Design in the track.

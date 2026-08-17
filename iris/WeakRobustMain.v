@@ -85,7 +85,10 @@
 
     - THE PREMISE PACKAGE is [main_premises]: [edges_split_ms] (the
       split, A0-relativized),
-      [bad_wf] (the residue), [ee_ok] (W2b (iii)) and
+      [bad_wf] (the residue), [ee_ok] (W2b (iii)), [dev_wit_ok] (A0′: the
+      fabric-order witness is [gdep2]-consistent — exactly what the
+      fabric-ordered graph's acyclicity needs, and free on a bundle with
+      fewer than two fabric accesses) and
       [∃ sync, ptraces_bytes_ok TS sync] (the byte classification, which
       [WeakRobustSer.co_serialized_pkg] turns into [co_tc]).
       [ptraces_wf], [ptraces_ws_init], [ptraces_fwd_own],
@@ -1102,10 +1105,11 @@ Proof.
   by apply rtc_gdep2_gdep3.
 Qed.
 
-(** THE CONE'S ACYCLICITY, in two steps — the two halves of G5a: the
-    relativized walk ([gdep2_acyclic_on]) kills every [gdep2] cycle
-    through the cone, and the DEVICE EPOCH lifts that pointwise to
-    [gdep3] ([gdep3_acyclic_at_epoch]). *)
+(** THE CONE'S ACYCLICITY, in two steps: the relativized walk
+    ([gdep2_acyclic_on]) kills every [gdep2] cycle through the cone, and
+    the WITNESS-ORDER CONSISTENCY of the fabric lifts that pointwise to
+    [gdep3] ([gdep3_acyclic_at_wit], A0′ — was [gdep3_acyclic_at_epoch]
+    in G5a). *)
 Lemma cone_acyc2_of_min {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
@@ -1121,12 +1125,12 @@ Qed.
 Lemma cone_acyc_of_min {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
-  ptraces_wit TS DS → dev_epoch_ok TS DS →
+  ptraces_wit TS DS → dev_wit_ok TS DS →
   edges_split_ms nh TS DS → bad_min nh TS DS b2 →
   ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep3 TS DS) e e.
 Proof.
-  intros Hwf Hfo Hee Hwit Hepo Hsplit Hmin e He.
-  apply (gdep3_acyclic_at_epoch TS DS e Hwit Hepo).
+  intros Hwf Hfo Hee Hwit Hwok Hsplit Hmin e He.
+  apply (gdep3_acyclic_at_wit TS DS e Hwit Hwok).
   by apply (cone_acyc2_of_min pstep TS DS nh b2 Hwf Hfo Hee Hsplit Hmin).
 Qed.
 
@@ -1148,7 +1152,7 @@ Corollary cone_acyc_of_min_nil {P D : Type}
 Proof.
   intros Hwf Hfo Hee Hdf Hsplit Hmin e He Hc.
   eapply (cone_acyc_of_min pstep TS (PDevs d []) nh b2 Hwf Hfo Hee
-            (ptraces_wit_nil TS d Hdf) (dev_epoch_ok_nil TS d) Hsplit Hmin e).
+            (ptraces_wit_nil TS d Hdf) (dev_wit_ok_nil TS d) Hsplit Hmin e).
   - by apply tc_gdep2_gdep3.
   - by apply tc_gdep2_gdep3.
 Qed.
@@ -1214,7 +1218,10 @@ Section exhibit.
   Context (DS : pdevs D).
   Context (Hwit : ptraces_wit TS DS).
   Context (Hd0 : pd_init DS = d0).
-  Context (Hepo : dev_epoch_ok TS DS).
+  (** THE NAMED RESIDUE (A0′): the witness order is [gdep2]-consistent —
+      exactly what [gdep3] acyclicity needs, and weaker than G5a's
+      [dev_epoch_ok] ([WeakRobustOrd.dev_wit_ok_of_epoch]). *)
+  Context (Hwok : dev_wit_ok TS DS).
   Context (Hfo : ptraces_fwd_own TS).
   Context (Hee : ee_ok TS).
   Context (nh : nat).
@@ -1245,7 +1252,7 @@ Section exhibit.
     destruct (cone_Qinv pstep pcls pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
                 Hcls Hclsobl Himg
                 Hnag Hdata Hps0 DS Hwit Hd0 b2 Hb2wf Hrr
-                (cone_acyc_of_min pstep TS DS nh b2 Hwf Hfo Hee Hwit Hepo
+                (cone_acyc_of_min pstep TS DS nh b2 Hwf Hfo Hee Hwit Hwok
                    Hsplit Hmin))
       as (order & HQ & Hmem).
     have Hq : qorder TS order
@@ -1419,15 +1426,16 @@ Section exhibit.
     by destruct (no_bad_edge Hvf Hbwf e1 e2 Hbad).
   Qed.
 
-  (** …and the FABRIC-ORDERED graph is acyclic too, by G5a's rank: the
-      device epoch never falls along [gdep2] (that is [dev_epoch_ok],
-      plus the free [gpo] half) and strictly rises along [gdev]. *)
+  (** …and the FABRIC-ORDERED graph is acyclic too, by A0′: [gdev] is
+      the successor chain on the witness, so the only way a [gdep3] cycle
+      escapes [gdep2] is a [gdep2] path from a LATER fabric access back
+      to an EARLIER one — which is exactly what [dev_wit_ok] forbids. *)
   Theorem gdep3_acyclic_main :
     pf_violation_free_hart cls_of pub_of nh pstep pcls img d0 ps → bad_wf nh TS DS →
     gdep3_acyclic TS DS.
   Proof.
     intros Hvf Hbwf.
-    apply (gdep3_acyclic_epoch TS DS Hwit Hepo).
+    apply (gdep3_acyclic_of_wit TS DS Hwit); [|exact Hwok].
     by apply gdep2_acyclic_main.
   Qed.
 
@@ -1437,8 +1445,9 @@ End exhibit.
 (** ** LAYER 7: THE ASSEMBLED THEOREM, and W2c's transport
 
     The premise package, per traced bundle: the weakened per-edge split,
-    the bad-SCC residue, the E-edge obligation, and the byte
-    classification.  [ptraces_fwd_own], [ptraces_ws_init],
+    the bad-SCC residue, the E-edge obligation, the fabric-order
+    consistency clause (A0′), and the byte classification.
+    [ptraces_fwd_own], [ptraces_ws_init],
     [writes_fulfilled], [ptraces_wf] and the shape facts are DERIVED
     from the behavior, exactly as [WeakRobustSim]'s wrapper derives
     them. *)
@@ -1446,7 +1455,7 @@ End exhibit.
 Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D)
     (DS : pdevs D) : Prop :=
   edges_split_ms nh TS DS ∧ bad_wf nh TS DS ∧ ee_ok TS ∧
-  dev_epoch_ok TS DS ∧
+  dev_wit_ok TS DS ∧
   (∃ sync, ptraces_bytes_ok TS sync).
 
 (** THE DEV-FREE READING of the package: with an empty witness the fabric
@@ -1457,7 +1466,7 @@ Lemma main_premises_nil {P D : Type} (nh : nat) (TS : ptraces P D) (d : D) :
   (∃ sync, ptraces_bytes_ok TS sync) →
   main_premises nh TS (PDevs d []).
 Proof.
-  intros ????. split_and!; [done|done|done|by apply dev_epoch_ok_nil|done].
+  intros ????. split_and!; [done|done|done|by apply dev_wit_ok_nil|done].
 Qed.
 
 Section main.
@@ -1521,7 +1530,7 @@ Section main.
     intros Hlf Hobl Hclsobl Hprom Hofd Hacct Hpkg Hcls Hvf.
     have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
     have Hdinit : pd_init DS = pc_dev mid by destruct Hofd as (_ & ? & _).
-    destruct Hpkg as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
+    destruct Hpkg as (Hsplit & Hbwf & Hee & Hwok & (sync & Hbytes)).
     destruct Hofd as (Hof & _).
     (* the derived bundle facts — as in [wp_behavior_robust] *)
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
@@ -1560,10 +1569,11 @@ Section main.
     have Hd01 : pd_init DS = d0 by rewrite Hdinit Hpdev.
     (* THE ACYCLICITY: the exhibit rules out every bad edge, so the
        per-edge split IS [rf_edges_ok] and the W2b walk closes; the
-       DEVICE EPOCH (G5a) then lifts it to the fabric-ordered graph *)
+       WITNESS-ORDER CONSISTENCY (A0′) then lifts it to the
+       fabric-ordered graph *)
     have Hacyc : gdep3_acyclic TS DS.
     { eapply (gdep3_acyclic_main pstep pcls pdev TS img d0 ps Hwf Hwsi Hco Hwfl
-                Hlf Hobl Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 DS Hwit Hd01 Hepo
+                Hlf Hobl Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 DS Hwit Hd01 Hwok
                 Hfo Hee nh Hsplit Hvf Hbwf). }
     eapply (sim_full pstep pcls pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl
               Hlf Hobl Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 Hwit Hd01 c Hacyc).
