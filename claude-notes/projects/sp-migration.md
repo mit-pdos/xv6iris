@@ -1093,14 +1093,12 @@ the paid park FEEDABLE means flipping that cone to KT1.
   - `stack_own` and the datum family stay instance-implicit (the data
     side, all honestly KT0); loose stack carves in post-boot proofs
     spell `(KTR := KT1)` at the carve site.
-- [ ] **K3 — the lifecycle** (restores the RED-era kexit shape, now
-  payable): `proc_dormant` gains the stack in BOTH arms; allocproc hands
-  it out (beside `fd_slots FDSPARE`, via `proc_dormant_unused`); kexit
-  DONATES the stack through its final swtch (the park with no
-  post-resume arm — the dying thread never returns, so giving away the
-  page it runs on is sound); the scheduler side deposits it in the
-  ZOMBIE slot's lock record at release; kwait/freeproc take it back out
-  to rebuild UNUSED. This is where `kstack_closer` earns its shape.
+- [x] **K3a — the lifecycle's storage half** — LANDED; see "K3a
+  findings" below. `proc_dormant` owns `kstack_free` on both arms, the
+  bank reaches the slots through `procs_inv_alloc`, allocproc hands the
+  slot's page out sealed, freeproc passes it through, and kexit's ZOMBIE
+  park DONATES it — paid, from usertrap's entry down the diverging
+  chain. `kstack_closer` earned its shape.
 - [ ] **K4 — retire `FORKRET_PARK`**: kfork's contract supplies
   `forkret_park_pkg` (K1-K3's stack + the kernel-environment closer:
   `bslots bn 3`, `fileclose_bm`, the `initproc` share — where a fresh
@@ -1110,6 +1108,119 @@ the paid park FEEDABLE means flipping that cone to KT1.
 - [ ] **K5 — the text tier** (the old phase E): `text_pointsto` gets the
   same index and witness; TRAMPOLINE fetch ownership becomes
   expressible.
+
+### K3a findings (LANDED)
+
+The whole tree is green. Twenty files moved; no escalation was needed
+and no landed spec was weakened.
+
+**THE BLOCK.** `ProcDefs.proc_dormant` and `proc_dormant_noctx` own
+`kstack_free pa` on **both** arms. That is what makes freeproc's
+ZOMBIE → UNUSED step a pass-through, and it is what forces kexit to
+donate: a slot kwait reclaims must have a page for its next thread, and
+the only page in play is the one the dying thread is standing on. There
+is no shape in which the ZOMBIE arm is stackless — freeproc would then
+need a `kstack_free` premise its only ZOMBIE caller (kwait) cannot pay.
+Check that first if the design is ever revisited.
+
+**THE DEPOSIT.** `SpecProcinit.procs_inv_alloc` takes
+`KstackOwn.kstack_bank` and deposits per slot at **pass 3**, the ghost
+step that persists `p->kstack` — `kstack_free` names its anchor through
+the persistent `is_kstack`, so pass 3 is the FIRST point at which the
+deposit is expressible. procinit therefore hands back
+`ProcInv.proc_dormant_prestk` (the block with its fd/iref units routed
+and its stack not yet deposited) rather than a sealed `proc_dormant`: a
+block sealed before the store would be UNSATISFIABLE, not merely
+premature, because the full `p_kstack` cell and a discarded one cannot
+coexist. `ProofMain.mn_grp_kvm` needed one word of change — the bank it
+already mints is passed to `procs_inv_alloc` eleven lines below instead
+of being dropped. **No boot premise anywhere**: the reverted RED-era
+design routed the stacks in through `SpecMain`, and that is exactly what
+made `wp_main_boot_sconf` vacuous. The bank is a CONSEQUENCE of
+kvminit's pages and kvminithart's claims, and it is minted where both
+are in hand.
+
+**`kstack_bank_carve`** peels the bank's 512 slots per stack down to
+`KSTACK_AV` once, at the deposit, and drops the rest. Restating
+`kstack_free` at 512 was the alternative and is wrong: the exit path
+would then owe back words nobody ever tracked.
+
+**`KSTACK_AV` IS 342, WHICH IS `UsertrapRes.K_usertrap` ON THE NOSE, AND
+THE TWO CONSTANTS MUST AGREE.** This is the increment's one real design
+finding. A dying thread pays the donation out of what it owns at the
+trap boundary, which is exactly the trap round's budget; a larger
+`KSTACK_AV` is therefore *unpayable by anyone* and a smaller one does
+not fit a fresh process's first trap. The old 400 (with "112 slots of
+headroom") predates the donation being payable. If either constant
+moves, the other must — the agreement is checked where it is spent, by
+the `unfold KSTACK_AV; lia` at each kexit(-1) site, not at the
+definition. The page's remaining 170 slots are slack, dropped at the
+deposit.
+
+**THE DONATION'S ROUTE, end to end.** The closer is BORN at usertrap's
+entry and DIES at kexit's park:
+
+| where | what happens |
+|---|---|
+| usertrap's three `kexit(-1)` sites (`ProofUsertrapArms.ut_e8`, `ProofUsertrapSys.ut_90`, `ProofUsertrapTail.ut_a6`) | `ProcDefs.kstack_closer_top` out of `ut_caps`' `is_kstack` + `ut_res`'s `ksp = ks + 4096`, then `kstack_closer_frame` over usertrap's own four dead slots (`UsertrapRes.ut_frame_stack`) |
+| `ProofUsertrapTail.ut_kexit` | pure pass-through — the dead end adds no frame |
+| `ProofSysExit` | `sex_frame_stack` + one `kstack_closer_frame` over sys_exit's four slots (slot 3 rejoined with `word_pointsto_join4`) |
+| `ProofKexit` (prologue) | `kx_frame_stack` + `kstack_closer_frame` over kexit's six |
+| `ProofKexit.kx_park` | applies the closer to the region **sched's `park_pay` closer** hands back, and `kexit_park_pay` seals the result into the ZOMBIE record |
+
+`kstack_closer_top` is the whole payment and it is free: at the page top
+nothing is owed above, so the closer is `kstack_free_intro` and the
+persistent `is_kstack` is all it needs. It takes `n` as a BOUND, not
+`KSTACK_AV`, and drops the surplus inside the wand — the entry
+capability's depth is only bounded below.
+
+**A WALK THAT MUST DONATE ITS STACK HAS TO PUBLISH ITS sp, and nothing
+else in the tree needs that.** The closer is anchored at an ADDRESS, so
+the park can only apply it to what sched returns if the walk has carried
+`M !!! Regidx csp_rs1 = spF` from the prologue to the `jal sched`.
+`ProofKexit`'s `kxl_regs` / `kxt_regs` gained that conjunct and the
+whole walk threads it — one two-line `assert` per regfile, mirroring the
+existing `s3`/`s4` chains: `upd_ne` across an instruction, `proj1` of
+the callee's `callee_saved` across a call (sp is `callee_saved`'s FIRST
+conjunct, so no `is_cs_idx` side condition is needed). Budget ~25
+asserts for kexit; sys_exit and usertrap already published theirs.
+The frame→`stack_own` converters (`kx_frame_stack`, `ut_frame_stack`,
+`sex_frame_stack`) are all the same four lines: `rewrite /stack_own`,
+`iExists [w1;…;wn]`, `simpl`, `iFrame`. Build them from the definition —
+`iEval (rewrite stack_own_slots)` on the GOAL leaves the `big_sepL`'s
+index bound, so a `rewrite` of the per-slot address equations finds
+nothing to rewrite.
+
+**`iDestruct (L with "H Hx") as "H"` IS NOT ALWAYS ALLOWED**: inside the
+usertrap blocks it fails with `iRename: "H" not fresh` even though the
+input is consumed, while the identical shape in `ProofSysExit` is fine.
+Name the output differently rather than debugging it.
+
+**allocproc's postcondition gained `kstack_free (proc_addr j)`,
+SEALED.** The lifecycle forces it — kfork's uvmcopy-failure arm hands
+the child to freeproc, whose `fp_rest` now carries the page. It is not a
+K3b deferral in disguise: the same postcondition already exports
+`is_kstack (proc_addr j) ks`, so a caller that wants the WORDS carves
+them itself with `kstack_free_at`. What K3b still owes is the park
+package, not the hand-out.
+
+**`SpecSysExit`'s closer premise is UNPAID.** Nothing applies
+`wp_sys_exit_sconf` — syscall's dispatch does not reach sys_exit (see
+`ProofSyscall.v`'s header for the six ties and nine resource families
+that block it). When it is wired up, syscall will need the same
+premise + one `kstack_closer_frame` over its own frame, and usertrap's
+payer is already in place. An unpayable hypothesis is not a vacuous
+theorem; a wand premise is not even unsatisfiable.
+
+**What K3b and K4 now need.** K3b (the park package): allocproc's
+`kstack_free` + `is_kstack` are already in the postcondition, so kfork
+carves `stack_own (ks + 4096) KSTACK_AV` with `kstack_free_at` and
+`SpecForkretParkPaid.forkret_park_pkg` takes it at `av = KSTACK_AV`.
+K4: the same `KSTACK_AV = K_usertrap` agreement is what makes the paid
+park's stack and the trap round's budget the same number, so the
+`FORKRET_PARK` retirement has no arithmetic left to reconcile — and the
+`sched`-side park is already a closer, so nothing about the crossing
+moves.
 
 ### K1 findings (LANDED)
 
@@ -1232,20 +1343,10 @@ The insertion is one `iDestruct (kstack_bank_intro pas Hpasok with
 Ordering matters only in that it must precede nothing — it can sit
 anywhere between the mint and the end of the lemma.
 
-**What K3 has to do with it.** `mn_grp_kvm`'s continuation must grow a
-`kstack_bank` premise (or the 64 conjuncts individually) so the bank
-survives to `procs_inv_alloc` / procinit; today the continuation ends at
-`main+0x7e` with the 64 claims and nothing else about the stacks. Two
-sizing facts for that increment: the bank hands out **512** slots per
-stack while `ProcDefs.KSTACK_AV` is **400** — peel with
-`stack_own_split_1` — and `ProcDefs.kstack_free`/`kstack_closer` predate
-ktier, so their `stack_own` conjuncts elaborate at the KT0 default and
-must be re-pinned `(KTR := KT1)` before a bank slot can feed them
-(`is_kstack` itself stays KT0: the `p->kstack` FIELD is static proc-table
-data). Also unresolved for K3: the bank is keyed by the stack INDEX `i`,
-while `proc_dormant` is keyed by the slot address `proc_addr i` — the
-correspondence `KSTACK(i) = p->kstack` for slot `i` is what procinit
-stores, and `KstackArith.v` is the arithmetic that proves it.
+**The bank never leaves `mn_grp_kvm`.** It is consumed eleven lines
+below where it is minted, by `SpecProcinit.procs_inv_alloc` — no premise
+is added to `SpecMain` or to `mn_grp_kvm`'s continuation, which is what
+keeps boot's theorem non-vacuous (K3a findings).
 
 ### K2a findings (LANDED)
 
