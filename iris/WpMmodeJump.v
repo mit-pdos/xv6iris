@@ -540,4 +540,51 @@ Section jump.
     iIntros (u) "Hf". iApply swp_ret. iSplitR; [done|]. iFrame.
   Qed.
 
+  (* [c.j] and [jal x0, off]: rd = x0, so the link write is discarded and the
+     whole instruction is a pure redirect of nextPC. *)
+  Lemma swp_execute_JAL_zreg (dq : dfrac) (imm : SailStdpp.Values.mword 21)
+      (rdz : SailStdpp.Values.mword 5) (m : regfile)
+      (pc npc0 : SailStdpp.Values.mword 64) :
+    uint rdz = 0 ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) zerobit
+      = true ->
+    gen_cert -∗
+    gpr_file m -∗
+    (R_bitvector_64 PC) ↦ᵣ pc -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    reg_pointsto cur_privilege dq Machine -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    swp (execute_JAL imm (Regidx rdz))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
+                (R_bitvector_64 PC) ↦ᵣ pc ∗
+                (R_bitvector_64 nextPC) ↦ᵣ (add_vec pc (sign_extend' 64 imm)) ∗
+                reg_pointsto cur_privilege dq Machine ∗
+                reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+                reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hrdz Halign. iIntros "#Hcert Hf HPC HnPC Hpriv Hsec Hmisa".
+    unfold execute_JAL. cbn match.
+    iApply (swp_bind_use (get_next_pc tt) _
+              (fun link => ⌜link = npc0⌝ ∗
+                 (R_bitvector_64 nextPC) ↦ᵣ npc0)%I _
+              with "[HnPC] [-]").
+    { unfold get_next_pc.
+      iApply (swp_read_reg_cell (R_bitvector_64 nextPC) npc0
+                with "Hcert HnPC"). }
+    iIntros (link) "[-> HnPC]".
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC)) _
+              (fun w => ⌜w = pc⌝ ∗ (R_bitvector_64 PC) ↦ᵣ pc)%I _
+              with "[HPC] [-]").
+    { iApply (swp_read_reg_cell (R_bitvector_64 PC) pc with "Hcert HPC"). }
+    iIntros (w0) "[-> HPC]".
+    iApply (swp_bind_use _ _ _ _ with "[HnPC Hpriv Hsec Hmisa] [-]").
+    { iApply (swp_jump_to_zca dq _ npc0 Halign
+                with "Hcert HnPC Hpriv Hsec Hmisa"). }
+    iIntros (r) "(-> & HnPC & Hpriv & Hsec & Hmisa)". cbn match.
+    iApply (swp_bind0_use _ _ (fun _ => gpr_file m)%I _ with "[Hf] [-]").
+    { iApply (swp_wX_zero rdz _ (gpr_file m) Hrdz with "Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
+
 End jump.
