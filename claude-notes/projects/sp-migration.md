@@ -1034,13 +1034,13 @@ the paid park FEEDABLE means flipping that cone to KT1.
 - [x] **K1 — the mint** — LANDED; see "K1 findings" below.
 - [x] **K2a — the witness conjunct** — LANDED; see "K2a findings" below.
   `sie_cap`/`sie_cap_of` carry `sr_ktier_wit strans_regime cur_ktier`.
-- [ ] **K2b — the cone genericization**: the trap fixpoint's tier
-  (`ihs_*_of` chain takes the binder), the uservec/usertrap/forkret
-  cone's stack conjuncts to `(KTR := KT1)`, post-boot files pin
-  `Local Instance : CurKtier := KT1`. The witness-delivery fork is
-  settled by K2a; what is LEFT is the engine funnels, which drop the
-  witness on the way through (K2a findings, "What K2b must know").
-- [ ] **K2b — SETTLED (user design, 2026-08-17): `kt` is an EXPLICIT
+- [x] **K2b — the cone genericization** — LANDED, in three increments:
+  F1 gave the capability family an explicit `kt`, F2 made the S-mode
+  memory leaves tier-generic, and F3 (THE PINNING) replaced the binder
+  with the LITERAL the function's own regime is, keeping `∀ kt` only for
+  the measured dual cone. See "F1 findings", "F2 findings", "F3
+  findings"; the tree is GREEN.
+- [x] **K2b — THE SETTLED DESIGN (user, 2026-08-17): `kt` is an EXPLICIT
   argument of the capability, and it means THE HART'S TRANSLATION REGIME.**
   `sie_cap kt m avail b p`: this hart runs at regime `kt` (KT0 = Bare,
   KT1 = kernel table installed). Supersedes the instance-implicit
@@ -1083,12 +1083,13 @@ the paid park FEEDABLE means flipping that cone to KT1.
     sites, iFrame-with-variable-kt brittleness under `Typeclasses
     Opaque cur_ktier`, any spec that genuinely cannot be tier-generic),
     then the mechanical remainder.
-    **RUN, AND BLOCKED — see "F1 findings" below.** The family, the
-    fixpoint and the whole engine tier convert green; what stops it is
-    one level lower and is owed by the flip route too: the S-mode memory
-    leaves take a stack frame at the AMBIENT tier, so a frame peeled off
-    a `kt`-indexed capability cannot feed them. Do the leaf increment
-    first.
+    **RUN, AND SUPERSEDED BY F3.** F1 converted the family, the fixpoint
+    and the whole engine tier, and stalled on the S-mode memory leaves
+    (F1 findings); F2 merged those leaves (F2 findings); F3 then replaced
+    the `∀ kt` binder with a LITERAL everywhere the regime does not vary,
+    and that is the shape that landed green. The experiment's own verdict
+    is the reason: `kt` was a variable where it never varied, and every
+    pain class it produced followed from that.
   - `stack_own` and the datum family stay instance-implicit (the data
     side, all honestly KT0); loose stack carves in post-boot proofs
     spell `(KTR := KT1)` at the carve site.
@@ -1767,17 +1768,199 @@ at KT0. Merge them when a KT1 consumer appears, not before.
    KSTACK any nearer — the leaf work is still owed at the flip — but it
    would bank the regime index and the ∀kt spec surface now.
 
+### F3 findings — THE PINNING (LANDED, tree GREEN)
+
+**The pivot: `kt` is a LITERAL almost everywhere.** ∀kt was right about the
+family's shape and wrong about who needs the binder — the regime never
+varies for a given function, so a variable `kt` bought nothing and cost
+the whole F1/F2 pain class (invisible implicit tiers, unresolved binders,
+`(kt := kt)` annotations at 397 sites). F3 replaces the binder with the
+literal the function's own regime IS, and keeps ∀kt only where a function
+genuinely runs at both.
+
+#### The classification roster, and how it was derived
+
+Derived from the C call graph, not from guesses: reachability from main's
+BARE prefix (`consoleinit`, `printkinit`, the three boot `printk`s, `kinit`,
+`kvminit`, `kvminithart`) intersected with reachability from the post-boot
+roots (`procinit` … `scheduler`, `kerneltrap`, `usertrap`, `syscall`).
+
+| class | files | what |
+|---|---|---|
+| **KT0** (Bare) | 30 | consoleinit, uartinit, printkinit, kinit, freerange, kvminit, kvmmake, kvmmap, proc_mapstacks, kvminithart, entry, spin, main, main_secondary (Spec+Proof pairs) + `BootBridge`, `BootChain` |
+| **∀kt** (dual) | 46 | acquire, release, holding, push_off, initlock (+wrapper), kalloc, kfree, memset (+page/parts), mappages, walk (+noalloc), panic, printk (+`LinkPrintk`), printint, consputc, cpuid, mycpu, uartputc_sync (`SpecUartPutc`), `SpecUart`, memmove, memcpy |
+| **KT1** (post-boot) | 384 | everything else with a spec, INCLUDING the boot-only functions that run AFTER kvminithart (procinit, trapinit(hart), plicinit(hart), binit, iinit, fileinit, virtio_disk_init, userinit) |
+| parametric | 704 | the engine/definitional layer (`IntrDefs`, `Wp*`, `RiscvPtsto`, `StackOwn`, `VcGenS`, …), the `Link*` functors and the generated `Code*` |
+
+**BOOT-ONLY IS NOT KT0.** The Bare cone ends at `kvminithart`, so ten of
+main's own boot-arm callees are KT1. Classifying by "is it called from
+boot" instead of "what regime is the hart in" would have pinned them wrong.
+
+`memmove`/`memcpy` are NOT boot-reachable and could have been KT1; they are
+kept ∀kt because the settled design lists them and the binder costs one
+line. Everything else in the dual set is forced: the set is closed under
+"callee of a dual function".
+
+`SchedCtx`, `SwtchCtx`, `UsertrapRes`, `ProcdumpAux`, `FsLookup`,
+`FsSyscalls` were moved OUT of the parametric layer into KT1: the process
+table, the parked contexts, the usertrap bundle and the fs-syscall
+envelopes are post-boot by construction, and pinning them retired ~350
+`(kt := kt)` annotations at a stroke.
+
+#### The boot seam
+
+`ProofMain.mn_grp_kvm` and `ProofMainSecondary.ms_inithart_sched` each
+apply **one line** — `iDestruct (sie_cap_gpr_ktier_up KT0 KT1 with "Hcg
+Hkptr") as "Hcg"` — immediately after kvminithart returns its `kpt_on`
+receipt (kept `#`-persistent, it is needed later for `trap_csrs`). The
+`stack_ktier_mono` weakening for the boot stack is INSIDE
+`sie_cap_ktier_up`, so the seam needs nothing else. Everything textually
+below that line — `mn_grp_trap`, `mn_grp_fs`, `mn_grp_started`, `procs_inv`,
+`trap_csrs` — states KT1; the `started` store keeps `(ktd := KT0)` because
+`started` is a static global. Two helper lemmas (`mn_dup_hw`,
+`mn_pin_sie_cap_gpr` and their `ms_` twins) straddle the seam and keep a
+`{kt : ktier}` binder: they are the ONLY surviving `kt` variables in a
+pinned file.
+
+#### THE TWO STRUCTURAL FINDINGS, and both are about instance search
+
+**(1) A TIER-FAMILY INSTANCE MUST BE DECLARED TWICE.** `simple apply` does
+not unfold `CurKtier` (a definitional class), so the tier argument's TYPE
+decides which instance can fire:
+
+- a BACKTICK class binder (`` `{KTR : !CurKtier} ``, i.e. the section
+  Context) makes the tier an instance-SEARCH argument. Search only ever
+  produces `curktier_default`, so the instance silently refuses every goal
+  written at a literal — reported as `no match for (Persistent …), N
+  possibilities`, with no hint that a tier is involved;
+- `(ktr : ktier)` fails the mirror image: *"Unable to unify CurKtier with
+  ktier"* on any goal whose tier came from the ambient instance;
+- `(ktr : CurKtier)` covers the ambient case and *"Unable to unify ktier
+  with CurKtier"* on the literals.
+
+So `Persistent`/`Timeless` over `mem_pointsto`/`word_pointsto`/
+`word2_pointsto`/`word4_pointsto`/`string_pointsto` are each declared TWICE
+— once at `CurKtier`, once at `ktier` (the second `exact`s the first). The
+same applies to `Ktier.KtierLe`: its three instances have `_c` twins at
+`CurKtier`, because a goal `KtierLe KTR KTR` over a section variable
+matches none of the `ktier`-typed ones. **Symptom to recognise: a
+`Persistent`/`Timeless`/`KtierLe` goal that fails only in the files that
+name a literal tier, or only in the files that do not.**
+
+**(2) A SECTION VARIABLE CANNOT BE INSTANTIATED FROM INSIDE ITS OWN
+SECTION.** A `Context {KTR : !CurKtier}` makes every lemma in the section
+tier-generic — for CALLERS. Inside the section the tier is fixed, so a
+lemma that must be KT0 (a bio-block window) cannot sit beside one that must
+be generic (readi's destination). Both `ProofReadiParts` and
+`ProofWriteiParts` grew a separate `…Bytes` section for the splitters, with
+the rest of the file at the default. The tell is `Wrong argument name KTR`
+at a `(KTR := …)` written inside the defining section.
+
+Two smaller traps of the same family:
+- **A `KtierLe` HYPOTHESIS in a section beats `ktier_le_refl`.** Adding
+  `Context `{!KtierLe ktb kt}` (needed for a two-tier callee) makes every
+  OTHER leaf in the file resolve its datum tier to `ktb` instead of the
+  hart's, so all the frame slots break at once. Every frame-slot leaf in
+  such a file has to say `(ktd := kt)` out loud (`ProofMemset`,
+  `ProofEitherCopy` carry the note at the `Context`).
+- **`Rocq's (name := value)` is implicit-only**, so a tier binder meant to
+  be named at call sites must be `{…}`, and one meant to be passed
+  positionally must be `(…)`. `vdrw_idx_join` was written explicit and had
+  to become implicit.
+
+#### The mechanical sweep
+
+| pass | count |
+|---|---|
+| `_body` definitions carrying a `kt` binder before F3 | 254 |
+| definitions/parameters that LOST the binder | 426 |
+| `kt` → literal substitutions | 8959 in 384 files |
+| argument sites un-applied (`f kt` → `f`, `f (kt := kt)` → `f`) | 1049 in 360 files |
+| whole increment | 409 files, +8628 / −8754 |
+
+The sweep is scripted and re-runnable: classify by file, strip the `kt`
+name out of every `(… : ktier)` binder group, delete the emptied `Context`,
+substitute `\bkt\b` (PROTECTING the `kt :=` argument NAME — substituting
+it too turns `(kt := kt)` into `(KT1 := KT1)`), then un-apply the argument
+tree-wide for every name whose binder went.
+
+#### THE FALLOUT WAS NOT WHAT THE PINNING PROMISED
+
+The F1/F2 error classes did collapse: `Cannot infer the implicit parameter
+kt` disappeared entirely (there is no implicit left), and the
+`iSpecialize`-with-identically-printing-propositions class became readable
+(`KT1` vs `curktier_default` in the printed term). What replaced them is
+ONE class, and it is the honest content of the campaign:
+
+**A FUNCTION WHOSE RESOURCE IS A BUFFER THE CALLER PASSED IN NEEDS THE
+BUFFER'S TIER AS ITS OWN PARAMETER, because callers genuinely differ.**
+Measured, not guessed — each of these has one caller handing it a frame
+local (KT1) and another handing it a static page or a bio window (KT0):
+
+| function | new parameter(s) | the two callers |
+|---|---|---|
+| `strncmp`, `namecmp` | `ktf ktg` (the two names) | dirlookup's frame name vs a disk-block name; sys_unlink's frame name vs the `.`/`..` .rodata |
+| `strlen` | `kts` | fetchstr's kernel buffer vs kexec's argv page |
+| `memset` (+`MEMSET_PARTS`) | `ktb`, with `KtierLe ktb kt` | sys_exec's frame buffer vs every kalloc'd page |
+| `safestrcpy` | `kts ktt` (dst, src) | kexec (p->name ← the KT1 path) vs kfork (both proc-table) |
+| `fetchstr`, `copyinstr` | `ktb` | argstr's frame buffer vs sys_exec's kalloc'd page |
+| `either_copyout` | `kts` beside `ktb` | consoleread's one-byte frame cell vs readi's bio window |
+| `either_copyin` | `kts` beside `ktb` | consolewrite's frame staging buffer vs writei's bio window |
+| `uartwrite`, `dirlookup`'s `poff`, `dirlink`'s name, `SpecStati.stat_at`, `SpecKexec`'s path and argv array | pinned KT1 | single-caller, and that caller's buffer is a frame local |
+
+The rest of the tail is one repeated annotation, and it has a rule:
+**a leaf over STATIC kernel data under a KT1 capability needs BOTH names,
+`(kt := KT1) (ktd := KT0)`** — writing only `(ktd := KT0)` drags the hart's
+tier down with it and the next error names `sie_cap_gpr KT0` at a site that
+mentions no tier at all. ~130 such sites (inode/superblock/proc-table/
+console/pipe/virtio fields); every frame slot needs nothing, because eager
+`ktier_le_refl` already gives it the hart's tier.
+
+`WpSmodeHalf`'s `lhu`/`lh`/`sh` were still single-tier (datum pinned at the
+ambient while the capability rode `kt`) — merged into the two-tier shape
+like `WpSconfMem`'s family, which is what made those 89 sites visible.
+
+#### The block executor: kernelvec forced VcGenS tier-generic
+
+kernelvec's saved trap frame is KSTACK, so its 136 cells are KT1, and
+`VcGenS.wp_vc_block_s` could only drive KT0 data. The `_s_r_t` leaves
+already take an `sr_ktier_wit R kt` premise, and at the shared kernel-table
+regime that witness is **`emp` at BOTH tiers** (`kpt_share_regime`'s
+`sr_kwit` is `emp`) — so the executor takes it as a PURE premise
+(`(⊢ sr_ktier_wit R KTR) ->`) and the concrete lemmas discharge it with the
+new `SRegime.sr_ktier_wit_kpt_share`. Two `_t` wrappers were added
+(`wp_cldsp_gpr_s_r_t`, `wp_csdsp_gpr_s_r_t`); nothing else moved. **This is
+the general recipe for the remaining `_s_r` consumers: check the regime's
+`sr_kwit` before assuming a witness has to be threaded.**
+
+#### What K3 inherits
+
+- The tree is GREEN: clean full build (1164/1164 `.vo`, `MAKEEXIT=0`) plus
+  a genuine no-op second build (0 compile lines).
+- `SpecForkretParkPaid.forkret_park_pkg`'s stack conjunct is now
+  `stack_own (KTR := KT1)` — **the VACUITY ALERT's flip has happened**, so
+  the paid park is stated over a KSTACK the `kstack_bank` can actually
+  feed. `procs_inv` inside it is `(kt := KT1)`.
+- `ProcDefs.kstack_free`/`kstack_closer` still elaborate at the KT0 default
+  and still need re-pinning `(KTR := KT1)` before a bank slot can feed them
+  (K1 findings said so; nothing in F3 touched them).
+- The remaining `kt` VARIABLES are exactly: the 46 dual-regime files, the
+  parametric engine, and the two seam helpers in ProofMain(Secondary).
+  `grep -n 'sie_cap_gpr KT1' Spec*.v` now audits the post-boot surface
+  directly.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
   sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) and D are
-  LANDED, and so is the `sie_cap` tier index on top of them; `main` is
-  GREEN. NEXT: the KSTACK campaign — K1 (the mint) and K2a (the witness
-  conjunct in `sie_cap`) are LANDED, so the tree carries real KT1 facts and
-  a capability that attests the access right; see "K1 findings" and "K2a
-  findings", then K2b. The one design question still open in this area is
-  the TRAP CONTRACT's tier: the Banach fixpoint's bundle is pinned at KT0
-  and moving it is a decision, not a mechanical step.
+  LANDED, and so is the `sie_cap` tier index on top of them. The KSTACK
+  campaign has K1 (the mint), K2a (the witness conjunct) and K2b (the cone,
+  via F1/F2/F3) LANDED on branch `f1-forall-kt`, which is GREEN: every
+  post-boot spec states `sie_cap KT1` literally, the Bare cone states KT0,
+  and only the measured dual cone keeps `∀ kt`. The trap contract's tier is
+  no longer an open question — its consumers are all post-boot, so it is
+  stated at KT1 while `IntrDefs`' definitions stay parametric. NEXT: K3
+  (the lifecycle), which now has a KT1 `forkret_park_pkg` to feed.
 - The `sp-migration-red` quarry branch is DELETED: the identity-pin
   deviation (phase C findings) left nothing to mine from it.
 - `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch
