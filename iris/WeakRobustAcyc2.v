@@ -186,6 +186,59 @@ Section acyc2.
     - by eapply gE_ra_gdep2.
   Qed.
 
+  (** A milestone edge WITH its measure IS a milestone edge. *)
+  Lemma mile_mu_gmile TS mu v u : mile_mu TS mu v u → gmile TS v u.
+  Proof.
+    intros [(a & Hts & Hrd & Hne)|(r & a & Hra & _)].
+    - left. split; [right; by exists mu, a|exact Hne].
+    - right. exists r. by eapply gE_ra_gE_at.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** A0: THE PER-EDGE PREMISE, RELATIVIZED TO THE WALK'S FULFILS
+
+      [WeakRobustAcyc.rf_edges_ok] demands [edge_ok] of a cross rf edge
+      against EVERY later fulfil of the reader, with coverage evaluated
+      AT THE READ.  Both halves are more than the walk consumes, and the
+      surplus is FALSE for xv6
+      ([design/weak-memory-premise-discharge.md] §2b: [holding()]'s plain
+      read of the lock word, followed by the acquire RMW with no fence
+      and nothing acquired yet).  The walk only ever applies the premise
+      at the fulfil that SOURCES THE EXIT MILESTONE
+      ([on_cycle2_advance]), and it only ever needs coverage at that
+      fulfil's own EXT view ([edge_ok_f]).  So:
+
+      - [k'] must be a MILESTONE SOURCE ([∃ y, gmile TS (e2.1, k') y]:
+        the fulfil's message is read cross-agent, or the fulfil is a
+        [gE] source);
+      - the conclusion is [edge_ok_f] (coverage at the FULFIL, which for
+        an acquiring RMW is after its own read half).
+
+      [k' = e2.2] — the rmw case, where the entry read and the exit
+      fulfil are the SAME event — is EXCLUDED from the quantification and
+      needs no premise at all: [WeakRobustAcyc.astep_ok_read_fulfil_lt]
+      gets [ts < ts'] from the rmw's own COH conjunct, checked on the
+      post-[load_post_run] state ([atrace_S1_le_f]'s [k = k'] arm). *)
+  Definition rf_edges_ok_ms TS : Prop :=
+    ∀ e1 e2 T ts a k' ev',
+      gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+      pt_trs TS !! e2.1 = Some T →
+      (e2.2 < k')%nat →
+      at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+      (∃ y, gmile TS (e2.1, k') y) →
+      edge_ok_f T e2.2 k' ts.
+
+  (** THE OLD PREMISE IMPLIES THE NEW ONE (so the relativization is a
+      pure weakening of every theorem below). *)
+  Lemma rf_edges_ok_rf_edges_ok_ms TS :
+    ptraces_wf pstep TS → rf_edges_ok TS → rf_edges_ok_ms TS.
+  Proof.
+    intros Hwf H e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome _.
+    eapply (edge_ok_edge_ok_f pstep (pt_img TS) (pt_log TS) e2.1 T e2.2 k' ts ev');
+      [by eapply Hwf|lia|exact Hev|exact Hsome|].
+    by eapply H.
+  Qed.
+
   Lemma gmile_mile_mu TS v u : gmile TS v u → ∃ mu, mile_mu TS mu v u.
   Proof.
     intros [[Hd Hne]|HE].
@@ -308,13 +361,14 @@ Section acyc2.
       E-target itself sourcing the next milestone — it is the E edge's
       OWN conjunct [F < t̂], no premise at all. *)
   Lemma mile_mu_gain TS mu v u x tx :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS → ee_ok TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok_ms TS → ee_ok TS →
     mile_mu TS mu v u → u.1 = x.1 → (u.2 ≤ x.2)%nat →
+    (∃ y, gmile TS x y) →
     gev_ts TS x = Some tx →
     (mu < tx)%nat.
   Proof.
     intros Hwf Hfo Hrf Hee
-           [(a & Hts1 & Hrd & Hne)|(r & a & Hra & ->)] Hag Hle Htx.
+           [(a & Hts1 & Hrd & Hne)|(r & a & Hra & ->)] Hag Hle Hms Htx.
     - (* CROSS-RF ENTRY: S1. *)
       have Hwfu : gev_wf TS u by eapply gev_reads_wf.
       apply gev_wf_bounds in Hwfu as (T & HT & _).
@@ -327,7 +381,7 @@ Section acyc2.
       have Hunf : read_unforwarded (pt_log TS) u.1 (ae_lb ev) mu.
       { right. exists (WMsg base data (Some v.1) kc), v.1.
         split_and!; [exact Hm|done|exact Hne]. }
-      eapply (atrace_S1_le pstep (pt_img TS) (pt_log TS) u.1 T u.2 x.2
+      eapply (atrace_S1_le_f pstep (pt_img TS) (pt_log TS) u.1 T u.2 x.2
                 ev evx a mu tx).
       + by eapply Hwf.
       + intros n ag Hn. by eapply (Hfo u.1 T n ag HT Hn).
@@ -338,8 +392,10 @@ Section acyc2.
       + exact Htsx.
       + exact Hle.
       + intros Hklt. eapply (Hrf v u T mu a x.2 evx);
-          [exact Hts1|exact Hrd|exact Hne|exact HT|exact Hklt|exact Hevx|].
-        rewrite Htsx. by eexists.
+          [exact Hts1|exact Hrd|exact Hne|exact HT|exact Hklt|exact Hevx| |].
+        * rewrite Htsx. by eexists.
+        * destruct Hms as (y & Hy). exists y.
+          by rewrite Hag -surjective_pairing.
     - (* gE ENTRY. *)
       destruct (decide (u.2 = x.2)) as [Heq|Hne].
       + (* [x = u]: the E-target itself.  The edge's own bound. *)
@@ -363,7 +419,7 @@ Section acyc2.
 
   (** THE ADVANCE STEP. *)
   Lemma on_cycle2_advance TS mu :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS → ee_ok TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok_ms TS → ee_ok TS →
     on_cycle2 TS mu → ∃ mu', (mu < mu')%nat ∧ on_cycle2 TS mu'.
   Proof.
     intros Hwf Hfo Hrf Hee (v & u & Hm & Hpath).
@@ -374,7 +430,8 @@ Section acyc2.
          [v] ITSELF — and the milestone's own source timestamp is ≤ µ. *)
       exfalso.
       destruct (mile_mu_src_ts TS mu v u Hm) as (tv & Htv & Hlev).
-      have Hgt := mile_mu_gain TS mu v u v tv Hwf Hfo Hrf Hee Hm Hag Hle Htv.
+      have Hgt := mile_mu_gain TS mu v u v tv Hwf Hfo Hrf Hee Hm Hag Hle
+                    (ex_intro _ u (mile_mu_gmile TS mu v u Hm)) Htv.
       lia.
     - (* THE EXIT MILESTONE [x → y]: its source [x] is a fulfil of [u]'s
          agent at or after [u]. *)
@@ -382,12 +439,14 @@ Section acyc2.
       have Hyx : rtc (gdep2 TS) y x.
       { eapply rtc_transitive; [exact Hyv|].
         eapply rtc_l; [exact Hedge|exact Hux]. }
+      have Hgm : gmile TS x y := Hmile.
       destruct Hmile as [[Hd Hne]|HE].
       + (* CROSS-RF EXIT: µ' := ts(x). *)
         have Hrfxy : grf TS x y.
         { destruct Hd as [(Hag' & _)|Hrf']; [by destruct (Hne Hag')|exact Hrf']. }
         destruct Hrfxy as (ts2 & a2 & Hts2 & Hrd2).
-        have Hlt := mile_mu_gain TS mu v u x ts2 Hwf Hfo Hrf Hee Hm Hag Hle Hts2.
+        have Hlt := mile_mu_gain TS mu v u x ts2 Hwf Hfo Hrf Hee Hm Hag Hle
+                      (ex_intro _ y Hgm) Hts2.
         exists ts2. split; [exact Hlt|].
         exists x, y. split; [|exact Hyx].
         left. exists a2. by split_and!.
@@ -399,7 +458,7 @@ Section acyc2.
         destruct Hra''
           as (l' & ts' & tstar' & that' & _ & _ & Hleaf' & _ & H5' & _).
         have Hlt := mile_mu_gain TS mu v u x tstar'
-                      Hwf Hfo Hrf Hee Hm Hag Hle H5'.
+                      Hwf Hfo Hrf Hee Hm Hag Hle (ex_intro _ y Hgm) H5'.
         have Hle' : (tstar' ≤ rd_floor TS r' a')%nat
           by apply (lval_ge id _ _ Hleaf').
         exists (rd_floor TS r' a'). split; [lia|].
@@ -415,7 +474,7 @@ Section acyc2.
       bounded set of measures.  (Measure [length log - µ]; no
       cycle-sequence extraction needed — as in [on_cycle_rf_empty].) *)
   Lemma on_cycle2_empty TS :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS → ee_ok TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok_ms TS → ee_ok TS →
     ∀ mu, ¬ on_cycle2 TS mu.
   Proof.
     intros Hwf Hfo Hrf Hee.
@@ -437,7 +496,7 @@ Section acyc2.
   (** ** THE THEOREM *)
 
   Theorem gdep2_acyclic_edges_ok TS :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS → ee_ok TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok_ms TS → ee_ok TS →
     gdep2_acyclic TS.
   Proof.
     intros Hwf Hfo Hrf Hee e Hc.
@@ -452,7 +511,7 @@ Section acyc2.
   (** The [gdep]-acyclicity of [WeakRobustAcyc] is a corollary (D⁺ is
       the bigger graph). *)
   Corollary gdep_acyclic_of_gdep2 TS :
-    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok TS → ee_ok TS →
+    ptraces_wf pstep TS → ptraces_fwd_own TS → rf_edges_ok_ms TS → ee_ok TS →
     gdep_acyclic TS.
   Proof.
     intros Hwf Hfo Hrf Hee. apply gdep2_acyclic_gdep.
@@ -475,7 +534,7 @@ Section acyc2.
       ptraces_wf pstep TS ∧
       ptraces_fwd_own TS ∧
       ptraces_ws_init TS ∧
-      (rf_edges_ok TS → ee_ok TS → gdep2_acyclic TS).
+      (rf_edges_ok_ms TS → ee_ok TS → gdep2_acyclic TS).
   Proof.
     intros Hpok Hlfp Hb.
     destruct (wp_behavior_traced pstep pdev img d0 ps c Hpok Hlfp Hb)
@@ -508,6 +567,14 @@ End acyc2.
       take, and hence what W2b's simulation consumes.
       [wp_behavior_gdep2_acyclic] is the behavior-level wrapper, with
       [ptraces_fwd_own] and [ptraces_ws_init] derived.
+
+    - [rf_edges_ok_ms] (A0): the per-edge premise relativized to the
+      fulfils the walk actually consumes — the fulfil is a MILESTONE
+      SOURCE ([∃ y, gmile TS (e2.1, k') y]) and the coverage is
+      [WeakRobustAcyc.fcov], at that fulfil's own EXT view.  The [k' =
+      e2.2] rmw case is excluded and needs no premise
+      ([astep_ok_read_fulfil_lt]).  [rf_edges_ok_rf_edges_ok_ms] is the
+      implication from the pre-A0 [rf_edges_ok].
 
     - [gmile] / [mile_mu] / [on_cycle2] / [mile_mu_gain] /
       [rtc_gdep2_first_mile] / [tc_gdep2_split]: the milestone

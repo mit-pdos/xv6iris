@@ -354,6 +354,92 @@ Lemma edge_ok_covered {P D : Type} (T : atrace P D) k k' ts :
 Proof. by right. Qed.
 
 (* ------------------------------------------------------------------ *)
+(** ** A0: COVERAGE AT THE *FULFIL*, NOT AT THE READ
+
+    [covered] evaluates the reader's write floor AT THE READ.  That is
+    too strong for xv6 ([design/weak-memory-premise-discharge.md] §2b):
+    [acquire]'s [holding()] plainly reads the lock word BEFORE the
+    acquiring RMW, so at the read the reader has acquired nothing — yet
+    the very next fulfil is the [amoswap.w.aq] itself, whose EXT
+    conjunct is checked AFTER its own acquire read.  The relativized
+    coverage [fcov] therefore names the view the FULFIL's [EXT] conjunct
+    is checked at.
+
+    [fulfil_vext ws l] is exactly the first argument [astep_ok] passes
+    to [fulfil_ok] in its two fulfilling arms — [pa_ws ag] for an
+    [LStore], the POST-LOAD state [load_post_run (pa_ws ag) aq base
+    tvs.*1] for an [LRmw] — reduced by [fulfil_vpre].  It is [None] on
+    the non-fulfilling labels. *)
+Definition fulfil_vext (ws : wstate) (l : wlabel) : option nat :=
+  match l with
+  | LStore rl _ _ => Some (fulfil_vpre ws rl)
+  | LRmw aq rl base tvs _ =>
+      Some (fulfil_vpre (load_post_run ws aq base (tvs.*1)) rl)
+  | _ => None
+  end.
+
+(** [w_vwNew] is a lower bound of the EXT view: [fulfil_vpre] is a max
+    over [w_vwNew], and the [LRmw] arm's [load_post_run] only raises it
+    ([load_post_run_le]). *)
+Lemma fulfil_vext_vwNew ws l v :
+  fulfil_vext ws l = Some v → (w_vwNew ws ≤ v)%nat.
+Proof.
+  destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    simpl; try done.
+  - intros [= <-]. rewrite /fulfil_vpre. lia.
+  - intros [= <-].
+    have Hle : (w_vwNew ws ≤ w_vwNew (load_post_run ws aq base (tvs.*1)))%nat
+      by apply ws_le_vwNew, load_post_run_le.
+    rewrite /fulfil_vpre. lia.
+Qed.
+
+(** THE RELATIVIZED COVERAGE: the fulfil at [k'] checks EXT at a view
+    that already includes [ts].  (Note the state: the PRE-state of the
+    step at [k'], run through the [LRmw] arm's own read half — so an
+    acquiring RMW covers whatever its own read acquired.) *)
+Definition fcov {P D : Type} (T : atrace P D) (k' : nat) (ts : nat) : Prop :=
+  ∃ ag ev v, at_ags T !! k' = Some ag ∧ at_evs T !! k' = Some ev ∧
+             fulfil_vext (pa_ws ag) (ae_lb ev) = Some v ∧ (ts ≤ v)%nat.
+
+Lemma fcov_mono_ts {P D : Type} (T : atrace P D) k' ts ts' :
+  fcov T k' ts → (ts' ≤ ts)%nat → fcov T k' ts'.
+Proof. intros (ag & ev & v & ? & ? & ? & ?) ?. exists ag, ev, v. split_and!; [done..|lia]. Qed.
+
+(** THE PER-EDGE OBLIGATION, RELATIVIZED (A0): the reader is
+    disciplined, or the LATER FULFIL's own EXT view already covers the
+    message.  Weaker than [edge_ok] ([edge_ok_edge_ok_f] below). *)
+Definition edge_ok_f {P D : Type} (T : atrace P D) (k k' : nat) (ts : nat)
+    : Prop :=
+  disciplined T k k' ∨ fcov T k' ts.
+
+Lemma edge_ok_f_disciplined {P D : Type} (T : atrace P D) k k' ts :
+  disciplined T k k' → edge_ok_f T k k' ts.
+Proof. by left. Qed.
+
+Lemma edge_ok_f_fcov {P D : Type} (T : atrace P D) k k' ts :
+  fcov T k' ts → edge_ok_f T k k' ts.
+Proof. by right. Qed.
+
+(** EXT, RELATIVIZED: a fulfilling step's EXT view is [fulfil_vext] of
+    its own pre-state, and it is strictly below the fulfilled timestamp.
+    ([astep_ok_fulfil_ext] is the [w_vwNew] shadow of this.) *)
+Lemma astep_ok_fulfil_vext {P : Type} img log i (ag : wpagent P) l f ts :
+  astep_ok img log i ag l f (Some ts) →
+  ∃ v, fulfil_vext (pa_ws ag) l = Some v ∧ (v < ts)%nat.
+Proof.
+  destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    simpl.
+  - by intros [_ ?].
+  - by intros (_ & _ & ?).
+  - intros (ts' & kc & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
+    by exists (fulfil_vpre (pa_ws ag) rl).
+  - intros (ts' & kc & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
+    by exists (fulfil_vpre (load_post_run (pa_ws ag) aq base (tvs.*1)) rl).
+  - by intros [_ ?].
+  - by intros [_ ?].
+Qed.
+
+(* ------------------------------------------------------------------ *)
 Section trace.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
@@ -415,7 +501,7 @@ Section trace.
       places an own read strictly AFTER the own fulfil, so a same-agent
       rf edge cannot participate in a cross-agent cycle — the measure
       only ever meets FOREIGN reads. *)
-  Theorem atrace_S1 img log i T k k' ev ev' a ts ts' :
+  Theorem atrace_S1_f img log i T k k' ev ev' a ts ts' :
     atrace_wf pstep img log i T →
     (∀ n ag, at_ags T !! n = Some ag → fwd_own log i (pa_ws ag)) →
     at_evs T !! k = Some ev →
@@ -424,7 +510,7 @@ Section trace.
     at_evs T !! k' = Some ev' →
     ae_ts ev' = Some ts' →
     (k < k')%nat →
-    edge_ok T k k' ts →
+    edge_ok_f T k k' ts →
     (ts < ts')%nat.
   Proof.
     intros Hwf Hfo Hev Hin Hunf Hev' Hts' Hlt Hdisc.
@@ -440,6 +526,17 @@ Section trace.
     (* the non-forwarding fact at the read *)
     have Hfv : fwd_view (pa_ws ag) (lb_aq (ae_lb ev)) a ts = ts.
     { eapply fwd_own_read_unforwarded; [exact (Hfo k ag Hag)|exact Hunf]. }
+    (* THE [fcov] ARM: the fulfil's OWN EXT view already covers [ts];
+       [astep_ok]'s EXT conjunct closes it with no view arithmetic at
+       all — and, for an [LRmw], with the read half's gain included. *)
+    destruct Hdisc as [Hdisc
+                      |(agc & evc & vc & Hagc & Hevc & Hvext & Hlev)];
+      last first.
+    { assert (agc = ag') as -> by congruence.
+      assert (evc = ev') as -> by congruence.
+      destruct (astep_ok_fulfil_vext img log i ag' (ae_lb ev') f' ts' Hok')
+        as (v' & Hv' & Hltv).
+      rewrite Hvext in Hv'. simplify_eq. lia. }
     (* IT SUFFICES to push [ts] into [w_vwNew] anywhere at or before [k'];
        [w_vwNew] only grows along the trace, and EXT closes at [k']. *)
     cut (∃ n agm, (n ≤ k')%nat ∧ at_ags T !! n = Some agm ∧
@@ -449,9 +546,8 @@ Section trace.
       { eapply (asteps_ws_le pstep img log i (at_ags T) (at_evs T) n k');
           [exact Hwf|exact Hn|exact Hagm|exact Hag']. }
       have Hle := ws_le_vwNew _ _ Hmono. lia. }
-    destruct Hdisc as [[(ev0 & Hev0 & Haq)
-                       |(k0 & ev0 & Hk0 & Hk0' & Hev0 & Hfen)]
-                      |(agc & Hagc & Hcov)].
+    destruct Hdisc as [(ev0 & Hev0 & Haq)
+                      |(k0 & ev0 & Hk0 & Hk0' & Hev0 & Hfen)].
     - (* THE AQ ARM: the read itself lands in [w_vwNew]. *)
       assert (ev0 = ev) as -> by congruence.
       exists (S k), agn. split_and!; [lia|exact Hagn|].
@@ -479,10 +575,65 @@ Section trace.
       rewrite Hb1e /=. etrans; [exact Hro0|].
       eapply (astep_ok_fence_vwNew img log i ag0 (ae_lb ev0) f0 (ae_ts ev0));
         [exact Hok0|exact Hfen].
-    - (* THE COVERED ARM: the floor is already there, in the read's
-         PRE-state.  Nothing to establish. *)
-      assert (agc = ag) as -> by congruence.
-      exists k, ag. split_and!; [lia|exact Hag|exact Hcov].
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** A0: [covered] IS AN [fcov], AND [edge_ok] AN [edge_ok_f]
+
+      [covered] evaluates the floor at the READ; views only grow along
+      the trace and the fulfil's EXT view is above the fulfil's own
+      pre-[w_vwNew] ([fulfil_vext_vwNew]).  So the old premise implies
+      the new one — the relativization is a pure weakening. *)
+  Lemma covered_fcov img log i T k k' ts ev' :
+    atrace_wf pstep img log i T →
+    covered T k ts → (k ≤ k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    fcov T k' ts.
+  Proof.
+    intros Hwf (ag & Hag & Hge) Hle Hev' [ts' Hts'].
+    destruct (asteps_wf_step pstep img log i (at_ags T) (at_evs T) k' ev'
+                Hwf Hev')
+      as (ag' & agn' & st2 & f' & Hag' & _ & _ & Hok' & _).
+    rewrite Hts' in Hok'.
+    destruct (astep_ok_fulfil_vext img log i ag' (ae_lb ev') f' ts' Hok')
+      as (v & Hv & _).
+    exists ag', ev', v. split_and!; [exact Hag'|exact Hev'|exact Hv|].
+    have Hmono : ws_le (pa_ws ag) (pa_ws ag').
+    { eapply (asteps_ws_le pstep img log i (at_ags T) (at_evs T) k k');
+        [exact Hwf|exact Hle|exact Hag|exact Hag']. }
+    have Hvw := ws_le_vwNew _ _ Hmono.
+    have Hb := fulfil_vext_vwNew (pa_ws ag') (ae_lb ev') v Hv. lia.
+  Qed.
+
+  Lemma edge_ok_edge_ok_f img log i T k k' ts ev' :
+    atrace_wf pstep img log i T → (k ≤ k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    edge_ok T k k' ts → edge_ok_f T k k' ts.
+  Proof.
+    intros Hwf Hle Hev' Hsome [Hd|Hcov]; [by left|right].
+    by eapply (covered_fcov img log i T k k' ts ev').
+  Qed.
+
+  (** S1, in its ORIGINAL [edge_ok] form: a corollary of the [edge_ok_f]
+      one. *)
+  Corollary atrace_S1 img log i T k k' ev ev' a ts ts' :
+    atrace_wf pstep img log i T →
+    (∀ n ag, at_ags T !! n = Some ag → fwd_own log i (pa_ws ag)) →
+    at_evs T !! k = Some ev →
+    (a, ts) ∈ lb_reads (ae_lb ev) →
+    read_unforwarded log i (ae_lb ev) ts →
+    at_evs T !! k' = Some ev' →
+    ae_ts ev' = Some ts' →
+    (k < k')%nat →
+    edge_ok T k k' ts →
+    (ts < ts')%nat.
+  Proof.
+    intros Hwf Hfo Hev Hin Hunf Hev' Hts' Hlt Hok.
+    eapply (atrace_S1_f img log i T k k' ev ev' a ts ts');
+      [exact Hwf|exact Hfo|exact Hev|exact Hin|exact Hunf|exact Hev'
+      |exact Hts'|exact Hlt|].
+    eapply (edge_ok_edge_ok_f img log i T k k' ts ev');
+      [exact Hwf|lia|exact Hev'|by rewrite Hts'|exact Hok].
   Qed.
 
   (** S1 with the SAME-STEP case folded in: [k ≤ k'], and [edge_ok] is
@@ -492,6 +643,32 @@ Section trace.
       premise is needed at all ([astep_ok_read_fulfil_lt] gets the strict
       inequality out of the rmw's own [fulfil_ok], which is checked on
       the post-[load_post_run] state). *)
+  Corollary atrace_S1_le_f img log i T k k' ev ev' a ts ts' :
+    atrace_wf pstep img log i T →
+    (∀ n ag, at_ags T !! n = Some ag → fwd_own log i (pa_ws ag)) →
+    at_evs T !! k = Some ev →
+    (a, ts) ∈ lb_reads (ae_lb ev) →
+    read_unforwarded log i (ae_lb ev) ts →
+    at_evs T !! k' = Some ev' →
+    ae_ts ev' = Some ts' →
+    (k ≤ k')%nat →
+    ((k < k')%nat → edge_ok_f T k k' ts) →
+    (ts < ts')%nat.
+  Proof.
+    intros Hwf Hfo Hev Hin Hunf Hev' Hts' Hle Hdisc.
+    destruct (decide (k = k')) as [->|Hne].
+    - assert (ev' = ev) as -> by congruence.
+      destruct (asteps_wf_step pstep img log i (at_ags T) (at_evs T) k' ev
+                  Hwf Hev)
+        as (ag & agn & st1 & f & _ & _ & _ & Hok & _).
+      rewrite Hts' in Hok.
+      by eapply (astep_ok_read_fulfil_lt img log i ag (ae_lb ev) f ts ts' a).
+    - eapply (atrace_S1_f img log i T k k' ev ev' a ts ts');
+        [exact Hwf|exact Hfo|exact Hev|exact Hin|exact Hunf|exact Hev'
+        |exact Hts'|lia|apply Hdisc; lia].
+  Qed.
+
+  (** …and its ORIGINAL [edge_ok] spelling. *)
   Corollary atrace_S1_le img log i T k k' ev ev' a ts ts' :
     atrace_wf pstep img log i T →
     (∀ n ag, at_ags T !! n = Some ag → fwd_own log i (pa_ws ag)) →
@@ -505,16 +682,12 @@ Section trace.
     (ts < ts')%nat.
   Proof.
     intros Hwf Hfo Hev Hin Hunf Hev' Hts' Hle Hdisc.
-    destruct (decide (k = k')) as [->|Hne].
-    - assert (ev' = ev) as -> by congruence.
-      destruct (asteps_wf_step pstep img log i (at_ags T) (at_evs T) k' ev
-                  Hwf Hev)
-        as (ag & agn & st1 & f & _ & _ & _ & Hok & _).
-      rewrite Hts' in Hok.
-      by eapply (astep_ok_read_fulfil_lt img log i ag (ae_lb ev) f ts ts' a).
-    - eapply (atrace_S1 img log i T k k' ev ev' a ts ts');
-        [exact Hwf|exact Hfo|exact Hev|exact Hin|exact Hunf|exact Hev'
-        |exact Hts'|lia|apply Hdisc; lia].
+    eapply (atrace_S1_le_f img log i T k k' ev ev' a ts ts');
+      [exact Hwf|exact Hfo|exact Hev|exact Hin|exact Hunf|exact Hev'
+      |exact Hts'|exact Hle|].
+    intros Hlt.
+    eapply (edge_ok_edge_ok_f img log i T k k' ts ev');
+      [exact Hwf|lia|exact Hev'|by rewrite Hts'|by apply Hdisc].
   Qed.
 
 End trace.
@@ -821,6 +994,16 @@ End acyc.
       bank never names a foreign write, DERIVED from [wp_init] through
       the promise phase.  Reusable wherever a read's [w_vrOld] gain must
       be the raw timestamp.
+    - [fulfil_vext] / [fcov] / [edge_ok_f] and [atrace_S1_f] /
+      [atrace_S1_le_f] (A0): coverage evaluated at the LATER FULFIL's
+      own EXT view instead of at the read — for an [LRmw] that is after
+      its own acquire read, which is what makes xv6's
+      "plain read; acquiring AMO" shape dischargeable
+      ([design/weak-memory-premise-discharge.md] §2b).
+      [covered_fcov] / [edge_ok_edge_ok_f] are the implications from the
+      pre-A0 shape, so [atrace_S1] / [atrace_S1_le] survive verbatim as
+      corollaries.
+
     - [disciplined] / [covered] / [edge_ok] / [rf_edges_ok]: the exact
       per-edge obligation the Iris layer must discharge — at the
       racy-read rules ([disciplined]) and at the lock / critical-section

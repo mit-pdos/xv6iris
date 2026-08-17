@@ -950,7 +950,7 @@ Section cone.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS (PDevs tt [])).
+  Context (Hsplit : edges_split_ms nh TS (PDevs tt [])).
 
   (** (B4-1) initial states are boundaries *)
   Context (Hps_bnd : ∀ i p, ps !! i = Some p → pbnd p).
@@ -2519,7 +2519,7 @@ Section package.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS (PDevs tt [])).
+  Context (Hsplit : edges_split_ms nh TS (PDevs tt [])).
   Context (Hps_bnd : ∀ i p, ps !! i = Some p → pbnd p).
   Context (Hcq : ∀ e1 e2, gdep2 TS e1 e2 → e1.1 ≠ e2.1 →
                    ∀ T ag', pt_trs TS !! e1.1 = Some T →

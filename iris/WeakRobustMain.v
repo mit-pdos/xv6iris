@@ -11,7 +11,12 @@
       (1) the per-edge premise WEAKENED from [rf_edges_ok] to
           "[edge_ok] OR [bad]" ([edges_split]), where [bad] is the
           owned-unpublished cross read — the shape the Layer-2
-          violation predicate φ refutes;
+          violation predicate φ refutes.  A0 (2026-08-17) weakened it
+          FURTHER, to exactly what the walk consumes ([edges_split_ms]:
+          the later fulfil is a MILESTONE SOURCE and the coverage is
+          [WeakRobustAcyc.fcov], at the fulfil's own EXT view) — see the
+          [edges_split_ms] header and
+          [design/weak-memory-premise-discharge.md] §2b;
       (2) THE EXHIBIT: given a [bad] edge whose target has
           bad-target-free strict ancestry ([bad_min]), the ancestor cone
           [U] of that target is sortable, the subset simulation replays
@@ -78,7 +83,8 @@
       [w_pub] publishes its own message, and Layer 2's [wm_class_of]
       tags exactly those [WCrel]).
 
-    - THE PREMISE PACKAGE is [main_premises]: [edges_split] (the split),
+    - THE PREMISE PACKAGE is [main_premises]: [edges_split_ms] (the
+      split, A0-relativized),
       [bad_wf] (the residue), [ee_ok] (W2b (iii)) and
       [∃ sync, ptraces_bytes_ok TS sync] (the byte classification, which
       [WeakRobustSer.co_serialized_pkg] turns into [co_tc]).
@@ -418,6 +424,74 @@ Proof.
   by eapply H.
 Qed.
 
+(* ------------------------------------------------------------------ *)
+(** ** A0: THE SPLIT PREMISE, RELATIVIZED TO THE WALK'S MILESTONE FULFILS
+
+    [edges_split] as stated is FALSE for xv6
+    ([design/weak-memory-premise-discharge.md] §2b): it demands
+    [edge_ok] of EVERY later fulfil of the reader, with coverage
+    evaluated AT THE READ, and [acquire]'s [holding()] plainly reads the
+    lock word before the acquiring RMW — no fence between, nothing
+    acquired yet, and an early store po-after a plain load is a legal
+    RVWMO reordering, so no per-edge inequality can hold in every
+    behavior.  The walk never asks for it: it applies the premise only
+    at the fulfil that SOURCES THE EXIT MILESTONE, and only needs
+    coverage at THAT fulfil's own EXT view.  [edges_split_ms] /
+    [rf_edges_ok_on_ms] are exactly what is consumed —
+
+      (a) [k'] is a MILESTONE SOURCE ([∃ y, gmile TS (e2.1, k') y]),
+      (b) coverage is [fcov] (at the fulfil, so an acquiring RMW covers
+          what its OWN read half acquired) — i.e. the conclusion is
+          [edge_ok_f],
+      (c) [k' = e2.2] is still excluded: that rmw case is free from the
+          machine ([WeakRobustAcyc.astep_ok_read_fulfil_lt]).
+
+    [edges_split_edges_split_ms] shows the old premise implies the new
+    one, so every consumer below is strictly weaker than it was. *)
+Definition edges_split_ms {P D : Type} (nh : nat) (TS : ptraces P D)
+    (DS : pdevs D) : Prop :=
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+    pt_trs TS !! e2.1 = Some T →
+    (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    (∃ y, gmile TS (e2.1, k') y) →
+    edge_ok_f T e2.2 k' ts ∨ bad nh TS DS e1 e2.
+
+(** …and the [W]-relativized strong premise in the same shape. *)
+Definition rf_edges_ok_on_ms {P D : Type} (TS : ptraces P D) (W : gev → Prop)
+    : Prop :=
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 → W e2 →
+    pt_trs TS !! e2.1 = Some T →
+    (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    (∃ y, gmile TS (e2.1, k') y) →
+    edge_ok_f T e2.2 k' ts.
+
+Lemma edges_split_edges_split_ms {P D : Type}
+    (pstep : P → D → wlabel → P → D → Prop)
+    (nh : nat) (TS : ptraces P D) (DS : pdevs D) :
+  ptraces_wf pstep TS → edges_split nh TS DS → edges_split_ms nh TS DS.
+Proof.
+  intros Hwf H e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome _.
+  destruct (H e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+    as [Hok|Hbad]; [left|by right].
+  eapply (edge_ok_edge_ok_f pstep (pt_img TS) (pt_log TS) e2.1 T e2.2 k' ts ev');
+    [by eapply Hwf|lia|exact Hev|exact Hsome|exact Hok].
+Qed.
+
+Lemma rf_edges_ok_on_ms_full {P D : Type}
+    (pstep : P → D → wlabel → P → D → Prop)
+    (TS : ptraces P D) (W : gev → Prop) :
+  ptraces_wf pstep TS → rf_edges_ok_on TS W → rf_edges_ok_on_ms TS W.
+Proof.
+  intros Hwf H e1 e2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome _.
+  eapply (edge_ok_edge_ok_f pstep (pt_img TS) (pt_log TS) e2.1 T e2.2 k' ts ev');
+    [by eapply Hwf|lia|exact Hev|exact Hsome|].
+  by eapply H.
+Qed.
+
 (** THE RESIDUE (worklist item (3)).  [bad_min TS e2]: no bad edge's
     target is a STRICT ancestor of [e2] — the minimality the exhibit
     picks.  [bad_wf]: whenever a bad edge exists, some bad edge is
@@ -465,13 +539,14 @@ Section walk.
       satisfy [W] (that is where the discipline premise is spent). *)
   Lemma mile_mu_gain_on TS (W : gev → Prop) mu v u x tx :
     ptraces_wf pstep TS → ptraces_fwd_own TS →
-    rf_edges_ok_on TS W → ee_ok TS →
+    rf_edges_ok_on_ms TS W → ee_ok TS →
     W u → mile_mu TS mu v u → u.1 = x.1 → (u.2 ≤ x.2)%nat →
+    (∃ y, gmile TS x y) →
     gev_ts TS x = Some tx →
     (mu < tx)%nat.
   Proof.
     intros Hwf Hfo Hrf Hee HWu
-           [(a & Hts1 & Hrd & Hne)|(r & a & Hra & ->)] Hag Hle Htx.
+           [(a & Hts1 & Hrd & Hne)|(r & a & Hra & ->)] Hag Hle Hms Htx.
     - (* CROSS-RF ENTRY: S1, with the reader [u] satisfying [W]. *)
       have Hwfu : gev_wf TS u by eapply gev_reads_wf.
       apply gev_wf_bounds in Hwfu as (T & HT & _).
@@ -482,7 +557,7 @@ Section walk.
       have Hunf : read_unforwarded (pt_log TS) u.1 (ae_lb ev) mu.
       { right. exists (WMsg base data (Some v.1) kc), v.1.
         split_and!; [exact Hm|done|exact Hne]. }
-      eapply (atrace_S1_le pstep (pt_img TS) (pt_log TS) u.1 T u.2 x.2
+      eapply (atrace_S1_le_f pstep (pt_img TS) (pt_log TS) u.1 T u.2 x.2
                 ev evx a mu tx).
       + by eapply Hwf.
       + intros n ag Hn. by eapply (Hfo u.1 T n ag HT Hn).
@@ -494,8 +569,10 @@ Section walk.
       + exact Hle.
       + intros Hklt. eapply (Hrf v u T mu a x.2 evx);
           [exact Hts1|exact Hrd|exact Hne|exact HWu|exact HT|exact Hklt
-           |exact Hevx|].
-        rewrite Htsx. by eexists.
+           |exact Hevx| |].
+        * rewrite Htsx. by eexists.
+        * destruct Hms as (y & Hy). exists y.
+          by rewrite Hag -surjective_pairing.
     - (* gE ENTRY: no discipline premise at all. *)
       destruct (decide (u.2 = x.2)) as [Heq|Hne].
       + have Hux : u = x.
@@ -512,7 +589,7 @@ Section walk.
 
   Lemma on_cycle2_advance_on TS (W : gev → Prop) mu :
     ptraces_wf pstep TS → ptraces_fwd_own TS →
-    rf_edges_ok_on TS W → ee_ok TS →
+    rf_edges_ok_on_ms TS W → ee_ok TS →
     (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
     on_cycle2_on TS W mu → ∃ mu', (mu < mu')%nat ∧ on_cycle2_on TS W mu'.
   Proof.
@@ -522,7 +599,7 @@ Section walk.
     - exfalso.
       destruct (mile_mu_src_ts TS mu v u Hm) as (tv & Htv & Hlev).
       have Hgt := mile_mu_gain_on TS W mu v u v tv Hwf Hfo Hrf Hee HWu Hm
-                    Hag Hle Htv.
+                    Hag Hle (ex_intro _ u (mile_mu_gmile TS mu v u Hm)) Htv.
       lia.
     - have Hedge : gdep2 TS v u by eapply mile_mu_gdep2.
       have Hyx : rtc (gdep2 TS) y x.
@@ -533,12 +610,13 @@ Section walk.
       { eapply (Hcl u y HWu).
         - eapply rtc_r; [exact Hux|by apply gmile_gdep2].
         - eapply rtc_r; [exact Hyv|exact Hedge]. }
+      have Hgm : gmile TS x y := Hmile.
       destruct Hmile as [[Hd Hne]|HE].
       + have Hrfxy : grf TS x y.
         { destruct Hd as [(Hag' & _)|Hrf']; [by destruct (Hne Hag')|exact Hrf']. }
         destruct Hrfxy as (ts2 & a2 & Hts2 & Hrd2).
         have Hlt := mile_mu_gain_on TS W mu v u x ts2 Hwf Hfo Hrf Hee HWu Hm
-                      Hag Hle Hts2.
+                      Hag Hle (ex_intro _ y Hgm) Hts2.
         exists ts2. split; [exact Hlt|].
         exists x, y. split_and!; [|exact Hyx|exact HWy].
         left. exists a2. by split_and!.
@@ -548,7 +626,7 @@ Section walk.
         destruct Hra''
           as (l' & ts' & tstar' & that' & _ & _ & Hleaf' & _ & H5' & _).
         have Hlt := mile_mu_gain_on TS W mu v u x tstar' Hwf Hfo Hrf Hee HWu Hm
-                      Hag Hle H5'.
+                      Hag Hle (ex_intro _ y Hgm) H5'.
         have Hle' : (tstar' ≤ rd_floor TS r' a')%nat
           by apply (lval_ge id _ _ Hleaf').
         exists (rd_floor TS r' a'). split; [lia|].
@@ -563,7 +641,7 @@ Section walk.
 
   Lemma on_cycle2_on_empty TS (W : gev → Prop) :
     ptraces_wf pstep TS → ptraces_fwd_own TS →
-    rf_edges_ok_on TS W → ee_ok TS →
+    rf_edges_ok_on_ms TS W → ee_ok TS →
     (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
     ∀ mu, ¬ on_cycle2_on TS W mu.
   Proof.
@@ -586,7 +664,7 @@ Section walk.
       [W]-event. *)
   Theorem gdep2_acyclic_on TS (W : gev → Prop) :
     ptraces_wf pstep TS → ptraces_fwd_own TS →
-    rf_edges_ok_on TS W → ee_ok TS →
+    rf_edges_ok_on_ms TS W → ee_ok TS →
     (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
     ∀ e, W e → ¬ tc (gdep2 TS) e e.
   Proof.
@@ -620,13 +698,13 @@ Definition bad_wf_strong {P D : Type} (nh : nat) (TS : ptraces P D)
 Theorem gdep2_acyclic_bad_free {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (nh : nat) (TS : ptraces P D) (DS : pdevs D) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
-  edges_split nh TS DS → bad_wf_strong nh TS DS →
+  edges_split_ms nh TS DS → bad_wf_strong nh TS DS →
   gdep2_acyclic TS.
 Proof.
   intros Hwf Hfo Hee Hsplit Hbs.
-  have Hrf : rf_edges_ok_on TS (λ e, tc (gdep2 TS) e e).
-  { intros e1 e2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome.
-    destruct (Hsplit e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+  have Hrf : rf_edges_ok_on_ms TS (λ e, tc (gdep2 TS) e e).
+  { intros e1 e2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome Hms.
+    destruct (Hsplit e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms)
       as [Hok|Hbad]; [exact Hok|]. by destruct (Hbs e1 e2 Hbad HW). }
   have Hcl : ∀ u x, tc (gdep2 TS) u u → rtc (gdep2 TS) u x →
                     rtc (gdep2 TS) x u → tc (gdep2 TS) x x.
@@ -998,11 +1076,11 @@ Qed.
 
 Lemma rf_edges_ok_on_min {P D : Type} (TS : ptraces P D) (DS : pdevs D)
     (nh : nat) (b2 : gev) :
-  edges_split nh TS DS → bad_min nh TS DS b2 →
-  rf_edges_ok_on TS (λ e, tc (gdep3 TS DS) e b2).
+  edges_split_ms nh TS DS → bad_min nh TS DS b2 →
+  rf_edges_ok_on_ms TS (λ e, tc (gdep3 TS DS) e b2).
 Proof.
-  intros Hsplit Hmin f1 f2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome.
-  destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+  intros Hsplit Hmin f1 f2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome Hms.
+  destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms)
     as [Hok|Hbad]; [exact Hok|].
   by destruct (Hmin f1 f2 Hbad HW).
 Qed.
@@ -1031,7 +1109,7 @@ Qed.
 Lemma cone_acyc2_of_min {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
-  edges_split nh TS DS → bad_min nh TS DS b2 →
+  edges_split_ms nh TS DS → bad_min nh TS DS b2 →
   ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep2 TS) e e.
 Proof.
   intros Hwf Hfo Hee Hsplit Hmin.
@@ -1044,7 +1122,7 @@ Lemma cone_acyc_of_min {P D : Type} (pstep : P → D → wlabel → P → D → 
     (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
   ptraces_wit TS DS → dev_epoch_ok TS DS →
-  edges_split nh TS DS → bad_min nh TS DS b2 →
+  edges_split_ms nh TS DS → bad_min nh TS DS b2 →
   ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep3 TS DS) e e.
 Proof.
   intros Hwf Hfo Hee Hwit Hepo Hsplit Hmin e He.
@@ -1065,7 +1143,7 @@ Corollary cone_acyc_of_min_nil {P D : Type}
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
   (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
      ae_dev ev = None) →
-  edges_split nh TS (PDevs d []) → bad_min nh TS (PDevs d []) b2 →
+  edges_split_ms nh TS (PDevs d []) → bad_min nh TS (PDevs d []) b2 →
   ∀ e, tc (gdep2 TS) e b2 → ¬ tc (gdep2 TS) e e.
 Proof.
   intros Hwf Hfo Hee Hdf Hsplit Hmin e He Hc.
@@ -1140,7 +1218,7 @@ Section exhibit.
   Context (Hfo : ptraces_fwd_own TS).
   Context (Hee : ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS DS).
+  Context (Hsplit : edges_split_ms nh TS DS).
 
   (** THE EXHIBIT: a minimal bad edge builds a promise-free run to a
       VIOLATING configuration — and the violation is HART-RESTRICTED
@@ -1335,8 +1413,8 @@ Section exhibit.
   Proof.
     intros Hvf Hbwf.
     eapply (gdep2_acyclic_edges_ok pstep TS Hwf Hfo); [|exact Hee].
-    intros e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome.
-    destruct (Hsplit e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome)
+    intros e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms.
+    destruct (Hsplit e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms)
       as [Hok|Hbad]; [exact Hok|].
     by destruct (no_bad_edge Hvf Hbwf e1 e2 Hbad).
   Qed.
@@ -1367,7 +1445,7 @@ End exhibit.
 
 Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D)
     (DS : pdevs D) : Prop :=
-  edges_split nh TS DS ∧ bad_wf nh TS DS ∧ ee_ok TS ∧
+  edges_split_ms nh TS DS ∧ bad_wf nh TS DS ∧ ee_ok TS ∧
   dev_epoch_ok TS DS ∧
   (∃ sync, ptraces_bytes_ok TS sync).
 
@@ -1375,7 +1453,7 @@ Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D)
     residue is free and [gdep3] is [gdep2], so a caller that runs at a
     marker which never fires owes exactly what W2c's package asked for. *)
 Lemma main_premises_nil {P D : Type} (nh : nat) (TS : ptraces P D) (d : D) :
-  edges_split nh TS (PDevs d []) → bad_wf nh TS (PDevs d []) → ee_ok TS →
+  edges_split_ms nh TS (PDevs d []) → bad_wf nh TS (PDevs d []) → ee_ok TS →
   (∃ sync, ptraces_bytes_ok TS sync) →
   main_premises nh TS (PDevs d []).
 Proof.
@@ -1582,9 +1660,13 @@ End main.
       else — the trace-global premises are discharged per-site/static
       (D-M6-8).
 
-    - [bad] / [edges_split] / [bad_wf]: the weakened per-edge premise
-      and the honest residue.  W3's writer-discipline export should
-      target [edges_split] (not [rf_edges_ok]): a racy read that the
+    - [bad] / [edges_split_ms] / [bad_wf]: the weakened per-edge premise
+      and the honest residue.  ([edges_split] is kept as the
+      pre-A0 shape, with [edges_split_edges_split_ms] the implication;
+      it is what a discharge site may prove if it can — but it is FALSE
+      for xv6, see §2b of the discharge design.)  W3's
+      writer-discipline export should target [edges_split_ms] (not
+      [rf_edges_ok]): a racy read that the
       kernel does NOT discipline is admissible as long as it is [bad],
       because [bad_edge_violates] turns it into a φ-refutable
       promise-free run.
@@ -1596,8 +1678,10 @@ End main.
       concrete violating configuration, and it is the sole consumer of
       [pf_violation_free_hart].
 
-    - [gdep2_acyclic_on] / [rf_edges_ok_on]: the relativized walk, for
+    - [gdep2_acyclic_on] / [rf_edges_ok_on_ms]: the relativized walk, for
       any future argument that needs acyclicity only along a cone.
+      ([rf_edges_ok_on] is the pre-A0 shape;
+      [rf_edges_ok_on_ms_full] is the implication.)
 
     - [robust_main] and [robust_transport]: the assembled theorem and
       W2c's completable-prefix corollary. *)

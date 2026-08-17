@@ -1864,7 +1864,7 @@ Definition tb_facts {P D : Type} (pstep : P → D → wlabel → P → D → Pro
   (∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []) ∧
   (∀ j T ag0, pt_trs TS !! j = Some T →
      at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)) ∧
-  ptraces_fwd_own TS ∧ ee_ok TS ∧ edges_split nh TS DS.
+  ptraces_fwd_own TS ∧ ee_ok TS ∧ edges_split_ms nh TS DS.
 
 (** THE FULFILMENT ACCOUNTING ([WeakRobustTrace.wp_behavior_fulfil_once]'s
     fourth output), named so that [robust_main_no_bad] can TAKE a

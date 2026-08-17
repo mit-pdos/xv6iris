@@ -382,6 +382,74 @@ Section disc.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** ** A0: THE TWO xv6 SHAPES THE RELATIVIZED PREMISE ASKS FOR
+
+      [WeakRobustMain.edges_split_ms] evaluates coverage at the FULFIL's
+      EXT view ([WeakRobustAcyc.fcov]) rather than at the read, which is
+      what makes §2b's [holding()] shape dischargeable: the plain read of
+      the lock word is followed by the acquiring [amoswap.w.aq], and THAT
+      fulfil's EXT conjunct is checked on the post-[load_post_run] state
+      — after its own acquire read.  Two arms:
+
+      (a) [fcov_of_aq_rmw]: the fulfil at [k'] IS an [aq] RMW whose read
+          half read a timestamp ≥ [ts].  No trace history at all: the
+          acquire's own gain sits inside the state [fulfil_ok] is checked
+          on ([load_post_run_vwNew_aq]).  This is the acquire RMW that
+          [holding()]'s plain read is followed by, and the [k'] that
+          sources the exit milestone (the lock word's next reader).
+
+      (b) [fcov_of_acquire_before]: an ACQUIRE of a timestamp ≥ [ts] sits
+          po-before [k'] (the critical-section shape) — [covered] at the
+          acquire, carried forward by monotonicity.  This is A1's
+          [disciplined_covered] composed with [covered_fcov]. *)
+
+  (** (a) THE ACQUIRING RMW COVERS WHAT ITS OWN READ HALF ACQUIRED. *)
+  Lemma fcov_of_aq_rmw i T k' ev rl base tvs data a ts_s ts :
+    pt_trs TS !! i = Some T →
+    at_evs T !! k' = Some ev →
+    ae_lb ev = LRmw true rl base tvs data →
+    (a, ts_s) ∈ lb_reads (ae_lb ev) →
+    (ts ≤ ts_s)%nat →
+    fcov T k' ts.
+  Proof.
+    intros HT Hev Hlb Hin Hle.
+    destruct (ag_at i T k' ev HT Hev) as (ag & Hag).
+    exists ag, ev,
+      (fulfil_vpre (load_post_run (pa_ws ag) true base (tvs.*1)) rl).
+    split_and!; [exact Hag|exact Hev|by rewrite /fulfil_vext Hlb|].
+    rewrite Hlb /= in Hin.
+    apply elem_of_tvs_reads in Hin as (j & v & Hj & _).
+    have Hts : (tvs.*1) !! j = Some ts_s by rewrite list_lookup_fmap Hj.
+    have Hge := load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts_s Hts.
+    rewrite /fulfil_vpre. lia.
+  Qed.
+
+  (** (b) AN ACQUIRE po-BEFORE THE FULFIL COVERS IT.  The read at [ka] is
+      [disciplined] (an [aq] load/rmw, or a [pr ∧ sw] fence before [kd]),
+      and its source [esrc] is another agent's fulfil of [ts_s ≥ ts]. *)
+  Lemma fcov_of_acquire_before i esrc T ka kd k' ev' a ts_s ts :
+    esrc.1 ≠ i →
+    pt_trs TS !! i = Some T →
+    gev_reads TS (i, ka) a ts_s →
+    gev_ts TS esrc = Some ts_s →
+    disciplined T ka kd →
+    (ka < kd)%nat → (kd ≤ k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    (ts ≤ ts_s)%nat →
+    fcov T k' ts.
+  Proof.
+    intros Hne HT Hrd Hsrc Hdisc H1 H2 Hev' Hsome Hle.
+    have [ag2 Hag2] : is_Some (at_ags T !! kd).
+    { apply lookup_lt_is_Some_2. destruct (trace_wf i T HT) as [Hlen _].
+      apply lookup_lt_Some in Hev'. lia. }
+    have Hcov : covered T kd ts.
+    { eapply covered_mono_ts; [|exact Hle].
+      by eapply (acquire_covered i esrc T ka kd a ts_s ag2). }
+    eapply (covered_fcov pstep Img Log i T kd k' ts ev');
+      [by apply trace_wf|exact Hcov|exact H2|exact Hev'|exact Hsome].
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** ** DELIVERABLE A1b: THE RELEASE SITE
 
       [ts] fulfilled at [k1], a [pw ∧ sw] fence at [kf > k1], [ts_s]
@@ -586,6 +654,37 @@ Section disc.
   Proof.
     intros Hne HTi HTj Hts1 Hm Hb Hlt1 Hfen Hlt2 Htss Hrd Hdisc Hlt Hagr k'.
     apply edge_ok_covered.
+    by eapply (covered_of_release_acquire i j Ti Tj k1 kf ks ka kr
+                 ts ts_s a1 m a agr).
+  Qed.
+
+  (** …and the [edge_ok_f] restatement (A0), which is the shape
+      [WeakRobustMain.edges_split_ms] now quantifies over: coverage is
+      demanded AT THE LATER FULFIL, so the conclusion names it. *)
+  Corollary edge_ok_f_of_release_acquire i j Ti Tj k1 kf ks ka kr
+      ts ts_s a1 m a agr :
+    i ≠ j →
+    pt_trs TS !! i = Some Ti →
+    pt_trs TS !! j = Some Tj →
+    gev_ts TS (i, k1) = Some ts →
+    Log !! (ts - 1)%nat = Some m → is_Some (msg_byte m a1) →
+    (k1 < kf)%nat →
+    (∃ ev, at_evs Ti !! kf = Some ev ∧ lb_fence_pwsw (ae_lb ev)) →
+    (kf < ks)%nat →
+    gev_ts TS (i, ks) = Some ts_s →
+    (* [j]'s ACQUIRE of the release message, po-BEFORE [kr] *)
+    gev_reads TS (j, ka) a ts_s →
+    disciplined Tj ka kr →
+    (ka < kr)%nat →
+    at_ags Tj !! kr = Some agr →
+    ∀ k' ev', (kr ≤ k')%nat → at_evs Tj !! k' = Some ev' →
+      is_Some (ae_ts ev') → edge_ok_f Tj kr k' ts.
+  Proof.
+    intros Hne HTi HTj Hts1 Hm Hb Hlt1 Hfen Hlt2 Htss Hrd Hdisc Hlt Hagr
+      k' ev' Hle Hev' Hsome.
+    apply edge_ok_f_fcov.
+    eapply (covered_fcov pstep Img Log j Tj kr k' ts ev');
+      [by apply trace_wf| |exact Hle|exact Hev'|exact Hsome].
     by eapply (covered_of_release_acquire i j Ti Tj k1 kf ks ka kr
                  ts ts_s a1 m a agr).
   Qed.

@@ -498,7 +498,7 @@ Section coneblocks.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS (PDevs d0 [])).
+  Context (Hsplit : edges_split_ms nh TS (PDevs d0 [])).
 
   (** THE BOUNDARY PREDICATE and the two premises about it. *)
   Context (bnd : P → Prop).
@@ -1724,7 +1724,7 @@ Section main.
   Context (Hfo : WeakRobustAcyc.ptraces_fwd_own TS).
   Context (Hee : WeakRobustAcyc2.ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split nh TS (PDevs d0 [])).
+  Context (Hsplit : edges_split_ms nh TS (PDevs d0 [])).
   Context (bnd : P → Prop).
   Context `{!∀ p, Decision (bnd p)}.
   Context (Hbnd0 : ∀ i T ag0, pt_trs TS !! i = Some T →
