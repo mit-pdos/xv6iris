@@ -234,7 +234,7 @@ Section ProofArgint.
     assert (Haddr10 : add_vec (rget MF (mword_of_int 9 : mword 5))
                         (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = ip).
     { rgne. rewrite HMFs1. apply ai_sw_off. }
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.argint + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argint + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) MF (av - 4)%nat old b
               with "Hcg Hpc Hi10 [Hip]").
     { iEval (rewrite Haddr10). iExact "Hip". }

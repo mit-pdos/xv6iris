@@ -49,7 +49,7 @@
      re-establishes it from the FAILED [nwrite == nread + PIPESIZE] test.
 
    - the 1-byte local [ch] is byte 7 of frame slot 13 (s0-97 = sp+15):
-     [pw_chslot] carves that slot into [StackBytes.bytes_own] and keeps the
+     [pw_chslot] carves that slot into [StackBytes.bytes_own (KTR := kt)] and keeps the
      8-alignment fact with it, so the slot can become a word again for the
      [c.addi16sp] pop.  copyin's destination buffer is that single byte. *)
 From Stdlib Require Import ZArith Lia List.
@@ -506,29 +506,29 @@ Section PwPieces.
 
   (* the seven prologue-saved slots (ra, s0..s5), holding the caller's values *)
   Definition pw_frame7 (m : regfile) (sp0 : mword 64) : iProp Σ :=
-    (pa_stk sp0 1%nat ↦₈ (m !!! Regidx Rra) ∗
-     pa_stk sp0 2%nat ↦₈ (m !!! Regidx Rs0) ∗
-     pa_stk sp0 3%nat ↦₈ (m !!! Regidx Rs1) ∗
-     pa_stk sp0 4%nat ↦₈ (m !!! Regidx Rs2) ∗
-     pa_stk sp0 5%nat ↦₈ (m !!! Regidx Rs3) ∗
-     pa_stk sp0 6%nat ↦₈ (m !!! Regidx Rs4) ∗
-     pa_stk sp0 7%nat ↦₈ (m !!! Regidx Rs5))%I.
+    (pa_stk sp0 1%nat ↦₈[kt] (m !!! Regidx Rra) ∗
+     pa_stk sp0 2%nat ↦₈[kt] (m !!! Regidx Rs0) ∗
+     pa_stk sp0 3%nat ↦₈[kt] (m !!! Regidx Rs1) ∗
+     pa_stk sp0 4%nat ↦₈[kt] (m !!! Regidx Rs2) ∗
+     pa_stk sp0 5%nat ↦₈[kt] (m !!! Regidx Rs3) ∗
+     pa_stk sp0 6%nat ↦₈[kt] (m !!! Regidx Rs4) ∗
+     pa_stk sp0 7%nat ↦₈[kt] (m !!! Regidx Rs5))%I.
 
   (* the five SHRINK-WRAPPED slots (s6..s10), saved only on the copy path *)
   Definition pw_frame5 (m : regfile) (sp0 : mword 64) : iProp Σ :=
-    (pa_stk sp0 8%nat  ↦₈ (m !!! Regidx Rs6) ∗
-     pa_stk sp0 9%nat  ↦₈ (m !!! Regidx Rs7) ∗
-     pa_stk sp0 10%nat ↦₈ (m !!! Regidx Rs8) ∗
-     pa_stk sp0 11%nat ↦₈ (m !!! Regidx Rs9) ∗
-     pa_stk sp0 12%nat ↦₈ (m !!! Regidx Rs10))%I.
+    (pa_stk sp0 8%nat  ↦₈[kt] (m !!! Regidx Rs6) ∗
+     pa_stk sp0 9%nat  ↦₈[kt] (m !!! Regidx Rs7) ∗
+     pa_stk sp0 10%nat ↦₈[kt] (m !!! Regidx Rs8) ∗
+     pa_stk sp0 11%nat ↦₈[kt] (m !!! Regidx Rs9) ∗
+     pa_stk sp0 12%nat ↦₈[kt] (m !!! Regidx Rs10))%I.
 
   (* slot 13 as BYTES (the 1-byte local [ch] is its byte 7) plus the untouched
      slot 14.  The 8-alignment of slot 13 rides along: a byte run does not
      carry it and the [c.addi16sp] pop needs the slot to be a word again. *)
   Definition pw_chslot (sp0 : mword 64) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr (pa_stk sp0 13%nat)) 8 = true⌝ ∗
-     bytes_own (DfracOwn 1) (pa_stk sp0 13%nat) 8 ∗
-     (∃ v : bv 64, pa_stk sp0 14%nat ↦₈ v))%I.
+     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 13%nat) 8 ∗
+     (∃ v : bv 64, pa_stk sp0 14%nat ↦₈[kt] v))%I.
 
   (* Constructor for [pw_chslot], proved HERE where the context is just [sp0]
      -- so the [done] on the pure alignment conjunct runs in a 1-hypothesis
@@ -536,8 +536,8 @@ Section PwPieces.
      in [wp_pipewrite] call this instead of unfolding [pw_chslot] in place. *)
   Lemma pw_chslot_mk (sp0 : mword 64) :
     is_aligned_paddr (Physaddr (pa_stk sp0 13%nat)) 8 = true ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 13%nat) 8 -∗
-    (∃ v : bv 64, pa_stk sp0 14%nat ↦₈ v) -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 13%nat) 8 -∗
+    (∃ v : bv 64, pa_stk sp0 14%nat ↦₈[kt] v) -∗
     pw_chslot sp0.
   Proof.
     intros Hal. rewrite /pw_chslot. iIntros "Hb Hv". iSplitR; [done|]. iFrame.
@@ -550,8 +550,8 @@ Section PwPieces.
   Lemma pw_hi_split (sp0 : mword 64) :
     stack_own (KTR := kt) (pa_stk sp0 7%nat) 7%nat ⊢
       (∃ w8 w9 w10 w11 w12 : bv 64,
-         pa_stk sp0 8%nat ↦₈ w8 ∗ pa_stk sp0 9%nat ↦₈ w9 ∗ pa_stk sp0 10%nat ↦₈ w10 ∗
-         pa_stk sp0 11%nat ↦₈ w11 ∗ pa_stk sp0 12%nat ↦₈ w12) ∗ pw_chslot sp0.
+         pa_stk sp0 8%nat ↦₈[kt] w8 ∗ pa_stk sp0 9%nat ↦₈[kt] w9 ∗ pa_stk sp0 10%nat ↦₈[kt] w10 ∗
+         pa_stk sp0 11%nat ↦₈[kt] w11 ∗ pa_stk sp0 12%nat ↦₈[kt] w12) ∗ pw_chslot sp0.
   Proof.
     assert (E8  : pa_stk (pa_stk sp0 7%nat) 1%nat = pa_stk sp0 8%nat)  by (apply pw_slot_eq; reflexivity).
     assert (E9  : pa_stk (pa_stk sp0 7%nat) 2%nat = pa_stk sp0 9%nat)  by (apply pw_slot_eq; reflexivity).
@@ -576,8 +576,8 @@ Section PwPieces.
   Qed.
 
   Lemma pw_hi_intro (sp0 : mword 64) (w8 w9 w10 w11 w12 : bv 64) :
-    pa_stk sp0 8%nat ↦₈ w8 -∗ pa_stk sp0 9%nat ↦₈ w9 -∗ pa_stk sp0 10%nat ↦₈ w10 -∗
-    pa_stk sp0 11%nat ↦₈ w11 -∗ pa_stk sp0 12%nat ↦₈ w12 -∗
+    pa_stk sp0 8%nat ↦₈[kt] w8 -∗ pa_stk sp0 9%nat ↦₈[kt] w9 -∗ pa_stk sp0 10%nat ↦₈[kt] w10 -∗
+    pa_stk sp0 11%nat ↦₈[kt] w11 -∗ pa_stk sp0 12%nat ↦₈[kt] w12 -∗
     pw_chslot sp0 -∗ stack_own (KTR := kt) (pa_stk sp0 7%nat) 7%nat.
   Proof.
     assert (E8  : pa_stk (pa_stk sp0 7%nat) 1%nat = pa_stk sp0 8%nat)  by (apply pw_slot_eq; reflexivity).

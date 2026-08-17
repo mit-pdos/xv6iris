@@ -316,7 +316,7 @@ Section ProofInitsleeplock.
       by (rewrite Hils2 HA7s2; apply add_vec_zero_l).
     (* ===== the three struct stores ===== *)
     (* +0x1e sd s2,32(s1)  (lk->name := name) *)
-    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x1e)) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x20 : mword 12)
+    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initsleeplock + 0x1e)) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x20 : mword 12)
               mil (av - 4)%nat vname b with "Hcg Hpc Hi1e [Hnamefield]").
     { iEval (rgne; rewrite Hmils1). unfold sl_name_field. iExact "Hnamefield". }
     iIntros (CID14 Hs14) "Hcg Hpc Hnamefield".
@@ -324,7 +324,7 @@ Section ProofInitsleeplock.
     assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
     (* +0x22 sw zero,0(s1)  (lk->locked := 0) *)
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x22)) (mword_of_int 9 : mword 5) (mword_of_int 0x0 : mword 12)
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initsleeplock + 0x22)) (mword_of_int 9 : mword 5) (mword_of_int 0x0 : mword 12)
               mil (av - 4)%nat vlocked b with "Hcg Hpc Hi22 [Hlocked]").
     { iEval (rgne; rewrite Hmils1 addv_sext0). iExact "Hlocked". }
     iIntros (CID15 Hs15) "Hcg Hpc Hlocked".
@@ -332,7 +332,7 @@ Section ProofInitsleeplock.
     assert (Hpc26 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
     (* +0x26 sw zero,40(s1)  (lk->pid := 0) *)
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x26)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12)
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initsleeplock + 0x26)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12)
               mil (av - 4)%nat vpid b with "Hcg Hpc Hi26 [Hpid]").
     { iEval (rgne; rewrite Hmils1). unfold sl_pid. iExact "Hpid". }
     iIntros (CID16 Hs16) "Hcg Hpc Hpid".

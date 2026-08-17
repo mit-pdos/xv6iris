@@ -104,8 +104,8 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
 
 Module Type REPARENT.
   Parameter wp_reparent_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (m : regfile) (γs : list gname) (pme ip : mword 64)
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+       (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
       wp_reparent_sconf_body kt m γs pme ip ps dqi lvl K eb b lks.
 End REPARENT.

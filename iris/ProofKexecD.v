@@ -764,7 +764,7 @@ Section KexecDCommit.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 last (pa_add av (8 * c))
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
@@ -2087,7 +2087,7 @@ Section KexecDMain.
        arms of the [beqz] below *)
     iAssert (∀ (last : mword 64),
                word_pointsto (pa_stk sp0 66) (DfracOwn 1) last -∗
-               ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+               ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[kt] pfun k) -∗
                kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
                        used2 plen pfun na avf aslen afun pidv
                        (upd_tf V (<[tf_arg_idx 1

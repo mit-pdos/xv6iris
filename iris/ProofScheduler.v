@@ -312,7 +312,7 @@ Section ProofScheduler.
      ProofDirlookup's file header records a 13-line body ruled the same
      way. *)
 
-  Definition sc_tail_body (γs : list gname) (av : nat) : iProp Σ :=
+  Definition sc_tail_body {kt : ktier} (γs : list gname) (av : nat) : iProp Σ :=
     (∀ (jj : nat) (γl : gname) (Mt : regfile) (ebx : bool) (n : nat),
         ⌜(jj < NPROC)%nat⌝ -∗ ⌜γs !! jj = Some γl⌝ -∗
         (* [n] is the index the tail RETURNS at, i.e. the index that goes with
@@ -737,7 +737,7 @@ Section ProofScheduler.
        invariant and no lock holds a fraction of it -- so [IntrDefs.cpu_cells]
        carries the WHOLE cell and the store neither opens anything nor
        changes the mask. *)
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.scheduler + 0x2a))
+    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.scheduler + 0x2a))
               Ra4 (mword_of_int 48 : mword 12)
               A7 (av - 10)%nat zero_reg false
               with "Hcg Hpc Hi2a [Hproc]").
@@ -1175,7 +1175,7 @@ Section ProofScheduler.
       (* the claim half of [arm_pay] is dropped: the scheduler runs at
          [c->proc == 0], so what it owes back at the next intr_on is the IDLE
          claim, which [cpu_claim_idle] re-mints for free. *)
-      iAssert trap_csrs kt with "[Hcsrs Hpay]" as "Hcsrs".
+      iAssert (trap_csrs kt) with "[Hcsrs Hpay]" as "Hcsrs".
       { destruct ebc; [ iDestruct "Hpay" as "[$ _]" | iExact "Hcsrs" ]. }
       (* the callee-saved pins survive acquire *)
       assert (Hmq : forall c : mword 5, is_cs_idx c = true -> macq !!! Regidx c = M !!! Regidx c).

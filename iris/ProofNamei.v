@@ -153,10 +153,10 @@ Section ProofNameiMain.
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)
 
   Lemma nam_slots_bytes (sp0 : mword 64) (w1 w2 : bv 64) :
-    (pa_stk sp0 4) ↦₈ w1 -∗ (pa_stk sp0 3) ↦₈ w2 -∗
+    (pa_stk sp0 4) ↦₈[kt] w1 -∗ (pa_stk sp0 3) ↦₈[kt] w2 -∗
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 4)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 3)) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 4) 16.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 4) 16.
   Proof.
     assert (E1 : pa_add (pa_stk sp0 4) 8 = pa_stk sp0 3)
       by (rewrite (pa_stk_next sp0 4 ltac:(lia)); reflexivity).
@@ -171,8 +171,8 @@ Section ProofNameiMain.
   Lemma nam_bytes_slots (sp0 : mword 64) :
     is_aligned_paddr (Physaddr (pa_stk sp0 4)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 3)) 8 = true ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 4) 16 ⊢
-    ∃ w1 w2 : bv 64, (pa_stk sp0 4) ↦₈ w1 ∗ (pa_stk sp0 3) ↦₈ w2.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 4) 16 ⊢
+    ∃ w1 w2 : bv 64, (pa_stk sp0 4) ↦₈[kt] w1 ∗ (pa_stk sp0 3) ↦₈[kt] w2.
   Proof.
     intros Ha1 Ha2.
     assert (E1 : pa_add (pa_stk sp0 4) 8 = pa_stk sp0 3)
@@ -185,12 +185,12 @@ Section ProofNameiMain.
   Qed.
 
   Lemma nam_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (DfracOwn 1) a N ⊢
+    bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
   Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
 
   Lemma nam_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a N.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
 
   (* 16 = 14 + 2: namex writes at most fourteen; the two above ride through *)
@@ -206,7 +206,7 @@ Section ProofNameiMain.
   Lemma nam_buf_join (a : mword 64) (f nf : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ nf j) -∗
     ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ f (14 + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 16.
+    bytes_own (KTR := kt) (DfracOwn 1) a 16.
   Proof.
     iIntros "H1 H2".
     iDestruct (nam_name_bytes a 14 nf with "H1") as "B1".

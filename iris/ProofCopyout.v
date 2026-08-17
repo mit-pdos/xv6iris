@@ -340,7 +340,7 @@ Section ProofCopyout.
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* +0x82 c.ld a5,0(a0) *)
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.copyout + 0x82)) Ra5 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.copyout + 0x82)) Ra5 Ra0
               (mword_of_int 0 : mword 12) mw n w0 b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi82 [Hcell]").
@@ -431,7 +431,7 @@ Section ProofCopyout.
      continuations, named so the walk's proofmode steps stop re-embedding
      ~30 lines of ∀/wands per step.  Transparent on purpose; the ∀ binders
      stay visible at each [iAssert]. *)
-  Definition co_tail_body
+  Definition co_tail_body {kt : ktier}
       (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (lks : gset string)
       (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
       (rem done len : nat) (src_bytes : nat -> bv 8)

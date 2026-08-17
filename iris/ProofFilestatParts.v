@@ -200,6 +200,9 @@ Proof. intro Hj. apply nth_byte_assemble_len; cbn [length]; lia. Qed.
 
 Section FilestatParts.
   Context `{!riscvGS Σ}.
+  (* tier-generic: these are byte-arithmetic facts about a stack buffer,
+     so they ride the ambient tier and a [kt]-file instantiates them at [kt]. *)
+  Context `{KTR : !CurKtier}.
 
   Lemma fst_bytes_w4 (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 4 = true ->
@@ -646,7 +649,7 @@ Section ProofFilestatParts.
      route is to peel the twenty-four existentials and read the function off
      the resulting list -- no [big_sepL_exist] and no list/function bridge. *)
   Lemma fst_bytes_name24 (a : Arch.pa) :
-    bytes_own (DfracOwn 1) a 24 ⊢
+    bytes_own (KTR := kt) (DfracOwn 1) a 24 ⊢
     ∃ f : nat -> bv 8, ([∗ list] j ∈ seq 0 24, (pa_add a j) ↦ₘ f j).
   Proof.
     rewrite /bytes_own. cbn [seq].

@@ -117,12 +117,12 @@ Section ProofFreerange.
     sie_cap_gpr kt Me (K - 6) b pcur -∗
     cpu_own ncnt eb pcur b lks -∗
     pc_is (mword_of_int (KernelSyms.freerange + 0x3e)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-    (∃ v : mword 64, (pa_stk sp0 4) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 5) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+    (∃ v : mword 64, (pa_stk sp0 4) ↦₈[kt] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 5) ↦₈[kt] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[kt] v) -∗
     kalloc_avail γk onf -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mr,
@@ -618,12 +618,12 @@ Section ProofFreerange.
         pc_is (CID:=CID0) (mword_of_int (KernelSyms.freerange + 0x2a)) -∗
         ([∗ list] p ∈ qs, page_own p) -∗
         kalloc_avail γk on -∗
-        (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-        (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-        (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-        (pa_stk sp0 4) ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5) : mword 64) -∗
-        (pa_stk sp0 5) ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5) : mword 64) -∗
-        (pa_stk sp0 6) ↦₈ (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
+        (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+        (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+        (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+        (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5) : mword 64) -∗
+        (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5) : mword 64) -∗
+        (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
         wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
           ∀ mr, sie_cap_gpr kt mr K b pcur -∗
           cpu_own ncnt eb pcur b lks -∗

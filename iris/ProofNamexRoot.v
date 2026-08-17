@@ -414,7 +414,7 @@ Section ProofNamexRoot.
     assert (HR5a0 : R5 !!! Regidx Ra0 = pv).
     { rewrite /R5 upd_ne; [| nz]. rewrite /R4 upd_ne; [| nz].
       rewrite /R3 upd_ne; [exact HR2a0 | nz]. }
-    iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x22)) Ra4 Ra0
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0x22)) Ra4 Ra0
               (mword_of_int 0 : mword 12) R5 (K - 12)%nat SLASH b (dqm := dqp)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi022 [Hp0]").
     { iEval (rgne; rewrite HR5a0 addv_sext0). iExact "Hp0". }
@@ -698,7 +698,7 @@ Section ProofNamexRoot.
     iIntros (CIDK5 HqK5). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt0f4) in "Hpc".
     (* ===== +0x0f4 lbu a5,0(s1) : path[0] again ===== *)
-    iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xf4)) Ra5 Rs1
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xf4)) Ra5 Rs1
               (mword_of_int 0 : mword 12) A8 (K - 12)%nat SLASH b (dqm := dqp)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0f4 [Hp0]").
     { iEval (rgne; rewrite HA8s1 addv_sext0). iExact "Hp0". }
@@ -742,7 +742,7 @@ Section ProofNamexRoot.
                      = mword_of_int (NX + 0xfe)) by pcw.
     iEval (rewrite Hpp0fe) in "Hpc".
     (* ===== +0x0fe lbu a5,0(s1) : path[1], the terminator ===== *)
-    iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xfe)) Ra5 Rs1
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xfe)) Ra5 Rs1
               (mword_of_int 0 : mword 12) Q1 (K - 12)%nat NUL b (dqm := dqp)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0fe [Hp1]").
     { iEval (rgne; rewrite HQ1s1 addv_sext0). iExact "Hp1". }

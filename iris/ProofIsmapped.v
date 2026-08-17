@@ -98,8 +98,8 @@ Section IsmappedEpi.
       sie_cap_gpr kt M (K - 2)%nat b p -∗
       pc_is (mword_of_int (KernelSyms.ismapped + 0x14) : mword 64) -∗
       ptree_own 2 dq t -∗
-      pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-      pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
+      pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+      pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
       ⌜ (M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0 /\ m !! vpn = None)
         \/ (exists w, m !! vpn = Some w /\
              M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 1) ⌝ -∗
@@ -435,7 +435,7 @@ Section ProofIsmapped.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.ismapped + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ismapped + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12)
               mw (K - 2)%nat w0 b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)

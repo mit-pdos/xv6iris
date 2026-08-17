@@ -152,30 +152,30 @@ Section CwBodies.
 
   (* ra / s0 / s1, saved unconditionally by the prologue *)
   Definition cw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1))%I.
+    (pa_stk sp0 1 ↦₈[kt] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[kt] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[kt] (m0 !!! Regidx Rs1))%I.
 
   (* s2..s10, saved only on the [n > 0] path (slots 4..12) *)
   Definition cw_spill (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 4  ↦₈ (m0 !!! Regidx Rs2) ∗
-     pa_stk sp0 5  ↦₈ (m0 !!! Regidx Rs3) ∗
-     pa_stk sp0 6  ↦₈ (m0 !!! Regidx Rs4) ∗
-     pa_stk sp0 7  ↦₈ (m0 !!! Regidx Rs5) ∗
-     pa_stk sp0 8  ↦₈ (m0 !!! Regidx Rs6) ∗
-     pa_stk sp0 9  ↦₈ (m0 !!! Regidx Rs7) ∗
-     pa_stk sp0 10 ↦₈ (m0 !!! Regidx Rs8) ∗
-     pa_stk sp0 11 ↦₈ (m0 !!! Regidx Rs9) ∗
-     pa_stk sp0 12 ↦₈ (m0 !!! Regidx Rs10))%I.
+    (pa_stk sp0 4  ↦₈[kt] (m0 !!! Regidx Rs2) ∗
+     pa_stk sp0 5  ↦₈[kt] (m0 !!! Regidx Rs3) ∗
+     pa_stk sp0 6  ↦₈[kt] (m0 !!! Regidx Rs4) ∗
+     pa_stk sp0 7  ↦₈[kt] (m0 !!! Regidx Rs5) ∗
+     pa_stk sp0 8  ↦₈[kt] (m0 !!! Regidx Rs6) ∗
+     pa_stk sp0 9  ↦₈[kt] (m0 !!! Regidx Rs7) ∗
+     pa_stk sp0 10 ↦₈[kt] (m0 !!! Regidx Rs8) ∗
+     pa_stk sp0 11 ↦₈[kt] (m0 !!! Regidx Rs9) ∗
+     pa_stk sp0 12 ↦₈[kt] (m0 !!! Regidx Rs10))%I.
 
   (* everything below the three unconditional saves, as WORDS -- what the
      pop needs.  Slots 4..16. *)
   Definition cw_rest (sp0 : mword 64) : iProp Σ :=
-    ([∗ list] k ∈ seq 4 13, ∃ w : mword 64, pa_stk sp0 k ↦₈ w)%I.
+    ([∗ list] k ∈ seq 4 13, ∃ w : mword 64, pa_stk sp0 k ↦₈[kt] w)%I.
 
   (* ...and the same region with its four lowest slots carved into bytes *)
   Definition cw_buf (sp0 : mword 64) : iProp Σ :=
-    bytes_own (DfracOwn 1) (pa_stk sp0 16) 32.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 16) 32.
 
   Lemma cw_frame_back (sp0 : mword 64) (m0 : regfile) :
     cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own (KTR := kt) sp0 16.
@@ -192,7 +192,7 @@ Section CwBodies.
      alignment facts are the ones the prologue's carve handed out. *)
   Lemma cw_buf_slots (sp0 : mword 64) :
     (forall i, (i < 4)%nat -> is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
-    cw_buf sp0 ⊢ [∗ list] i ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - i) ↦₈ w.
+    cw_buf sp0 ⊢ [∗ list] i ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - i) ↦₈[kt] w.
   Proof.
     intro Hal. rewrite /cw_buf.
     change 32%nat with (8 * 4)%nat.
@@ -1974,7 +1974,7 @@ Section CwBodies.
         rewrite /G2 upd_ne; [| reg_neq]. rewrite /G1 upd_ne; [| reg_neq].
         apply HA1cs; reg_neq. }
       (* the four lowest slots become the 32-byte bounce buffer *)
-      iAssert ([∗ list] k ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - k) ↦₈ w)%I
+      iAssert ([∗ list] k ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - k) ↦₈[kt] w)%I
         with "[F13 F14 F15 F16]" as "Hbs".
       { cbn [seq]. iFrame "F16 F15 F14 F13". all: try done. }
       iDestruct (slotsn_bytes_own sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".

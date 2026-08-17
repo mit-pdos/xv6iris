@@ -284,7 +284,7 @@ Section ProofAllocpid.
     iPoseProof (apdi_1e with "Htext") as "Hi1e".
     assert (Hnaddr : add_vec (B2 !!! Regidx ai_a5) (sign_extend' 64 (mword_of_int 0 : mword 12)) = alp_nextpid)
       by (rewrite HB2a5; apply addv_sext0).
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.allocpid + 0x1e)) ai_s1 ai_a5
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.allocpid + 0x1e)) ai_s1 ai_a5
               (mword_of_int 0 : mword 12) B2 (trap_res b + (av - 4))%nat (nv : mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hnp]").
@@ -319,7 +319,7 @@ Section ProofAllocpid.
     iPoseProof (apdi_24 with "Htext") as "Hi24".
     assert (Hnaddr2 : add_vec (B4 !!! Regidx ai_a5) (sign_extend' 64 (mword_of_int 0 : mword 12)) = alp_nextpid)
       by (rewrite HB4a5; apply addv_sext0).
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.allocpid + 0x24)) ai_a4 ai_a5
+    iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.allocpid + 0x24)) ai_a4 ai_a5
               (mword_of_int 0 : mword 12) B4 (trap_res b + (av - 4))%nat (nv : mword 32) false
               with "Hcg Hpc Hi24 [Hnp]").
     { iEval (rgne; rewrite Hnaddr2). iExact "Hnp". }

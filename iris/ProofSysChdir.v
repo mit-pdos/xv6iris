@@ -350,11 +350,11 @@ Section ProofSysChdirFrame.
     stack_own (KTR := kt) sp0 20 -∗
     ⌜forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true⌝ ∗
-    (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 3) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 4) ↦₈ w) ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 20) 128.
+    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[kt] w) ∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 20) 128.
   Proof.
     iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
@@ -380,9 +380,9 @@ Section ProofSysChdirFrame.
   Lemma sc_frame_join (sp0 : mword 64) (w1 w2 w3 w4 : mword 64) :
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true) ->
-    (pa_stk sp0 1) ↦₈ w1 -∗ (pa_stk sp0 2) ↦₈ w2 -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗ (pa_stk sp0 4) ↦₈ w4 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 20) 128 -∗
+    (pa_stk sp0 1) ↦₈[kt] w1 -∗ (pa_stk sp0 2) ↦₈[kt] w2 -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗ (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 20) 128 -∗
     stack_own (KTR := kt) sp0 20.
   Proof.
     intro Hal. iIntros "H1 H2 H3 H4 Hb".
@@ -410,12 +410,12 @@ Section ProofSysChdirFrame.
   (* the buffer, named as bytes and back: namei / argstr both speak the
      [seq]-indexed byte window, not [bytes_own] *)
   Lemma sc_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (DfracOwn 1) a N ⊢
+    bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
   Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
 
   Lemma sc_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a N.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
 
   (* 128 = (k+1) + (127-k): namei reads the NUL-terminated prefix, the rest
@@ -437,7 +437,7 @@ Section ProofSysChdirFrame.
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
        pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 128.
+    bytes_own (KTR := kt) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
     iDestruct (sc_name_bytes a (S k) f with "H1") as "B1".
@@ -490,11 +490,11 @@ Section ProofSysChdirEpilogue.
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true) ->
     sie_cap_gpr kt M (K - 20) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SC + 0x5c)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ bf jj) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ[kt] bf jj) -∗
     (* THE INDEX IS [b], NOT [true], and it has to be: the epilogue is five
        PLAIN instructions, so every crossing it makes is a [b]-link and the
        [b]-form chain is what it can hand back.  Stated at [true] the caller
@@ -733,11 +733,11 @@ Section ProofSysChdirM1Tail.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ bf jj) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ[kt] bf jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗

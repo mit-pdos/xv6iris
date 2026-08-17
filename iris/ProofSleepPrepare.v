@@ -285,7 +285,7 @@ Section ProofSleepPrepare.
     assert (Hsaddr : add_vec (macq !!! Regidx spr_s2) (sign_extend' 64 (mword_of_int 32 : mword 12))
                      = p_chan (proc_addr j))
       by (rewrite Hmacq_s2; apply spr_chan_off).
-    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x1a)) spr_s1 spr_s2
+    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sleep_prepare + 0x1a)) spr_s1 spr_s2
               (mword_of_int 32 : mword 12) macq (trap_res b + (av - 4))%nat ch false
               with "Hcg Hpc Hi1a [Hchcell]").
     { iEval (rgne; rewrite Hsaddr). iExact "Hchcell". }

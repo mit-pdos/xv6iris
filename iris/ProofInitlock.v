@@ -158,7 +158,7 @@ Section ProofInitlock.
     assert (Hea_name : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))) = c_name).
     { intros CID'. rgne. rewrite HR2a0. unfold c_name, lock_name_field. f_equal; apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.initlock + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) R2 (K - 2)%nat vname b
               with "Hcg Hpc Hi08 [Hname]").
     { iEval (rewrite Hea_name). iExact "Hname". }
@@ -178,7 +178,7 @@ Section ProofInitlock.
     assert (Hea_lock : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lk).
     { intros CID'. rgne. rewrite HR2a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initlock + 0x0a)) (mword_of_int 10 : mword 5)
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x0a)) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12) R2 (K - 2)%nat vlock b
               with "Hcg Hpc Hi0a [Hlock]").
     { iEval (rewrite Hea_lock). iExact "Hlock". }
@@ -190,7 +190,7 @@ Section ProofInitlock.
     assert (Hea_cpu : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x10 : mword 12)) = c_cpu).
     { intros CID'. rgne. rewrite HR2a0. reflexivity. }
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.initlock + 0x0e)) (mword_of_int 10 : mword 5)
+    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x0e)) (mword_of_int 10 : mword 5)
               (mword_of_int 0x10 : mword 12) R2 (K - 2)%nat vcpu b
               with "Hcg Hpc Hi0e [Hcpu]").
     { iEval (rewrite Hea_cpu). iExact "Hcpu". }

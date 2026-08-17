@@ -395,10 +395,10 @@ Section VtPrologue.
         locked γk cpu_id -∗ disk_res γd pd pav pu -∗
         cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay kt n eb pme -∗
         (* the frame: ra/s0/s1's entry values and the unused fourth slot *)
-        pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
-        pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
-        pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗
-        (∃ vg : mword 64, pa_stk sp0 4 ↦₈ vg) -∗
+        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx ra_idx) -∗
+        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx s0_idx) -∗
+        pa_stk sp0 3 ↦₈[kt] (m !!! Regidx s1_idx) -∗
+        (∃ vg : mword 64, pa_stk sp0 4 ↦₈[kt] vg) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -662,10 +662,10 @@ Section VtEpilogue.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
     cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay kt n eb pme -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗
-    (∃ vg : mword 64, pa_stk sp0 4 ↦₈ vg) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx ra_idx) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx s0_idx) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx s1_idx) -∗
+    (∃ vg : mword 64, pa_stk sp0 4 ↦₈[kt] vg) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ MF : regfile,
         ⌜ callee_saved m MF ⌝ -∗

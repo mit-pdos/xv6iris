@@ -78,8 +78,8 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
 
 Module Type WALK.
   Parameter wp_walk_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_walk_sconf_body kt γa mm t m K lvl eb p on b lks.
 End WALK.
 

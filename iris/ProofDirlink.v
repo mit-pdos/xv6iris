@@ -609,10 +609,10 @@ Section DlBuf.
   (* the two frame slots the [de] occupies (10 and 9), carved into sixteen
      named bytes and put back *)
   Lemma dl_slots_bytes (sp0 : Arch.pa) (w1 w2 : bv 64) :
-    (pa_stk sp0 10) ↦₈ w1 -∗ (pa_stk sp0 9) ↦₈ w2 -∗
+    (pa_stk sp0 10) ↦₈[kt] w1 -∗ (pa_stk sp0 9) ↦₈[kt] w2 -∗
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 10) 16.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 10) 16.
   Proof.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
@@ -627,8 +627,8 @@ Section DlBuf.
   Lemma dl_bytes_slots (sp0 : Arch.pa) :
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 10) 16 ⊢
-    ∃ w1 w2 : bv 64, (pa_stk sp0 10) ↦₈ w1 ∗ (pa_stk sp0 9) ↦₈ w2.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 10) 16 ⊢
+    ∃ w1 w2 : bv 64, (pa_stk sp0 10) ↦₈[kt] w1 ∗ (pa_stk sp0 9) ↦₈[kt] w2.
   Proof.
     intros Ha1 Ha2.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
@@ -1048,15 +1048,15 @@ Section ProofDirlinkMain.
        ⌜dl_tregs m sp0 Mt⌝ -∗
        sie_cap_gpr kt Mt (K - 10)%nat b (proc_addr j) -∗
        pc_is (mword_of_int (DK + 0x9c)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ w3 -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ w5 -∗
-       (pa_stk sp0 6) ↦₈ w6 -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dnew jj) -∗
+       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[kt] w3 -∗
+       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[kt] w5 -∗
+       (pa_stk sp0 6) ↦₈[kt] w6 -∗
+       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] dnew jj) -∗
        wp_next (CID0 := CIDt) true (proc_addr j) (fun CIDf : CpuId =>
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
@@ -1085,15 +1085,15 @@ Section ProofDirlinkMain.
        sie_cap_gpr kt Mp (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (DK + 0x70)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ w5 -∗
-       (pa_stk sp0 6) ↦₈ w6 -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dolz jj) -∗
+       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[kt] w5 -∗
+       (pa_stk sp0 6) ↦₈[kt] w6 -∗
+       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] dolz jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        i_inum ip ↦₄{dqf} dinum -∗
        inode_meta ip dn -∗
@@ -1200,15 +1200,15 @@ Section ProofDirlinkMain.
        sie_cap_gpr kt Ml (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (DK + 0x30)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dol jj) -∗
+       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] dol jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        i_inum ip ↦₄{dqf} dinum -∗
        inode_meta ip dn -∗
@@ -2195,7 +2195,7 @@ Section ProofDirlinkMain.
         (* ---- the sixteen bytes ARE [dirent_bytes (de_of_name inum s)] ---- *)
         iDestruct (word2_pointsto_bytes with "Hdehi") as "Hdehi".
         iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
-                   ↦ₘ (dirent_bytes (de_of_name inum s) !!! jj))%I
+                   ↦ₘ[kt] (dirent_bytes (de_of_name inum s) !!! jj))%I
           with "[Hdehi Hdenm]" as "Hsrc".
         { rewrite (dlk_de_split (pa_stk sp0 10)
                      (fun jj => dirent_bytes (de_of_name inum s) !!! jj)).
@@ -3181,7 +3181,7 @@ Section ProofDirlinkMain.
             iApply bi.later_intro. iIntros (CIDB9 HqB9) "Hcg Hpc".
             iEval (rewrite Htgt6c) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[kt] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dl_de_view data i (pa_stk sp0 10)
                                 (dlk_align_8_2 _ Hal10))).
@@ -3266,7 +3266,7 @@ Section ProofDirlinkMain.
                             = mword_of_int (DK + 0x48)) by pcw.
             iEval (rewrite Hbb48) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[kt] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dl_de_view data i (pa_stk sp0 10)
                                 (dlk_align_8_2 _ Hal10))).

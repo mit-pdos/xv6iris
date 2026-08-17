@@ -55,14 +55,14 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap M)) ⌝ -∗
       sie_cap_gpr kt M (K - 8) b p -∗
       pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
-      wk_fcell spF 7 ↦₈ (m !!! Regidx (mword_of_int 1)) -∗
-      wk_fcell spF 6 ↦₈ (m !!! Regidx (mword_of_int 8)) -∗
-      wk_fcell spF 5 ↦₈ (m !!! Regidx (mword_of_int 9)) -∗
-      wk_fcell spF 4 ↦₈ (m !!! Regidx (mword_of_int 18)) -∗
-      wk_fcell spF 3 ↦₈ (m !!! Regidx (mword_of_int 19)) -∗
-      wk_fcell spF 2 ↦₈ (m !!! Regidx (mword_of_int 20)) -∗
-      wk_fcell spF 1 ↦₈ (m !!! Regidx (mword_of_int 21)) -∗
-      wk_fcell spF 0 ↦₈ vpad -∗
+      wk_fcell spF 7 ↦₈[kt] (m !!! Regidx (mword_of_int 1)) -∗
+      wk_fcell spF 6 ↦₈[kt] (m !!! Regidx (mword_of_int 8)) -∗
+      wk_fcell spF 5 ↦₈[kt] (m !!! Regidx (mword_of_int 9)) -∗
+      wk_fcell spF 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18)) -∗
+      wk_fcell spF 3 ↦₈[kt] (m !!! Regidx (mword_of_int 19)) -∗
+      wk_fcell spF 2 ↦₈[kt] (m !!! Regidx (mword_of_int 20)) -∗
+      wk_fcell spF 1 ↦₈[kt] (m !!! Regidx (mword_of_int 21)) -∗
+      wk_fcell spF 0 ↦₈[kt] vpad -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -74,9 +74,9 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
   (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
   sie_cap_gpr kt M (K - 8) b p -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
-  wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗
-  wk_fcell spF 4 ↦₈ vs2 -∗ wk_fcell spF 3 ↦₈ vs3 -∗ wk_fcell spF 2 ↦₈ vs4 -∗
-  wk_fcell spF 1 ↦₈ vs5 -∗ wk_fcell spF 0 ↦₈ vpad -∗
+  wk_fcell spF 7 ↦₈[kt] vra -∗ wk_fcell spF 6 ↦₈[kt] vs0 -∗ wk_fcell spF 5 ↦₈[kt] vs1 -∗
+  wk_fcell spF 4 ↦₈[kt] vs2 -∗ wk_fcell spF 3 ↦₈[kt] vs3 -∗ wk_fcell spF 2 ↦₈[kt] vs4 -∗
+  wk_fcell spF 1 ↦₈[kt] vs5 -∗ wk_fcell spF 0 ↦₈[kt] vpad -∗
   wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
       ⌜ Mf !!! Regidx (mword_of_int 1)  = vra

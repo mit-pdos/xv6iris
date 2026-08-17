@@ -159,9 +159,9 @@ Section ProofBrelse.
     pc_is pc -∗
     instr pc true (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 64,
-       add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) ↦₈ vold ∗
+       add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) ↦₈[kt] vold ∗
        (add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000")))
-          ↦₈ (rget m0 rs2) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
+          ↦₈[kt] (rget m0 rs2) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     wp_next b pme (fun (CID : CpuId) =>
       sie_cap_gpr kt m0 av b pme -∗
       pc_is (add_vec_int pc 2) -∗
@@ -270,10 +270,10 @@ Section ProofBrelse.
     bcache_res bn V -∗
     cpu_own 1%nat eb p false ({["bcache"]} ∪ lks) -∗
     arm_pay kt 0%nat eb p -∗
-    pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
-    pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx Rs1) -∗
-    pa_stk (m !!! Regidx csp_rs1) 4 ↦₈ (m !!! Regidx Rs2) -∗
+    pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+    pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+    pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
+    pa_stk (m !!! Regidx csp_rs1) 4 ↦₈[kt] (m !!! Regidx Rs2) -∗
     wp_next eb p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -634,7 +634,7 @@ Section ProofBrelse.
               R1 (K - 4)%nat
               ((add_vec (R1 !!! Regidx csp_rs1)
                   (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
-                 ↦₈ (R1 !!! Regidx Rra)) ∗
+                 ↦₈[kt] (R1 !!! Regidx Rra)) ∗
                (∃ q : Qp, bref_tok bn k q ∗
                   b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
                   b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗ bown bn k))%I

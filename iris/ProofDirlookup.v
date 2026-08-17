@@ -290,17 +290,17 @@ Section ProofDirlookupMain.
        ⌜dlk_tregs m sp0 Mt⌝ -∗
        sie_cap_gpr kt Mt (K - 12)%nat b pj -∗
        pc_is (mword_of_int (DL + 0x96)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-       (pa_stk sp0 10) ↦₈ uu10 -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dnew jj) -∗
+       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈[kt] uu10 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[kt] dnew jj) -∗
        wp_next (CID0 := CIDt) true pj (fun CIDf : CpuId =>
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
@@ -367,17 +367,17 @@ Section ProofDirlookupMain.
        sie_cap_gpr kt Ml (K - 12)%nat b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is (mword_of_int (DL + 0x5c)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-       (pa_stk sp0 10) ↦₈ mt10 -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol jj) -∗
+       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈[kt] mt10 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[kt] dol jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
@@ -407,17 +407,17 @@ Section ProofDirlookupMain.
        sie_cap_gpr kt Mp (K - 12)%nat b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is (mword_of_int (DL + 0x52)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-       (pa_stk sp0 10) ↦₈ mt10' -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol' jj) -∗
+       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈[kt] mt10' -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[kt] dol' jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
@@ -1774,7 +1774,7 @@ Section ProofDirlookupMain.
           iNext. iIntros (CIDB9 HqB9) "Hcg Hpc".
           iEval (rewrite Htgt52) in "Hpc".
           iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
-                     ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                     ↦ₘ[kt] file_byte data (16 * i + jj)%nat)%I
             with "[Hdehi Hdenm]" as "Hde".
           { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                               (dlk_align_8_2 _ Hal12))).
@@ -2118,7 +2118,7 @@ Section ProofDirlookupMain.
             iEval (rewrite Htgt96b) in "Hpc".
             (* the de buffer goes back to sixteen raw bytes for the tail *)
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[kt] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                                 (dlk_align_8_2 _ Hal12))).
@@ -2154,7 +2154,7 @@ Section ProofDirlookupMain.
             iNext. iIntros (CIDB13 HqB13) "Hcg Hpc".
             iEval (rewrite Htgt52b) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[kt] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                                 (dlk_align_8_2 _ Hal12))).

@@ -553,7 +553,7 @@ Section ProofPipeclose.
       assert (Hroaddr : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 544 : mword 12)) = a_popen pi false)
         by (rgne; rewrite Hs1M; reflexivity).
       iPoseProof (pci_24 with "Htext") as "Hi24".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.pipeclose + 0x24)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipeclose + 0x24)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (mword_of_int 544 : mword 12) M (trap_res b + (av - 4))%nat ro false ltac:(nz) ltac:(rdok)
                 with "Hcg Hpc Hi24 [Hro]").
       { iEval (rewrite Hroaddr). iExact "Hro". }
@@ -596,7 +596,7 @@ Section ProofPipeclose.
       assert (Hwoaddr1 : add_vec (rget J1 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 548 : mword 12)) = a_popen pi true)
         by (rgne; rewrite Hs1J1; reflexivity).
       iPoseProof (pci_2a with "Htext") as "Hi2a".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.pipeclose + 0x2a)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipeclose + 0x2a)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (mword_of_int 548 : mword 12) J1 (trap_res b + (av - 4))%nat wo false ltac:(nz) ltac:(rdok)
                 with "Hcg Hpc Hi2a [Hwo]").
       { iEval (rewrite Hwoaddr1). iExact "Hwo". }
@@ -801,7 +801,7 @@ Section ProofPipeclose.
       assert (Hwoaddr : add_vec (rget M0 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 548 : mword 12)) = a_popen pi true)
         by (rgne; rewrite Hs1M0; reflexivity).
       iPoseProof (pci_18 with "Htext") as "Hi18".
-      iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.pipeclose + 0x18)) (mword_of_int 9 : mword 5)
+      iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipeclose + 0x18)) (mword_of_int 9 : mword 5)
                 (mword_of_int 548 : mword 12) M0 (trap_res b + (av - 4))%nat wo false with "Hcg Hpc Hi18 [Hwo]").
       { iEval (rewrite Hwoaddr). iExact "Hwo". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hwo".
@@ -876,7 +876,7 @@ Section ProofPipeclose.
       assert (Hroaddr : add_vec (rget M0 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 544 : mword 12)) = a_popen pi false)
         by (rgne; rewrite Hs1M0; reflexivity).
       iPoseProof (pci_42 with "Htext") as "Hi42".
-      iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.pipeclose + 0x42)) (mword_of_int 9 : mword 5)
+      iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipeclose + 0x42)) (mword_of_int 9 : mword 5)
                 (mword_of_int 544 : mword 12) M0 (trap_res b + (av - 4))%nat ro false with "Hcg Hpc Hi42 [Hro]").
       { iEval (rewrite Hroaddr). iExact "Hro". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hro".

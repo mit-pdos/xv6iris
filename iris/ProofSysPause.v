@@ -291,15 +291,15 @@ Section SpProps.
   (* the scratch slots: 3/4/5 (only spilled on the loop path), 6 and 8 (never
      touched at all).  Slot 7 is the [int n] local and rides separately. *)
   Definition sp_free (sp0 : mword 64) : iProp Σ :=
-    ((∃ w : bv 64, pa_stk sp0 3 ↦₈ w) ∗ (∃ w : bv 64, pa_stk sp0 4 ↦₈ w) ∗
-     (∃ w : bv 64, pa_stk sp0 5 ↦₈ w) ∗ (∃ w : bv 64, pa_stk sp0 6 ↦₈ w) ∗
-     (∃ w : bv 64, pa_stk sp0 8 ↦₈ w))%I.
+    ((∃ w : bv 64, pa_stk sp0 3 ↦₈[kt] w) ∗ (∃ w : bv 64, pa_stk sp0 4 ↦₈[kt] w) ∗
+     (∃ w : bv 64, pa_stk sp0 5 ↦₈[kt] w) ∗ (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) ∗
+     (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w))%I.
 
   (* the right to put frame slot 7 back together once the [int n] cell is
      done with -- the lower half plus its 8-alignment, packaged so no join
      predicate has to carry a pure alignment fact. *)
   Definition sp_join7 (sp0 : mword 64) : iProp Σ :=
-    (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈ w)%I.
+    (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w)%I.
 
   (* +0x7e -- the shared epilogue.  [r] is the value already parked in a0. *)
   Definition sp_tail `{GEN : GenId} (CID0 : CPU)  (j : nat)
@@ -310,9 +310,9 @@ Section SpProps.
         ⌜ sp_base m M sp0 /\ sp_saved m M /\
           M !!! Regidx (mword_of_int 10 : mword 5) = r /\
           (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
-        pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
+        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
         sie_cap_gpr kt M (av - 8) true pj -∗
         cpu_own 0 eb pj true lks -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x8e)) -∗
@@ -325,9 +325,9 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_saved m M ⌝ -∗
-        pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
+        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
         cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -343,13 +343,13 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_lregs M tk ⌝ -∗
-        pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-        pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-        pa_stk sp0 5 ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-        (∃ w : bv 64, pa_stk sp0 6 ↦₈ w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
-        (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
+        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+        pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+        pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+        (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
+        (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
         cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -364,13 +364,13 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_lregs M tk ⌝ -∗
-        pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-        pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-        pa_stk sp0 5 ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-        (∃ w : bv 64, pa_stk sp0 6 ↦₈ w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
-        pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
+        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+        pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+        pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+        (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
+        pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
         cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -389,10 +389,10 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (M : regfile) (nv : mword 32),
         ⌜ sp_base m M sp0 /\ sp_saved m M ⌝ -∗
-        pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
         sp_free sp0 -∗
-        pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
+        pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
         sie_cap_gpr kt M (av - 8) true pj -∗
         cpu_own 0 eb pj true lks -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
@@ -436,9 +436,9 @@ Section SpBodies.
     (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ->
     sp0 = m !!! Regidx csp_rs1 ->
     kernel_text -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    sp_free (kt := kt) sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
     sie_cap_gpr kt M (av - 8) true pj -∗
     cpu_own 0 eb pj true lks -∗
     p_trapframe pj ↦₈{dqt} page_base tfp -∗
@@ -594,9 +594,9 @@ Section SpBodies.
     locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr kt N (trap_res true + (av - 8))%nat false pj -∗
     cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -713,13 +713,13 @@ Section SpBodies.
     locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    (∃ w : bv 64, pa_stk sp0 6 ↦₈ w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
-    (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
+    (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr kt N (trap_res true + (av - 8))%nat false pj -∗
     cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -927,13 +927,13 @@ Section SpBodies.
     sp_exit0 CID0 γt j m av eb sp0 pj lks -∗
     sp_exitk CID0 γt j m av eb sp0 pj tk lks -∗
     sp_tail CID0 j m av eb sp0 pj lks -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    (∃ w : bv 64, pa_stk sp0 6 ↦₈ w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
-    pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
+    pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
     cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -1143,13 +1143,13 @@ Section SpBodies.
     sp_exit0 CID0 γt j m av eb sp0 pj lks -∗
     sp_exitk CID0 γt j m av eb sp0 pj tk lks -∗
     sp_tail CID0 j m av eb sp0 pj lks -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    (∃ w : bv 64, pa_stk sp0 6 ↦₈ w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
-    pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
+    pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
     cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
@@ -1510,10 +1510,10 @@ Section SpBodies.
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv (kt := kt) γs -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     sp_free sp0 -∗
-    pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
+    pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
     sie_cap_gpr kt M (av - 8)%nat true pj -∗
     cpu_own 0 eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗

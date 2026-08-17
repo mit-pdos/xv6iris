@@ -326,10 +326,10 @@ Section SsProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ ss_regs0 m M spd ⌝ -∗
-      pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-      pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-      (∃ v : mword 64, pa_stk sp0 3 ↦₈ v) -∗
-      (∃ v : mword 64, pa_stk sp0 4 ↦₈ v) -∗
+      pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+      pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+      (∃ v : mword 64, pa_stk sp0 3 ↦₈[kt] v) -∗
+      (∃ v : mword 64, pa_stk sp0 4 ↦₈[kt] v) -∗
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       cpu_own 1 eb (proc_addr j) false ({["log"]} ∪ lks) -∗
@@ -348,10 +348,10 @@ Section SsProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ ss_regs m M spd ⌝ -∗
-      pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-      pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-      pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-      pa_stk sp0 4 ↦₈ (m !!! Regidx Rs2) -∗
+      pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+      pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+      pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
+      pa_stk sp0 4 ↦₈[kt] (m !!! Regidx Rs2) -∗
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       cpu_own 1 eb (proc_addr j) false ({["log"]} ∪ lks) -∗
@@ -396,10 +396,10 @@ Section SsBodies.
     locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-    (∃ v : mword 64, pa_stk sp0 3 ↦₈ v) -∗
-    (∃ v : mword 64, pa_stk sp0 4 ↦₈ v) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+    (∃ v : mword 64, pa_stk sp0 3 ↦₈[kt] v) -∗
+    (∃ v : mword 64, pa_stk sp0 4 ↦₈[kt] v) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
@@ -658,12 +658,12 @@ Section SsBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    ▷ ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+    ▷ ss_loop (kt := kt) CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
     ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx Rs2) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx Rs2) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
@@ -1003,10 +1003,10 @@ Section SsBodies.
     kernel_text -∗
     ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
     ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-    (∃ v : mword 64, pa_stk sp0 3 ↦₈ v) -∗
-    (∃ v : mword 64, pa_stk sp0 4 ↦₈ v) -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+    (∃ v : mword 64, pa_stk sp0 3 ↦₈[kt] v) -∗
+    (∃ v : mword 64, pa_stk sp0 4 ↦₈[kt] v) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗

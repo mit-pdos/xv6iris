@@ -1412,7 +1412,7 @@ Section KexecABody.
         rewrite /Q10 upd_ne; [| regne]. exact (HQ9thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
       (* ---- give the magic word back and re-form the elf buffer ---- *)
       iDestruct (kxc_named_of_word4 (pa_stk sp0 54) gb with "Hw4") as "Helf4".
-      iAssert ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ gb j)%I
+      iAssert ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] gb j)%I
         with "[Helf4 Helfr]" as "Helfb".
       { iApply (kxc_named_join4 (pa_stk sp0 54) gb 64 ltac:(lia)
                   with "Helf4 Helfr"). }

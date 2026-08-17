@@ -391,7 +391,7 @@ Section ProofFreeproc.
       iPoseProof (fri_48 with "Htext") as "Hj48".
       iPoseProof (fri_4a with "Htext") as "Hj4a".
       (* +0x22 sd zero,80(s1) : p->pagetable = 0 *)
-      iApply (wp_sd_zero_s_sconf (mword_of_int (FR + 0x22)) Rs1
+      iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x22)) Rs1
                 (mword_of_int 80 : mword 12) me (K - 4)%nat pgv false
                 with "Hcg Hpc Hj22 [Hpg]").
       { iEval (rgne; rewrite Hmes1 fr_off_80). iExact "Hpg". }
@@ -401,7 +401,7 @@ Section ProofFreeproc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq26) in "Hpc".
       (* +0x26 sd zero,72(s1) : p->sz = 0 *)
-      iApply (wp_sd_zero_s_sconf (mword_of_int (FR + 0x26)) Rs1
+      iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x26)) Rs1
                 (mword_of_int 72 : mword 12) me (K - 4)%nat (pv_sz V) false
                 with "Hcg Hpc Hj26 [Hsz]").
       { iEval (rgne; rewrite Hmes1 fr_off_72). iExact "Hsz". }
@@ -413,7 +413,7 @@ Section ProofFreeproc.
       (* +0x2a sw zero,48(s1) : p->pid = 0.  BOTH halves are needed -- one
          came in with the block, the other out of [proc_pub]. *)
       iDestruct (word4_pointsto_half_join with "Hpid Hpid2") as "Hpidf".
-      iApply (wp_sw_zero_s_sconf (mword_of_int (FR + 0x2a)) Rs1
+      iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x2a)) Rs1
                 (mword_of_int 48 : mword 12) me (K - 4)%nat pid false
                 with "Hcg Hpc Hj2a [Hpidf]").
       { iEval (rgne; rewrite Hmes1 fr_off_48). iExact "Hpidf". }
@@ -436,7 +436,7 @@ Section ProofFreeproc.
                    ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
       assert (Hsbv : trunc8 (rget me (mword_of_int 0 : mword 5)) = (mword_of_int 0 : mword 8)).
       { rgne. rewrite Hx0. apply bv_eq; vm_compute; reflexivity. }
-      iApply (wp_sb_s_sconf (mword_of_int (FR + 0x2e)) (mword_of_int 0 : mword 5) Rs1
+      iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x2e)) (mword_of_int 0 : mword 5) Rs1
                 (mword_of_int 344 : mword 12) me (K - 4)%nat nb0 false
                 with "Hcg Hpc Hj2e [Hnm0]").
       { iEval (rgne; rewrite Hmes1 fr_off_344). iExact "Hnm0". }
@@ -447,7 +447,7 @@ Section ProofFreeproc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq32) in "Hpc".
       (* +0x32 sd zero,32(s1) : p->chan = 0 *)
-      iApply (wp_sd_zero_s_sconf (mword_of_int (FR + 0x32)) Rs1
+      iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x32)) Rs1
                 (mword_of_int 32 : mword 12) me (K - 4)%nat ch false
                 with "Hcg Hpc Hj32 [Hchan]").
       { iEval (rgne; rewrite Hmes1 fr_off_32). iExact "Hchan". }
@@ -457,7 +457,7 @@ Section ProofFreeproc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq36) in "Hpc".
       (* +0x36 sw zero,40(s1) : p->killed = 0 *)
-      iApply (wp_sw_zero_s_sconf (mword_of_int (FR + 0x36)) Rs1
+      iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x36)) Rs1
                 (mword_of_int 40 : mword 12) me (K - 4)%nat kl false
                 with "Hcg Hpc Hj36 [Hkilled]").
       { iEval (rgne; rewrite Hmes1 fr_off_40). iExact "Hkilled". }
@@ -467,7 +467,7 @@ Section ProofFreeproc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq3a) in "Hpc".
       (* +0x3a sw zero,44(s1) : p->xstate = 0 *)
-      iApply (wp_sw_zero_s_sconf (mword_of_int (FR + 0x3a)) Rs1
+      iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x3a)) Rs1
                 (mword_of_int 44 : mword 12) me (K - 4)%nat xs false
                 with "Hcg Hpc Hj3a [Hxstate]").
       { iEval (rgne; rewrite Hmes1 fr_off_44). iExact "Hxstate". }
@@ -477,7 +477,7 @@ Section ProofFreeproc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq3e) in "Hpc".
       (* +0x3e sw zero,24(s1) : p->state = UNUSED *)
-      iApply (wp_sw_zero_s_sconf (mword_of_int (FR + 0x3e)) Rs1
+      iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x3e)) Rs1
                 (mword_of_int 24 : mword 12) me (K - 4)%nat st false
                 with "Hcg Hpc Hj3e [Hstate]").
       { iEval (rgne; rewrite Hmes1 fr_off_24). iExact "Hstate". }
@@ -639,7 +639,7 @@ Section ProofFreeproc.
       iPoseProof (fri_1c with "Htext") as "Hj1c".
       iPoseProof (fri_1e with "Htext") as "Hj1e".
       (* +0x14 sd zero,88(s1) : p->trapframe = 0 *)
-      iApply (wp_sd_zero_s_sconf (mword_of_int (FR + 0x14)) Rs1
+      iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x14)) Rs1
                 (mword_of_int 88 : mword 12) me (K - 4)%nat tfv false
                 with "Hcg Hpc Hj14 [Htf]").
       { iEval (rgne; rewrite Hmes1 fr_off_88). iExact "Htf". }
@@ -656,7 +656,7 @@ Section ProofFreeproc.
         (* the root page's [page_valid] -- what refutes the [c.beqz] at +0x1a
            -- is READ OFF the table rather than demanded of the caller. *)
         iDestruct (proc_pt_root_valid P with "Hpt") as %Hrootv.
-        iApply (wp_cld_s_sconf (mword_of_int (FR + 0x18)) Ra0 Rs1
+        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x18)) Ra0 Rs1
                   (mword_of_int 80 : mword 12) me (K - 4)%nat (page_base P.(ud_root)) false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hj18 [Hpgc]").
@@ -686,7 +686,7 @@ Section ProofFreeproc.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hq1c) in "Hpc".
         (* +0x1c ld a1,72(s1) : a1 := p->sz *)
-        iApply (wp_cld_s_sconf (mword_of_int (FR + 0x1c)) Ra1 Rs1
+        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x1c)) Ra1 Rs1
                   (mword_of_int 72 : mword 12) B0 (K - 4)%nat (pv_sz V) false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hj1c [Hsz]").
@@ -741,7 +741,7 @@ Section ProofFreeproc.
         + intros c Hc H2 H8 H9.
           rewrite (callee_saved_lookup Hcs c Hc). apply HB2thr; assumption.
       - (* ---- NO table: p->pagetable is already 0, the call is skipped ---- *)
-        iApply (wp_cld_s_sconf (mword_of_int (FR + 0x18)) Ra0 Rs1
+        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x18)) Ra0 Rs1
                   (mword_of_int 80 : mword 12) me (K - 4)%nat (zero_reg : mword 64) false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hj18 [Hpg]").
@@ -786,7 +786,7 @@ Section ProofFreeproc.
       destruct tw as (tfp & ws).
       iDestruct "Htf" as "(Htfc & Htfp & %Htfval)".
       cbn [fst snd] in *.
-      iApply (wp_cld_s_sconf (mword_of_int (FR + 0x0c)) Ra0 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x0c)) Ra0 Ra0
                 (mword_of_int 88 : mword 12) A2 (K - 4)%nat (page_base tfp) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi0c [Htfc]").
@@ -872,7 +872,7 @@ Section ProofFreeproc.
       + intros c Hc H2 H8 H9.
         rewrite (callee_saved_lookup Hcsk c Hc). apply HT1thr; assumption.
     - (* ---- NO trapframe page: the cell is already 0, kfree is skipped ---- *)
-      iApply (wp_cld_s_sconf (mword_of_int (FR + 0x0c)) Ra0 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x0c)) Ra0 Ra0
                 (mword_of_int 88 : mword 12) A2 (K - 4)%nat (zero_reg : mword 64) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi0c [Htf]").

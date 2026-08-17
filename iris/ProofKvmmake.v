@@ -681,10 +681,10 @@ Section KvmmakeHouse.
     sie_cap_gpr kt Mf (K - 4)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0xa2)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    (∃ v4 : bv 64, pa_stk sp0 4 ↦₈ v4) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9)) -∗
+    (∃ v4 : bv 64, pa_stk sp0 4 ↦₈[kt] v4) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on K_kvmmake) -∗
     ([∗ list] i ∈ seq 0 64,
@@ -972,10 +972,10 @@ Section KvmmakeBody.
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x18)) -∗
       ptree_own 2 (DfracOwn 1) (pt_empty_node bppn) -∗
       kalloc_env γa (avail_sub (Some nb) 1) -∗
-      pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-      pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-      pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-      (∃ v4 : bv 64, pa_stk sp0 4 ↦₈ v4) -∗
+      pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+      pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
+      pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9)) -∗
+      (∃ v4 : bv 64, pa_stk sp0 4 ↦₈[kt] v4) -∗
       ⌜M !!! Regidx (mword_of_int 9)
          = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜M !!! Regidx csp_rs1 = spr⌝ -∗

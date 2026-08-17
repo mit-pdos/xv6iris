@@ -144,7 +144,7 @@ Section ProofMemset.
     assert (Hm1' : forall H : CpuId, rget (CID := H) m ra1 = cval).
     { intro H. rewrite (rget_ne (CID := H) m ra1 Hra1tp). exact Hm1. }
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s_sconf pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
               with "Hcg Hpc Hi0 [Hb0]").
     { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
     iIntros (CID1 Hs1) "Hcg Hpc Hb0".

@@ -554,10 +554,10 @@ Section IputTail.
     locked gtl cpu_id -∗
     itable_res2 cn gfs gi cov logstart nib dev -∗
     iref_slot -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ vg4 -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[kt] vg4 -∗
     p_pid pj ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -853,10 +853,10 @@ Section IputTail.
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
     ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
     IcacheRef.inode_ref k q dev inum -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ vg4 -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[kt] vg4 -∗
     p_pid pj ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

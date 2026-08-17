@@ -263,18 +263,18 @@ Section ProofCopyin.
     cpu_own ncnt eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyin + 0x7c) : mword 64) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx Rs2) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx Rs4) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx Rs5) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx Rs7) -∗
-    pa_stk sp0 10 ↦₈ (mm !!! Regidx Rs8) -∗
-    pa_stk sp0 11 ↦₈ (mm !!! Regidx Rs9) -∗
-    pa_stk sp0 12 ↦₈ (mm !!! Regidx Rs10) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx Rs2) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx Rs3) -∗
+    pa_stk sp0 6 ↦₈[kt] (mm !!! Regidx Rs4) -∗
+    pa_stk sp0 7 ↦₈[kt] (mm !!! Regidx Rs5) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx Rs6) -∗
+    pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx Rs7) -∗
+    pa_stk sp0 10 ↦₈[kt] (mm !!! Regidx Rs8) -∗
+    pa_stk sp0 11 ↦₈[kt] (mm !!! Regidx Rs9) -∗
+    pa_stk sp0 12 ↦₈[kt] (mm !!! Regidx Rs10) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       sie_cap_gpr kt mf K b pcur -∗
@@ -548,7 +548,7 @@ Section ProofCopyin.
      pc_is (mword_of_int (KernelSyms.copyin + 0x3c) : mword 64) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Definition ci_chunk_body
+  Definition ci_chunk_body {kt : ktier}
       (b : bool) (p : mword 64) (CID0 : CpuId) (szv : mword 64) (Pc : uptd)
       (spr cur va0 dst : mword 64) (rem done : nat) (P : uptd) (v11 : mword 64)
       (K lvl : nat) (eb : bool) (len : nat) (fd : nat -> bv 8)

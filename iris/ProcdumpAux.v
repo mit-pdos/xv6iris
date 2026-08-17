@@ -414,11 +414,11 @@ Section ProcdumpFrame.
 
   (* procdump's ten slots: nine named saves and one the code never touches
      (offset 0 -- the 80-byte frame is round, the nine saves are not). *)
-  Definition pd_frame (sp0 ra0 s00 s10 s20 s30 s40 s50 s60 s70 : mword 64) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ ra0 ∗ pa_stk sp0 2 ↦₈ s00 ∗ pa_stk sp0 3 ↦₈ s10 ∗
-     pa_stk sp0 4 ↦₈ s20 ∗ pa_stk sp0 5 ↦₈ s30 ∗ pa_stk sp0 6 ↦₈ s40 ∗
-     pa_stk sp0 7 ↦₈ s50 ∗ pa_stk sp0 8 ↦₈ s60 ∗ pa_stk sp0 9 ↦₈ s70 ∗
-     (∃ w : mword 64, pa_stk sp0 10 ↦₈ w))%I.
+  Definition pd_frame (kt : ktier) (sp0 ra0 s00 s10 s20 s30 s40 s50 s60 s70 : mword 64) : iProp Σ :=
+    (pa_stk sp0 1 ↦₈[kt] ra0 ∗ pa_stk sp0 2 ↦₈[kt] s00 ∗ pa_stk sp0 3 ↦₈[kt] s10 ∗
+     pa_stk sp0 4 ↦₈[kt] s20 ∗ pa_stk sp0 5 ↦₈[kt] s30 ∗ pa_stk sp0 6 ↦₈[kt] s40 ∗
+     pa_stk sp0 7 ↦₈[kt] s50 ∗ pa_stk sp0 8 ↦₈[kt] s60 ∗ pa_stk sp0 9 ↦₈[kt] s70 ∗
+     (∃ w : mword 64, pa_stk sp0 10 ↦₈[kt] w))%I.
 
 End ProcdumpFrame.
 

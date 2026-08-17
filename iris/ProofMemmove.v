@@ -194,8 +194,8 @@ Section ProofMemmove.
     kernel_text -∗
     sie_cap_gpr kt (CID := CID0) M (n - 2) b pcur -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x28)) -∗
-    (pa_stk sp0 1) ↦₈ ra0 -∗
-    (pa_stk sp0 2) ↦₈ s00 -∗
+    (pa_stk sp0 1) ↦₈[kt] ra0 -∗
+    (pa_stk sp0 2) ↦₈[kt] s00 -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr kt mf n b pcur -∗
@@ -416,7 +416,7 @@ Section ProofMemmove.
     assert (Ha1_2' : rget (CID := CID2) m2 a1_idx = pa_add p_src (S off))
       by (rgne; exact Ha1_2).
     (* ---- +0x1c: lbu a3,-1(a1) ---- *)
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.memmove + 0x1c)) a3_idx a1_idx
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memmove + 0x1c)) a3_idx a1_idx
               (mword_of_int 0xfff : mword 12) m2 n (src_bytes off : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hs0]").
@@ -436,7 +436,7 @@ Section ProofMemmove.
     { unfold m3. rewrite upd_ne; [| vm_compute; discriminate]. exact Ha4_2. }
     assert (Ha4v' : rget (CID := CID3) m3 a4_idx = pa_add p_dst (S off))
       by (rgne; exact Ha4v).
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.memmove + 0x20)) a3_idx a4_idx
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memmove + 0x20)) a3_idx a4_idx
               (mword_of_int 0xfff : mword 12) m3 n (dst_olds off) b
               with "Hcg Hpc Hi20 [Hd0]").
     { iEval (rewrite Ha4v' (Hback p_dst off)). iExact "Hd0". }
@@ -546,8 +546,8 @@ Section ProofMemmove.
     kernel_text -∗
     sie_cap_gpr kt (CID := CID0) M (n - 2) b pcur -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x0e)) -∗
-    (pa_stk sp0 1) ↦₈ ra0 -∗
-    (pa_stk sp0 2) ↦₈ s00 -∗
+    (pa_stk sp0 1) ↦₈[kt] ra0 -∗
+    (pa_stk sp0 2) ↦₈[kt] s00 -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>

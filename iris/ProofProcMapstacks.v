@@ -136,16 +136,16 @@ Section ProofPMS.
     sie_cap_gpr kt Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x80)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx (mword_of_int 18)) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx (mword_of_int 19)) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx (mword_of_int 20)) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
-    pa_stk sp0 10 ↦₈ (mm !!! Regidx (mword_of_int 24)) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9)) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx (mword_of_int 18)) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx (mword_of_int 19)) -∗
+    pa_stk sp0 6 ↦₈[kt] (mm !!! Regidx (mword_of_int 20)) -∗
+    pa_stk sp0 7 ↦₈[kt] (mm !!! Regidx (mword_of_int 21)) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx (mword_of_int 22)) -∗
+    pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx (mword_of_int 23)) -∗
+    pa_stk sp0 10 ↦₈[kt] (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on (64 + g)) -∗
     ([∗ list] i ∈ seq 0 64,
@@ -461,16 +461,16 @@ Section ProofPMS.
     sie_cap_gpr kt Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x52)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx (mword_of_int 18)) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx (mword_of_int 19)) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx (mword_of_int 20)) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
-    pa_stk sp0 10 ↦₈ (mm !!! Regidx (mword_of_int 24)) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9)) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx (mword_of_int 18)) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx (mword_of_int 19)) -∗
+    pa_stk sp0 6 ↦₈[kt] (mm !!! Regidx (mword_of_int 20)) -∗
+    pa_stk sp0 7 ↦₈[kt] (mm !!! Regidx (mword_of_int 21)) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx (mword_of_int 22)) -∗
+    pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx (mword_of_int 23)) -∗
+    pa_stk sp0 10 ↦₈[kt] (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env γa (avail_sub (Some nb) (i + gk)) -∗
     ([∗ list] j ∈ seq 0 i,

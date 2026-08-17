@@ -156,7 +156,7 @@ Section ProofFilealloc.
      ProofConsputc.wp_consputc_epi; file header for the full reason [Hepi]
      is stated this way and takes its own [wp_next]-shaped continuation
      rather than invoking [Hcont] directly). *)
-  Definition fa_epi_body
+  Definition fa_epi_body {kt : ktier}
       (γf : gname) (m : regfile) (spr : mword 64) (K : nat) (b : bool)
       (p : mword 64) (n : nat) (eb : bool) (ret_tgt : mword 64)
       (CID0 : CpuId) (lks : gset string) : iProp Σ :=

@@ -148,15 +148,15 @@ Section CtBodies.
 
   (* the three the prologue saves unconditionally *)
   Definition ct_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1))%I.
+    (pa_stk sp0 1 ↦₈[kt] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[kt] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[kt] (m0 !!! Regidx Rs1))%I.
 
   (* slots 4 and 5 (s2/s3's shrink-wrap) and slot 6, which nothing writes *)
   Definition ct_rest (sp0 : mword 64) : iProp Σ :=
-    ((∃ w : mword 64, pa_stk sp0 4 ↦₈ w) ∗
-     (∃ w : mword 64, pa_stk sp0 5 ↦₈ w) ∗
-     (∃ w : mword 64, pa_stk sp0 6 ↦₈ w))%I.
+    ((∃ w : mword 64, pa_stk sp0 4 ↦₈[kt] w) ∗
+     (∃ w : mword 64, pa_stk sp0 5 ↦₈[kt] w) ∗
+     (∃ w : mword 64, pa_stk sp0 6 ↦₈[kt] w))%I.
 
   Lemma ct_frame_back (sp0 : mword 64) (m0 : regfile) :
     ct_saved sp0 m0 -∗ ct_rest sp0 -∗ stack_own (KTR := kt) sp0 6.
@@ -828,9 +828,9 @@ Section ProofConsoleintr.
     arm_pay kt lvl eb pme -∗
     locked γc cpu_id -∗
     cons_res -∗
-    pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2) -∗
-    pa_stk sp0 5 ↦₈ (m0 !!! Regidx Rs3) -∗
-    (∃ w : mword 64, pa_stk sp0 6 ↦₈ w) -∗
+    pa_stk sp0 4 ↦₈[kt] (m0 !!! Regidx Rs2) -∗
+    pa_stk sp0 5 ↦₈[kt] (m0 !!! Regidx Rs3) -∗
+    (∃ w : mword 64, pa_stk sp0 6 ↦₈[kt] w) -∗
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb b sp0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -914,9 +914,9 @@ Section ProofConsoleintr.
          arm_pay kt lvl eb pme -∗
          locked γc cpu_id -∗
          a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗ cons_data bs -∗
-         pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2) -∗
-         pa_stk sp0 5 ↦₈ (m0 !!! Regidx Rs3) -∗
-         (∃ w : mword 64, pa_stk sp0 6 ↦₈ w) -∗
+         pa_stk sp0 4 ↦₈[kt] (m0 !!! Regidx Rs2) -∗
+         pa_stk sp0 5 ↦₈[kt] (m0 !!! Regidx Rs3) -∗
+         (∃ w : mword 64, pa_stk sp0 6 ↦₈[kt] w) -∗
          WP (Loop : expr riscv_lang)))%I.
 
   Lemma ct_mk_kill (γtx γc : gname) (γu : uart_names) (γv : disk_names)

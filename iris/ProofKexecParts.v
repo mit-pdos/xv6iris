@@ -190,48 +190,48 @@ Section ProofKexecParts.
 
   (* struct elfhdr elf -- 64 bytes, slots 54 down to 47. *)
   Lemma kxc_slots_elf (sp0 : mword 64) :
-    ([∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈ w) ⊢
+    ([∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈[kt] w) ⊢
     ⌜forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 54) 64.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 54) 64.
   Proof. exact (slotsn_bytes_own sp0 54 8 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_elf (sp0 : mword 64) :
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 54) 64 ⊢
-    [∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈ w.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 54) 64 ⊢
+    [∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈[kt] w.
   Proof. exact (bytes_own_slotsn sp0 54 8 ltac:(lia)). Qed.
 
   (* struct proghdr ph -- 56 bytes, slots 61 down to 55. *)
   Lemma kxc_slots_ph (sp0 : mword 64) :
-    ([∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈ w) ⊢
+    ([∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈[kt] w) ⊢
     ⌜forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 61) 56.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 61) 56.
   Proof. exact (slotsn_bytes_own sp0 61 7 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_ph (sp0 : mword 64) :
     (forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 61) 56 ⊢
-    [∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈ w.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 61) 56 ⊢
+    [∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈[kt] w.
   Proof. exact (bytes_own_slotsn sp0 61 7 ltac:(lia)). Qed.
 
   (* uint64 ustack[33] -- 264 bytes, slots 46 down to 14.  Slot 14 is
      sp+432..sp+439, and s11's spill is sp+440: there is NO slack here. *)
   Lemma kxc_slots_ustack (sp0 : mword 64) :
-    ([∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈ w) ⊢
+    ([∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[kt] w) ⊢
     ⌜forall i, (i < 33)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (46 - i))) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 46) 264.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 46) 264.
   Proof. exact (slotsn_bytes_own sp0 46 33 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_ustack (sp0 : mword 64) :
     (forall i, (i < 33)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (46 - i))) 8 = true) ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 46) 264 ⊢
-    [∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈ w.
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 46) 264 ⊢
+    [∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[kt] w.
   Proof. exact (bytes_own_slotsn sp0 46 33 ltac:(lia)). Qed.
 
   (* =================================================================== *)

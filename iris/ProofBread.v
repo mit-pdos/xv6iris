@@ -342,12 +342,12 @@ Section BreadDefs.
   (* the six frame slots, as one bundle (slot 6 -- offset 0 -- is pushed but
      never written) *)
   Definition bd_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) ∗
-     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) ∗
-     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx Rs1) ∗
-     pa_stk (m !!! Regidx csp_rs1) 4 ↦₈ (m !!! Regidx Rs2) ∗
-     pa_stk (m !!! Regidx csp_rs1) 5 ↦₈ (m !!! Regidx Rs3) ∗
-     ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈ w)%I.
+    (pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[kt] (m !!! Regidx Rra) ∗
+     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[kt] (m !!! Regidx Rs0) ∗
+     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[kt] (m !!! Regidx Rs1) ∗
+     pa_stk (m !!! Regidx csp_rs1) 4 ↦₈[kt] (m !!! Regidx Rs2) ∗
+     pa_stk (m !!! Regidx csp_rs1) 5 ↦₈[kt] (m !!! Regidx Rs3) ∗
+     ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈[kt] w)%I.
 
   (* the register facts every block lemma carries about its arrival map:
      the frame pointer, the two saved arguments, and agreement with the entry

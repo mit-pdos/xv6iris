@@ -201,12 +201,12 @@ Section ProofKerneltrapParts.
         sepc ↦ᵣ ep -∗
         scause ↦ᵣ sc -∗
         pc_is (mword_of_int (KernelSyms.kerneltrap + 0x2a) : mword 64) -∗
-        pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx ra_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx s0_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx s1_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 4 ↦₈ (m !!! Regidx s2_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 5 ↦₈ (m !!! Regidx s3_idx) -∗
-        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈ v) -∗
+        pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[kt] (m !!! Regidx ra_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[kt] (m !!! Regidx s0_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[kt] (m !!! Regidx s1_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 4 ↦₈[kt] (m !!! Regidx s2_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 5 ↦₈[kt] (m !!! Regidx s3_idx) -∗
+        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈[kt] v) -∗
         WP (Loop : expr riscv_lang) ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -557,12 +557,12 @@ Section ProofKerneltrapParts.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kerneltrap + 0x36) : mword 64) -∗
     sepc ↦ᵣ epold -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ s10 -∗
-    pa_stk sp0 4 ↦₈ s20 -∗
-    pa_stk sp0 5 ↦₈ s30 -∗
-    pa_stk sp0 6 ↦₈ vgap -∗
+    pa_stk sp0 1 ↦₈[kt] ra0 -∗
+    pa_stk sp0 2 ↦₈[kt] s00 -∗
+    pa_stk sp0 3 ↦₈[kt] s10 -∗
+    pa_stk sp0 4 ↦₈[kt] s20 -∗
+    pa_stk sp0 5 ↦₈[kt] s30 -∗
+    pa_stk sp0 6 ↦₈[kt] vgap -∗
     ( ∀ (mf : regfile) (ms_f : mword 64),
         ⌜ callee_saved m0 mf ⌝ -∗
         ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗

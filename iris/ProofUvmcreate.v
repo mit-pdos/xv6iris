@@ -108,10 +108,10 @@ Section ProofUvmcreate.
     cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmcreate + 0x1a)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[kt] v4 -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) rv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr : regfile,

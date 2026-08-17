@@ -162,10 +162,10 @@ Section YieldPostSched.
     hart_full j cpu_id -∗
     ▷ sched_vc (kt := kt) γs (a_cpu_ctx cid_word) pj -∗
     (* the three saved frame words + the frame's bottom slot *)
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ vgap -∗
+    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[kt] vgap -∗
     wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
@@ -701,7 +701,7 @@ Section ProofYield.
       by (rgne; exact Hsv).
     (* +0x16: c.sw a5,24(s1) : p->state := RUNNABLE *)
     iPoseProof (ydi_16 with "Htext") as "Hi16".
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 24 : mword 12) C0 (trap_res eb + (av - 4))%nat RUNNING false
               with "Hcg Hpc Hi16 [Hstate]").
     { iEval (rewrite Hrec_state_g). iExact "Hstate". }
@@ -739,7 +739,7 @@ Section ProofYield.
        moved the hart). *)
     iDestruct (trap_csrs_ext_transport CID CIDa eb pj ltac:(wp_next_chain)
                  with "Hext") as "Hext".
-    iAssert trap_csrs kt with "[Hpay Hext]" as "Htc".
+    iAssert (trap_csrs kt) with "[Hpay Hext]" as "Htc".
     { iEval (rewrite -(trap_csrs_ext_split eb)). iFrame "Hpay Hext". }
     iApply fupd_wp.
     (* the store to p->state above moved the CELL; the mirror follows here,

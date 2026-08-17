@@ -776,18 +776,18 @@ Section ProofNamexMain.
      ⌜Mt !!! Regidx Rs4 = rv⌝ -∗
      sie_cap_gpr kt Mt (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0x5c)) -∗
-     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-     (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
-     (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
-     (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
+     (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+     (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+     (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+     (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+     (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+     (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+     (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+     (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+     (pa_stk sp0 10) ↦₈[kt] (m !!! Regidx Rs8 : mword 64) -∗
+     (pa_stk sp0 11) ↦₈[kt] (m !!! Regidx Rs9 : mword 64) -∗
+     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx Rs10 : mword 64) -∗
      (* the LITERAL [true]: this is the CONTRACT's continuation re-wrapped
         (it ends at [pc_is ret_tgt]), and namex parks. *)
      wp_next (CID0 := CIDt) true (proc_addr j) (fun CIDf : CpuId =>
@@ -1028,18 +1028,18 @@ Section ProofNamexMain.
      sie_cap_gpr kt Ml (K - 12)%nat b (proc_addr j) -∗
      cpu_own 0 eb (proc_addr j) b lks -∗
      pc_is (mword_of_int (NX + 0xf4)) -∗
-     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-     (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
-     (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
-     (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
+     (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+     (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+     (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+     (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+     (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+     (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+     (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+     (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+     (pa_stk sp0 10) ↦₈[kt] (m !!! Regidx Rs8 : mword 64) -∗
+     (pa_stk sp0 11) ↦₈[kt] (m !!! Regidx Rs9 : mword 64) -∗
+     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx Rs10 : mword 64) -∗
      inode_held ipv -∗
      iref_slots 1 -∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1082,18 +1082,18 @@ Section ProofNamexMain.
      sie_cap_gpr kt Mt (K - 12)%nat b (proc_addr j) -∗
      cpu_own 0 eb (proc_addr j) b lks -∗
      pc_is (mword_of_int (NX + 0xae)) -∗
-     (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-     (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-     (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-     (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-     (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-     (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-     (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-     (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-     (pa_stk sp0 10) ↦₈ (m !!! Regidx Rs8 : mword 64) -∗
-     (pa_stk sp0 11) ↦₈ (m !!! Regidx Rs9 : mword 64) -∗
-     (pa_stk sp0 12) ↦₈ (m !!! Regidx Rs10 : mword 64) -∗
+     (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+     (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+     (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+     (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+     (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
+     (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
+     (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+     (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+     (pa_stk sp0 10) ↦₈[kt] (m !!! Regidx Rs8 : mword 64) -∗
+     (pa_stk sp0 11) ↦₈[kt] (m !!! Regidx Rs9 : mword 64) -∗
+     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx Rs10 : mword 64) -∗
      inode_held ipv -∗
      iref_slots 1 -∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

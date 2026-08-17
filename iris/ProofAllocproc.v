@@ -881,7 +881,7 @@ Section ProofAllocproc.
       assert (Hstaddr : add_vec (macq !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 24 : mword 12))
                         = p_state (proc_addr k))
         by (rewrite Hacq_s1; apply ap_off_24).
-      iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x22)) ap_a5 ap_s1
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x22)) ap_a5 ap_s1
                 (mword_of_int 24 : mword 12) macq (trap_res b + (K - 4))%nat st false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi22 [Hstate]").
@@ -990,7 +990,7 @@ Section ProofAllocproc.
         assert (Hpidaddr : add_vec (mfa !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 48 : mword 12))
                            = p_pid (proc_addr k))
           by (rewrite Hfa_s1; apply ap_off_48).
-        iApply (wp_csw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x3c)) ap_a0 ap_s1
+        iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x3c)) ap_a0 ap_s1
                   (mword_of_int 48 : mword 12) mfa (trap_res b + (K - 4))%nat pid1 false
                   with "Hcg Hpc Hi3c [Hpidfull]").
         { iEval (rewrite ap_rg_s1 Hpidaddr). iExact "Hpidfull". }
@@ -1020,7 +1020,7 @@ Section ProofAllocproc.
         assert (Hstaddr2 : add_vec (F2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 24 : mword 12))
                            = p_state (proc_addr k))
           by (rewrite HF2s1; apply ap_off_24).
-        iApply (wp_csw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x40)) ap_a5 ap_s1
+        iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x40)) ap_a5 ap_s1
                   (mword_of_int 24 : mword 12) F2 (trap_res b + (K - 4))%nat UNUSED false
                   with "Hcg Hpc Hi40 [Hstate]").
         { iEval (rewrite ap_rg_s1 Hstaddr2). iExact "Hstate". }
@@ -1107,7 +1107,7 @@ Section ProofAllocproc.
         assert (Htfaddr : add_vec (F4 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 88 : mword 12))
                           = p_trapframe (proc_addr k))
           by (rewrite HF4s1; apply ap_off_88).
-        iApply (wp_csd_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x48)) ap_a0 ap_s1
+        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x48)) ap_a0 ap_s1
                   (mword_of_int 88 : mword 12) F4 (trap_res b + (K - 4))%nat (zero_reg : mword 64) false
                   with "Hcg Hpc Hi48 [Htfcell]").
         { iEval (rewrite ap_rg_s1 Htfaddr). iExact "Htfcell". }
@@ -1472,7 +1472,7 @@ Section ProofAllocproc.
         assert (Hpgaddr : add_vec (F7 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable (proc_addr k))
           by (rewrite HF7s1; apply ap_off_80).
-        iApply (wp_csd_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x54)) ap_a0 ap_s1
+        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x54)) ap_a0 ap_s1
                   (mword_of_int 80 : mword 12) F7 (trap_res b + (K - 4))%nat (zero_reg : mword 64) false
                   with "Hcg Hpc Hi54 [Hpgcell]").
         { iEval (rewrite ap_rg_s1 Hpgaddr). iExact "Hpgcell". }
@@ -1907,7 +1907,7 @@ Section ProofAllocproc.
         assert (Hctx0 : add_vec (H2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 96 : mword 12))
                         = p_context (proc_addr k))
           by (rewrite HH2s1; apply ap_off_96).
-        iApply (wp_csd_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x6e)) ap_a5 ap_s1
+        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x6e)) ap_a5 ap_s1
                   (mword_of_int 96 : mword 12) H2 (trap_res b + (K - 4))%nat w0 false
                   with "Hcg Hpc Hi6e [Hc0]").
         { iEval (rewrite ap_rg_s1 Hctx0). iExact "Hc0". }
@@ -1921,7 +1921,7 @@ Section ProofAllocproc.
         assert (Hksaddr : add_vec (H2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                           = p_kstack (proc_addr k))
           by (rewrite HH2s1; apply ap_off_64).
-        iApply (wp_cld_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x70)) ap_a5 ap_s1
+        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x70)) ap_a5 ap_s1
                   (mword_of_int 64 : mword 12) H2 (trap_res b + (K - 4))%nat ks false (dqm := DfracDiscarded)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi70 []").
@@ -1968,7 +1968,7 @@ Section ProofAllocproc.
         assert (Hctx1 : add_vec (H5 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 104 : mword 12))
                         = pa_add (p_context (proc_addr k)) 8)
           by (rewrite HH5s1; apply ap_off_104).
-        iApply (wp_csd_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x76)) ap_a5 ap_s1
+        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x76)) ap_a5 ap_s1
                   (mword_of_int 104 : mword 12) H5 (trap_res b + (K - 4))%nat w1 false
                   with "Hcg Hpc Hi76 [Hc1]").
         { iEval (rewrite ap_rg_s1 Hctx1). iExact "Hc1". }

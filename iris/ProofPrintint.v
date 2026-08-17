@@ -130,14 +130,14 @@ Section ProofPrintint.
     sie_cap_gpr kt mc (K - 8)%nat b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x84) : mword 64) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx ra_idx) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx s0_idx) -∗
-    (∃ v : mword 64, (pa_stk sp0 3) ↦₈ v) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2_idx) -∗
-    (∃ v : mword 64, (pa_stk sp0 5) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 7) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx ra_idx) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0_idx) -∗
+    (∃ v : mword 64, (pa_stk sp0 3) ↦₈[kt] v) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2_idx) -∗
+    (∃ v : mword 64, (pa_stk sp0 5) ↦₈[kt] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[kt] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 7) ↦₈[kt] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 8) ↦₈[kt] v) -∗
     wp_next b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr kt mf K b pcur -∗
@@ -286,7 +286,7 @@ Section ProofPrintint.
     kernel_text -∗
     digits_tbl dg -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x22) : mword 64) -∗
-    bytes_own (DfracOwn 1) buf 24 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mb : regfile),
       ⌜ mb !!! Regidx a0_idx = mword_of_int (Z.quot (uint x) (uint (md !!! Regidx a1_idx))) /\
@@ -298,7 +298,7 @@ Section ProofPrintint.
         dl_kept mb md ⌝ -∗
       sie_cap_gpr kt mb (K - 8)%nat b pcur -∗
       pc_is (mword_of_int (KernelSyms.printint + 0x40) : mword 64) -∗
-      bytes_own (DfracOwn 1) buf 24 -∗
+      bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -406,7 +406,7 @@ Section ProofPrintint.
                  (Z.to_nat (Z.rem (uint x) (uint (md !!! Regidx a1_idx)))) with "Hdig") as (dbyte) "Hdb".
     { rewrite lookup_seq_lt; [reflexivity | ].
       destruct Hrem as [Hr0 Hr16]. lia. }
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printint + 0x30)) a5_idx a5_idx (mword_of_int 0 : mword 12)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printint + 0x30)) a5_idx a5_idx (mword_of_int 0 : mword 12)
               D5 (K - 8)%nat (dbyte : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi30 [Hdb]").
@@ -422,7 +422,7 @@ Section ProofPrintint.
     (* +0x34 sb a5,0(a3) : buf[i] = digit *)
     iDestruct (bytes_own_acc (DfracOwn 1) buf 24 i Hi24 with "Hbuf") as "[Hbi Hbcl]".
     iDestruct "Hbi" as (bold) "Hbi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.printint + 0x34)) a5_idx a3_idx (mword_of_int 0 : mword 12)
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printint + 0x34)) a5_idx a3_idx (mword_of_int 0 : mword 12)
               D6 (K - 8)%nat (bold : mword 8) b with "Hcg Hpc Hi34 [Hbi]").
     { iEval (rgne; rewrite HD6a3 Hz0 kv_addv_zero). iExact "Hbi". }
     iIntros (CID7 Hs7) "Hcg Hpc Hbi". iEval (rgne; rewrite HD6a3 Hz0 kv_addv_zero) in "Hbi".
@@ -527,7 +527,7 @@ Section ProofPrintint.
     kernel_text -∗
     digits_tbl dg -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x22) : mword 64) -∗
-    bytes_own (DfracOwn 1) buf 24 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (i' : nat),
       ⌜ (1 <= i')%nat /\ (i' <= 21)%nat /\
@@ -537,7 +537,7 @@ Section ProofPrintint.
         dl_kept mf md ⌝ -∗
       sie_cap_gpr kt mf (K - 8)%nat b pcur -∗
       pc_is (mword_of_int (KernelSyms.printint + 0x44) : mword 64) -∗
-      bytes_own (DfracOwn 1) buf 24 -∗
+      bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -664,7 +664,7 @@ Section ProofPrintint.
     cpu_own n eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x74) : mword 64) -∗
-    bytes_own (DfracOwn 1) buf 24 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
@@ -673,7 +673,7 @@ Section ProofPrintint.
       sie_cap_gpr kt mf (K - 8)%nat b pcur -∗
       cpu_own n eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.printint + 0x82) : mword 64) -∗
-      bytes_own (DfracOwn 1) buf 24 -∗
+      bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
       uart_sent_sub γd (bs ++ cs) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -700,7 +700,7 @@ Section ProofPrintint.
                     = pa_add buf _) by (rewrite Hs1 Hz0; apply kv_addv_zero);
       iEval (rewrite -Hpa) in "Hbj";
       (* +0x74 lbu a0,0(s1) : buf[i] *)
-      iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printint + 0x74)) a0_idx s1_idx (mword_of_int 0 : mword 12)
+      iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printint + 0x74)) a0_idx s1_idx (mword_of_int 0 : mword 12)
                 mp (K - 8)%nat (bj : mword 8) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi74 Hbj");
@@ -830,12 +830,12 @@ Section ProofPrintint.
     cpu_own n eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x5c) : mword 64) -∗
-    bytes_own (DfracOwn 1) buf 24 -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx ra_idx) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx s0_idx) -∗
-    (∃ v : mword 64, (pa_stk sp0 3) ↦₈ v) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2_idx) -∗
-    (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
+    bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx ra_idx) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0_idx) -∗
+    (∃ v : mword 64, (pa_stk sp0 3) ↦₈[kt] v) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2_idx) -∗
+    (∃ v : mword 64, (pa_stk sp0 8) ↦₈[kt] v) -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
@@ -1064,12 +1064,12 @@ Section ProofPrintint.
     kernel_text -∗
     digits_tbl (mword_of_int KernelSyms.digits) -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x12) : mword 64) -∗
-    bytes_own (DfracOwn 1) buf 24 -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx ra_idx) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx s0_idx) -∗
-    (∃ v : mword 64, (pa_stk sp0 3) ↦₈ v) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2_idx) -∗
-    (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
+    bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx ra_idx) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0_idx) -∗
+    (∃ v : mword 64, (pa_stk sp0 3) ↦₈[kt] v) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2_idx) -∗
+    (∃ v : mword 64, (pa_stk sp0 8) ↦₈[kt] v) -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),

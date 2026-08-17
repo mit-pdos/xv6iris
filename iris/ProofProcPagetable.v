@@ -899,7 +899,7 @@ Section ProofProcPagetable.
     (* +0x34 ld a3,88(s2) : a3 := p->trapframe *)
     assert (HN118 : N1 !!! Regidx (mword_of_int 18 : mword 5) = pp)
       by (rewrite /N1; rewrite upd_ne; [exact Hmr118 | reg_neq]).
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.proc_pagetable + 0x34)) (mword_of_int 13 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 88 : mword 12)
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.proc_pagetable + 0x34)) (mword_of_int 13 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 88 : mword 12)
               N1 (K - 4)%nat tf b (dqm := dqtf)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [Htfcell]").

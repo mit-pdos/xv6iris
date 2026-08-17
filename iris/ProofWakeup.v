@@ -70,11 +70,11 @@ Local Open Scope Z_scope.
 (* wakeup's 7-entry callee-save frame, over [SpecWakeupParts.wk_fcell]: ra/s0
    and s1..s5 at spF+56 down to spF+8, written by the prologue and read back
    by the epilogue. *)
-Definition wk_frame `{!riscvGS Σ} (spF : mword 64)
+Definition wk_frame `{!riscvGS Σ} (kt : ktier) (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) : iProp Σ :=
-  (wk_fcell spF 7 ↦₈ vra ∗ wk_fcell spF 6 ↦₈ vs0 ∗ wk_fcell spF 5 ↦₈ vs1 ∗
-   wk_fcell spF 4 ↦₈ vs2 ∗ wk_fcell spF 3 ↦₈ vs3 ∗ wk_fcell spF 2 ↦₈ vs4 ∗
-   wk_fcell spF 1 ↦₈ vs5)%I.
+  (wk_fcell spF 7 ↦₈[kt] vra ∗ wk_fcell spF 6 ↦₈[kt] vs0 ∗ wk_fcell spF 5 ↦₈[kt] vs1 ∗
+   wk_fcell spF 4 ↦₈[kt] vs2 ∗ wk_fcell spF 3 ↦₈[kt] vs3 ∗ wk_fcell spF 2 ↦₈[kt] vs4 ∗
+   wk_fcell spF 1 ↦₈[kt] vs5)%I.
 
 (* a state cell holding a value whose 64-bit sign-extension is 2 is SLEEPING;
    used in the wake path where the c.lw-loaded [sext st] compared equal to
@@ -132,7 +132,7 @@ Section ProofWakeup.
      [wakeup+0x54]: the SAME statement is both the lemma's own [Hqexit]
      hypothesis below and the tail [wk_loop_body] hands [wp_next] on exit
      (both anchored at the lemma's own [CID0], per the file header). *)
-  Definition wk_exit_body `{GEN : GenId}
+  Definition wk_exit_body `{GEN : GenId} {kt : ktier}
       (pme spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
       (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -149,7 +149,7 @@ Section ProofWakeup.
        sie_cap_gpr kt Mexit av b pme -∗
        cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
-       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+       wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* the fuel-indexed scan invariant at the loop head [wakeup+0x38]; the
@@ -169,7 +169,7 @@ Section ProofWakeup.
        sie_cap_gpr kt M av b pme -∗
        cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
-       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+       wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* the shared release tail [Hrel] both arms of the state test (and the
@@ -229,7 +229,7 @@ Section ProofWakeup.
       sie_cap_gpr kt M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
-      wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+      wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hlvl Hav Hfresh.
@@ -259,7 +259,7 @@ Section ProofWakeup.
                    sie_cap_gpr kt Mt av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗
-                   wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+                   wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                    WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
       { iIntros (CIDt Hst Mt) "%Hmt Hcg Hown Hpc Hframe".

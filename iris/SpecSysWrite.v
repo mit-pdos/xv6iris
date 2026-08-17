@@ -143,7 +143,7 @@ Section SpecSysWrite.
      anything the caller holds -- which is why it is a binder of the wand and
      not of the frame. *)
   Lemma write_env_frame (γf : gname) (fn : fwrite_names) (Cf : fcontent) :
-    filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗
+    filewrite_fs_env (kt := kt) γf fn -∗ filewrite_devsw fn -∗
     filewrite_env (kt := kt) γf fn Cf ∗
     (∀ used' : gset Z, filewrite_env_out fn Cf used' -∗
        ∃ used'' : gset Z,

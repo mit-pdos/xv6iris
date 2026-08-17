@@ -1701,7 +1701,7 @@ Section KexecCExitM1.
      Coq-level premise is the tell that the plain tactic is wanted. *)
   Local Lemma kxc_ustack_collapse (sp0 : mword 64) (c : nat) (f : nat -> mword 64) :
     (c < 46)%nat ->
-    ([∗ list] j ∈ seq 0 c, pa_stk sp0 (46 - j) ↦₈ (f j : mword 64)) -∗
+    ([∗ list] j ∈ seq 0 c, pa_stk sp0 (46 - j) ↦₈[kt] (f j : mword 64)) -∗
     stack_own (KTR := kt) (pa_stk sp0 (46 - c)) c.
   Proof.
     induction c as [| c IH]; intro Hc46.
@@ -1760,7 +1760,7 @@ Section KexecCExitM1.
     (c <= 33)%nat ->
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) -∗
     kxc_frameC sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen -∗
     kxc_frame_at sp0 ra0 s00 s10 s20 w5 w6 w7 w8 w9 w10 w11 w12 w13.
@@ -1822,7 +1822,7 @@ Section KexecCExitM1.
     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
     stack_own (KTR := kt) (pa_stk sp0 13) (33 - c) -∗
     ([∗ list] j ∈ seq 0 c,
-       pa_stk sp0 (46 - j) ↦₈ (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) -∗
+       pa_stk sp0 (46 - j) ↦₈[kt] (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) -∗
     stack_own (KTR := kt) (pa_stk sp0 54) 9 -∗
     word_pointsto (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) -∗
     word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 -∗
@@ -1873,7 +1873,7 @@ Section KexecCExitM1.
     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) -∗
     ([∗ list] k ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) -∗
     kxc_frameC sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen -∗
     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
@@ -3260,7 +3260,7 @@ Section KexecCLoop.
         (* [Hust1] (depth [32-c]) is exactly index [S c]'s own "not yet
            written" region -- rename only. [Hslot] folds onto [Hwr]'s
            already-written prefix via [seq_S], extending it to [S c]. *)
-        iAssert ([∗ list] j ∈ seq 0 (S c), pa_stk sp0 (46 - j) ↦₈
+        iAssert ([∗ list] j ∈ seq 0 (S c), pa_stk sp0 (46 - j) ↦₈[kt]
                    (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64))%I
           with "[Hwr Hslot]" as "Hwr".
         { rewrite seq_S big_sepL_app big_sepL_singleton. iFrame. }
@@ -3877,7 +3877,7 @@ Section KexecCClose.
      source unchanged, but by then nothing cares what it holds). *)
   Local Lemma kxc_ustack_collapse_ex (sp0 : mword 64) (n : nat) :
     (n <= 46)%nat ->
-    ([∗ list] i ∈ seq 0 n, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈ w) -∗
+    ([∗ list] i ∈ seq 0 n, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[kt] w) -∗
     stack_own (KTR := kt) (pa_stk sp0 (46 - n)) n.
   Proof.
     induction n as [| n IH]; intro Hn.
@@ -3903,7 +3903,7 @@ Section KexecCClose.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64) (ef : nat -> bv 8) :
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) -∗
     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 -∗
     kxc_frame_at sp0 ra0 s00 s10 s20 w5 w6 w7 w8 w9 w10 w11 w12 w13.
   Proof.
@@ -4256,7 +4256,7 @@ Section KexecCClose.
     iEval (rewrite Hstoreaddr) in "Hslot".
     (* the whole written run, contents forgotten -- what both the byte
        conversion below and the two [bad:] arms want *)
-    iAssert ([∗ list] i ∈ seq 0 (S c), ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈ w)%I
+    iAssert ([∗ list] i ∈ seq 0 (S c), ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[kt] w)%I
       with "[Hwr Hslot]" as "Hustex".
     { rewrite seq_S big_sepL_app big_sepL_singleton.
       iSplitL "Hwr".

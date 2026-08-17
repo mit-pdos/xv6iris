@@ -523,16 +523,16 @@ Section ProofKwait.
      slot 10 the code never touches.  Bundled so that every block lemma
      carries the frame as ONE hypothesis instead of ten. *)
   Definition kw_frame (sp0 : mword 64) (mm : regfile) : iProp Σ :=
-    (pa_stk sp0 1  ↦₈ (mm !!! Regidx Rra) ∗
-     pa_stk sp0 2  ↦₈ (mm !!! Regidx Rs0) ∗
-     pa_stk sp0 3  ↦₈ (mm !!! Regidx Rs1) ∗
-     pa_stk sp0 4  ↦₈ (mm !!! Regidx Rs2) ∗
-     pa_stk sp0 5  ↦₈ (mm !!! Regidx Rs3) ∗
-     pa_stk sp0 6  ↦₈ (mm !!! Regidx Rs4) ∗
-     pa_stk sp0 7  ↦₈ (mm !!! Regidx Rs5) ∗
-     pa_stk sp0 8  ↦₈ (mm !!! Regidx Rs6) ∗
-     pa_stk sp0 9  ↦₈ (mm !!! Regidx Rs7) ∗
-     (∃ w : mword 64, pa_stk sp0 10 ↦₈ w))%I.
+    (pa_stk sp0 1  ↦₈[kt] (mm !!! Regidx Rra) ∗
+     pa_stk sp0 2  ↦₈[kt] (mm !!! Regidx Rs0) ∗
+     pa_stk sp0 3  ↦₈[kt] (mm !!! Regidx Rs1) ∗
+     pa_stk sp0 4  ↦₈[kt] (mm !!! Regidx Rs2) ∗
+     pa_stk sp0 5  ↦₈[kt] (mm !!! Regidx Rs3) ∗
+     pa_stk sp0 6  ↦₈[kt] (mm !!! Regidx Rs4) ∗
+     pa_stk sp0 7  ↦₈[kt] (mm !!! Regidx Rs5) ∗
+     pa_stk sp0 8  ↦₈[kt] (mm !!! Regidx Rs6) ∗
+     pa_stk sp0 9  ↦₈[kt] (mm !!! Regidx Rs7) ∗
+     (∃ w : mword 64, pa_stk sp0 10 ↦₈[kt] w))%I.
 
   (* ------------------------------------------------------------------ *)
   (* THE FUNCTION EXIT, as ONE named proposition.                        *)
@@ -1322,7 +1322,7 @@ Section ProofKwait.
     assert (Hsv60 : rget (CID := CIDp) Mr (mword_of_int 0 : mword 5) = (zero_reg : mword 64)).
     { rewrite (rget_ne (CID := CIDp) Mr (mword_of_int 0 : mword 5)
                  ltac:(vm_compute; discriminate)). exact Hx0. }
-    iApply (wp_sd_s_sconf (mword_of_int (KW + 0x60)) (mword_of_int 0 : mword 5) Rs1
+    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KW + 0x60)) (mword_of_int 0 : mword 5) Rs1
               (mword_of_int 56 : mword 12) Mr (trap_res eb + (K - 10))%nat pv false
               with "Hcg Hpc Hi60 [Hcell]").
     { iEval (rewrite Hea60). iExact "Hcell". }
@@ -1638,7 +1638,7 @@ Section ProofKwait.
                       (sign_extend' 64 (mword_of_int 48 : mword 12)) = p_pid (proc_addr k)).
     { rewrite (rget_ne (CID := CIDf) Mf Rs1 ltac:(vm_compute; discriminate)) Hs1.
       apply kw_pid_off. }
-    iApply (wp_lw_s_sconf (mword_of_int (KW + 0x40)) Rs3 Rs1
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KW + 0x40)) Rs3 Rs1
               (mword_of_int 48 : mword 12) Mf (trap_res eb + (K - 10))%nat pidc false
               (dqm := DfracOwn (1/2))
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1775,7 +1775,7 @@ Section ProofKwait.
                         (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz pme).
       { rewrite (rget_ne (CID := CIDf) F3 Rs2 ltac:(vm_compute; discriminate)) HF3s2.
         reflexivity. }
-      iApply (wp_ld_s_sconf (mword_of_int (KW + 0x50)) Ra1 Rs2 (mword_of_int 72 : mword 12)
+      iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KW + 0x50)) Ra1 Rs2 (mword_of_int 72 : mword 12)
                 F3 (trap_res eb + (K - 10))%nat (pv_sz V) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi50 [Hsz]").
@@ -1805,7 +1805,7 @@ Section ProofKwait.
                         (sign_extend' 64 (mword_of_int 80 : mword 12)) = p_pagetable pme).
       { rewrite (rget_ne (CID := CIDf) F4 Rs2 ltac:(vm_compute; discriminate)) HF4s2.
         apply kw_pagetable_off. }
-      iApply (wp_ld_s_sconf (mword_of_int (KW + 0x54)) Ra0 Rs2 (mword_of_int 80 : mword 12)
+      iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KW + 0x54)) Ra0 Rs2 (mword_of_int 80 : mword 12)
                 F4 (trap_res eb + (K - 10))%nat (page_base (ud_root (pv_upt V))) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi54 [Hpg]").
@@ -2151,7 +2151,7 @@ Section ProofKwait.
                         (sign_extend' 64 (mword_of_int 56 : mword 12)) = p_parent (proc_addr kk)).
       { rewrite (rget_ne (CID := CID0) M Rs1 ltac:(vm_compute; discriminate)) Hs1.
         apply kw_parent_off. }
-      iApply (wp_cld_s_sconf (mword_of_int (KW + 0xb2)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KW + 0xb2)) Ra5 Rs1
                 (mword_of_int 56 : mword 12) M (trap_res eb + (K - 10))%nat pv false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hib2 [Hcell]").
@@ -2263,7 +2263,7 @@ Section ProofKwait.
         { destruct HAcq as (_ & B2 & _).
           rewrite (rget_ne (CID := CID0) Macq Rs1 ltac:(vm_compute; discriminate)) B2.
           apply kw_state_off. }
-        iApply (wp_clw_s_sconf (mword_of_int (KW + 0xbe)) Ra5 Rs1
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KW + 0xbe)) Ra5 Rs1
                   (mword_of_int 24 : mword 12) Macq (trap_res eb + (K - 10))%nat st false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hibe [Hstate]").

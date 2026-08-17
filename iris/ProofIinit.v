@@ -84,12 +84,12 @@ Section ProofIinit.
     kernel_text -∗
     sie_cap_gpr kt Me (K - 6) b p -∗
     pc_is (mword_of_int (KernelSyms.iinit + 0x4a)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx s3i : mword 64) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[kt] v) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr kt mr K b p -∗
@@ -304,12 +304,12 @@ Section ProofIinit.
     pc_is (mword_of_int (KernelSyms.iinit + 0x3a)) -∗
     ([∗ list] i ∈ seq 0 j, sl_fresh (inode_lock i) "inode"%string) -∗
     ([∗ list] i ∈ seq j (NINODE - j), sl_raw (inode_lock i)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx s3i : mword 64) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[kt] v) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr, sie_cap_gpr kt mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗

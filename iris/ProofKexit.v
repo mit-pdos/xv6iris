@@ -20,7 +20,7 @@
 
    * THERE IS NO EPILOGUE, AND THAT IS THE POINT.  kexit diverges, so the
      six frame cells are never reloaded and the six stack slots are never
-     given back: [kx_frame] is EXISTENTIAL in the saved values (nothing will
+     given back: [kx_frame kt] is EXISTENTIAL in the saved values (nothing will
      ever read them) and is simply carried to the [jal sched], where the
      post-resume arm drops it into the diverging panic along with everything
      else.
@@ -185,10 +185,10 @@ Proof. intros Hi Hfd Heq. apply (p_ofile_end_inj i (S fd) Hi ltac:(lia) Heq). Qe
 Definition kx_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition kx_frame `{!riscvGS Σ} (spF : mword 64) : iProp Σ :=
+Definition kx_frame `{!riscvGS Σ} (kt : ktier) (spF : mword 64) : iProp Σ :=
   (∃ v5 v4 v3 v2 v1 v0 : mword 64,
-     kx_fcell spF 5 ↦₈ v5 ∗ kx_fcell spF 4 ↦₈ v4 ∗ kx_fcell spF 3 ↦₈ v3 ∗
-     kx_fcell spF 2 ↦₈ v2 ∗ kx_fcell spF 1 ↦₈ v1 ∗ kx_fcell spF 0 ↦₈ v0)%I.
+     kx_fcell spF 5 ↦₈[kt] v5 ∗ kx_fcell spF 4 ↦₈[kt] v4 ∗ kx_fcell spF 3 ↦₈[kt] v3 ∗
+     kx_fcell spF 2 ↦₈[kt] v2 ∗ kx_fcell spF 1 ↦₈[kt] v1 ∗ kx_fcell spF 0 ↦₈[kt] v0)%I.
 
 (* the register shape the fd loop threads: the cursor, its end pointer, the
    process and the exit status.  s0 is dead after the prologue and s5..s11
@@ -283,7 +283,7 @@ Section KexitPro.
         /\ (forall r : regidx, r ∈ dom (rf_to_gmap M)) ⌝ -∗
         sie_cap_gpr kt M (K - 6) b pme -∗
         pc_is (mword_of_int (KX + 0x12)) -∗
-        kx_frame spF -∗
+        kx_frame kt spF -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -462,7 +462,7 @@ Section KexitLoop.
         pc_is (mword_of_int (KX + 0x4c)) -∗
         proc_priv γf pj pid Vx -∗
         (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
-        (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+        (∃ usx : gset Z, fileclose_fs_env_nopid (kt := kt) fn usx 0%nat eb pj) -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (fd : nat) (M : regfile) (V : pprivate),
       ⌜(fd < NOFILE)%nat⌝ -∗ ⌜kxl_regs M pj sv fd⌝ -∗ ⌜kx_nulled cwdv fd V⌝ -∗

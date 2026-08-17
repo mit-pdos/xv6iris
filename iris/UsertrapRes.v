@@ -1051,8 +1051,8 @@ Section UsertrapRes.
      the epilogue's [c.ldsp ra,24(sp)] is what makes the [ret] land on the
      boundary's [ret_pc (m !!! ra)]. *)
   Definition ut_frame (sp0 : mword 64) (vra vs0 vs1 vs2 : mword 64) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ vra ∗ pa_stk sp0 2 ↦₈ vs0 ∗
-     pa_stk sp0 3 ↦₈ vs1 ∗ pa_stk sp0 4 ↦₈ vs2)%I.
+    (pa_stk sp0 1 ↦₈[kt] vra ∗ pa_stk sp0 2 ↦₈[kt] vs0 ∗
+     pa_stk sp0 3 ↦₈[kt] vs1 ∗ pa_stk sp0 4 ↦₈[kt] vs2)%I.
 
   (* CALLEE-SAVED MINUS THE FOUR THE FRAME HOLDS.  [CalleeSaved.callee_saved
      m0 m] is FALSE at every point inside usertrap -- s1 holds [p] and s2

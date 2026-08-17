@@ -82,7 +82,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
 
 Module Type BINIT.
   Parameter wp_binit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
       wp_binit_sconf_body kt m K vlock vname vcpu b p.
 End BINIT.

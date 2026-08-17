@@ -5,7 +5,7 @@
 
    The frame is 80 bytes = 10 slots and NINE registers are saved
    (ra,s0,s1,s2..s7) at c.sdsp displacements 72..8, i.e. [pa_stk sp0 k] for
-   k = 1..9; slot 10 (displacement 0) is never touched and is [pd_frame]'s
+   k = 1..9; slot 10 (displacement 0) is never touched and is [pd_frame kt]'s
    [exists w] conjunct.  Structurally this is kwait's frame exactly, so the
    three blocks follow ProofKwait.v's prologue / [kw_epilogue] instruction
    for instruction.
@@ -99,7 +99,7 @@ Section ProofProcdumpParts.
       ∀ (M : regfile),
         ⌜ pd_regs_pro m M ⌝ -∗
         sie_cap_gpr kt M (K - 10) b p -∗
-        pd_frame (m !!! pdR 2) (m !!! pdR 1) (m !!! pdR 8) (m !!! pdR 9)
+        pd_frame kt (m !!! pdR 2) (m !!! pdR 1) (m !!! pdR 8) (m !!! pdR 9)
                  (m !!! pdR 18) (m !!! pdR 19) (m !!! pdR 20) (m !!! pdR 21)
                  (m !!! pdR 22) (m !!! pdR 23) -∗
         pc_is (mword_of_int (KernelSyms.procdump + 0x1e)) -∗
@@ -257,7 +257,7 @@ Section ProofProcdumpParts.
     iEval (rewrite HP0s3) in "H5". iEval (rewrite HP0s4) in "H6".
     iEval (rewrite HP0s5) in "H7". iEval (rewrite HP0s6) in "H8".
     iEval (rewrite HP0s7) in "H9".
-    iAssert (pd_frame (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
+    iAssert (pd_frame kt (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                (m !!! Regidx Rs1) (m !!! Regidx Rs2) (m !!! Regidx Rs3)
                (m !!! Regidx Rs4) (m !!! Regidx Rs5) (m !!! Regidx Rs6)
                (m !!! Regidx Rs7))
@@ -546,7 +546,7 @@ Section ProofProcdumpParts.
     sie_cap_gpr kt Mx (K - 10) b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
-    pd_frame (m !!! pdR 2) (m !!! pdR 1) (m !!! pdR 8) (m !!! pdR 9)
+    pd_frame kt (m !!! pdR 2) (m !!! pdR 1) (m !!! pdR 8) (m !!! pdR 9)
              (m !!! pdR 18) (m !!! pdR 19) (m !!! pdR 20) (m !!! pdR 21)
              (m !!! pdR 22) (m !!! pdR 23) -∗
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>

@@ -840,15 +840,15 @@ Section ProofSysOpenFrame.
   Lemma so_frame_carve (sp0 : mword 64) :
     stack_own (KTR := kt) sp0 24 -∗
     ⌜so_al sp0⌝ ∗
-    (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 3) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 4) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 5) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 6) ↦₈ w) ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 22) 128 ∗
-    (∃ w : mword 64, (pa_stk sp0 23) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w).
+    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 5) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 6) ↦₈[kt] w) ∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 22) 128 ∗
+    (∃ w : mword 64, (pa_stk sp0 23) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 24) ↦₈[kt] w).
   Proof.
     iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
@@ -874,11 +874,11 @@ Section ProofSysOpenFrame.
   Lemma so_frame_join (sp0 : mword 64)
       (w1 w2 w3 w4 w5 w6 w23 w24 : mword 64) :
     so_al sp0 ->
-    (pa_stk sp0 1) ↦₈ w1 -∗ (pa_stk sp0 2) ↦₈ w2 -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗ (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗ (pa_stk sp0 6) ↦₈ w6 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 22) 128 -∗
-    (pa_stk sp0 23) ↦₈ w23 -∗ (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] w1 -∗ (pa_stk sp0 2) ↦₈[kt] w2 -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗ (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗ (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 22) 128 -∗
+    (pa_stk sp0 23) ↦₈[kt] w23 -∗ (pa_stk sp0 24) ↦₈[kt] w24 -∗
     stack_own (KTR := kt) sp0 24.
   Proof.
     intro HalP. iIntros "H1 H2 H3 H4 H5 H6 HbP H23 H24".
@@ -915,25 +915,25 @@ Section ProofSysOpenFrame.
      needs.  The lower word of slot 23 is dead (it is the [int fd] gcc never
      spilled); it rides through as an arbitrary word and comes back. *)
   Lemma so_omode_split (sp0 : mword 64) (w : mword 64) :
-    (pa_stk sp0 23) ↦₈ w ⊢
-    (pa_stk sp0 23) ↦₄ word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄ word_hi w.
+    (pa_stk sp0 23) ↦₈[kt] w ⊢
+    (pa_stk sp0 23) ↦₄[kt] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[kt] word_hi w.
   Proof. apply word_pointsto_split4. Qed.
 
   Lemma so_omode_join (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
-    (pa_stk sp0 23) ↦₄ lo -∗ (pa_add (pa_stk sp0 23) 4) ↦₄ hi -∗
-    (pa_stk sp0 23) ↦₈ word_of_words lo hi.
+    (pa_stk sp0 23) ↦₄[kt] lo -∗ (pa_add (pa_stk sp0 23) 4) ↦₄[kt] hi -∗
+    (pa_stk sp0 23) ↦₈[kt] word_of_words lo hi.
   Proof. intro Hal. apply word_pointsto_join4. exact Hal. Qed.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak
      the [seq]-indexed byte window, not [bytes_own]. *)
   Lemma so_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (DfracOwn 1) a N ⊢
+    bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
   Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
 
   Lemma so_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a N.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
 
   (* 128 = (k+1) + (127-k): the walkers read the NUL-terminated prefix, the
@@ -955,7 +955,7 @@ Section ProofSysOpenFrame.
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
        pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 128.
+    bytes_own (KTR := kt) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
     iDestruct (so_name_bytes a (S k) f with "H1") as "B1".
@@ -1014,15 +1014,15 @@ Section ProofSysOpenEpilogue.
     so_al sp0 ->
     sie_cap_gpr kt M (K - 24) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SO + 0xca)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₈ w23 -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗
+    (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₈[kt] w23 -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     (* THE INDEX IS [b], NOT [true]: the epilogue is four PLAIN
        instructions, so every crossing it makes is a [b]-link and the
        [b]-form chain is what it can hand back.  A caller whose own

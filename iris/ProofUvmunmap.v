@@ -39,7 +39,7 @@
       pushed at +0x2a only when the loop runs; the [npages == 0] branch at
       +0x26 jumps to +0x78, PAST the [ld s1] at +0x76.  So the epilogue
       lemma [uu_epilogue] covers +0x78..+0x88 and takes slot 3 as an
-      [∃ w, pa_stk sp0 3 ↦₈ w] argument (the vmfault join recipe).
+      [∃ w, pa_stk sp0 3 ↦₈[kt] w] argument (the vmfault join recipe).
 
    3. THE +0x4a JOIN.  Three arms reach the loop tail -- walk found no leaf,
       the leaf word is invalid, and the freed-and-cleared arm -- and all three
@@ -214,14 +214,14 @@ Section ProofUvmunmap.
     sie_cap_gpr kt mj (K - 8) b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x78) : mword 64) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx Rs0) -∗
-    (∃ w : mword 64, pa_stk sp0 3 ↦₈ w) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx Rs2) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx Rs4) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx Rs5) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx Rs0) -∗
+    (∃ w : mword 64, pa_stk sp0 3 ↦₈[kt] w) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx Rs2) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx Rs3) -∗
+    pa_stk sp0 6 ↦₈[kt] (mm !!! Regidx Rs4) -∗
+    pa_stk sp0 7 ↦₈[kt] (mm !!! Regidx Rs5) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx Rs6) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
       sie_cap_gpr kt mf K b p -∗
@@ -424,7 +424,7 @@ Section ProofUvmunmap.
      ~15-20 lines of ∀/wands per step.  Transparent on purpose; the
      [wp_next]/[fun CID => ] shape stays visible at each [iAssert], only
      what follows the lambda is folded. *)
-  Definition uu_tail_body
+  Definition uu_tail_body {kt : ktier}
       (b : bool) (p spr va : mword 64) (uroot : mword 44)
       (done npages : nat) (df : bool) (fx um : gmap (mword 27) (mword 64))
       (K ilvl : nat) (eb : bool) (mm : regfile)

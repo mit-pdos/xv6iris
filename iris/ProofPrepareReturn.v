@@ -498,7 +498,7 @@ Section ProofPrepareReturn.
       rewrite /T3 upd_ne; [| reg_neq]. rewrite /T2 upd_ne; [| reg_neq].
       rewrite /T1 upd_ne; [| reg_neq]. exact HAa0. }
     iEval (rewrite -(prr_p_trapframe p) -HT9a0) in "Htfc".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x30)) a5_idx a0_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x30)) a5_idx a0_idx
               (mword_of_int 88 : mword 12) T9 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -551,7 +551,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp38) in "Hpc".
     (* ---- +0x38: c.ld a4,88(a0) -- a4 = p->trapframe ---- *)
     iEval (rewrite -(prr_p_trapframe p) -HU2a0) in "Htfc".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x38)) a4_idx a0_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x38)) a4_idx a0_idx
               (mword_of_int 88 : mword 12) U2 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -570,7 +570,7 @@ Section ProofPrepareReturn.
        borrows a copy and the original stays in the intuitionistic context. ---- *)
     iPoseProof "Hks" as "Hksb".
     iEval (rewrite /is_kstack -(prr_p_kstack p) -HU3a0) in "Hksb".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x3a)) a5_idx a0_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x3a)) a5_idx a0_idx
               (mword_of_int 64 : mword 12) U3 (trap_res b + (av - 2))%nat
               ks false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -638,7 +638,7 @@ Section ProofPrepareReturn.
     { rgne. rewrite /U6 upd_ne; [| reg_neq]. rewrite /U5 upd_ne; [| reg_neq].
       rewrite /U4 upd_ne; [| reg_neq]. rewrite -HU3a0. rgne. reflexivity. }
     iEval (rewrite -(prr_p_trapframe p) -HU6a0) in "Htfc".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x42)) a5_idx a0_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x42)) a5_idx a0_idx
               (mword_of_int 88 : mword 12) U6 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -709,7 +709,7 @@ Section ProofPrepareReturn.
     { rgne. rewrite /U9 upd_ne; [| reg_neq]. rewrite /U8 upd_ne; [| reg_neq].
       rewrite /U7 upd_ne; [| reg_neq]. rewrite -HU6a0. rgne. reflexivity. }
     iEval (rewrite -(prr_p_trapframe p) -HU9a0) in "Htfc".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x4e)) a5_idx a0_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x4e)) a5_idx a0_idx
               (mword_of_int 88 : mword 12) U9 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -866,7 +866,7 @@ Section ProofPrepareReturn.
       rewrite /U12 upd_ne; [| reg_neq]. rewrite /U11 upd_ne; [| reg_neq].
       rewrite /U10 upd_ne; [| reg_neq]. rewrite -HU9a0. rgne. reflexivity. }
     iEval (rewrite -(prr_p_trapframe p) -HU14a0) in "Htfc".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x64)) a5_idx a0_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x64)) a5_idx a0_idx
               (mword_of_int 88 : mword 12) U14 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -895,7 +895,7 @@ Section ProofPrepareReturn.
     iDestruct (tf_page_word_mem tfp _ tf_epc_idx epc ltac:(vm_compute; lia) Hepc4
                  with "Hptc Htfp") as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_24 tfp) -HU15a5) in "Hcell".
-    iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x66)) a5_idx a5_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (PRR + 0x66)) a5_idx a5_idx
               (mword_of_int 24 : mword 12) U15 (trap_res b + (av - 2))%nat
               epc false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)

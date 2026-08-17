@@ -269,14 +269,14 @@ Section ProofProcinit.
     kernel_text -∗
     sie_cap_gpr kt Me (K - 8) b p -∗
     pc_is (mword_of_int (KernelSyms.procinit + 0xa2)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx rai : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx s0i : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx s1i : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
-    (pa_stk sp0 6) ↦₈ (m !!! Regidx s4i : mword 64) -∗
-    (pa_stk sp0 7) ↦₈ (m !!! Regidx s5i : mword 64) -∗
-    (pa_stk sp0 8) ↦₈ (m !!! Regidx s6i : mword 64) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx rai : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0i : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx s1i : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx s3i : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx s4i : mword 64) -∗
+    (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx s5i : mword 64) -∗
+    (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx s6i : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr kt mr K b p -∗
@@ -549,14 +549,14 @@ Section ProofProcinit.
     pc_is (mword_of_int (KernelSyms.procinit + 0x78)) -∗
     ([∗ list] i ∈ seq 0 j, proc_ready i) -∗
     ([∗ list] i ∈ seq j (NPROC - j), proc_seal (proc_addr i)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx rai : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx s0i : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx s1i : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
-    (pa_stk sp0 6) ↦₈ (m !!! Regidx s4i : mword 64) -∗
-    (pa_stk sp0 7) ↦₈ (m !!! Regidx s5i : mword 64) -∗
-    (pa_stk sp0 8) ↦₈ (m !!! Regidx s6i : mword 64) -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx rai : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0i : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx s1i : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx s3i : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx s4i : mword 64) -∗
+    (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx s5i : mword 64) -∗
+    (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx s6i : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr, sie_cap_gpr kt mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
@@ -701,7 +701,7 @@ Section ProofProcinit.
     (* +0x80 sw zero,24(s1) -- p->state = UNUSED.  The store leaf spells its
        address [rget mil s1i]; bridge it at THIS hart before applying. *)
     assert (Hils1r : rget (CID:=CID54) mil s1i = proc_addr j) by (rgne; exact Hils1).
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.procinit + 0x80)) s1i (mword_of_int 24 : mword 12)
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.procinit + 0x80)) s1i (mword_of_int 24 : mword 12)
               mil (K - 8)%nat vst b with "Hcg Hpc Hi80 [Hst]").
     { iEval (rewrite Hils1r pi_state_addr). iExact "Hst". }
     iIntros (CID55 Hs55) "Hcg Hpc Hst".
@@ -804,7 +804,7 @@ Section ProofProcinit.
        the stored value are [rget]-spelled; bridge them at THIS hart. *)
     assert (HN7s1r : rget (CID:=CID62) N7 s1i = proc_addr j) by (rgne; exact HN7s1).
     assert (HN7a5r : rget (CID:=CID62) N7 a5i = kstack_va j) by (rgne; exact HN7a5).
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.procinit + 0x98)) a5i s1i (mword_of_int 64 : mword 12)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.procinit + 0x98)) a5i s1i (mword_of_int 64 : mword 12)
               N7 (K - 8)%nat vks b with "Hcg Hpc Hi98 [Hks]").
     { iEval (rewrite HN7s1r pi_kstack_addr). iExact "Hks". }
     iIntros (CID63 Hs63) "Hcg Hpc Hks".

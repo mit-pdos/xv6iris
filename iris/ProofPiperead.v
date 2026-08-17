@@ -457,7 +457,7 @@ Section ProofPiperead.
      disappears once both are left inline.  Per the file's fallback rule,
      both are left as their original inline [pose]/[iAssert] here. *)
 
-  Definition pr_epi_body
+  Definition pr_epi_body {kt : ktier}
       (sp0 spr vra vs0 vs1 vs2 vs3 vs4 vs5 vs6 vs7 vs8 : mword 64)
       (m : regfile) (av : nat) (pj : mword 64)
       (γp : pipe_names) (w : bool) (q : Qp) (pid : mword 32) (V : pprivate)
@@ -478,14 +478,14 @@ Section ProofPiperead.
      cpu_own 0%nat true pj true lks -∗
      pipe_ref γp w q -∗
      proc_priv_core pj pid (upd_upt V P') -∗
-     pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
-     pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
-     pa_stk sp0 7 ↦₈ vs5 -∗
-     (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     pa_stk sp0 1 ↦₈[kt] vra -∗ pa_stk sp0 2 ↦₈[kt] vs0 -∗ pa_stk sp0 3 ↦₈[kt] vs1 -∗
+     pa_stk sp0 4 ↦₈[kt] vs2 -∗ pa_stk sp0 5 ↦₈[kt] vs3 -∗ pa_stk sp0 6 ↦₈[kt] vs4 -∗
+     pa_stk sp0 7 ↦₈[kt] vs5 -∗
+     (∃ z : mword 64, pa_stk sp0 8 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 9 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 10 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈[kt] z) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition pr_cphase_body
@@ -511,11 +511,11 @@ Section ProofPiperead.
      pipe_res γp pi -∗
      pipe_ref γp w q -∗
      proc_priv_core pj pid V -∗
-     pa_stk sp0 8 ↦₈ vs6 -∗
-     pa_stk sp0 9 ↦₈ vs7 -∗
-     pa_stk sp0 10 ↦₈ vs8 -∗
-     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     pa_stk sp0 8 ↦₈[kt] vs6 -∗
+     pa_stk sp0 9 ↦₈[kt] vs7 -∗
+     pa_stk sp0 10 ↦₈[kt] vs8 -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈[kt] z) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition pr_epic_body
@@ -539,11 +539,11 @@ Section ProofPiperead.
      cpu_own 0%nat true pj true lks -∗
      pipe_ref γp w q -∗
      proc_priv_core pj pid (upd_upt V P') -∗
-     (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 8 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 9 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 10 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈[kt] z) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition pr_wloop_body
@@ -562,11 +562,11 @@ Section ProofPiperead.
      pipe_res γp pi -∗
      pipe_ref γp w q -∗
      proc_priv_core pj pid V -∗
-     (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
-     (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
+     (∃ z : mword 64, pa_stk sp0 8 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 9 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 10 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 11 ↦₈[kt] z) -∗
+     (∃ z : mword 64, pa_stk sp0 12 ↦₈[kt] z) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_piperead_sconf (γa : gname) (γf : gname)

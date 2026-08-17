@@ -138,12 +138,12 @@ Section ProofUvmdealloc.
        facts for its OWN internal use (the final pop), but its INPUT shape
        must match exactly what the three call sites actually hold. *)
     add_vec (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈ (mm !!! Regidx Rra) -∗
+      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[kt] (mm !!! Regidx Rra) -∗
     add_vec (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈ (mm !!! Regidx Rs0) -∗
+      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[kt] (mm !!! Regidx Rs0) -∗
     add_vec (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ (mm !!! Regidx Rs1) -∗
-    (∃ v, pa_stk (mm !!! Regidx csp_rs1) 4 ↦₈ v) -∗
+      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[kt] (mm !!! Regidx Rs1) -∗
+    (∃ v, pa_stk (mm !!! Regidx csp_rs1) 4 ↦₈[kt] v) -∗
     proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
     (* [wp_next]'s OWN implicit "entry hart" argument must be pinned to the
        WHOLE FUNCTION's entry hart [CID] (the section's own, ambient here

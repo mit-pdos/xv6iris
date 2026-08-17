@@ -294,7 +294,7 @@ Section ProofUvmclear.
       apply kv_addv_zero. }
     iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 vpn) (DfracOwn 1) wr
                  with "Hcl0 Hcell") as "Hcell".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.uvmclear + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.uvmclear + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12)
               mw (K - 2)%nat wr b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -323,7 +323,7 @@ Section ProofUvmclear.
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.uvmclear + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.uvmclear + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ---- +0x14 c.sd a5,0(a0) : *pte = a5 ---- *)
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.uvmclear + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.uvmclear + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12) B2 (K - 2)%nat wr b
               with "Hcg Hpc Hi14 [Hcell]").
     { iEval (rewrite Hea0; rgne; rewrite HB2a0). iExact "Hcell". }

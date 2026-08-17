@@ -1266,8 +1266,8 @@ Section ProofVirtioDiskRw.
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ ∗
     (∃ v0 v1 v2 vp : mword 32,
-       pa_stk sp0 12 ↦₄ v0 ∗ pa_add (pa_stk sp0 12) 4 ↦₄ v1 ∗
-       pa_stk sp0 11 ↦₄ v2 ∗ pa_add (pa_stk sp0 11) 4 ↦₄ vp).
+       pa_stk sp0 12 ↦₄[kt] v0 ∗ pa_add (pa_stk sp0 12) 4 ↦₄[kt] v1 ∗
+       pa_stk sp0 11 ↦₄[kt] v2 ∗ pa_add (pa_stk sp0 11) 4 ↦₄[kt] vp).
   Proof.
     iIntros "H". iDestruct "H" as (w11 w12) "[H11 H12]".
     iDestruct (word_pointsto_aligned_p with "H11") as %Hal11.

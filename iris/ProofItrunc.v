@@ -11,7 +11,7 @@
 
    S4 IS SAVED CONDITIONALLY.  [sd s4,0(sp)] is at +0x50 and [ld s4,0(sp)]
    at +0x90, both INSIDE the indirect arm, so the direct-only path owns the
-   sixth frame slot without ever giving it a value.  [it_frame]'s sixth
+   sixth frame slot without ever giving it a value.  [it_frame kt]'s sixth
    conjunct is existential for exactly that reason. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -232,7 +232,7 @@ Section ItruncTail.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    it_frame m -∗
+    it_frame kt m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -789,7 +789,7 @@ Section ItruncDLoop.
                                 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz Z.add_0_r. apply bvw64_small, bv_unsigned_in_range. }
     iEval (rewrite -Hca) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (IT + 0x20)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x20)) Ra1 Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat (bm_dir bm !!! k) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi20 Hcell").
     iIntros (CID1 Hq1) "Hcg Hpc Hcell".
@@ -997,7 +997,7 @@ Section ItruncDLoop.
                      = i_dev ip).
       { rgne. rewrite HL0s3. reflexivity. }
       iEval (rewrite -Hdva) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (IT + 0x24)) Ra0 Rs3
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x24)) Ra0 Rs3
                 (mword_of_int 0 : mword 12) L0 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24 Hidev").
       iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -1374,7 +1374,7 @@ Section ItruncELoop.
                                 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz Z.add_0_r. apply bvw64_small, bv_unsigned_in_range. }
     iEval (rewrite -Hca) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (IT + 0x6c)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x6c)) Ra1 Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat (bm_ent bm !!! q) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi6c Hcell").
     iIntros (CID1 Hq1) "Hcg Hpc Hcell".
@@ -1558,7 +1558,7 @@ Section ItruncELoop.
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
       { rgne. rewrite HE0s3. reflexivity. }
       iEval (rewrite -Hdva) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (IT + 0x70)) Ra0 Rs3
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x70)) Ra0 Rs3
                 (mword_of_int 0 : mword 12) E0 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi70 Hidev").
       iIntros (CIDy Hqy) "Hcg Hpc Hidev".
@@ -1814,7 +1814,7 @@ Section ItruncIArm.
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v) -∗
+        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] v) -∗
         inode_map γfs ip bm_empty -∗
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
@@ -1872,7 +1872,7 @@ Section ItruncIArm.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     (* the sixth frame slot -- this arm is the only writer *)
-    (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v) -∗
+    (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] v) -∗
     bslots bn 3 -∗
     inode_map γfs ip (bm_dir_zeroed bm NDIRECT) -∗
     it_ent_res γfs bm data 0 -∗
@@ -1939,7 +1939,7 @@ Section ItruncIArm.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite Hs3. reflexivity. }
     iEval (rewrite -Hdva) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x52)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x52)) Ra0 Rs3
               (mword_of_int 0 : mword 12) M (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi52 Hidev").
     iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -2285,7 +2285,7 @@ Section ItruncIArm.
                    = i_addr ip NDIRECT).
     { rgne. rewrite HmRs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica) in "Hindcell".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x80)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x80)) Ra1 Rs3
               (mword_of_int 128 : mword 12) mR (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi80 Hindcell").
@@ -2311,7 +2311,7 @@ Section ItruncIArm.
                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite HC0s3. reflexivity. }
     iEval (rewrite -Hdva2) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x84)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x84)) Ra0 Rs3
               (mword_of_int 0 : mword 12) C0 (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 Hidev").
     iIntros (CID14 Hq14) "Hcg Hpc Hidev".
@@ -2703,7 +2703,7 @@ Section ItruncMain.
     iEval (rewrite Hp0c) in "Hpc".
     (* the frame is complete: five saved registers and the sixth slot,
        which only the indirect arm ever writes *)
-    iAssert (it_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
+    iAssert (it_frame kt m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
     { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hf6". }
     (* ===== +0x0c c.addi4spn s0,sp,48 : the frame pointer, unused below ==== *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (IT + 0x0c))
@@ -2852,7 +2852,7 @@ Section ItruncMain.
                     = i_addr ip NDIRECT).
     { rgne. rewrite HMs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica0) in "Hindcell".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x32)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x32)) Ra1 Rs3
               (mword_of_int 128 : mword 12) Mx (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 Hindcell").

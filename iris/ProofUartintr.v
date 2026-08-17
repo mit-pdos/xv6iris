@@ -139,10 +139,10 @@ Section UiCont.
   Context {kt : ktier}.
   (* the frame the prologue spilled *)
   Definition ui_frame (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1) ∗
-     pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2))%I.
+    (pa_stk sp0 1 ↦₈[kt] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[kt] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[kt] (m0 !!! Regidx Rs1) ∗
+     pa_stk sp0 4 ↦₈[kt] (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
   Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
@@ -199,7 +199,7 @@ Section ProofUartintr.
     sie_cap_gpr kt M (av - 4) b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
-    ui_frame sp0 m0 -∗
+    ui_frame (kt := kt) sp0 m0 -∗
     ui_ret_cont (kt := kt) m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.

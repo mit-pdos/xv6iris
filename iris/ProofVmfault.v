@@ -372,7 +372,7 @@ Section ProofVmfault.
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.vmfault + 0x10) : mword 64) -∗
         (∃ w3 w4 w5 : mword 64,
-           pa_stk sp0 3 ↦₈ w3 ∗ pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
+           pa_stk sp0 3 ↦₈[kt] w3 ∗ pa_stk sp0 4 ↦₈[kt] w4 ∗ pa_stk sp0 5 ↦₈[kt] w5) -∗
         PAY res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hk1 Hk2 Hk6]" as "Hepi".

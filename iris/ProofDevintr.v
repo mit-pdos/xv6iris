@@ -136,10 +136,10 @@ Section ProofDevintr.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x22) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ v3 -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[kt] ra0 -∗
+    pa_stk sp0 2 ↦₈[kt] s00 -∗
+    pa_stk sp0 3 ↦₈[kt] v3 -∗
+    pa_stk sp0 4 ↦₈[kt] v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = retv ⌝ -∗
         sie_cap_gpr kt mf (k + 4) false p -∗
@@ -274,10 +274,10 @@ Section ProofDevintr.
     pc_is (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
     dev_inv γu γv -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ s10 -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[kt] ra0 -∗
+    pa_stk sp0 2 ↦₈[kt] s00 -∗
+    pa_stk sp0 3 ↦₈[kt] s10 -∗
+    pa_stk sp0 4 ↦₈[kt] v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = devintr_ret sc ⌝ -∗
         sie_cap_gpr kt mf (k + 4) false p -∗

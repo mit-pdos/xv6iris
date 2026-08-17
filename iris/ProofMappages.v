@@ -118,16 +118,16 @@ Section ProofMappages.
     sie_cap_gpr kt Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x9c)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx (mword_of_int 18)) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx (mword_of_int 19)) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx (mword_of_int 20)) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
-    (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9)) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx (mword_of_int 18)) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx (mword_of_int 19)) -∗
+    pa_stk sp0 6 ↦₈[kt] (mm !!! Regidx (mword_of_int 20)) -∗
+    pa_stk sp0 7 ↦₈[kt] (mm !!! Regidx (mword_of_int 21)) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx (mword_of_int 22)) -∗
+    pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx (mword_of_int 23)) -∗
+    (∃ v00 : bv 64, pa_stk sp0 10 ↦₈[kt] v00) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on q) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -457,16 +457,16 @@ Section ProofMappages.
     sie_cap_gpr kt Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x3e)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx (mword_of_int 18)) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx (mword_of_int 19)) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx (mword_of_int 20)) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
-    (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9)) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx (mword_of_int 18)) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx (mword_of_int 19)) -∗
+    pa_stk sp0 6 ↦₈[kt] (mm !!! Regidx (mword_of_int 20)) -∗
+    pa_stk sp0 7 ↦₈[kt] (mm !!! Regidx (mword_of_int 21)) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx (mword_of_int 22)) -∗
+    pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx (mword_of_int 23)) -∗
+    (∃ v00 : bv 64, pa_stk sp0 10 ↦₈[kt] v00) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env γa (avail_sub on consumed) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -807,7 +807,7 @@ Section ProofMappages.
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* +0x4a c.ld a5,0(a0) *)
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.mappages + 0x4a)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.mappages + 0x4a)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               mr (K - 10)%nat w0 b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -935,7 +935,7 @@ Section ProofMappages.
     { rewrite /M11 /M10 /M9 /M8 /M7 /M6 /M5.
       repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.mappages + 0x60)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.mappages + 0x60)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               M11 (K - 10)%nat w0 b
               with "Hcg Hpc Hi60 [Hcell]").

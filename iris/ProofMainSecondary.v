@@ -316,7 +316,7 @@ Section ProofMainSecondary.
         (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ->
     sie_cap_gpr kt m n false p0 -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0x16) : mword 64) -∗
-    started_inv (main_deposit γd γv) -∗
+    started_inv (main_deposit (kt := kt) γd γv) -∗
     ( ∀ m' : regfile,
         sie_cap_gpr kt m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗

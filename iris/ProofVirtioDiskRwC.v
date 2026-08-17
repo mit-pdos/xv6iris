@@ -111,7 +111,7 @@ Section ProofVirtioDiskRwC.
     M !!! Regidx Rs7 = sector ->
     sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
-    pa_stk sp0 12 ↦₄ (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) -∗
+    pa_stk sp0 12 ↦₄[kt] (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) -∗
     d_ops h ↦₄ ty0 -∗
     pa_add disk_base (168 + 16 * h + 4) ↦₄ res0 -∗
     pa_add disk_base (168 + 16 * h + 8) ↦₈ sec0 -∗
@@ -122,7 +122,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
         sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ec) : mword 64) -∗
-        pa_stk sp0 12 ↦₄ (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) -∗
+        pa_stk sp0 12 ↦₄[kt] (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) -∗
         d_ops h ↦₄ vdrw_ty wr -∗
         pa_add disk_base (168 + 16 * h + 4) ↦₄ (mword_of_int 0 : SailStdpp.Values.mword 32) -∗
         pa_add disk_base (168 + 16 * h + 8) ↦₈ sector -∗
@@ -628,7 +628,7 @@ Section ProofVirtioDiskRwC.
     sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x10a) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
-    pa_add (pa_stk sp0 12) 4 ↦₄ (mword_of_int (Z.of_nat m2) : SailStdpp.Values.mword 32) -∗
+    pa_add (pa_stk sp0 12) 4 ↦₄[kt] (mword_of_int (Z.of_nat m2) : SailStdpp.Values.mword 32) -∗
     pa_add pd (16 * h + 14) ↦₂ vn0 -∗
     d_desc pd m2 ↦₈ va1 -∗
     pa_add pd (16 * m2 + 8) ↦₄ vl1 -∗
@@ -643,7 +643,7 @@ Section ProofVirtioDiskRwC.
          /\ M1 !!! Regidx Ra7 = pd⌝ -∗
         sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x138) : mword 64) -∗
-        pa_add (pa_stk sp0 12) 4 ↦₄ (mword_of_int (Z.of_nat m2)
+        pa_add (pa_stk sp0 12) 4 ↦₄[kt] (mword_of_int (Z.of_nat m2)
                                        : SailStdpp.Values.mword 32) -∗
         pa_add pd (16 * h + 14) ↦₂ Z_to_bv 16 (Z.of_nat m2) -∗
         d_desc pd m2 ↦₈ (b_data b : SailStdpp.Values.mword 64) -∗
@@ -956,7 +956,7 @@ Section ProofVirtioDiskRwC.
     M !!! Regidx Ra7 = pd ->
     sie_cap_gpr kt M av false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x138) : mword 64) -∗
-    pa_stk sp0 11 ↦₄ (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) -∗
+    pa_stk sp0 11 ↦₄[kt] (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) -∗
     pa_add pd (16 * m2 + 14) ↦₂ vn1 -∗
     d_info_status h ↦ₘ sb0 -∗
     d_desc pd t ↦₈ va2 -∗
@@ -971,7 +971,7 @@ Section ProofVirtioDiskRwC.
                                         (mword_of_int (16 * Z.of_nat h + 32))⌝ -∗
         sie_cap_gpr kt M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x15e) : mword 64) -∗
-        pa_stk sp0 11 ↦₄ (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) -∗
+        pa_stk sp0 11 ↦₄[kt] (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) -∗
         pa_add pd (16 * m2 + 14) ↦₂ Z_to_bv 16 (Z.of_nat t) -∗
         d_info_status h ↦ₘ Z_to_bv 8 255 -∗
         d_desc pd t ↦₈ (d_info_status h : SailStdpp.Values.mword 64) -∗

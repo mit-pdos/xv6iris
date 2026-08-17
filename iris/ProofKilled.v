@@ -248,7 +248,7 @@ Section ProofKilled.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))))
                     = p_killed (proc_addr j))
       by (rewrite Hmacq_s1; apply kl_killed_off).
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
               (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) macq (trap_res b + (av - 4))%nat kl false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)

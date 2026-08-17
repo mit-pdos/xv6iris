@@ -313,7 +313,7 @@ Section ProofKkill.
                         (sign_extend' 64 (mword_of_int 48 : mword 12)) = p_pid (proc_addr k)).
       { rewrite (rget_ne (CID := CIDf) Macq Rs1 ltac:(vm_compute; discriminate)) HA9.
         apply kk_pid_off. }
-      iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x26)) Ra5 Rs1
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x26)) Ra5 Rs1
                 (mword_of_int 48 : mword 12) Macq (trap_res b + av)%nat pidc false (dqm := DfracOwn (1/2))
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi26 [Hpidhalf]").
@@ -492,7 +492,7 @@ Section ProofKkill.
                           (sign_extend' 64 (mword_of_int 40 : mword 12)) = p_killed (proc_addr k)).
         { rewrite (rget_ne (CID := CIDf) M3e Rs1 ltac:(vm_compute; discriminate)) HC9.
           apply kk_killed_off. }
-        iApply (wp_csw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x40)) Ra5 Rs1
+        iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x40)) Ra5 Rs1
                   (mword_of_int 40 : mword 12) M3e (trap_res b + av)%nat kl false
                   with "Hcg Hpc Hi40 [Hkilled]").
         { iEval (rewrite Hea40). iExact "Hkilled". }
@@ -506,7 +506,7 @@ Section ProofKkill.
                           (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state (proc_addr k)).
         { rewrite (rget_ne (CID := CIDf) M3e Rs1 ltac:(vm_compute; discriminate)) HC9.
           apply kk_state_off. }
-        iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x42)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x42)) Ra4 Rs1
                   (mword_of_int 24 : mword 12) M3e (trap_res b + av)%nat st false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi42 [Hpst]").
@@ -588,7 +588,7 @@ Section ProofKkill.
                             (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state (proc_addr k)).
           { rewrite (rget_ne (CID := CIDf) M60 Rs1 ltac:(vm_compute; discriminate)) HE9.
             apply kk_state_off. }
-          iApply (wp_csw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x62)) Ra5 Rs1
+          iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x62)) Ra5 Rs1
                     (mword_of_int 24 : mword 12) M60 (trap_res b + av)%nat st false
                     with "Hcg Hpc Hi62 [Hpst]").
           { iEval (rewrite Hea62). iExact "Hpst". }
@@ -954,7 +954,7 @@ Section ProofKkillMain.
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.kkill + 0x0a) : mword 64) 2 = mword_of_int (KernelSyms.kkill + 0x0c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
-    (* normalize the five saved cells to [pa_stk sp0 _ ↦₈ (m !!! r)] *)
+    (* normalize the five saved cells to [pa_stk sp0 _ ↦₈[kt] (m !!! r)] *)
     assert (HM1ra : M1 !!! Regidx Rra = m !!! Regidx Rra)
       by (rewrite /M1 upd_ne; [reflexivity | vm_compute; discriminate]).
     assert (HM1s0 : M1 !!! Regidx Rs0 = m !!! Regidx Rs0)

@@ -260,7 +260,7 @@ Section ProofHoldingsleep.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply addv_sext0. }
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.holdingsleep + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.holdingsleep + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) A (trap_res b + (av - 6))%nat v false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [Hslk]").
@@ -310,7 +310,7 @@ Section ProofHoldingsleep.
     iPoseProof (hsl_34 with "Htext") as "Hi34".
     assert (Haddr34 : add_vec (B18 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x28 : mword 12)) = sl_pid slk).
     { rewrite HB18s1. rewrite /sl_pid. reflexivity. }
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.holdingsleep + 0x34)) (mword_of_int 19 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.holdingsleep + 0x34)) (mword_of_int 19 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 0x28 : mword 12) B18 (trap_res b + (av - 6))%nat pidv false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [Hpidfield]").
@@ -357,7 +357,7 @@ Section ProofHoldingsleep.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       reflexivity. }
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.holdingsleep + 0x3c)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.holdingsleep + 0x3c)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) MP (trap_res b + (av - 6))%nat pidv false (dqm := dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3c [Hpidproc]").

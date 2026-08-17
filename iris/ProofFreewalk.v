@@ -411,12 +411,12 @@ Section ProofFreewalk.
     pc_is (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) -∗
     kfree_pre (page_base bpt) -∗
     kalloc_env γa None -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx Rs2) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
-    (∃ w : mword 64, pa_stk sp0 6 ↦₈ w) -∗
+    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[kt] (mm !!! Regidx Rs2) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx Rs3) -∗
+    (∃ w : mword 64, pa_stk sp0 6 ↦₈[kt] w) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       sie_cap_gpr kt mf K b p -∗
@@ -800,7 +800,7 @@ Section ProofFreewalk.
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* --- +0x2a c.ld a5,0(s1) --- *)
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.freewalk + 0x2a)) Ra5 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.freewalk + 0x2a)) Ra5 Rs1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               m (K - 6) (pt_ents t (mword_of_int d)) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1013,7 +1013,7 @@ Section ProofFreewalk.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.freewalk + 0x42)) Rs1
+    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.freewalk + 0x42)) Rs1
               (mword_of_int 0 : mword 12) mr (K - 6) (pt_ents t (mword_of_int d)) b
               with "Hcg Hpc Hi42 [Hcell]").
     { iEval (rgne; rewrite Hzoff Hmrs1 Hcuraddr). iExact "Hcell". }

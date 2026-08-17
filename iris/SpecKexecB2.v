@@ -249,7 +249,7 @@ Section KexecB2Frame.
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
     kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                  w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 -∗
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av w6.
   Proof.
     intro Hal. rewrite /kxc_frameBpin /kxc_frameA6.
@@ -314,7 +314,7 @@ Section KexecB2Res.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
      kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67)%I.
 
@@ -502,7 +502,7 @@ Section KexecB2Res.
     ⌜forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true⌝ ∗
     ∃ f : nat -> bv 8,
-      [∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ f j.
+      [∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ[kt] f j.
   Proof.
     iIntros "H".
     iDestruct (kxc_slots_ph sp0 with "H") as "[%Hal Hb]".
@@ -514,7 +514,7 @@ Section KexecB2Res.
   Lemma kxc_ph_give (sp0 : mword 64) (h : nat -> bv 8) :
     (forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ h j) ⊢
+    ([∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ[kt] h j) ⊢
     [∗ list] i ∈ seq 0 7,
       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w.
   Proof.
@@ -624,7 +624,7 @@ Definition kxc_bad324_body
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
-  ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+  ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) -∗
   bslots bn 3 -∗
   iref_slots 1 -∗
   log_op g n2 -∗

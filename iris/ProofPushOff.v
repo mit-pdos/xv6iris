@@ -121,8 +121,8 @@ Section ProofPushOff.
     let ret_tgt := ret_pc ra0e in
     sie_cap_gpr kt M av b p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.pop_off + 0x28) : mword 64) -∗
-    add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ ra0e -∗
-    add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ s00e -∗
+    add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[kt] ra0e -∗
+    add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[kt] s00e -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ mf,
       sie_cap_gpr kt mf (av + 2) b p -∗
@@ -300,10 +300,10 @@ Section ProofPushOff.
     sie_cap_gpr kt ms av false p -∗
     kernel_text -∗ pc_is P -∗
     a8_noff ↦₄ noff -∗
-    a8_p24 ↦₈ ra0e -∗
-    a8_p16 ↦₈ s00e -∗
-    a8_p8 ↦₈ s10e -∗
-    spm ↦₈ vgap -∗
+    a8_p24 ↦₈[kt] ra0e -∗
+    a8_p16 ↦₈[kt] s00e -∗
+    a8_p8 ↦₈[kt] s10e -∗
+    spm ↦₈[kt] vgap -∗
     ( pc_is cret_tgt -∗
       (∃ mfin, sie_cap_gpr kt mfin (av + 4) false p ∗ ⌜ mfin !!! Regidx (mword_of_int 1 : mword 5) = ra0e /\
                                  mfin !!! Regidx (mword_of_int 8 : mword 5) = s00e /\

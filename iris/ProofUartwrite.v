@@ -343,19 +343,19 @@ Section UwProps.
      n = 0 path never builds a frame at all and there is no shrink-wrapping
      to account for). *)
   Definition uw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1) ∗
-     pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2) ∗
-     pa_stk sp0 5 ↦₈ (m0 !!! Regidx Rs3) ∗
-     pa_stk sp0 6 ↦₈ (m0 !!! Regidx Rs4) ∗
-     pa_stk sp0 7 ↦₈ (m0 !!! Regidx Rs5) ∗
-     pa_stk sp0 8 ↦₈ (m0 !!! Regidx Rs6) ∗
-     pa_stk sp0 9 ↦₈ (m0 !!! Regidx Rs7))%I.
+    (pa_stk sp0 1 ↦₈[kt] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[kt] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[kt] (m0 !!! Regidx Rs1) ∗
+     pa_stk sp0 4 ↦₈[kt] (m0 !!! Regidx Rs2) ∗
+     pa_stk sp0 5 ↦₈[kt] (m0 !!! Regidx Rs3) ∗
+     pa_stk sp0 6 ↦₈[kt] (m0 !!! Regidx Rs4) ∗
+     pa_stk sp0 7 ↦₈[kt] (m0 !!! Regidx Rs5) ∗
+     pa_stk sp0 8 ↦₈[kt] (m0 !!! Regidx Rs6) ∗
+     pa_stk sp0 9 ↦₈[kt] (m0 !!! Regidx Rs7))%I.
 
   (* the tenth slot is alignment padding: never written, carried existentially *)
   Definition uw_slot10 (sp0 : mword 64) : iProp Σ :=
-    (∃ w : mword 64, pa_stk sp0 10 ↦₈ w)%I.
+    (∃ w : mword 64, pa_stk sp0 10 ↦₈[kt] w)%I.
 
   Lemma uw_frame_stack_own sp0 m0 :
     uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗ stack_own (KTR := kt) sp0 10.
@@ -498,7 +498,7 @@ Section UwBodies.
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
     uart_sent_sub γu bs -∗
-    uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗
+    uw_saved (kt := kt) sp0 m0 -∗ uw_slot10 sp0 -∗
     Rbuf -∗
     uw_ret (CID0 := CID0) γu j m0 av eb bs Rbuf pidv dqp lks -∗
     WP (Loop : expr riscv_lang).

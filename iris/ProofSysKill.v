@@ -109,7 +109,7 @@ Section ProofSysKill.
     (* the local [pid] is the upper half of slot 3 *)
     iDestruct (word_pointsto_aligned_p with "Hb3") as %Hal3.
     iDestruct (word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
-    iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄ nv -∗ ∃ w, pa_stk sp0 3 ↦₈ w)%I
+    iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄[kt] nv -∗ ∃ w, pa_stk sp0 3 ↦₈[kt] w)%I
       with "[Hb3lo]" as "Hjoin3".
     { iIntros (nv) "Hhi". iExists _.
       iApply (word_pointsto_join4 _ _ _ _ Hal3 with "Hb3lo Hhi"). }

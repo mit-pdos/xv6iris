@@ -482,7 +482,7 @@ Section KforkB3Proof.
       (* ---- +0x96: c.ld a0,0(s1) ---- *)
       assert (Haddr : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                      = p_ofile pme i) by (rewrite Hs1; apply addv_sext0).
-      iApply (wp_cld_s_sconf (mword_of_int (KF + 0x96)) Ra0 Rs1 (mword_of_int 0 : mword 12)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x96)) Ra0 Rs1 (mword_of_int 0 : mword 12)
                 M (rsv + (K - 8))%nat v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi096 [Hcell]").
       { iEval (rewrite Haddr). iExact "Hcell". }
@@ -636,7 +636,7 @@ Section KforkB3Proof.
         (* ---- +0x9e: sd a0,0(s2) -- np->ofile[i] = the duplicate ---- *)
         assert (Haddr2 : add_vec (mr !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = p_ofile npa i) by (rewrite Hmrs2; apply addv_sext0).
-        iApply (wp_sd_s_sconf (mword_of_int (KF + 0x9e)) Ra0 Rs2 (mword_of_int 0 : mword 12)
+        iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x9e)) Ra0 Rs2 (mword_of_int 0 : mword 12)
                   mr (rsv + (K - 8))%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi09e [Hcell2]").
         { iEval (rgne; rewrite Haddr2). iExact "Hcell2". }

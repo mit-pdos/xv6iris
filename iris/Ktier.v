@@ -84,9 +84,14 @@ Proof. destruct t; reflexivity. Qed.
    default (a frame slot peeled off the capability, anything the function
    owns), and it is why the leaves need no annotation at their ~1800
    stack-slot call sites.  A datum at a DIFFERENT tier -- static image data
-   under a tier-generic hart -- must say so with a one-token
-   [(ktd := cur_ktier)] / [(ktd := KT0)]; there is nothing for the leaf to
-   infer it from.
+   under a tier-generic hart -- must say so, and the annotation is TWO
+   named arguments, [(kt := kt) (ktd := KT0)], not one: at a call site the
+   HART's tier is an implicit argument too, so [ktier_le_refl] ties the two
+   together and pinning only [ktd] drags the capability's tier along with
+   it (the symptom is [iSpecialize: cannot instantiate (sie_cap_gpr KT0 ...)]).
+   [KT0] and not [cur_ktier]: [cur_ktier] is [Typeclasses Opaque], so
+   instance search cannot see through it to [ktier_le_bot] and the whole
+   application fails to elaborate.
 
    DO NOT "FIX" THIS WITH [Hint Mode KtierLe ! -].  It was measured: the
    mode does defer resolution so a bracket's [iExact] can pin the tier, but

@@ -79,7 +79,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_mapstacks_sconf_body kt γa mm t m lvl K eb p on b lks.
 End PROC_MAPSTACKS.

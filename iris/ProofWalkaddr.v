@@ -665,7 +665,7 @@ Section ProofWalkaddr.
       apply kv_addv_zero. }
     assert (Ha0vg : rget (CID := CID19) mw (mword_of_int 10 : mword 5) = pt_addr0 p1 vpn)
       by (rgne; exact Ha0v).
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.walkaddr + 0x1c)) (mword_of_int 15 : mword 5)
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.walkaddr + 0x1c)) (mword_of_int 15 : mword 5)
               (mword_of_int 10 : mword 5) (mword_of_int 0 : mword 12)
               mw (K - 2)%nat w0 b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)

@@ -107,8 +107,8 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 
 Module Type FREEWALK.
   Parameter wp_freewalk_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
       wp_freewalk_sconf_body kt γa mm t lvl K eb p ilvl b lks.

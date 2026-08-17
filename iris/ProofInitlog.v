@@ -683,7 +683,7 @@ Section ProofInitlog.
                     = pa_add sb 20%nat).
     { rgne. rewrite Hmils3 il_s20. reflexivity. }
     iEval (rewrite -Hsbad) in "Hsbf".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.initlog + 0x28)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x28)) Ra1 Rs3
               (mword_of_int 20 : mword 12) mil (K - 6)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -871,7 +871,7 @@ Section ProofInitlog.
     { rgne. rewrite HmBa0 il_s88. apply il_hdr_addr. }
     iEval (rewrite (il_hdrw_zero bs_hdr Hhdr0)) in "Hword".
     iEval (rewrite -Hhaddr) in "Hword".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
               (mword_of_int 88 : mword 12) mB (K - 6)%nat
               (mword_of_int 0 : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)

@@ -257,7 +257,7 @@ Section UvmallocDefs.
       cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.uvmalloc + 0x78) : mword 64) -∗
       (∃ w1 w3 w6 : mword 64,
-         pa_stk sp0 3 ↦₈ w1 ∗ pa_stk sp0 5 ↦₈ w3 ∗ pa_stk sp0 8 ↦₈ w6) -∗
+         pa_stk sp0 3 ↦₈[kt] w1 ∗ pa_stk sp0 5 ↦₈[kt] w3 ∗ pa_stk sp0 8 ↦₈[kt] w6) -∗
       ua_pay P vpn0 n xperm oldsz newsz res -∗
       WP (Loop : expr riscv_lang) )%I.
 
@@ -414,9 +414,9 @@ Section ProofUvmalloc.
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.uvmalloc + 0x36) : mword 64) -∗
     proc_pt Pi -∗
     kalloc_env γa None -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx Rs1) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
+    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx Rs1) -∗
+    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx Rs3) -∗
+    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx Rs6) -∗
     ua_exit (kt := kt) (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
     WP (Loop : expr riscv_lang).
   Proof.

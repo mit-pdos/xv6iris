@@ -107,8 +107,8 @@ Section ProofConsputc.
     sie_cap_gpr kt mc (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.consputc + 0x14) : mword 64) -∗
-    pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx ra_idx) -∗
-    pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx s0_idx) -∗
+    pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[kt] (m !!! Regidx ra_idx) -∗
+    pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[kt] (m !!! Regidx s0_idx) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr kt mf K b p -∗

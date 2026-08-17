@@ -370,9 +370,9 @@ Section KexecAFrame.
   Lemma kxc_elf_acc (sp0 : mword 64) :
     stack_own (KTR := kt) (pa_stk sp0 46) 8 ⊢
     (∃ f : nat -> bv 8,
-       [∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ f j) ∗
+       [∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] f j) ∗
     (∀ g : nat -> bv 8,
-       ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ g j) -∗
+       ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] g j) -∗
        stack_own (KTR := kt) (pa_stk sp0 46) 8).
   Proof.
     iIntros "H".

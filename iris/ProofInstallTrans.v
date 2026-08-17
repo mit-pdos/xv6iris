@@ -569,7 +569,7 @@ Section InstallTransDefs.
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
      explicit hart (durable-notes: a whole-function post must not be
      spelled inline). *)
-  Definition it_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition it_cont `{GEN : GenId} `{CID0 : CpuId}  {kt : ktier}
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
@@ -604,7 +604,7 @@ Section InstallTransDefs.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool)
       (R : iProp Σ) (lks : gset string) :
-    (* the guard is at the LITERAL [true] now, matching it_cont's own index *)
+    (* the guard is at the LITERAL [true] now, matching it_cont (kt := kt)'s own index *)
     (true = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     it_cont (kt := kt) (CID0 := CIDa)  j bn γfs logstart n W Lw L D pidv dq m K eb b R lks -∗
     it_cont (kt := kt) (CID0 := CIDb)  j bn γfs logstart n W Lw L D pidv dq m K eb b R lks.
@@ -615,17 +615,17 @@ Section InstallTransDefs.
   Qed.
 
   (* the ten saved slots (ra, s0..s8): every one is written *)
-  Definition it_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ (m !!! Regidx Rs8 : mword 64))%I.
+  Definition it_frame kt (m : regfile) : iProp Σ :=
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[kt] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[kt] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[kt] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[kt] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[kt] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[kt] (m !!! Regidx Rs7 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[kt] (m !!! Regidx Rs8 : mword 64))%I.
 
   (* what the caller still owns when the loop is done / at the epilogue *)
   Definition it_out (bn : bio_names) (γfs : fs_names) (logstart : Z)
@@ -787,7 +787,7 @@ Section InstallTransBlocks.
     sie_cap_gpr kt M (K - 10)%nat eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.install_trans + 0xb2) : mword 64) -∗
-    it_frame m -∗
+    it_frame kt m -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
     trap_csrs_ext kt eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1236,7 +1236,7 @@ Section InstallTransBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    it_frame m -∗
+    it_frame kt m -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     ghost_map_auth (fs_L γfs) 1 L -∗
@@ -2529,7 +2529,7 @@ Section ProofInstallTrans.
                       = mword_of_int (KernelSyms.install_trans + 0x22))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp22) in "Hpc".
-      iAssert (it_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hframe".
+      iAssert (it_frame kt m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hframe".
       { rewrite /it_frame. iFrame. }
       (* ===== +0x22 c.addi4spn s0,sp,80 ===== *)
       iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.install_trans + 0x22)) (Cregidx (mword_of_int 0))

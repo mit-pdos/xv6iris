@@ -376,7 +376,7 @@ Section ProofProcdumpLoop.
      dirlink/dirlookup/namex families these definitions take them as
      explicit parameters. *)
 
-  Definition pdl_loop_body `{GEN : GenId} (CID0 : CpuId)
+  Definition pdl_loop_body `{GEN : GenId} (CID0 : CpuId) {kt : ktier}
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
       (lks : gset string) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
     (∀ (j : nat) (M : regfile),

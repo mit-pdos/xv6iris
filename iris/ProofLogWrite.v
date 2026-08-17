@@ -347,10 +347,10 @@ Section LogWriteDefs.
 
   (* the four frame slots (slot 4 -- offset 0 -- is pushed but never written) *)
   Definition lw_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ w)%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[kt] (m !!! Regidx Rs1 : mword 64) ∗
+     ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[kt] w)%I.
 
   (* the register facts every block carries about its arrival map *)
   Definition lw_regs (m M : regfile) : Prop :=
@@ -492,7 +492,7 @@ Section LogWriteBlocks.
     arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    lw_frame m -∗
+    lw_frame (kt := kt) m -∗
     lw_res bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud -∗
     lw_cont (kt := kt) (CID0 := CID0) bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud m K n eb p b lks -∗
     WP (Loop : expr riscv_lang).

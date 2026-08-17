@@ -224,7 +224,7 @@ Section ProofSetkilled.
     assert (Hsaddr : add_vec (C1 !!! Regidx sk_s1) (sign_extend' 64 (mword_of_int 40 : mword 12))
                      = p_killed (proc_addr j))
       by (rewrite HC1s1; apply sk_killed_off).
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.setkilled + 0x12)) sk_a5 sk_s1
+    iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.setkilled + 0x12)) sk_a5 sk_s1
               (mword_of_int 40 : mword 12) C1 (trap_res b + (av - 4))%nat kl false
               with "Hcg Hpc Hi12 [Hkilled]").
     { iEval (rgne; rewrite Hsaddr). iExact "Hkilled". }

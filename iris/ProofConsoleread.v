@@ -189,23 +189,23 @@ Section CrBodies.
 
   (* the eight the prologue saves unconditionally *)
   Definition cr_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1) ∗
-     pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2) ∗
-     pa_stk sp0 5 ↦₈ (m0 !!! Regidx Rs3) ∗
-     pa_stk sp0 6 ↦₈ (m0 !!! Regidx Rs4) ∗
-     pa_stk sp0 8 ↦₈ (m0 !!! Regidx Rs6) ∗
-     pa_stk sp0 9 ↦₈ (m0 !!! Regidx Rs7))%I.
+    (pa_stk sp0 1 ↦₈[kt] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[kt] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[kt] (m0 !!! Regidx Rs1) ∗
+     pa_stk sp0 4 ↦₈[kt] (m0 !!! Regidx Rs2) ∗
+     pa_stk sp0 5 ↦₈[kt] (m0 !!! Regidx Rs3) ∗
+     pa_stk sp0 6 ↦₈[kt] (m0 !!! Regidx Rs4) ∗
+     pa_stk sp0 8 ↦₈[kt] (m0 !!! Regidx Rs6) ∗
+     pa_stk sp0 9 ↦₈[kt] (m0 !!! Regidx Rs7))%I.
 
   (* slot 7 (s5's shrink-wrap) and the three local slots, contents free.
      [cbuf] lives in slot 11 and is written by the [sb] at +0x9a, so the
      locals are carried as WORDS everywhere except across that store. *)
   Definition cr_rest (sp0 : mword 64) : iProp Σ :=
-    ((∃ w : mword 64, pa_stk sp0 7  ↦₈ w) ∗
-     (∃ w : mword 64, pa_stk sp0 10 ↦₈ w) ∗
-     (∃ w : mword 64, pa_stk sp0 11 ↦₈ w) ∗
-     (∃ w : mword 64, pa_stk sp0 12 ↦₈ w))%I.
+    ((∃ w : mword 64, pa_stk sp0 7  ↦₈[kt] w) ∗
+     (∃ w : mword 64, pa_stk sp0 10 ↦₈[kt] w) ∗
+     (∃ w : mword 64, pa_stk sp0 11 ↦₈[kt] w) ∗
+     (∃ w : mword 64, pa_stk sp0 12 ↦₈[kt] w))%I.
 
   Lemma cr_frame_back (sp0 : mword 64) (m0 : regfile) :
     cr_saved sp0 m0 -∗ cr_rest sp0 -∗ stack_own (KTR := kt) sp0 12.
@@ -913,10 +913,10 @@ Section ProofConsoleread.
          locked γc cpu_id -∗
          a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗ cons_data bs -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
-         pa_stk sp0 7%nat ↦₈ (m0 !!! Regidx Rs5) -∗
-         (∃ w : mword 64, pa_stk sp0 10%nat ↦₈ w) -∗
-         (∃ w : mword 64, pa_stk sp0 11%nat ↦₈ w) -∗
-         (∃ w : mword 64, pa_stk sp0 12%nat ↦₈ w) -∗
+         pa_stk sp0 7%nat ↦₈[kt] (m0 !!! Regidx Rs5) -∗
+         (∃ w : mword 64, pa_stk sp0 10%nat ↦₈[kt] w) -∗
+         (∃ w : mword 64, pa_stk sp0 11%nat ↦₈[kt] w) -∗
+         (∃ w : mword 64, pa_stk sp0 12%nat ↦₈[kt] w) -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* ---- the address arithmetic the two stack objects need -------------- *)
@@ -1458,7 +1458,7 @@ Section ProofConsoleread.
       by (rewrite /G6 upd_ne; [exact Hmrcs5 | reg_neq]).
     (* give the [cbuf] byte back to slot 11 -- every exit below needs the
        slot whole again *)
-    iAssert (∃ w : mword 64, pa_stk sp0 11%nat ↦₈ w)%I with "[Hbuf Hchback]" as "Hq11".
+    iAssert (∃ w : mword 64, pa_stk sp0 11%nat ↦₈[kt] w)%I with "[Hbuf Hchback]" as "Hq11".
     { iDestruct ("Hchback" $! (trunc8 (H8 !!! Regidx Ra4)) with "[Hbuf]") as "Hby11".
       { iEval (rewrite (cr_cbufa sp0)) in "Hbuf". iExact "Hbuf". }
       iApply (bytes_own_slot (pa_stk sp0 11%nat) Hal11 with "Hby11"). }

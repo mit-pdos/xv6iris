@@ -310,15 +310,15 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₈ w23 -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₈[kt] w23 -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -525,16 +525,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[kt] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[kt] om -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -1122,16 +1122,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[kt] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[kt] om -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -1876,16 +1876,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[kt] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[kt] om -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -2313,16 +2313,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots ns -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[kt] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[kt] om -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf bn gfs cov logstart bmapstart inodestart size ninodes ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv V m K eb b lks) -∗
@@ -2768,16 +2768,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots ns -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[kt] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[kt] om -∗
+    (pa_stk sp0 24) ↦₈[kt] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf bn gfs cov logstart bmapstart inodestart size ninodes ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv V m K eb b lks) -∗

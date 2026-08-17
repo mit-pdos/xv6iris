@@ -701,10 +701,10 @@ Section ProofFdalloc.
       pc_is (CID:=CID0) (mword_of_int (KernelSyms.fdalloc + 0x1a) : mword 64) -∗
       proc_priv_core p pid V -∗
       proc_ofiles_owe γf p (pv_ofile V) D -∗
-      (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-      (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-      (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-      (pa_stk sp0 4) ↦₈ (vgap : mword 64) -∗
+      (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+      (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+      (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
+      (pa_stk sp0 4) ↦₈[kt] (vgap : mword 64) -∗
       wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
         ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗

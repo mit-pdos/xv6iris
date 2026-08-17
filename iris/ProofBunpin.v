@@ -447,7 +447,7 @@ Section ProofBunpin.
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1 Hs64.
       rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bunpin + 0x18)) Ra5 Rs1 (mword_of_int 64 : mword 12)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bunpin + 0x18)) Ra5 Rs1 (mword_of_int 64 : mword 12)
               macq (trap_res b + (K - 4))%nat (cw : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell").

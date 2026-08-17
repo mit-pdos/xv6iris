@@ -1628,7 +1628,7 @@ Section ProofVirtioDiskInit.
     iEval (rewrite Hp0ca) in "Hpc".
     (* +0x0ca sd a0,0(s1) : disk.desc = kalloc() *)
     iPoseProof (vdi_0ca with "Htext") as "Hi".
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0ca)) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x0ca)) (mword_of_int 10 : mword 5)
               (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) C2 (K - 4)%nat pd0 false
               with "Hcg Hpc Hi [Hdesc]").
     { iEval (rgne; rewrite Hadesc). iExact "Hdesc". }              iApply wp_next_off_intro.
@@ -1682,7 +1682,7 @@ Section ProofVirtioDiskInit.
       by (rewrite Hk2s1; bvc).
     (* +0x0d0 sd a0,8(s1) : disk.avail = kalloc() *)
     iPoseProof (vdi_0d0 with "Htext") as "Hi".
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0d0)) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x0d0)) (mword_of_int 10 : mword 5)
               (mword_of_int 9 : mword 5) (mword_of_int 8 : mword 12) mk2 (K - 4)%nat pav0 false
               with "Hcg Hpc Hi [Havail]").
     { iEval (rgne; rewrite Haavail). iExact "Havail". }              iApply wp_next_off_intro.
@@ -1747,7 +1747,7 @@ Section ProofVirtioDiskInit.
     iEval (rewrite Hp0d8) in "Hpc".
     (* +0x0d8 sd a0,16(s1) : disk.used = kalloc() *)
     iPoseProof (vdi_0d8 with "Htext") as "Hi".
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0d8)) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x0d8)) (mword_of_int 10 : mword 5)
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) E1 (K - 4)%nat pu0 false
               with "Hcg Hpc Hi [Hused]").
     { iEval (rgne; rewrite Haused). iExact "Hused". }              iApply wp_next_off_intro.
@@ -1763,7 +1763,7 @@ Section ProofVirtioDiskInit.
       by (rewrite HE1s1; bvc).
     (* +0x0da ld a0,0(s1) *)
     iPoseProof (vdi_0da with "Htext") as "Hi".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0da)) (mword_of_int 10 : mword 5)
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x0da)) (mword_of_int 10 : mword 5)
               (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) E1 (K - 4)%nat pd false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Hdesc]").
     { iEval (rgne; rewrite Hadesc1). iExact "Hdesc". }              iApply wp_next_off_intro.
@@ -1802,7 +1802,7 @@ Section ProofVirtioDiskInit.
     iEval (rewrite Hp0e4) in "Hpc".
     (* +0x0e4 ld a4,-584(a4) : disk.avail *)
     iPoseProof (vdi_0e4 with "Htext") as "Hi".
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0e4)) (mword_of_int 14 : mword 5)
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x0e4)) (mword_of_int 14 : mword 5)
               (mword_of_int 14 : mword 5) (mword_of_int 3352 : mword 12) E3 (K - 4)%nat pav false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Havail]").
     { iEval (rewrite Havail2). iExact "Havail". }              iApply wp_next_off_intro.
@@ -1931,7 +1931,7 @@ Section ProofVirtioDiskInit.
     assert (Haavail2 : add_vec (F4 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 8 : mword 12)) = disk_avail)
       by (rewrite HF4s1; bvc).
     iPoseProof (vdi_100 with "Htext") as "Hi".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x100)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 8 : mword 12) F4 (K - 4)%nat pav false
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x100)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 8 : mword 12) F4 (K - 4)%nat pav false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Havail]").
     { iEval (rgne; rewrite Haavail2). iExact "Havail". }              iApply wp_next_off_intro.
 
@@ -1994,7 +1994,7 @@ Section ProofVirtioDiskInit.
     assert (Haused2 : add_vec (G2 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = disk_used)
       by (rewrite HG2s1; bvc).
     iPoseProof (vdi_10a with "Htext") as "Hi".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x10a)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) G2 (K - 4)%nat pu false
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x10a)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) G2 (K - 4)%nat pu false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Hused]").
     { iEval (rgne; rewrite Haused2). iExact "Hused". }              iApply wp_next_off_intro.
 
@@ -2100,7 +2100,7 @@ Section ProofVirtioDiskInit.
     assert (Hdad0 : add_vec (H2 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = disk_desc)
       by (rewrite HH2s1; bvc).
     iPoseProof (vdi_118 with "Htext") as "Hi".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x118)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) H2 (K - 4)%nat (word_lo pd) false
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x118)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) H2 (K - 4)%nat (word_lo pd) false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Hdlo]").
     { iEval (rewrite Hdad0). iExact "Hdlo". }              iApply wp_next_off_intro.
 
@@ -2124,7 +2124,7 @@ Section ProofVirtioDiskInit.
     assert (Hdad4 : add_vec (H3 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 4 : mword 12)) = pa_add disk_desc 4%nat)
       by (rewrite HH3s1; bvc).
     iPoseProof (vdi_11e with "Htext") as "Hi".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x11e)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 4 : mword 12) H3 (K - 4)%nat (word_hi pd) false
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x11e)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 4 : mword 12) H3 (K - 4)%nat (word_hi pd) false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Hdhi]").
     { iEval (rewrite Hdad4). iExact "Hdhi". }              iApply wp_next_off_intro.
 
@@ -2152,7 +2152,7 @@ Section ProofVirtioDiskInit.
     assert (Hava3 : add_vec (H4 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 8 : mword 12)) = disk_avail)
       by (rewrite HH4s1; bvc).
     iPoseProof (vdi_124 with "Htext") as "Hi".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x124)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 8 : mword 12) H4 (K - 4)%nat pav false
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x124)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 8 : mword 12) H4 (K - 4)%nat pav false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Havail]").
     { iEval (rewrite Hava3). iExact "Havail". }              iApply wp_next_off_intro.
 
@@ -2223,7 +2223,7 @@ Section ProofVirtioDiskInit.
     assert (Husa3 : add_vec (H8 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = disk_used)
       by (rewrite HH8s1; bvc).
     iPoseProof (vdi_138 with "Htext") as "Hi".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x138)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) H8 (K - 4)%nat pu false
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x138)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) H8 (K - 4)%nat pu false
               ltac:(nzd) ltac:(rdok) with "Hcg Hpc Hi [Hused]").
     { iEval (rewrite Husa3). iExact "Hused". }              iApply wp_next_off_intro.
 
@@ -2312,7 +2312,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa0 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12)) = pa_add disk_free 0%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_14c with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x14c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12) H12 (K - 4)%nat (free0 0%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x14c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12) H12 (K - 4)%nat (free0 0%nat) false
               with "Hcg Hpc Hi [Hf0]").
     { iEval (rewrite Hfa0). iExact "Hf0". }              iApply wp_next_off_intro.
 
@@ -2323,7 +2323,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa1 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 25 : mword 12)) = pa_add disk_free 1%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_150 with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x150)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 25 : mword 12) H12 (K - 4)%nat (free0 1%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x150)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 25 : mword 12) H12 (K - 4)%nat (free0 1%nat) false
               with "Hcg Hpc Hi [Hf1]").
     { iEval (rewrite Hfa1). iExact "Hf1". }              iApply wp_next_off_intro.
 
@@ -2334,7 +2334,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa2 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 26 : mword 12)) = pa_add disk_free 2%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_154 with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x154)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 26 : mword 12) H12 (K - 4)%nat (free0 2%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x154)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 26 : mword 12) H12 (K - 4)%nat (free0 2%nat) false
               with "Hcg Hpc Hi [Hf2]").
     { iEval (rewrite Hfa2). iExact "Hf2". }              iApply wp_next_off_intro.
 
@@ -2345,7 +2345,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa3 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 27 : mword 12)) = pa_add disk_free 3%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_158 with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x158)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 27 : mword 12) H12 (K - 4)%nat (free0 3%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x158)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 27 : mword 12) H12 (K - 4)%nat (free0 3%nat) false
               with "Hcg Hpc Hi [Hf3]").
     { iEval (rewrite Hfa3). iExact "Hf3". }              iApply wp_next_off_intro.
 
@@ -2356,7 +2356,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa4 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 28 : mword 12)) = pa_add disk_free 4%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_15c with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x15c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 28 : mword 12) H12 (K - 4)%nat (free0 4%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x15c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 28 : mword 12) H12 (K - 4)%nat (free0 4%nat) false
               with "Hcg Hpc Hi [Hf4]").
     { iEval (rewrite Hfa4). iExact "Hf4". }              iApply wp_next_off_intro.
 
@@ -2367,7 +2367,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa5 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 29 : mword 12)) = pa_add disk_free 5%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_160 with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x160)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 29 : mword 12) H12 (K - 4)%nat (free0 5%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x160)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 29 : mword 12) H12 (K - 4)%nat (free0 5%nat) false
               with "Hcg Hpc Hi [Hf5]").
     { iEval (rewrite Hfa5). iExact "Hf5". }              iApply wp_next_off_intro.
 
@@ -2378,7 +2378,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa6 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 30 : mword 12)) = pa_add disk_free 6%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_164 with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x164)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 30 : mword 12) H12 (K - 4)%nat (free0 6%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x164)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 30 : mword 12) H12 (K - 4)%nat (free0 6%nat) false
               with "Hcg Hpc Hi [Hf6]").
     { iEval (rewrite Hfa6). iExact "Hf6". }              iApply wp_next_off_intro.
 
@@ -2389,7 +2389,7 @@ Section ProofVirtioDiskInit.
     assert (Hfa7 : add_vec (H12 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 31 : mword 12)) = pa_add disk_free 7%nat)
       by (rewrite HH12s1; bvc).
     iPoseProof (vdi_168 with "Htext") as "Hi".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x168)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 31 : mword 12) H12 (K - 4)%nat (free0 7%nat) false
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x168)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 31 : mword 12) H12 (K - 4)%nat (free0 7%nat) false
               with "Hcg Hpc Hi [Hf7]").
     { iEval (rewrite Hfa7). iExact "Hf7". }              iApply wp_next_off_intro.
 

@@ -76,10 +76,10 @@ Proof. intro Hk. apply proc_addr_inj_le; lia. Qed.
 Definition rp_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition rp_frame `{!riscvGS Σ} (spF : mword 64)
+Definition rp_frame `{!riscvGS Σ} (kt : ktier) (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 : mword 64) : iProp Σ :=
-  (rp_fcell spF 5 ↦₈ vra ∗ rp_fcell spF 4 ↦₈ vs0 ∗ rp_fcell spF 3 ↦₈ vs1 ∗
-   rp_fcell spF 2 ↦₈ vs2 ∗ rp_fcell spF 1 ↦₈ vs3 ∗ rp_fcell spF 0 ↦₈ vs4)%I.
+  (rp_fcell spF 5 ↦₈[kt] vra ∗ rp_fcell spF 4 ↦₈[kt] vs0 ∗ rp_fcell spF 3 ↦₈[kt] vs1 ∗
+   rp_fcell spF 2 ↦₈[kt] vs2 ∗ rp_fcell spF 1 ↦₈[kt] vs3 ∗ rp_fcell spF 0 ↦₈[kt] vs4)%I.
 
 (* the register shape the loop threads: the cursor, the frame pointer, the
    three loop constants, and the seven callee-saved registers reparent never
@@ -144,7 +144,7 @@ Section ProofReparentEnds.
             (m !!! Regidx (mword_of_int 27)) 0 ⌝ -∗
         sie_cap_gpr kt M (K - 6) b pme -∗
         pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
-        rp_frame spF (m !!! Regidx (mword_of_int 1)) (m !!! Regidx (mword_of_int 8))
+        rp_frame kt spF (m !!! Regidx (mword_of_int 1)) (m !!! Regidx (mword_of_int 8))
                      (m !!! Regidx (mword_of_int 9)) (m !!! Regidx (mword_of_int 18))
                      (m !!! Regidx (mword_of_int 19)) (m !!! Regidx (mword_of_int 20)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -427,7 +427,7 @@ Section ProofReparentEnds.
     (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
     sie_cap_gpr kt M (K - 6) b pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
-    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
+    rp_frame kt spF vra vs0 vs1 vs2 vs3 vs4 -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx (mword_of_int 1)  = vra
@@ -622,7 +622,7 @@ Section ProofReparentLoop.
         sie_cap_gpr kt Mexit av b pme -∗
         cpu_own lvl eb pme b lks -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
-        rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
+        rp_frame kt spF vra vs0 vs1 vs2 vs3 vs4 -∗
         (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
         parents_own (rp_map pv ip ps) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -631,7 +631,7 @@ Section ProofReparentLoop.
       sie_cap_gpr kt M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
-      rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
+      rp_frame kt spF vra vs0 vs1 vs2 vs3 vs4 -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       parents_own (rp_upto pv ip k ps) -∗
       WP (Loop : expr riscv_lang).
@@ -649,14 +649,14 @@ Section ProofReparentLoop.
                        sie_cap_gpr kt Mexit av b pme -∗
                        cpu_own lvl eb pme b lks -∗
                        kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
-                       rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
+                       rp_frame kt spF vra vs0 vs1 vs2 vs3 vs4 -∗
                        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                        parents_own (rp_map pv ip ps) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr kt M av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
-                   rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
+                   rp_frame kt spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                    parents_own (rp_upto pv ip k ps) -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
@@ -674,7 +674,7 @@ Section ProofReparentLoop.
                    sie_cap_gpr kt Mt av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.reparent + 0x2c)) -∗
-                   rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
+                   rp_frame kt spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                    parents_own (rp_upto pv ip (S k) ps) -∗
                    WP (Loop : expr riscv_lang)))%I
@@ -794,7 +794,7 @@ Section ProofReparentLoop.
       (* +0x34 c.ld a5,56(s1) : a5 := pp->parent *)
       assert (Hrgk9 : rget (CID := CIDk) M (mword_of_int 9 : mword 5)
                       = M !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
-      iApply (wp_cld_s_sconf (CID := CIDk) (mword_of_int (KernelSyms.reparent + 0x34))
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDk) (mword_of_int (KernelSyms.reparent + 0x34))
                 (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 56 : mword 12)
                 M av v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [Hcell]").
@@ -854,7 +854,7 @@ Section ProofReparentLoop.
         (* +0x3a ld a0,0(s4) : a0 := initproc *)
         assert (Hrgm20 : rget (CID := CIDm) M34 (mword_of_int 20 : mword 5)
                          = M34 !!! Regidx (mword_of_int 20 : mword 5)) by (rgne; reflexivity).
-        iApply (wp_ld_s_sconf (CID := CIDm) (mword_of_int (KernelSyms.reparent + 0x3a))
+        iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDm) (mword_of_int (KernelSyms.reparent + 0x3a))
                   (mword_of_int 10 : mword 5) (mword_of_int 20 : mword 5) (mword_of_int 0 : mword 12)
                   M34 av ip b (dqm := dqi) ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi3a [Hinit]").
@@ -873,7 +873,7 @@ Section ProofReparentLoop.
                         = M3a !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
         assert (Hrgn10 : rget (CID := CIDn) M3a (mword_of_int 10 : mword 5)
                          = M3a !!! Regidx (mword_of_int 10 : mword 5)) by (rgne; reflexivity).
-        iApply (wp_csd_s_sconf (CID := CIDn) (mword_of_int (KernelSyms.reparent + 0x3e))
+        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (CID := CIDn) (mword_of_int (KernelSyms.reparent + 0x3e))
                   (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 56 : mword 12)
                   M3a av v b
                   with "Hcg Hpc Hi3e [Hcell]").

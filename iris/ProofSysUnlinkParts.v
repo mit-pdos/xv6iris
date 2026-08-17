@@ -857,18 +857,18 @@ Section ProofSysUnlinkFrame.
   Lemma su_frame_carve (sp0 : mword 64) :
     stack_own (KTR := kt) sp0 30 -∗
     ⌜su_al sp0⌝ ∗
-    (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 3) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 4) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 5) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 6) ↦₈ w) ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 8) 16 ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 10) 16 ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 26) 128 ∗
-    (∃ w : mword 64, (pa_stk sp0 27) ↦₈ w) ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 29) 16 ∗
-    (∃ w : mword 64, (pa_stk sp0 30) ↦₈ w).
+    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 5) ↦₈[kt] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 6) ↦₈[kt] w) ∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 8) 16 ∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 10) 16 ∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 26) 128 ∗
+    (∃ w : mword 64, (pa_stk sp0 27) ↦₈[kt] w) ∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 29) 16 ∗
+    (∃ w : mword 64, (pa_stk sp0 30) ↦₈[kt] w).
   Proof.
     iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
@@ -910,15 +910,15 @@ Section ProofSysUnlinkFrame.
 
   Lemma su_frame_join (sp0 : mword 64) (w1 w2 w3 w4 w5 w6 w27 w30 : mword 64) :
     su_al sp0 ->
-    (pa_stk sp0 1) ↦₈ w1 -∗ (pa_stk sp0 2) ↦₈ w2 -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗ (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗ (pa_stk sp0 6) ↦₈ w6 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 8) 16 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 10) 16 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 26) 128 -∗
-    (pa_stk sp0 27) ↦₈ w27 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 29) 16 -∗
-    (pa_stk sp0 30) ↦₈ w30 -∗
+    (pa_stk sp0 1) ↦₈[kt] w1 -∗ (pa_stk sp0 2) ↦₈[kt] w2 -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗ (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗ (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 8) 16 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 10) 16 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 26) 128 -∗
+    (pa_stk sp0 27) ↦₈[kt] w27 -∗
+    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 29) 16 -∗
+    (pa_stk sp0 30) ↦₈[kt] w30 -∗
     stack_own (KTR := kt) sp0 30.
   Proof.
     intros (HalD & HalN & HalP & HalE).
@@ -967,12 +967,12 @@ Section ProofSysUnlinkFrame.
      dirlookup / memset / readi / writei all speak the [seq]-indexed byte
      window, not [bytes_own]. *)
   Lemma su_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (DfracOwn 1) a N ⊢
+    bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
   Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
 
   Lemma su_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a N.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
 
   (* 128 = (k+1) + (127-k): nameiparent reads the NUL-terminated prefix and
@@ -994,7 +994,7 @@ Section ProofSysUnlinkFrame.
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
        pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 128.
+    bytes_own (KTR := kt) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
     iDestruct (su_name_bytes a (S k) f with "H1") as "B1".
@@ -1019,7 +1019,7 @@ Section ProofSysUnlinkFrame.
   Lemma su_nm_join (a : mword 64) (f g : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ g j) -∗
     ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ f (14 + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 16.
+    bytes_own (KTR := kt) (DfracOwn 1) a 16.
   Proof.
     iIntros "H1 H2".
     iDestruct (su_name_bytes a 14 g with "H1") as "B1".
@@ -1033,14 +1033,14 @@ Section ProofSysUnlinkFrame.
      The LOWER word of slot 27 is dead; it rides through as an arbitrary
      word and comes back. *)
   Lemma su_off_split (sp0 : mword 64) (w : mword 64) :
-    (pa_stk sp0 27) ↦₈ w ⊢
-    (pa_stk sp0 27) ↦₄ word_lo w ∗ (pa_add (pa_stk sp0 27) 4) ↦₄ word_hi w.
+    (pa_stk sp0 27) ↦₈[kt] w ⊢
+    (pa_stk sp0 27) ↦₄[kt] word_lo w ∗ (pa_add (pa_stk sp0 27) 4) ↦₄[kt] word_hi w.
   Proof. apply word_pointsto_split4. Qed.
 
   Lemma su_off_join (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 27)) 8 = true ->
-    (pa_stk sp0 27) ↦₄ lo -∗ (pa_add (pa_stk sp0 27) 4) ↦₄ hi -∗
-    (pa_stk sp0 27) ↦₈ word_of_words lo hi.
+    (pa_stk sp0 27) ↦₄[kt] lo -∗ (pa_add (pa_stk sp0 27) 4) ↦₄[kt] hi -∗
+    (pa_stk sp0 27) ↦₈[kt] word_of_words lo hi.
   Proof. intro Hal. apply word_pointsto_join4. exact Hal. Qed.
 
 End ProofSysUnlinkFrame.
@@ -1088,18 +1088,18 @@ Section ProofSysUnlinkEpilogue.
     su_al sp0 ->
     sie_cap_gpr kt M (K - 30) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SU + 0x168)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ bd jj) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ bn jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 27) ↦₈ w27 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ be jj) -∗
-    (pa_stk sp0 30) ↦₈ w30 -∗
+    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[kt] w3 -∗
+    (pa_stk sp0 4) ↦₈[kt] w4 -∗
+    (pa_stk sp0 5) ↦₈[kt] w5 -∗
+    (pa_stk sp0 6) ↦₈[kt] w6 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ[kt] bd jj) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] bn jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ[kt] bp jj) -∗
+    (pa_stk sp0 27) ↦₈[kt] w27 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[kt] be jj) -∗
+    (pa_stk sp0 30) ↦₈[kt] w30 -∗
     (* THE INDEX IS [b], NOT [true]: the epilogue is four PLAIN
        instructions, so every crossing it makes is a [b]-link.  A caller
        whose own continuation is at [true] weakens into this for free. *)

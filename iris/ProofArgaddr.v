@@ -208,7 +208,7 @@ Section ProofArgaddr.
     assert (Haddr10 : add_vec (rget MF (mword_of_int 9 : mword 5))
                         (sign_extend' 64 (mword_of_int 0 : mword 12)) = ip).
     { rgne. rewrite HMFs1. apply addv_sext0. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.argaddr + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argaddr + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) MF (av - 4)%nat old b
               with "Hcg Hpc Hi10 [Hip]").
     { iEval (rewrite Haddr10). iExact "Hip". }

@@ -356,7 +356,7 @@ Section ConsoleinitBody.
     (* +0x30 sd a4,16(a5) : devsw[CONSOLE].read = consoleread *)
     assert (Hdra : forall (CID' : CpuId), add_vec (rget (CID := CID') D4 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = devsw_console_read).
     { intros CID'. rewrite HD4a5. unfold devsw_console_read. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 16 : mword 12)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.consoleinit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 16 : mword 12)
               D4 (K - 2)%nat dread0 false with "Hcg Hpc Hi30 [Hdr]").
     { iEval (rewrite Hdra). iExact "Hdr". }
     iApply wp_next_off_intro.
@@ -393,7 +393,7 @@ Section ConsoleinitBody.
     (* +0x3a sd a4,24(a5) : devsw[CONSOLE].write = consolewrite *)
     assert (Hdwa : forall (CID' : CpuId), add_vec (rget (CID := CID') D6 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12)) = devsw_console_write).
     { intros CID'. rewrite HD6a5. unfold devsw_console_write. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x3a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 24 : mword 12)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.consoleinit + 0x3a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 24 : mword 12)
               D6 (K - 2)%nat dwrite0 false with "Hcg Hpc Hi3a [Hdw]").
     { iEval (rewrite Hdwa). iExact "Hdw". }
     iApply wp_next_off_intro.

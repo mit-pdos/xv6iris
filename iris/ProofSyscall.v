@@ -930,7 +930,7 @@ Section SyscallVocab.
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots bn 3 -∗ fileclose_bm fn us' -∗
-    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈[kt]{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
     syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
     pc_is (mword_of_int (KernelSyms.syscall + 0x58) : mword 64) -∗
@@ -1281,7 +1281,7 @@ Section SyscallRet.
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots bn 3 -∗ fileclose_bm fn us' -∗
-    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈[kt]{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
     syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
     pc_is (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) -∗
