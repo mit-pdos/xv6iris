@@ -2025,14 +2025,14 @@ Section ProofSysOpenTails.
     iEval (rewrite Hpp1) in "Hpc".
     (* ===== +0xba jal ra,iunlock ===== *)
     iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SO + 0xba)) Rra
-              (mword_of_int 2089270 : mword 21) M1 (K - 24)%nat b
+              (mword_of_int 2089198 : mword 21) M1 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (M2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0xba) : mword 64) 4)]> M1).
     assert (Hjiu : add_vec (mword_of_int (SO + 0xba) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2089270 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2089198 : mword 21))
                    = mword_of_int KernelSyms.iunlock) by pcw.
     iEval (rewrite Hjiu) in "Hpc".
     assert (HM2ra : (M2 !!! Regidx Rra : mword 64)

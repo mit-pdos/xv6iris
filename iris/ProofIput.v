@@ -1329,12 +1329,12 @@ Section ProofIput.
                      (auipc_off (mword_of_int 29 : mword 20)))]> R3).
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.iput + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.iput + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x10)) Ra0 Ra0 (mword_of_int 1372 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x10)) Ra0 Ra0 (mword_of_int 1388 : mword 12)
               R4 (K - 4)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1372 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1388 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = itable_lock).
     { rewrite /R5 upd_eq /R4 upd_eq. rewrite /itable_lock. pcw. }
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.iput + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.iput + 0x14)) by pcw.
@@ -1470,7 +1470,7 @@ Section ProofIput.
     destruct (decide (cnt = 1%positive)) as [Hcone|Hcnone]; last first.
     { (* ---- ref != 1: fall through straight into the tail ---- *)
       iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x1c))
-                (mword_of_int 32 : mword 13) Ra5 Ra4 E2 (trap_res eb + (K - 4))%nat false
+                (mword_of_int 30 : mword 13) Ra5 Ra4 E2 (trap_res eb + (K - 4))%nat false
                 ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc Hi1cb").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.iput + 0x1c) : mword 64) 4
@@ -1498,12 +1498,12 @@ Section ProofIput.
     iPoseProof (ipi_40 with "Htext") as "Hi40".
     iPoseProof (ipi_44 with "Htext") as "Hi44".
     iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.iput + 0x1c))
-              (mword_of_int 32 : mword 13) Ra5 Ra4 E2 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 30 : mword 13) Ra5 Ra4 E2 (trap_res eb + (K - 4))%nat false
               ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1cb").
     iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpp3c : add_vec (mword_of_int (KernelSyms.iput + 0x1c) : mword 64)
-                      (sign_extend' 64 (mword_of_int 32 : mword 13))
+                      (sign_extend' 64 (mword_of_int 30 : mword 13))
                     = mword_of_int (KernelSyms.iput + 0x3c)) by pcw.
     iEval (rewrite Hpp3c) in "Hpc".
     (* the slot's own share comes out of the lock's big-op *)
@@ -2301,14 +2301,14 @@ Section ProofIput.
                     = mword_of_int (KernelSyms.iput + 0x6c)) by pcw.
     iEval (rewrite Hpp6c) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x6c)) Rra
-              (mword_of_int 2096478 : mword 21) J3 (K - 4)%nat eb
+              (mword_of_int 2096896 : mword 21) J3 (K - 4)%nat eb
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi6c").
     iIntros (CIDm4 Hsm4) "Hcg Hpc".
     set (J4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x6c) : mword 64) 4)]> J3).
     assert (Htgtiu : add_vec (mword_of_int (KernelSyms.iput + 0x6c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096478 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096896 : mword 21))
                      = mword_of_int KernelSyms.iupdate) by pcw.
     iEval (rewrite Htgtiu) in "Hpc".
     assert (HJ4a0 : J4 !!! Regidx Ra0 = ientry k)
@@ -2464,14 +2464,14 @@ Section ProofIput.
                     = mword_of_int (KernelSyms.iput + 0x76)) by pcw.
     iEval (rewrite Hpp76) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x76)) Rra
-              (mword_of_int 2970 : mword 21) J5 (K - 4)%nat eb
+              (mword_of_int 3042 : mword 21) J5 (K - 4)%nat eb
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi76").
     iIntros (CIDm6 Hsm6) "Hcg Hpc".
     set (J6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x76) : mword 64) 4)]> J5).
     assert (Htgtrs : add_vec (mword_of_int (KernelSyms.iput + 0x76) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2970 : mword 21))
+                       (sign_extend' 64 (mword_of_int 3042 : mword 21))
                      = mword_of_int KernelSyms.releasesleep) by pcw.
     iEval (rewrite Htgtrs) in "Hpc".
     assert (HJ6a0 : J6 !!! Regidx Ra0 = i_lock (ientry k))
@@ -2519,13 +2519,13 @@ Section ProofIput.
                     = mword_of_int (KernelSyms.iput + 0x7e)) by pcw.
     iEval (rewrite Hpp7e) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x7e)) Ra0 Ra0
-              (mword_of_int 1262 : mword 12) J7 (K - 4)%nat eb
+              (mword_of_int 1278 : mword 12) J7 (K - 4)%nat eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7e").
     iIntros (CIDm8 Hsm8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (J8 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (J7 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 1262 : mword 12)))]> J7).
+                     (sign_extend' 64 (mword_of_int 1278 : mword 12)))]> J7).
     assert (HJ8a0 : J8 !!! Regidx Ra0 = itable_lock).
     { rewrite /J8 upd_eq /J7 upd_eq. rewrite /itable_lock. pcw. }
     assert (Hpp82 : add_vec_int (mword_of_int (KernelSyms.iput + 0x7e) : mword 64) 4

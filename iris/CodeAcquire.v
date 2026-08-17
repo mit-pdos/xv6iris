@@ -29,7 +29,6 @@ Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
-Require Import KernelDecode23.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode29.
@@ -140,8 +139,8 @@ Section CodeAcquire.
   Proof. mk_base (KernelSyms.acquire + 0x38) (mword_of_int 0x45a50513 : mword 32)
     (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) (ITYPE (mword_of_int 1114 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_45a50513. Qed.
 
-  Lemma aqi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) false (JAL (mword_of_int 2096158 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.acquire + 0x3c) (mword_of_int 0xc1fff0ef : mword 32)
-    (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (JAL (mword_of_int 2096158 : mword 21, Regidx (mword_of_int 1))) kd_c1fff0ef. Qed.
+  Lemma aqi_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) false (JAL (mword_of_int 2096198 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.acquire + 0x3c) (mword_of_int 0xc47ff0ef : mword 32)
+    (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (JAL (mword_of_int 2096198 : mword 21, Regidx (mword_of_int 1))) kd_c47ff0ef. Qed.
 
 End CodeAcquire.

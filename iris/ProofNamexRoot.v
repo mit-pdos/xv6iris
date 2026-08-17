@@ -512,10 +512,10 @@ Section ProofNamexRoot.
     iEval (rewrite Hpp04c) in "Hpc".
     (* ===== +0x04c jal ra,iget ===== *)
     assert (Htgtig : add_vec (mword_of_int (NX + 0x4c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094538 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094466 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (NX + 0x4c)) Rra
-              (mword_of_int 2094538 : mword 21) A2 (K - 12)%nat b
+              (mword_of_int 2094466 : mword 21) A2 (K - 12)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi04c").
     iIntros (CID23 Hq23) "Hcg Hpc".

@@ -354,22 +354,22 @@ Section ProofSysUnlinkTails.
                   = mword_of_int (SU + 0xf0)) by pcw.
     iEval (rewrite Hp0) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID1) (mword_of_int (SU + 0xf0)) Ra0 Ra0
-              (mword_of_int 1488 : mword 12) P1 K b
+              (mword_of_int 1416 : mword 12) P1 K b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1").
     iIntros (CID2 Hq2) "Hcg Hpc".
     pose (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 1488 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 1416 : mword 12)))]> P1).
     assert (Hp1 : add_vec_int (mword_of_int (SU + 0xf0) : mword 64) 4
                   = mword_of_int (SU + 0xf4)) by pcw.
     iEval (rewrite Hp1) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (SU + 0xf4)) Rra
-              (mword_of_int 2078700 : mword 21) P2 K b
+              (mword_of_int 2078628 : mword 21) P2 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2").
     iIntros (CID3 Hq3) "Hcg Hpc".
     assert (Htgt : add_vec (mword_of_int (SU + 0xf4) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2078700 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2078628 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
@@ -418,22 +418,22 @@ Section ProofSysUnlinkTails.
                   = mword_of_int (SU + 0x132)) by pcw.
     iEval (rewrite Hp0) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID1) (mword_of_int (SU + 0x132)) Ra0 Ra0
-              (mword_of_int 1446 : mword 12) P1 K b
+              (mword_of_int 1374 : mword 12) P1 K b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1").
     iIntros (CID2 Hq2) "Hcg Hpc".
     pose (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 1446 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 1374 : mword 12)))]> P1).
     assert (Hp1 : add_vec_int (mword_of_int (SU + 0x132) : mword 64) 4
                   = mword_of_int (SU + 0x136)) by pcw.
     iEval (rewrite Hp1) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (SU + 0x136)) Rra
-              (mword_of_int 2078634 : mword 21) P2 K b
+              (mword_of_int 2078562 : mword 21) P2 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2").
     iIntros (CID3 Hq3) "Hcg Hpc".
     assert (Htgt : add_vec (mword_of_int (SU + 0x136) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2078634 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2078562 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
@@ -482,22 +482,22 @@ Section ProofSysUnlinkTails.
                   = mword_of_int (SU + 0x13e)) by pcw.
     iEval (rewrite Hp0) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID1) (mword_of_int (SU + 0x13e)) Ra0 Ra0
-              (mword_of_int 1458 : mword 12) P1 K b
+              (mword_of_int 1386 : mword 12) P1 K b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1").
     iIntros (CID2 Hq2) "Hcg Hpc".
     pose (P2 := <[Regidx Ra0 := regval_into_reg
                    (add_vec (rget P1 Ra0)
-                      (sign_extend' 64 (mword_of_int 1458 : mword 12)))]> P1).
+                      (sign_extend' 64 (mword_of_int 1386 : mword 12)))]> P1).
     assert (Hp1 : add_vec_int (mword_of_int (SU + 0x13e) : mword 64) 4
                   = mword_of_int (SU + 0x142)) by pcw.
     iEval (rewrite Hp1) in "Hpc".
     iApply (wp_jal_s_sconf (CID := CID2) (mword_of_int (SU + 0x142)) Rra
-              (mword_of_int 2078622 : mword 21) P2 K b
+              (mword_of_int 2078550 : mword 21) P2 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2").
     iIntros (CID3 Hq3) "Hcg Hpc".
     assert (Htgt : add_vec (mword_of_int (SU + 0x142) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2078622 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2078550 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
     (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote

@@ -178,10 +178,10 @@ Section KvminithartBody.
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     (* ============ +0x10 ld a5,764(a5) : a5 := root_b ============ *)
-    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 952 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
+    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 968 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (kvi_10 with "Htext") as "Hi10".
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 952 : mword 12)
+    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 968 : mword 12)
               A0 (K - 2)%nat (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 []").

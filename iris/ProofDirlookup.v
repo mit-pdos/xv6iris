@@ -1671,23 +1671,23 @@ Section ProofDirlookupMain.
           iEval (rewrite Hpp4a) in "Hpc".
           (* +0x4a addi a0,a0,3290 : ...and its low part *)
           iApply (wp_addi4_s_sconf (mword_of_int (DL + 0x4a)) Ra0 Ra0
-                    (mword_of_int 3324 : mword 12) PA1 (K - 12)%nat b
+                    (mword_of_int 3252 : mword 12) PA1 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a").
           iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
           set (PA2 := <[Regidx Ra0 := regval_into_reg
                          (add_vec (rget PA1 Ra0)
-                            (sign_extend' 64 (mword_of_int 3324 : mword 12)))]> PA1).
+                            (sign_extend' 64 (mword_of_int 3252 : mword 12)))]> PA1).
           assert (Hpp4e : add_vec_int (mword_of_int (DL + 0x4a) : mword 64) 4
                           = mword_of_int (DL + 0x4e)) by pcw.
           iEval (rewrite Hpp4e) in "Hpc".
           (* +0x4e jal ra,panic -- and panic() never returns *)
           iApply (wp_jal_s_sconf (mword_of_int (DL + 0x4e)) Rra
-                    (mword_of_int 2084912 : mword 21) PA2 (K - 12)%nat b
+                    (mword_of_int 2084840 : mword 21) PA2 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi4e").
           iIntros (CIDpa4 Hqpa4) "Hcg Hpc".
           assert (Htgtpn : add_vec (mword_of_int (DL + 0x4e) : mword 64)
-                             (sign_extend' 64 (mword_of_int 2084912 : mword 21))
+                             (sign_extend' 64 (mword_of_int 2084840 : mword 21))
                            = mword_of_int KernelSyms.panic) by pcw.
           iEval (rewrite Htgtpn) in "Hpc".
           (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
@@ -1991,10 +1991,10 @@ Section ProofDirlookupMain.
             iEval (rewrite Hbb8e) in "Hpc".
             (* +0x8e jal ra,iget *)
             assert (Htgtig : add_vec (mword_of_int (DL + 0x8e) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094644 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2094572 : mword 21))
                       = mword_of_int KernelSyms.iget) by pcw.
             iApply (wp_jal_s_sconf (mword_of_int (DL + 0x8e)) Rra
-                      (mword_of_int 2094644 : mword 21) N6 (K - 12)%nat b
+                      (mword_of_int 2094572 : mword 21) N6 (K - 12)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hi8e").
             iIntros (CIDB17 HqB17) "Hcg Hpc".

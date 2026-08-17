@@ -1097,14 +1097,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp3c) in "Hpc".
     (* ===== +0x3c jal ra,printk ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x3c)) Rra
-              (mword_of_int 2085028 : mword 21) O2 (K - 8)%nat b
+              (mword_of_int 2084956 : mword 21) O2 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi3c").
     iIntros (CID3 Hq3) "Hcg Hpc".
     set (O3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x3c) : mword 64) 4)]> O2).
     assert (Htgtpk : add_vec (mword_of_int (KernelSyms.ireclaim + 0x3c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2085028 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2084956 : mword 21))
                      = mword_of_int KernelSyms.printk) by pcw.
     iEval (rewrite Htgtpk) in "Hpc".
     assert (HO3a0 : O3 !!! Regidx Ra0 = (mword_of_int irc_msg_addr : mword 64))
@@ -1238,14 +1238,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp44) in "Hpc".
     (* ===== +0x44 jal ra,iget -- THE BUFFER IS STILL HELD ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x44)) Rra
-              (mword_of_int 2095602 : mword 21) O5 (K - 8)%nat b
+              (mword_of_int 2095530 : mword 21) O5 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi44").
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (O6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64) 4)]> O5).
     assert (Htgtig : add_vec (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095602 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095530 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iEval (rewrite Htgtig) in "Hpc".
     assert (HO6a0 : O6 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
@@ -1410,14 +1410,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp4c) in "Hpc".
     (* ===== +0x4c jal ra,brelse : the buffer goes back at last ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x4c)) Rra
-              (mword_of_int 2095096 : mword 21) O8 (K - 8)%nat b
+              (mword_of_int 2095024 : mword 21) O8 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4c").
     iIntros (CID11 Hq11) "Hcg Hpc".
     set (O9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x4c) : mword 64) 4)]> O8).
     assert (Htgtbl : add_vec (mword_of_int (KernelSyms.ireclaim + 0x4c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095096 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095024 : mword 21))
                      = mword_of_int KernelSyms.brelse) by pcw.
     iEval (rewrite Htgtbl) in "Hpc".
     assert (HO9a0 : O9 !!! Regidx Ra0 = bnode kk)
@@ -1601,14 +1601,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp5a) in "Hpc".
     (* ===== +0x5a jal ra,ilock ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x5a)) Rra
-              (mword_of_int 2096506 : mword 21) OB (K - 8)%nat b
+              (mword_of_int 2096434 : mword 21) OB (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi5a").
     iIntros (CID17 Hq17) "Hcg Hpc".
     set (OC := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x5a) : mword 64) 4)]> OB).
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.ireclaim + 0x5a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096506 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096434 : mword 21))
                      = mword_of_int KernelSyms.ilock) by pcw.
     iEval (rewrite Htgtil) in "Hpc".
     assert (HOCa0 : OC !!! Regidx Ra0 = ientry kslot)
@@ -1714,14 +1714,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp60) in "Hpc".
     (* ===== +0x60 jal ra,iunlock ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x60)) Rra
-              (mword_of_int 2096674 : mword 21) OD (K - 8)%nat b
+              (mword_of_int 2096602 : mword 21) OD (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi60").
     iIntros (CID20 Hq20) "Hcg Hpc".
     set (OE := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x60) : mword 64) 4)]> OD).
     assert (Htgtiu : add_vec (mword_of_int (KernelSyms.ireclaim + 0x60) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096674 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096602 : mword 21))
                      = mword_of_int KernelSyms.iunlock) by pcw.
     iEval (rewrite Htgtiu) in "Hpc".
     assert (HOEa0 : OE !!! Regidx Ra0 = ientry kslot)
@@ -1820,14 +1820,14 @@ Section IreclaimOrphan.
     iEval (rewrite Hpp66) in "Hpc".
     (* ===== +0x66 jal ra,iput : nlink = 0, so this truncates and frees ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x66)) Rra
-              (mword_of_int 2096880 : mword 21) OF (K - 8)%nat b
+              (mword_of_int 2096808 : mword 21) OF (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi66").
     iIntros (CID23 Hq23) "Hcg Hpc".
     set (OG := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x66) : mword 64) 4)]> OF).
     assert (Htgtip : add_vec (mword_of_int (KernelSyms.ireclaim + 0x66) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096880 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096808 : mword 21))
                      = mword_of_int KernelSyms.iput) by pcw.
     iEval (rewrite Htgtip) in "Hpc".
     assert (HOGa0 : OG !!! Regidx Ra0 = ientry kslot)
@@ -2070,14 +2070,14 @@ Section IreclaimRelease.
     iEval (rewrite Hppac) in "Hpc".
     (* ===== +0xac jal ra,brelse ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xac)) Rra
-              (mword_of_int 2095000 : mword 21) V1 (K - 8)%nat b
+              (mword_of_int 2094928 : mword 21) V1 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hiac").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (V2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0xac) : mword 64) 4)]> V1).
     assert (Htgtbl : add_vec (mword_of_int (KernelSyms.ireclaim + 0xac) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095000 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094928 : mword 21))
                      = mword_of_int KernelSyms.brelse) by pcw.
     iEval (rewrite Htgtbl) in "Hpc".
     assert (HV2a0 : V2 !!! Regidx Ra0 = bnode kk)
@@ -2442,14 +2442,14 @@ Section IreclaimScan.
       iEval (rewrite Hpp8c) in "Hpc".
       (* ===== +0x8c jal ra,bread ===== *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x8c)) Rra
-                (mword_of_int 2094768 : mword 21) W5 (K - 8)%nat b
+                (mword_of_int 2094696 : mword 21) W5 (K - 8)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi8c").
       iIntros (CID6 Hq6) "Hcg Hpc".
       set (W6 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.ireclaim + 0x8c) : mword 64) 4)]> W5).
       assert (Htgtbr : add_vec (mword_of_int (KernelSyms.ireclaim + 0x8c) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094768 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094696 : mword 21))
                        = mword_of_int KernelSyms.bread) by pcw.
       iEval (rewrite Htgtbr) in "Hpc".
       assert (HW6a0 : W6 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
@@ -3040,12 +3040,12 @@ Section IreclaimMain.
     iEval (rewrite Hpp04) in "Hpc".
     (* ===== +0x04 lw a4,1192(a4) : a4 := sb.ninodes ===== *)
     assert (Hnadr : add_vec (rget R1 Ra4)
-                      (sign_extend' 64 (mword_of_int 1194 : mword 12))
+                      (sign_extend' 64 (mword_of_int 1138 : mword 12))
                     = sb_ninodes).
     { rgne. rewrite HR1a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x4)) Ra4 Ra4
-              (mword_of_int 1194 : mword 12) R1 K
+              (mword_of_int 1138 : mword 12) R1 K
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04 Hsbn").
     iIntros (CID2 Hq2) "Hcg Hpc Hsbn".
@@ -3372,12 +3372,12 @@ Section IreclaimMain.
     iEval (rewrite Hpp2a) in "Hpc".
     (* ===== +0x2a addi s4,s4,1142 : s4 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x2a)) Rs4 Rs4
-              (mword_of_int 1144 : mword 12) R8 (K - 8)%nat b
+              (mword_of_int 1088 : mword 12) R8 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2a").
     iIntros (CID18 Hq18) "Hcg Hpc".
     set (R9 := <[Regidx Rs4 := regval_into_reg
                   (add_vec (rget R8 Rs4)
-                     (sign_extend' 64 (mword_of_int 1144 : mword 12)))]> R8).
+                     (sign_extend' 64 (mword_of_int 1088 : mword 12)))]> R8).
     assert (HR9s4 : R9 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)).
     { rewrite /R9 upd_eq. rgne. rewrite HR8s4. pcw. }
     assert (HR9s1 : R9 !!! Regidx Rs1
@@ -3424,12 +3424,12 @@ Section IreclaimMain.
     iEval (rewrite Hpp32) in "Hpc".
     (* ===== +0x16 addi s6,s6,22 : s6 := the format string ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x32)) Rs6 Rs6
-              (mword_of_int 56 : mword 12) RA (K - 8)%nat b
+              (mword_of_int 4080 : mword 12) RA (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32").
     iIntros (CID20 Hq20) "Hcg Hpc".
     set (RB := <[Regidx Rs6 := regval_into_reg
                   (add_vec (rget RA Rs6)
-                     (sign_extend' 64 (mword_of_int 56 : mword 12)))]> RA).
+                     (sign_extend' 64 (mword_of_int 4080 : mword 12)))]> RA).
     assert (HRBs6 : RB !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64)).
     { rewrite /RB upd_eq. rgne. rewrite HRAs6. unfold irc_msg_addr. pcw. }
     assert (HRBs4 : RB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))

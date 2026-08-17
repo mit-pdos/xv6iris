@@ -2634,10 +2634,10 @@ Section ProofNamexMain.
                iEval (rewrite Hq136) in "Hpc".
                (* +0x146 jal ra,iput *)
                assert (Htgip : add_vec (mword_of_int (NX + 0x146) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2095600 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2095528 : mword 21))
                        = mword_of_int KernelSyms.iput) by pcw.
                iApply (wp_jal_s_sconf (mword_of_int (NX + 0x146)) Rra
-                         (mword_of_int 2095600 : mword 21) T1 (K - 12)%nat b
+                         (mword_of_int 2095528 : mword 21) T1 (K - 12)%nat b
                          ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                          with "Hcg Hpc Hj136").
                iIntros (CIDA3 HqA3) "Hcg Hpc".
@@ -3062,10 +3062,10 @@ Section ProofNamexMain.
                    assert (Htgil : add_vec
                              (mword_of_int (NX + 0xc2) : mword 64)
                              (sign_extend' 64
-                                (mword_of_int 2095346 : mword 21))
+                                (mword_of_int 2095274 : mword 21))
                            = mword_of_int KernelSyms.ilock) by pcw.
                    iApply (wp_jal_s_sconf (mword_of_int (NX + 0xc2)) Rra
-                             (mword_of_int 2095346 : mword 21) V1
+                             (mword_of_int 2095274 : mword 21) V1
                              (K - 12)%nat b ltac:(nz) ltac:(rdok)
                              ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc Hjb8").
@@ -3565,10 +3565,10 @@ Section ProofNamexMain.
                        assert (Htgiu : add_vec
                                  (mword_of_int (NX + 0x86) : mword 64)
                                  (sign_extend' 64
-                                    (mword_of_int 2095580 : mword 21))
+                                    (mword_of_int 2095508 : mword 21))
                                = mword_of_int KernelSyms.iunlock) by pcw.
                        iApply (wp_jal_s_sconf (mword_of_int (NX + 0x86)) Rra
-                                 (mword_of_int 2095580 : mword 21) NP2
+                                 (mword_of_int 2095508 : mword 21) NP2
                                  (K - 12)%nat b ltac:(nz) ltac:(rdok)
                                  ltac:(vm_compute; reflexivity)
                                  with "Hcg Hpc Hj7c").
@@ -4793,10 +4793,10 @@ Section ProofNamexMain.
                   (* +0x132 jal ra,memmove *)
                   assert (Htgmm : add_vec
                             (mword_of_int (NX + 0x132) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2085734 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2085662 : mword 21))
                           = mword_of_int KernelSyms.memmove) by pcw.
                   iApply (wp_jal_s_sconf (mword_of_int (NX + 0x132)) Rra
-                            (mword_of_int 2085734 : mword 21) S3
+                            (mword_of_int 2085662 : mword 21) S3
                             (K - 12)%nat b
                             ltac:(nz) ltac:(rdok)
                             ltac:(vm_compute; reflexivity)
@@ -5079,10 +5079,10 @@ Section ProofNamexMain.
                   (* +0xa8 jal ra,memmove -- FOURTEEN bytes, no terminator *)
                   assert (Htgmm : add_vec
                             (mword_of_int (NX + 0xa8) : mword 64)
-                            (sign_extend' 64 (mword_of_int 2085872 : mword 21))
+                            (sign_extend' 64 (mword_of_int 2085800 : mword 21))
                           = mword_of_int KernelSyms.memmove) by pcw.
                   iApply (wp_jal_s_sconf (mword_of_int (NX + 0xa8)) Rra
-                            (mword_of_int 2085872 : mword 21) T3
+                            (mword_of_int 2085800 : mword 21) T3
                             (K - 12)%nat b
                             ltac:(nz) ltac:(rdok)
                             ltac:(vm_compute; reflexivity)
@@ -5356,10 +5356,10 @@ Section ProofNamexMain.
       iEval (rewrite Hpp04c) in "Hpc".
       (* +0x4c jal ra,iget *)
       assert (Htgtig : add_vec (mword_of_int (NX + 0x4c) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094538 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094466 : mword 21))
                        = mword_of_int KernelSyms.iget) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (NX + 0x4c)) Rra
-                (mword_of_int 2094538 : mword 21) A2 (K - 12)%nat b
+                (mword_of_int 2094466 : mword 21) A2 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi04c").
       iIntros (CID23 Hq23) "Hcg Hpc".
@@ -5591,10 +5591,10 @@ Section ProofNamexMain.
       iEval (rewrite Hpp02e) in "Hpc".
       (* +0x2e jal ra,myproc *)
       assert (Htgtmp : add_vec (mword_of_int (NX + 0x2e) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2089066 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2088994 : mword 21))
                        = mword_of_int KernelSyms.myproc) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (NX + 0x2e)) Rra
-                (mword_of_int 2089066 : mword 21) R7 (K - 12)%nat b
+                (mword_of_int 2088994 : mword 21) R7 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi02e").
       iIntros (CID21 Hq21) "Hcg Hpc".
@@ -5636,10 +5636,10 @@ Section ProofNamexMain.
       iDestruct "Hcref" as "[Hckeep Hcshr]".
       (* +0x36 jal ra,idup *)
       assert (Htgtid : add_vec (mword_of_int (NX + 0x36) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2095432 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2095360 : mword 21))
                        = mword_of_int KernelSyms.idup) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (NX + 0x36)) Rra
-                (mword_of_int 2095432 : mword 21) B2 (K - 12)%nat b
+                (mword_of_int 2095360 : mword 21) B2 (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi036").
       iIntros (CID23 Hq23) "Hcg Hpc".

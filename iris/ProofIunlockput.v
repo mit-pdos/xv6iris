@@ -246,14 +246,14 @@ Section ProofIunlockputMain.
     iEval (rewrite Hpp0c) in "Hpc".
     (* ===== +0x0c jal ra,iunlock ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x0c)) Rra
-              (mword_of_int 2096790 : mword 21) R3 (K - 4)%nat b
+              (mword_of_int 2096718 : mword 21) R3 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0c").
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (R4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x0c) : mword 64) 4)]> R3).
     assert (Htgtiu : add_vec (mword_of_int (KernelSyms.iunlockput + 0x0c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096790 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096718 : mword 21))
                      = mword_of_int KernelSyms.iunlock) by pcw.
     iEval (rewrite Htgtiu) in "Hpc".
     assert (HR4a0 : R4 !!! Regidx Ra0 = ip)
@@ -321,14 +321,14 @@ Section ProofIunlockputMain.
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== +0x12 jal ra,iput ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x12)) Rra
-              (mword_of_int 2096996 : mword 21) R5 (K - 4)%nat b
+              (mword_of_int 2096924 : mword 21) R5 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi12").
     iIntros (CID10 Hq10) "Hcg Hpc".
     set (R6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) 4)]> R5).
     assert (Htgtip : add_vec (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096996 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096924 : mword 21))
                      = mword_of_int KernelSyms.iput) by pcw.
     iEval (rewrite Htgtip) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx Ra0 = ip)

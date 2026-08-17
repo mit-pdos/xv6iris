@@ -27,6 +27,7 @@ Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
+Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -37,6 +38,7 @@ Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode22.
 Require Import KernelDecode23.
+Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode28.
@@ -80,17 +82,17 @@ Section CodeAllocproc.
   Proof. mk_base (KernelSyms.allocproc + 0xc) (mword_of_int 0x00011497 : mword 32)
     (mword_of_int (KernelSyms.allocproc + 0xc) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00011497. Qed.
 
-  Lemma api_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.allocproc + 0x10) : mword 64) false (ITYPE (mword_of_int 3286 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.allocproc + 0x10) (mword_of_int 0xcd648493 : mword 32)
-    (mword_of_int (KernelSyms.allocproc + 0x10) : mword 64) (ITYPE (mword_of_int 3286 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_cd648493. Qed.
+  Lemma api_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.allocproc + 0x10) : mword 64) false (ITYPE (mword_of_int 3302 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.allocproc + 0x10) (mword_of_int 0xce648493 : mword 32)
+    (mword_of_int (KernelSyms.allocproc + 0x10) : mword 64) (ITYPE (mword_of_int 3302 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_ce648493. Qed.
 
   Lemma api_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.allocproc + 0x14) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 18), AUIPC)).
   Proof. mk_base (KernelSyms.allocproc + 0x14) (mword_of_int 0x00016917 : mword 32)
     (mword_of_int (KernelSyms.allocproc + 0x14) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 18), AUIPC)) kd_00016917. Qed.
 
-  Lemma api_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.allocproc + 0x18) : mword 64) false (ITYPE (mword_of_int 1742 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
-  Proof. mk_base (KernelSyms.allocproc + 0x18) (mword_of_int 0x6ce90913 : mword 32)
-    (mword_of_int (KernelSyms.allocproc + 0x18) : mword 64) (ITYPE (mword_of_int 1742 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_6ce90913. Qed.
+  Lemma api_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.allocproc + 0x18) : mword 64) false (ITYPE (mword_of_int 1758 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
+  Proof. mk_base (KernelSyms.allocproc + 0x18) (mword_of_int 0x6de90913 : mword 32)
+    (mword_of_int (KernelSyms.allocproc + 0x18) : mword 64) (ITYPE (mword_of_int 1758 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) kd_6de90913. Qed.
 
   Lemma api_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.allocproc + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.allocproc + 0x1c) (mword_of_int 0x8526 : mword 16)

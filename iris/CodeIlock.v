@@ -95,9 +95,9 @@ Section CodeIlock.
   Proof. mk_rvc (KernelSyms.ilock + 0x14) (mword_of_int 0x0541 : mword 16)
     (mword_of_int (KernelSyms.ilock + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_0541 exec_execute_C_ADDI. Qed.
 
-  Lemma ili_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) false (JAL (mword_of_int 3368 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ilock + 0x16) (mword_of_int 0x529000ef : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) (JAL (mword_of_int 3368 : mword 21, Regidx (mword_of_int 1))) kd_529000ef. Qed.
+  Lemma ili_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) false (JAL (mword_of_int 3440 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ilock + 0x16) (mword_of_int 0x571000ef : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) (JAL (mword_of_int 3440 : mword 21, Regidx (mword_of_int 1))) kd_571000ef. Qed.
 
   Lemma ili_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x1a) : mword 64) true (LOAD (mword_of_int 64 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.ilock + 0x1a) (mword_of_int 0x40bc : mword 16)
@@ -159,9 +159,9 @@ Section CodeIlock.
   Proof. mk_base (KernelSyms.ilock + 0x3e) (mword_of_int 0x0001d597 : mword 32)
     (mword_of_int (KernelSyms.ilock + 0x3e) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_0001d597. Qed.
 
-  Lemma ili_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) false (LOAD (mword_of_int 1700 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)).
-  Proof. mk_base (KernelSyms.ilock + 0x42) (mword_of_int 0x6a45a583 : mword 32)
-    (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) (LOAD (mword_of_int 1700 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)) kd_6a45a583. Qed.
+  Lemma ili_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) false (LOAD (mword_of_int 1716 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)).
+  Proof. mk_base (KernelSyms.ilock + 0x42) (mword_of_int 0x6b45a583 : mword 32)
+    (mword_of_int (KernelSyms.ilock + 0x42) : mword 64) (LOAD (mword_of_int 1716 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), false, 4)) kd_6b45a583. Qed.
 
   Lemma ili_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.ilock + 0x46) : mword 64) true (RTYPEW (creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 3)), creg2reg_idx (Cregidx (mword_of_int 3)), ADDW)).
   Proof. mk_rvc (KernelSyms.ilock + 0x46) (mword_of_int 0x9dbd : mword 16)

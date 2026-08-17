@@ -140,11 +140,11 @@ Section ProofKalloc.
     assert (Hpp0e : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x0a) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e addi a0,a0,2046  (a0 := &kmem) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x8ae : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x8be : mword 12)
               R3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e").
     iIntros (CID7 Hs7) "Hcg Hpc".
-    set (R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2222 : mword 12)))]> R3).
+    set (R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2238 : mword 12)))]> R3).
     iEval (rgne) in "Hcg".
     assert (HR4a0 : R4 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
     { rewrite /R4 upd_eq. rewrite /R3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
@@ -205,9 +205,9 @@ Section ProofKalloc.
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a ld s1,-2038(s1) : s1 := head *)
     iDestruct "HRres" as (head pages) "(Hflw & Hchain & Hauth)".
-    assert (Hldaddr : add_vec (R6 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x8ba : mword 12)) = fl).
+    assert (Hldaddr : add_vec (R6 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x8ca : mword 12)) = fl).
     { rewrite Hs1R6 Hfl. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kalloc + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x8ba : mword 12)
+    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kalloc + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x8ca : mword 12)
               R6 (trap_res b + (K - 4))%nat head false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [Hflw]").
     { iEval (rewrite -Hldaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
@@ -252,12 +252,12 @@ Section ProofKalloc.
       assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x4c) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp50) in "Hpc".
       (* +0x50 addi a0,a0,1980  (a0 := &kmem) *)
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x50)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x86c : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x50)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x87c : mword 12)
                 E1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi50").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
-      set (E2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (E1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2156 : mword 12)))]> E1).
+      set (E2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (E1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2172 : mword 12)))]> E1).
       assert (Ha0kmem2 : E2 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
       { rewrite /E2 upd_eq /E1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
       assert (Hpp54 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x50) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x54)) by (apply bv_eq; vm_compute; reflexivity).
@@ -506,9 +506,9 @@ Section ProofKalloc.
       assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp26) in "Hpc".
       (* +0x26 sd a5,2046(a4) : kmem.freelist := nxt *)
-      assert (Hstaddr : add_vec (R9 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0x8ae : mword 12)) = fl).
+      assert (Hstaddr : add_vec (R9 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0x8be : mword 12)) = fl).
       { rewrite Ha4R9 Hfl. apply bv_eq; vm_compute; reflexivity. }
-      iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kalloc + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x8ae : mword 12)
+      iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kalloc + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x8be : mword 12)
                 R9 (trap_res b + (K - 4))%nat pg false with "Hcg Hpc Hi26 [Hflw]").
       { iEval (rewrite -Hstaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
       iApply wp_next_off_intro.
@@ -532,13 +532,13 @@ Section ProofKalloc.
       set (R10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kalloc + 0x2a) : mword 64) (auipc_off (mword_of_int 0x12 : mword 20)))]> R9).
       assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2e) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x88e : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x89e : mword 12)
                 R10 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       iEval (rgne) in "Hcg".
-      set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2190 : mword 12)))]> R10).
+      set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2206 : mword 12)))]> R10).
       assert (Ha0kmem : R11 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
       { rewrite /R11 upd_eq /R10 upd_eq. apply bv_eq; vm_compute; reflexivity. }
       assert (Hpp32 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x2e) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x32)) by (apply bv_eq; vm_compute; reflexivity).

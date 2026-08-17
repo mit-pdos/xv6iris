@@ -1818,14 +1818,14 @@ Section ProofFilewrite.
     iEval (rewrite Hpp8c) in "Hpc".
     (* ---- +0x8c jal ra,ilock ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0x8c)) Rra
-              (mword_of_int 2092716 : mword 21) D2 (K - 12)%nat b
+              (mword_of_int 2092644 : mword 21) D2 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8c").
     iIntros (CIDa3 Hsa3) "Hcg Hpc".
     set (D3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0x8c) : mword 64) 4)]> D2).
     assert (Htgtil : add_vec (mword_of_int (FW + 0x8c) : mword 64)
-              (sign_extend' 64 (mword_of_int 2092716 : mword 21))
+              (sign_extend' 64 (mword_of_int 2092644 : mword 21))
               = mword_of_int KernelSyms.ilock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtil) in "Hpc".
@@ -2260,14 +2260,14 @@ Section ProofFilewrite.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb8) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0xb8)) Rra
-              (mword_of_int 2092846 : mword 21) X1 (K - 12)%nat b
+              (mword_of_int 2092774 : mword 21) X1 (K - 12)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib8").
     iIntros (CIDb4 Hsb4) "Hcg Hpc".
     set (X2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FW + 0xb8) : mword 64) 4)]> X1).
     assert (Htgtiu : add_vec (mword_of_int (FW + 0xb8) : mword 64)
-              (sign_extend' 64 (mword_of_int 2092846 : mword 21))
+              (sign_extend' 64 (mword_of_int 2092774 : mword 21))
               = mword_of_int KernelSyms.iunlock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtiu) in "Hpc".

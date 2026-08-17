@@ -1774,10 +1774,10 @@ Section KexecCBad.
     iEval (rewrite Hpp1da) in "Hpc".
     (* ---- +0x1da: jal ra,proc_freepagetable ---- *)
     assert (Htpfp : add_vec (mword_of_int (KXA + 0x1da) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085186 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085114 : mword 21))
                    = mword_of_int KernelSyms.proc_freepagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x1da)) Rra
-              (mword_of_int 2085186 : mword 21) B2 (K - 68)%nat true
+              (mword_of_int 2085114 : mword 21) B2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpfp; vm_compute; reflexivity)
               with "Hcg Hpc Hi1da").

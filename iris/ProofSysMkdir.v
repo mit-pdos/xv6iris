@@ -991,14 +991,14 @@ Section ProofSysMkdirBody.
     iEval (rewrite Hpp16) in "Hpc".
     (* ================= +0x16 jal ra,argstr ================= *)
     iApply (wp_jal_s_sconf (CID := CID9) (mword_of_int (MD + 0x16)) Rra
-              (mword_of_int 2086452 : mword 21) M6 (K - 18)%nat b
+              (mword_of_int 2086380 : mword 21) M6 (K - 18)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16").
     iIntros (CID10 Hq10) "Hcg Hpc".
     set (M7 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (MD + 0x16) : mword 64) 4)]> M6).
     assert (Hjas : add_vec (mword_of_int (MD + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2086452 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2086380 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM7ra : (M7 !!! Regidx Rra : mword 64)
