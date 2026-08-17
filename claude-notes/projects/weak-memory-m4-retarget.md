@@ -108,7 +108,39 @@ callback), registers via the client's `reg_pointsto`s.  Consequences:
   `wcert_regonly`); then the OWNED-WINDOW extension (RAM reads/writes at
   bytes the client holds `↦w` for; the barrier arm).  Report the register
   footprint of the boot-cone instructions and whether `sig_seip` is read.
-- **M4-1** the funnel twin: `ewp_instr` with `wwp_cb`'s interface (fetch
+- **M4-1 — FIRST SLICE LANDED (2026-08-17, `iris/WeakEvFunnel.v` +
+  `iris/WeakEvWire.v`, `1d9cee32`).**  `erun Dr Dw m t` (the mirror with
+  READ and WRITE register footprints split), `ereg_fr c rs Dr q` (dfrac a
+  FUNCTION of the register — needed because `try_step` reads `misa`/
+  `mseccfg`/`pma_regions`/`htif_tohost_base`/`elp` which `hw_config` holds
+  persistently, and `cur_privilege`/`mstatus`/`hart_state` at a fraction:
+  `DfracOwn 1` over the footprint is unobtainable, so `WeakEvLift`'s
+  `ereg_frame` is the constant-1 instance), `ewp_ev_one_fetch`/
+  `ewp_instr_pure` (one `▷`, as `wwp_cb`), the demonstration
+  `ewp_lui_leaf_ev` = `WeakLeafUtypeShift.wwp_lui_leaf` restated at the
+  event tier (statement delta recorded in the file §6b: the register bundle
+  becomes one `ereg_fr`; the decode/pmp/alignment premises are absorbed by
+  the run certificate), `wire_inv` + **`ewp_plic`** (the PLIC thread's WP,
+  by Löb — an obligation of the WP package that had no rule before) and
+  `ewp_instr` with the wires OUT of the owned frame (a wire read needs no
+  resource: the certificate branches at the node, `ewrun`).  FINDINGS:
+  (1) **THE MIRROR GAP** — the tree's existing whole-instruction `exec_eff`
+  certificates do NOT transfer to `erun`/`epure`: `exec_eff` consults
+  `dev_read`/`dev_write` at a device access and RECORDS NOTHING, so a
+  successful `exec_eff` run cannot witness device-freedom.  The agent's
+  estimate for re-mirroring the `try_step` spine at `erun` is ~2 800 lines
+  of mechanical script; THE ORCHESTRATOR'S ALTERNATIVE (do this instead):
+  make `WeakCert.exec_eff` RECORD device accesses in its trace (two new
+  `weff` constructors `WEdevr`/`WEdevw`); the existing certificate library
+  never reaches a device arm, so its lemma statements (traces of RAM
+  effects only) re-check with the same scripts, and a certificate's trace
+  then witnesses device-freedom by inspection — the mirror re-do collapses
+  to adding two arms to `weff_apply`/`weff_quiet`/`weff_touches` and their
+  lemma families.  (2) B1 dissolves: the `minstret`/clock cells are
+  hart-local and go into `Dw`.  (3) `leaf_hide` needs no adapter; the
+  `mmode_config` adapter (`hw_config`'s five registers at
+  `DfracDiscarded` in `ereg_fr`) is the next packaging item.
+  ORIGINAL BRIEF: the funnel twin: `ewp_instr` with `wwp_cb`'s interface (fetch
   through `ewp_ev_fetch`/`etext_word` from `winstr`'s text resource; the
   minstret/clock cells per B1-local; `mmode_config`), so `WeakLeafM`'s 34
   hoisted leaves and `WeakLeafO`'s 65 wrappers re-check with `WWP Loop`
