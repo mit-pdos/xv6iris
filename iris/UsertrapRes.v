@@ -1302,14 +1302,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res SY.syscall_env.
+    ut_res (kt := KT0) (SY.syscall_env (kt := KT0)).
 
   Definition usertrap_res_parked
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_parked SY.syscall_env.
+    ut_res_parked (kt := KT0) (SY.syscall_env (kt := KT0)).
 
   Lemma usertrap_res_tlb_close
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1317,7 +1317,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
-  Proof. exact (ut_res_tlb_close SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_tlb_close (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp kroot). Qed.
 
   Lemma usertrap_res_tlb_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1326,14 +1326,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res pt ksp -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_tlb_open (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp). Qed.
 
   Definition usertrap_res_bare
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_bare SY.syscall_env.
+    ut_res_bare (kt := KT0) (SY.syscall_env (kt := KT0)).
 
   Lemma usertrap_res_pt_close
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1341,7 +1341,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_pt_close SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_pt_close (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp). Qed.
 
   Lemma usertrap_res_pt_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1349,7 +1349,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
-  Proof. exact (ut_res_pt_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_pt_open (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp). Qed.
 
   Lemma usertrap_res_bare_norm
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1357,7 +1357,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
-  Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_bare_norm (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp). Qed.
 
   Lemma usertrap_res_tf_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1368,7 +1368,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
     usertrap_res_bare pt ksp -∗
     ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_bare_tf_open (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp kroot). Qed.
 
   Lemma usertrap_res_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1377,7 +1377,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗
     hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_bare_csrs_open (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp). Qed.
 
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1390,6 +1390,6 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
         (∀ ws' : list (mword 64),
            tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_bare_tf_csrs_open (kt := KT0) (SY.syscall_env (kt := KT0)) pt ksp kroot). Qed.
 
 End UtResFits.

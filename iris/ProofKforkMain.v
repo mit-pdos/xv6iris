@@ -260,7 +260,7 @@ Section KforkArms.
     arm_pay kt lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
+    (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at (kt := kt) sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv_nocwd γf npa pid_c Vc -∗
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
@@ -346,7 +346,7 @@ Section KforkArms.
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
-    kfk_frame sp0 ra0 s00 s10 s50 -∗
+    kfk_frame (kt := kt) sp0 ra0 s00 s10 s50 -∗
     proc_priv γf pme pid_p Vp -∗
     (* at [on = None] allocproc's two not-found disjuncts are the SAME
        resource -- [avail_sub None n] is [None] and [avail_zero None] is
@@ -460,7 +460,7 @@ Section KforkArms.
     sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
-    kfk_frame_at sp0 ra0 s00 s10 s50
+    kfk_frame_at (kt := kt) sp0 ra0 s00 s10 s50
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv_nocwd γf npa pid_c Vc' -∗

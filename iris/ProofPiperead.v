@@ -1391,8 +1391,8 @@ Section ProofPiperead.
         by (rewrite (HthrG Rs11 ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact HMs11).
       (* ---- carve the [ch] byte out of the frame slot at sp+8 ---- *)
       iDestruct "Hq11" as (w11) "Hc11".
-      iDestruct (slot_bytes_own with "Hc11") as "[%Hal11 Hby11]".
-      iDestruct (bytes_own_acc (DfracOwn 1) (pa_stk sp0 11) 8 7 ltac:(lia) with "Hby11")
+      iDestruct (slot_bytes_own (KTR := kt) with "Hc11") as "[%Hal11 Hby11]".
+      iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) (pa_stk sp0 11) 8 7 ltac:(lia) with "Hby11")
         as "[Hchb Hchback]".
       iDestruct "Hchb" as (chb0) "Hch".
       iEval (rewrite -Hchaddr) in "Hch".
@@ -1574,7 +1574,7 @@ Section ProofPiperead.
         iDestruct "Hchx" as (chbf) "Hchf".
         iEval (rewrite Hchaddr) in "Hchf".
         iDestruct ("Hchback" $! chbf with "Hchf") as "Hby11".
-        iDestruct (bytes_own_slot (pa_stk sp0 11) Hal11 with "Hby11") as (w11f) "Hc11".
+        iDestruct (bytes_own_slot (KTR := kt) (pa_stk sp0 11) Hal11 with "Hby11") as (w11f) "Hc11".
         assert (HthrX7 : forall r : mword 5, is_cs_idx r = true ->
                   r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> X7 !!! Regidx r = M2 !!! Regidx r).
         { intros r Hr N22 N23 N24.

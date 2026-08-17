@@ -2347,7 +2347,7 @@ Section ProofSysLinkBody.
                    iEval (rewrite Hpp8c) in "Hpc".
                    (* ===== +0x8c lw a4,0(s2) -- dp->dev ===== *)
                    iEval (rewrite /i_dev) in "Hidevd".
-                   iApply (wp_lw_s_sconf (CID := CID53) (mword_of_int (SL + 0x8c))
+                   iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (CID := CID53) (mword_of_int (SL + 0x8c))
                              Ra4 Rs2 (mword_of_int 0 : mword 12) U1 (K - 38)%nat
                              dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8c [Hidevd]").
                    { iEval (rgne; rewrite HU1s2). iExact "Hidevd". }
@@ -2379,7 +2379,7 @@ Section ProofSysLinkBody.
                       rides along to the reassembly at +0xa0 below. *)
                    iDestruct "Hkeep"
                      as "(Hkfrag & Hklive & (Hipdev & Hipinum) & Hkshare)".
-                   iApply (wp_clw_s_sconf (CID := CID54) (mword_of_int (SL + 0x90))
+                   iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CID54) (mword_of_int (SL + 0x90))
                              Ra5 Rs1 (mword_of_int 0 : mword 12) U2 (K - 38)%nat
                              dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi90 [Hipdev]").
                    { iEval (rgne; rewrite HU2s1). iExact "Hipdev". }
@@ -2415,7 +2415,7 @@ Section ProofSysLinkBody.
                                    = mword_of_int (SL + 0x96)) by pcw.
                    iEval (rewrite Hpp96) in "Hpc".
                    (* ===== +0x96 c.lw a2,4(s1) -- ip->inum ===== *)
-                   iApply (wp_clw_s_sconf (CID := CID56) (mword_of_int (SL + 0x96))
+                   iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CID56) (mword_of_int (SL + 0x96))
                              Ra2 Rs1 (mword_of_int 4 : mword 12) U3 (K - 38)%nat
                              inum b ltac:(nz) ltac:(rdok)
                              with "Hcg Hpc Hi96 [Hipinum]").

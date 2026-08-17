@@ -1535,7 +1535,7 @@ Section VdrwdP4.
     assert (Hava : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_avail_ptr : SailStdpp.Values.mword 64))
       by (rewrite Ha5; apply vdrwd_avail_ptr_addr).
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) Ra3 Ra5
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) Ra3 Ra5
               (mword_of_int 8 : mword 12) M av pav false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi162 []").
@@ -1690,7 +1690,7 @@ Section VdrwdP4.
     assert (Hava2 : add_vec (N5 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                     = (d_avail_ptr : SailStdpp.Values.mword 64))
       by (rewrite HN5a5; apply vdrwd_avail_ptr_addr).
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x18a) : mword 64) Ra4 Ra5
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x18a) : mword 64) Ra4 Ra5
               (mword_of_int 8 : mword 12) N5 av pav false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi176 []").

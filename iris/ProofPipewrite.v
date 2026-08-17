@@ -569,7 +569,7 @@ Section PwPieces.
     iDestruct "A5" as (w12) "H12". iEval (rewrite E12) in "H12".
     iDestruct "A6" as (w13) "H13". iEval (rewrite E13) in "H13".
     iDestruct "A7" as (w14) "H14". iEval (rewrite E14) in "H14".
-    iDestruct (slot_bytes_own with "H13") as "[%Hal Hb13]".
+    iDestruct (slot_bytes_own (KTR := kt) with "H13") as "[%Hal Hb13]".
     iSplitL "H8 H9 H10 H11 H12".
     { iExists w8, w9, w10, w11, w12. iFrame "H8 H9 H10 H11 H12". }
     rewrite /pw_chslot. iSplitR; [done|]. iFrame "Hb13". iExists w14. iFrame "H14".
@@ -589,7 +589,7 @@ Section PwPieces.
     assert (E14 : pa_stk (pa_stk sp0 7%nat) 7%nat = pa_stk sp0 14%nat) by (apply pw_slot_eq; reflexivity).
     iIntros "H8 H9 H10 H11 H12 (%Hal & Hb13 & H14)".
     iDestruct "H14" as (w14) "H14".
-    iDestruct (bytes_own_slot (pa_stk sp0 13%nat) Hal with "Hb13") as (w13) "H13".
+    iDestruct (bytes_own_slot (KTR := kt) (pa_stk sp0 13%nat) Hal with "Hb13") as (w13) "H13".
     rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iSplitL "H8".  { iExists w8.  iEval (rewrite E8).  iExact "H8". }
     iSplitL "H9".  { iExists w9.  iEval (rewrite E9).  iExact "H9". }
@@ -673,7 +673,7 @@ Section PwConts.
        ⌜pw_base_regs m M (pa_stk sp0 14%nat)⌝ -∗
        ⌜pipe_rw_ret n (M !!! Regidx Rs2)⌝ -∗
        ⌜uptd_ext (pv_upt V) P'⌝ -∗
-       pw_frame7 m sp0 -∗
+       pw_frame7 (kt := kt) m sp0 -∗
        stack_own (KTR := kt) (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr kt M (av - 14)%nat true (proc_addr j) -∗
        cpu_own 0%nat eb (proc_addr j) true ∅ -∗
@@ -694,7 +694,7 @@ Section PwConts.
        ⌜M !!! Regidx Rs1 = pi⌝ -∗
        ⌜pipe_rw_ret n (M !!! Regidx Rs2)⌝ -∗
        ⌜uptd_ext (pv_upt V) P'⌝ -∗
-       pw_frame7 m sp0 -∗
+       pw_frame7 (kt := kt) m sp0 -∗
        stack_own (KTR := kt) (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr kt M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
        cpu_own 1%nat eb (proc_addr j) false ({["pipe"]} ∪ lks) -∗
@@ -716,9 +716,9 @@ Section PwConts.
      ∀ (M : regfile) (P' : uptd),
        ⌜pw_min_regs m M (pa_stk sp0 14%nat) pi⌝ -∗
        ⌜uptd_ext (pv_upt V) P'⌝ -∗
-       pw_frame7 m sp0 -∗
-       pw_frame5 m sp0 -∗
-       pw_chslot sp0 -∗
+       pw_frame7 (kt := kt) m sp0 -∗
+       pw_frame5 (kt := kt) m sp0 -∗
+       pw_chslot (kt := kt) sp0 -∗
        sie_cap_gpr kt M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
        cpu_own 1%nat eb (proc_addr j) false ({["pipe"]} ∪ lks) -∗
        arm_pay kt 0%nat eb (proc_addr j) -∗
@@ -748,9 +748,9 @@ Section PwConts.
        ⌜(0 <= i < n)%Z⌝ -∗
        ⌜uptd_ext (pv_upt V) Pc⌝ -∗
        ⌜pw_loop_regs m M (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i⌝ -∗
-       pw_frame7 m sp0 -∗
-       pw_frame5 m sp0 -∗
-       pw_chslot sp0 -∗
+       pw_frame7 (kt := kt) m sp0 -∗
+       pw_frame5 (kt := kt) m sp0 -∗
+       pw_chslot (kt := kt) sp0 -∗
        sie_cap_gpr kt M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
        cpu_own 1%nat eb (proc_addr j) false ({["pipe"]} ∪ lks) -∗
        arm_pay kt 0%nat eb (proc_addr j) -∗
@@ -811,10 +811,10 @@ Section PwRestore.
     instr p2 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx Rs8, false, 8)) -∗
     instr p3 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx Rs9, false, 8)) -∗
     instr p4 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx Rs10, false, 8)) -∗
-    pw_frame5 m sp0 -∗
+    pw_frame5 (kt := kt) m sp0 -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ M' : regfile, ⌜ pw_restored m M M' ⌝ -∗
-        sie_cap_gpr kt M' K b pme -∗ pc_is p5 -∗ pw_frame5 m sp0 -∗
+        sie_cap_gpr kt M' K b pme -∗ pc_is p5 -∗ pw_frame5 (kt := kt) m sp0 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -921,7 +921,7 @@ Section PwGuard.
 
   Context {kt : ktier}.
   Lemma pw_stack7_of (m : regfile) (sp0 : mword 64) :
-    pw_frame5 m sp0 -∗ pw_chslot sp0 -∗ stack_own (KTR := kt) (pa_stk sp0 7%nat) 7%nat.
+    pw_frame5 (kt := kt) m sp0 -∗ pw_chslot (kt := kt) sp0 -∗ stack_own (KTR := kt) (pa_stk sp0 7%nat) 7%nat.
   Proof.
     iIntros "(F8 & F9 & F10 & F11 & F12) HCH".
     iApply (pw_hi_intro sp0 with "F8 F9 F10 F11 F12 HCH").
@@ -937,7 +937,7 @@ Section PwGuard.
     uptd_ext (pv_upt V) Pc ->
     pw_loop_regs m M (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i ->
     kernel_text -∗
-    pw_frame7 m sp0 -∗ pw_frame5 m sp0 -∗ pw_chslot sp0 -∗
+    pw_frame7 (kt := kt) m sp0 -∗ pw_frame5 (kt := kt) m sp0 -∗ pw_chslot (kt := kt) sp0 -∗
     sie_cap_gpr kt M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
     cpu_own 1%nat eb (proc_addr j) false ({["pipe"]} ∪ lks) -∗
     arm_pay kt 0%nat eb (proc_addr j) -∗
@@ -947,8 +947,8 @@ Section PwGuard.
     pipe_ref γp w q -∗
     proc_priv_core (proc_addr j) pid (upd_upt V Pc) -∗
     kalloc_env γa None -∗
-    pw_exits CID0 γf γs j γl γp w q m av eb lks pid V n sp0 pi -∗
-    pw_loop CID0 γa γf γs j γl γp w q m av eb lks pid V n sp0 pi addr -∗
+    pw_exits (kt := kt) CID0 γf γs j γl γp w q m av eb lks pid V n sp0 pi -∗
+    pw_loop (kt := kt) CID0 γa γf γs j γl γp w q m av eb lks pid V n sp0 pi addr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn0 Hn31 Hi Hanch Hext Hregs.
@@ -1105,7 +1105,7 @@ Section ProofPipewrite.
     (* ================================================================= *)
     (* EPI -- the common epilogue at +0x58.                              *)
     (* ================================================================= *)
-    iAssert (pw_epi CID γf γs j γp w q m av true pid V n sp0) with "[Hcont]" as "EPI".
+    iAssert (pw_epi (kt := kt) CID γf γs j γp w q m av true pid V n sp0) with "[Hcont]" as "EPI".
     { rewrite /pw_epi. iIntros (CIDep Hsep M P') "%Hbr %Hrw %Hext (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) Hhi Hcg Hown Hpc Href Hpriv".
       destruct Hbr as (Hsp & B6 & B7 & B8 & B9 & B10 & B11).
       assert (Hb1 : add_vec (pa_stk sp0 14%nat) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))) = pa_stk sp0 1%nat)
@@ -1339,7 +1339,7 @@ Section ProofPipewrite.
     (* EXITS -- the +0x108 tail and the +0x46 (-1) arm, CONJOINED: exactly *)
     (* one of them is taken, so they must SHARE the epilogue closure.     *)
     (* ================================================================= *)
-    iAssert (pw_exits CID γf γs j γl γp w q m av true lks pid V n sp0 pi) with "[EPI]" as "EXITS".
+    iAssert (pw_exits (kt := kt) CID γf γs j γl γp w q m av true lks pid V n sp0 pi) with "[EPI]" as "EXITS".
     { rewrite /pw_exits. iSplit.
       - (* ---------------- +0x108: wakeup(&pi->nread); release ---------------- *)
         rewrite /pw_tail. iIntros (CIDtl Hstl).
@@ -1447,7 +1447,7 @@ Section ProofPipewrite.
         iEval (rewrite Hjep) in "Hpc".
         rewrite /pw_epi.
         (* the pipe lock's release left [({[rank "pipe"]} ∪ lks) ∖ {[rank
-           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set [pw_epi]'s
+           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set [pw_epi (kt := kt)]'s
            fixed [∅] binder names. *)
         iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
         iSpecialize ("EPI" $! CIDp16 with "[%]"); [wp_next_chain|].
@@ -1547,7 +1547,7 @@ Section ProofPipewrite.
         { rewrite (Rrest (mword_of_int 18) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)). exact Hs2Q3. }
         rewrite /pw_epi.
         (* the pipe lock's release left [({[rank "pipe"]} ∪ lks) ∖ {[rank
-           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set [pw_epi]'s
+           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set [pw_epi (kt := kt)]'s
            fixed [∅] binder names. *)
         iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
         iSpecialize ("EPI" $! CIDrs with "[%]"); [wp_next_chain|].
@@ -1667,7 +1667,7 @@ Section ProofPipewrite.
     iEval (rewrite HspA0 Hb7 Hs5A0) in "Hc7".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.pipewrite + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iAssert (pw_frame7 m sp0) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7]" as "HF7".
+    iAssert (pw_frame7 (kt := kt) m sp0) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7]" as "HF7".
     { rewrite /pw_frame7. iFrame "Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7". }
     (* +0x10 c.addi4spn s0,sp,112 *)
     iPoseProof (pwi_10 with "Htext") as "Hi10".
@@ -1992,7 +1992,7 @@ Section ProofPipewrite.
       iEval (rewrite HspM1 Hb12 Hs10M1) in "G12".
       assert (Hpp32 : add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x30) : mword 64) 2 = mword_of_int (KernelSyms.pipewrite + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp32) in "Hpc".
-      iAssert (pw_frame5 m sp0) with "[G8 G9 G10 G11 G12]" as "HF5".
+      iAssert (pw_frame5 (kt := kt) m sp0) with "[G8 G9 G10 G11 G12]" as "HF5".
       { rewrite /pw_frame5. iFrame "G8 G9 G10 G11 G12". }
       (* +0x32 c.li s2,0 *)
       iPoseProof (pwi_32 with "Htext") as "Hi32".
@@ -2103,7 +2103,7 @@ Section ProofPipewrite.
       (* ================================================================= *)
       (* THE LOOP (iLöb at the body, +0x8c)                                 *)
       (* ================================================================= *)
-      iAssert (pw_loop CID γa γf γs j γl γp w q m av true lks pid V n sp0 pi addr) with "[]" as "LOOP".
+      iAssert (pw_loop (kt := kt) CID γa γf γs j γl γp w q m av true lks pid V n sp0 pi addr) with "[]" as "LOOP".
       { iLöb as "IH". rewrite /pw_loop.
         iIntros (CIDlp Hslp i M Pc) "%Hi %Hext %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ HEX".
         pose proof Hregs as Hregs2.
@@ -2122,7 +2122,7 @@ Section ProofPipewrite.
         assert (Hroaddr : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 544 : mword 12)) = a_popen pi false)
           by (rewrite Hs1; reflexivity).
         iPoseProof (pwi_8c with "Htext") as "Hi8c".
-        iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x8c)) Ra5 Rs1 (mword_of_int 544 : mword 12)
+        iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipewrite + 0x8c)) Ra5 Rs1 (mword_of_int 544 : mword 12)
                   M (trap_res true + (av - 14))%nat ro false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8c [Hro]").
         { rgall. iEval (rewrite Hroaddr). iExact "Hro". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hro". rgall.
@@ -2254,7 +2254,7 @@ Section ProofPipewrite.
             assert (Hnraddr : add_vec (K0 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 536 : mword 12)) = a_pnread pi)
               by (rewrite Ks1F; reflexivity).
             iPoseProof (pwi_9a with "Htext") as "Hi9a".
-            iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x9a)) Ra5 Rs1 (mword_of_int 536 : mword 12)
+            iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipewrite + 0x9a)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                       K0 (trap_res true + (av - 14))%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9a [Hnr]").
             { rgall. iEval (rewrite Hnraddr). iExact "Hnr". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall.
@@ -2267,7 +2267,7 @@ Section ProofPipewrite.
             assert (Hnwaddr : add_vec (K1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 540 : mword 12)) = a_pnwrite pi).
             { rewrite /K1 upd_ne; [| reg_neq]. rewrite Ks1F. reflexivity. }
             iPoseProof (pwi_9e with "Htext") as "Hi9e".
-            iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x9e)) Ra4 Rs1 (mword_of_int 540 : mword 12)
+            iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipewrite + 0x9e)) Ra4 Rs1 (mword_of_int 540 : mword 12)
                       K1 (trap_res true + (av - 14))%nat nw false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9e [Hnw]").
             { rgall. iEval (rewrite Hnwaddr). iExact "Hnw". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall.
@@ -2645,7 +2645,7 @@ Section ProofPipewrite.
                                 = p_sz (proc_addr j)) by (rewrite Hs3N3; reflexivity).
               iPoseProof (pwi_b2 with "Htext") as "Hib2".
               iEval (rewrite -Hszaddr) in "Hszc".
-              iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xb2)) Ra1 Rs3
+              iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipewrite + 0xb2)) Ra1 Rs3
                         (mword_of_int 72 : mword 12) N3 (trap_res true + (av - 14))%nat (pv_sz V) false
                         ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib2 Hszc").
               iApply wp_next_off_intro. iIntros "Hcg Hpc Hszc". rgall.
@@ -2661,7 +2661,7 @@ Section ProofPipewrite.
                                 = p_pagetable (proc_addr j)) by (rewrite Hs3N3b; reflexivity).
               iPoseProof (pwi_b6 with "Htext") as "Hib6".
               iEval (rewrite -Hptaddr) in "Hptc".
-              iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xb6)) Ra0 Rs3
+              iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pipewrite + 0xb6)) Ra0 Rs3
                         (mword_of_int 80 : mword 12) N3b (trap_res true + (av - 14))%nat (page_base (ud_root Pc)) false
                         ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib6 Hptc").
               iApply wp_next_off_intro. iIntros "Hcg Hpc Hptc". rgall.
@@ -2701,7 +2701,7 @@ Section ProofPipewrite.
               assert (Hlen1 : (Z.of_nat 1%nat < 2 ^ 64)%Z) by (vm_compute; reflexivity).
               (* the single byte [ch] IS copyin's destination buffer *)
               iDestruct "HCH" as "(%Hal13 & Hb13 & Hslot14)".
-              iDestruct (bytes_own_acc (DfracOwn 1) (pa_stk sp0 13%nat) 8%nat 7%nat ltac:(lia) with "Hb13")
+              iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) (pa_stk sp0 13%nat) 8%nat 7%nat ltac:(lia) with "Hb13")
                 as "[Hchx Hchback]".
               iDestruct "Hchx" as (b0) "Hch".
               iAssert ([∗ list] k ∈ seq 0 1, (pa_add (N5 !!! Regidx Ra2) k) ↦ₘ ((fun _ : nat => b0) k))%I

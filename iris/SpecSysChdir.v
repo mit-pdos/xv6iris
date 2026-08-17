@@ -290,8 +290,8 @@ Module Type SYSCHDIR.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γf : gname) (γa : gname)
+      (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)

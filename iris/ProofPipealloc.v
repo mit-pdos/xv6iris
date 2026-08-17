@@ -356,7 +356,7 @@ Section ProofPipealloc.
         trap_csrs_ext kt eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈[kt] w4 ∗ pa_stk sp0 5 ↦₈[kt] w5) -∗
-        pipealloc_post γf γk on pf0 pf1 res -∗
+        pipealloc_post (kt := kt) γf γk on pf0 pf1 res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hr40 Hr32 Hr24 Hr0]" as "Hepi".
     { rewrite /EPI.

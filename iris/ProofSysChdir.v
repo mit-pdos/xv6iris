@@ -1759,7 +1759,7 @@ Section ProofSysChdirBody.
           (* the reference, re-formed: this is the one the [sd] installs *)
           iDestruct (inode_ref_gather with "Hkeep Hshr") as "Hrefnew".
           (* ============ +0x48 ld a0,336(s2) -- a0 := p->cwd ============ *)
-          iApply (wp_ld_s_sconf (CID := CID30) (mword_of_int (SC + 0x48)) Ra0 Rs2
+          iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (CID := CID30) (mword_of_int (SC + 0x48)) Ra0 Rs2
                     (mword_of_int 336 : mword 12) miu (K - 20)%nat (pv_cwd V) b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi48 [Hcwd]").
           { iEval (rgne; rewrite Hius2 p_cwd_sext). iExact "Hcwd". }
@@ -1913,7 +1913,7 @@ Section ProofSysChdirBody.
           { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcseo c Hc).
             exact (HP7thr c Hc N2' N8 N9 N18). }
           (* ============ +0x54 sd s1,336(s2) -- p->cwd = ip ============ *)
-          iApply (wp_sd_s_sconf (CID := CID35) (mword_of_int (SC + 0x54)) Rs1 Rs2
+          iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (CID := CID35) (mword_of_int (SC + 0x54)) Rs1 Rs2
                     (mword_of_int 336 : mword 12) meo (K - 20)%nat (pv_cwd V) b
                     with "Hcg Hpc Hi54 [Hcwd]").
           { iEval (rgne; rewrite Heos2 p_cwd_sext). iExact "Hcwd". }

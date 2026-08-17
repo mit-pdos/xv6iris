@@ -445,7 +445,7 @@ Qed.
     iDestruct (bb_byte_acc s n k h (DfracOwn 1) Hklt with "Hdst") as "[Hdb Hdback]".
     iDestruct (sie_cap_gpr_x0 P1 (K - 2)%nat b p Rz
                  ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.strncpy + 0x32)) Rz Ra4
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.strncpy + 0x32)) Rz Ra4
               (mword_of_int 4095 : mword 12) P1 (K - 2)%nat (h k) b
               with "Hcg Hpc Hi32 [Hdb]").
     { iEval (rewrite (HP1a4' _) (snc_back1 s k)). iExact "Hdb". }
@@ -675,7 +675,7 @@ Qed.
                      = mword_of_int (KernelSyms.strncpy + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp1a) in "Hpc". iPoseProof (sncp_1a with "Htext") as "Hi1a".
       iDestruct (bb_byte_acc t n d f dq Hdlt with "Hsrc") as "[Hsb Hsback]".
-      iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.strncpy + 0x1a)) Ra4 Ra1
+      iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.strncpy + 0x1a)) Ra4 Ra1
                 (mword_of_int 0 : mword 12) C3 (K - 2)%nat (f d : mword 8) b (dqm:=dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a [Hsb]").
@@ -697,7 +697,7 @@ Qed.
                      = mword_of_int (KernelSyms.strncpy + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp1e) in "Hpc". iPoseProof (sncp_1e with "Htext") as "Hi1e".
       iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdlt with "Hdst") as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.strncpy + 0x1e)) Ra4 Ra5
+      iApply (wp_sb_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.strncpy + 0x1e)) Ra4 Ra5
                 (mword_of_int 4095 : mword 12) C4 (K - 2)%nat (h d) b
                 with "Hcg Hpc Hi1e [Hdb]").
       { iEval (rewrite (HC4a5' _) (snc_back1 s d)). iExact "Hdb". }

@@ -1455,8 +1455,8 @@ Section ProofCreateMain.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "H1 H2".
-    iDestruct (slot_bytes_own with "H1") as "[%Ha1 B1]".
-    iDestruct (slot_bytes_own with "H2") as "[%Ha2 B2]".
+    iDestruct (slot_bytes_own (KTR := kt) with "H1") as "[%Ha1 B1]".
+    iDestruct (slot_bytes_own (KTR := kt) with "H2") as "[%Ha2 B2]".
     iSplitR; [done |].
     change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iSplitL "B1"; [iExact "B1" | iExact "B2"].
@@ -1473,8 +1473,8 @@ Section ProofCreateMain.
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "B". change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iDestruct "B" as "[B1 B2]".
-    iDestruct (bytes_own_slot _ Ha1 with "B1") as (w1) "H1".
-    iDestruct (bytes_own_slot _ Ha2 with "B2") as (w2) "H2".
+    iDestruct (bytes_own_slot (KTR := kt) _ Ha1 with "B1") as (w1) "H1".
+    iDestruct (bytes_own_slot (KTR := kt) _ Ha2 with "B2") as (w2) "H2".
     iExists w1, w2. iFrame.
   Qed.
 
@@ -1575,7 +1575,7 @@ Section ProofCreateMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used' -∗
        proc_priv γf (proc_addr j) pidv V -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
        bslots bn 3 -∗
        ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat
          /\ (ok = true -> (S ns' <= ns)%nat)⌝ -∗
@@ -2003,7 +2003,7 @@ Section ProofCreateMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used1 -∗
        proc_priv γf (proc_addr j) pidv V -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 1) -∗
        log_opS γ n1 Sb1 -∗
@@ -2176,7 +2176,7 @@ Section ProofCreateMain.
        p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
           proc_priv γf (proc_addr j) pidv V) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n3 Sb3 -∗
@@ -2353,7 +2353,7 @@ Section ProofCreateMain.
        p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
           proc_priv γf (proc_addr j) pidv V) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n4 Sb4 -∗
@@ -2440,7 +2440,7 @@ Section ProofCreateMain.
     bitmap_res γfs bmapstart cov logstart size used -∗
     proc_priv γf (proc_addr j) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen),
-       pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ pfun i) -∗
+       pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[kt] pfun i) -∗
     procs_inv (kt := kt) γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -3607,7 +3607,7 @@ Section ProofCreateMain.
                        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
                           proc_priv γf (proc_addr j) pidv V) -∗
                        ([∗ list] i ∈ seq 0 (S plen),
-                          pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ pfun i) -∗
+                          pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[kt] pfun i) -∗
                        bslots bn 3 -∗
                        iref_slots 1 -∗ iref_slots (ns - 2) -∗
                        log_opS γ n2 Sb2 -∗
@@ -6733,7 +6733,7 @@ Section ProofCreateMain.
        p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
           proc_priv γf (proc_addr j) pidv V) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n4 Sb4 -∗
@@ -9320,7 +9320,7 @@ Section ProofCreateMain.
      hart's stack, and the prologue's [c.addi16sp] is exactly the split
      that would hand it out.  So the seal READS them off the capability and
      keeps the resource: the conclusion is PURE, so the [iDestruct .. as %_]
-     leaves [Hcg] in place (the same idiom [StackBytes.slot_bytes_own] uses
+     leaves [Hcg] in place (the same idiom [StackBytes.slot_bytes_own (KTR := kt)] uses
      on its own argument). *)
   Lemma cr_cap_align (m : regfile) (avail : nat) (b : bool) (pp : mword 64) :
     (10 <= avail)%nat ->

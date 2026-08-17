@@ -1786,7 +1786,7 @@ Section ProofNamexMain.
         (* +0xfe lbu a5,0(s1) *)
         iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) (S off) ltac:(lia)
                      with "Hpath") as "[Hpb Hpback]".
-        iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xfe)) Ra5 Rs1
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xfe)) Ra5 Rs1
                   (mword_of_int 0 : mword 12) Q1 (K - 12)%nat
                   (pfun (S off) : mword 8) b (dqm := DfracOwn 1)
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjee [Hpb]").
@@ -1901,7 +1901,7 @@ Section ProofNamexMain.
         (* +0xb8 lbu a5,0(s1) *)
         iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) (S off) ltac:(lia)
                      with "Hpath") as "[Hpb Hpback]".
-        iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xb8)) Ra5 Rs1
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xb8)) Ra5 Rs1
                   (mword_of_int 0 : mword 12) T1 (K - 12)%nat
                   (pfun (S off) : mword 8) b (dqm := DfracOwn 1)
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjae [Hpb]").
@@ -2017,7 +2017,7 @@ Section ProofNamexMain.
         (* +0x118 lbu a5,0(s2) *)
         iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) (S ii) ltac:(lia)
                      with "Hpath") as "[Hpb Hpback]".
-        iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0x118)) Ra5 Rs2
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x118)) Ra5 Rs2
                   (mword_of_int 0 : mword 12) E1 (K - 12)%nat
                   (pfun (S ii) : mword 8) b (dqm := DfracOwn 1)
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj108 [Hpb]").
@@ -2214,7 +2214,7 @@ Section ProofNamexMain.
         (* +0x108 lbu a5,0(s1) -- the SAME byte, read again *)
         iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) a ltac:(lia)
                      with "Hpath") as "[Hpb Hpback]".
-        iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0x108)) Ra5 Rs1
+        iApply (wp_lbu_s_sconf (mword_of_int (NX + 0x108)) Ra5 Rs1
                   (mword_of_int 0 : mword 12) Ms (K - 12)%nat
                   (pfun a : mword 8) b (dqm := DfracOwn 1)
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hjf8 [Hpb]").
@@ -2311,7 +2311,7 @@ Section ProofNamexMain.
       (* +0xf4 lbu a5,0(s1) *)
       iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) off ltac:(lia)
                    with "Hpath") as "[Hpb Hpback]".
-      iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xf4)) Ra5 Rs1
+      iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xf4)) Ra5 Rs1
                 (mword_of_int 0 : mword 12) Ms (K - 12)%nat
                 (pfun off : mword 8) b (dqm := DfracOwn 1)
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hje4 [Hpb]").
@@ -2440,7 +2440,7 @@ Section ProofNamexMain.
       (* +0xae lbu a5,0(s1) *)
       iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) off ltac:(lia)
                    with "Hpath") as "[Hpb Hpback]".
-      iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xae)) Ra5 Rs1
+      iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xae)) Ra5 Rs1
                 (mword_of_int 0 : mword 12) Ms (K - 12)%nat
                 (pfun off : mword 8) b (dqm := DfracOwn 1)
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hja4 [Hpb]").
@@ -3503,7 +3503,7 @@ Section ProofNamexMain.
                        iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) o2
                                     ltac:(lia) with "Hpath")
                          as "[Hpb Hpback]".
-                       iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xd8)) Ra5
+                       iApply (wp_lbu_s_sconf (mword_of_int (NX + 0xd8)) Ra5
                                  Rs1 (mword_of_int 0 : mword 12) W0
                                  (K - 12)%nat (pfun o2 : mword 8) b
                                  (dqm := DfracOwn 1)

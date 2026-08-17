@@ -20,10 +20,10 @@
 
    - THE BOUNCE BUFFER IS THE FRAME'S FOUR LOWEST SLOTS.  [buf] is [s0-128],
      which is the pushed sp itself, so it is slots 16..13 of a sixteen-slot
-     frame.  [StackBytes.slotsn_bytes_own] carves them into 32 bytes at the
-     prologue and [bytes_own_slotsn] puts them back before the pop; in
+     frame.  [StackBytes.slotsn_bytes_own (KTR := kt)] carves them into 32 bytes at the
+     prologue and [bytes_own_slotsn (KTR := kt)] puts them back before the pop; in
      between the loop owns [bytes_own], contents unspecified, and each
-     iteration NAMES the first [nn] of them ([StackBytes.bytes_own_name])
+     iteration NAMES the first [nn] of them ([StackBytes.bytes_own_name (KTR := kt)])
      because both callees are parametric in the contents.  The naming has to
      happen per iteration rather than once, since [nn] varies.
    - THE LOOP IS ROTATED.  The head is the TEST at +0x5e ([n - i], then the
@@ -1130,7 +1130,7 @@ Section CwBodies.
       (* the first [nn] bytes of the frame buffer, NAMED *)
       rewrite /cw_buf H32 bytes_own_app.
       iDestruct "Hbuf" as "[Hb1 Hb2]".
-      iDestruct (bytes_own_name nnN buf with "Hb1") as (fb) "Hb1".
+      iDestruct (bytes_own_name (KTR := kt) nnN buf with "Hb1") as (fb) "Hb1".
      iDestruct (cpu_own_transport CIDb CIDc6 0%nat eb pj true 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EitherCopyin.wp_either_copyin_sconf kt kt γa γf B6 (av - 16)%nat 0%nat
@@ -1274,9 +1274,9 @@ Section CwBodies.
         iEval (rewrite HD3a0) in "Hb1".
         iDestruct ("Hpback" with "Hpid") as "Hpriv".
         (* the buffer is whole again *)
-        iDestruct (bytes_own_of_name nnN buf fb' with "Hb1") as "Hb1".
+        iDestruct (bytes_own_of_name (KTR := kt) nnN buf fb' with "Hb1") as "Hb1".
         iAssert (cw_buf sp0) with "[Hb1 Hb2]" as "Hbuf".
-        { rewrite /cw_buf H32 bytes_own_app.
+        { rewrite /cw_buf H32 bytes_own_app (KTR := kt).
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
         assert (Hregd : cw_regs mf2 (pa_stk sp0 16%nat) sp0 src n i).
         { apply (cw_regs_cs D3); [exact Hcs2|].
@@ -1381,8 +1381,8 @@ Section CwBodies.
         iApply bi.later_intro. iIntros (CIDc8 Hsc8) "Hcg Hpc".
         iEval (rewrite Htgtb) in "Hpc".
         iAssert (cw_buf sp0) with "[Hb1 Hb2]" as "Hbuf".
-        { rewrite /cw_buf H32 bytes_own_app.
-          iDestruct (bytes_own_of_name nnN buf fb' with "Hb1") as "Hb1".
+        { rewrite /cw_buf H32 bytes_own_app (KTR := kt).
+          iDestruct (bytes_own_of_name (KTR := kt) nnN buf fb' with "Hb1") as "Hb1".
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
         iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid V P1 n lks Hext1
                      with "Hcont") as "Hcont".
@@ -1977,7 +1977,7 @@ Section CwBodies.
       iAssert ([∗ list] k ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - k) ↦₈[kt] w)%I
         with "[F13 F14 F15 F16]" as "Hbs".
       { cbn [seq]. iFrame "F16 F15 F14 F13". all: try done. }
-      iDestruct (slotsn_bytes_own sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".
+      iDestruct (slotsn_bytes_own (KTR := kt) sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".
       iApply (cw_loop (Z.to_nat n) CID γa γf γs jp γlp γl γu γv m av eb pid n sp0
                 (m !!! Regidx Ra1) lks
                 Hj Hjlp Hlens ltac:(exact (proj2 Hnr))

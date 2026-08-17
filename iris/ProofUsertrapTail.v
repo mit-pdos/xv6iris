@@ -130,7 +130,7 @@ Section ProofUsertrapTail.
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
     sie_cap_gpr kt m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
+    ut_hold (kt := kt) Rsys N V b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -210,11 +210,11 @@ Section UtRet2.
     stvec ↦ᵣ uservec_tvec -∗
     ghost_var sie_gname (1/4) vb -∗
     kpt_on cpu_id -∗
-    ut_env Rsys N V -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_env (kt := kt) Rsys N V -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -291,7 +291,7 @@ Section UtRet2.
                       = p_pagetable (un_pj N))
       by (rgne; rewrite Hmfs1; reflexivity).
     iEval (rewrite -Haddrpg) in "Hpgt".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xb2)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (UT + 0xb2)) Ra0 Rs1
               (mword_of_int 80 : mword 12) mf (trap_res b + nx)%nat
               (page_base (ud_root (pv_upt V))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -657,11 +657,11 @@ Section UtRet.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr kt m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) Rsys N V b lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -782,11 +782,11 @@ Section UtA6.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr kt m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) Rsys N V b lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1019,11 +1019,11 @@ Section UtFa.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr kt m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) Rsys N V b lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.

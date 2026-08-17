@@ -691,7 +691,7 @@ Section ProofConsoleread.
          locked γc cpu_id -∗
          cons_res -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
-         cr_rest sp0 -∗
+         cr_rest (kt := kt) sp0 -∗
          WP (Loop : expr riscv_lang)))%I.
 
   Lemma cr_mk_retx (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile)
@@ -700,7 +700,7 @@ Section ProofConsoleread.
     (consoleread_stack <= av)%nat ->
     locks_below lks "cons" ->
     kernel_text -∗ is_conslock γc -∗
-    cr_epi_prop (CID0 := CID) jp sp0 m0 av pid V n lks -∗
+    cr_epi_prop (kt := kt) (CID0 := CID) jp sp0 m0 av pid V n lks -∗
     cr_retx_prop (CID0 := CID) γc jp sp0 m0 av pid V n lks.
   Proof.
     intros Hn31 Hav Hbelow.
@@ -838,7 +838,7 @@ Section ProofConsoleread.
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
     (cr_retx_prop (CID0 := CID0) γc jp sp0 m0 av pid V n lks
-     ∧ cr_epi_prop (CID0 := CID0) jp sp0 m0 av pid V n lks)%I.
+     ∧ cr_epi_prop (kt := kt) (CID0 := CID0) jp sp0 m0 av pid V n lks)%I.
 
   (* the pins every block in the body shares: the six live callee-saved
      roles plus the three registers nothing here ever writes *)
@@ -879,7 +879,7 @@ Section ProofConsoleread.
          locked γc cpu_id -∗
          cons_res -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
-         cr_rest sp0 -∗
+         cr_rest (kt := kt) sp0 -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* =================================================================== *)
@@ -1012,7 +1012,7 @@ Section ProofConsoleread.
                     (sign_extend' 64 (mword_of_int 152 : mword 12)) = a_cons_r)
       by (rewrite HH3a4; reflexivity).
     iPoseProof (cnri_082 with "Ht") as "Hi82".
-    iApply (wp_sw_s_sconf (mword_of_int (CR + 0x82)) Ra3 Ra4 (mword_of_int 152 : mword 12)
+    iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (CR + 0x82)) Ra3 Ra4 (mword_of_int 152 : mword 12)
               H3 (trap_res true + (av - 12))%nat rr false with "Hcg Hpc Hi82 [Hrc]").
     { rgall. iEval (rewrite Hra). iExact "Hrc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall.
@@ -1063,7 +1063,7 @@ Section ProofConsoleread.
     assert (HH5a4 : H5 !!! Regidx Ra4 = add_vec a_cons (mword_of_int (Z.of_nat idx) : mword 64))
       by (rewrite /H5; apply upd_eq).
     iPoseProof (cnri_08c with "Ht") as "Hi8c".
-    iApply (wp_lbu_s_sconf (mword_of_int (CR + 0x8c)) Ra4 Ra4 (mword_of_int 24 : mword 12)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (CR + 0x8c)) Ra4 Ra4 (mword_of_int 24 : mword 12)
               H5 (trap_res true + (av - 12))%nat (db : mword 8) false ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi8c [Hbyte]").
     { rgall. iEval (rewrite HH5a4 (cr_byaddr idx Hidxlt)). iExact "Hbyte". }
@@ -1230,7 +1230,7 @@ Section ProofConsoleread.
       assert (HE1a5 : E1 !!! Regidx Ra5 = sign_extend' 64 rr)
         by (rewrite /E1 upd_ne; [exact HH8a5 | reg_neq]).
       iPoseProof (cnri_0ea with "Ht") as "Hiea".
-      iApply (wp_sw_s_sconf (mword_of_int (CR + 0xea)) Ra5 Ra4 (mword_of_int 250 : mword 12)
+      iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (CR + 0xea)) Ra5 Ra4 (mword_of_int 250 : mword 12)
                 E1 (trap_res true + (av - 12))%nat (add_vec rr (mword_of_int 1 : mword 32)) false
                 with "Hcg Hpc Hiea [Hrc]").
       { rgall. iEval (rewrite HE1ra). iExact "Hrc". }
@@ -1298,8 +1298,8 @@ Section ProofConsoleread.
     iEval (rewrite Hp9a) in "Hpc".
     (* carve [cbuf] out of slot 11 for the length of the copy *)
     iDestruct "Hq11" as (w11) "Hc11".
-    iDestruct (slot_bytes_own with "Hc11") as "[%Hal11 Hby11]".
-    iDestruct (bytes_own_acc (DfracOwn 1) (pa_stk sp0 11%nat) 8 7 ltac:(lia) with "Hby11")
+    iDestruct (slot_bytes_own (KTR := kt) with "Hc11") as "[%Hal11 Hby11]".
+    iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) (pa_stk sp0 11%nat) 8 7 ltac:(lia) with "Hby11")
       as "[Hchb Hchback]".
     iDestruct "Hchb" as (chb0) "Hch".
     iEval (rewrite -(cr_cbufa sp0)) in "Hch".
@@ -1461,7 +1461,7 @@ Section ProofConsoleread.
     iAssert (∃ w : mword 64, pa_stk sp0 11%nat ↦₈[kt] w)%I with "[Hbuf Hchback]" as "Hq11".
     { iDestruct ("Hchback" $! (trunc8 (H8 !!! Regidx Ra4)) with "[Hbuf]") as "Hby11".
       { iEval (rewrite (cr_cbufa sp0)) in "Hbuf". iExact "Hbuf". }
-      iApply (bytes_own_slot (pa_stk sp0 11%nat) Hal11 with "Hby11"). }
+      iApply (bytes_own_slot (KTR := kt) (pa_stk sp0 11%nat) Hal11 with "Hby11"). }
     iPoseProof (cnri_0ae with "Ht") as "Hiae".
     destruct Hret as [Hr0 | Hrm1].
     { (* ---- either_copyout SUCCEEDED: bump the cursor and the count ---- *)
@@ -1751,7 +1751,7 @@ Section ProofConsoleread.
          locked γc cpu_id -∗
          cons_res -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
-         cr_rest sp0 -∗
+         cr_rest (kt := kt) sp0 -∗
          WP (Loop : expr riscv_lang)))%I.
 
   Lemma cr_mk_wait (γa γc γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
@@ -2607,9 +2607,9 @@ Section ProofConsoleread.
                     = mword_of_int (CR + 0x12)) by pcw.
     iEval (rewrite Hpc12) in "Hpc".
     (* ---- the exits, built the moment the frame is saved ---- *)
-    iAssert (cr_ret (CID0 := CID) j m av true pid V n lks) with "[Hcont]" as "Hcont".
+    iAssert (cr_ret (kt := kt) (CID0 := CID) j m av true pid V n lks) with "[Hcont]" as "Hcont".
     { rewrite /cr_ret. iExact "Hcont". }
-    iAssert (cr_saved sp0 m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf8 Hf9]" as "Hsaved".
+    iAssert (cr_saved (kt := kt) sp0 m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf8 Hf9]" as "Hsaved".
     { rewrite /cr_saved. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf8 Hf9". }
     iAssert (cr_exits (CID0 := CID) γc j sp0 m av pid V n lks)
       with "[Hsaved Hcont]" as "EX".

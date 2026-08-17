@@ -585,14 +585,14 @@ Section ProofSysUnlinkBody.
   (* ================================================================== *)
 
   Lemma su_del_split (a : Arch.pa) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ f j)
-    ⊣⊢ ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ f j)
-       ∗ ([∗ list] j ∈ seq 0 14, pa_add (pa_add a 2) j ↦ₘ f (2 + j)%nat).
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] f j)
+    ⊣⊢ ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[kt] f j)
+       ∗ ([∗ list] j ∈ seq 0 14, pa_add (pa_add a 2) j ↦ₘ[kt] f (2 + j)%nat).
   Proof. exact (bb_split a 2 14 f). Qed.
 
   Lemma su_half_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ file_byte data (16 * i + j)%nat)
+    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[kt] file_byte data (16 * i + j)%nat)
     ⊣⊢ a ↦₂ dir_inum data i.
   Proof.
     intro Hal.
@@ -607,8 +607,8 @@ Section ProofSysUnlinkBody.
   Qed.
 
   Lemma su_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ file_byte data (16 * i + (2 + j))%nat)
-    ⊣⊢ ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ dir_name data i j).
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] file_byte data (16 * i + (2 + j))%nat)
+    ⊣⊢ ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] dir_name data i j).
   Proof.
     apply (bb_ext a 14 (fun j => file_byte data (16 * i + (2 + j))%nat)
                        (dir_name data i)
@@ -618,9 +618,9 @@ Section ProofSysUnlinkBody.
   (* the whole record, split for the [lhu] and put back *)
   Lemma su_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ file_byte data (16 * i + jj)%nat)
+    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat)
     ⊣⊢ a ↦₂ dir_inum data i
-       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ dir_name data i jj).
+       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[kt] dir_name data i jj).
   Proof.
     intro Hal.
     rewrite -(su_half_acc data i a Hal).
@@ -632,9 +632,9 @@ Section ProofSysUnlinkBody.
   Lemma su_rdd_view (data : nat -> list (bv 8)) (olds : nat -> bv 8)
       (i : nat) (a : Arch.pa) :
     ([∗ list] jj ∈ seq 0 16,
-       pa_add a jj ↦ₘ rd_delivered data olds (16 * i)%nat 16 jj)
+       pa_add a jj ↦ₘ[kt] rd_delivered data olds (16 * i)%nat 16 jj)
     ⊣⊢ ([∗ list] jj ∈ seq 0 16,
-          pa_add a jj ↦ₘ file_byte data (16 * i + jj)%nat).
+          pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat).
   Proof.
     apply (bb_ext a 16
              (fun jj => rd_delivered data olds (16 * i)%nat 16 jj)

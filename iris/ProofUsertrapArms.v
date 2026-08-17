@@ -158,15 +158,15 @@ Section UtArmsCommon.
      [trap_csrs_ext false] is not syntactically a [∗]: destructuring it
      directly is a coin flip on whether resolution unfolds the definition. *)
   Lemma ua_hold_off (N : ut_names) (V : pprivate) (lks : gset string) :
-    ut_hold Rsys N V false lks -∗
+    ut_hold (kt := kt) Rsys N V false lks -∗
       cpu_own 0%nat false (un_pj N) false lks ∗ trap_csrs kt ∗
-      cpu_claim (un_pj N) ∗ ut_env Rsys N V.
+      cpu_claim (un_pj N) ∗ ut_env (kt := kt) Rsys N V.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma ua_hold_on (N : ut_names) (V : pprivate) (lks : gset string) :
     cpu_own 0%nat false (un_pj N) false lks -∗ trap_csrs kt -∗
-    cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
-    ut_hold Rsys N V false lks.
+    cpu_claim (un_pj N) -∗ ut_env (kt := kt) Rsys N V -∗
+    ut_hold (kt := kt) Rsys N V false lks.
   Proof.
     iIntros "Hcpu Hcsrs Hclm Henv". rewrite /ut_hold.
     iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -240,11 +240,11 @@ Section Ut56.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
     sie_cap_gpr kt m nx false (un_pj N) -∗
-    ut_hold Rsys N V false lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) Rsys N V false lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -312,7 +312,7 @@ Section Ut56.
                        = p_pid (un_pj N))
       by (rgne; rewrite HM1s1; reflexivity).
     iEval (rewrite -Haddrpid) in "Hpid".
-    iApply (wp_clw_s_sconf (mword_of_int (UT + 0x5a)) Ra2 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (UT + 0x5a)) Ra2 Rs1
               (mword_of_int 48 : mword 12) M1 nx (un_pid N) false
               (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -668,11 +668,11 @@ Section UtD0.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
     sie_cap_gpr kt m nx false (un_pj N) -∗
-    ut_hold Rsys N V false lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) Rsys N V false lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -789,7 +789,7 @@ Section UtD0.
                       = p_sz (un_pj N))
       by (rgne; rewrite HM4s1; reflexivity).
     iEval (rewrite -Haddrsz) in "Hsz".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xde)) Ra1 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (UT + 0xde)) Ra1 Rs1
               (mword_of_int 72 : mword 12) M4 nx (pv_sz V) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hide Hsz [-]").
@@ -815,7 +815,7 @@ Section UtD0.
                       = p_pagetable (un_pj N))
       by (rgne; rewrite HM5s1; reflexivity).
     iEval (rewrite -Haddrpg) in "Hpgt".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xe0)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (UT + 0xe0)) Ra0 Rs1
               (mword_of_int 80 : mword 12) M5 nx
               (page_base (ud_root (pv_upt V))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1036,11 +1036,11 @@ Section UtE8.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
     sie_cap_gpr kt m nx false (un_pj N) -∗
-    ut_hold Rsys N V false lks -∗
-    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    ut_hold (kt := kt) Rsys N V false lks -∗
+    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.

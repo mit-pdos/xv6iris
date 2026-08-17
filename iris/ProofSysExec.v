@@ -40,7 +40,7 @@
    [memset] writes BYTES and the array is read as WORDS, and the zero has to
    survive the round trip: the loop's [bad:] exit walks argv until it finds
    a NULL, and the NULL it finds at index [i] is memset's, not one the code
-   wrote.  [bytes_own_slotsn] would give the words back EXISTENTIALLY and
+   wrote.  [bytes_own_slotsn (KTR := kt)] would give the words back EXISTENTIALLY and
    lose exactly that, so the rebuild goes through [sx_zeros_slots] instead,
    which reassembles each eight zero bytes into a zero WORD.  That is the
    one place this proof cannot use the generic frame vocabulary.
@@ -374,7 +374,7 @@ Section SysExecZeros.
     ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ[kt] zb) ⊢ a ↦₈[kt] (mword_of_int 0 : mword 64).
   Proof.
     intros Hzb Hal. iIntros "H".
-    iApply (word_pointsto_intro _ _ _ Hal).
+    iApply (word_pointsto_intro (KTR := kt) _ _ _ Hal).
     iApply (big_sepL_mono with "H"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite (Hzb i Hlt). done.
   Qed.
@@ -438,7 +438,7 @@ Section SysExecFrame.
     iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
     iDestruct "H" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & S13 & S14 & S15 & S16 & S17 & S18 & S19 & S20 & S21 & S22 & S23 & S24 & S25 & S26 & S27 & S28 & S29 & S30 & S31 & S32 & S33 & S34 & S35 & S36 & S37 & S38 & S39 & S40 & S41 & S42 & S43 & S44 & S45 & S46 & S47 & S48 & S49 & S50 & S51 & S52 & S53 & S54 & S55 & S56 & S57 & S58 & S59 & S60 & _)".
     change 128%nat with (8 * 16)%nat. change 256%nat with (8 * 32)%nat.
-    iDestruct (slotsn_bytes_own sp0 26 16 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 26 16 ltac:(lia)
                  with "[S26 S25 S24 S23 S22 S21 S20 S19 S18 S17 S16 S15 S14 S13 S12 S11]") as "[%Halp Hpb]".
     { cbn [seq].
       iSplitL "S26"; [iExact "S26" |].
@@ -458,7 +458,7 @@ Section SysExecFrame.
       iSplitL "S12"; [iExact "S12" |].
       iSplitL "S11"; [iExact "S11" |].
       done. }
-    iDestruct (slotsn_bytes_own sp0 58 32 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 58 32 ltac:(lia)
                  with "[S58 S57 S56 S55 S54 S53 S52 S51 S50 S49 S48 S47 S46 S45 S44 S43 S42 S41 S40 S39 S38 S37 S36 S35 S34 S33 S32 S31 S30 S29 S28 S27]") as "[%Hala Hab]".
     { cbn [seq].
       iSplitL "S58"; [iExact "S58" |].
@@ -531,8 +531,8 @@ Section SysExecFrame.
   Proof.
     intros Halp Hala. iIntros "S1 S2 S3 S4 S5 S6 S7 S8 S9 S10 S59 S60 Hpb Hab".
     change 128%nat with (8 * 16)%nat. change 256%nat with (8 * 32)%nat.
-    iDestruct (bytes_own_slotsn sp0 26 16 ltac:(lia) Halp with "Hpb") as "Hp".
-    iDestruct (bytes_own_slotsn sp0 58 32 ltac:(lia) Hala with "Hab") as "Ha".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 26 16 ltac:(lia) Halp with "Hpb") as "Hp".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 58 32 ltac:(lia) Hala with "Hab") as "Ha".
     cbn [seq].
     iDestruct "Hp" as "(P26 & P25 & P24 & P23 & P22 & P21 & P20 & P19 & P18 & P17 & P16 & P15 & P14 & P13 & P12 & P11 & _)".
     iDestruct "Ha" as "(A58 & A57 & A56 & A55 & A54 & A53 & A52 & A51 & A50 & A49 & A48 & A47 & A46 & A45 & A44 & A43 & A42 & A41 & A40 & A39 & A38 & A37 & A36 & A35 & A34 & A33 & A32 & A31 & A30 & A29 & A28 & A27 & _)".
@@ -4076,7 +4076,7 @@ Section SysExecReload.
     iIntros "(H3 & H4 & H5 & H6 & H7 & H8 & H9) H10 Hp Hs F59 F60 Ha".
     iDestruct (sx_buf_join (pa_stk sp0 26) pfun rest plen Hplen with "Hp Hs") as "Hpb".
     change 256%nat with (8 * 32)%nat.
-    iDestruct (slotsn_bytes_own sp0 58 32 ltac:(lia) with "Ha") as "[_ Hab]".
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 58 32 ltac:(lia) with "Ha") as "[_ Hab]".
     iSplitL "H3"; [iExists (m !!! Regidx Rs1 : mword 64); iExact "H3" |].
     iSplitL "H4"; [iExists (m !!! Regidx Rs2 : mword 64); iExact "H4" |].
     iSplitL "H5"; [iExists (m !!! Regidx Rs3 : mword 64); iExact "H5" |].
@@ -4091,16 +4091,16 @@ Section SysExecReload.
   Qed.
 
   (* THE ALIGNMENT FACTS ARE READ BACK OFF THE ARRAY, not threaded: a word
-     points-to carries its own alignment, and [slotsn_bytes_own] hands the
-     whole run's out.  The round trip through [bytes_own_slotsn] is what
+     points-to carries its own alignment, and [slotsn_bytes_own (KTR := kt)] hands the
+     whole run's out.  The round trip through [bytes_own_slotsn (KTR := kt)] is what
      makes the extraction non-consuming. *)
   Lemma sx_argv_ala (sp0 : mword 64) :
     sx_argv_free sp0 ⊢ ⌜sx_ala sp0⌝ ∗ sx_argv_free sp0.
   Proof.
     rewrite /sx_argv_free. iIntros "H".
-    iDestruct (slotsn_bytes_own sp0 58 32 ltac:(lia) with "H") as "[%Hal Hb]".
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 58 32 ltac:(lia) with "H") as "[%Hal Hb]".
     iSplitR; [iPureIntro; exact Hal |].
-    iApply (bytes_own_slotsn sp0 58 32 ltac:(lia) Hal with "Hb").
+    iApply (bytes_own_slotsn (KTR := kt) sp0 58 32 ltac:(lia) Hal with "Hb").
   Qed.
 
 End SysExecReload.

@@ -1377,7 +1377,7 @@ Section VtDevRam.
                     (sign_extend' 64 (mword_of_int 16 : mword 12)) = (d_used_ptr : mword 64)).
     { rgne. rewrite HMs1 vt_sext_16. reflexivity. }
     iPoseProof (vti_30 with "Htext") as "Hi30".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x30)) (mword_of_int 15 : mword 5)
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x30)) (mword_of_int 15 : mword 5)
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) M n pu false
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1974,7 +1974,7 @@ Section VtBody.
                   = (d_used_ptr : mword 64)).
     { rgne. rewrite HMs1 vt_sext_16. reflexivity. }
     iPoseProof (vti_42 with "Htext") as "Hi42".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x42)) a4_idx s1_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x42)) a4_idx s1_idx
               (mword_of_int 16 : mword 12) M n pu false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi42 []").
@@ -2245,7 +2245,7 @@ Section VtBody.
                   = (d_info_status h : SailStdpp.Values.mword 64)).
     { rgne. rewrite HB2a4. apply vt_status_addr. exact Hh8. }
     iPoseProof (vti_5a with "Htext") as "Hi5a".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x5a)) a4_idx a4_idx
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x5a)) a4_idx a4_idx
               (mword_of_int 16 : mword 12) B2 n byte_zero false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5a [Hstat]").
@@ -2393,7 +2393,7 @@ Section VtBody.
                   = (d_info_b h : SailStdpp.Values.mword 64)).
     { rgne. rewrite HC2a5. apply vt_infob_addr. exact Hh8. }
     iPoseProof (vti_68 with "Htext") as "Hi68".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x68)) a0_idx a5_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x68)) a0_idx a5_idx
               (mword_of_int 8 : mword 12) C2 n (b : SailStdpp.Values.mword 64) false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2413,7 +2413,7 @@ Section VtBody.
                    = (b_disk b : SailStdpp.Values.mword 64)).
     { rgne. rewrite HC3a0. apply vt_bdisk_addr. }
     iPoseProof (vti_6a with "Htext") as "Hi6a".
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x6a)) a0_idx
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x6a)) a0_idx
               (mword_of_int 4 : mword 12) C3 n
               (SailStdpp.Values.mword_of_int (len := 32) 1) false
               with "Hcg Hpc Hi6a [Hbd]").
@@ -2585,7 +2585,7 @@ Section VtBody.
                   = (d_used_ptr : mword 64)).
     { rgne. rewrite HD3s1 vt_sext_16. reflexivity. }
     iPoseProof (vti_80 with "Htext") as "Hi80".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x80)) a4_idx s1_idx
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_intr + 0x80)) a4_idx s1_idx
               (mword_of_int 16 : mword 12) D3 n pu false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi80 []").
@@ -2738,7 +2738,7 @@ Section VtLoopProof.
     locks_below lks "virtio_disk" ->
     kernel_text -∗ procs_inv (kt := kt) γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    vt_loop γd pd pav pu m av lvl eb pme sp0 lks.
+    vt_loop (kt := kt) γd pd pav pu m av lvl eb pme sp0 lks.
   Proof.
     intros Hav Hlen Hlvl Hfresh.
     iIntros "#Htext #Hpi #Hdinv #Hgeom".

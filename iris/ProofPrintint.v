@@ -420,7 +420,7 @@ Section ProofPrintint.
     assert (Hp34 : add_vec_int (mword_of_int (KernelSyms.printint + 0x30) : mword 64) 4 = mword_of_int (KernelSyms.printint + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp34) in "Hpc".
     (* +0x34 sb a5,0(a3) : buf[i] = digit *)
-    iDestruct (bytes_own_acc (DfracOwn 1) buf 24 i Hi24 with "Hbuf") as "[Hbi Hbcl]".
+    iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) buf 24 i Hi24 with "Hbuf") as "[Hbi Hbcl]".
     iDestruct "Hbi" as (bold) "Hbi".
     iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.printint + 0x34)) a5_idx a3_idx (mword_of_int 0 : mword 12)
               D6 (K - 8)%nat (bold : mword 8) b with "Hcg Hpc Hi34 [Hbi]").
@@ -694,13 +694,13 @@ Section ProofPrintint.
       iPoseProof (pii_78 with "Htext") as "Hi78";
       iPoseProof (pii_7c with "Htext") as "Hi7c";
       iPoseProof (pii_7e with "Htext") as "Hi7e";
-      iDestruct (bytes_own_acc (DfracOwn 1) buf 24 _ Hj24 with "Hbuf") as "[Hbj Hbcl]";
+      iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) buf 24 _ Hj24 with "Hbuf") as "[Hbj Hbcl]";
       iDestruct "Hbj" as (bj) "Hbj";
       assert (Hpa : add_vec (mp !!! Regidx s1_idx) (sign_extend' 64 (mword_of_int 0 : mword 12))
                     = pa_add buf _) by (rewrite Hs1 Hz0; apply kv_addv_zero);
       iEval (rewrite -Hpa) in "Hbj";
       (* +0x74 lbu a0,0(s1) : buf[i] *)
-      iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printint + 0x74)) a0_idx s1_idx (mword_of_int 0 : mword 12)
+      iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printint + 0x74)) a0_idx s1_idx (mword_of_int 0 : mword 12)
                 mp (K - 8)%nat (bj : mword 8) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi74 Hbj");
@@ -1006,7 +1006,7 @@ Section ProofPrintint.
     assert (Hp84 : add_vec_int (mword_of_int (KernelSyms.printint + 0x82) : mword 64) 2 = mword_of_int (KernelSyms.printint + 0x84)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp84) in "Hpc".
     (* ---- rebuild the three byte slots and run the epilogue ---- *)
-    iDestruct (bytes_own_slots3 sp0 7 ltac:(lia) Hal7 Hal6 Hal5 with "Hbuf") as (w7 w6 w5) "(Hs7 & Hs6 & Hs5)".
+    iDestruct (bytes_own_slots3 (KTR := kt) sp0 7 ltac:(lia) Hal7 Hal6 Hal5 with "Hbuf") as (w7 w6 w5) "(Hs7 & Hs6 & Hs5)".
     iApply (wp_printint_epi (CID0 := CIDld) m R1 K b pcur ltac:(lia)
               ltac:(rewrite /R1 upd_ne; [exact Hmfsp | reg_neq])
               ltac:(intros c Hc Nsp N8 N18;
@@ -1271,7 +1271,7 @@ Section ProofPrintint.
         replace (sign_extend' 64 (mword_of_int 4072 : mword 12)) with (mword_of_int (-24) : mword 64)
           by (apply bv_eq; vm_compute; reflexivity).
         apply sign_slot_addr. }
-      iDestruct (bytes_own_acc (DfracOwn 1) buf 24 i' ltac:(lia) with "Hbuf") as "[Hbi Hbcl]".
+      iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) buf 24 i' ltac:(lia) with "Hbuf") as "[Hbi Hbcl]".
       iDestruct "Hbi" as (bold) "Hbi".
       iEval (rewrite -Hpa') in "Hbi".
       iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.printint + 0x54)) a5_idx a2_idx (mword_of_int 4072 : mword 12)
@@ -1456,7 +1456,7 @@ Section ProofPrintint.
     { intros c Hc Nsp N8 N18.
       rewrite /W2 upd_ne; [| congruence]. rewrite /W1 upd_ne; [reflexivity | congruence]. }
     (* the three byte slots [buf] lives in *)
-    iDestruct (slots3_bytes_own sp0 7 w7 w6 w5 ltac:(lia) with "Hs7 Hs6 Hs5") as "[%Hals Hbuf]".
+    iDestruct (slots3_bytes_own (KTR := kt) sp0 7 w7 w6 w5 ltac:(lia) with "Hs7 Hs6 Hs5") as "[%Hals Hbuf]".
     destruct Hals as (Hal7 & Hal6 & Hal5).
     assert (Hp0a : add_vec_int (mword_of_int (KernelSyms.printint + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.printint + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0a) in "Hpc".

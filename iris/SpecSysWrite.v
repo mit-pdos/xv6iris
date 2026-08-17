@@ -227,7 +227,7 @@ Definition wp_sys_write_sconf_body
   procs_inv (kt := kt) γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
      device table's write column for whatever major the descriptor may name *)
-  filewrite_fs_env γf fn -∗
+  filewrite_fs_env (kt := kt) γf fn -∗
   filewrite_devsw fn -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>

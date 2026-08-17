@@ -22,7 +22,7 @@
 
    A buffer's BASE is its LOWEST address, i.e. its HIGHEST slot index, and it
    grows toward smaller indices -- which is the direction
-   [StackBytes.slotsn_bytes_own] carves in.  [ustack] ends at sp+439, abutting
+   [StackBytes.slotsn_bytes_own (KTR := kt)] carves in.  [ustack] ends at sp+439, abutting
    s11's spill at sp+440 with ZERO slack: an off-by-one in a carve collides
    with a callee-saved spill rather than landing in padding.
 
@@ -42,7 +42,7 @@
      [add_vec s0 (sign_extend' 64 (mword_of_int 3664 : mword 12))]), each shown
      equal to its slot.
    * [kxc_slots_elf] / [kxc_bytes_elf] and the two siblings -- the carves,
-     instances of [StackBytes.slotsn_bytes_own] / [bytes_own_slotsn].
+     instances of [StackBytes.slotsn_bytes_own (KTR := kt)] / [bytes_own_slotsn (KTR := kt)].
    * [kxc_frame] / [kxc_frame_at] / [kxc_frame_at_weaken] -- the frame as the
      several exits agree to present it: slots 1..4 pinned, the NINE lazily
      spilled slots 5..13 (s3..s11) existential in [kxc_frame] and pinned in
@@ -201,7 +201,7 @@ Section ProofKexecParts.
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 54) 64 ⊢
     [∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈[kt] w.
-  Proof. exact (bytes_own_slotsn sp0 54 8 ltac:(lia)). Qed.
+  Proof. exact (bytes_own_slotsn (KTR := kt) sp0 54 8 ltac:(lia)). Qed.
 
   (* struct proghdr ph -- 56 bytes, slots 61 down to 55. *)
   Lemma kxc_slots_ph (sp0 : mword 64) :
@@ -209,14 +209,14 @@ Section ProofKexecParts.
     ⌜forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true⌝ ∗
     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 61) 56.
-  Proof. exact (slotsn_bytes_own sp0 61 7 ltac:(lia)). Qed.
+  Proof. exact (slotsn_bytes_own (KTR := kt) sp0 61 7 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_ph (sp0 : mword 64) :
     (forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 61) 56 ⊢
     [∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈[kt] w.
-  Proof. exact (bytes_own_slotsn sp0 61 7 ltac:(lia)). Qed.
+  Proof. exact (bytes_own_slotsn (KTR := kt) sp0 61 7 ltac:(lia)). Qed.
 
   (* uint64 ustack[33] -- 264 bytes, slots 46 down to 14.  Slot 14 is
      sp+432..sp+439, and s11's spill is sp+440: there is NO slack here. *)
@@ -225,14 +225,14 @@ Section ProofKexecParts.
     ⌜forall i, (i < 33)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (46 - i))) 8 = true⌝ ∗
     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 46) 264.
-  Proof. exact (slotsn_bytes_own sp0 46 33 ltac:(lia)). Qed.
+  Proof. exact (slotsn_bytes_own (KTR := kt) sp0 46 33 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_ustack (sp0 : mword 64) :
     (forall i, (i < 33)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (46 - i))) 8 = true) ->
     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 46) 264 ⊢
     [∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[kt] w.
-  Proof. exact (bytes_own_slotsn sp0 46 33 ltac:(lia)). Qed.
+  Proof. exact (bytes_own_slotsn (KTR := kt) sp0 46 33 ltac:(lia)). Qed.
 
   (* =================================================================== *)
   (*  +0x72 .. +0x86 -- THE EPILOGUE.  Every exit reaches it.             *)

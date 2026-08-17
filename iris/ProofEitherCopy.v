@@ -894,7 +894,7 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyout.wp_copyout_sconf kt ktb γa U5 (pv_upt V) (pv_sz V) len src_bytes
+      iApply (Copyout.wp_copyout_sconf kt KT0 γa U5 (pv_upt V) (pv_sz V) len src_bytes
                 (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").

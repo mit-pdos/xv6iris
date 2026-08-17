@@ -485,13 +485,13 @@ Section WriteiDefs.
       (bytes : nat -> bv 8) :
     (if user
      then proc_priv_core (proc_addr j) pidv Vc
-     else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ bytes i) ∗
+     else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ[ktb] bytes i) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
       p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
       (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗
        (if user
         then proc_priv_core (proc_addr j) pidv Vc
-        else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ bytes i) ∗
+        else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ[ktb] bytes i) ∗
              p_pid (proc_addr j) ↦₄{dq} pidv)).
   Proof.
     rewrite /wi_q. destruct user.
@@ -573,7 +573,7 @@ Section WriteiDefs.
         (if user
          then proc_priv_core (proc_addr j) pidv (upd_upt V P')
          else ([∗ list] i ∈ seq 0 n,
-                 pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
+                 pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
               p_pid (proc_addr j) ↦₄{dq} pidv) -∗
         bslots bn 3 -∗
         log_opS γ n' Sb' -∗
@@ -676,7 +676,7 @@ Section WriteiRet.
     (if user
      then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
-             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
+             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ n' Sb' -∗
@@ -1086,7 +1086,7 @@ Section WriteiJoin.
     (if user
      then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
-             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
+             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ (S u) SbC -∗
@@ -1471,7 +1471,7 @@ Section WriteiSize.
     (if user
      then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
-             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
+             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ (S u) SbC -∗
@@ -2125,7 +2125,7 @@ Section WriteiLoop.
     (if user
      then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
      else ([∗ list] i ∈ seq 0 n,
-             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) ∗
+             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv) -∗
     bslots bn 3 -∗
     log_opS γ nI SI -∗
@@ -2889,13 +2889,13 @@ Section WriteiLoop.
                   then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
                   else [∗ list] jj ∈ seq 0 mm,
                          pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot) jj
-                           ↦ₘ (src_bytes (tot + jj)%nat))
+                           ↦ₘ[ktb] (src_bytes (tot + jj)%nat))
                  ∗ (if user then True
                     else ([∗ list] jj ∈ seq 0 tot,
-                            pa_add (m !!! Regidx Ra2 : mword 64) jj ↦ₘ (src_bytes jj))
+                            pa_add (m !!! Regidx Ra2 : mword 64) jj ↦ₘ[ktb] (src_bytes jj))
                          ∗ ([∗ list] jj ∈ seq 0 (n - tot - mm),
                               pa_add (pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot)
-                                        mm) jj ↦ₘ (src_bytes (tot + (mm + jj))%nat))
+                                        mm) jj ↦ₘ[ktb] (src_bytes (tot + (mm + jj))%nat))
                          (* THE PID SHARE PARKS HERE across the copy.  On the
                             user arm it is inside [proc_priv], which travels
                             as [Hsrcw]; on the kernel arm either_copyin never
@@ -2972,7 +2972,7 @@ Section WriteiLoop.
                       pa_add (pa_add (b_data (bnode kkb)) o) i ↦ₘ (g i)) ∗
                    (if user then proc_priv_core (proc_addr j) pidv (upd_upt V P2)
                     else ([∗ list] i ∈ seq 0 n,
-                            pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i))
+                            pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i))
                          ∗ p_pid (proc_addr j) ↦₄{dq} pidv))%I
           with "[Hpost Hsrcrest]" as "Hnorm".
         { destruct user.
@@ -4237,7 +4237,7 @@ Section WriteiMain.
     iAssert (if user
              then proc_priv_core (proc_addr j) pidv (upd_upt V (pv_upt V))
              else ([∗ list] i ∈ seq 0 n,
-                     pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i))
+                     pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i))
                   ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
       with "[Hsrc]" as "Hsrc"; [rewrite HVid; iExact "Hsrc"|].
     iAssert (inode_meta ip dn) with "[Hmt Hmj Hmn Hml Hmz]" as "Hmeta".

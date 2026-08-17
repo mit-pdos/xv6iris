@@ -252,9 +252,9 @@ Section ProofDirlookupMain.
      rewrite a partially-applied byte function. *)
   Lemma dlk_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ file_byte data (16 * i + jj)%nat)
+    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat)
     ⊣⊢ a ↦₂ dir_inum data i
-       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ dir_name data i jj).
+       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[kt] dir_name data i jj).
   Proof.
     intro Hal.
     rewrite -(dlk_half_acc data i a Hal).
@@ -1615,7 +1615,7 @@ Section ProofDirlookupMain.
         first [ iEval (rewrite Hpjd) in "Hcnt" | idtac ].
         iAssert (([∗ list] ii ∈ seq 0 16,
                     pa_add (L6 !!! Regidx Ra2 : mword 64) ii
-                      ↦ₘ rd_delivered data dol (16 * i) tot ii)
+                      ↦ₘ[kt] rd_delivered data dol (16 * i) tot ii)
                  ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hdst2]" as "[Hde Hppid]".
         { iExact "Hdst2". }
         first [ iEval (rewrite Hpjd) in "Hppid" | idtac ].

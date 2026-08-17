@@ -236,7 +236,7 @@ Section ReadiDefs.
       (bytes : nat -> bv 8) : iProp Σ :=
     (if user
      then proc_priv_core (proc_addr j) pidv Vc
-     else ([∗ list] i ∈ seq 0 n, pa_add dstb i ↦ₘ bytes i) ∗
+     else ([∗ list] i ∈ seq 0 n, pa_add dstb i ↦ₘ[ktb] bytes i) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv)%I.
 
   (* the dfrac the borrowed share carries: [proc_priv]'s own quarter on the
@@ -1713,16 +1713,16 @@ Section ReadiLoop.
                 then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
                 else [∗ list] jj ∈ seq 0 mm,
                        pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot) jj
-                         ↦ₘ rd_delivered data dst_olds off tot (tot + jj)%nat)
+                         ↦ₘ[ktb] rd_delivered data dst_olds off tot (tot + jj)%nat)
                ∗ (if user then True
                   else p_pid (proc_addr j) ↦₄{dq} pidv
                        ∗ ([∗ list] jj ∈ seq 0 tot,
                             pa_add (m !!! Regidx Ra2 : mword 64) jj
-                              ↦ₘ rd_delivered data dst_olds off tot jj)
+                              ↦ₘ[ktb] rd_delivered data dst_olds off tot jj)
                        ∗ ([∗ list] jj ∈ seq 0 (n - tot - mm),
                             pa_add (pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot)
                                       mm) jj
-                              ↦ₘ rd_delivered data dst_olds off tot
+                              ↦ₘ[ktb] rd_delivered data dst_olds off tot
                                    (tot + (mm + jj))%nat)))%I
         with "[Hdst]" as "[Hdstw Hdstrest]".
       { rewrite /rd_dst. destruct user.

@@ -2106,7 +2106,7 @@ Section ProofSysPipe.
     assert (Hsza : add_vec (rget A3 Rs1) (sign_extend' 64 (mword_of_int 72 : mword 12))
                    = p_sz p) by (rgne; rewrite HA3s1; reflexivity).
     iEval (rewrite -Hsza) in "Hszc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x5a)) Ra1 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x5a)) Ra1 Rs1
               (mword_of_int 72 : mword 12) A3 (av - 8)%nat
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2125,7 +2125,7 @@ Section ProofSysPipe.
     assert (Hpta : add_vec (rget A4 Rs1) (sign_extend' 64 (mword_of_int 80 : mword 12))
                    = p_pagetable p) by (rgne; rewrite HA4s1; reflexivity).
     iEval (rewrite -Hpta) in "Hptc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x5c)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x5c)) Ra0 Rs1
               (mword_of_int 80 : mword 12) A4 (av - 8)%nat
               (page_base (ud_root (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)

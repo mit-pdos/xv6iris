@@ -618,8 +618,8 @@ Section DlBuf.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "H1 H2".
-    iDestruct (slot_bytes_own with "H1") as "[%Ha1 B1]".
-    iDestruct (slot_bytes_own with "H2") as "[%Ha2 B2]".
+    iDestruct (slot_bytes_own (KTR := kt) with "H1") as "[%Ha1 B1]".
+    iDestruct (slot_bytes_own (KTR := kt) with "H2") as "[%Ha2 B2]".
     iSplitR; [done |].
     change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iSplitL "B1"; [iExact "B1" | iExact "B2"].
@@ -636,8 +636,8 @@ Section DlBuf.
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "B". change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iDestruct "B" as "[B1 B2]".
-    iDestruct (bytes_own_slot _ Ha1 with "B1") as (w1) "H1".
-    iDestruct (bytes_own_slot _ Ha2 with "B2") as (w2) "H2".
+    iDestruct (bytes_own_slot (KTR := kt) _ Ha1 with "B1") as (w1) "H1".
+    iDestruct (bytes_own_slot (KTR := kt) _ Ha2 with "B2") as (w2) "H2".
     iExists w1, w2. iFrame.
   Qed.
 
@@ -647,7 +647,7 @@ Section DlBuf.
      built out of, so [nth_byte_assemble_len] gives the two readings. *)
   Lemma dl_bytes_half (a : Arch.pa) (g : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ g j) ⊢ ∃ w : bv 16, a ↦₂ w.
+    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[kt] g j) ⊢ ∃ w : bv 16, a ↦₂ w.
   Proof.
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
@@ -1011,9 +1011,9 @@ Section ProofDirlinkMain.
   (* readi's sixteen delivered bytes as the [lhu]'s halfword plus the name *)
   Lemma dl_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ file_byte data (16 * i + jj)%nat)
+    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[kt] file_byte data (16 * i + jj)%nat)
     ⊣⊢ a ↦₂ dir_inum data i
-       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ dir_name data i jj).
+       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[kt] dir_name data i jj).
   Proof.
     intro Hal.
     rewrite -(dlk_half_acc data i a Hal).
@@ -2986,7 +2986,7 @@ Section ProofDirlinkMain.
                                (mword_of_int (Z.of_nat 16%nat) : mword 32))
             by (rewrite HL6a4; apply rd_arg32_small; lia).
           iAssert (([∗ list] ii ∈ seq 0 16,
-                      pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ dol ii)
+                      pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[kt] dol ii)
                    ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
             with "[Hde Hppid]" as "Hdst".
           { iEval (rewrite HL6a2). iFrame. }
@@ -3016,7 +3016,7 @@ Section ProofDirlinkMain.
              Hdst2 Hbs1".
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii
-                        ↦ₘ rd_delivered data dol (16 * i) tot ii)
+                        ↦ₘ[kt] rd_delivered data dol (16 * i) tot ii)
                    ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
             with "[Hdst2]" as "[Hde Hppid]".
           { iExact "Hdst2". }
