@@ -89,6 +89,7 @@ Module StrlenProof : STRLEN.
 Section ProofStrlen.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kts : ktier}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -357,7 +358,7 @@ Section ProofStrlen.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp16) in "Hpc".
     (* ---- +0x16: lbu a4,-1(a5) ---- *)
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.strlen + 0x16)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.strlen + 0x16)) Ra4 Ra5
               (mword_of_int 4095 : mword 12) P2 Kv bt b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [Hbyte]").
@@ -533,7 +534,7 @@ Section ProofStrlen.
   (* ================================================================== *)
   Lemma wp_strlen_sconf (mm : regfile)
       (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_strlen_sconf_body mm n k f K dq b p.
+    : wp_strlen_sconf_body kts mm n k f K dq b p.
   Proof.
     cbv beta delta [wp_strlen_sconf_body].
     intros pcE s ret_tgt HK Hkn Hcstr Hk31.
@@ -627,7 +628,7 @@ Section ProofStrlen.
     assert (HR2a0' : rget R2 Ra0 = s) by (rgne; exact HR2a0).
     assert (H0n : (0 < n)%nat) by lia.
     iDestruct (bb_byte_acc s n 0%nat f dq H0n with "Hbuf") as "[Hbyte Hback]".
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.strlen + 0x08)) Ra5 Ra0
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.strlen + 0x08)) Ra5 Ra0
               (mword_of_int 0 : mword 12) R2 (K - 2)%nat (f 0%nat : mword 8) b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [Hbyte]").

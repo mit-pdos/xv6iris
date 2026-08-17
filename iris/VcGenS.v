@@ -331,6 +331,9 @@ Qed.
 Section VcGenSIris.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  (* the block's heap cells are frame slots, so they ride the accessing
+     hart's regime -- see VcGen.v's [vheap_own]. *)
+  Context `{KTR : !CurKtier}.
 
   (* ------------------------------------------------------------------ *)
   (* 4-byte (word) cells: the [word_pointsto] analogue for lw/sw.  Both   *)

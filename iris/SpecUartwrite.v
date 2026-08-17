@@ -141,7 +141,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      motivated -- delete it when the cone is next touched. *)
   p_pid pj ↦₄{dqp} pidv -∗
   (* the buffer, read-only *)
-  ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
+  ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -150,7 +150,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
+      ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
       p_pid pj ↦₄{dqp} pidv -∗
       uart_sent_sub γu (f <$> seq 0 n) -∗
       WP (Loop : expr riscv_lang)) -∗

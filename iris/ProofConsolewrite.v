@@ -1275,7 +1275,7 @@ Section CwBodies.
         (* the buffer is whole again *)
         iDestruct (bytes_own_of_name (KTR := KT1) nnN buf fb' with "Hb1") as "Hb1".
         iAssert (cw_buf sp0) with "[Hb1 Hb2]" as "Hbuf".
-        { rewrite /cw_buf H32 bytes_own_app (KTR := KT1).
+        { rewrite /cw_buf H32 (bytes_own_app (KTR := KT1)).
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
         assert (Hregd : cw_regs mf2 (pa_stk sp0 16%nat) sp0 src n i).
         { apply (cw_regs_cs D3); [exact Hcs2|].
@@ -1380,7 +1380,7 @@ Section CwBodies.
         iApply bi.later_intro. iIntros (CIDc8 Hsc8) "Hcg Hpc".
         iEval (rewrite Htgtb) in "Hpc".
         iAssert (cw_buf sp0) with "[Hb1 Hb2]" as "Hbuf".
-        { rewrite /cw_buf H32 bytes_own_app (KTR := KT1).
+        { rewrite /cw_buf H32 (bytes_own_app (KTR := KT1)).
           iDestruct (bytes_own_of_name (KTR := KT1) nnN buf fb' with "Hb1") as "Hb1".
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
         iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid V P1 n lks Hext1

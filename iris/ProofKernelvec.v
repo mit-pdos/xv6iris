@@ -516,7 +516,7 @@ Section KernelvecCore.
     assert (HVr30 : ρ 30%nat = m !!! Regidx (mword_of_int 30 : mword 5)) by reflexivity.
     assert (HVr31 : ρ 31%nat = m !!! Regidx (mword_of_int 31 : mword 5)) by reflexivity.
     iDestruct (kv_store_instrs with "Htext") as "Hbi".
-    iApply (wp_vc_block_s root_ppn kv_store_prog
+    iApply (wp_vc_block_s (KTR := KT1) root_ppn kv_store_prog
               (VSt (KernelSyms.kernelvec + 0x2) kv_store_regs0 kv_store_heap0 [])
               (VSt (KernelSyms.kernelvec + 0x24) kv_store_regs0 kv_store_heap1 [])
               ρ m γ
@@ -647,7 +647,7 @@ Section KernelvecCore.
     assert (HVw16 : ρ 48%nat = (w16 : mword 64)) by reflexivity.
     assert (HVw17 : ρ 49%nat = (w17 : mword 64)) by reflexivity.
     iDestruct (kv_load_instrs with "Htext") as "Hbi".
-    iApply (wp_vc_block_s root_ppn kv_load_prog
+    iApply (wp_vc_block_s (KTR := KT1) root_ppn kv_load_prog
               (VSt (KernelSyms.kernelvec + 0x28) kv_load_regs0 kv_store_heap0 [])
               (VSt (KernelSyms.kernelvec + 0x4a) kv_load_regs1 kv_store_heap0 [])
               ρ m γ

@@ -1973,7 +1973,7 @@ Section ProofSysUnlinkBody.
       by (rewrite /R4; apply su_regs_caller; [exact Hcsra | exact HR3regs]).
     iPoseProof (su_dot_window (mword_of_int su_dot_addr) eq_refl with "Hdata")
       as "Hdotw".
-    iApply (Namecmp.wp_namecmp_sconf (CID := CID6) R4 nf su_dot_f
+    iApply (Namecmp.wp_namecmp_sconf (CID := CID6) KT1 KT0 R4 nf su_dot_f
               (K - 30)%nat (DfracOwn 1) DfracDiscarded b (proc_addr jx)
               ltac:(exact Knc) with "Hcg Htext Hpc [Hnm14] [Hdotw]").
     { iEval (rewrite HR4a0). iExact "Hnm14". }
@@ -2128,7 +2128,7 @@ Section ProofSysUnlinkBody.
         by (rewrite /R8; apply su_regs_caller; [exact Hcsra | exact HR7regs]).
       iPoseProof (su_dotdot_window (mword_of_int su_dotdot_addr) eq_refl
                     with "Hdata") as "Hddw".
-      iApply (Namecmp.wp_namecmp_sconf (CID := CID12) R8 nf su_dotdot_f
+      iApply (Namecmp.wp_namecmp_sconf (CID := CID12) KT1 KT0 R8 nf su_dotdot_f
                 (K - 30)%nat (DfracOwn 1) DfracDiscarded b (proc_addr jx)
                 ltac:(exact Knc) with "Hcg Htext Hpc [Hnm14] [Hddw]").
       { iEval (rewrite HR8a0). iExact "Hnm14". }

@@ -209,7 +209,7 @@ Proof.
   assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (FR + 0x02)) by pcw.
   iEval (rewrite Hp02) in "Hpc".
   (* the frame: three saved words, three scratch slots *)
-  iDestruct (stack_own_split_1 ksp 4 6 ltac:(lia) with "Hframe") as "[Hf14 Hf56]".
+  iDestruct (stack_own_split_1 (KTR := KT1) ksp 4 6 ltac:(lia) with "Hframe") as "[Hf14 Hf56]".
   iDestruct (stack_own_4_elim with "Hf14") as (vra vs0 vs1 vsc) "(Hbra & Hbs0 & Hbs1 & Hbsc)".
   assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                    (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
@@ -393,7 +393,7 @@ Proof.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = first_addr)
     by (rewrite HT2a5; apply addv_sext0).
   iEval (rewrite -Hfaddr) in "Hfirst".
-  iApply (wp_clw_s_sconf (mword_of_int (FR + 0x1c)) Ra5 Ra5
+  iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x1c)) Ra5 Ra5
             (mword_of_int 0 : mword 12) T2 av2 (mword_of_int 0 : mword 32) eb
             ltac:(vm_compute; discriminate) ltac:(rdok)
             with "Hcg Hpc Hi1c Hfirst").

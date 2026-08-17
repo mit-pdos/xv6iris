@@ -382,6 +382,9 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section ReadiRes.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  (* the byte-window splitters ride the CALLER's regime: readi's destination
+     is a caller buffer ([ktb]) while the bio block window is static. *)
+  Context `{KTR : !CurKtier}.
 
   (* --- conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so the call
      sites APPLY them (unification, hence conversion-tolerant between

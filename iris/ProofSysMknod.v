@@ -1507,7 +1507,7 @@ Section ProofSysMknodBody.
       { rewrite (rget_ne (CID := CID20) mas Rs0 ltac:(vm_compute; discriminate))
                 Hass0. apply mn_min. }
       iEval (rewrite -Hamin) in "Hminlo".
-      iApply (wp_lh_s_sconf (CID := CID20) (mword_of_int (MN + 0x32)) Ra3 Rs0
+      iApply (wp_lh_s_sconf (CID := CID20) (kt := KT1) (ktd := KT1) (mword_of_int (MN + 0x32)) Ra3 Rs0
                 (mword_of_int 3944 : mword 12) mas (K - 20)%nat
                 (hw_lo (arg_int32 v2)) b (dqm := DfracOwn 1)
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 Hminlo").

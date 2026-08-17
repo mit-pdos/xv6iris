@@ -256,8 +256,8 @@ Section ProofDirlookupMain.
        ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[KT1] dir_name data i jj).
   Proof.
     intro Hal.
-    rewrite -(dlk_half_acc data i a Hal).
-    rewrite -(dlk_name_acc data i (pa_add a 2)).
+    rewrite -(dlk_half_acc (KTR := KT1) data i a Hal).
+    rewrite -(dlk_name_acc (KTR := KT1) data i (pa_add a 2)).
     exact (dlk_de_split (KTR := KT1) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
@@ -343,12 +343,12 @@ Section ProofDirlookupMain.
              inode_ref kslot q dev
                (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
              (if hasp
-              then pf ↦₄ (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
+              then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
               else emp)
         else ⌜dir_first data nrec s = None
               /\ mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
              iref_slot ∗
-             (if hasp then pf ↦₄ pofv else emp)) -∗
+             (if hasp then pf ↦₄[KT1] pofv else emp)) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_loop_body
@@ -382,7 +382,7 @@ Section ProofDirlookupMain.
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
-       (if hasp then pf ↦₄ pofv else emp) -∗
+       (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        p_pid pj ↦₄{dq} pidv -∗
        bslot bn -∗
        iref_slot -∗
@@ -422,7 +422,7 @@ Section ProofDirlookupMain.
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
-       (if hasp then pf ↦₄ pofv else emp) -∗
+       (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        p_pid pj ↦₄{dq} pidv -∗
        bslot bn -∗
        iref_slot -∗
@@ -1856,7 +1856,7 @@ Section ProofDirlookupMain.
             by (rewrite /N4; apply upd_eq).
           iEval (rewrite -HN4a0) in "Hnm".
           iEval (rewrite -HN4a1) in "Hdenm".
-          iApply (NC.wp_namecmp_sconf N4 fn (dir_name data i) (K - 12)%nat
+          iApply (NC.wp_namecmp_sconf KT1 KT0 N4 fn (dir_name data i) (K - 12)%nat
                     dqn (DfracOwn 1) b pj ltac:(lia)
                     with "Hcg Htext Hpc Hnm Hdenm").
           iIntros (CIDnc Hsnc mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
@@ -1906,12 +1906,12 @@ Section ProofDirlookupMain.
             (* +0x7e beq s7,x0 / +0x82 sw s1,0(s7) : the optional [*poff = off] *)
             iAssert (sie_cap_gpr KT1 mnc (K - 12)%nat b pj -∗
                      pc_is (mword_of_int (DL + 0x7e)) -∗
-                     (if hasp then pf ↦₄ pofv else emp) -∗
+                     (if hasp then pf ↦₄[KT1] pofv else emp) -∗
                      wp_next (CID0 := CIDB13) true pj (fun CIDs : CpuId =>
                        sie_cap_gpr KT1 mnc (K - 12)%nat b pj -∗
                        pc_is (mword_of_int (DL + 0x86)) -∗
                        (if hasp
-                        then pf ↦₄ (mword_of_int (Z.of_nat (16 * i)) : mword 32)
+                        then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * i)) : mword 32)
                         else emp) -∗
                        WP (Loop : expr riscv_lang)) -∗
                      WP (Loop : expr riscv_lang))%I with "[]" as "Hpoffst".

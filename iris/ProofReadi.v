@@ -1723,7 +1723,7 @@ Section ReadiLoop.
       { rewrite /rd_dst. destruct user.
         - iSplitL "Hdst"; [iExact "Hdst" | done].
         - iDestruct "Hdst" as "[Hdst Hppid]".
-          iDestruct (rd_split3 (m !!! Regidx Ra2 : mword 64)
+          iDestruct (rd_split3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                        tot mm (n - tot - mm)%nat n
                        (fun i => rd_delivered data dst_olds off tot i)
                        ltac:(lia) with "Hdst") as "(Hp & Hq & Hr)".
@@ -1755,7 +1755,7 @@ Section ReadiLoop.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iEval (rewrite -HD8a2) in "Hwin".
       iEval (rewrite -HD8a1) in "Hdstw".
-      iApply (EC.wp_either_copyout_sconf ktb γa γf D8 (K - 14)%nat 0%nat eb
+      iApply (EC.wp_either_copyout_sconf ktb KT0 γa γf D8 (K - 14)%nat 0%nat eb
                 (proc_addr j) pidv (upd_upt V PI) user mm
                 (fun i => (data fbn) !!! (o + i)%nat)
                 (fun jj => rd_delivered data dst_olds off tot (tot + jj)%nat) b lks

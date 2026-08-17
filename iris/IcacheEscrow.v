@@ -204,8 +204,8 @@ Section IcacheEscrow.
      timeless -- but several are guarded by a [decide], so the instances
      have to be discharged by hand rather than found. *)
 
-  Global Instance word2_pointsto_timeless (a : Arch.pa) (dq : dfrac) (w : bv 16) :
-    Timeless (word2_pointsto a dq w).
+  Global Instance word2_pointsto_timeless (ktr : CurKtier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
+    Timeless (word2_pointsto (KTR := ktr) a dq w).
   Proof. rewrite /word2_pointsto. apply _. Qed.
 
   Global Instance inode_meta_timeless (ip : mword 64) (d : dinode) :

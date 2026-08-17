@@ -2343,7 +2343,7 @@ Section KexecCLoop.
     assert (Halen31 : (Z.of_nat (alen c) < 2 ^ 31)%Z)
       by (change (2 ^ 31)%Z with 2147483648%Z; lia).
     iEval (rewrite -HZ0a0) in "Hargc".
-    iApply (Strlen.wp_strlen_sconf Z0 (aslen c) (alen c) (afun c) (K - 68)%nat
+    iApply (Strlen.wp_strlen_sconf KT0 Z0 (aslen c) (alen c) (afun c) (K - 68)%nat
               (DfracOwn 1) true (proc_addr jp) HK2 Halenlt Hcstr Halen31
               with "Hcg Htext Hpc Hargc").
     iIntros (CID2 Hs2 T0) "Hcg Hpc Hargc %Hcs0 %HT0a0".
@@ -2757,7 +2757,7 @@ Section KexecCLoop.
          through [avf c] to reach [Z1!!!Ra0] for this one. *)
       iEval (rewrite HZ0a0) in "Hargc".
       iEval (rewrite -HZ1a0) in "Hargc".
-      iApply (Strlen.wp_strlen_sconf Z1 (aslen c) (alen c) (afun c) (K - 68)%nat
+      iApply (Strlen.wp_strlen_sconf KT0 Z1 (aslen c) (alen c) (afun c) (K - 68)%nat
                 (DfracOwn 1) true (proc_addr jp) HK2 Halenlt Hcstr Halen31
                 with "Hcg Htext Hpc Hargc").
       iIntros (CID12 Hs12 T7) "Hcg Hpc Hargc %Hcs1 %HT7a0".

@@ -369,7 +369,7 @@ Section UwProps.
   Qed.
 
   Definition uw_buf (buf : mword 64) (dq : dfrac) (f : nat -> bv 8) (n : nat) : iProp Σ :=
-    ([∗ list] k0 ∈ seq 0 n, (pa_add buf k0) ↦ₘ{dq} f k0)%I.
+    ([∗ list] k0 ∈ seq 0 n, (pa_add buf k0) ↦ₘ[KT1]{dq} f k0)%I.
 
   Definition uw_full (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (uw_saved sp0 m0 ∗ uw_slot10 sp0)%I.
@@ -1101,12 +1101,12 @@ Section UwBodies.
         assert (HG1a5 : G1 !!! Regidx Ra5 = pa_add buf i) by (rewrite /G1 upd_eq; reflexivity).
         (* --- +0x64  lbu a5,0(a5) --- *)
         assert (Hlk0 : seq 0 n !! i = Some i) by (apply lookup_seq; split; [lia | exact Hin]).
-        iDestruct (big_sepL_lookup_acc (fun _ x => ((pa_add buf x) ↦ₘ{dq} f x)%I) (seq 0 n) i i Hlk0
+        iDestruct (big_sepL_lookup_acc (fun _ x => ((pa_add buf x) ↦ₘ[KT1]{dq} f x)%I) (seq 0 n) i i Hlk0
                      with "Hbuf") as "[Hbyte Hback]".
         assert (Haddrb : add_vec (rget G1 Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                          = pa_add buf i).
         { rgne. rewrite HG1a5. apply uw_addv_0. }
-        iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.uartwrite + 0x64)) Ra5 Ra5
+        iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.uartwrite + 0x64)) Ra5 Ra5
                   (mword_of_int 0 : mword 12) G1 (trap_res true + (av - 10))%nat (f i : mword 8) false
                   (dqm := dq) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi64 [Hbyte]").
         { iEval (rewrite Haddrb). iExact "Hbyte". }

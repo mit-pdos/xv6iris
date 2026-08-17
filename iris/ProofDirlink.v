@@ -1014,9 +1014,9 @@ Section ProofDirlinkMain.
        ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[KT1] dir_name data i jj).
   Proof.
     intro Hal.
-    rewrite -(dlk_half_acc data i a Hal).
-    rewrite -(dlk_name_acc data i (pa_add a 2)).
-    exact (dlk_de_split a (fun jj => file_byte data (16 * i + jj)%nat)).
+    rewrite -(dlk_half_acc (KTR := KT1) data i a Hal).
+    rewrite -(dlk_name_acc (KTR := KT1) data i (pa_add a 2)).
+    exact (dlk_de_split (KTR := KT1) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
   (* the [V] slot of readi's contract is dead on the kernel arm *)
@@ -2153,7 +2153,7 @@ Section ProofDirlinkMain.
                         = add_vec_int (mword_of_int (DK + 0x78) : mword 64) 4)
           by (rewrite /W4; apply upd_eq).
         (* the [de] buffer splits into the inum halfword and the name *)
-        iEval (rewrite (dlk_de_split (pa_stk sp0 10) dolz)) in "Hde".
+        iEval (rewrite (dlk_de_split (KTR := KT1) (pa_stk sp0 10) dolz)) in "Hde".
         iDestruct "Hde" as "[Hdehi Hdenm]".
         iEval (rewrite -HW4a0) in "Hdenm".
         iEval (rewrite -HW4a1) in "Hnm".
@@ -2182,7 +2182,7 @@ Section ProofDirlinkMain.
                            (sign_extend' 64 (mword_of_int 4016 : mword 12))
                          = pa_stk sp0 10) by (rewrite Hs8; apply dl_de_addr).
         iEval (rewrite -Hdeadr) in "Hdehi".
-        iApply (wp_sh_s_sconf (mword_of_int (DK + 0x7c)) Rs6 Rs0
+        iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DK + 0x7c)) Rs6 Rs0
                   (mword_of_int 4016 : mword 12) msn (K - 10)%nat vold b
                   with "Hcg Hpc Hi7c [Hdehi]").
         { iEval (rgne). iExact "Hdehi". }
@@ -2196,7 +2196,7 @@ Section ProofDirlinkMain.
         iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
                    ↦ₘ[KT1] (dirent_bytes (de_of_name inum s) !!! jj))%I
           with "[Hdehi Hdenm]" as "Hsrc".
-        { rewrite (dlk_de_split (pa_stk sp0 10)
+        { rewrite (dlk_de_split (KTR := KT1) (pa_stk sp0 10)
                      (fun jj => dirent_bytes (de_of_name inum s) !!! jj)).
           iSplitL "Hdehi".
           - rewrite (bb_ext (KTR := KT1) (pa_stk sp0 10) 2

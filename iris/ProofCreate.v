@@ -5054,7 +5054,7 @@ Section ProofCreateMain.
         iPoseProof (cri_0d8 with "Htext") as "Hi0d8".
         iPoseProof (cri_0dc with "Htext") as "Hi0dc".
         (* ===== +0xce lw a2,4(s3) : the child's inum ================ *)
-        iApply (wp_lw_s_sconf (mword_of_int (CK + 0xce)) Ra2 Rs3
+        iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0xce)) Ra2 Rs3
                   (mword_of_int 4 : mword 12) W4 (K - 10)%nat cinum b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0ce [Hciinum]").
         { iEval (rgne; rewrite HW4s3). iExact "Hciinum". }
@@ -7494,7 +7494,7 @@ Section ProofCreateMain.
     iPoseProof (cri_106 with "Htext") as "Hi106".
     iPoseProof (cri_10a with "Htext") as "Hi10a".
     (* ===== +0xf8 lw a2,4(s3) : the child's inum ====================== *)
-    iApply (wp_lw_s_sconf (mword_of_int (CK + 0xf8)) Ra2 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0xf8)) Ra2 Rs3
               (mword_of_int 4 : mword 12) Mx (K - 10)%nat cinum b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0f8 [Hciinum]").
     { iEval (rgne; rewrite X19). iExact "Hciinum". }

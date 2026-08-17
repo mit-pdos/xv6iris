@@ -117,14 +117,14 @@ Section VdrwbFreeAt.
     instr (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) false
           (LOAD (imm, Regidx Rs0, Regidx Ra0, false, 4)) -∗
     instr (mword_of_int (KernelSyms.virtio_disk_rw + off + 4) : mword 64) false (JAL (jimm, Regidx Rra)) -∗
-    idxa ↦₄ (mword_of_int (Z.of_nat i) : mword 32) -∗
+    idxa ↦₄[KT1] (mword_of_int (Z.of_nat i) : mword 32) -∗
     free_bundles pd fr -∗ free_slot_res pd i -∗
     ( ∀ Mf : regfile,
         ⌜forall r : mword 5, is_cs_idx r = true -> Mf !!! Regidx r = M !!! Regidx r⌝ -∗
         sie_cap_gpr KT1 Mf av false pme -∗
         cpu_own 1 eb pme false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off + 8) : mword 64) -∗
-        idxa ↦₄ (mword_of_int (Z.of_nat i) : mword 32) -∗
+        idxa ↦₄[KT1] (mword_of_int (Z.of_nat i) : mword 32) -∗
         free_bundles pd (fr_upd fr i true) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

@@ -646,7 +646,7 @@ Section KexitLoop.
       (* +0x3e c.ld a0,0(s1) : a0 := p->ofile[fd] *)
       assert (Hrgk9 : rget (CID := CIDk) M (mword_of_int 9 : mword 5)
                       = M !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
-      iApply (wp_cld_s_sconf (CID := CIDk) (mword_of_int (KX + 0x3e))
+      iApply (wp_cld_s_sconf (CID := CIDk) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x3e))
                 (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12)
                 M av v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e [Hcell]").
@@ -778,7 +778,7 @@ Section KexitLoop.
         assert (Hrgo9 : rget (CID := CIDo) mr (mword_of_int 9 : mword 5)
                         = mr !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
         (* +0x46 sd x0,0(s1) : p->ofile[fd] = 0 *)
-        iApply (wp_sd_zero_s_sconf (CID := CIDo) (mword_of_int (KX + 0x46))
+        iApply (wp_sd_zero_s_sconf (CID := CIDo) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x46))
                   (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) mr av v b
                   with "Hcg Hpc Hi46 [Hcell]").
         { iEval (rewrite Hrgo9 Hmr9 addv_sext0). iExact "Hcell". }

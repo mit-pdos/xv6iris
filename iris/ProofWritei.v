@@ -1765,7 +1765,7 @@ Section WriteiSize.
                         = i_size ip).
       { rgne. rewrite HM0s5. reflexivity. }
       iEval (rewrite -Hszadr0) in "Hmz".
-      iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (WI + 0xc4)) Rs2 Rs5
+      iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (WI + 0xc4)) Rs2 Rs5
                 (mword_of_int 76 : mword 12) M0 (K - 14)%nat (di_size dn : mword 32) b
                 with "Hcg Hpc Hibe Hmz").
       iIntros (CIDz3 Hqz3) "Hcg Hpc Hmz".

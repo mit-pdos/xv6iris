@@ -2699,10 +2699,10 @@ Section ProofPipewrite.
               iDestruct (bytes_own_acc (KTR := KT1) (DfracOwn 1) (pa_stk sp0 13%nat) 8%nat 7%nat ltac:(lia) with "Hb13")
                 as "[Hchx Hchback]".
               iDestruct "Hchx" as (b0) "Hch".
-              iAssert ([∗ list] k ∈ seq 0 1, (pa_add (N5 !!! Regidx Ra2) k) ↦ₘ ((fun _ : nat => b0) k))%I
+              iAssert ([∗ list] k ∈ seq 0 1, (pa_add (N5 !!! Regidx Ra2) k) ↦ₘ[KT1] ((fun _ : nat => b0) k))%I
                 with "[Hch]" as "Hbuf".
               { cbn [seq]. iSplitL "Hch"; [| done]. iEval (rewrite Ha2N5 pa_add_0). iExact "Hch". }
-              iApply (Copyin.wp_copyin_sconf KT0 γa N5 Pc (pv_sz V) 1%nat (fun _ : nat => b0)
+              iApply (Copyin.wp_copyin_sconf KT1 γa N5 Pc (pv_sz V) 1%nat (fun _ : nat => b0)
                         (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) false ({["pipe"]} ∪ lks)
                         HK50 Ha0N5 Ha1N5 Ha4N5 Hlen1 Hszb Hlvl1
                         with "Hcg Hown Htext Hpc Hpt Henv Hbuf").

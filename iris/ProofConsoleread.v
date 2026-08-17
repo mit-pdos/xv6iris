@@ -1396,7 +1396,7 @@ Section ProofConsoleread.
     assert (Hstk : (either_copyout_stack <= trap_res true + (av - 12))%nat).
     { assert (trap_res true = 90%nat) as -> by reflexivity.
       lia. }
-    iApply (EitherCopyout.wp_either_copyout_sconf KT1 γa γf G5
+    iApply (EitherCopyout.wp_either_copyout_sconf KT1 KT1 γa γf G5
               (trap_res true + (av - 12))%nat 1%nat true (proc_addr jp) pid
               (upd_upt V P') true 1%nat (fun _ => trunc8 (H8 !!! Regidx Ra4))
               (fun _ => chb0) false ({["cons"]} ∪ lks)
@@ -2148,7 +2148,7 @@ Section ProofConsoleread.
                      (sign_extend' 64 (mword_of_int 152 : mword 12)) = a_cons_r)
       by (rewrite Hmaqs1; reflexivity).
     iPoseProof (cnri_068 with "Ht") as "Hi68".
-    iApply (wp_lw_s_sconf (mword_of_int (CR + 0x68)) Ra5 Rs1 (mword_of_int 152 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x68)) Ra5 Rs1 (mword_of_int 152 : mword 12)
               maq (trap_res true + (av - 12))%nat rr2 false ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi68 [Hrc]").
     { rgall. iEval (rewrite Hra2). iExact "Hrc". }
@@ -2163,7 +2163,7 @@ Section ProofConsoleread.
                      (sign_extend' 64 (mword_of_int 156 : mword 12)) = a_cons_w)
       by (rewrite HS8s1; reflexivity).
     iPoseProof (cnri_06c with "Ht") as "Hi6c".
-    iApply (wp_lw_s_sconf (mword_of_int (CR + 0x6c)) Ra4 Rs1 (mword_of_int 156 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x6c)) Ra4 Rs1 (mword_of_int 156 : mword 12)
               S8 (trap_res true + (av - 12))%nat ww2 false ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi6c [Hwc]").
     { rgall. iEval (rewrite Hwa2). iExact "Hwc". }

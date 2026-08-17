@@ -154,11 +154,12 @@ Definition nc_sp (m M : regfile) : Prop :=
 Section ProofNamecmpMain.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {ktf ktg : ktier}.
 
   Lemma wp_namecmp_sconf
       (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
       (b : bool) (p : mword 64)
-    : wp_namecmp_sconf_body mm f g K dq1 dq2 b p.
+    : wp_namecmp_sconf_body ktf ktg mm f g K dq1 dq2 b p.
   Proof.
     cbv beta delta [wp_namecmp_sconf_body].
     intros pcE s1 s2 ret_tgt HK.
@@ -296,7 +297,7 @@ Section ProofNamecmpMain.
       rewrite /R4 upd_ne; [| regne]. exact (HR3thr c Hcs N2 N8). }
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID6) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (SC.wp_strncmp_sconf R4 14%nat f g (K - 2)%nat dq1 dq2 b p
+    iApply (SC.wp_strncmp_sconf ktf ktg R4 14%nat f g (K - 2)%nat dq1 dq2 b p
               ltac:(lia) HR4a2 ltac:(lia)
               with "Hcg Htext Hpc [Hb1] [Hb2]").
     { iEval (rewrite HR4a0). iExact "Hb1". }

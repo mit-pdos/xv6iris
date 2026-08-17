@@ -4460,7 +4460,7 @@ Section ProofNamexMain.
                           iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen)
                                        o2 ltac:(lia) with "Hpath")
                             as "[Hpb Hpback]".
-                          iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0xd8))
+                          iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (NX + 0xd8))
                                     Ra5 Rs1 (mword_of_int 0 : mword 12) W0
                                     (K - 12)%nat (pfun o2 : mword 8) b
                                     (dqm := DfracOwn 1)
@@ -4890,7 +4890,7 @@ Section ProofNamexMain.
                                (mword_of_int 0 : mword 5)
                                ltac:(vm_compute; reflexivity) with "Hcg")
                     as "[%Hz0 Hcg]".
-                  iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0x138))
+                  iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (NX + 0x138))
                             (mword_of_int 0 : mword 5) Rs10
                             (mword_of_int 0 : mword 12) S5 (K - 12)%nat
                             (nf (e - a)%nat) b
@@ -5242,7 +5242,7 @@ Section ProofNamexMain.
     iDestruct (nx_buf_acc pv (DfracOwn 1) pfun (S plen) 0 ltac:(lia) with "Hpath")
       as "[Hp0 Hpback]".
     iEval (rewrite pa_add_0) in "Hp0".
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0x22)) Ra4 Ra0
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (NX + 0x22)) Ra4 Ra0
               (mword_of_int 0 : mword 12) R5 (K - 12)%nat (pfun 0%nat) b (dqm:=DfracOwn 1)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi022 [Hp0]").
     { iEval (rgne; rewrite HR5a0 addv_sext0). iExact "Hp0". }

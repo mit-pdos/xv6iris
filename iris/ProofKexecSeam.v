@@ -406,7 +406,7 @@ Section KexecBFrame.
     iDestruct (kxc_elf_slots_of_stack with "H") as "H".
     iDestruct (kxc_slots_elf sp0 with "H") as "[%Hal Hb]".
     iSplitR; [iPureIntro; exact Hal |].
-    iApply (bb_any_named (pa_stk sp0 54) 64). rewrite /bytes_own /byte_any.
+    iApply (bb_any_named (KTR := KT1) (pa_stk sp0 54) 64). rewrite /bytes_own /byte_any.
     iExact "Hb".
   Qed.
 

@@ -302,7 +302,7 @@ Section UtSysBlock.
                         = p_trapframe (un_pj N))
         by (rgne; rewrite Hmfs1; apply prr_p_trapframe).
       iEval (rewrite -Haddrtf) in "Htfc".
-      iApply (wp_cld_s_sconf (mword_of_int (UT + 0x96)) Ra4 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x96)) Ra4 Rs1
                 (mword_of_int 88 : mword 12) mf nx
                 (page_base (ud_tfp (pv_upt V))) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)

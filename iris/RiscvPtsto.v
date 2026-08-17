@@ -1030,9 +1030,17 @@ Notation "a ↦ₘ[ kt ] dq v" := (mem_pointsto (KTR := kt) a dq v)
    [Definition] on its own: without this instance the [>] intro pattern on a
    byte taken out of an invariant fails with "iMod: cannot eliminate modality"
    on a hypothesis that visibly IS timeless. *)
-Global Instance mem_pointsto_timeless `{!riscvGS Σ} `{KTR : !CurKtier}
+(* THE TIER BINDER IS A PLAIN [(KTR : CurKtier)], NOT the backtick class
+   binder [`{KTR : !CurKtier}] and NOT [(KTR : ktier)].  An instance whose
+   tier is CLASS-bound is resolved by instance SEARCH, which only ever
+   produces the KT0 default, so it silently fails to fire on a statement
+   written at a literal [KT1] ("no match, N possibilities").  Binding it at
+   [ktier] fails the other way -- [simple apply] will not unfold the class
+   and reports "Unable to unify CurKtier with ktier".  A plain binder AT THE
+   CLASS TYPE is fixed by unification and fires at every tier. *)
+Global Instance mem_pointsto_timeless `{!riscvGS Σ} (KTR : CurKtier)
     (a : Arch.pa) (dq : dfrac) (v : bv 8) :
-  Timeless (mem_pointsto a dq v).
+  Timeless (mem_pointsto (KTR := KTR) a dq v).
 Proof. rewrite /mem_pointsto. apply _. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1406,9 +1414,9 @@ Notation "a ↦₄[ kt ] dq w" := (word4_pointsto (KTR := kt) a dq w)
 (* TIMELESS, for the same reason as [mem_pointsto_timeless] above: this is what
    lets an invariant over a 4-byte cell ([StartedInv.started_body], the panic
    flags) hand the cell out from under the [▷]. *)
-Global Instance word4_pointsto_timeless `{!riscvGS Σ} `{KTR : !CurKtier}
+Global Instance word4_pointsto_timeless `{!riscvGS Σ} (KTR : CurKtier)
     (a : Arch.pa) (dq : dfrac) (w : bv 32) :
-  Timeless (word4_pointsto a dq w).
+  Timeless (word4_pointsto (KTR := KTR) a dq w).
 Proof. rewrite /word4_pointsto. apply _. Qed.
 
 Section word4_pointsto.
@@ -1526,7 +1534,8 @@ Section string_pointsto.
   Context `{!riscvGS Σ}.
   Context `{KTR : !CurKtier}.
 
-  Global Instance string_pointsto_persistent a s : Persistent (a ↦ₛ□ s).
+  Global Instance string_pointsto_persistent (ktr : CurKtier) a s :
+    Persistent (string_pointsto (KTR := ktr) a DfracDiscarded s).
   Proof. rewrite /string_pointsto /mem_pointsto. apply _. Qed.
 
   Lemma string_pointsto_bytes a dq s :
@@ -1923,8 +1932,8 @@ Section Bridge.
 
   (* a discarded (read-only) memory byte is persistent — hence FREELY duplicable.
      This is what makes [kernel_text] (built from [↦ₓ□] code bytes) duplicable. *)
-  Global Instance mem_pointsto_discarded_persistent a b :
-    Persistent (a ↦ₘ□ b).
+  Global Instance mem_pointsto_discarded_persistent (ktr : CurKtier) a b :
+    Persistent (mem_pointsto (KTR := ktr) a DfracDiscarded b).
   Proof. rewrite /mem_pointsto. apply _. Qed.
 
   (* discard the fraction: turn any memory byte into the persistent read-only one. *)
@@ -2170,9 +2179,11 @@ Section pointsto_persist.
   Context `{!riscvGS Σ}.
   Context `{KTR : !CurKtier}.
 
-  Global Instance word_pointsto_discarded_persistent a w : Persistent (a ↦₈□ w).
+  Global Instance word_pointsto_discarded_persistent (ktr : CurKtier) a w :
+    Persistent (word_pointsto (KTR := ktr) a DfracDiscarded w).
   Proof. rewrite /word_pointsto. apply _. Qed.
-  Global Instance word4_pointsto_discarded_persistent a w : Persistent (a ↦₄□ w).
+  Global Instance word4_pointsto_discarded_persistent (ktr : CurKtier) a w :
+    Persistent (word4_pointsto (KTR := ktr) a DfracDiscarded w).
   Proof. rewrite /word4_pointsto. apply _. Qed.
 
   Lemma word_pointsto_persist a dq w : a ↦₈{dq} w ==∗ a ↦₈□ w.

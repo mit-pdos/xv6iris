@@ -884,7 +884,7 @@ Section ProofFetchstr.
         apply Nat2Z.inj_lt. exact Hkmax. }
       iEval (rewrite -HB2a0) in "Hbuf".
       (* ---- strlen(buf) ---- *)
-      iApply (Strlen.wp_strlen_sconf B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
+      iApply (Strlen.wp_strlen_sconf KT1 B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
                 ltac:(lia) Hkmax Hcstr Hk31
                 with "Hcg Htext Hpc Hbuf").
       iIntros (CID22 Hk22 msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".
