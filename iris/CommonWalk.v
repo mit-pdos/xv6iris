@@ -61,6 +61,15 @@ Definition u_global (pte2 pte1 pte0 : mword 64) : bool :=
    the read-frame bridge instead; the read set is exactly {misa}. *)
 Definition D_misa (r : register) : bool := register_beq r (R_bitvector_64 misa).
 
+(* the leaf check's read set: the Svnapot probe reads misa, the PBMTE gate
+   reads menvcfg, and nothing else in the region touches a register. *)
+Definition D_leafchk (r : register) : bool :=
+  orb (register_beq r (R_bitvector_64 misa))
+      (register_beq r (R_bitvector_64 menvcfg)).
+
+Lemma D_misa_leafchk (r : register) : D_misa r = true -> D_leafchk r = true.
+Proof. unfold D_misa, D_leafchk. intros ->. reflexivity. Qed.
+
 Lemma exec_currentlyEnabled_Svnapot s :
   register_lookup misa s.(sregs) = MISA_C ->
   exec (currentlyEnabled Ext_Svnapot) s = Some (true, s).
@@ -70,6 +79,22 @@ Proof.
   - intros r Hr. unfold D_misa in Hr. apply register_beq_eq in Hr. subst r.
     rewrite Hmisa. vm_compute; reflexivity.
   - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+Qed.
+
+
+(* its footprint certificate, by the same reference-state transport: the
+   probe's read set IS [D_misa], and [MISA_C] is the reference value, so the
+   certificate computes there and [goodb_congr] carries it to any state that
+   pins misa the same way. *)
+Lemma goodb_currentlyEnabled_Svnapot s :
+  register_lookup misa s.(sregs) = MISA_C ->
+  goodb D_misa (currentlyEnabled Ext_Svnapot) s = true.
+Proof.
+  intro Hmisa.
+  apply (goodb_congr D_misa (currentlyEnabled Ext_Svnapot) dstateM s).
+  - intros r Hr. unfold D_misa in Hr. apply register_beq_eq in Hr. subst r.
+    rewrite Hmisa. vm_compute; reflexivity.
   - vm_compute; reflexivity.
 Qed.
 
@@ -142,6 +167,17 @@ Section UserWalk.
                                = Some (PTE_Check_Success tt, s).
   Hypothesis H0N : eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE pte0)) ('b"1") = false.
 
+  (* the EVENT-FREENESS companions of the two monadic hypotheses above.  Both
+     are pure tests on the leaf word, so an instance discharges them at its
+     concrete flag byte exactly where it discharges the exec versions. *)
+  Hypothesis H0ig : forall (Db : register -> bool) s,
+    goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                (ext_bits_of_PTE pte0)) s = true.
+  Hypothesis Hchk0g : forall (Db : register -> bool) s,
+    goodb Db (check_PTE_permission acc p mxr do_sum
+                (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                (ext_bits_of_PTE pte0) tt) s = true.
+
   (* ------------------------------------------------------------------ *)
   (* [check_leaf_pte]: Steps 3 and 5-8 of the VATP, which the fork factored *)
   (* OUT of [pt_walk] so that the atomic A/D update can re-run them on the  *)
@@ -189,6 +225,23 @@ Section UserWalk.
     rewrite Hmenv. rewrite HPBMTE. cbv iota beta.
     cbn. reflexivity.
   Qed.
+
+
+  (* THE FOOTPRINT CERTIFICATE FOR THIS REGION IS THE NEXT PIECE, and the
+     pieces it needs are all in place: [HartGoodb.goodb_cer] to enter the
+     early-return region, [goodb_bindR] to walk it, [H0ig] / [Hchk0g] above
+     for the two monadic tests, and [goodb_currentlyEnabled_Svnapot] +
+     [goodb_mono] for the Svnapot probe.  It mirrors the proof above step for
+     step and restates no page-table reasoning.
+
+     WHAT STOPPED THE FIRST ATTEMPT, so the next one does not repeat it:
+     [execR]'s bind equations peel the goal structurally, but [goodb]'s do
+     not -- [goodb_bindR] must be given its LEFT OPERAND, and neither
+     [match goal] nor a hand-written copy of that operand matched the goal's
+     term (the [and_boolM] carries type arguments that do not survive being
+     retyped by hand).  Print the operand and paste it, exactly as the
+     [_red]-lemma recipe in the worklist's traps section says; do not write
+     it out from the model source. *)
 
   (* level 0: the leaf, from any reclimit-0 Acc *)
   Lemma exec_rec_walk_leaf (g : bool) (menvcfg0 : mword 64)

@@ -404,6 +404,9 @@ Evidence:
 | `HartMCycle.swp_exec_step_decode_execute` | the cycle rule: resources in, ONE obligation, resources back with PC at the new value | replaces `wp_exec_step_decode_execute_inv`.  **MODE-AGNOSTIC** — no misa, no mstatus, and the privilege only as the value the prelude reads and forwards (see §"the privilege belongs on the FILE").  S-mode reuses it verbatim |
 | `HartRunGen.swp_run_hart_active_gen` / `_gen_rvc` | `run_hart_active` with the privilege a parameter, the DISPATCH and the FETCH as obligations, and a DISJUNCTIVE conclusion | the machine picks the arm (the PLIC wires can move between the dispatch's nodes), and the fetch is the only thing that differs by mode — it may land on a different file `rsf`, which is the TLB fill.  `HartMRun`'s four rules are instances, statements unchanged |
 | `HartRunGen.swp_run_hart_active_intr` | the trap-only rule: dispatch obligation in, `Step_Pending_Interrupt` out | not an instance of the two above — a caller that knows the dispatch traps owes neither a fetch nor an execute |
+| `WpDecodeBridge.goodb` (generalized to `monad E X`) + `HartGoodb.goodb_try_catch` / `_liftR` / `_cer` / `goodb_bindR` / `goodb_bind0R` | the footprint certificate can now see into an early-return region | the page walk's regions are `catch_early_return` blocks whose bodies live in `monadR`; without these, `check_leaf_pte` and `_rec_pt_walk` could not be CARRIED to the swp layer and would have to be re-proved there.  `goodb_try_catch` is one-directional on purpose — a handler can turn a thrown term into a good one |
+| `PtTree.pte_check_pure` / `goodb_translate_TLB_hit_pt` / `hval_translate_TLB_hit_pt` | the TLB-hit translate, footprinted | spliced in beside the exec lemma it bridges; the hit path makes NO events, so the certificate mirrors `exec_translate_TLB_hit_pt`'s own chain with the same sub-facts and nothing is restated |
+| `HartSTrans.hfrun_lookup_TLB_hit_ent` / `swp_translate_hit` | S-mode `translate` on a TLB hit, at the swp layer | the lookup is the ONE step the bridge cannot carry: `goodb` transports only reads pinned in the REFERENCE state, and the `tlb` register holds whatever this hart's frame says |
 | `HartRunGen.mcer_early_return` | `catch_early_return (bind (early_return r) K) = Ret r` | `reflexivity`.  It is what makes the trap arm cheap: `early_return` is `throw (inl r)` and `bind` absorbs a throw |
 | `HartStepAny.swp_try_step_any` / `swp_exec_step_any` | the cycle rule that does NOT pick the arm: the body's postcondition MATCHES on the step reached, and the post-file is a PREDICATE | `dispatchInterrupt` reads the PLIC wires, which live in `WireInv.wire_inv` and can move BETWEEN the dispatch's nodes, so no caller can promise whether a cycle retires or traps.  The predicate post-file is independently what `csrw stimecmp` needs.  `swp_try_step_gen` / `swp_exec_step_decode_execute` are the singleton-`Q`, retire-only instances and should become instances at the fold-back.  PRIVILEGE-AGNOSTIC — see §"the privilege belongs on the FILE" |
 | `HartMCycle.swp_step_ex` | introduces the fetched word's existential | the word must be existential in the obligation, or a caller that dispatches on fetch SHAPE cannot instantiate it per branch |
@@ -790,6 +793,12 @@ painful once B′ puts those leaves back in scope.
 All measured.  **The first group now lives in design §5 item 1** (the
 reduction discipline, heads (a)–(g)) — read it there, and do not duplicate
 it here.  What is left is the rest:
+
+- **`makes inconsistent assumptions over library X` IS A STALE `.d`, NOT
+  BREAKAGE.**  Edit a bottom-of-tree file whose edge `.CoqMakefile.d` does not
+  record and the next build throws that error for a hundred files at once.
+  `rm .CoqMakefile.d`, regenerate with `rocq makefile`, rebuild — the red set
+  comes back to what it was.  Do not start "fixing" the hundred files.
 
 - **DO NOT EDIT A SOURCE FILE WHILE `make` IS RUNNING**, not even a comment:
   the touched file's whole cone rebuilds on the next `make`, and in this tree

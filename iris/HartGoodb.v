@@ -125,6 +125,24 @@ Qed.
 (* block) could not be certified at all, since [goodb] would have to see   *)
 (* through the wrapper by computation.                                     *)
 (* ====================================================================== *)
+
+(* [goodb] is monotone in the read set: a certificate proved against the
+   smallest set that works (typically [D_misa]) is one against any larger
+   set, which is how per-call certificates combine into a walk's. *)
+Lemma goodb_mono (Db Db' : register -> bool) {E X : Type}
+    (m : Defs.monad E X) (s : mstate) :
+  (forall r : register, Db r = true -> Db' r = true) ->
+  goodb Db m s = true -> goodb Db' m s = true.
+Proof.
+  intros Hle. revert m. fix IH 1. intros m.
+  destruct m as [y | T oc k]; [by cbn|].
+  destruct oc; cbn [goodb]; intros Hg; try discriminate Hg;
+    try (by apply (IH (k tt)));
+    try (by apply (IH (k 0%Z))).
+  apply andb_prop in Hg as [Hr Hk]. rewrite (Hle _ Hr). cbn [andb].
+  by apply (IH (k (register_lookup _ s.(sregs)))).
+Qed.
+
 Lemma goodb_try_catch (Db : register -> bool) {X E1 E2 : Type}
     (m : Defs.monad E1 X) (h : E1 -> Defs.monad E2 X) (s : mstate) :
   goodb Db m s = true -> goodb Db (Defs.try_catch m h) s = true.
