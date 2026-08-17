@@ -151,6 +151,15 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`weak-memory-deps.md`](design/weak-memory-deps.md)** — PROPOSAL
+  (2026-08-17): restore PARM's dependency tracking (per-register views +
+  `vcap`) in the full machine and the pf fragment, so the model IS
+  Promising-RISC-V per byte, OOTA disappears, dependent accesses are
+  machine-ordered, and a machine-checked Layer 2 becomes possible: an
+  exported pf-state predicate Ψ (read watermark + ownership map) and a
+  transfer theorem to the relativized `main_premises`.  Needs one Sail-fork
+  change (a real `InstrAnnounce` node) so `pstep` can name operand
+  registers.  Staged D0–D7 with risks.
 - **[`weak-memory-premise-discharge.md`](design/weak-memory-premise-discharge.md)** —
   the ANALYSIS + PLAN (2026-08-17, nothing built) for discharging the
   capstone's `main_premises`: what each clause says and why xv6 satisfies
