@@ -90,6 +90,46 @@ which for an RMW is after its own aq read — re-prove S1/the walk with it, and
 only then discharge.  The weaker premise makes `robust_main` STRONGER (fewer
 obligations), so it is a pure improvement of Layer 1.
 
+## 2c. FINDINGS from Track A4–A6 (2026-08-17, `WeakRobustDisc.v` `db0dfe81`)
+
+- **`dev_epoch_ok` (G5a) is REFUTED for ordinary xv6 bundles.**  Machine-checked
+  characterization (`dev_epoch_ok ↔ dev_dom`): it is a per-agent DOMINATION
+  condition — every fabric access of the WRITER's agent po-before the write
+  must be matched by one of the READER's agent po-before the read at a
+  witness index ≥ — so the SC-looking bundle "agent A: fabric access; store
+  x — agent B (no fabric access yet): load x" already violates it (epoch
+  drops 1 → 0 across a forward-in-time rf edge).  Hardware-real, harmless,
+  excluded.  So the theorem is currently INAPPLICABLE to xv6 through this
+  clause; the defect is `depoch`'s per-agent definition (the rank argument
+  for `gdep3` acyclicity), not the bundle.  Even the intended reading ("no
+  read of a promise across a device epoch") mixes behavior time with gmo:
+  the honest content is that FABRIC EVENTS HAVE NO gmo POSITION in the
+  model.  The needed repair (Track A0′, Layer 1): give each witness entry a
+  gmo position consistent with the witness order, and state the premise as
+  "memory events fence-ordered before/after a fabric access sit
+  below/above its position" — i.e. the permissive I/O-fence semantics
+  (`design/weak-memory-m5.md` assumption 3, `WeakCompose` §6(4)) made
+  precise per bundle; a mixed `gdev`/`gdep2` cycle then contradicts
+  `EXT`/coverage.  Design before building; it re-lands G5a's acyclicity
+  lemma with the new rank.
+- **`edges_split`**: see 2b (relativize to the walk's fulfils; Track A0).
+- **`bad_wf`**: derivable from `gdep3_acyclic` (`bad_wf_of_acyclic`, needs
+  decidability of `bad_target`), but that is CIRCULAR inside `robust_main`
+  (acyclicity is what `bad_wf` helps establish); an independent argument
+  needs a well-founded measure on owned-unpublished messages that drops at
+  every ownership transfer — a Track-B/C fact about the kernel.  Vacuous
+  when there are no bad edges (`bad_wf_of_no_bad`), which φ-refutation
+  gives at the exhibit… but `bad_wf` is consumed BEFORE the refutation.
+  ⚑ open.
+- **`ptraces_bytes_ok`**: `excl_byte` from "all writers are RMWs",
+  `sw_byte` from a single author, `handoff` from A2's hop chains — the chain
+  discharges exactly ONE of `handoff`'s eight conjuncts (`tr ≤ t_star`); the
+  other seven are site facts (which sync byte, whose release, whose read).
+  RESTRICTION: `handoff` needs ONE sync byte shared by both endpoint agents.
+- **A1–A3 landed** with no hypothesis beyond trace facts (+ "the fulfilled
+  message writes ≥ 1 byte", free at every call site).  Only the ORIGIN hop
+  of a chain needs the release fence.
+
 ## 3. The plan (three tracks, in order)
 
 ### Track A — the machine-side theory (Layer 1, generic, no xv6)
