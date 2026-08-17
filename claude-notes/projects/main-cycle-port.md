@@ -281,12 +281,22 @@ its `execute` writes.  Three groups, and only ONE of them touches the wrapper:
 
 2. **ONE genuine obligation gap: `wp_csrw_stimecmp_gpr` writes `mip`.**
    `mip` is a CLOCK cell — it arrives via `pc_is` → `clock_res` and is therefore
-   in `mm_Drw`, held by the wrapper for the whole obligation.  The leaf's
-   statement does not mention it, so it cannot write it.  Fix: lend `mip` in the
-   obligation exactly as `PC` is lent (writable, returned at whatever the
-   instruction left).  Cost: one more lent cell plus a two-token edit in each of
-   the 13 converted leaves' obligation proofs.  Nothing else in the leaf set
-   writes `mcycle`/`mtime`/`minstret`, so this is the LAST obligation change.
+   in `mm_Drw`, held by the wrapper for the whole obligation, so the leaf cannot
+   write it.
+
+   **And the value cannot be named.**  `exec_write_CSR_stimecmp` concludes
+   `exists mp, exec .. = Some (.., set_reg (set_reg s stimecmp ..) mip mp)` —
+   `mp` comes out of `clint_dispatch`, i.e. from DEVICE state, so neither the
+   leaf nor a `mip' = f ip` parameter can name it.  Lending the cell is
+   therefore not enough: the wrapper must absorb an EXISTENTIAL post-file.
+
+   The shape is already there to absorb it, which is what makes this tractable:
+   the cycle rule's continuation constrains the post-file only OFF `tk_clock3`,
+   and `mip ∈ tk_clock3`.  So the generalization is to let the instruction's
+   obligation return frames at any `rs2'` agreeing with `rsB` off `tk_clock3`,
+   and compose that with the tick's own agreement by transitivity (`wrap_post`
+   touches only minstret and PC, both outside `tk_clock3`, so it commutes).
+   Keep the strict form as a corollary and the other 13 leaves are untouched.
 
 3. **`wp_instr_config` must be rebuilt — MRET and the two `_raw` CSR leaves do
    not take `mmode_config` at all.**  `wp_mret_gpr`, `wp_csrw_mstatus_raw` and

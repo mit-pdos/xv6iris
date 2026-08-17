@@ -323,6 +323,29 @@ Section MinstretInv.
   (* up holding, [clock_res] holds again.                                    *)
   (* ---------------------------------------------------------------------- *)
 
+  (* ---------------------------------------------------------------------- *)
+  (* [minstret_inv] SURVIVES AS [emp], DELIBERATELY AND TEMPORARILY.          *)
+  (*                                                                        *)
+  (* The Iris invariant it used to name is gone -- the counter facts are      *)
+  (* owned resources now, riding in [pc_is] via [minstret_res].  But several  *)
+  (* leaves upstream still take [minstret_inv] as a premise                   *)
+  (* ([WpMmodeMret.wp_mret_gpr], [WpGprCsrwC]'s two [_raw] leaves), and       *)
+  (* deleting the premise would be the ONLY statement change in the whole     *)
+  (* leaf sweep -- every other converted leaf is byte-identical.              *)
+  (*                                                                        *)
+  (* Keeping it as [emp] costs nothing, is trivially persistent, and lets      *)
+  (* those callers go on supplying an argument that now carries no            *)
+  (* information.  DELETE IT once the tree is green, as a pure                *)
+  (* premise-removal commit that can be reviewed on its own.                  *)
+  (* ---------------------------------------------------------------------- *)
+  Definition minstret_inv : iProp Σ := emp%I.
+
+  Global Instance minstret_inv_persistent : Persistent minstret_inv.
+  Proof. rewrite /minstret_inv. apply _. Qed.
+
+  Lemma minstret_inv_intro : ⊢ minstret_inv.
+  Proof. rewrite /minstret_inv. auto. Qed.
+
   Definition clock_res : iProp Σ :=
     (∃ (c t p : mword 64), mcycle ↦ᵣ c ∗ mtime ↦ᵣ t ∗ mip ↦ᵣ p)%I.
 
