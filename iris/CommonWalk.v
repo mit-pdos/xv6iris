@@ -141,6 +141,9 @@ Local Ltac walk_peel_read st Hrd :=
   rewrite (exec_bind_Some _ _ _ _ _ Hrd); cbn match beta zeta.
 
 Section UserWalk.
+  (* the [swp] layer's parameters, used only by the [swp_] lemmas below *)
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (vpn : mword 27) (root : mword 44).
   Context (pte2 pte1 pte0 : mword 64).
   Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
@@ -227,21 +230,118 @@ Section UserWalk.
   Qed.
 
 
-  (* THE FOOTPRINT CERTIFICATE FOR THIS REGION IS THE NEXT PIECE, and the
-     pieces it needs are all in place: [HartGoodb.goodb_cer] to enter the
-     early-return region, [goodb_bindR] to walk it, [H0ig] / [Hchk0g] above
-     for the two monadic tests, and [goodb_currentlyEnabled_Svnapot] +
-     [goodb_mono] for the Svnapot probe.  It mirrors the proof above step for
-     step and restates no page-table reasoning.
+  (* ------------------------------------------------------------------ *)
+  (* ...and its FOOTPRINT CERTIFICATE, mirroring the proof above step for   *)
+  (* step with the same sub-facts, so no page-table reasoning is restated.  *)
+  (* This is the shape that made the walk bridgeable at all: the region is  *)
+  (* a [catch_early_return] block, so it goes through [goodb_cer] and then  *)
+  (* [goodb_bindR] -- the EARLY-RETURN interpreter's bind.                  *)
+  (*                                                                       *)
+  (* TWO HABITS MAKE IT GO THROUGH, and neither is optional.  [execR]'s     *)
+  (* bind equations peel a goal structurally; [goodb]'s must be GIVEN their *)
+  (* left operand, and a hand-written copy of that operand does not match   *)
+  (* (the [and_boolM] carries type arguments that do not survive retyping). *)
+  (* So: [set] the operand straight OUT of the goal, and make its VALUE     *)
+  (* EXISTENTIAL -- the certificate never needs to know the ppn, only that  *)
+  (* the step returned rather than early-returned.                          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma goodb_check_leaf_pte_leaf0 (pa : physaddr) (menvcfg0 : mword 64) s :
+    register_lookup misa s.(sregs) = MISA_C ->
+    register_lookup menvcfg s.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    goodb D_leafchk (check_leaf_pte 39 vpn acc p mxr do_sum pte0 pa 0 tt) s
+    = true.
+  Proof.
+    intros Hmisa Hmenv HPBMTE.
+    unfold check_leaf_pte. apply goodb_cer.
+    rewrite (goodb_bindR D_leafchk _ _ s false
+               (goodb_liftR D_leafchk _ s (H0ig D_leafchk s))
+               ltac:(rewrite execR_liftR; rewrite (H0i s); reflexivity)).
+    cbv iota beta.
+    rewrite H0nl. cbv iota beta.
+    change (0 >? 0) with false. cbv iota beta.
+    match goal with |- context[Defs.bind0 ?A ?B] =>
+      assert (HAB : execR (Defs.bind0 A B) s
+                    = Some (inr (PTE_Check_Success tt), s));
+      [| assert (HABg : goodb D_leafchk (Defs.bind0 A B) s = true) ] end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite (Hchk0 s). cbn match. reflexivity. }
+    { match goal with |- goodb _ (Defs.bind0 ?A ?B) _ = true =>
+        rewrite (goodb_bind0R D_leafchk A B s ltac:(reflexivity)
+                   ltac:(apply execR_returnR)) end.
+      apply (goodb_liftR D_leafchk _ s (Hchk0g D_leafchk s)). }
+    rewrite (goodb_bindR D_leafchk _ _ s (PTE_Check_Success tt) HABg HAB).
+    cbv iota beta. cbn match.
+    change (0 >? 0) with false. cbv iota beta.
+    (* The Svnapot gate sits under TWO binds, as in the exec proof.  Neither
+       operand is written out here: [set] takes the outer one straight from
+       the goal (so the rewrite matches syntactically), and its VALUE is
+       existential -- the certificate never needs to know the ppn, only that
+       the step returned. *)
+    match goal with |- goodb _ (Defs.bind ?A _) _ = true => set (Aout := A) end.
+    assert (Houtg : goodb D_leafchk Aout s = true).
+    { subst Aout.
+      match goal with |- goodb _ (Defs.bind ?A ?B) _ = true =>
+        rewrite (goodb_bindR D_leafchk A B s false
+                   ltac:(unfold Defs.and_boolM;
+                         match goal with |- goodb _ (Defs.bind ?C ?D) _ = true =>
+                           rewrite (goodb_bindR D_leafchk C D s true
+                             ltac:(apply (goodb_liftR D_leafchk _ s);
+                                   apply (goodb_mono D_misa D_leafchk _ s
+                                            D_misa_leafchk);
+                                   exact (goodb_currentlyEnabled_Svnapot s Hmisa))
+                             ltac:(rewrite execR_liftR;
+                                   rewrite (exec_currentlyEnabled_Svnapot s Hmisa);
+                                   reflexivity)) end;
+                         reflexivity)
+                   ltac:(unfold Defs.and_boolM; rewrite execR_bind;
+                         rewrite execR_liftR;
+                         rewrite (exec_currentlyEnabled_Svnapot s Hmisa);
+                         cbn match; rewrite execR_returnR; rewrite H0N;
+                         reflexivity)) end.
+      reflexivity. }
+    assert (Hout : exists v, execR Aout s = Some (inr v, s)).
+    { subst Aout. eexists. rewrite execR_bind.
+      unfold Defs.and_boolM. rewrite execR_bind. rewrite execR_liftR.
+      rewrite (exec_currentlyEnabled_Svnapot s Hmisa). cbn match.
+      rewrite execR_returnR. rewrite H0N. cbn match.
+      rewrite execR_returnR. reflexivity. }
+    destruct Hout as (vout & Hout).
+    match goal with |- goodb _ (Defs.bind _ ?B) _ = true =>
+      rewrite (goodb_bindR D_leafchk Aout B s vout Houtg Hout) end.
+    cbv iota beta.
+    (* the PBMTE gate's menvcfg read: the region's last node *)
+    match goal with |- goodb _ (Defs.bind ?A ?B) _ = true => set (Amenv := A) end.
+    rewrite (goodb_bindR D_leafchk Amenv _ s
+               (register_lookup menvcfg s.(sregs))
+               ltac:(subst Amenv; apply (goodb_liftR D_leafchk _ s);
+                     reflexivity)
+               ltac:(subst Amenv; rewrite execR_liftR;
+                     rewrite (exec_read_reg menvcfg s); reflexivity)).
+    rewrite Hmenv. rewrite HPBMTE. cbv iota beta.
+    reflexivity.
+  Qed.
 
-     WHAT STOPPED THE FIRST ATTEMPT, so the next one does not repeat it:
-     [execR]'s bind equations peel the goal structurally, but [goodb]'s do
-     not -- [goodb_bindR] must be given its LEFT OPERAND, and neither
-     [match goal] nor a hand-written copy of that operand matched the goal's
-     term (the [and_boolM] carries type arguments that do not survive being
-     retyped by hand).  Print the operand and paste it, exactly as the
-     [_red]-lemma recipe in the worklist's traps section says; do not write
-     it out from the model source. *)
+
+  (* the pair, as the fuel-free characterization [swp_span] consumes.  A
+     caller that takes [dst] to be a state carrying its OWN register file
+     discharges the agreement by [reflexivity]. *)
+  Lemma hval_check_leaf_pte_leaf0 (D Drw : gset register) (rs : regstate)
+      (dst : mstate) (pa : physaddr) (menvcfg0 : mword 64) :
+    (forall r : register, D_leafchk r = true -> r ∈ D) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    hval D Drw rs (check_leaf_pte 39 vpn acc p mxr do_sum pte0 pa 0 tt)
+      (Ok (autocast (T := mword) (PPN_of_PTE pte0), PBMT_PMA, tt)) rs.
+  Proof.
+    intros HD Hag Hmisa Hmenv HPBMTE.
+    eapply (hval_of_goodb D_leafchk D Drw _ dst rs _ HD Hag).
+    - exact (goodb_check_leaf_pte_leaf0 pa menvcfg0 dst Hmisa Hmenv HPBMTE).
+    - exact (exec_check_leaf_pte_leaf0 pa menvcfg0 dst Hmisa Hmenv HPBMTE).
+  Qed.
 
   (* level 0: the leaf, from any reclimit-0 Acc *)
   Lemma exec_rec_walk_leaf (g : bool) (menvcfg0 : mword 64)
@@ -292,6 +392,109 @@ Section UserWalk.
                (exec_check_leaf_pte_leaf0 (Physaddr addr0) menvcfg0 s Hmisa Hmenv HPBMTE)).
     cbn match beta zeta.
     apply exec_returnM.
+  Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SAME LEVEL AT THE SWP LAYER.  One thing changes shape and only    *)
+  (* one: the PTE read is a MEMORY EVENT, so it cannot be a pure premise   *)
+  (* the way [Hrd0] is above -- under per-node stepping another hart may    *)
+  (* step between this walk's nodes, so what the read returns has to be     *)
+  (* justified where it happens.  It becomes the caller's OBLIGATION.       *)
+  (*                                                                      *)
+  (* Everything else is carried, not re-proved: the two asserts reduce, the *)
+  (* follow-a-pointer test and the leaf check come across as [hval] through *)
+  (* the [goodb] bridge, with the same sub-facts the exec proof uses.       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_rec_walk_leaf (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (g : bool) (menvcfg0 : mword 64)
+      (wfacc : Acc (Zwf 0) 0) :
+    Drw ## Dro ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr0) 8)
+         (fun r => ⌜r = Values.Ok pte0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte1) 0 g tt 0 wfacc)
+      (fun r => ⌜r = Values.Ok
+                       ({| PTW_Output_ppn := autocast (T := mword)
+                             ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44);
+                           PTW_Output_pte := autocast (T := mword) pte0;
+                           PTW_Output_pteAddr := Physaddr addr0;
+                           PTW_Output_level := 0;
+                           PTW_Output_pbmt := PBMT_PMA;
+                           PTW_Output_global := orb g (u_gbit pte0) |}, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hag Hmisa Hmenv HPBMTE.
+    iIntros "#Hcert Hrw Hro Hrd".
+    destruct wfacc as [a0].
+    cbn [_rec_pt_walk].
+    (* the two asserts are literal [true]s here, so they reduce rather than
+       needing a rule *)
+    change (0 >=? 0) with true.
+    unfold Defs.assert_exp'. cbn match. rewrite mbind_ret. cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    cbn match. rewrite mbind_ret. cbn beta zeta.
+    (* THE MEMORY EVENT *)
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with addr0 by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    iApply (swp_bind_use (read_pte (Physaddr addr0) 8) _ _ _
+              with "[Hrw Hro Hrd] [-]").
+    { iApply ("Hrd" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta zeta.
+    (* the follow-a-pointer test: carried, not re-proved.  This level peels
+       in the PLAIN monad (the leaf arm's escapes live in [check_leaf_pte]),
+       so it is [goodb_bind] and [exec], not their early-return twins. *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      set (Anl := Defs.and_boolM A B) end.
+    assert (Hinner : exec (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                             (ext_bits_of_PTE pte0))
+                             (fun w => Defs.returnm (negb w))) dst
+                     = Some (true, dst)).
+    { rewrite (exec_bind_Some _ _ _ _ _ (H0i dst)). cbn match beta.
+      apply exec_returnm. }
+    assert (Hinnerg : goodb D_leafchk (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                             (ext_bits_of_PTE pte0))
+                             (fun w => Defs.returnm (negb w))) dst = true).
+    { rewrite (goodb_bind D_leafchk _ _ dst false (H0ig D_leafchk dst)
+                 (H0i dst)). reflexivity. }
+    assert (Hnl : exec Anl dst = Some (false, dst)).
+    { subst Anl. unfold Defs.and_boolM.
+      rewrite (exec_bind_Some _ _ _ _ _ Hinner). cbn match beta.
+      change (0 >? 0) with false. rewrite andb_false_r. apply exec_returnm. }
+    assert (Hnlg : goodb D_leafchk Anl dst = true).
+    { subst Anl. unfold Defs.and_boolM.
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind D_leafchk _ E dst true Hinnerg Hinner) end.
+      reflexivity. }
+    iApply (swp_bind_use Anl _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Anl false Hdisj
+                (hval_of_goodb D_leafchk (Drw ∪ Dro) Drw Anl dst rs false
+                   HD Hag Hnlg Hnl)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta.
+    (* the leaf check, likewise *)
+    iApply (swp_bind_use (check_leaf_pte 39 vpn acc p mxr do_sum pte0
+                            (Physaddr addr0) 0 tt) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_check_leaf_pte_leaf0 (Drw ∪ Dro) Drw rs dst
+                   (Physaddr addr0) menvcfg0 HD Hag Hmisa Hmenv HPBMTE)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta zeta.
+    iApply swp_ret. by iFrame.
   Qed.
 
   (* level 1: a valid non-leaf step into the leaf, from any reclimit-1 Acc *)
