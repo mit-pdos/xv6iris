@@ -1181,13 +1181,30 @@ End mem_pointsto_share.
    claim + ownership of the mapped physical byte; identity for the static
    kernel-text fragments, non-identity for the TRAMPOLINE va once its
    fragment is minted at the boot switch.  [↦ₓ□] is the form the immutable
-   kernel image lives at ([kernel_text]/[instr_bytes]). *)
-Definition text_pointsto `{!riscvGS Σ} (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+   kernel image lives at ([kernel_text]/[instr_bytes]).
+
+   THE TIER PIN CONJUNCT, exactly as for [mem_pointsto] above and for the
+   same reason (claude-notes/projects/sp-migration.md, K5): a KT0 code byte
+   promises that its va IS its physical address, which is what makes a
+   FETCH at it sound under BOTH translation regimes -- a Bare hart fetches
+   physical [va].  Every byte of the static kernel-text image is KT0 and
+   nothing about it changes.  A KT1 code byte drops the pin and is
+   therefore expressible at the TRAMPOLINE va (whose page is the SAME
+   kernel-text page, mapped high); driving a fetch with it needs the
+   per-hart witness [SRegime.sr_kwit] instead, which is what
+   [SRegime.sr_absorb_ktier] dispatches on.
+
+   THE TIER IS AN AMBIENT INSTANCE ARGUMENT (phase C's convention): the
+   three spellings below leave [KTR] to typeclass resolution -- the global
+   default is KT0, so every existing text fact means exactly what it meant
+   -- and an explicit tier is written [a ↦ₓ[kt]{dq} v]. *)
+Definition text_pointsto `{!riscvGS Σ} `{KTR : !CurKtier}
+    (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
   (∃ ppn : mword 44,
      kmap_at (svpn_of va) ppn KP_rx ∗
      ⌜(uint va < 274877906944)%Z⌝ ∗          (* 2^38: canonical, positive half *)
      ⌜addr_is_text (pa_of ppn va)⌝ ∗
-     ⌜pa_of ppn va = va⌝ ∗                   (* IDENTITY (see [mem_pointsto]) *)
+     ⌜ktier_pin cur_ktier ppn va⌝ ∗          (* TIER PIN (see the note above) *)
      pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v)%I.
 Notation "a ↦ₓ{ dq } v" := (text_pointsto a dq v)
   (at level 20, format "a  ↦ₓ{ dq }  v") : bi_scope.
@@ -1197,6 +1214,15 @@ Notation "a ↦ₓ□ v" := (text_pointsto a DfracDiscarded v)
 (* full ownership (pre-persist, e.g. at adequacy init). *)
 Notation "a ↦ₓ v" := (text_pointsto a (DfracOwn 1) v)
   (at level 20, format "a  ↦ₓ  v") : bi_scope.
+(* ---- EXPLICIT-TIER spelling, ONE notation for all four dfrac forms, via
+   Iris's CUSTOM [dfrac] entry.  It MUST go through that entry: spelling
+   the closing bracket and the brace as one token ("]{") makes the lexer
+   prefer it everywhere and [ghost_map]'s [k ↪[ γ ] dq v] stops parsing
+   tree-wide (phase C's finding; the rule is "never write []{] or []□] in
+   a notation string"). ---- *)
+Notation "a ↦ₓ[ kt ] dq v" := (text_pointsto (KTR := kt) a dq v)
+  (at level 20, kt at level 50, dq custom dfrac at level 1,
+   format "a  ↦ₓ[ kt ] dq  v") : bi_scope.
 
 (* ---------------------------------------------------------------------- *)
 (* PHYSICAL points-to (uniform-claims PHYSICAL TIER): ownership of the byte
@@ -1979,7 +2005,7 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rx ∗
       ⌜(uint a < 274877906944)%Z⌝ ∗
       ⌜addr_is_text (pa_of ppn a)⌝ ∗
-      ⌜pa_of ppn a = a⌝ ∗
+      ⌜ktier_pin cur_ktier ppn a⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b -∗ a ↦ₓ{dq} b).
   Proof.
@@ -1996,11 +2022,14 @@ Section Bridge.
     iPureIntro; exact Hc.
   Qed.
 
-  (* PA-SIDE: the byte's PHYSICAL address is kernel TEXT ... *)
+  (* PA-SIDE: the byte's PHYSICAL address is kernel TEXT ... (and the third
+     conjunct is the datum's TIER PIN -- at the KT0 default it is the
+     identity [pa_of ppn a = a] by conversion, which is what lets the fetch
+     engine hand it straight to [sr_adm_id]). *)
   Lemma code_text a dq b :
     a ↦ₓ{dq} b -∗ ∃ ppn : mword 44,
       kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_text (pa_of ppn a)⌝ ∗
-      ⌜pa_of ppn a = a⌝.
+      ⌜ktier_pin cur_ktier ppn a⌝.
   Proof.
     rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _)".
     iExists ppn. iFrame "Hk". iPureIntro; split; [exact Hd | exact Hi].
@@ -2026,9 +2055,17 @@ Section Bridge.
     iExists ppn. iFrame "Hk". iPureIntro. split; [exact Hd | exact Hlk].
   Qed.
 
-  Global Instance text_pointsto_discarded_persistent a b :
-    Persistent (a ↦ₓ□ b).
+  (* DECLARED TWICE, at [CurKtier] and at [ktier] -- [simple apply] does not
+     unfold the definitional class, so one instance cannot serve both a goal
+     whose tier came from the ambient instance and one written at a literal
+     (F3's structural finding; the whole tier family is declared this way). *)
+  Global Instance text_pointsto_discarded_persistent (ktr : CurKtier) a b :
+    Persistent (text_pointsto (KTR := ktr) a DfracDiscarded b).
   Proof. rewrite /text_pointsto. apply _. Qed.
+
+  Global Instance text_pointsto_discarded_persistent' (ktr : ktier) a b :
+    Persistent (text_pointsto (KTR := ktr) a DfracDiscarded b).
+  Proof. exact (text_pointsto_discarded_persistent ktr a b). Qed.
 
   (* discard the fraction: turn any code byte into the persistent read-only
      one (adequacy init persists the whole sub-etext image this way). *)
@@ -2037,6 +2074,34 @@ Section Bridge.
     rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
     iMod (pointsto_persist with "Hp") as "Hp". iModIntro. iExists ppn.
     iFrame "Hk Hp". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
+  Qed.
+
+  (* ---- the TIER algebra of the code family, mirroring [↦ₘ]'s ---- *)
+
+  (* WEAKENING along the tier order: the pin is the only tier-dependent
+     conjunct and it weakens ([ktier_pin_mono]); at KT1 there is nothing
+     left to prove. *)
+  Lemma text_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq b :
+    a ↦ₓ[kt]{dq} b ⊢ a ↦ₓ[kt']{dq} b.
+  Proof.
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hp & Hpt)".
+    iExists ppn. iFrame "Hk Hpt". iPureIntro.
+    split; [exact Hc | split; [exact Hd | exact (ktier_pin_mono kt kt' ppn a Hp)]].
+  Qed.
+
+  (* two holders of the same code byte, at ANY two dfracs and ANY two tiers,
+     agree on its value: agreement runs through [kmap_at_agree] +
+     [pointsto_agree], neither of which looks at the pin.  This is what lets
+     a TRAMPOLINE-va (KT1) code byte be reconciled with the identity (KT0)
+     image byte it is minted from. *)
+  Lemma text_pointsto_agree {kt1 kt2 : ktier} a dq1 b1 dq2 b2 :
+    a ↦ₓ[kt1]{dq1} b1 -∗ a ↦ₓ[kt2]{dq2} b2 -∗ ⌜b1 = b2⌝.
+  Proof.
+    rewrite /text_pointsto. iIntros "H1 H2".
+    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & _ & Hp1)".
+    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & _ & Hp2)".
+    iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
+    by iDestruct (pointsto_agree with "Hp1 Hp2") as %->.
   Qed.
 
   (* ---- the PHYSICAL points-to bridge (the OLD pa-era [mem_*] bodies) ---- *)
@@ -2179,7 +2244,7 @@ Section Bridge.
   Lemma text_pointsto_pin (pa : mword 64) dq b (ppn0 : mword 44) :
     kmap_at (svpn_of pa) ppn0 KP_rx -∗ pa ↦ₓ{dq} b -∗
       ⌜(uint pa < 274877906944)%Z⌝ ∗ ⌜addr_is_text (pa_of ppn0 pa)⌝ ∗
-      ⌜pa_of ppn0 pa = pa⌝ ∗
+      ⌜ktier_pin cur_ktier ppn0 pa⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b -∗ pa ↦ₓ{dq} b).
   Proof.
@@ -2272,9 +2337,13 @@ Typeclasses Opaque phys_pointsto.
    node's ownership must be timeless for the SHARED kernel table to live in
    an Iris [inv] (KptShare.v): opening the invariant yields the body under a
    [▷], and the Svadu A/D write-back needs the slot NOW. *)
-Global Instance text_pointsto_timeless `{!riscvGS Σ} a dq b :
-  Timeless (text_pointsto a dq b).
+Global Instance text_pointsto_timeless `{!riscvGS Σ} (KTR : CurKtier) a dq b :
+  Timeless (text_pointsto (KTR := KTR) a dq b).
 Proof. rewrite /text_pointsto. apply _. Qed.
+(* ...and its [ktier]-typed twin (see the note on [mem_pointsto_timeless']). *)
+Global Instance text_pointsto_timeless' `{!riscvGS Σ} (ktr : ktier) a dq b :
+  Timeless (text_pointsto (KTR := ktr) a dq b).
+Proof. exact (text_pointsto_timeless ktr a dq b). Qed.
 Global Instance phys_pointsto_timeless `{!riscvGS Σ} a dq b :
   Timeless (phys_pointsto a dq b).
 Proof. rewrite /phys_pointsto. apply _. Qed.

@@ -44,6 +44,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile HartTp WpGpr MinstretInv InstrBytes.
 Require Import SmodeCore SmodeCorePt.
+Require Import SRegime.   (* sr_ktier_wit_KT0: the fetch engine's tier witness *)
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -585,9 +586,10 @@ Section WpSmodeWfi.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σa.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the fetch, through the capability's translation slot (both arms) *)
+    iPoseProof (sr_ktier_wit_KT0 strans_regime) as "#Hwtier".
     unshelve iMod (s_regime_fetch strans_regime σa pc (F_Base w) _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
-            with "[$Hreg $Hmem] Htr Hbytes")
+            with "Hwtier [$Hreg $Hmem] Htr Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htr)"; [solve_ndisj |].
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".

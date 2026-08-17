@@ -135,6 +135,7 @@ PtAdBits.v
 Pt4kWalk.v
 KptPt.v
 KMap.v
+TrampText.v
 PtTree.v
 KptGhost.v
 KstackArith.v

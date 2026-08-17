@@ -37,7 +37,13 @@ Section InstrBytes.
          at pc whose low 2 bytes are [h] (the high 2 are whatever follows); a
          non-4-aligned (but 2-aligned) [pc] reads only the 2 bytes of [h].
        - fetch-error results carry no instruction, hence no footprint. *)
-  Definition instr_bytes (pc : mword 64) (r : FetchResult) : iProp Σ :=
+  (* TIER-INDEXED (sp-migration K5), by the same ambient-instance convention
+     as the [↦ₘ]/[↦ₓ] families: the fetch window rides whatever tier its
+     bytes are at.  The kernel-text image is KT0 (identity-mapped) and the
+     global default is KT0, so every existing use is unchanged; a KT1
+     window is what a TRAMPOLINE-va fetch will consume, and
+     [SmodeCorePt.s_regime_fetch] is generic in the index. *)
+  Definition instr_bytes `{KTR : !CurKtier} (pc : mword 64) (r : FetchResult) : iProp Σ :=
     (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
      match r with
      | F_Base w =>
