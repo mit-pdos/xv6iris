@@ -73,7 +73,51 @@ Inductive wlabel :=
         in ONE event.  The written data is chosen by the program, which
         sees the read values through the label — that is where the
         value dependency of amoswap/CAS lives. *)
-| LFence (pr pw sr sw : bool).
+| LFence (pr pw sr sw : bool)
+| LDev
+    (** THE FABRIC MARKER (M5).  A SILENT-EFFECT label: like [LSilent] it
+        touches no message log, no [wstate] and no view — its ONLY role is
+        to mark a step as fabric-touching, so that [WeakPromiseFact.pdev]
+        can decide it.  The instance's [pdev] becomes [λ _ l _, l = LDev].
+
+        WHY A LABEL AND NOT A PREDICATE ON THE PROGRAM STATES.  [pdev] is
+        given only [(p, l, p')], and "this silent step read the fabric" is
+        NOT a function of that triple: the PLIC wire is a step of the
+        TARGET hart's agent whose program transition is indistinguishable
+        from an ordinary internal step (design note
+        [claude-notes/design/weak-memory-m5.md], "The label [LDev]").
+        Marking it in the label is the smallest change that makes the
+        distinction decidable.
+
+        EVERYTHING IN LAYER 1 TREATS [LDev] EXACTLY AS [LSilent]: it reads
+        nothing, writes nothing, is neither an rf source nor an rf sink,
+        carries no fulfil timestamp, and leaves the [wstate] alone.  It is
+        NOT a load, so [lat_free]/[ts_oblivious]/[pcls_obl] are unaffected.
+        The one thing that distinguishes it is that [pdev] may answer
+        [true] on it, and hence that it may carry [ae_dev = Some _]. *)
+.
+
+(** THE MACHINE ARMS FOR [LDev]: A SEPARATE CONSTRUCTOR PER MACHINE
+    ([WPDev] here, [WeakPromiseBridge.PFDev] there), NOT a generalization
+    of the silent arm over a predicate [lb_silent l].  Both shapes were
+    considered; the arm was chosen because it leaves every EXISTING arm
+    byte-identical.
+
+    The alternative — [WPSilent cfg i ag l st' d' : lb_silent l → …] —
+    changes the shape of an arm that ~30 downstream proofs invert with an
+    explicit intro pattern AND that ~15 sites APPLY as a constructor: each
+    inversion pattern would gain two binders, each application an
+    argument, and — the real cost — the silent arm's label would become a
+    VARIABLE, so every downstream computation that reduces [post_ws],
+    [aev_post], [astep_ok], [lat_free] … at the concrete [LSilent] would
+    need a case split to get going again.  With a separate arm every
+    existing intro pattern and every existing constructor application
+    stays valid verbatim; the downstream cost is exactly "+1 arm in the
+    pattern, +1 bullet that COPIES the silent one", which is mechanical
+    and local.  [LDev] is placed LAST in [wlabel] and [WPDev]/[PFDev] LAST
+    in their machines for the same reason: a pattern gains a trailing
+    [|…] and a bulleted script gains a trailing bullet, so nothing above
+    it moves. *)
 
 (* ------------------------------------------------------------------ *)
 (** ** Per-agent state and configurations *)
@@ -316,7 +360,16 @@ Section machine.
       wpstep cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
-                         (pa_prom ag)]> (pc_ags cfg))).
+                         (pa_prom ag)]> (pc_ags cfg)))
+  (** [WPSilent]'s twin at the fabric marker: the SAME configuration
+      update, the SAME (absent) side conditions.  Only the label differs,
+      and only [pdev] reads it. *)
+  | WPDev cfg i ag st' d' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (pc_dev cfg) LDev st' d' →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
+               (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags cfg))).
 
   (* ---------------------------------------------------------------- *)
   (** ** Initial configurations and behaviors *)
@@ -448,6 +501,13 @@ Section machine.
           [by eapply lookup_lt_Some|simplify_eq/=].
         destruct (Hwf i ag) as [Hb Hp]; [done|]. split; [|done].
         by apply fence_post_bounded.
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* dev: [WPSilent]'s twin *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        by destruct (Hwf i ag).
       + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
   Qed.
 

@@ -375,12 +375,13 @@ Proof.
   { intros base tvs Hlb. apply list_fmap_ext. intros i u Hu.
     apply Hag. left. destruct (tvs_fst_reads base tvs i u Hu) as (a & Ha).
     exists a. by rewrite Hlb. }
-  destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
+  destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|].
   - done.
   - by rewrite (Hread base tvs eq_refl).
   - destruct ts as [t|]; [|done]. by rewrite (Hag t (or_intror eq_refl)).
   - destruct ts as [t|]; [|done].
     by rewrite (Hread base tvs eq_refl) (Hag t (or_intror eq_refl)).
+  - done.
   - done.
 Qed.
 
@@ -1197,7 +1198,7 @@ Section sim.
       left. eapply read_ts_in_fl; [done|exact Hpre|exact Hr|lia]. }
     have Hokc := Hok.
     destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                            |pr pw sr sw] eqn:Hlbe.
+                            |pr pw sr sw|] eqn:Hlbe.
     - (* ---- LSilent ---- *)
       destruct Hok as (Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -1343,6 +1344,20 @@ Section sim.
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
                  pr pw sr sw st' dnew); [done|].
         simpl. exact Hpure.
+    - (* ---- LDev: the LSilent case verbatim, at [PFDev] ---- *)
+      destruct Hok as (Hf & Hts0).
+      have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
+      have Hlogq : pf_log TS (done ++ [e]) = pc_log cf.
+      { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
+      eexists. eapply (qcfg_step done e T ev ag2 cf
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) LDev);
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe.
+      + rewrite Hstpost Hlogq.
+        apply (PFDev pstep pcls e.1 cf (WPAgent (pa_st ag)
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
+                 dnew);
+          [done|]. simpl. exact Hpure.
   Qed.
 
   (* ---------------------------------------------------------------- *)

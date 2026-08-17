@@ -258,6 +258,11 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
                     rl base (length data) (S (length (wglog σ)))
   | LFence pr pw sr sw =>
       wglog σ' = wglog σ /\ wgws σ' c = fence_post (wgws σ c) pr pw sr sw
+  (* THE FABRIC MARKER (M5): [LSilent]'s twin.  A hart's MMIO access and
+     the PLIC wire are silent-effect steps that TOUCH THE FABRIC, and
+     [pdev] can only see that in the label — so they will be relabelled
+     [LDev].  The memory effect is the silent one, verbatim. *)
+  | LDev => wglog σ' = wglog σ /\ wgws σ' c = wgws σ c
   end.
 
 (** The disk agent's version.  Only two labels ever arise — a burst (and a
@@ -272,6 +277,9 @@ Definition edlabel_ok (P : epool) (σ : wgstate) (l : wlabel)
       data <> [] /\
       dws' = store_post_run (ep_dws P) rl base (length data)
                (S (length (wglog σ)))
+  (* the fabric marker, [LSilent]'s twin: the disk's own fabric reads and
+     writes are silent-effect steps that touch the fabric *)
+  | LDev => wglog σ' = wglog σ /\ dws' = ep_dws P
   | _ => False
   end.
 

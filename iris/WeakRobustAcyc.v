@@ -179,7 +179,7 @@ Section astep.
     astep_ok img log i ag l f D →
     ∀ w, fwd_own log i w → fwd_own log i (f w).
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - intros [-> _] w Hw. exact Hw.
     - intros (_ & -> & _) w Hw a tf vf. rewrite load_post_run_fwd.
@@ -195,6 +195,7 @@ Section astep.
         eexists. split; [exact Hlog|done].
       + rewrite load_post_run_fwd in Hlk. exact (Hw a tf vf Hlk).
     - intros [-> _] w Hw a tf vf. rewrite fence_post_fwd. exact (Hw a tf vf).
+    - intros [-> _] w Hw. exact Hw.
   Qed.
 
   (** EXT, in the form the measure wants: the fulfilling step's PRE-state
@@ -204,7 +205,7 @@ Section astep.
   Lemma astep_ok_fulfil_ext img log i ag l f ts :
     astep_ok img log i ag l f (Some ts) → (w_vwNew (pa_ws ag) < ts)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -216,6 +217,7 @@ Section astep.
                   ≤ w_vwNew (load_post_run (pa_ws ag) aq base (tvs.*1)))%nat
         by apply ws_le_vwNew, load_post_run_le.
       lia.
+    - by intros [_ ?].
     - by intros [_ ?].
   Qed.
 
@@ -229,7 +231,7 @@ Section astep.
     astep_ok img log i ag l f (Some ts') → (a, ts) ∈ lb_reads l →
     (ts < ts')%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -243,6 +245,7 @@ Section astep.
       have Hge := load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts.
       have Hlt := Hcoh j Hjlt. rewrite /acc_addr in Hge. lia.
     - by intros [_ ?].
+    - by intros [_ ?].
   Qed.
 
   (** THE AQ ARM's gain: an acquire read joins its timestamp into
@@ -252,7 +255,7 @@ Section astep.
     astep_ok img log i ag l f D → lb_aq l = true → (a, ts) ∈ lb_reads l →
     (ts ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) -> [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
@@ -265,6 +268,7 @@ Section astep.
       etrans; [by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts)|].
       apply ws_le_vwNew, store_post_run_le.
     - intros _ _ Hin%elem_of_nil. done.
+    - intros _ _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE FENCE ARM's gain, half 1: an UNFORWARDED read joins its
@@ -275,7 +279,7 @@ Section astep.
     (a, ts) ∈ lb_reads l →
     (ts ≤ w_vrOld (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
@@ -290,6 +294,7 @@ Section astep.
       apply (load_post_run_vrOld' (pa_ws ag) aq base (tvs.*1) j ts Hts).
       rewrite /acc_addr. exact Hfv.
     - intros _ _ Hin%elem_of_nil. done.
+    - intros _ _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE FENCE ARM's gain, half 2: a [pr ∧ sw] fence ships [w_vrOld]
@@ -299,7 +304,7 @@ Section astep.
     astep_ok img log i ag l f D → lb_fence_prsw l →
     (w_vrOld (pa_ws ag) ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl; try (by intros _ []).
     intros [-> _] [-> ->]. apply fence_post_vwNew_r.
   Qed.

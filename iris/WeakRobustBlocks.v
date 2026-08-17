@@ -345,7 +345,7 @@ Section complete.
                   |cfg ag aq lat base tvs st' dd Hag Hps Hro
                   |cfg ag rl base data k st' dd Hag Hps Hdne
                   |cfg ag aq rl base tvs data k st' dd Hag Hps Hdne Hlen Hro Hex
-                  |cfg ag pr pw sr sw st' dd Hag Hps]; simpl.
+                  |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps]; simpl.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
       exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)). split_and!; [done|done|].
       reflexivity.
@@ -362,6 +362,9 @@ Section complete.
         by apply list_relations.Forall_singleton.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
       eexists ag, _. split_and!; [done|done|]. apply fence_post_le.
+    - (* dev *) split_and!; [done| |exists []; rewrite app_nil_r; by split].
+      exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)). split_and!; [done|done|].
+      reflexivity.
   Qed.
 
   Lemma wp_pf_step_frame i l c c' j :
@@ -433,7 +436,7 @@ Section complete.
                   |cfg ag aq lat base tvs st' dd Hag Hps Hro
                   |cfg ag rl base data k st' dd Hag Hps Hdne
                   |cfg ag aq rl base tvs data k st' dd Hag Hps Hdne Hlen Hro Hex
-                  |cfg ag pr pw sr sw st' dd Hag Hps];
+                  |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps];
       intros Hb j ag2 Hag2; simpl in Hag2 |- *.
     - destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
@@ -468,6 +471,11 @@ Section complete.
         simplify_eq/=. apply fence_post_bounded. by eapply Hb.
       + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
         by eapply Hb.
+    - (* dev *) destruct (decide (j = i)) as [->|Hne].
+      + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
+        simplify_eq/=. by eapply Hb.
+      + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
+        by eapply Hb.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -487,7 +495,7 @@ Section complete.
     intros Hen Hi Hb Hag Hps.
     have Hlt : (i < length (pc_ags c))%nat by eapply lookup_lt_Some.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                  |pr pw sr sw].
+                  |pr pw sr sw|].
     - (* silent *)
       eexists _, (WPAgent p' (pa_ws ag) (pa_prom ag)). split_and!.
       + split; [eexists; by apply (PFSilent pstep pcls i c ag p' dd)|].
@@ -562,6 +570,12 @@ Section complete.
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists (LFence pr pw sr sw), dd.
+    - (* dev: the silent case verbatim *)
+      eexists _, (WPAgent p' (pa_ws ag) (pa_prom ag)). split_and!.
+      + split; [eexists; by apply (PFDev pstep pcls i c ag p' dd)|].
+        exists []. rewrite /= app_nil_r. by split.
+      + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
+      + simpl. by exists LDev, dd.
   Qed.
 
   Lemma cstep_bnd i c c' : cstep i c c' → cfg_bnd c → cfg_bnd c'.

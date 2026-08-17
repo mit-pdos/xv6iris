@@ -127,6 +127,7 @@ Section fact.
                       rl base (length data) ts) ∧
           Dl = Some ts
     | LFence pr pw sr sw => f = (λ w, fence_post w pr pw sr sw) ∧ Dl = None
+    | LDev => f = id ∧ Dl = None   (* [LSilent]'s twin *)
     end.
 
   (** The five non-promise rules of [wpstep], as ONE relation indexed by
@@ -161,13 +162,14 @@ Section fact.
     wp_astep i l c c' → wpstep pstep c c'.
   Proof.
     destruct 1 as [cfg ag st' d' f Dl Hlk Hps Hok].
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl in Hok.
     - destruct Hok as [-> ->]. by apply WPSilent.
     - destruct Hok as (Hr & -> & ->). by eapply WPLoad.
     - destruct Hok as (ts & k & ? & ? & ? & -> & ->). by eapply WPFulfil.
     - destruct Hok as (ts & k & ? & ? & ? & ? & ? & ? & -> & ->). by eapply WPRmw.
     - destruct Hok as [-> ->]. by apply WPFence.
+    - destruct Hok as [-> ->]. by apply WPDev.
   Qed.
 
   Lemma wp_state_step_wpstep c c' : wp_state_step c c' → wpstep pstep c c'.
@@ -208,6 +210,8 @@ Section fact.
         [done|done|]. exists ts, k. done.
     - right. exists i, (LFence pr pw sr sw).
       by apply (WPAStep i _ cfg ag st' d' (λ w, fence_post w pr pw sr sw) None).
+    - right. exists i, LDev.
+      by apply (WPAStep i LDev cfg ag st' d' id None).
   Qed.
 
   (** A LAT-FREE PROGRAM never emits a latest-kind load.  For the kernel
@@ -227,8 +231,8 @@ Section fact.
     apply wpstep_split in Hstep as [Hpr|(i & l & Hs)]; [by left|].
     right. exists i, l. split; [|done].
     destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok].
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
-      simpl; [done| |done|done|done].
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+      simpl; [done| |done|done|done|done].
     destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ Hps).
   Qed.
 
@@ -323,7 +327,7 @@ Section fact.
     astep_ok img (log ++ l') i ag lb f Dl.
   Proof.
     intros Hb Hlf.
-    destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl in Hlf |- *.
     - done.
     - subst lat. intros (Hr & -> & ->). split_and!; [|done|done].
@@ -337,6 +341,7 @@ Section fact.
       + rewrite lookup_app_l; [done|done].
       + by eapply read_ok_app.
       + eapply excl_ok_app; [lia|done].
+    - done.
     - done.
   Qed.
 
@@ -388,8 +393,8 @@ Section fact.
     astep_ok img log i ag l f Dl → astep_ok img log i ag' l f Dl.
   Proof.
     intros Hws Hpr.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
-      simpl; rewrite ?Hws; [done|done| | |done].
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+      simpl; rewrite ?Hws; [done|done| | |done|done].
     - intros (ts & k & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [by eapply elem_of_weaken|done|done|done|done].
     - intros (ts & k & ? & ? & ? & ? & ? & ? & ? & ?). exists ts, k.
@@ -399,12 +404,13 @@ Section fact.
   Lemma astep_ok_del img log i ag l f Dl ts :
     astep_ok img log i ag l f Dl → Dl = Some ts → ts ∈ pa_prom ag.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - by intros [_ ->].
     - by intros (_ & _ & ->).
     - intros (ts' & k & ? & _ & _ & _ & ->). by intros [= <-].
     - intros (ts' & k & _ & ? & _ & _ & _ & _ & _ & ->). by intros [= <-].
+    - by intros [_ ->].
     - by intros [_ ->].
   Qed.
 

@@ -414,7 +414,7 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hag Hps Hok
     |cfg ag rl base data k st' dd Hag Hps Hne Hkc
     |cfg ag aq rl base tvs data k st' dd Hag Hps Hne Hlen Hok Hex Hkc
-    |cfg ag pr pw sr sw st' dd Hag Hps]; destruct dd;
+    |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps]; destruct dd;
     (have Hlt : (i < length (pc_ags cfg))%nat
        by exact (lookup_lt_Some _ _ _ Hag));
     (have Hlk := lift_ags_lookup dks (pc_ags cfg) i ag Hag);
@@ -436,6 +436,11 @@ Proof.
   - exact (PFFence (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) pr pw sr sw (PHart st') tt Hlk Hps).
+  - (* dev: [PFSilent]'s twin (unreachable for this LTS, but framed
+       uniformly — nothing here inspects the label) *)
+    exact (PFDev (pstep_unit (pstep_xv6 next)) lbl_class_p i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) (PHart st') tt Hlk Hps).
 Qed.
 
 (** …and the run-level form: a whole [psail] pf run embeds, the framed agents

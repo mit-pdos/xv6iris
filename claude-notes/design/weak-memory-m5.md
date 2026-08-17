@@ -108,6 +108,37 @@ Layer 1 gets the `LDev` case ≅ `LSilent`.  Needed because the PLIC wire is
 a step of the TARGET hart's agent that reads the fabric, and "this silent
 step read the fabric" is not decidable from `(p, LSilent, p')`.
 
+**LANDED (2026-08-17).**  `LDev` is the LAST constructor of `wlabel`, and
+each machine got a SEPARATE arm rather than a predicate `lb_silent l` over
+a generalized silent arm: `WeakPromise.WPDev` and
+`WeakPromiseBridge.PFDev`, both byte-identical twins of the silent arm
+(same configuration update, no side condition).  The reason, recorded in
+`WeakPromise.v`'s header: the predicate form changes the shape of an arm
+that ~30 downstream proofs invert with an explicit intro pattern and that
+~15 sites apply as a constructor, and — the real cost — it turns the
+silent arm's label into a VARIABLE, so every downstream computation that
+reduces `post_ws`/`aev_post`/`astep_ok`/`lat_free` at the concrete
+`LSilent` would need a case split.  With a separate arm placed LAST,
+every existing pattern and application stays valid verbatim and the cost
+is exactly "+1 branch in the pattern, +1 bullet copying the silent one".
+Files touched: `WeakPromise`, `WeakPromiseFact` (`astep_ok`, `wpstep_split`),
+`WeakPromiseBridge` (`PFDev`, `proj_lbl`), `WeakRobustTrace`,
+`WeakRobustGraph`, `WeakRobustAcyc`, `WeakRobustSer`, `WeakRobustProv`
+(`aev_post`, `laev_post`), `WeakRobustSim`, `WeakRobustCone`,
+`WeakRobustBlocks`, `WeakRobustMain`, `WeakRetag`, `WeakSailLTS2`,
+`WeakSailComplete` (`post_ws`), `WeakSailCone`, `WeakCompose`,
+`WeakComposeLang`, `WeakEvPf` (`elabel_ok`/`edlabel_ok`), `WeakEvInst`
+(`elab_ok`/`elab_ws`/`edlab_ok`/`edlab_ws`).  Two deliberate NON-changes:
+`lbl_quiet` does NOT list `LDev` (a quiet label is one that may be
+commuted past another agent's step, and two fabric-touching steps are
+exactly what must not commute — `WeakPromiseFact.wp_afree` is the scoped
+law), and `WeakSailLTS2` gains `sail_step_ni_not_dev`/`sail_step_not_dev`
+so the archive's five-shape inversion lemmas REFUTE the new arm instead of
+enumerating it (the archive's `pdev` is constant `false` and its LTS pins
+every label to one of the five original constructors).  Nothing in the
+fabric machinery (`pdev`, `pdev_ok`, `wp_afree`, `mk_aev`, `qfab`) needed
+more than the extra case — all of it is already generic in the label.
+
 ## The WP side (NOT on the capstone's path; recorded for the M4 port)
 
 `WeakExec.wp_wdisk_step` (the lifting lemma at the flat memory) is retired

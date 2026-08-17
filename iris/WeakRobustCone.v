@@ -298,7 +298,7 @@ Section stepout.
         [done|exact Hpre|exact Hr|lia]. }
     have Hokc := Hok.
     destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                            |pr pw sr sw] eqn:Hlbe.
+                            |pr pw sr sw|] eqn:Hlbe.
     - (* ---- LSilent ---- *)
       destruct Hok as (Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -445,6 +445,20 @@ Section stepout.
         apply (PFFence pstep pcls e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
                  pr pw sr sw st' dnew); [done|]. simpl. exact Hpure.
+    - (* ---- LDev: the LSilent case verbatim, at [PFDev] ---- *)
+      destruct Hok as (Hf & Hts0).
+      have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
+      have Hlogq : pf_log TS (done ++ [e]) = pc_log cf.
+      { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
+      eapply (qcfg_step_ex done e T ev ag2 cf
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) LDev);
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe.
+      + rewrite Hstpost Hlogq.
+        apply (PFDev pstep pcls e.1 cf (WPAgent (pa_st ag)
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
+                 dnew);
+          [done|]. simpl. exact Hpure.
   Qed.
 
 End stepout.
@@ -1578,10 +1592,10 @@ Section coneblocks.
                            ae_ts ev2 = Some ts)).
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
       destruct l2 as [|aq lat base tvs|rl base data
-                     |aq rl base tvs data|pr pw sr sw];
+                     |aq rl base tvs data|pr pw sr sw|];
         simpl in Hinrd;
         [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
-        | |by apply elem_of_nil in Hinrd].
+        | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
         split_and!; [done|done|left; by exists aq, lat].

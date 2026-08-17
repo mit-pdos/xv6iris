@@ -212,7 +212,7 @@ Proof.
     + by intros [_ ->].
     + intros [_ H].
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                    |pr pw sr sw]; try done.
+                    |pr pw sr sw|]; try done.
       * destruct lat; [done|].
         by destruct H as (_ & _ & _ & w & _ & ->).
       * by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
@@ -220,6 +220,36 @@ Proof.
     destruct (dev_addr _); [by intros [_ ->]|]. by intros (_ & _ & ->).
   - (* Choose *)
     by intros [_ [c ->]].
+Qed.
+
+(** THE ARCHIVE NEVER EMITS THE FABRIC MARKER (M5).  Every arm of
+    [sail_step_ni] pins its label to one of the five original
+    constructors, so [WeakPromise.LDev] — which exists only so that a
+    device-language instance can mark a fabric-touching silent step — is
+    unreachable here.  That is what lets the inversion lemmas below keep
+    their FIVE-shape statements after [wp_pf_step] gained its sixth
+    ([PFDev]) arm: the extra case is refuted, not enumerated. *)
+Lemma sail_step_ni_not_dev next p p' :
+  ¬ sail_step_ni next p WeakPromise.LDev p'.
+Proof.
+  rewrite /sail_step_ni.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by intros [? _]|].
+  destruct (sp_m p) as [m|]; [|by intros [? _]].
+  rewrite /sail_mstep. destruct m as [y|T oc k]; [by intros [? _]|].
+  (* every arm pins [l]; the RAM read arm pins it through a label match
+     whose [LDev] leaf is [False] *)
+  destruct oc; simpl; try (destruct (dev_addr _)); try (destruct b);
+    first [ by intros [? _] | by intros [_ ?] | by intros (? & _ & _)
+          | by intros [] ].
+Qed.
+
+Lemma sail_step_not_dev next p p' :
+  ¬ sail_step next p WeakPromise.LDev p'.
+Proof.
+  rewrite /sail_step /irq_deliver.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|] eqn:Hf; [by intros [? _]|].
+  intros [[? _]|H]; [done|].
+  by apply (sail_step_ni_not_dev next p p'); rewrite /sail_step_ni Hf.
 Qed.
 
 (* ====================================================================== *)
@@ -309,12 +339,13 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
     |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps];
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps];
     [ by eapply PFSilent, sail_step_ni_step
     | by eapply PFLoad; [done|apply sail_step_ni_step|done]
     | by eapply PFStore; [done|apply sail_step_ni_step|done|done]
     | by eapply PFRmw; [done|apply sail_step_ni_step|done|done|done|done|done]
-    | by eapply PFFence; [done|apply sail_step_ni_step] ].
+    | by eapply PFFence; [done|apply sail_step_ni_step]
+    | by eapply PFDev, sail_step_ni_step ].
 Qed.
 
 Lemma lookup_insert_at (l : list (wpagent psail)) (i : agent) a b :
@@ -331,7 +362,7 @@ Proof.
     |cfg ag0 aq lat base tvs st' dd H0 Hps Hr
     |cfg ag0 rl base data kk st' dd H0 Hps Hne Hkc
     |cfg ag0 aq rl base tvs data kk st' dd H0 Hps Hne Hlen Hr He Hkc
-    |cfg ag0 pr pw sr sw st' dd H0 Hps];
+    |cfg ag0 pr pw sr sw st' dd H0 Hps|cfg ag0 st' dd H0 Hps];
     simpl in Hlk; rewrite Hlk in H0; injection H0 as <-;
     (eexists; (split;
       [ by eapply lookup_insert_at, Hlk
@@ -644,7 +675,7 @@ Section peel.
       |cfg ag aq lat base tvs st' dd Hlk Hps Hr
       |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
       |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-      |cfg ag pr pw sr sw st' dd Hlk Hps]; destruct dd.
+      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps]; destruct dd.
     - exists ag. split; [done|]. left. by exists st'.
     - exists ag. split; [done|]. right; left. by exists aq, lat, base, tvs, st'.
     - exists ag. split; [done|]. right; right; left.
@@ -659,6 +690,8 @@ Section peel.
       + by rewrite Hk.
     - exists ag. split; [done|]. right; right; right; right.
       by exists pr, pw, sr, sw, st'.
+    - (* dev: unreachable — this LTS never emits the fabric marker *)
+      by destruct (sail_step_ni_not_dev next (pa_st ag) st' Hps).
   Qed.
 
   (** In the block ⟹ the run has not stopped: peel the first step. *)

@@ -374,6 +374,7 @@ Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ)))
   | LFence _ _ _ _ => True
+  | LDev => True                (* the fabric marker: [LSilent]'s twin *)
   end.
 
 Definition eregs_apply (σ : wgstate) (c : CPU) (ors : option regstate)
@@ -395,6 +396,7 @@ Definition elab_ws (σ : wgstate) (c : CPU) (l : wlabel) : CPU -> wstate :=
       <[c := store_post_run (load_post_run (wgws σ c) aq base tvs.*1)
                rl base (length data) (S (length (wglog σ)))]> (wgws σ)
   | LFence pr pw sr sw => <[c := fence_post (wgws σ c) pr pw sr sw]> (wgws σ)
+  | LDev => wgws σ              (* the fabric marker: [LSilent]'s twin *)
   end.
 
 Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
@@ -421,6 +423,7 @@ Definition edlab_ok (σ : wgstate) (l : wlabel) : Prop :=
   | LSilent => True
   | LStore _ _ data => data <> []
   | LFence _ _ _ _ => True
+  | LDev => True                (* the fabric marker: [LSilent]'s twin *)
   | _ => False
   end.
 
@@ -434,6 +437,7 @@ Definition edlab_ws (σ : wgstate) (dws : wstate) (l : wlabel) : wstate :=
       store_post_run (load_post_run dws aq base tvs.*1) rl base (length data)
         (S (length (wglog σ)))
   | LFence pr pw sr sw => fence_post dws pr pw sr sw
+  | LDev => dws                 (* the fabric marker: [LSilent]'s twin *)
   end.
 
 Definition edlab_log (σ : wgstate) (l : wlabel) (k : wm_class) : list wmsg :=

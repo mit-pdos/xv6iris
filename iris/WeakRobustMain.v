@@ -202,7 +202,7 @@ Lemma w_pub_aev_post_lt {D : Type} σ (ev : aev D) w (N : nat) :
 Proof.
   intros Hlt Hraise. rewrite /aev_post.
   destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                          |pr pw sr sw] eqn:Hlb; [done| | | |].
+                          |pr pw sr sw|] eqn:Hlb; [done| | | | |done].
   - by rewrite w_pub_load_post_run.
   - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
     destruct (decide (w_relp w = true ∨ rl = true)) as [Hr|Hr].
@@ -1215,10 +1215,10 @@ Section exhibit.
                            ae_ts ev2 = Some ts)).
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
       destruct l2 as [|aq lat base tvs|rl base data
-                     |aq rl base tvs data|pr pw sr sw];
+                     |aq rl base tvs data|pr pw sr sw|];
         simpl in Hinrd;
         [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
-        | |by apply elem_of_nil in Hinrd].
+        | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
         split_and!; [done|done|left; by exists aq, lat].
