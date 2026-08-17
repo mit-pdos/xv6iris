@@ -83,7 +83,26 @@ callback), registers via the client's `reg_pointsto`s.  Consequences:
 
 ## Stages
 
-- **M4-S1 (spike, dispatched)** — `WeakEvExecEff.v`: `ewp_ev_exec_eff` for
+- **M4-S1 — DONE (2026-08-17, `iris/WeakEvExecEff.v` `bbca8853`): THE BRIDGE
+  WORKS.**  `epure D m t` (= `exec_eff` with the RAM/MMIO/barrier arms deleted
+  and register arms guarded by `r ∈ D`) and
+  `ewp_ev_exec_eff_pure : epure D m t = Some (y,t') → ereg_frame c (sregs t) D
+  -∗ (ereg_frame c (sregs t') D -∗ EWP (ELoop gen c)) -∗ EWP (ECycle gen c m
+  None)` — `▷`-FREE (laters are weakening on the continuation), no
+  vm_compute anywhere, applied to a real boot-cone leaf mirror at an
+  ARBITRARY register bank in 0.04 s.  B3 is closed.  `epurew` (RAM arms
+  against the run's own byte map, emitting the `weff` trace) is proven equal
+  to the certificate run; its Iris side is M4-1.  FINDINGS: (i) `Choose` is
+  never reached by a certified run (both `exec_eff` and `esil_node` are
+  `None` there); (ii) there is NO free device-free detector (every
+  `dev_state` answers UART reads), so device-freedom rides in `epure`
+  structurally; (iii) **`sig_seip` IS READ BY EVERY INSTRUCTION, ungated by
+  `mstatus.MIE`** (`getPendingSet` reads `read_mip` → `sig_meip`/`sig_seip`
+  BEFORE the MIE test) — the volatile-register treatment is MANDATORY for
+  M4-1; (iv) B1's register list per instruction is recorded in the file
+  header (`minstret_increment`/`nextPC` writes before `execute`; `PC`,
+  conditionally `minstret` after; tick branch writes `mcycle`/`mtime`/`mip`).
+  ORIGINAL BRIEF: — `WeakEvExecEff.v`: `ewp_ev_exec_eff` for
   memory-free, device-free runs (`es = []`, no device node) with the
   register footprint owned by the client (twin of `wwp_instr_conf` /
   `wcert_regonly`); then the OWNED-WINDOW extension (RAM reads/writes at
