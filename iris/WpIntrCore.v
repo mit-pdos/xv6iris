@@ -219,6 +219,25 @@ Section SwpDispatch.
      and hand the pair to [hval_of_goodb].  Then the outcome test and the
      [and_vec_zeros64_r] step are the exec proof's last four lines unchanged.
 
+     TWO THINGS AN ATTEMPT ALREADY PAID FOR, so the next one does not:
+
+       - [goodb] on a [returnm] is [true] only after the [returnm] is
+         unfolded, and no [cbn] whitelist spelling closed it in place.  Name
+         it once at the top of the section --
+           Lemma goodb_returnm Db {E X} (x : X) s :
+             goodb Db (Defs.returnm (E := E) x) s = true.
+           Proof. reflexivity. Qed.
+         -- and pass it as the certificate argument.
+
+       - the blocks are NESTED two deep: after [unfold Defs.or_boolM,
+         Defs.and_boolM] the shape is [bind (bind (returnM _) k1) k2], so a
+         [match goal with |- goodb _ (Defs.bind ?L ?K) _] binds [L] to the
+         INNER BIND, not to the [returnM].  Establish the inner bind's exec
+         and goodb facts FIRST (name it with [set] from the goal), then feed
+         them to the outer [goodb_bind].  The exec side of both is already
+         written out inside [exec_getPendingSet_S_reduce]'s [Hand] asserts --
+         copy them, with [dst] for [s].
+
      After that, [swp_dispatchInterrupt_S] is one [swp_bind_use] over this
      plus the [findPendingInterrupt] match -- and it is exactly the dispatch
      obligation [HartRunGen.swp_run_hart_active_gen] asks for, with [Qi]
