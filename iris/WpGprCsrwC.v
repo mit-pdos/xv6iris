@@ -31,6 +31,11 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec RegFile WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import WpGprCsrwCommon WpGprCsrwA.
+Require Import RiscvExec RiscvExtras ExecCommon.
+Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
+        HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
+Require Import WpGprCsrrCommon.   (* drive_csr_term *)
+Require Import WpInstrConfig.     (* wp_instr_config: the raw-cell wrapper *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -620,6 +625,153 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(* THE WALKER SIDE of the two config writes.                                *)
+(*                                                                        *)
+(* [legalize_mstatus] is read-only and reads only misa, so it goes through  *)
+(* [goodb] -- but NOT computably: it branches on the written value's MPP     *)
+(* field (via [have_nominal_privLevel], which branches on the privilege      *)
+(* bits themselves).  [goodb] cannot walk a term whose control flow depends  *)
+(* on symbolic data, so the branch is DESTRUCTED first and each arm is       *)
+(* closed.  That is the same shape satp's legalization needed.               *)
+(* ====================================================================== *)
+Lemma write_CSR_mstatus_red (v : mword 64) :
+  write_CSR csr_mstatus v
+  = Defs.bind (Defs.read_reg mstatus)
+      (fun o : mword 64 =>
+         Defs.bind (legalize_mstatus o v)
+           (fun c : mword 64 =>
+              Defs.bind (Defs.bind0 (Defs.write_reg mstatus c)
+                           (Defs.read_reg mstatus))
+                (fun c2 : mword 64 => returnM (Ok c2)))).
+Proof. unfold write_CSR, csr_mstatus. drive_csr_term. reflexivity. Qed.
+
+Lemma goodb_have_nominal_privLevel (p : mword 2) :
+  goodb D_m (have_nominal_privLevel p) dstateM = true.
+Proof.
+  unfold have_nominal_privLevel. cbn zeta.
+  destruct (eq_vec p ('b"00")); [cbn match; vm_compute; reflexivity|].
+  cbn match.
+  destruct (eq_vec p ('b"01")); [cbn match; vm_compute; reflexivity|].
+  cbn match. reflexivity.
+Qed.
+
+Lemma goodb_legalize_mstatus (o v : mword 64) :
+  goodb D_m (legalize_mstatus o v) dstateM = true.
+Proof.
+  unfold legalize_mstatus.
+  repeat goodb_step.
+  erewrite goodb_bind.
+  3: apply (exec_have_nominal_privLevel (_get_Mstatus_MPP (Mk_Mstatus v))
+              dstateM ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)).
+  2: apply goodb_have_nominal_privLevel.
+  destruct (have_nom_val (_get_Mstatus_MPP (Mk_Mstatus v)));
+    cbn match; repeat goodb_step; reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* pmpcfg0's write, for the walker.  [pmpWriteCfgReg] is a foreach over the *)
+(* eight config BYTES, each iteration two reads of pmpcfg_n, a PURE         *)
+(* legalization and a write -- so the whole thing is one [hfrun] walk once   *)
+(* [pmpWriteCfg] is rewritten to a [returnM] (it reads nothing; its two      *)
+(* branches are on the byte's own bits).  Do that rewrite AFTER the reads    *)
+(* are peeled: before, its arguments are still under the read's binder and   *)
+(* [rewrite] cannot reach them.                                             *)
+(* ---------------------------------------------------------------------- *)
+Lemma pmpWriteCfg_ret (cfg v : mword 8) :
+  pmpWriteCfg cfg v = returnM (pmpWriteCfg_val cfg v).
+Proof.
+  unfold pmpWriteCfg, pmpWriteCfg_val.
+  destruct (pmpLocked cfg); [reflexivity|].
+  destruct (andb (eq_vec (_get_Pmpcfg_ent_W (Mk_Pmpcfg_ent (and_vec v (Ox"9F")))) ('b"1"))
+                 (eq_vec (_get_Pmpcfg_ent_R (Mk_Pmpcfg_ent (and_vec v (Ox"9F")))) ('b"0")));
+    cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.returnm returnM];
+    reflexivity.
+Qed.
+
+
+Local Ltac hf_spine :=
+  cbn beta iota zeta delta [Defs.bind Defs.bind0 Interface.iMon_bind
+    Defs.read_reg Defs.write_reg Defs.returnm returnM].
+
+Local Ltac hf_cfg HD HW :=
+  rewrite Defs.unroll_foreach_ZM_up'; [| lia];
+  (match goal with
+   | |- context [ Z.ltb ?a sys_pmp_usable_count ] =>
+       change (Z.ltb a sys_pmp_usable_count) with true
+   end);
+  cbn match;
+  hf_spine;
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD);
+  hf_spine;
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD);
+  rewrite pmpWriteCfg_ret;
+  hf_spine;
+  rewrite hfrun_write (bool_decide_eq_true_2 _ HW).
+
+Lemma hfrun_pmpWriteCfgReg_0 (D Drw : gset register) (rs : regstate)
+    (v : mword 64) :
+  (pmpcfg_n : register) ∈ D -> (pmpcfg_n : register) ∈ Drw ->
+  hfrun 45 D Drw rs (pmpWriteCfgReg 0 v)
+  = Some (tt, register_set pmpcfg_n
+                (pmpcfg_written v (register_lookup pmpcfg_n rs)) rs).
+Proof.
+  intros HD HW.
+  unfold pmpWriteCfgReg, Defs.assert_exp'.
+  change (Z.eqb (Z.rem 0 2) 0) with true. cbn match. hf_spine.
+  unfold Defs.foreach_ZM_up.
+  do 8 (hf_cfg HD HW;
+        rewrite ?register_lookup_set ?register_set_pmpcfg_n_overwrite).
+  unfold pmpcfg_written, pmpcfg0_vecupd.
+  cbn [Defs.foreach_ZM_up'].
+  apply hfrun_ret.
+Qed.
+
+Lemma hfrun_pmpReadCfgReg_0 (D Drw : gset register) (rs : regstate) :
+  (pmpcfg_n : register) ∈ D ->
+  hfrun 10 D Drw rs (pmpReadCfgReg 0)
+  = Some (pmpcfg0_readback (register_lookup pmpcfg_n rs), rs).
+Proof.
+  intros HD. unfold pmpReadCfgReg, Defs.assert_exp'.
+  change (Z.eqb (Z.rem 0 2) 0) with true. cbn match. hf_spine.
+  do 8 (rewrite hfrun_read (bool_decide_eq_true_2 _ HD); hf_spine).
+  apply hfrun_ret.
+Qed.
+
+Lemma write_CSR_pmpcfg0_red (v : mword 64) :
+  write_CSR csr_pmpcfg0 v
+  = Defs.bind (Defs.bind0 (pmpWriteCfgReg 0 v) (pmpReadCfgReg 0))
+      (fun w : mword 64 => returnM (Ok w)).
+Proof.
+  unfold write_CSR, csr_pmpcfg0. drive_csr_term.
+  change (uint (subrange_vec_dec (mword_of_int 928 : mword 12) 3 0)) with 0.
+  reflexivity.
+Qed.
+
+Lemma hfrun_write_CSR_pmpcfg0 (D Drw : gset register) (rs : regstate)
+    (v : mword 64) :
+  (pmpcfg_n : register) ∈ D -> (pmpcfg_n : register) ∈ Drw ->
+  hfrun 56 D Drw rs (write_CSR csr_pmpcfg0 v)
+  = Some (Ok (pmpcfg0_readback
+                (pmpcfg_written v (register_lookup pmpcfg_n rs))),
+          register_set pmpcfg_n
+            (pmpcfg_written v (register_lookup pmpcfg_n rs)) rs).
+Proof.
+  intros HD HW. rewrite write_CSR_pmpcfg0_red.
+  set (nc := pmpcfg_written v (register_lookup pmpcfg_n rs)).
+  set (rs' := register_set pmpcfg_n nc rs).
+  assert (Hin : hfrun 55 D Drw rs
+                  (Defs.bind0 (pmpWriteCfgReg 0 v) (pmpReadCfgReg 0))
+                = Some (pmpcfg0_readback nc, rs')).
+  { apply (hfrun_bind0 45 10 D Drw rs rs' rs' _ _ (pmpcfg0_readback nc)).
+    - apply (hfrun_pmpWriteCfgReg_0 D Drw rs v HD HW).
+    - rewrite (hfrun_pmpReadCfgReg_0 D Drw rs' HD).
+      subst rs'. by rewrite register_lookup_set. }
+  apply (hfrun_bind 55 1 D Drw rs rs' rs' _ _ (pmpcfg0_readback nc) _ Hin).
+  apply hfrun_ret.
+Qed.
+
+(* ====================================================================== *)
 (* The two config-writing csrw WPs, on [wp_instr_config].                    *)
 (* ====================================================================== *)
 Section WpCsrwGprNewC.
@@ -643,6 +795,91 @@ Section WpCsrwGprNewC.
      the chain proves [pmp_allows_all (pmpcfg_written ...)] separately for the
      instructions that follow.  mstatus is unchanged, so the continuation gets
      an opaque REBUILT [mmode_config (DfracOwn 1)]. ---- *)
+
+  Lemma swp_write_CSR_mstatus (dq : dfrac) (ms0 v : mword 64) :
+    cw_fresh mstatus ->
+    gen_cert -∗
+    (hreg_frame (cw_rs mstatus ms0) (cw_Drw mstatus) -∗
+     hreg_frame_ro (cw_Df dq) (cw_rs mstatus ms0) cw_Dro -∗
+     swp (write_CSR csr_mstatus v)
+       (fun x => ⌜x = Ok (mstatus_legalized ms0 v)⌝ ∗
+          hreg_frame (cw_rs mstatus (mstatus_legalized ms0 v))
+            (cw_Drw mstatus) ∗
+          hreg_frame_ro (cw_Df dq)
+            (cw_rs mstatus (mstatus_legalized ms0 v)) cw_Dro)).
+  Proof.
+    intros Hfresh. iIntros "#Hcert Hrw Hro".
+    rewrite write_CSR_mstatus_red.
+    iApply (swp_bind_use (Defs.read_reg mstatus) _
+              (fun o => ⌜o = ms0⌝ ∗
+                 hreg_frame (cw_rs mstatus ms0) (cw_Drw mstatus) ∗
+                 hreg_frame_ro (cw_Df dq) (cw_rs mstatus ms0) cw_Dro)%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_mono with "[] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw mstatus) cw_Dro (cw_Df dq)
+                     (cw_rs mstatus ms0) mstatus (cw_disj mstatus Hfresh)
+                     (cw_in_r mstatus) with "Hcert Hrw Hro") ].
+      iIntros (o) "(-> & Hrw & Hro)".
+      rewrite (cw_rs_r mstatus ms0). by iFrame. }
+    iIntros (o) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (legalize_mstatus ms0 v) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span (cw_Drw mstatus) cw_Dro (cw_Df dq)
+                (cw_rs mstatus ms0) (cw_rs mstatus ms0) _ _
+                (cw_disj mstatus Hfresh)
+                (hval_of_goodb D_m (cw_Drw mstatus ∪ cw_Dro) (cw_Drw mstatus)
+                   _ dstateM (cw_rs mstatus ms0) (mstatus_legalized ms0 v)
+                   (dm_sub _ (cw_in_priv mstatus) (cw_in_sec mstatus)
+                      (cw_in_misa mstatus))
+                   (agree_m (MState (cw_rs mstatus ms0) ∅ dev0_state)
+                      (cw_rs_priv mstatus ms0 Hfresh)
+                      (cw_rs_sec mstatus ms0 Hfresh)
+                      (cw_rs_misa mstatus ms0 Hfresh))
+                   (goodb_legalize_mstatus ms0 v)
+                   (exec_legalize_mstatus ms0 v dstateM
+                      ltac:(vm_compute; reflexivity)
+                      ltac:(vm_compute; reflexivity)))
+                with "Hcert Hrw Hro"). }
+    iIntros (c) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use _ _
+              (fun c2 => ⌜c2 = mstatus_legalized ms0 v⌝ ∗
+                 hreg_frame (cw_rs mstatus (mstatus_legalized ms0 v))
+                   (cw_Drw mstatus) ∗
+                 hreg_frame_ro (cw_Df dq)
+                   (cw_rs mstatus (mstatus_legalized ms0 v)) cw_Dro)%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => hreg_frame
+                   (cw_rs mstatus (mstatus_legalized ms0 v)) (cw_Drw mstatus) ∗
+                   hreg_frame_ro (cw_Df dq)
+                     (cw_rs mstatus (mstatus_legalized ms0 v)) cw_Dro)%I _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_reg_owned (cw_Drw mstatus) cw_Dro (cw_Df dq)
+                       (cw_rs mstatus ms0) mstatus _
+                       (cw_disj mstatus Hfresh) (cw_w_r mstatus)
+                       with "Hcert Hrw Hro") ].
+        iIntros (u) "[Hrw Hro]".
+        iDestruct (cw_rw_ext mstatus _ _
+                     (reg_agree_l _ _ _ _
+                        (cw_set_agree mstatus ms0 _ Hfresh)) with "Hrw")
+          as "Hrw".
+        iDestruct (cw_ro_ext dq _ _
+                     (reg_agree_r _ _ _ _
+                        (cw_set_agree mstatus ms0 _ Hfresh)) with "Hro")
+          as "Hro".
+        by iFrame. }
+      iIntros (u) "[Hrw Hro]".
+      iApply (swp_mono with "[] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw mstatus) cw_Dro (cw_Df dq)
+                     (cw_rs mstatus (mstatus_legalized ms0 v)) mstatus
+                     (cw_disj mstatus Hfresh) (cw_in_r mstatus)
+                     with "Hcert Hrw Hro") ].
+      iIntros (c2) "(-> & Hrw & Hro)".
+      rewrite (cw_rs_r mstatus (mstatus_legalized ms0 v)). by iFrame. }
+    iIntros (c2) "(-> & Hrw & Hro)".
+    iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
 
   (* ---- RAW variant of the csrw-mstatus WP: the caller supplies the config
      cells UNBUNDLED with the mstatus VALUE [ms0] explicit (a chain that
@@ -675,56 +912,51 @@ Section WpCsrwGprNewC.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
-              pmpcfg0 ms0 Hpmp HmIE Hstat
-              with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
-    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
+    iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv Hms Hpmpc Hpc Hf Hinstr Hcont".
+    assert (Hfresh : cw_fresh mstatus)
+      by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
+    assert (Hchk : exec (check_CSR_result csr_mstatus Machine CSRWrite) dstateM
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
-    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1u.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    assert (Lprivp : register_lookup cur_privilege s_pc.(sregs) = Machine)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmisap : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    assert (Lmsp : register_lookup mstatus s_pc.(sregs) = ms0)
-      by (unfold s_pc; tmig; exact Lms).
-    iMod (reg_update _ mstatus _ (mstatus_legalized ms0 (m !!! Regidx rs1))
-            with "Hreg Hms") as "[Hreg Hms]".
-    iModIntro.
-    iExists (set_reg s_pc mstatus (mstatus_legalized ms0 (m !!! Regidx rs1))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)))
-        with (execute_CSRReg csr_mstatus (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_mstatus rs1 s_pc Lprivp
-                 ltac:(rewrite Lmisap; exact HmisaS)
-                 ltac:(rewrite Lmisap; exact HmisaU)).
-      rewrite Lmsp Lrs1u. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc mstatus (mstatus_legalized ms0 (m !!! Regidx rs1))).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. apply Hdom. }
-    iExact "Hfmap".
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr_config pc (add_vec_int pc 4) false
+              (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)) m m
+              Machine ms0 (mstatus_legalized ms0 (m !!! Regidx rs1))
+              pmpcfg0 pmpcfg0 emp%I
+              Hpmp HmIE Hstat
+              with "Hhw Hinv Hhs Hpriv Hms Hpmpc Hpc Hf Hinstr [] [Hcont]").
+    - iIntros "Hpriv Hms Hpmpc Hf HPC HnPC".
+      iDestruct (cw_frames_in (DfracOwn 1) mstatus ms0 Hfresh
+                   with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      iApply (swp_mono with "[HPC HnPC Hpmpc] [Hf Hrw Hro]");
+        [| iApply (swp_execute_CSRReg_csrw (cw_Drw mstatus) cw_Dro
+                     (cw_Df (DfracOwn 1)) (cw_rs mstatus ms0)
+                     (cw_rs mstatus (mstatus_legalized ms0 (m !!! Regidx rs1)))
+                     m csr_mstatus rs1 _ (cw_disj mstatus Hfresh)
+                     (cw_in_priv mstatus) (cw_in_sec mstatus)
+                     (cw_in_misa mstatus)
+                     (cw_rs_priv mstatus ms0 Hfresh)
+                     (cw_rs_sec mstatus ms0 Hfresh)
+                     (cw_rs_misa mstatus ms0 Hfresh)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     Hchk
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     with "Hcert Hf Hrw Hro [Hcert]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (cw_frames_out (DfracOwn 1) mstatus _ Hfresh
+                     with "[$Hrw $Hro]") as "(Hms & Hpriv & _ & _)".
+        iSplitR; [done|]. iFrame "Hpriv Hms Hpmpc Hf HPC HnPC".
+      + iApply (swp_write_CSR_mstatus (DfracOwn 1) ms0 (m !!! Regidx rs1)
+                  Hfresh with "Hcert").
+    - iNext. iIntros "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf' _".
+      iApply ("Hcont" with "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf'").
   Qed.
 
   (* ---- RAW variant of the csrw-pmpcfg0 WP: unbundled config cells with the
@@ -756,47 +988,72 @@ Section WpCsrwGprNewC.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
-              pmpcfg0 ms0 Hpmp HmIE Hstat
-              with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
-    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hpmpc") as %Lcfg.
-    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1u.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    assert (Lprivp : register_lookup cur_privilege s_pc.(sregs) = Machine)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lcfgp : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0)
-      by (unfold s_pc; tmig; exact Lcfg).
-    iMod (reg_update _ pmpcfg_n _ (pmpcfg_written (m !!! Regidx rs1) pmpcfg0)
-            with "Hreg Hpmpc") as "[Hreg Hpmpc]".
-    iModIntro.
-    iExists (set_reg s_pc pmpcfg_n (pmpcfg_written (m !!! Regidx rs1) pmpcfg0)).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW)))
-        with (execute_CSRReg csr_pmpcfg0 (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_pmpcfg0 rs1 s_pc Lprivp).
-      rewrite Lrs1u pmpcfg0_final_set Lcfgp. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc pmpcfg_n (pmpcfg_written (m !!! Regidx rs1) pmpcfg0)).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. apply Hdom. }
-    iExact "Hfmap".
+    iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv Hms Hpmpc Hpc Hf Hinstr Hcont".
+    assert (Hfresh : cw_fresh pmpcfg_n)
+      by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
+    assert (Hchk : exec (check_CSR_result csr_pmpcfg0 Machine CSRWrite) dstateM
+                   = Some (CSR_Check_OK tt, dstateM))
+      by (vm_compute; reflexivity).
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr_config pc (add_vec_int pc 4) false
+              (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW)) m m
+              Machine ms0 ms0
+              pmpcfg0 (pmpcfg_written (m !!! Regidx rs1) pmpcfg0) emp%I
+              Hpmp HmIE Hstat
+              with "Hhw Hinv Hhs Hpriv Hms Hpmpc Hpc Hf Hinstr [] [Hcont]").
+    - iIntros "Hpriv Hms Hpmpc Hf HPC HnPC".
+      iDestruct (cw_frames_in (DfracOwn 1) pmpcfg_n pmpcfg0 Hfresh
+                   with "Hpmpc Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      iApply (swp_mono with "[HPC HnPC Hms] [Hf Hrw Hro]");
+        [| iApply (swp_execute_CSRReg_csrw (cw_Drw pmpcfg_n) cw_Dro
+                     (cw_Df (DfracOwn 1)) (cw_rs pmpcfg_n pmpcfg0)
+                     (cw_rs pmpcfg_n
+                        (pmpcfg_written (m !!! Regidx rs1) pmpcfg0))
+                     m csr_pmpcfg0 rs1 _ (cw_disj pmpcfg_n Hfresh)
+                     (cw_in_priv pmpcfg_n) (cw_in_sec pmpcfg_n)
+                     (cw_in_misa pmpcfg_n)
+                     (cw_rs_priv pmpcfg_n pmpcfg0 Hfresh)
+                     (cw_rs_sec pmpcfg_n pmpcfg0 Hfresh)
+                     (cw_rs_misa pmpcfg_n pmpcfg0 Hfresh)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     Hchk
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     with "Hcert Hf Hrw Hro [Hcert]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (cw_frames_out (DfracOwn 1) pmpcfg_n _ Hfresh
+                     with "[$Hrw $Hro]") as "(Hpmpc & Hpriv & _ & _)".
+        iSplitR; [done|]. iFrame "Hpriv Hms Hpmpc Hf HPC HnPC".
+      + (* one walk: the eight-byte foreach and the readback, all at pmpcfg_n *)
+        iIntros "Hrw Hro".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_hfrun 56 (cw_Drw pmpcfg_n) cw_Dro (cw_Df (DfracOwn 1))
+                       (cw_rs pmpcfg_n pmpcfg0) _ _ _
+                       (cw_disj pmpcfg_n Hfresh)
+                       (hfrun_write_CSR_pmpcfg0 (cw_Drw pmpcfg_n ∪ cw_Dro)
+                          (cw_Drw pmpcfg_n) (cw_rs pmpcfg_n pmpcfg0)
+                          (m !!! Regidx rs1)
+                          (cw_in_r pmpcfg_n) (cw_w_r pmpcfg_n))
+                       with "Hcert Hrw Hro") ].
+        iIntros (x) "(-> & Hrw & Hro)".
+        rewrite (cw_rs_r pmpcfg_n pmpcfg0).
+        iDestruct (cw_rw_ext pmpcfg_n _ _
+                     (reg_agree_l _ _ _ _
+                        (cw_set_agree pmpcfg_n pmpcfg0 _ Hfresh)) with "Hrw")
+          as "Hrw".
+        iDestruct (cw_ro_ext (DfracOwn 1) _ _
+                     (reg_agree_r _ _ _ _
+                        (cw_set_agree pmpcfg_n pmpcfg0 _ Hfresh)) with "Hro")
+          as "Hro".
+        iSplitR; [done|]. iFrame.
+    - iNext. iIntros "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf' _".
+      iApply ("Hcont" with "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf'").
   Qed.
 
 End WpCsrwGprNewC.
