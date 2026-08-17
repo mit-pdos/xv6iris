@@ -346,6 +346,10 @@ Section KforkPrologue.
         FdSlots.fd_slots FDSPARE -∗
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
+        (* the child's kernel stack, exactly as allocproc handed it out: this
+           exit frees the slot, so the page goes straight back into
+           freeproc's block ([SpecFreeproc.fp_rest]). *)
+        ProcDefs.kstack_free npa -∗
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
@@ -713,7 +717,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
@@ -1030,6 +1034,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "[Hctx]").
         { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
           iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"]. }
+        iSpecialize ("Hcont7c" with "Hkstk").
         iSpecialize ("Hcont7c" with "Harmpay").
         iSpecialize ("Hcont7c" with "Hcpu").
         iSpecialize ("Hcont7c" with "Henv'").

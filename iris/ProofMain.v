@@ -851,9 +851,10 @@ Section ProofMain.
        handed out, ARE the 64 process kernel stacks owned at their KSTACK
        virtual addresses -- at KT1, the tree's first real KT1 facts.  This
        is the one point in the tree where both halves are in hand.
-       The bank is DROPPED here (affine): routing it into procinit /
-       [proc_dormant] is increment K3.  What this line buys today is that
-       the pipeline is PAYABLE inside the real boot proof. ---- *)
+       The bank travels to the [procs_inv] assembly below, where each slot's
+       page is carved to [KSTACK_AV] and deposited in its dormant block
+       ([SpecProcinit.procs_inv_alloc]) -- so a process's kernel stack comes
+       from HERE for the rest of the system's life. ---- *)
     iDestruct (kstack_bank_intro pas Hpasok with "Hkstx Hkstacks") as "Hbank".
     iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
             (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
@@ -933,7 +934,7 @@ Section ProofMain.
                                 proc_pub (proc_addr i))) ∗ hart_full i (0%fin : CPU))%I)
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
-    iMod (procs_inv_alloc ⊤ with "Hin") as (γs) "#Hpinv".
+    iMod (procs_inv_alloc ⊤ with "Hin Hbank") as (γs) "#Hpinv".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").

@@ -60,22 +60,6 @@ Section ProcDefs.
   Proof. rewrite /is_kstack /word_pointsto /mem_pointsto. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE SLOT'S KERNEL STACK, FREE -- VOCABULARY ONLY, NOT YET IN THE      *)
-  (* BLOCK, and the reason is a trap worth stating.                        *)
-  (*                                                                       *)
-  (* [stack_own] is [word_pointsto] is [mem_pointsto], which carries the    *)
-  (* IDENTITY conjunct [pa_of ppn va = va] -- so a byte at a KSTACK va,     *)
-  (* which is NOT identity-mapped, is not expressible as one at all         *)
-  (* (RiscvPtsto.v's own header; design/tlb-translation.md).  Putting       *)
-  (* [kstack_free] into [proc_dormant] therefore makes every producer's     *)
-  (* premise UNSATISFIABLE at the real [ks] procinit stores -- main's boot  *)
-  (* theorem included, which would go quietly VACUOUS rather than red.      *)
-  (* So the slot does not own its stack until sp-migration lands; what      *)
-  (* lives here is the vocabulary the park and the exit path are already    *)
-  (* written against ([SpecForkretParkPaid.forkret_park_pkg] takes          *)
-  (* [stack_own] as a PREMISE, which is honest -- an unpayable hypothesis   *)
-  (* is not a vacuous theorem).                                            *)
-  (* ------------------------------------------------------------------ *)
   (* THE SLOT'S KERNEL STACK, FREE.                                       *)
   (*                                                                      *)
   (* A kernel thread's stack is not free-floating memory: it belongs to    *)
@@ -98,26 +82,41 @@ Section ProcDefs.
   (* [ks] is existential and pinned by the persistent [is_kstack] beside   *)
   (* it: [procs_inv] knows only [∃ ks, is_kstack (proc_addr i) ks], and    *)
   (* two [is_kstack]s for one slot agree for free (discarded points-to).    *)
+  (*                                                                      *)
+  (* THE WORDS ARE AT KT1 AND THE FIELD IS NOT.  [ks] is a KSTACK virtual  *)
+  (* address, which is not identity-mapped, so its bytes are expressible   *)
+  (* only at the kernel-table tier -- every [stack_own] below is spelled   *)
+  (* [(KTR := KT1)] rather than at the ambient KT0 default.  [is_kstack]   *)
+  (* stays KT0: [p->kstack] is a cell of the static proc table, which IS   *)
+  (* identity-mapped.  The words come from [KstackOwn.kstack_bank], minted *)
+  (* in main out of kvminit's pages and kvminithart's claims, and reach a  *)
+  (* slot at [SpecProcinit.procs_inv_alloc]'s deposit.                     *)
   (* ------------------------------------------------------------------ *)
-  (* 400 of the page's 512 slots.  It must cover [UsertrapRes.K_usertrap]
-     (164, the deepest trap round) and the park's own
-     [6 + trap_res true + K_prepare_return] (96); the 112 slots below are
-     headroom -- the reserve a zombie's parked record will need once
-     the placeholder's [∀ avail] contract is replaced by the real panic's.
-     Stated here, at the bottom of the tree, so the constant has one home;
-     the two bounds are checked where they are used, not here. *)
-  Definition KSTACK_AV : nat := 400%nat.
+  (* 342 of the page's 512 slots, AND IT IS [UsertrapRes.K_usertrap]'S VALUE
+     ON THE NOSE -- the two constants have to agree and the reason is the
+     donation.  A dying thread hands its whole page to the slot it leaves at
+     ZOMBIE ([kstack_closer_top], spent at usertrap's entry, where sp IS
+     [p->kstack + PGSIZE]); all it owns there is the trap round's own budget,
+     so a [KSTACK_AV] any LARGER would be unpayable and no exit could ever
+     give the page back.  Any SMALLER and the first trap of a freshly
+     allocated process would not fit.  The park's own
+     [6 + trap_res true + K_prepare_return] (96) is comfortably under it.
+     Spelled as a literal because [UsertrapRes] sits far above this file;
+     the agreement is checked where it is spent (the [unfold KSTACK_AV; lia]
+     at each kexit(-1) site), not here.  The 170 slots below it are the
+     page's slack and are simply dropped at the deposit. *)
+  Definition KSTACK_AV : nat := 342%nat.
 
   Definition kstack_free (pa : mword 64) : iProp Σ :=
     (∃ ks : mword 64,
        is_kstack pa ks ∗
-       stack_own (add_vec ks (mword_of_int 4096)) KSTACK_AV)%I.
+       stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) KSTACK_AV)%I.
 
   (* the two ends, as lemmas rather than unfoldings: every producer knows
      its [ks] concretely and every consumer wants it back. *)
   Lemma kstack_free_intro (pa ks : mword 64) :
     is_kstack pa ks -∗
-    stack_own (add_vec ks (mword_of_int 4096)) KSTACK_AV -∗
+    stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) KSTACK_AV -∗
     kstack_free pa.
   Proof. iIntros "#Hks Hstk". iExists ks. by iFrame "Hks Hstk". Qed.
 
@@ -134,22 +133,47 @@ Section ProcDefs.
      simply drops it, and no return-side postcondition changes anywhere in
      the chain. *)
   Definition kstack_closer (pa sp : mword 64) (av : nat) : iProp Σ :=
-    (stack_own sp av -∗ kstack_free pa)%I.
+    (stack_own (KTR := KT1) sp av -∗ kstack_free pa)%I.
 
   Lemma kstack_closer_frame (pa sp : mword 64) (av f : nat) :
     (f <= av)%nat ->
-    kstack_closer pa sp av -∗ stack_own sp f -∗
+    kstack_closer pa sp av -∗ stack_own (KTR := KT1) sp f -∗
     kstack_closer pa (pa_stk sp f) (av - f).
   Proof.
     iIntros (Hf) "Hc Hfr Hrest". iApply "Hc".
     assert (Hsplit : av = (f + (av - f))%nat) by lia.
-    iEval (rewrite {1}Hsplit (stack_own_app sp f (av - f))).
+    iEval (rewrite {1}Hsplit (stack_own_app (KTR := KT1) sp f (av - f))).
     iSplitL "Hfr"; [iExact "Hfr" | iExact "Hrest"].
+  Qed.
+
+  (* the closer's anchor MOVES with sp and its depth shrinks by the frame,
+     which is the whole point: a diverging chain's every layer wraps the one
+     it was given ([kstack_closer_frame]) and the bottom (kexit) applies what
+     reaches it to the region sched hands back at the park. *)
+
+  (* THE CLOSER AT THE TOP OF THE PAGE, WHICH IS FREE.  A thread whose sp IS
+     the page top owes nothing above it, so its closer is [kstack_free_intro]
+     and the persistent [is_kstack] is the whole payment.  This is where a
+     dying thread's closer is BORN -- at usertrap's entry, the one point in a
+     trap round where [sp = p->kstack + PGSIZE] is a stated fact
+     ([UsertrapRes.ut_res]) -- and [kstack_closer_frame] walks it down the
+     diverging call chain from there.  [n] is a BOUND rather than [KSTACK_AV]
+     itself because the entry capability's depth is only bounded below; the
+     surplus is dropped inside the wand, where it costs nothing. *)
+  Lemma kstack_closer_top (pa ks : mword 64) (n : nat) :
+    (KSTACK_AV <= n)%nat ->
+    is_kstack pa ks -∗
+    kstack_closer pa (add_vec ks (mword_of_int 4096)) n.
+  Proof.
+    iIntros (Hn) "#Hks Hstk".
+    iDestruct (stack_own_split_1 (KTR := KT1) _ KSTACK_AV n Hn with "Hstk")
+      as "[Hstk _]".
+    iApply (kstack_free_intro with "Hks Hstk").
   Qed.
 
   Lemma kstack_free_at (pa ks : mword 64) :
     is_kstack pa ks -∗ kstack_free pa -∗
-    stack_own (add_vec ks (mword_of_int 4096)) KSTACK_AV.
+    stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) KSTACK_AV.
   Proof.
     iIntros "#Hks (%ks' & #Hks' & Hstk)".
     iDestruct (word_pointsto_agree with "Hks Hks'") as %<-.
@@ -167,6 +191,11 @@ Section ProcDefs.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
        iref_slots (1 + IREFSPARE) ∗
+       (* THE SLOT'S KERNEL STACK -- see [kstack_free] above.  On BOTH arms:
+          a zombie owns its stack exactly as an unused slot does, which is
+          what makes freeproc's ZOMBIE -> UNUSED step a pass-through and
+          what puts the bill on the exit path, where the page actually is. *)
+       kstack_free pa ∗
        own_ctx (p_context pa) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
@@ -185,6 +214,7 @@ Section ProcDefs.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
        iref_slots (1 + IREFSPARE) ∗
+       kstack_free pa ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
              proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
@@ -195,11 +225,11 @@ Section ProcDefs.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 

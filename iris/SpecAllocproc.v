@@ -196,6 +196,14 @@ Definition allocproc_post
           [procs_inv], so it is where the unit has to come from. *)
        iref_slots (1 + IREFSPARE) ∗
        is_kstack (proc_addr j) ks ∗
+       (* THE SLOT'S KERNEL STACK, out of the dormant block with everything
+          else the slot owned.  SEALED ([ProcDefs.kstack_free]) rather than
+          carved: the caller that wants the words spells [kstack_free_at]
+          against the [is_kstack] one line up.  It is what a failure tail
+          hands freeproc ([SpecFreeproc.fp_rest]) and, once kfork builds a
+          paid park, what [SpecForkretParkPaid.forkret_park_pkg] is anchored
+          on. *)
+       kstack_free (proc_addr j) ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
        (* [trap_res b + K], NOT [K]: allocproc RETURNS HOLDING p->lock, so

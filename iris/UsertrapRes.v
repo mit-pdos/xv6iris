@@ -1053,6 +1053,19 @@ Section UsertrapRes.
     (pa_stk sp0 1 ↦₈[KT1] vra ∗ pa_stk sp0 2 ↦₈[KT1] vs0 ∗
      pa_stk sp0 3 ↦₈[KT1] vs1 ∗ pa_stk sp0 4 ↦₈[KT1] vs2)%I.
 
+  (* ...and the same four cells as FREE STACK, which is what they are on a
+     path that never returns: usertrap's frame is dead the moment the walk
+     reaches [kexit], and it is part of the page the dying thread donates
+     ([ProcDefs.kstack_closer_frame]). *)
+  Lemma ut_frame_stack (sp0 vra vs0 vs1 vs2 : mword 64) :
+    ut_frame sp0 vra vs0 vs1 vs2 ⊢ stack_own (KTR := KT1) sp0 4.
+  Proof.
+    rewrite /ut_frame /stack_own.
+    iIntros "(H1 & H2 & H3 & H4)".
+    iExists [vra; vs0; vs1; vs2]. iSplitR; [done|].
+    simpl. iFrame "H1 H2 H3 H4".
+  Qed.
+
   (* CALLEE-SAVED MINUS THE FOUR THE FRAME HOLDS.  [CalleeSaved.callee_saved
      m0 m] is FALSE at every point inside usertrap -- s1 holds [p] and s2
      holds [which_dev] from +0x26 on -- so what travels through the walk is
