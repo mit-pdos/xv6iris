@@ -86,6 +86,17 @@ Section EscrowDefs.
     rewrite dfrac_op_own Qp.div_2. iExact "H".
   Qed.
 
+  (* the inverse of [reg_join]: the off-lock deposit splits the marked slot's
+     whole [reg_full] into the structural half (stays in the pending arm) and
+     the [region_pending] half. *)
+  Lemma reg_split z ge gr :
+    reg_full z ge gr -∗ reg_half z ge gr ∗ reg_half z ge gr.
+  Proof.
+    rewrite /reg_full /reg_half. iIntros "H".
+    iEval (rewrite -{1}(Qp.div_2 1)) in "H".
+    iDestruct "H" as "[H1 H2]". iFrame.
+  Qed.
+
   (* the region-side pending payload: reg_half (½ of the registry element) +
      committed (persistent).  [esc_inv] (not Timeless) rides the POOL side, so
      this stays Timeless and [ireg_body]'s [iInv .. as ">"] is unaffected. *)

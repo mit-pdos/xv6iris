@@ -606,7 +606,10 @@ Section IcacheBootRegion.
     { apply map_disjoint_empty_r. }
     rewrite right_id_L.
     iDestruct (ireg_registry_from_map (dummy_reg nib) nib (dummy_reg_cov nib)
-                with "Hrauth Hfulls") as "Hreg".
+                with "Hrauth") as "Hreg".
+    (* OPTION A (walk reg-fold): the reg_full fragments no longer form a
+       standalone big-op; distribute them into the per-inum slots below. *)
+    iEval (rewrite /dummy_reg big_sepM_gset_to_gmap) in "Hfulls".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -620,6 +623,7 @@ Section IcacheBootRegion.
     { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hepa"). intros z Hz.
       iIntros "Ha". iApply (ireg_ep_intro z (image_dinode dss z) with "Ha"). }
     iDestruct (big_sepS_sep_2 with "Hall Hep") as "Hall".
+    iDestruct (big_sepS_sep_2 with "Hall Hfulls") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
        the other one is the payout; the ledger authority stays with the
        slot on BOTH arms (design §20.2) *)
@@ -628,7 +632,7 @@ Section IcacheBootRegion.
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[[[Hfrag Hmk] Hla] Hep]".
+      iIntros "[[[[Hfrag Hmk] Hla] Hep] Hrf]".
       assert (Hok : ireg_link_ok (image_dinode dss z) 0).
       { split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
       (* the root clause at the EMPTY ledger, i.e. §20.4's own words *)
@@ -644,7 +648,7 @@ Section IcacheBootRegion.
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        iLeft. iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
+        iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
@@ -653,7 +657,7 @@ Section IcacheBootRegion.
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        iLeft. iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
+        iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Hty | iExact "Hmk"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
     iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
