@@ -339,7 +339,8 @@ Section trace.
     match l with LStore _ _ _ | LRmw _ _ _ _ _ => True | _ => Dl = None end.
   Proof.
     destruct l; simpl;
-      [by intros [_ ->]|by intros (_ & _ & ->)|done|done|by intros [_ ->]].
+      [by intros [_ ->]|by intros (_ & _ & ->)|done|done|by intros [_ ->]
+      |by intros [_ ->]].
   Qed.
 
   Lemma atrace_ts_none img log i T k ev :
@@ -366,7 +367,8 @@ Section trace.
     destruct (asteps_wf_step _ _ _ _ _ _ _ Hwf Hev)
       as (ag & ag' & st' & f & _ & _ & Hps & _ & _).
     apply (astep_prog_step d0) in Hps as (d & d' & Hps).
-    destruct (ae_lb ev) as [|aq lat base tvs| | |]; simpl; [done| |done|done|done].
+    destruct (ae_lb ev) as [|aq lat base tvs| | | |]; simpl;
+      [done| |done|done|done|done].
     destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ Hps).
   Qed.
 

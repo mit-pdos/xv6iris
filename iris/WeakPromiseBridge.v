@@ -205,7 +205,17 @@ Section bridge.
       wp_pf_step i (WeakPromise.LFence pr pw sr sw) cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
-                         (pa_prom ag)]> (pc_ags cfg))).
+                         (pa_prom ag)]> (pc_ags cfg)))
+  (** [PFSilent]'s twin at the fabric marker [WeakPromise.LDev] — same
+      update, same (absent) side conditions.  See [WeakPromise]'s header
+      for why this is a separate arm and not a predicate on the silent
+      one. *)
+  | PFDev cfg ag st' d' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (pc_dev cfg) WeakPromise.LDev st' d' →
+      wp_pf_step i WeakPromise.LDev cfg
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
+               (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags cfg))).
 
   Definition wp_pf_run c c' : Prop := ∃ i l, wp_pf_step i l c c'.
 
@@ -224,7 +234,7 @@ Section bridge.
       |cfg ag aq lat base tvs st' d' Hlk Hps Hr
       |cfg ag rl base data k st' d' Hlk Hps Hnn Hk
       |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He Hk
-      |cfg ag pr pw sr sw st' d' Hlk Hps].
+      |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps].
     - apply rtc_once. by eapply WPSilent.
     - apply rtc_once. by eapply WPLoad.
     - eapply wpstep_store_now; [done|done|done| |].
@@ -234,6 +244,7 @@ Section bridge.
       + by destruct (Hwf i ag Hlk).
       + rewrite (Hnp i ag Hlk). apply not_elem_of_empty.
     - apply rtc_once. by eapply WPFence.
+    - (* dev: [PFSilent]'s twin *) apply rtc_once. by eapply WPDev.
   Qed.
 
   Lemma no_promises_upd c i ag st' w (lg : list wmsg) (dv : D) :
@@ -284,7 +295,8 @@ Section bridge.
   (* ---------------------------------------------------------------- *)
   (** ** (B) The projections *)
 
-  (** [LSilent] has no image: the axiomatic execution simply skips it. *)
+  (** [LSilent] and [LDev] have no image: the axiomatic execution simply
+      skips them. *)
 (** [k] is the class the pf step's append stamped on its message (a free
     binder of the [PFStore]/[PFRmw] arms — the pf fragment mirrors the store
     label and does not compute the class), which the axiomatic label carries
@@ -300,6 +312,7 @@ Section bridge.
         Some (WeakAxiomatic.LRmw aq rl base (tvs.*1) (tvs.*2) data k)
     | WeakPromise.LFence pr pw sr sw =>
         Some (WeakAxiomatic.LFence pr pw sr sw)
+    | WeakPromise.LDev => None   (* [LSilent]'s twin: no axiomatic image *)
     end.
 
   (** The state projection, RELATIONALLY (see the header): same image, same
@@ -427,7 +440,7 @@ Section bridge.
       |cfg ag aq lat base tvs st' d' Hlk Hps Hr
       |cfg ag rl base data k st' d' Hlk Hps Hnn Hk
       |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He Hk
-      |cfg ag pr pw sr sw st' d' Hlk Hps].
+      |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|reflexivity].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply load_post_run_le].
     - eapply (own_coh_append _ _ _ _ _ _ _ _ _ d');
@@ -437,6 +450,7 @@ Section bridge.
       + etrans; [apply load_post_run_le|apply store_post_run_le].
       + intros j Hj. by apply (store_post_run_coh _ rl base (length data) _ j).
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply fence_post_le].
+    - (* dev *) eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|reflexivity].
   Qed.
 
   Lemma own_coh_run c c' : own_coh c → rtc wp_pf_run c c' → own_coh c'.
@@ -490,8 +504,9 @@ Section bridge.
       |cfg ag aq lat base tvs st' d' Hlk Hps Hr
       |cfg ag rl base data k st' d' Hlk Hps Hnn Hk
       |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He Hk
-      |cfg ag pr pw sr sw st' d' Hlk Hps]; subst img lg;
-      [exists WCplain| exists WCplain| exists k| exists k| exists WCplain];
+      |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps]; subst img lg;
+      [exists WCplain| exists WCplain| exists k| exists k| exists WCplain
+      | exists WCplain];
       simpl.
     - (* silent: the projected state does not move *)
       eapply (cfg_match_upd_gen _ _ _ _ i ag st' (pa_ws ag) _ f f);
@@ -524,6 +539,9 @@ Section bridge.
       + simpl. eapply (cfg_match_upd_gen _ _ _ _ i ag st' _ _ f); [done|done| |].
         * rewrite upd_ws_eq (Hf i ag Hlk) //.
         * intros j Hne. by rewrite upd_ws_ne.
+    - (* dev: the silent case verbatim *)
+      eapply (cfg_match_upd_gen _ _ _ _ i ag st' (pa_ws ag) _ f f);
+        [done|done|by apply Hf|done].
   Qed.
 
   (** Extending the execution by one pf step. *)

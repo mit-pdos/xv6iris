@@ -427,7 +427,7 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
     |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps]; try done;
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps]; try done;
     by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx.
 Qed.
 
@@ -447,7 +447,7 @@ Proof.
   rewrite /sail_mstep /= in Hstep. destruct Hex as [Hd Hlat].
   rewrite Hd in Hstep. destruct Hstep as (_ & Hstep).
   destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                |pr pw sr sw]; try done.
+                |pr pw sr sw|]; try done.
   - destruct lat; [done|]. left. by exists aq, base, tvs.
   - right. by exists aq, rl, base, tvs, data.
 Qed.
@@ -492,7 +492,7 @@ Proof.
       |cfg ag0 aq lat base tvs st' dd Hlk0 Hps Hr
       |cfg ag0 rl base data kk st' dd Hlk0 Hps Hne
       |cfg ag0 aq rl base tvs data kk st' dd Hlk0 Hps Hne Hlen Hr He Hkc
-      |cfg ag0 pr pw sr sw st' dd Hlk0 Hps];
+      |cfg ag0 pr pw sr sw st' dd Hlk0 Hps|cfg ag0 st' dd Hlk0 Hps];
       simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
       try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
       destruct (excl_read_lbl next (pa_st ag) _ st' Hfe Hex Hps)
@@ -504,7 +504,7 @@ Proof.
       |cfg ag0 aq lat base tvs st' dd Hlk0 Hps Hr
       |cfg ag0 rl base data kk st' dd Hlk0 Hps Hne
       |cfg ag0 aq rl base tvs data kk st' dd Hlk0 Hps Hne Hlen Hr He Hkc
-      |cfg ag0 pr pw sr sw st' dd Hlk0 Hps];
+      |cfg ag0 pr pw sr sw st' dd Hlk0 Hps|cfg ag0 st' dd Hlk0 Hps];
       simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
       try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
       destruct (con_write_lbl next (pa_st ag) _ st' Hfe Hcw Hps)
@@ -554,7 +554,7 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
     |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps];
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps];
     try (by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx).
   - split_and!; [done|done|by intros j Hj; apply lookup_insert_other|].
     intros ag2 Hag2. simpl in Hag2. rewrite Hlk in Hag2. injection Hag2 as <-.
@@ -956,7 +956,7 @@ Section residual.
       + destruct Hstep as [_ ->]. simpl. by apply (proj2 Hsh).
       + destruct Hsh as (Hcoh & Hsh). destruct Hstep as (_ & Hstep).
         destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                      |pr pw sr sw]; try (by destruct Hstep).
+                      |pr pw sr sw|]; try (by destruct Hstep).
         * (* the ONE load arm, exclusive or not *)
           destruct lat; [by destruct Hstep|].
           destruct Hstep as (_ & _ & _ & w & _ & ->). simpl. by apply Hsh.
@@ -996,7 +996,7 @@ Section residual.
       + destruct Hstep as [_ ->]. simpl. by apply Hlv.
       + destruct Hstep as (_ & Hstep).
         destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                      |pr pw sr sw]; try (by destruct Hstep).
+                      |pr pw sr sw|]; try (by destruct Hstep).
         * destruct lat; [by destruct Hstep|].
           destruct Hstep as (_ & _ & _ & w & _ & ->). simpl. by apply Hlv.
         * (* the fused rmw: the register file MOVES across the silent
@@ -1522,7 +1522,7 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
     |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps];
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps];
     destruct dd; rewrite Hdev in Hps;
     have Hlkd : pc_ags d !! i = Some ag by rewrite Hags.
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
@@ -1546,6 +1546,9 @@ Proof.
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog.
     exact (PFFence pstep pcls i d ag pr pw sr sw st' tt Hlkd Hps).
+  - (* dev: [PFSilent]'s twin *)
+    eexists. split_and!; [reflexivity|reflexivity|]. simpl.
+    rewrite -Himg -Hlog. exact (PFDev pstep pcls i d ag st' tt Hlkd Hps).
 Qed.
 
 (** The QUIET transplant, which needs only the stepping agent's slot: a
@@ -1567,7 +1570,7 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag rl base data kc st' dd Hlk Hps Hne Hkc
     |cfg ag aq rl base tvs data kc st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps];
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps];
     try (by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx);
     destruct dd; rewrite Hdev in Hps;
     have Hlkd : pc_ags d !! k = Some ag by rewrite Hags.
@@ -1947,7 +1950,7 @@ Proof.
     + destruct Hstep as [-> ->]. eexists. split_and!; pafin.
     + destruct Hstep as (Hcoh & Hstep).
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                    |pr pw sr sw]; try (by destruct Hstep).
+                    |pr pw sr sw|]; try (by destruct Hstep).
       * destruct lat; [by destruct Hstep|].
         destruct Hstep as (Haq & Hbase & Hlent & w & Hw & ->).
         exists (PSail (Some (k (inl (w, None)))) rs' d None iq').
@@ -2038,7 +2041,7 @@ Proof.
     + destruct Hstep as [_ ->]. simpl. by apply Hfr.
     + destruct Hstep as (_ & Hstep).
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                    |pr pw sr sw]; try (by destruct Hstep).
+                    |pr pw sr sw|]; try (by destruct Hstep).
       * destruct lat; [by destruct Hstep|].
         destruct Hstep as (_ & _ & _ & w & _ & ->). simpl. by apply Hfr.
       * destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
@@ -2098,7 +2101,7 @@ Proof.
     + by destruct Hstep as [_ ->].
     + destruct Hstep as (_ & Hstep).
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                    |pr pw sr sw]; try (by destruct Hstep).
+                    |pr pw sr sw|]; try (by destruct Hstep).
       * destruct lat; [by destruct Hstep|].
         by destruct Hstep as (_ & _ & _ & w & _ & ->).
       * destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
@@ -2266,6 +2269,7 @@ Definition post_ws (l : wlabel) (ws : wstate) (n : nat) : wstate :=
       store_post_run (load_post_run ws aq base tvs.*1) rl base (length data)
         (S n)
   | WeakPromise.LFence pr pw sr sw => fence_post ws pr pw sr sw
+  | WeakPromise.LDev => ws   (* [LSilent]'s twin *)
   end.
 
 Lemma wp_pf_step_inv {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
@@ -2302,7 +2306,7 @@ Proof.
     |cfg ag0 aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag0 rl base data kk st' dd Hlk Hps Hne Hkc
     |cfg ag0 aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag0 pr pw sr sw st' dd Hlk Hps];
+    |cfg ag0 pr pw sr sw st' dd Hlk Hps|cfg ag0 st' dd Hlk Hps];
     destruct dd;
     (have Hdv : pc_dev cfg = tt by destruct (pc_dev cfg));
     rewrite Hdv in Hps;
@@ -2343,6 +2347,12 @@ Proof.
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
     rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
     exact (PFFence pstep pcls i d agd pr pw sr sw stD tt Hlkd Hpsd).
+  - (* dev: [PFSilent]'s twin *)
+    exists st', []. split_and!;
+      [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
+    rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
+    exact (PFDev pstep pcls i d agd stD tt Hlkd Hpsd).
 Qed.
 
 (** *** 9.7 configurations that differ only in one agent's register file *)
@@ -2499,7 +2509,7 @@ Proof.
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
     |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
     |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps];
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps];
     destruct dd; rewrite /pstep_unit in Hps;
     destruct (sail_step_irq_or_ni next (pa_st ag) _ st' Hps)
       as [[Hf Hirq]|Hni];
@@ -2510,6 +2520,7 @@ Proof.
   - right. by eapply PFStore.
   - right. by eapply PFRmw.
   - right. by eapply PFFence.
+  - right. by eapply PFDev.
 Qed.
 
 

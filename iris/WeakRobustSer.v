@@ -125,7 +125,7 @@ Section astep.
     log !! (ts - 1)%nat = Some m → is_Some (msg_byte m a) →
     (ts ≤ coh (f (pa_ws ag)) a)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -144,6 +144,7 @@ Section astep.
       have Hacc : base + Z.of_nat j = acc_addr base j by rewrite /acc_addr.
       rewrite Hacc. by apply store_post_run_coh.
     - by intros [_ ?].
+    - by intros [_ ?].
   Qed.
 
   (** A step that BOTH reads [(a, tr)] and fulfils [ts] is an [LRmw]
@@ -154,7 +155,7 @@ Section astep.
     astep_ok img log i ag l f (Some ts) → (a, tr) ∈ lb_reads l →
     (tr < ts)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -168,6 +169,7 @@ Section astep.
       have Hge := load_post_run_coh (pa_ws ag) aq base (tvs.*1) j tr Hts.
       have Hlt := Hcoh j Hjlt. rewrite /acc_addr in Hge. lia.
     - by intros [_ ?].
+    - by intros [_ ?].
   Qed.
 
   (** ... and its EXCLUSIVITY WINDOW: no OTHER agent's write to the byte
@@ -178,7 +180,7 @@ Section astep.
     astep_ok img log i ag l f (Some ts) → (a, tr) ∈ lb_reads l →
     ¬ writes_in_by log (λ tid, tid ≠ Some i) a tr (ts - 1)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
+    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -187,6 +189,7 @@ Section astep.
              [j [v [Hj ->]]]%elem_of_tvs_reads.
       injection Heq as Heq. subst tsf.
       exact (Hexcl j tr v Hj).
+    - by intros [_ ?].
     - by intros [_ ?].
   Qed.
 

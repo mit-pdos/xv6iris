@@ -834,7 +834,7 @@ Section prj.
 
       |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
 
-      |cfg ag pr pw sr sw st' dv Hlk Hps];
+      |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps];
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
       rewrite Hstx /= in Hps;
       (destruct st' as [q'|dd pend]; [|done]);
@@ -863,7 +863,7 @@ Section prj.
 
       |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
 
-      |cfg ag pr pw sr sw st' dv Hlk Hps]; destruct dv;
+      |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps]; destruct dv;
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
       rewrite Hstx /= in Hps;
       (destruct st' as [q'|dd pend]; [|done]);
@@ -921,6 +921,17 @@ Section prj.
       exists (WeakPromise.LFence pr pw sr sw). split_and!.
       + apply (PFFence (pstep_unit (sail_step_ni next)) lbl_class_p i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) pr pw sr sw q' tt Hlks).
+        rewrite /prj_ag /= Hstx. exact Hps.
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - (* dev: the silent case verbatim, at [PFDev] *)
+      split.
+      { exists (WPAgent (PHart q') (pa_ws ag) (pa_prom ag)), q'. simpl.
+        split; [by eapply lookup_insert_self|done]. }
+      exists WeakPromise.LDev. split_and!.
+      + apply (PFDev (pstep_unit (sail_step_ni next)) lbl_class_p i (prj_cfg q0 cfg)
+                 (prj_ag q0 ag) q' tt Hlks).
         rewrite /prj_ag /= Hstx. exact Hps.
       + intros ag2 msg Hag2 Heq. simpl in Heq.
         by destruct (app_snoc_absurd _ _ Heq).

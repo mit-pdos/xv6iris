@@ -107,6 +107,7 @@ Definition aev_post {D : Type} (σ : nat → nat) (ev : aev D) (w : wstate) : ws
       | None => w
       end
   | LFence pr pw sr sw => fence_post w pr pw sr sw
+  | LDev => w   (* [LSilent]'s twin *)
   end.
 
 Definition aevs_post {D : Type} (σ : nat → nat) (evs : list (aev D)) (w : wstate) : wstate :=
@@ -174,7 +175,7 @@ Lemma w_relp_aev_post_indep {D : Type} σ σ' (ev : aev D) w w' :
 Proof.
   intros Heq. rewrite /aev_post.
   destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                          |pr pw sr sw]; [done| | | |].
+                          |pr pw sr sw|]; [done| | | | |done].
   - by rewrite !w_relp_load_post_run.
   - destruct (ae_ts ev) as [ts|]; [|done].
     by apply w_relp_store_post_run_indep.
@@ -207,12 +208,13 @@ Section fold.
     ∀ w, f w = aev_post id ev w.
   Proof.
     destruct ev as [lb ts dd]. rewrite /aev_post /=.
-    destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
+    destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|].
     - by intros [-> _] w.
     - intros (_ & -> & _) w. by rewrite list_fmap_id.
     - intros (ts' & kc & _ & _ & _ & -> & ->) w. done.
     - intros (ts' & kc & _ & _ & _ & _ & _ & _ & -> & ->) w.
       by rewrite list_fmap_id.
+    - by intros [-> _] w.
     - by intros [-> _] w.
   Qed.
 
@@ -418,6 +420,7 @@ Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
       | None => S
       end
   | LFence pr pw sr sw => lfence_post S pr pw sr sw
+  | LDev => S   (* [LSilent]'s twin *)
   end.
 
 Definition laevs_post {D : Type} (evs : list (aev D)) (S : lstate) : lstate :=
@@ -615,13 +618,14 @@ Theorem lrel_aev_post {D : Type} σ (ev : aev D) S w :
 Proof.
   intros [_ Hinj] Hrel. destruct ev as [lb ts dd].
   rewrite /laev_post /aev_post /=.
-  destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
+  destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|].
   - exact Hrel.
   - by apply lrel_load_post_run.
   - destruct ts as [t|]; [|exact Hrel]. by apply lrel_store_post_run.
   - destruct ts as [t|]; [|exact Hrel].
     apply lrel_store_post_run. by apply lrel_load_post_run.
   - by apply lrel_fence_post.
+  - exact Hrel.
 Qed.
 
 Theorem lrel_aevs_post {D : Type} σ (evs : list (aev D)) S w :
@@ -837,7 +841,7 @@ Lemma laev_post_leaf {D : Type} (ev : aev D) S u :
   lstate_leaf (laev_post ev S) u → lstate_leaf S u ∨ aev_ts_occurs ev u.
 Proof.
   destruct ev as [lb ts dd]. rewrite /laev_post /aev_ts_occurs /=.
-  destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
+  destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|].
   - by left.
   - intros [Hu|(j & Hj)]%lload_post_run_leaf; [by left|].
     right; left. by eapply tvs_fst_reads.
@@ -848,6 +852,7 @@ Proof.
     apply lload_post_run_leaf in Hu as [Hu|(j & Hj)]; [by left|].
     right; left. by eapply tvs_fst_reads.
   - intros Hu%lfence_post_leaf. by left.
+  - by left.
 Qed.
 
 Lemma laevs_post_leaf {D : Type} (evs : list (aev D)) :
