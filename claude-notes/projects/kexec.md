@@ -1329,28 +1329,35 @@ proof that memsets a pointer array**; a byte-level `memset` postcondition
 does not survive a word-level read without it.
 
 **WIRING IT INTO `syscall()` COST A NAMING CHANGE, NOT A NEW INDEX, AND THAT
-IS THE TEMPLATE FOR THE OTHER SEVEN GAP ENTRIES.** `ProofSyscall.v`'s header
+IS THE TEMPLATE FOR THE REMAINING GAP ENTRIES.** `ProofSyscall.v`'s header
 called the fs fabric a "genuinely missing resource"; it was not missing, it
 was misnamed. `syscall_env` held the icache/fs ghost names as FRESH
 EXISTENTIALS, while the mutable half a caller also needs — `fileclose_bm fn
 us`, the two superblock cells and `bitmap_res` — is stated at `fn`'s own
 fields, so no fabric over fresh names could ever be shown to describe the
 same file system (SpecSyscall.v's UNREACHABLE-WITNESS problem). The fix,
-`ProofSyscall.sysc_fs_env`, is the fabric at `fn`'s field names for
-everything `fileclose_bm` also pins, and at the ambient `icfg` class for
-`dev`/`nib`/the log names — which makes sys_exec's `dev = icfg_dev` /
-`nib = icfg_nib` / `g = icfg_log` premises `eq_refl` and leaves
-`fcn_inodestart fn = icfg_ist` as the only real tie. Three consequences:
+`ProofSyscall.sysc_fs_env`, spells the whole bundle at `fn`'s field names and
+carries the ties to the ambient `icfg` class as pure conjuncts. Four
+consequences worth keeping:
 
-- **`procs_inv γs` and `kernel_data` stay OUT of the bundle** and are drawn
-  from `sysc_arm_pre` instead (`sysc_fs_fabric` re-assembles
-  `SpecKexec.fs_fabric` from the three). That is what keeps `fcn_procs fn`
-  out of the story: the dispatch's own `γs`/`j`/`γl` reach the callee
-  directly, so none of the six ties `sys_exit` needs appear, and
-  `syscall_env`'s TYPE did not have to grow.
+- **STATE THE BUNDLE AT THE RECORD'S FIELDS AND CARRY THE TIES, NOT THE
+  OTHER WAY ROUND.** The first version spelled `dev`/`nib`/`g` at `icfg_*`
+  directly, which made `sys_exec`'s premises `eq_refl` — and made
+  `sys_exit`, which wants `fileclose_ic_env fn` (at `fn`'s fields
+  throughout), unreachable. Spelling at `fn` and carrying
+  `⌜fcn_dev fn = icfg_dev⌝` makes BOTH one rewrite away. A bundle serving
+  two callees should be stated in the vocabulary of the thing it is indexed
+  by.
+- **`pj` IS AN INDEX, AND THAT DISSOLVES MOST "UNSTATABLE" TIES.** An arm may
+  instantiate its callee's proc-array parameters at `fn`'s fields instead of
+  the dispatch's, so `procs_inv (fcn_procs fn)`, the slot lookup and
+  `⌜pj = proc_addr (fcn_j fn)⌝` all live inside the bundle. Of the six ties
+  the header attributed to `sys_exit`, five vanished this way; the sixth
+  (`fcn_pid fn = pid`) is a pure premise usertrap pays by `reflexivity`,
+  because `UsertrapRes.un_fn` is DEFINED out of the fields it names. Check
+  what the indices can already reach before widening a type.
 - **Nothing linear was invented.** `bitmap_res` and the superblock cells came
-  from the `fileclose_bm` the contract already threaded (its `us'`
-  re-indexing is exactly the `used' ⊆ used` give-back); `iref_slots 2` was
+  from the `fileclose_bm` the contract already threaded; `iref_slots 2` was
   split out of the existing `IREFSPARE` = 4; `trap_csrs_ext`/`cpu_claim_ext`
   are `emp` at `eb = true` and are minted, not threaded.
 - **The debt is honest and unpaid.** `syscall_env` is a Definition nobody
@@ -1362,10 +1369,39 @@ everything `fileclose_bm` also pins, and at the ambient `icfg` class for
 
 **A GAP ENTRY WHOSE CONTRACT IS PHRASED OVER `fs_fabric` PLUS
 `fileclose_bm`'s THREE IS NOW A STRAIGHT PORT OF `sysc_arm_exec`.** Read that
-arm's own header for the three things that made it unlike the nine arms
-above it; the third — the trapframe page surviving TWO moves (`uptd_ext`
-across the copy-ins, then `kexec_ok` across the commit) — is the only part
-specific to exec.
+arm's own header for the three things that made it unlike the eight before
+it; the third — the trapframe page surviving TWO moves (`uptd_ext` across the
+copy-ins, then `kexec_ok` across the commit) — is the only part specific to
+exec.
+
+**AND `sys_exit` IS WIRED TOO, WHICH IS WHERE THE DISPATCH LEARNED TO LET A
+CALLEE NOT RETURN.** Its only real obstacle was `ProcDefs.kstack_closer`, a
+plain non-persistent wand nothing in the dispatch could mint: it is free at
+the PAGE TOP (`kstack_closer_top` takes only the persistent `is_kstack`) but
+walking the anchor down to the callee's sp costs the caller's own frame,
+which usertrap still needs to return on the other twenty-one entries. The
+resolution generalizes far past exec:
+
+> **A FUNCTION THAT MAY OR MAY NOT RETURN TAKES ITS EXIT AS AN ADDITIVE
+> CONJUNCTION: the caller's continuation `∧` whatever the non-returning path
+> needs.** `∗` would make the caller supply both at once out of disjoint
+> resources, which it cannot; `∨` would make the CALLER pick, which it cannot
+> (the choice is the callee's — here, the syscall number). `∧` makes the
+> caller prove EACH from its full context and lets the CALLEE pick, so both
+> branches are funded by the same cells precisely because only one ever runs.
+> The contract then never has to expose WHETHER the function returns; all it
+> proves is the conditional.
+
+`SpecSyscall.wp_syscall_sconf_body`'s exit slot is that conjunction and
+`ProofSyscall.sysc_exit_ty` names it. It reaches neither `SpecUsertrap` nor
+`SpecUservec`: usertrap is entered with sp AT THE PAGE TOP, so it mints the
+closer for free and wraps its own frame around it, paying both conjuncts with
+one `iSplit` — the same construction its `jal kexit` arm already used at the
+other place a usertrap round stops returning. Only the left conjunct is
+hart-indexed (`ProcDefs` and `StackOwn` name no `CpuId`), so
+`sysc_exit_retarget` is a `wp_next_retarget` on one side and a re-assertion
+on the other, and a returning arm's whole cost is one
+`iDestruct "Hcont" as "[Hcont _]"`.
 
 
 ### 2. Optional, none blocking

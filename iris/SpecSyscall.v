@@ -168,6 +168,18 @@ Definition wp_syscall_sconf_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_syscall <= av)%nat ->
+  (* THE ONE TIE BETWEEN [fn]'s FIELDS AND A DISPATCH PARAMETER THAT [fn]'s
+     OWN INDEX LIST CANNOT REACH.  [sys_exit]'s contract asks for [fn] to BE
+     the record built out of the running process's names, and every field of
+     that record except this one is either a field of [fn] itself or an index
+     of [syscall_env] ([pj], [bn]) -- so every other tie is statable inside
+     the bundle.  [pid] is neither, hence a premise.
+     IT COSTS THE CALLER NOTHING: [UsertrapRes.un_fn] is DEFINED as
+     [MkFCloseNames ... (un_pid N) ...] out of the very fields this names, so
+     usertrap discharges it by [reflexivity].  Widening [syscall_env] with a
+     [pid] index instead would have reached [wp_syscall_sconf_body]'s [R] and
+     [UsertrapRes.ut_own]'s [Rsys] slot for the same effect. *)
+  fcn_pid fn = pid ->
   (* INTERRUPTS ON, at push_off level 0 -- see the header: the [csrsi] that
      precedes the only call site, and what the parking entries need. *)
   sie_cap_gpr KT1 m av true pj -∗

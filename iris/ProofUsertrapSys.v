@@ -456,7 +456,7 @@ Section UtSysBlock.
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
                 (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
-                Hj Hjl ltac:(rewrite Hn2; lia)
+                Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hbm Hip Hfd Hir Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
