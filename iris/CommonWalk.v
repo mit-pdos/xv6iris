@@ -140,6 +140,7 @@ Local Ltac walk_peel_asserts lvl st :=
 Local Ltac walk_peel_read st Hrd :=
   rewrite (exec_bind_Some _ _ _ _ _ Hrd); cbn match beta zeta.
 
+
 Section UserWalk.
   (* the [swp] layer's parameters, used only by the [swp_] lemmas below *)
   Context `{!riscvGS Σ}.

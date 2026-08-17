@@ -210,6 +210,73 @@ Some (r, σf)` plus σf's frame properties), and its `swp` twin is the work.  It
 WRITES (the TLB fill), so it is not a `goodb` transport; it is a walk with
 memory events, the shape `HartMFetch.swp_fetch_ram` has in M-mode.
 
+### The page-table proofs are BRIDGED, not rewritten
+
+The S-mode fetch needs the walk in FOOTPRINTED form.  The existing exec-side
+proofs (`PtTree` / `KptTree` / `CommonWalk` / `Pt4kWalk`) are not restated to
+get it — they are carried, and only what genuinely changes shape is converted
+in place, beside the lemma it comes from.
+
+**THE SEAM.**  `WpDecodeBridge.goodb` certifies "reads inside a declared set,
+no writes, no memory" along the SAME chain an exec proof walks; `HartGoodb.
+hval_of_goodb` pairs that certificate with the exec lemma and yields `hval`.
+For that to reach the page walk, `goodb` was generalized from `M X` to
+`monad E X` (its body never mentioned the error type) and given
+`goodb_try_catch` / `_liftR` / `_cer` (the wrappers rebuild the term node for
+node — ONE direction: a handler can turn a thrown term into a good one) plus
+`goodb_bindR` / `_bind0R` (the `execR` bind, where `inr` means the step
+RETURNED rather than early-returned) and `goodb_mono`.
+
+**WHAT THE BRIDGE CANNOT CARRY**, and these are the only conversions:
+
+- a read whose value is NOT reference-pinned — the `tlb` register holds
+  whatever this hart's frame says, so every `lookup_TLB` case is a real
+  footprinted node (`HartSTrans.hfrun_lookup_TLB_hit_ent` / `_nomatch` /
+  `_empty`);
+- the PTE reads, which are MEMORY EVENTS: they become the caller's `swp`
+  obligations rather than pure premises, because under per-node stepping
+  another hart may step between the walk's nodes;
+- the TLB install, the walk's one register WRITE
+  (`CommonWalk.hfrun_add_to_TLB_user`).
+
+Everything between them is carried: the A/D update declines without an event,
+and the follow-a-pointer tests and the leaf check come across as `hval`.
+
+**CONVERTED SO FAR**, each next to its exec twin: `PtTree.{pte_check_pure,
+goodb_translate_TLB_hit_pt, hval_translate_TLB_hit_pt}`,
+`CommonWalk.{goodb_check_leaf_pte_leaf0, hval_check_leaf_pte_leaf0,
+swp_rec_walk_leaf, swp_rec_walk_l1, swp_pt_walk_user, hfrun_add_to_TLB_user,
+swp_translate_TLB_miss_user}`, `HartSTrans.{the three lookup rules,
+swp_translate_hit}`.
+
+**THREE HABITS THE CONVERSION NEEDS**, all learned the expensive way:
+
+1. `exec`/`execR` bind equations peel a goal structurally; `goodb`'s must be
+   GIVEN their left operand — and a hand-retyped copy does not match (an
+   `and_boolM` carries type arguments that do not survive retyping).  `set`
+   the operand straight OUT of the goal.
+2. Make the operand's VALUE existential where the certificate does not need
+   it: it only has to know the step returned.
+3. Mind the monad level: `_rec_pt_walk` peels in the PLAIN monad (the leaf
+   arm's escapes live in `check_leaf_pte`), so `goodb_bind`/`exec` there and
+   `goodb_bindR`/`execR` inside the check.
+
+**WHAT IS LEFT FOR A COMPLETE S-MODE FETCH**, in order, all of it assembly of
+things now proved:
+
+1. `swp_translate_miss` — `lookup_TLB` (None) + `swp_translate_TLB_miss_user`.
+   Pure plumbing; the cost is threading `CommonWalk`'s section hypothesis
+   list, exactly as `KptTree` already threads it on the exec side.
+2. `translateAddr`'s FRONT MATTER at the swp layer — three mstatus reads,
+   cur_privilege, `get_satp`, and the canonicality test.  All frame reads, no
+   events: one `hfrun`.
+3. `swp_fetch_bytes_S` = that + `mem_read` AT THE TRANSLATED pa (M-mode's
+   twin reads at `Physaddr pc` because Bare translation is the identity;
+   S-mode's does not).
+4. `HartMFetch.swp_fetch` is ALREADY privilege-generic and takes the
+   `fetch_bytes` obligation, so step 3 completes the fetch — which is
+   `HartRunGen`'s remaining obligation, with `rsf` the TLB-updated file.
+
 ### The privilege belongs on the FILE, not on the rule
 
 `should_inc_minstret` takes the current privilege, so the prelude's

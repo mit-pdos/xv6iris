@@ -61,6 +61,47 @@ Proof.
   apply hfrun_ret.
 Qed.
 
+(* the lookup's MISS cases, footprinted.  Like the hit
+   ([HartSTrans.hfrun_lookup_TLB_hit_ent]) these cannot go through the
+   [goodb] bridge: the [tlb] register's value is whatever this hart's frame
+   says, not what the reference state says.  One read, then a pure match --
+   [SmodePte.exec_lookup_TLB_nomatch_s]'s twin, stated with its premises. *)
+Lemma hfrun_lookup_TLB_nomatch (D Drw : gset register) (rs : regstate)
+    (vpn : mword 27) (asid : mword 16) (ent' : TLB_Entry)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  (tlb : register) ∈ D ->
+  register_lookup tlb rs = tlbvec ->
+  vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' ->
+  match_TLB_Entry ent' asid (sign_extend' (57 - 12) vpn) = false ->
+  hfrun 2 D Drw rs (lookup_TLB 39 asid vpn) = Some (None, rs).
+Proof.
+  intros HD Htlb Hvec Hnm. unfold lookup_TLB.
+  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+    Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+  rewrite Htlb Hvec Hnm.
+  cbn beta iota zeta delta [Defs.returnm returnM].
+  apply hfrun_ret.
+Qed.
+
+(* ...and the EMPTY slot, which the model treats identically. *)
+Lemma hfrun_lookup_TLB_empty (D Drw : gset register) (rs : regstate)
+    (vpn : mword 27) (asid : mword 16)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  (tlb : register) ∈ D ->
+  register_lookup tlb rs = tlbvec ->
+  vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None ->
+  hfrun 2 D Drw rs (lookup_TLB 39 asid vpn) = Some (None, rs).
+Proof.
+  intros HD Htlb Hvec. unfold lookup_TLB.
+  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+    Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+  rewrite Htlb Hvec.
+  cbn beta iota zeta delta [Defs.returnm returnM].
+  apply hfrun_ret.
+Qed.
+
 Section strans.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
