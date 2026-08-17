@@ -101,7 +101,7 @@ specialization to `rsx = wrap_post rsB mi` happens in
 `swp_exec_step_decode_execute` itself), thread it through `mm_cycle` and
 `wp_instr_ex`, and hand the leaf the mip cell in and an arbitrary one back.
 
-**elp, for MRET.**  MRET writes elp with the value it already holds
+**elp, for MRET** (and the recipe, since the walk is scoped now).    MRET writes elp with the value it already holds
 (`NO_LP_EXPECTED`, forced by `hw_config`'s pin), so the write is a no-op —
 but `hw_config` holds elp at `DfracDiscarded`, so no leaf can own it, and
 **the span semantics genuinely forbid the step**: `hspan_node` gates a write
@@ -112,9 +112,33 @@ unprovable).  So the walk must SPLIT at that node and use a `swp`-level rule, an
 **`HartRegNode.swp_write_reg_same` is that rule and is proved** (the trap
 handler's `reset_elp` needs it too, which is why it lives there and not in a
 leaf file).  The
-surrounding walk is ~15 nodes of reads/writes of cells the leaf holds; get
-their exact order by PRINTING the reduced term (see §"printing a model term"
-in the traps section) rather than guessing the bind structure.
+surrounding walk is ~25 nodes; its exact order is known (print the reduced
+term -- see the traps section -- which gives the whole chain: 4 cur_privilege
+reads, ~8 mstatus reads, 5 mstatus writes producing `cms1`..`cms5`, the
+cur_privilege write, the elp reset, and the tail through
+`prepare_xret_target` / `set_next_pc`).
+
+WHAT MAKES IT MORE THAN A WALK, measured while scoping it: the sub-calls need a
+FRAME, not cells, so the leaf wants a 6-cell footprint of its own —
+Drw = {mstatus, cur_privilege, nextPC}, Dro = {misa, menvcfg, mepc} — with the
+three writables as tower parameters plus the usual agreement lemma, in the
+`cw2_*` style.  Which sub-call needs which:
+
+- `currentlyEnabled Ext_U` and `Ext_Zca` read ONLY misa (checked:
+  `ExecCommon.exec_currentlyEnabled_U` has just the misa.U premise), and misa
+  IS reference-pinned, so both can go through `hval_of_goodb` at
+  `D0 := D_misa` rather than at `D_m` — which matters, because by then
+  cur_privilege is no longer Machine and `agree_m` would not hold.
+  `HartMRun.hfrun_cE_Zca` already exists for the Zca one.
+- `hartSupports Ext_Zicfilp` and `long_csr_write_callback` are pure: term
+  equations by `vm_compute`.
+- `get_xLPE Supervisor` reads menvcfg and its RESULT depends on the value, so
+  it CANNOT be transported from the reference state (the leaf knows only that
+  menvcfg's LPE bit is clear, not the whole value).  It needs an `hfrun` at the
+  leaf's own frame — which is the reason menvcfg is in Dro above.
+- `prepare_xret_target Machine` reads mepc, then `align_pc` (the Zca call).
+
+So: the footprint family first, then the walk is uniform.
 
 ### The arm nobody can pick
 
