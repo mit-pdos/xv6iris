@@ -59,19 +59,21 @@ gates above.
 0. ~~THE S-MODE `run_hart_active`, DISJUNCTIVE~~ — **DONE**: `HartRunGen`,
    see §"the arm nobody can pick".  The two engines were ONE piece of work,
    and what is left of it is exactly one obligation: the S-mode fetch.
-1. **The S-MODE FETCH itself** — `swp_fetch_ram`'s twin through Sv39 and the TLB.
-   It now has a NAMED INTERFACE to hit, which is the whole point of doing
-   `HartRunGen` first:
+1. ~~The S-MODE FETCH itself~~ — **DONE**: `HartSTrans.swp_fetch_S`, which is
+   exactly `HartRunGen`'s fetch obligation with `rsf` the TLB-updated file.
+   The chain is `swp_fetch_S` → `swp_fetch` (HartMFetch's, now with its
+   LANDING FILE a parameter) → `swp_fetch_bytes_S` → the translation
+   (`swp_translateAddr_pt_front` over `swp_translate_hit` / `_miss` over the
+   converted walk) and `checked_mem_read` AT THE TRANSLATED pa
+   (`swp_mem_read_M`, now privilege-generic).
 
-       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-         swp (fetch tt) (fun r => ⌜r = F_Base w⌝ ∗
-                                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)
-
-   with `rsf` free — that is where the TLB fill goes.  Everything else on that
-   side reuses M-mode machinery: the cycle rule
-   (`swp_exec_step_decode_execute`) is privilege-agnostic, the fetch SHAPES are
-   `WpInstrRun.swp_run_hart_active_instr`'s business, and
-   `instr` itself is privilege-generic by construction.  What is genuinely new
+   **Two in-place generalizations were the whole of the last step**, and
+   neither needed a new rule: `swp_mem_read_M`'s only use of `Machine` was
+   passing it through `effectivePrivilege` (the identity for a fetch), and
+   `swp_fetch` only ever assumed `fetch_bytes` lands back where it started.
+   M-mode recovers both statements by passing `Machine` / `rsf := rs`.  The
+   M/S difference is now where it belongs: the translation, which walks and
+   may fill the TLB.  What is genuinely new
    is one fetch that WALKS, and it is the reason the port exists — a page walk
    interleaving with other harts is the thing whole-instruction stepping could
    not express.
@@ -261,21 +263,37 @@ swp_translate_hit}`.
    arm's escapes live in `check_leaf_pte`), so `goodb_bind`/`exec` there and
    `goodb_bindR`/`execR` inside the check.
 
-**WHAT IS LEFT FOR A COMPLETE S-MODE FETCH**, in order, all of it assembly of
-things now proved:
+**THE S-MODE FETCH IS DONE** (`HartSTrans.swp_fetch_S`).  What was left, and
+how each step went, kept here because the shape recurs:
 
-1. `swp_translate_miss` — `lookup_TLB` (None) + `swp_translate_TLB_miss_user`.
-   Pure plumbing; the cost is threading `CommonWalk`'s section hypothesis
-   list, exactly as `KptTree` already threads it on the exec side.
-2. `translateAddr`'s FRONT MATTER at the swp layer — three mstatus reads,
-   cur_privilege, `get_satp`, and the canonicality test.  All frame reads, no
-   events: one `hfrun`.
-3. `swp_fetch_bytes_S` = that + `mem_read` AT THE TRANSLATED pa (M-mode's
-   twin reads at `Physaddr pc` because Bare translation is the identity;
-   S-mode's does not).
-4. `HartMFetch.swp_fetch` is ALREADY privilege-generic and takes the
-   `fetch_bytes` obligation, so step 3 completes the fetch — which is
-   `HartRunGen`'s remaining obligation, with `rsf` the TLB-updated file.
+1. `swp_translate_miss` — plumbing, threading `CommonWalk`'s hypothesis list
+   the way `KptTree` already threads it on the exec side.
+2. `swp_translateAddr_pt_front` — beside its exec twin, node for node.  The
+   three monadic ingredients are CARRIED (exec premise + certificate);
+   `get_satp` is one small `hfrun`; only `translate` changes shape.
+3. `swp_fetch_bytes_S` — the front matter + `mem_read` AT THE TRANSLATED pa.
+4. `swp_fetch_S` — and this one needed NO NEW RULE, only two in-place
+   generalizations: `swp_mem_read_M`'s privilege (its only use of `Machine`
+   was passing it through `effectivePrivilege`, the identity for a fetch) and
+   `swp_fetch`'s LANDING FILE (it only ever assumed `fetch_bytes` lands where
+   it started).  M-mode recovers both by passing `Machine` / `rsf := rs`.
+
+**WHAT IS LEFT ON THE 711-FILE PATH**, now that the fetch exists:
+
+- **the S-MODE DISPATCH** — `HartRunGen`'s other obligation and the last one
+  open.  M-mode's (`HartMDispatch.swp_dispatchInterrupt_M`) short-circuits
+  before the PLIC wires; S-mode's must READ them, and they live in
+  `WireInv.wire_inv` rather than in any frame.  Its postcondition is the
+  match `HartRunGen` already expects (`Some (ii,pr) => Qi ii pr | None =>
+  frames`), so the shape is fixed — what is new is opening the wire invariant
+  around the read.
+- then the two obligations of `swp_run_hart_active_gen` are both discharged
+  at Supervisor, and `wp_instr_s` / `s_cycle` are the wrapper work over
+  `mm_cycle` / `wp_instr`'s pattern.
+- the fetch's own obligations need their S-mode suppliers: the translate
+  obligation wants the kernel page-table invariant at the swp layer (the
+  `sr_absorb` recipe, converted), and the byte obligation is the `instr`
+  bundle, which is privilege-generic already.
 
 ### The privilege belongs on the FILE, not on the rule
 
