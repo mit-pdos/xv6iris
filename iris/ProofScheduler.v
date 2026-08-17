@@ -373,7 +373,7 @@ Section ProofScheduler.
   (* fuel-indexed: [av]/[γs] as above; [fuel] is the recursion measure --
      kept as an explicit trailing parameter so the CALL site can keep
      [∀ fuel] visible (RULE 3) and [iInduction] leaves the IH folded. *)
-  Definition sc_scan_body (γs : list gname) (av : nat) (fuel : nat) : iProp Σ :=
+  Definition sc_scan_body {kt : ktier} (γs : list gname) (av : nat) (fuel : nat) : iProp Σ :=
     (∀ (jj : nat) (M : regfile) (ebc : bool) (n : nat),
         ⌜(NPROC - jj <= fuel)%nat⌝ -∗ ⌜(jj < NPROC)%nat⌝ -∗
         (* the index that goes with this round's base enable over the fixed

@@ -488,7 +488,7 @@ Section ProofPiperead.
      (∃ z : mword 64, pa_stk sp0 12 ↦₈[kt] z) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Definition pr_cphase_body
+  Definition pr_cphase_body {kt : ktier}
       (spr s0v pi addrv pj sp0 vs6 vs7 vs8 : mword 64)
       (n : Z) (m : regfile) (av : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)

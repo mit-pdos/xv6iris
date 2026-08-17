@@ -468,7 +468,7 @@ Section ProofCopyout.
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Definition co_copy_body
+  Definition co_copy_body {kt : ktier}
       (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (lks : gset string)
       (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
       (rem done navail len : nat) (src_bytes : nat -> bv 8)

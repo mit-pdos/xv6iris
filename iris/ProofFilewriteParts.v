@@ -1261,7 +1261,6 @@ Section ProofFilewriteParts.
     Context `{!lockG Σ, !uartGhostG Σ, !diskGhostG Σ}.
     Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
     (* CID is EXPLICIT here, unlike [PANIC]'s own [`{CID : CpuId}]: a
        maximally-inserted implicit is instantiated the moment the constant
        is named, so [PN.wp_panic_sconf] passed as an argument would arrive

@@ -155,7 +155,7 @@ Section ProofWakeup.
   (* the fuel-indexed scan invariant at the loop head [wakeup+0x38]; the
      [∀ fuel]/[wp_next] wrapper stays at each [iAssert] site (RULE 3), only
      what follows [fun CID : CpuId =>] is named here. *)
-  Definition wk_loop_body `{GEN : GenId}
+  Definition wk_loop_body `{GEN : GenId} {kt : ktier}
       (pme spF chan : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
       (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)

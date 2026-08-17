@@ -448,7 +448,7 @@ Section ProofUvmunmap.
      upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Definition uu_store_body
+  Definition uu_store_body {kt : ktier}
       (b : bool) (p spr va : mword 64) (uroot : mword 44)
       (done npages : nat) (df : bool) (um : gmap (mword 27) (mword 64))
       (K ilvl : nat) (eb : bool) (mm mw : regfile) (t : ptree)

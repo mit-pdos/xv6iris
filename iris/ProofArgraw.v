@@ -504,7 +504,7 @@ Section ProofArgraw.
      74 GB).  Keeping the index CONCRETE also keeps the addresses closed
      terms, so the WP leaves' unification can just compute them -- a symbolic
      [k] there made unification itself blow up (14 GB and climbing). *)
-  Definition ar_arm_body `{CID0 : CpuId}
+  Definition ar_arm_body `{CID0 : CpuId} {kt : ktier}
       (M : regfile) (k : nat) (av' : nat)
       (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) : Prop :=

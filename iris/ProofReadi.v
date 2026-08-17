@@ -1015,7 +1015,7 @@ Section ReadiLoop.
      re-embedding ~20 lines of ∀/wands per step.  The ∀ binders stay
      visible at the [iAssert] below; only what they quantify over is
      folded here. *)
-  Definition rd_chunk_body `{GEN : GenId}
+  Definition rd_chunk_body `{GEN : GenId} {kt : ktier}
       (j : nat) (b : bool) (K : nat) (m : regfile) (nc tot o : nat)
       (kkb : nat) (usv ip : mword 64) (off : nat) (CIDa14 : CpuId)
       (CIDb : CpuId) (Mb : regfile) (mm : nat) : iProp Σ :=
