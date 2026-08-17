@@ -1099,15 +1099,146 @@ the paid park FEEDABLE means flipping that cone to KT1.
   slot's page out sealed, freeproc passes it through, and kexit's ZOMBIE
   park DONATES it — paid, from usertrap's entry down the diverging
   chain. `kstack_closer` earned its shape.
-- [ ] **K4 — retire `FORKRET_PARK`**: kfork's contract supplies
-  `forkret_park_pkg` (K1-K3's stack + the kernel-environment closer:
-  `bslots bn 3`, `fileclose_bm`, the `initproc` share — where a fresh
-  process's half of the kernel environment comes from is its own design
-  question); sys_fork and the syscall environment follow;
-  `LinkForkretPark`'s Axiom module is replaced by the paid functor.
+- [!] **K4 — retire `FORKRET_PARK`: BLOCKED, and not on the stack.** The
+  stack half is ready (allocproc's post + `kstack_free_at`, one conjunct
+  of plumbing) and two of the three kernel-environment pieces have a
+  sound source, but `fileclose_bm` is a UNIQUE EXCLUSIVE resource that
+  no second process can hold. See "K4 findings" below; the fix belongs to
+  the FS layer, not to this campaign.
 - [ ] **K5 — the text tier** (the old phase E): `text_pointsto` gets the
   same index and witness; TRAMPOLINE fetch ownership becomes
-  expressible.
+  expressible. Independent of K4 — start here.
+
+### K4 findings — THE BLOCKER IS `fileclose_bm`, NOT THE KSTACK
+
+Nothing landed; the Axiom stays and the tree is unchanged.
+
+**THE STACK HALF IS READY AND COSTS ALMOST NOTHING.** allocproc's post
+carries `kstack_free (proc_addr j)` beside `is_kstack (proc_addr j) ks`
+(K3a), so the paid park's `stack_own (KTR := KT1) (ks + 4096) KSTACK_AV`
+is one `ProcDefs.kstack_free_at`. The only plumbing missing:
+`ProofKforkB6.kfk_prologue` DROPS the child's `kstack_free` on the
+uvmcopy-SUCCESS continuation `Hcont4a` while keeping it on the failure
+one `Hcont7c` (where freeproc wants it) — the resource is in hand at the
+dispatch (`"Hkstk"`) and simply is not listed. One conjunct in
+`Hcont4a`, one argument to `ProofKforkMain.kfork_arm3`, one
+`kstack_free_at` before the `B5.kfk_b5` call. The arithmetic is
+pre-reconciled: `av = KSTACK_AV = K_usertrap = 342` discharges both of
+the park's depth premises (the second wants only
+`6 + trap_res true + K_prepare_return` = 96).
+
+**THE THREE KERNEL-ENVIRONMENT PIECES, MEASURED.** What a creator owes
+beyond the stack is `URes h pt ksp` for the child, i.e.
+`UsertrapRes.ut_res_bare syscall_env` = `ut_caps` (persistent, free) ∗
+`ut_own_nopt`. Of `ut_own_nopt`'s seven conjuncts the child already has
+four — `fd_slots FDSPARE` and `iref_slots (1+IREFSPARE)` come out of
+allocproc's block, `proc_priv_nopt` out of `forkret_yield`, and
+`Rsys = ProofSyscall.syscall_env` is entirely persistent. The other
+three:
+
+| piece | source | verdict |
+|---|---|---|
+| `bslots bn 3` | BOOT, per slot | SOUND. `bslots` is `own (bn_slot bn) (◯ n)` over `authUR natUR`, so it is additive (`bslots bn (n+m) ⊣⊢ bslots bn n ∗ bslots bn m`, one `own_op`), and `NPROC * 3 = 192 ≤ BSLOTS = 1024`. Exactly the `fd_slots FDSPARE` pattern: deposit per slot at `procs_inv_alloc`, hand out at allocproc. NOT parent-donatable — `wp_syscall_sconf_body` hands the parent's three back and the parent needs all three. |
+| the `initproc` share | BOOT, by DISCARD (or parent, by dfrac split) | SOUND, twice over. Every consumer (`SpecSyscall`, `SpecReparent`, `ProofKexit`, `UsertrapRes`'s `un_dqi`) already takes it at a PARAMETRIC `dfrac` and only reads it, and only `ProofMain` holds it whole. Discarding it at boot makes it persistent and free for every process forever — the argument `SpecForkret.v` already makes for `first_addr ↦₄{DfracDiscarded}`. The parent-donation route also works (`un_dqi` is a `ut_names` field and `ut_res_bare` quantifies `N`, so the parent re-keys itself at `dqi/2`), but it costs per-fork bookkeeping for nothing. |
+| `fileclose_bm fn us` | **NONE** | **THE HOLE.** |
+
+**WHY `fileclose_bm` HAS NO SOURCE, mechanically.** It is
+`sb_bmapstart ↦₄{fcn_dqb fn} _ ∗ sb_inodestart ↦₄{fcn_dqs fn} _ ∗
+bitmap_res (fcn_fs fn) …  us`. The two superblock cells are at
+parametric dfracs and split fine. `bitmap_res` does not: it is
+`fsblock γfs bmapstart (bitmap_bytes us)` — a FIXED half-fraction
+`ghost_map` element at ONE key, whose other half the bio/log machinery
+holds (`FsBlocks.fs_mclean`/`fs_mdirty`) — plus `free_pool`, a
+`blk_own γfs b` per FREE block, and `blk_own` is a FULL-fraction element
+(`FsBlocks.blk_own_excl` is right there). So:
+
+```coq
+Lemma k4_bitmap_res_excl (γfs : fs_names) (bms : Z) (cov : gset Z)
+    (ls size : Z) (us : gset Z) (b : Z) :
+  b ∈ free_set size us ->
+  bitmap_res γfs bms cov ls size us -∗
+  bitmap_res γfs bms cov ls size us -∗ False.
+Proof.
+  iIntros (Hb) "(_ & _ & Hp1) (_ & _ & Hp2)". rewrite /free_pool.
+  iDestruct (big_sepS_delete _ _ b Hb with "Hp1") as "[H1 _]".
+  iDestruct (big_sepS_delete _ _ b Hb with "Hp2") as "[H2 _]".
+  iDestruct "H1" as (bs1) "(_ & _ & Ho1)".
+  iDestruct "H2" as (bs2) "(_ & _ & Ho2)".
+  iApply (blk_own_excl with "Ho1 Ho2").
+Qed.
+```
+
+— checked, compiles, and lifts to `fileclose_bm` in three lines. There
+is exactly ONE block bitmap in the kernel, so boot cannot mint 64 of it;
+and the parent cannot spare its own, because `wp_syscall_sconf_body`'s
+continuation demands `fileclose_bm fn us'` back and usertrap rebuilds
+`ut_own` from it (`ut_own_rebuild_us`) — a fork arm that consumed it
+could not produce syscall's postcondition. Re-keying the child's `N`
+does not escape it either: `fileclose_bm` reads only `fcn_fs`,
+`fcn_bmapstart`, `fcn_cov`, `fcn_logstart`, `fcn_size` and the two
+dfracs — no process-specific field at all — so the child's copy is
+literally the same proposition as the parent's.
+
+**THE REAL STATEMENT OF THE DEFECT, which is bigger than fork.** The
+trap loop's residue claims the FS's consumable environment PER PROCESS,
+and `ut_res_bare` is what a process holds while parked in user mode as
+well as while parked in a record. So **the closed trap loop is
+satisfiable for exactly one process**, and fork is merely the first
+thing that asks for a second. `SpecSyscall.v`'s header already worried
+about the dual of this ("TWO disjoint fundings of one pool") for the
+five families it pulled out of `syscall_env`; what it did not check is
+that one of those five is not a POOL at all but a singleton. Its
+parenthetical "`UsertrapRes.v` never mentions … `bitmap_res` at all" is
+stale — `ut_own_nopt`'s `fileclose_bm` is exactly that.
+
+**THE FIX, and it is the FS layer's.** `bitmap_res` is only ever touched
+inside a log transaction, and xv6 protects it with `log.lock` +
+`bcache`; it belongs behind `log_ctx`/the log lock, acquired by
+`balloc`/`bfree` and released, not parked in a per-process residue.
+Doing that removes `fileclose_bm` from `ut_own_nopt` and from
+`wp_syscall_sconf_body`'s five families, at which point the child's
+residue is fully sourceable and K4 is the mechanical cascade below.
+Anything cheaper (a second bitmap, a fractional `blk_own`, a fresh
+`fs_names` for the child) is refuted by the accounting above.
+
+**THE CASCADE, MEASURED, for when the hole is closed** — nine files, and
+nothing in it is hard once the resource exists:
+
+1. `ProofKforkB6.v` — `Hcont4a` gains `kstack_free npa`.
+2. `ProofKforkMain.kfork_arm3` — carve, and thread the package.
+3. `ProofKforkB5.v` — `KforkB5 … (FP : FORKRET_PARK_PAID)`, and
+   `FP.forkret_park_paid` in place of `FP.forkret_park`.
+4. `SpecKfork.v` — a `URes : CpuId -> uptd -> mword 64 -> iProp Σ`
+   parameter (the layering wall forbids naming `usertrap_res_bare`
+   here), plus `wire_inv`, the trampoline `kmap_at`, the residue closer
+   ∀-quantified over the child's `pa`/`ks`/`pid`/`V'`, and the two pure
+   `SpecUservec` gaps. `ud_data pt = ud_pas pt` / `proc_pt_wf pt` come
+   off uvmcopy's post (`ud_norm_id`/`ud_norm_pas`), not from the caller.
+5. `ProofKforkMain.v` / `LinkKfork.v` — functor over
+   `FORKRET_PARK_PAID`, applied at `ForkretParkPaid`.
+6. `LinkForkretPark.v` + `SpecForkretPark.v` — DELETED.
+7. `SpecSysFork.v` / `ProofSysFork.v` — the same premises, forwarded.
+8. `SpecSyscall.v` + `ProofSyscall.sysc_arm_fork` — sys_fork is WIRED
+   (table entry k = 1), so this is not optional.
+9. `UsertrapRes.v` / `ProofUsertrapSys.v` — usertrap pays. This is the
+   step that dies today, and only here.
+
+`wire_inv` and the trampoline `kmap_at` are persistent, allocated in
+`BootChain.v`, and absent from both `ut_caps` and `syscall_env`; adding
+them to `ut_caps` is mechanical and can be done independently of the
+blocker.
+
+**THE UNPAID `SpecSysExit` CLOSER PREMISE IS STILL UNPAYABLE, and not for
+a kstack reason.** K3a left it as "one premise + one frame, and the payer
+already exists" — true of the `kstack_closer` half, but there is nothing
+to attach it to: `sys_exit` (table entry k = 2) is NOT wired into
+`ProofSyscall`'s dispatch and falls through to `sysc_arm_placeholder`.
+`ProofSyscall.v`'s header measures why — six ties between the ambient
+dispatch parameters and `fn`'s fields that `syscall_env`'s TYPE cannot
+state (`γs`, `j`, `γl`, `pid` are not indices of it), plus nine resource
+families it does not carry. That is the same `syscall_env`-shape decision
+the eight GAP entries wait on, so the closer premise is blocked behind it,
+not behind anything in this campaign.
 
 ### K3a findings (LANDED)
 
@@ -2052,17 +2183,17 @@ the general recipe for the remaining `_s_r` consumers: check the regime's
 
 ## State
 
-- Phases A-D, K1, K2a, and F1-F3 (the ∀kt experiment + THE PINNING) are
-  LANDED and pushed; `main` is GREEN at the F3 merge. The capability
-  names its regime explicitly (154 Spec files at literal KT1, 12 at KT0,
-  23 polymorphic); the leaves are generic under their original names;
-  `forkret_park_pkg`'s stack is `stack_own (KTR := KT1)` — SATISFIABLE
-  at a KSTACK va. The `f1-forall-kt` branch is merged and deleted.
-- NEXT: **K3 — the lifecycle**, as green increments on `main`: re-pin
-  `ProcDefs.kstack_free`/`kstack_closer` at KT1 (recorded debt), route
-  K1's bank into `proc_dormant` via procinit, allocproc's handout, the
-  kexit donation, kwait/freeproc restitution; then K4 (retire
-  `FORKRET_PARK` via the paid form) and K5 (text tier).
+- Phases A-D, K1, K2a, F1-F3 (the ∀kt experiment + THE PINNING) and K3a
+  (the lifecycle's storage half) are LANDED; `main` is GREEN. The
+  capability names its regime explicitly; the leaves are generic under
+  their original names; `forkret_park_pkg`'s stack is
+  `stack_own (KTR := KT1)` — SATISFIABLE at a KSTACK va, and now
+  FEEDABLE (a slot owns its page, allocproc hands it out, the exit path
+  gives it back).
+- NEXT: **K5 — the text tier**. K4 (retire `FORKRET_PARK`) is BLOCKED on
+  a resource that is not this campaign's: `UsertrapRes.ut_own_nopt`
+  claims `fileclose_bm` — the FS block bitmap — PER PROCESS, and there
+  is exactly one. See "K4 findings". K5 does not depend on it.
 - Cleanup debt, non-blocking: `VcGenS`'s blanket `Unshelve` (may be a
   no-op now); `ProofFilestatParts`' ambient `CurKtier` pin (the only
   file pinned by instance rather than literals).
