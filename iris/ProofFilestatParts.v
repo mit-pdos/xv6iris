@@ -202,7 +202,9 @@ Section FilestatParts.
   Context `{!riscvGS Σ}.
   (* tier-generic: these are byte-arithmetic facts about a stack buffer,
      so they ride the ambient tier and a [KT1]-file instantiates them at [KT1]. *)
-  Context `{KTR : !CurKtier}.
+  (* THE WHOLE SECTION IS AT KT1: every buffer it names is filestat's own
+     [struct stat] frame local, and [SpecStati.stat_at] is stated there. *)
+  Local Instance fst_ktier : CurKtier := KT1.
 
   Lemma fst_bytes_w4 (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 4 = true ->
@@ -221,7 +223,6 @@ Section FilestatParts.
     iEval (rewrite Hw2) in "H2". iEval (rewrite Hw3) in "H3".
     iExists W. iApply word4_pointsto_intro; [exact Hal |].
     cbn [seq]. iFrame "H0 H1 H2 H3". done.
-  Show Existentials.
   Qed.
 
   Lemma fst_bytes_w2 (a : Arch.pa) :
@@ -650,7 +651,7 @@ Section ProofFilestatParts.
      the resulting list -- no [big_sepL_exist] and no list/function bridge. *)
   Lemma fst_bytes_name24 (a : Arch.pa) :
     bytes_own (KTR := KT1) (DfracOwn 1) a 24 ⊢
-    ∃ f : nat -> bv 8, ([∗ list] j ∈ seq 0 24, (pa_add a j) ↦ₘ f j).
+    ∃ f : nat -> bv 8, ([∗ list] j ∈ seq 0 24, (pa_add a j) ↦ₘ[KT1] f j).
   Proof.
     rewrite /bytes_own. cbn [seq].
     iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 &

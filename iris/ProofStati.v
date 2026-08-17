@@ -239,7 +239,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x0a)) by pcw.
     iEval (rewrite Hpp0a) in "Hpc".
     (* ===== +0x0a c.sw a5,0(a1) : st->dev ===== *)
-    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x0a)) Ra5 Ra1
+    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x0a)) Ra5 Ra1
               (mword_of_int 0 : mword 12) R3 (K - 2)%nat dev0 b
               with "Hcg Hpc Hi0a [Hsdev]").
     { iEval (rgne; rewrite HR3a1). iExact "Hsdev". }
@@ -271,7 +271,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x0e)) by pcw.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ===== +0x0e c.sw a5,4(a1) : st->ino ===== *)
-    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x0e)) Ra5 Ra1
+    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x0e)) Ra5 Ra1
               (mword_of_int 4 : mword 12) R4 (K - 2)%nat ino0 b
               with "Hcg Hpc Hi0e [Hsino]").
     { iEval (rgne; rewrite HR4a1). iExact "Hsino". }
@@ -305,7 +305,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x14)) by pcw.
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 sh a5,8(a1) : st->type ===== *)
-    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x14)) Ra5 Ra1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x14)) Ra5 Ra1
               (mword_of_int 8 : mword 12) R5 (K - 2)%nat ty0 b
               with "Hcg Hpc Hi14 [Hsty]").
     { iEval (rgne; rewrite HR5a1). iExact "Hsty". }
@@ -339,7 +339,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x1c)) by pcw.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c sh a5,10(a1) : st->nlink ===== *)
-    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x1c)) Ra5 Ra1
+    iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x1c)) Ra5 Ra1
               (mword_of_int 10 : mword 12) R6 (K - 2)%nat nl0 b
               with "Hcg Hpc Hi1c [Hsnl]").
     { iEval (rgne; rewrite HR6a1). iExact "Hsnl". }
@@ -371,7 +371,7 @@ Section ProofStatiMain.
                     = mword_of_int (KernelSyms.stati + 0x24)) by pcw.
     iEval (rewrite Hpp24) in "Hpc".
     (* ===== +0x24 c.sd a5,16(a1) : st->size (8 bytes) ===== *)
-    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x24)) Ra5 Ra1
+    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x24)) Ra5 Ra1
               (mword_of_int 16 : mword 12) R7 (K - 2)%nat sz0 b
               with "Hcg Hpc Hi24 [Hssz]").
     { iEval (rgne; rewrite HR7a1). iExact "Hssz". }

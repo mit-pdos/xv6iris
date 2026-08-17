@@ -308,8 +308,8 @@ Section KexecB2Res.
      bslots bn 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
-     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
-     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
      ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
@@ -527,16 +527,16 @@ Section KexecB2Res.
   Lemma kxc_win8 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 8 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 8 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
-    ((pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢
+    (pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
+    ((pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
-    rewrite (bb_split3 a o 8 r n f Hn).
+    rewrite (bb_split3 (KTR := KT1) a o 8 r n f Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro _ _ _ Hal).
+    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
@@ -619,7 +619,7 @@ Definition kxc_bad324_body
   proc_pt P -∗
   proc_priv gf (proc_addr jp) pidv V -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
   ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
@@ -647,7 +647,7 @@ Definition kxc_bad324_body
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -759,7 +759,7 @@ Definition kxc_ls_body
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -804,7 +804,7 @@ Definition kxc_ls_body
             kalloc_env ga None -∗
             proc_priv gf (proc_addr jp) pidv V' -∗
             ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-            ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+            ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
             ([∗ list] i ∈ seq 0 na,
                [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
             bslots bn 3 -∗

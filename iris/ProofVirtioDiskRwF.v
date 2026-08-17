@@ -1629,7 +1629,7 @@ Section VdrwfP6.
                    = mword_of_int (KernelSyms.virtio_disk_rw + 0x230)) by pcstep.
     iEval (rewrite Hq11) in "Hpc".
     (* ---- +0x230  c.addi16sp sp,96 : the frame pop ---- *)
-    iDestruct (vdrw_idx_join sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+    iDestruct (vdrw_idx_join (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                  (mword_of_int (Z.of_nat t)) Hal11 Hal12 with "[Hx0 Hx1 Hx2 Hxp]")
       as "Hscratch".
     { rewrite /vdrw_idx. iFrame "Hx0 Hx1 Hx2 Hxp". }

@@ -428,7 +428,7 @@ Section ProofFilestat.
     { rewrite (rget_ne P0 Rs1 ltac:(vm_compute; discriminate)) HP0s1.
       rewrite /a_ftype. apply addv_sext0. }
     iEval (rewrite -Hpty) in "Hcty".
-    iApply (wp_clw_s_sconf (mword_of_int (FST + 0x14)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x14)) Ra5 Rs1
               (mword_of_int 0 : mword 12) P0 (K - 10)%nat (fc_type Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 Hcty").
@@ -631,7 +631,7 @@ Section ProofFilestat.
                      = a_fip k).
       { rewrite (rget_ne Q1 Rs1 ltac:(vm_compute; discriminate)) HQ1s1. reflexivity. }
       iEval (rewrite -Hpip) in "Hcip".
-      iApply (wp_cld_s_sconf (mword_of_int (FST + 0x24)) Ra0 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x24)) Ra0 Rs1
                 (mword_of_int 24 : mword 12) Q1 (K - 10)%nat (fc_ip Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi24 Hcip").

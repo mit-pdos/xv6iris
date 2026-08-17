@@ -517,7 +517,7 @@ Definition wp_kexec_sconf_body
      projects/kexec.md, not done.
        The pointer vector stays at [dqa] because kexec only loads from it. *)
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
   bslots bn 3 -∗
@@ -538,7 +538,7 @@ Definition wp_kexec_sconf_body
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
          [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
       bslots bn 3 -∗

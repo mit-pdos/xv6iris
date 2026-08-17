@@ -235,7 +235,7 @@ Section KexecDName.
           ∗ pc_is (mword_of_int (KXD + 0x2c8) : mword 64)
         ∨ pc_is (mword_of_int (KXD + 0x2d2) : mword 64) ) -∗
         sie_cap_gpr KT1 M' n b pj -∗
-        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -259,7 +259,7 @@ Section KexecDName.
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2c0) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
-    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
     WP (Loop : expr riscv_lang).
@@ -312,7 +312,7 @@ Section KexecDName.
                         = pa_add pv (S i))
       by (rewrite HN1a5; apply pa_add_pred).
     iEval (rewrite -Hloadaddr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
               (mword_of_int 4095 : mword 12) N1 n (pfun (S i)) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c2 Hbyte").
     iIntros (CID2 Hs2) "Hcg Hpc Hbyte".
@@ -420,7 +420,7 @@ Section KexecDName.
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
-    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
     WP (Loop : expr riscv_lang).
@@ -527,7 +527,7 @@ Section KexecDName.
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
-    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (M' : regfile) (q' : nat),
@@ -538,7 +538,7 @@ Section KexecDName.
           M' !!! Regidx Rs6 = v6 /\ M' !!! Regidx Rs10 = v10⌝ -∗
         pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
         sie_cap_gpr KT1 M' n b pj -∗
-        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -650,7 +650,7 @@ Section KexecDCommit.
     rewrite (bb_split3 a o 8 r n f Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro _ _ _ Hal).
+    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
@@ -758,8 +758,8 @@ Section KexecDCommit.
      bslots bn 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv Vc ∗
-     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
-     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
      ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
@@ -927,7 +927,7 @@ Section KexecDCommit.
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -1132,7 +1132,7 @@ Section KexecDCommit.
     iEval (rewrite Hpc2e0) in "Hpc".
     (* ---- put both buffers back ---- *)
     iEval (rewrite HE4a1) in "Hsrc".
-    iAssert ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k)%I
+    iAssert ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k)%I
       with "[Hpre Hsrc Hsuf]" as "Hpath".
     { iEval (rewrite (bb_split3 pv q (S plen - q) 0 (S plen) pfun Hsplit3)).
       iSplitL "Hpre"; [iExact "Hpre" |].
@@ -1888,7 +1888,7 @@ Section KexecDMain.
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗

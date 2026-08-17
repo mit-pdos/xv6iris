@@ -909,7 +909,7 @@ Section ProofVirtioDiskRwB.
                   "[%] Hcg Hown Htc Hclm Hpc Htok Hbun
                    [Hidx] Hexit").
         { intros r Hr. reflexivity. }
-        iApply (vdrw_idx_join sp0 v0 v1 v2 Hal11 Hal12 with "Hidx").
+        iApply (vdrw_idx_join (KTR := KT1) sp0 v0 v1 v2 Hal11 Hal12 with "Hidx").
       - (* ---------------- s2 = 1: one descriptor to give back ------------ *)
         iDestruct "H1" as (h) "(%Hh & Hbun & Hbh & Hidx)".
         destruct Hh as (Hh8 & Hfrh & Hs2).
@@ -981,7 +981,7 @@ Section ProofVirtioDiskRwB.
             - rewrite fr_upd_eq. symmetry. exact Hfrh.
             - rewrite (fr_upd_ne _ h i true Hne) (fr_upd_ne _ h i false Hne). reflexivity. }
           iExact "Hbun". }
-        iApply (vdrw_idx_join sp0 (mword_of_int (Z.of_nat h)) v1 v2 Hal11 Hal12).
+        iApply (vdrw_idx_join (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) v1 v2 Hal11 Hal12).
         rewrite /vdrw_idx. iFrame "Hx0 Hx1 Hx2 Hxp".
       - (* ---------------- s2 = 2: two descriptors to give back ----------- *)
         iDestruct "H2" as (h m2) "(%Hh & Hbun & Hbh & Hbm & Hidx)".
@@ -1086,7 +1086,7 @@ Section ProofVirtioDiskRwB.
               + rewrite (fr_upd_ne _ h i true Hneh) (fr_upd_ne _ m2 i false Hnem)
                         (fr_upd_ne _ h i false Hneh). reflexivity. }
           iExact "Hbun". }
-        iApply (vdrw_idx_join sp0 (mword_of_int (Z.of_nat h))
+        iApply (vdrw_idx_join (KTR := KT1) sp0 (mword_of_int (Z.of_nat h))
                   (mword_of_int (Z.of_nat m2)) v2 Hal11 Hal12).
         rewrite /vdrw_idx. iFrame "Hx0 Hx1 Hx2 Hxp". }
     (* ---- +0x044  c.j -> +0x0bc : enter the loop ---- *)

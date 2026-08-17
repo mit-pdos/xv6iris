@@ -571,10 +571,10 @@ Section VdrwbDefs.
   Qed.
 
   (* re-joining the [int idx[3]] straddle into the two frame slots *)
-  Lemma vdrw_idx_join (sp0 : Arch.pa) (v0 v1 v2 : mword 32) :
+  Lemma vdrw_idx_join {KTR : CurKtier} (sp0 : Arch.pa) (v0 v1 v2 : mword 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true ->
-    vdrw_idx sp0 v0 v1 v2 -∗ vdrw_scratch sp0.
+    vdrw_idx (KTR := KTR) sp0 v0 v1 v2 -∗ vdrw_scratch (KTR := KTR) sp0.
   Proof.
     intros Hal11 Hal12. iIntros "(Hx0 & Hx1 & Hx2 & Hxp)".
     iDestruct "Hxp" as (vp) "Hxp".

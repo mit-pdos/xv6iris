@@ -349,13 +349,13 @@ Section PrLeaves.
 
   (* copyin/copyout's one-byte buffer, in and out of the [seq 0 1] big-sep *)
   Lemma pr_buf1_intro (a : mword 64) (b : bv 8) :
-    a ↦ₘ b ⊢ [∗ list] j ∈ seq 0 1, (pa_add a j) ↦ₘ b.
+    a ↦ₘ[KT1] b ⊢ [∗ list] j ∈ seq 0 1, (pa_add a j) ↦ₘ[KT1] b.
   Proof.
     iIntros "H". cbn [seq]. rewrite big_sepL_singleton pr_pa_add0. iExact "H".
   Qed.
 
   Lemma pr_buf1_elim (a : mword 64) (b : bv 8) :
-    ([∗ list] j ∈ seq 0 1, (pa_add a j) ↦ₘ b) ⊢ a ↦ₘ b.
+    ([∗ list] j ∈ seq 0 1, (pa_add a j) ↦ₘ[KT1] b) ⊢ a ↦ₘ[KT1] b.
   Proof.
     iIntros "H". cbn [seq] in *. rewrite big_sepL_singleton pr_pa_add0. iExact "H".
   Qed.
@@ -2008,7 +2008,7 @@ Section ProofPiperead.
                           = a_pnread pi) by (rewrite Hmrcs1; reflexivity).
           (* 0xc2 lw a5,536(s1) *)
           iPoseProof (pri_c2 with "Htext") as "Hic2".
-          iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0xc2)) Ra5 Rs1 (mword_of_int 536 : mword 12)
+          iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.piperead + 0xc2)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                     mrc (trap_res true + (av - 12))%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic2 [Hnr]").
           { rgall. iEval (rewrite Hnra2). iExact "Hnr". }
           iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra2) in "Hnr".
