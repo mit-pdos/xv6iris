@@ -23,10 +23,11 @@ kexec-specific, and no `PanicStub` credential.  (It used to inherit
 `ProofIput.iput_acquiresleep_order_ADMITTED` from every `iput` client; that
 axiom is gone — [`iput-acquiresleep.md`](iput-acquiresleep.md).)
 
-`sys_exec`, kexec's only caller, is SPECIFIED (`SpecSysExec.v`) and its
-frame algebra and epilogue are proven (`ProofSysExec.v`); its body is what is
-left, and the Worklist at the end has the block decomposition, the loop
-invariant and the callee inventory to write it from.
+`sys_exec`, kexec's only caller, is proven end to end (`SpecSysExec.v` /
+`ProofSysExec.v` / `LinkSysExec.v`) and is WIRED INTO THE SYSCALL DISPATCH at
+table index 7 (`ProofSyscall.sysc_arm_exec`), so the exec cone reaches
+`syscall()` — the first of that file's eight fs-fabric GAP entries to do so.
+The Worklist at the end is what that wiring left behind.
 
 ## The composition
 
@@ -1313,123 +1314,59 @@ pin `ud_root`) plus three `tf_page_word_upd` at `tf_epc_idx` /
 
 ## Worklist
 
-### 1. `sys_exec` — SPECIFIED, and the frame and epilogue are proven
+### 1. `sys_exec` — PROVEN, LINKED, AND DISPATCHED
 
-`SpecSysExec.v` is landed and complete: `wp_sys_exec_sconf_body`, the module
-type `SYSEXEC`, and `sys_exec_post`, which is `kexec_ok` verbatim against the
-block the copy-ins leave behind. Read its header first — almost every premise
-is one of kexec's, paid here, and it says which.
+Nothing is left. What the work left behind, for the next reader:
 
-`ProofSysExec.v` holds the pure side conditions, the frame algebra and the
-epilogue, all `Qed`. What is left is the body, `+0x000 .. +0x102`.
+**THE ONE TRAP WORTH CARRYING FORWARD: `memset` WRITES BYTES AND THE ARRAY
+IS READ AS WORDS.** `ProofSysExec.sx_zeros_slots` is the only place in the
+proof that cannot use the generic frame vocabulary. The `bad:` free loop
+stops at the first NULL, and at a fetchaddr failure that NULL is memset's,
+not one the code wrote — but `StackBytes.bytes_own_slotsn` hands the words
+back EXISTENTIALLY and loses exactly that. `sx_zeros_slots` reassembles each
+eight zero bytes into a zero WORD instead. **Check for this in any future
+proof that memsets a pointer array**; a byte-level `memset` postcondition
+does not survive a word-level read without it.
 
-**THE FRAME, 480 bytes / 60 slots, `s0 = sp0` = the entry sp**
-(`pa_stk sp0 k` is `sp0 - 8k`):
+**WIRING IT INTO `syscall()` COST A NAMING CHANGE, NOT A NEW INDEX, AND THAT
+IS THE TEMPLATE FOR THE OTHER SEVEN GAP ENTRIES.** `ProofSyscall.v`'s header
+called the fs fabric a "genuinely missing resource"; it was not missing, it
+was misnamed. `syscall_env` held the icache/fs ghost names as FRESH
+EXISTENTIALS, while the mutable half a caller also needs — `fileclose_bm fn
+us`, the two superblock cells and `bitmap_res` — is stated at `fn`'s own
+fields, so no fabric over fresh names could ever be shown to describe the
+same file system (SpecSyscall.v's UNREACHABLE-WITNESS problem). The fix,
+`ProofSyscall.sysc_fs_env`, is the fabric at `fn`'s field names for
+everything `fileclose_bm` also pins, and at the ambient `icfg` class for
+`dev`/`nib`/the log names — which makes sys_exec's `dev = icfg_dev` /
+`nib = icfg_nib` / `g = icfg_log` premises `eq_refl` and leaves
+`fcn_inodestart fn = icfg_ist` as the only real tie. Three consequences:
 
-| slots | what |
-| --- | --- |
-| 1, 2 | `ra`, `s0` — spilled at +0x02/+0x04 |
-| 3 .. 9 | `s1 s2 s3 s4 s5 s6 s7` — spilled LAZILY at +0x28..+0x36 |
-| 10 | unused (alignment) |
-| 11 .. 26 | `char path[MAXPATH]`, base `pa_stk sp0 26`, 128 bytes |
-| 27 .. 58 | `char *argv[MAXARG]` — **`argv[i]` IS slot `58 - i`** |
-| 59 | `uint64 uargv` |
-| 60 | `uint64 uarg` |
+- **`procs_inv γs` and `kernel_data` stay OUT of the bundle** and are drawn
+  from `sysc_arm_pre` instead (`sysc_fs_fabric` re-assembles
+  `SpecKexec.fs_fabric` from the three). That is what keeps `fcn_procs fn`
+  out of the story: the dispatch's own `γs`/`j`/`γl` reach the callee
+  directly, so none of the six ties `sys_exit` needs appear, and
+  `syscall_env`'s TYPE did not have to grow.
+- **Nothing linear was invented.** `bitmap_res` and the superblock cells came
+  from the `fileclose_bm` the contract already threaded (its `us'`
+  re-indexing is exactly the `used' ⊆ used` give-back); `iref_slots 2` was
+  split out of the existing `IREFSPARE` = 4; `trap_csrs_ext`/`cpu_claim_ext`
+  are `emp` at `eb = true` and are minted, not threaded.
+- **The debt is honest and unpaid.** `syscall_env` is a Definition nobody
+  constructs — `LinkSyscall.v`'s axiom still says `emp` — so enlarging it
+  costs whoever eventually builds it at boot. Every conjunct is persistent
+  and boot-supplied, and `SpecFileclose.fileclose_fs_env_nopid` already
+  bundles the same set at the same `fn`, but SATISFIABILITY IS UNCHECKED
+  because there is no site that constructs it.
 
-**THE CONTROL FLOW**, read off `CodeSysExec.v` (prefix `sxi_`), not the C:
+**A GAP ENTRY WHOSE CONTRACT IS PHRASED OVER `fs_fabric` PLUS
+`fileclose_bm`'s THREE IS NOW A STRAIGHT PORT OF `sysc_arm_exec`.** Read that
+arm's own header for the three things that made it unlike the nine arms
+above it; the third — the trapframe page surviving TWO moves (`uptd_ext`
+across the copy-ins, then `kexec_ok` across the commit) — is the only part
+specific to exec.
 
-```
-  +0x000  push 60 ; sd ra,472 ; sd s0,464 ; addi s0,sp,480
-  +0x008  a1 = &uargv ; a0 = 1 ; jal argaddr
-  +0x012  a2 = 128 ; a1 = path ; a0 = 0 ; jal argstr
-  +0x020  mv a5,a0 ; li a0,-1 ; blt a5,zero,+0x104     the FIRST -1 exit,
-                                       and it reloads NOTHING: s1..s7 are
-                                       not spilled yet
-  +0x028  sd s1..s7 (slots 3..9) ; s4 = argv
-  +0x03a  a2 = 256 ; a1 = 0 ; a0 = s4 ; jal memset
-  +0x046  s1 = s4 ; s3 = s4 ; s2 = 0 ; s5 = &uarg ; s6 = 4096 ; s7 = 32
-  +0x056  THE FILL LOOP HEAD, index i in s2, cursor argv+8i in s3
-          a0 = uargv + 8i ; a1 = &uarg ; jal fetchaddr
-          blt a0,zero,+0x92                             -> bad
-          ld a5,uarg ; beqz a5,+0xb6                    -> the break
-          jal kalloc ; mv a1,a0 ; sd a0,0(s3)           argv[i] = page
-          beqz a0,+0x92                                 -> bad
-          a2 = 4096 ; a0 = uarg ; jal fetchstr
-          blt a0,zero,+0x92                             -> bad
-  +0x08a  i++ ; s3 += 8 ; bne s2,s7,+0x56               back edge; FALLS
-                                       THROUGH to bad at i = 32
-  +0x092  bad:  s4 = argv+256 ; THE FREE LOOP (+0x96..+0xa0)
-          li a0,-1 ; ld s1..s7 ; j +0x104
-  +0x0b6  break: argv[i] = 0 ; a1 = argv ; a0 = path ; jal kexec
-  +0x0ce  mv s2,a0 ; s4 = argv+256 ; THE FREE LOOP (+0xd4..+0xde)
-          mv a0,s2 ; ld s1..s7 ; j +0x104
-  +0x0f4  li a0,-1 ; ld s1..s7          (the free loop's own fallthrough)
-  +0x104  THE EPILOGUE: ld ra ; ld s0 ; pop 60 ; ret
-```
-
-**THE BLOCK DECOMPOSITION TO WRITE.** Each ends at a seam the next starts
-from; the two free loops are ONE lemma at two addresses, the way
-`ProofKexecC.kxc_c_exit_m1` factors kexec's three `-1` stubs.
-
-1. `sx_head` — `+0x000 .. +0x026`: the push, the two eager spills, argaddr,
-   argstr, the `blt`. Owns the first `-1` exit (straight into `sx_epilogue`,
-   with s1..s7 still at `m`'s values). Publishes `plen`/`pfun` with
-   `bb_cstr pfun plen` and `plen < 128` — kexec's path premises, paid.
-2. `sx_setup` — `+0x028 .. +0x054`: the seven lazy spills, memset, and the
-   six register initialisations. Ends at the loop head at `i = 0`.
-3. `sx_step` — one iteration, `+0x056 .. +0x090`. FOUR outputs: the back
-   edge at `S i`, the break at `+0x0b6`, `bad:` at `+0x092`, and the
-   `i = 32` fall-through (which is also `bad:`). Publish them as a
-   DISJUNCTION over one `wp_next`, not four — the caller's exit is linear
-   (kexec.md's block-interface rule).
-4. `sx_loop` — the fuel induction over `sx_step`, measure `32 - i`.
-5. `sx_free_loop` — `+0x096 .. +0x0a0` / `+0x0d4 .. +0x0de`, parameterised
-   by the block's base address and its two `instr` facts.
-6. `sx_bad`, `sx_break`, `sx_done`, `sx_m1tail` — the four tails.
-7. `wp_sys_exec_sconf` — the composition.
-
-**THE LOOP INVARIANT** at the head, index `i`:
-
-- `s1 = argv` (the free loop's cursor, NOT bumped by this loop),
-  `s2 = i`, `s3 = pa_add argv (8*i)`, `s4 = argv`, `s5 = &uarg`,
-  `s6 = 4096`, `s7 = 32`, `s0 = sp0`; `i <= 32`;
-- the argv array SPLIT at `i`: slots `58 - k` for `k < i` hold the pages
-  already filled, slot `58 - i` and above still hold memset's ZERO;
-- one `page_valid p_k ∗ (the page's 4096 bytes, NUL-terminated at `alen k`)`
-  per filled index, which is exactly what kexec's argument-string premise
-  wants and what the free loop gives back to kfree;
-- `proc_priv` at the page table the copy-ins have grown so far, and
-  `uptd_ext` from the entry one (transitive across the iterations).
-
-**TWO THINGS THE BODY NEEDS THAT ARE ALREADY PROVEN IN THE FILE:**
-
-- `sx_frame_carve` / `sx_frame_join` — sixty slots into ten spill words, the
-  path buffer and the argv array as BYTES, and the two out-parameter cells;
-  `sx_rest` bundles everything the epilogue does not touch.
-- `sx_zeros_slots` — **memset writes BYTES and the array is read as WORDS,
-  and the zero has to survive the round trip.** The `bad:` free loop stops
-  at the first NULL, and at a fetchaddr failure that NULL is memset's, not
-  one the code wrote; `bytes_own_slotsn` hands the words back
-  EXISTENTIALLY and loses exactly that. `sx_zeros_slots` reassembles each
-  eight zero bytes into a zero WORD instead. This is the one place the proof
-  cannot use the generic frame vocabulary, and it is worth checking for in
-  any future proof that memsets a pointer array.
-
-**THE CALLEES, and what each wants** (all eight have Spec and Link files):
-
-| callee | the resource that is not obvious |
-| --- | --- |
-| `argaddr` | `ProcInv.proc_priv_tf` — the trapframe pointer QUARTER plus the page, as ONE accessor; the out-cell is slot 59 |
-| `argstr` | `proc_priv` WHOLE (it splits inside), plus the 128 path bytes |
-| `memset` | the argv array as 256 named bytes; its `cbyte` at `cval = 0` is the zero byte |
-| `fetchaddr` | `proc_priv` whole, `kalloc_env γa None`, the out-cell at slot 60 |
-| `kalloc` | the `is_lock`/`kalloc_avail` pair INSIDE `kalloc_env γa None`; at `on = None` the bundle is persistent and `avail_dec`/`avail_inc` are the identity, so it survives the whole loop |
-| `fetchstr` | `maxn = 4096` named bytes out of `KallocInv.page_own` (`ByteBuf.bb_page_named` / `bb_page_of_named`) |
-| `kexec` | everything in `SpecSysExec`'s precondition, plus `fs_fabric` rebuilt from the thirteen |
-| `kfree` | `kfree_pre p = ⌜page_valid p⌝ ∗ page_own p` — so `page_valid` must be CARRIED per filled slot, not re-derived |
-
-`K_sys_exec = 234 = 60 + K_kexec`; every other callee's need is far below
-kexec's 174 (`sx_kb` turns the one premise into all eight bounds).
 
 ### 2. Optional, none blocking
 

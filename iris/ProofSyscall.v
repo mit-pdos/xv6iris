@@ -9,8 +9,11 @@
    `p->trapframe->a0` and the jump into the epilogue), the epilogue
    (`sysc_epilogue_tail`: the four reloads, the frame pop, `c.ret`) AND the
    whole unknown-syscall printk fallback (`sysc_fallback`, +0x40..+0x56).
-   NINE of the 22 table entries are REAL, `Qed`'d arms calling their own
-   whole-function contracts:
+   NINE of the 22 table entries are WIRED to real, `Qed`'d arms calling
+   their own whole-function contracts.  Ten are listed below: the k = 18
+   entry is here because its contract exists and its arm was written, but it
+   is NOT wired -- count the `decide` branches in `sysc_arm_dispatch`, not
+   the bullets here.
 
      k =  1  sys_fork    (`sysc_arm_fork`)   -- the widest premise list of
                                                 any wired entry, and every
@@ -28,6 +31,20 @@
                                                 and `tf_page` SEPARATELY:
                                                 `ProcInv.proc_priv_tf` lends
                                                 both and takes them back;
+     k =  7  sys_exec    (`sysc_arm_exec`)   -- the deepest entry in the
+                                                table and the first of the
+                                                fs-fabric group: the whole
+                                                `SpecKexec.fs_fabric`, the
+                                                two superblock cells,
+                                                `bitmap_res` (which comes back
+                                                SMALLER) and two units of the
+                                                iref allowance.  Read its own
+                                                header for what wiring it
+                                                cost -- the fabric moved from
+                                                fresh existentials to `fn`'s
+                                                own field names, which is what
+                                                the eight GAP entries were
+                                                really waiting on;
      k = 10  sys_dup     (`sysc_arm_dup`)    -- the ftable lock, and a post
                                                 (`sys_dup_post`) whose three
                                                 exits differ only in `V`;
@@ -98,13 +115,32 @@
        `syscall_env` stops being FULLY PERSISTENT -- which every arm here
        relies on (see the `#`-copy note below) -- so it is a shape decision,
        not a proof detail, and it buys exactly one entry.
-   (3) Genuinely missing resources: `log_ctx` and
-       `trap_csrs_ext`/`cpu_claim_ext` (sys_sync, which syscall does not
-       thread at all), and, for the eight GAP entries, the whole fs fabric
-       (`bio_ctx`, `fs_crash_seam`, `dev_inv`, `disk_geom`, the four
-       superblock cells, `bitmap_res`, `ic_escrows`, `ireg_inv`) plus
-       `fd_slot`/`iref_slots ns` allowances -- sys_open's contract
-       (SpecSysOpen.v), though PROVEN, is the extreme case.
+   (3) Genuinely missing resources.  THIS IS THE ONE `sysc_arm_exec` CLOSED,
+       and how it closed is the template for the rest of the fs-fabric
+       group.  The obstacle was never that the fabric could not be held --
+       it is entirely persistent -- but that `syscall_env` held it at FRESH
+       EXISTENTIALS, while the mutable half a caller also needs
+       (`fileclose_bm fn us`: the two superblock cells and `bitmap_res`) is
+       stated at `fn`'s own fields.  A fabric over fresh names can never be
+       shown to describe the same file system as `fn`'s bitmap, which is
+       SpecSyscall.v's UNREACHABLE-WITNESS problem and the whole reason the
+       `bn`/`fn` indices exist.  `sysc_fs_env` is the fix: the fabric at
+       `fn`'s field names for everything `fileclose_bm` also pins, and at
+       the ambient `icfg` class for `dev`/`nib`/the log names -- so
+       sys_exec's `dev = icfg_dev` / `nib = icfg_nib` / `g = icfg_log`
+       premises are `eq_refl` and only `fcn_inodestart fn = icfg_ist` is a
+       real tie.  It cost no new index: `procs_inv γs` and `kernel_data`
+       come from `sysc_arm_pre` (see `sysc_fs_fabric`), so the dispatch's
+       own `γs`/`j`/`γl` reach the callee directly and none of the ties
+       sys_exit needs appear.  What is still genuinely missing is narrower
+       than this paragraph used to claim: `log_ctx` at the
+       `trap_csrs_ext`/`cpu_claim_ext` complement sys_sync wants at
+       `eb = false`, and the `fd_slot`/`iref_slots ns` allowances the
+       descriptor-returning entries want -- sys_open's contract
+       (SpecSysOpen.v), though PROVEN, is the extreme case.  A GAP entry
+       whose contract, like sys_exec's, is phrased over `fs_fabric` plus
+       `fileclose_bm`'s three should now be a straight port of
+       `sysc_arm_exec`.
 
    `sys_exit` (k = 2) stays outside `sysc_arm_goal` regardless of any of
    this: its contract DIVERGES (bare `WP Loop`, no continuation), so it
@@ -265,6 +301,12 @@ Require Import DiskPtsto DiskInv.
 Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+(* [sb_bmapstart]/[bitmap_res]/[BPB] -- the three resources
+   [SpecFileclose.fileclose_bm] bundles, which [sys_exec]'s contract asks for
+   one by one.  Everything else the fs fabric names is qualified at its home
+   ([SpecKexec], [SpecPanic], [BioInv], [SpecDirlink], [InodeInv]) rather than
+   imported, so nothing this file already says changes meaning. *)
+Require Import BitmapInv.
 Require Import InodeRegion.
 Require Import IcacheEscrow IcacheInv.
 Require Import IrefSlots FdSlots.
@@ -400,47 +442,191 @@ Section SyscallVocab.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ===================================================================== *)
-  (* syscall_env -- the union of everything the FOURTEEN wired entries need
+  (* syscall_env -- the union of everything the wired entries need
      that is NOT one of the five explicit families (bslots/fileclose_bm/
      initproc/fd_slots/iref_slots).  Every conjunct is Persistent (is_lock,
      kalloc_env at [None], procs_avail at [None], printk_env), so the whole
      bundle is held with [#] and never needs reassembly across a call --
-     none of the fourteen entries write anything inside it. *)
-  (* explicit (redundant-with-Section) binder list: [syscall_env]'s BODY
-     does not need [bioG]/[logG]/[fsCrashG] (none of the fourteen wired
-     entries touch bio/log/crash resources), so Section discharge would
-     otherwise narrow its inferred signature below what the [SYSCALL]
-     Module Type's [syscall_env] Parameter fixes -- pin the full fifteen
-     explicitly so the two signatures match exactly at [End]. *)
-  (* [bn]/[fn] are UNUSED by this body for now: the fourteen entries wired
-     below all take their icache/fs-fabric ghost names (cov/logstart/nib/...)
-     as free-standing parameters rather than bundled inside an opaque
-     [fclose_names], so a fresh existential here is exactly as good as one
-     tied to the ambient [fn] -- see SpecSyscall.v's header on why the two
-     extra indices exist at all.  The eight GENUINE SPEC GAP entries (still
-     [Admitted] below) are exactly the ones where that stops being true:
-     closing them means replacing some of this body's fresh existentials
-     with direct references to [fn]'s own fields (via [FCloseNames]'s
-     accessors) plus a premise tying the ambient [fn]/[bn] to them, not
-     changing this Definition's TYPE again. *)
+     no wired entry writes anything inside it.  The one MUTABLE thing an
+     entry moves (the block bitmap) rides outside, in [fileclose_bm fn us],
+     which is re-indexed on the way out. *)
+  (* explicit (redundant-with-Section) binder list, for two reasons.  It
+     pins the full fifteen classes so Section discharge cannot narrow the
+     inferred signature below what the [SYSCALL] Module Type's
+     [syscall_env] Parameter fixes (the body used to need fewer -- with
+     [sysc_fs_env] in it, it now genuinely uses [bioG]/[logG]/[fsCrashG]
+     too).  And it is what lets the body MENTION [sysc_fs_env] at all: a
+     Section-variable [Σ] would not be this definition's own. *)
+  (* ===================================================================== *)
+  (* THE FILE-SYSTEM FABRIC, AT [fn]'s OWN NAMES -- what closing a GAP entry
+     costs, and it is a NAMING change, not a type change.
+
+     The nine wired entries all take their icache/fs ghost names as
+     free-standing parameters, so a fresh existential inside this bundle was
+     exactly as good as one tied to the ambient [fn].  The GAP entries are
+     precisely the ones where that stops being true: [sys_exec] consumes
+     [SpecKexec.fs_fabric] AND [fileclose_bm fn us] (the two superblock cells
+     and [bitmap_res]) in the same breath, and [fileclose_bm] is stated at
+     [fn]'s own [fcn_fs]/[fcn_bmapstart]/[fcn_cov]/[fcn_logstart]/[fcn_size],
+     so a fabric over fresh existentials could never be shown to describe the
+     same file system -- SpecSyscall.v's header calls that the
+     UNREACHABLE-WITNESS problem, and it is why the two extra indices [bn]/
+     [fn] exist.  So everything the fabric needs that [fileclose_bm] also
+     pins is spelled at [fn]'s fields, and the rest is spelled at the AMBIENT
+     [icfg] class ("there is one inode cache"), which is what lets
+     [dev]/[nib]/[g] be discharged by [eq_refl] instead of by a tie.
+
+     WHAT IS NOT HERE, and deliberately: [procs_inv] and [kernel_data].  Both
+     are already separate conjuncts of [sysc_arm_pre] at the DISPATCH's own
+     [γs], so drawing them from here would tie [fcn_procs fn] to [γs] -- a
+     tie [syscall_env]'s index list cannot state.  [sysc_fs_fabric] below
+     re-assembles [fs_fabric] from this bundle plus those two, which is why
+     [sys_exec] costs no new index. *)
+  (* the SAME explicit (redundant-with-Section) binder list [syscall_env]
+     carries, and for a sharper reason than its own: a definition that took
+     the Section's variables would be fixed at the Section's [Σ], and
+     [syscall_env] -- which binds its own -- could not then mention it. *)
+  Definition sysc_fs_env
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+        !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
+      (bn : bio_names) (fn : fclose_names) : iProp Σ :=
+    (⌜fcn_inodestart fn = icfg_ist⌝ ∗
+     ⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗
+     ⌜(0 < icfg_nib)%nat⌝ ∗
+     ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
+     ⌜0 < fcn_size fn <= BitmapInv.BPB⌝ ∗
+     ⌜0 <= fcn_bmapstart fn⌝ ∗
+     ⌜fcn_bmapstart fn ∈ fcn_cov fn⌝ ∗
+     ⌜~ (fcn_bmapstart fn ∈ log_region_set (fcn_logstart fn))⌝ ∗
+     ⌜0 <= fcn_inodestart fn⌝ ∗
+     ⌜cov_below (fcn_cov fn) (fcn_size fn)⌝ ∗
+     ⌜SpecDirlink.ireg_blocks_ok (fcn_inodestart fn) icfg_nib
+                                 (fcn_cov fn) (fcn_logstart fn)⌝ ∗
+     SpecPanic.panic_env ∗
+     BioInv.bio_ctx bn (fs_view (fcn_fs fn) (fcn_disk fn) icfg_dev (fcn_cov fn)) ∗
+     log_ctx icfg_log bn (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn) icfg_dev ∗
+     fs_crash_seam (fcn_cov fn) (fcn_logstart fn) ∗
+     gen_cert ∗
+     ic_escrows (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn) (fcn_logstart fn) ∗
+     SpecDirlink.ic_sleeplocks (fcn_ic fn) ∗
+     ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) icfg_nib ∗
+     dev_inv (fcn_uart fn) (fcn_disk fn) ∗
+     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
+     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
+       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)))%I.
+
+  (* no explicit binder list here -- unlike the Definition above, an
+     [Instance] takes its binders as a CONTEXT, so re-binding the Section's
+     [GEN] is rejected ("GEN is already used").  The Section's variables are
+     the right ones anyway: the instance is only ever looked up after [End]
+     discharges them. *)
+  Global Instance sysc_fs_env_persistent bn fn : Persistent (sysc_fs_env bn fn).
+  Proof. apply _. Qed.
+
+  (* [syscall_env]'s FIRST NINE conjuncts are untouched by the fs work above,
+     and their POSITIONS are the interface every arm's [iDestruct] pattern is
+     written against -- a new conjunct goes at the END. *)
   Definition syscall_env
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       : iProp Σ :=
-    (∃ (γa γp γw γft γtk γil γpr : gname) (cn : ic_names) (γics : fs_names)
-       (γic : gname) (cov : gset Z) (logstart : Z) (nib : nat)
+    (∃ (γa γp γw γft γtk γpr : gname)
        (γud : uart_names) (γvd : disk_names),
        kalloc_env γa None ∗
        is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
        procs_avail None ∗
        is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
        is_ftable γft γf ∗
-       is_itable2 γil cn γics γic cov logstart nib icfg_dev ∗
+       is_itable2 (fcn_tlock fn) (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn)
+                  (fcn_cov fn) (fcn_logstart fn) icfg_nib icfg_dev ∗
        itable_inv ∗
        is_tickslock γtk ∗
-       printk_env γpr γud γvd)%I.
+       printk_env γpr γud γvd ∗
+       sysc_fs_env bn fn)%I.
+
+  (* [SpecKexec.fs_fabric], re-assembled: the thirteen persistent resources
+     kexec's cone (and therefore sys_exec's) states as one bundle.  Two of
+     them come from OUTSIDE [syscall_env] -- [kernel_data], which every arm
+     already holds, and [procs_inv γs] at the dispatch's own [γs] -- see
+     [sysc_fs_env]'s note on why they cannot live in the bundle. *)
+  Lemma sysc_fs_fabric (γf : gname) (pj : mword 64) (γs : list gname)
+      (bn : bio_names) (fn : fclose_names) :
+    kernel_data -∗ procs_inv γs -∗ syscall_env γf pj bn fn -∗
+    SpecKexec.fs_fabric γs (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+      icfg_log (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+      (fcn_cov fn) (fcn_logstart fn) (fcn_inodestart fn) icfg_nib icfg_dev.
+  Proof.
+    iIntros "#Hdata #Hprocs #Henv".
+    iDestruct "Henv" as (γa γp γw γft γtk γpr γud γvd)
+      "(_ & _ & _ & _ & _ & #Hit & #Hitinv & _ & _ & #Hfs)".
+    iDestruct "Hfs" as
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hesc & #Hsl & #Hireg &
+        #Hdev & #Hgeom & #Hdlock)".
+    (* assembled conjunct by conjunct rather than with [iFrame "#"]: the
+       fifteen are in the fabric's own order, and a mismatch then names the
+       one that moved instead of leaving an unsolved goal. *)
+    rewrite /SpecKexec.fs_fabric.
+    iSplitR; [iExact "Hdata"   |].
+    iSplitR; [iExact "Hpanic"  |].
+    iSplitR; [iExact "Hbio"    |].
+    iSplitR; [iExact "Hlog"    |].
+    iSplitR; [iExact "Hseam"   |].
+    iSplitR; [iExact "Hgen"    |].
+    iSplitR; [iExact "Hit"     |].
+    iSplitR; [iExact "Hitinv"  |].
+    iSplitR; [iExact "Hesc"    |].
+    iSplitR; [iExact "Hsl"     |].
+    iSplitR; [iExact "Hireg"   |].
+    iSplitR; [iExact "Hprocs"  |].
+    iSplitR; [iExact "Hdev"    |].
+    iSplitR; [iExact "Hgeom"   |].
+    iExact "Hdlock".
+  Qed.
+
+  (* [fileclose_bm] is exactly the three resources sys_exec's contract lists
+     one by one (the two superblock cells and the bitmap), so the split and
+     the re-fold are both [iExact]-shallow -- stated as lemmas only so the
+     arm never has to spell [fn]'s six field accessors. *)
+  Lemma sysc_bm_split (fn : fclose_names) (us : gset Z) :
+    fileclose_bm fn us -∗
+    sb_bmapstart ↦₄{fcn_dqb fn} (mword_of_int (fcn_bmapstart fn) : mword 32) ∗
+    InodeInv.sb_inodestart ↦₄{fcn_dqs fn} (mword_of_int (fcn_inodestart fn) : mword 32) ∗
+    bitmap_res (fcn_fs fn) (fcn_bmapstart fn) (fcn_cov fn) (fcn_logstart fn)
+               (fcn_size fn) us.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  Lemma sysc_bm_join (fn : fclose_names) (us : gset Z) :
+    sb_bmapstart ↦₄{fcn_dqb fn} (mword_of_int (fcn_bmapstart fn) : mword 32) -∗
+    InodeInv.sb_inodestart ↦₄{fcn_dqs fn} (mword_of_int (fcn_inodestart fn) : mword 32) -∗
+    bitmap_res (fcn_fs fn) (fcn_bmapstart fn) (fcn_cov fn) (fcn_logstart fn)
+               (fcn_size fn) us -∗
+    fileclose_bm fn us.
+  Proof. iIntros "H1 H2 H3". rewrite /fileclose_bm. iFrame. Qed.
+
+  (* the dispatch carries [IREFSPARE] = 4 units of the inode-reference
+     allowance; kexec's walk wants 2 and gives them back. *)
+  Lemma sysc_iref_split : iref_slots IREFSPARE -∗ iref_slots 2 ∗ iref_slots 2.
+  Proof. rewrite /IREFSPARE. iIntros "H". iApply (iref_slots_split 2 2 with "H"). Qed.
+
+  Lemma sysc_iref_join : iref_slots 2 -∗ iref_slots 2 -∗ iref_slots IREFSPARE.
+  Proof.
+    rewrite /IREFSPARE. iIntros "H1 H2".
+    iApply (iref_slots_combine 2 2 with "H1 H2").
+  Qed.
+
+  (* the trap-CSR complement, at the index [syscall()] runs at: both halves
+     are [emp] at [eb = true], so an arm mints them rather than threading
+     them (IntrDefs.v's own [trap_csrs_ext]/[cpu_claim_ext]). *)
+  Lemma sysc_trap_ext_true : ⊢ trap_csrs_ext KT1 true.
+  Proof. rewrite /trap_csrs_ext. done. Qed.
+
+  Lemma sysc_claim_ext_true (p : mword 64) : ⊢ cpu_claim_ext true p.
+  Proof. rewrite /cpu_claim_ext. done. Qed.
 
   (* ===================================================================== *)
   (* THE DISPATCH TABLE.  syscalls[k], k = 1..22, straight out of KernelSyms
@@ -1473,7 +1659,7 @@ Section SyscallArms.
     (* [kalloc_env], peeled off a COPY of the (fully persistent) environment
        bundle, so the original stays available to hand back verbatim *)
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
       "(#Hkalloc & _)".
     (* ---- the call ---- *)
     iApply (SysSbrk.wp_sys_sbrk_sconf γa γf M (av - 4)%nat true pj pid V v0 v1 true lks
@@ -1540,7 +1726,7 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
       "(#Hkalloc & _ & _ & #Hwaitlk & _)".
     (* ---- the call ---- *)
     iApply (SysWait.wp_sys_wait_sconf γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
@@ -1612,7 +1798,7 @@ Section SyscallArms.
     iEval (rewrite Hpce) in "Hpc".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
       "(_ & _ & _ & _ & _ & _ & _ & #Hticks & _)".
     (* ---- the call ---- *)
     iApply (SysUptime.wp_sys_uptime_sconf γtk M 0%nat true pj (av - 4)%nat true ∅
@@ -1732,7 +1918,7 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
       "(_ & _ & _ & _ & _ & _ & _ & #Hticks & _)".
     (* ---- the call ---- *)
     iApply (SysPause.wp_sys_pause_sconf γs j γl γtk M (av - 4)%nat true 0%nat
@@ -1810,7 +1996,7 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
       "(_ & _ & _ & _ & #Hftable & _)".
     (* ---- the call ---- *)
     iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid V true ∅
@@ -1865,10 +2051,13 @@ Section SyscallArms.
     iEval (rewrite Hpce) in "Hpc".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
       "(#Hkalloc & #Hnextpid & #Hpav & #Hwaitlk & #Hftable & #Hitable & #Hitinv & _)".
     (* ---- the call ---- *)
-    iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf γil γic γs cn γics cov logstart nib
+    (* the itable's names are [fn]'s own now (see [sysc_fs_env]), not this
+       bundle's fresh existentials -- the call is otherwise unchanged. *)
+    iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
+              γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn) icfg_nib
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
@@ -1912,6 +2101,128 @@ Section SyscallArms.
      falls through to [sysc_arm_placeholder] until that is settled --
      see claude-notes/projects/fs-sysfile.md, "S7-unlink". *)
 
+  (* ------------------------------------------------------------------- *)
+  (* THE TENTH ARM: k = 7, [sys_exec] -- the first of the eight entries the
+     file header calls the GENUINE SPEC GAP, and the one that shows what
+     closing that gap actually costs.  Its contract (SpecSysExec.v) is
+     kexec's precondition marshalled: the whole FS fabric, the two
+     superblock cells, [bitmap_res], the kalloc environment and two units of
+     the inode-reference allowance.
+
+     THREE THINGS MAKE IT UNLIKE THE NINE ARMS ABOVE, and each was a design
+     question rather than a proof detail:
+
+     (1) THE FABRIC IS NOT A NEW INDEX.  sys_exec wants [fs_fabric] over the
+         SAME file system [fileclose_bm fn us] describes, and [fileclose_bm]
+         is stated at [fn]'s fields -- so the fabric had to move from
+         [syscall_env]'s fresh existentials to [fn]'s own names
+         ([sysc_fs_env]).  Its two remaining pieces, [procs_inv γs] and
+         [kernel_data], are drawn from [sysc_arm_pre] instead, which is what
+         keeps [fcn_procs fn] out of the story: the dispatch's own [γs]/[j]/
+         [γl] go straight into the call, so none of the three ties
+         SpecSyscall.v's header shows sys_exit needing is needed here.
+     (2) THE BITMAP IS THE ONE MUTABLE THING THAT CROSSES.  It comes back
+         SMALLER ([used' ⊆ used], kexec's cone being the only mover), which
+         is exactly the re-indexing [sysc_hcont_ty]'s own [∃ us'] was written
+         for -- so the arm hands [sysc_ret_tail] the POST-call [used'] and
+         nothing in the dispatch had to widen.
+     (3) THE TRAPFRAME PAGE SURVIVES TWO MOVES, NOT ONE.  The copy-ins grow
+         the page table before kexec runs ([uptd_ext (pv_upt V) P']) and
+         kexec then replaces the address space outright ([kexec_ok] against
+         [upd_upt V P']); [ud_tfp] is pinned by BOTH -- by [uptd_ext]'s
+         second conjunct and by [kexec_ok]'s success arm -- and composing the
+         two is what [sysc_ret_tail]'s immobility premise needs.
+
+     The budget is exact rather than slack: [K_syscall = 4 + K_sys_exec], so
+     an arm running at [av - 4] has precisely sys_exec's own bound. *)
+  Lemma sysc_arm_exec (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 7 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
+    assert (Hav82 : (82 <= av)%nat)
+      by (lia).
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    assert (Hpce : (mword_of_int (sysc_target 7) : mword 64)
+                   = mword_of_int KernelSyms.sys_exec) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    (* argaddr and argstr read trapframe arguments 1 and 0; the arm only has
+       to say the two words EXIST, which the page's length gives *)
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
+    (* ---- the environment: the fabric, the allocator, and the pure ties ---- *)
+    iPoseProof (sysc_fs_fabric γf (proc_addr j) γs bn fn
+                  with "Hdata Hprocs Henv") as "#Hfab".
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
+      "(#Hkalloc & _ & _ & _ & _ & _ & _ & _ & _ & #Hfsenv)".
+    iDestruct "Hfsenv" as
+      "(%Hist & %Hroot & %Hnib0 & %Hlg & %Hsize & %Hbm0 & %Hbmc & %Hbml &
+        %Hist0 & %Hcb & %Hireg & _)".
+    (* ---- the three consumable families, carved to sys_exec's own shape ---- *)
+    iDestruct (sysc_bm_split with "Hfc") as "(Hbmp & Hisp & Hbmr)".
+    iDestruct (sysc_iref_split with "Hir") as "[Hirk Hire]".
+    iPoseProof sysc_trap_ext_true as "Htcx".
+    iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    (* ---- the call ---- *)
+    iApply (SysExec.wp_sys_exec_sconf γf γa γs j γl
+              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+              icfg_log (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
+              (fcn_inodestart fn) icfg_nib (fcn_size fn) icfg_dev us
+              (fcn_dqb fn) (fcn_dqs fn) v0 v1 pid V M (av - 4)%nat true true lks
+              ltac:(lia) eq_refl eq_refl eq_refl Hist Hroot Hnib0 Hlg Hsize
+              Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
+              with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hfab Hbmp Hisp Hbmr Hbs
+                    Hkalloc Hire Hpriv").
+    iIntros (CIDy Hsy mf used' P') "%Hcs %Hext Hcg Hcpu Htcx' Hccx' Hpc
+                                    Hbmp Hisp %Husub Hbmr Hbs Hka' Hire' Hpost".
+    iDestruct "Hpost" as (V' na alen entry spv szv') "[%Hkok Hpriv]".
+    (* ---- the trapframe page, across BOTH moves (see (3) in the header) ---- *)
+    assert (Htfp' : ud_tfp (pv_upt V') = ud_tfp (pv_upt V)).
+    { destruct Hext as (_ & Htf & _).
+      destruct Hkok as [ (_ & HV') | (_ & _ & _ & _ & _ & Htf' & _) ].
+      - rewrite HV'. cbn [pv_upt upd_upt]. exact Htf.
+      - rewrite Htf'. cbn [pv_upt upd_upt]. exact Htf. }
+    (* ---- what the shared tail needs of the returned state ---- *)
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
+              r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
+              mf !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r Hr). exact (HMother r Hr Ncsp N8 N9 N18). }
+    assert (Hret : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hret) in "Hpc".
+    (* ---- the two families re-folded at their POST-call indices ---- *)
+    iDestruct (sysc_bm_join with "Hbmp Hisp Hbmr") as "Hfc".
+    iDestruct (sysc_iref_join with "Hirk Hire'") as "Hir".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+              lks av used' m mf
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
   (* THE COMBINATOR.  One [decide (k = <literal>)] branch per wired entry,
      ahead of the generic placeholder: adding an arm is adding a branch, and
      nothing already wired moves.  Kept in THIS section (rather than beside
@@ -1931,6 +2242,8 @@ Section SyscallArms.
     { exact (sysc_arm_wait γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     destruct (decide (k = 6%nat)) as [-> | _].
     { exact (sysc_arm_kill γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    destruct (decide (k = 7%nat)) as [-> | _].
+    { exact (sysc_arm_exec γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     destruct (decide (k = 10%nat)) as [-> | _].
     { exact (sysc_arm_dup γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     destruct (decide (k = 11%nat)) as [-> | _].
@@ -2006,8 +2319,8 @@ Section SyscallArms.
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpenv)".
+    iDestruct "Henvc" as (γa γp γw γft γtk γpr γud γvd)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpenv & _)".
     (* ---- +0x40: addi a2,s1,344 -- a2 := &p->name ---- *)
     iPoseProof (syci_40 with "Htext") as "Hi40".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.syscall + 0x40)) Ra2 Rs1

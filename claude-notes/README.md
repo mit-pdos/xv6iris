@@ -144,11 +144,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   from `um`, the physical-tier decision, the `page_own ⇄ udata_own` bridges.
   The CONSTRUCTION side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
 - **[`kexec.md`](projects/kexec.md)** — `kexec()`, the largest function in the
-  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN
-  and linked, with `sys_exec` the only thing left. Read it for how a
-  four-phase function's seams compose (every seam hands the caller's exit
-  BACK), and for **the copyout story**, the most transferable thing this
-  project produced.
+  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN,
+  linked, and reaching `syscall()` through `sys_exec` at dispatch index 7.
+  Read it for how a four-phase function's seams compose (every seam hands the
+  caller's exit BACK), for **the copyout story**, the most transferable thing
+  this project produced, and — before wiring any other `ProofSyscall.v` GAP
+  entry — for why the fs fabric was a NAMING problem, not a missing resource.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
   chain. Remaining: the whole-system adequacy composition, and (§G2) retiring
