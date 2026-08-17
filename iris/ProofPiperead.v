@@ -518,7 +518,7 @@ Section ProofPiperead.
      (∃ z : mword 64, pa_stk sp0 12 ↦₈[kt] z) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Definition pr_epic_body
+  Definition pr_epic_body {kt : ktier}
       (sp0 spr vs6 vs7 vs8 : mword 64)
       (m : regfile) (av : nat) (pj : mword 64)
       (γp : pipe_names) (w : bool) (q : Qp) (pid : mword 32) (V : pprivate)

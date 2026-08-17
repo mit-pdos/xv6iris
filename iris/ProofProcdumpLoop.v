@@ -418,7 +418,7 @@ Section ProofProcdumpLoop.
        ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Definition pdl_print_body `{GEN : GenId} (CID0 : CpuId)
+  Definition pdl_print_body `{GEN : GenId} {kt : ktier} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
       (lks : gset string) (j : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (sptr : mword 64) (ss nm2 : string)

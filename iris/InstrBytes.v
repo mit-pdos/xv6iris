@@ -1238,6 +1238,9 @@ Qed.
 
 Section WordHalves.
   Context `{!riscvGS Σ}.
+  (* tier-generic: the halves come back at the SAME tier the doubleword was
+     owned at, so a frame slot splits without losing its [kt]. *)
+  Context `{KTR : !CurKtier}.
 
   (* re-anchor a byte window at its own base: the [seq o n] window of [P] is
      the [seq 0 n] window of [P] shifted by [o]. *)

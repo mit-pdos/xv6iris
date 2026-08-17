@@ -411,7 +411,7 @@ Section ProofScheduler.
             WP (Loop : expr riscv_lang) ) -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Definition sc_outer_body (av : nat) : iProp Σ :=
+  Definition sc_outer_body {kt : ktier} (av : nat) : iProp Σ :=
     (∀ (M : regfile) (eb : bool) (n : nat),
         ⌜ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
           /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word

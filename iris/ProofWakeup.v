@@ -177,7 +177,7 @@ Section ProofWakeup.
      release call runs at the FIXED hart [CID] (a held lock pins
      noff >= 1, file header), so unlike the two definitions above this one
      carries no [wp_next]/hart binder of its own. *)
-  Definition wk_rel_body `{GEN : GenId}
+  Definition wk_rel_body `{GEN : GenId} {kt : ktier}
       (γs : list gname) (γk : gname) (pme spF chan : mword 64)
       (av lvl k : nat) (eb b : bool)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (CID : CpuId) : iProp Σ :=
