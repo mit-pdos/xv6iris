@@ -21,15 +21,17 @@
     [riscv_step tick] hands out), so it rides in [ECycle], is consumed
     monotonically, and WP-of-an-instruction becomes proof by SYNTACTIC
     DESCENT on that argument.  Devices have neither a fetch nor a preemption
-    problem, so [EDisk] carries its whole operation state.
+    problem, so [EDisk] carries its whole operation state — which, since M5,
+    is a RESIDUAL MONAD exactly as a hart's is ([VirtioProg.DM]).
 
       σ           = [WeakLang.wgstate] VERBATIM (no new fields, no new
                     ghosts, [WeakGhost.weak_state_interp] unchanged);
       [ELoop g c] = hart [c] at an instruction boundary;
       [ECycle g c m fn] = hart [c] executing one instruction, [m] the
                     residual monad and [fn] the parked second fence;
-      [EDisk g pend dws] = the disk agent, its message burst and its own
-                    view — the pf [PDisk] agent field for field;
+      [EDisk g dp dws] = the disk agent: the RESIDUAL DEVICE PROGRAM (M5 —
+                    [VirtioProg.virtio_prog], [None] between bursts) and its
+                    own view — the pf [PDisk] agent field for field;
       [EUart g] / [EPlic g] / [EPower] = as in [WeakLang].
 
     ------------------------------------------------------------------------
@@ -75,6 +77,12 @@ Require Import SailStdpp.ConcurrencyInterfaceTypes.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import DevModel.
+(* THE DEVICE PROGRAM (M5).  Required BEFORE [WeakInterpProj] on purpose:
+   [VirtioProg] has its own [wbytes] (the device's little-endian field
+   bytes), and every [wbytes] in THIS file is the hart-side
+   [WeakInterpProj.wbytes], so the later [Require] must be the one that
+   wins. *)
+Require Import VirtioProg.
 Require Import WeakMem.
 Require Import WeakPromise.
 Require Import WeakInterp.
@@ -97,7 +105,7 @@ Inductive eexpr :=
   | Sail   (gen : nat) (cpu : CPU) (m : M unit)
            (fn : option (bool * bool * bool * bool))
   | EUart  (gen : nat)
-  | EDisk  (gen : nat) (pend : list wmsg) (dws : wstate)
+  | EDisk  (gen : nat) (dp : option (DM dres)) (dws : wstate)
   | EPlic  (gen : nat)
   | EPower.
 
@@ -122,7 +130,7 @@ Definition eto_val (_ : eexpr) : option eval := None.
     burst and a FRESH view — the two clauses the pre-revision [eboot_facts]
     had to put on σ. *)
 Definition epower_fork (gen : nat) : list eexpr :=
-  (ELoop gen <$> enum CPU) ++ [EUart gen; EDisk gen [] ws_init; EPlic gen].
+  (ELoop gen <$> enum CPU) ++ [EUart gen; EDisk gen None ws_init; EPlic gen].
 
 (* ====================================================================== *)
 (** ** 2. σ-updates
@@ -428,33 +436,121 @@ Definition eplic_step (σ σ' : wgstate) : Prop :=
            (register_set sig_seip
               (bool_to_bit (dev_seip (wgdev σ) (fin_to_nat c))) (wgregs σ c)).
 
-(** THE BURST: one [wdisk_step] at the flat projection of image+log, loading
-    the canonical message list into the disk expression's buffer.  Only at an
-    EMPTY buffer, so a burst never clobbers messages still owed to the log. *)
-Definition edisk_burst (gen : nat) (pend : list wmsg) (dws : wstate)
-    (σ : wgstate) (e' : eexpr) (σ' : wgstate) : Prop :=
-  pend = [] /\
-  exists d' w, wdisk_step (wgdev σ) (wflat (wgimg σ) (wglog σ)) d' w /\
-    e' = EDisk gen (wmsgs_of_map w) dws /\ σ' = ewg_dev σ d'.
+(** THE DISK THREAD (M5 — [claude-notes/design/weak-memory-m5.md]).
 
-(** THE EMIT: pop one buffered message and append it.  Its tid is already
-    [Some n_disk] ([WeakLang.wmsgs_of_map] stamps it), so the disk's own view
-    moves by [store_post_run] exactly as a pf [PFStore] would. *)
-Definition edisk_emit (gen : nat) (pend : list wmsg) (dws : wstate)
-    (σ : wgstate) (e' : eexpr) (σ' : wgstate) : Prop :=
-  exists m rest, pend = m :: rest /\
-    (* the buffer is CANONICAL: [WeakLang.wmsgs_of_map] only ever produces
-       one-byte messages stamped [Some n_disk], and the pf disk agent's
-       [PFStore] needs both *)
-    wm_data m <> [] /\ wm_tid m = Some n_disk /\
-    e' = EDisk gen rest
-           (store_post_run dws false (wm_pa m) (length (wm_data m))
-              (S (length (wglog σ)))) /\
-    σ' = ewg_log σ (wglog σ ++ [m]).
+    The disk is a WEAK-MEMORY AGENT, not a flat-memory oracle: it runs
+    [VirtioProg.virtio_prog] NODE BY NODE at its OWN [wstate], with exactly
+    the events a hart has — a plain/acquire RAM read, a plain RAM write, a
+    fence — plus fabric-touching silent steps for the three points where it
+    reads or moves the device state itself (start, commit, PLIC latch).
+    [WeakLang.wflat] / [wdisk_step] / [wmsgs_of_map] are GONE from the event
+    language (they stay in [WeakLang] for the archived instruction-atomic
+    tier), and with them the burst buffer and its canonicity invariant.
 
-Definition edisk_step (gen : nat) (pend : list wmsg) (dws : wstate)
+    THE CLASS THE DEVICE'S STORES CARRY.  The device has no access-kind
+    annotations, so each of its stores is a PLAIN EXPLICIT store: [ddev_ak]
+    is [AkInfo] with no coherence requirement, no exclusivity and no
+    release/acquire annotation — literally
+    [WeakInterp.classify (AK_explicit (Explicit_access_kind AV_plain
+    AS_normal))].  [WeakInterp.wm_class_of] then computes [WCrel] exactly
+    when the disk's own [w_relp] is armed (i.e. right after its [DFence])
+    and [WCplain] otherwise — the same rule a hart's plain [sd] gets, which
+    is the point: the used-index store the driver polls IS the device's
+    release. *)
+Definition ddev_ak : akinfo := AkInfo false false false.
+
+Definition ddev_class (ws : wstate) : wm_class := wm_class_of ddev_ak ws.
+
+Lemma ddev_class_eq ws : ddev_class ws = if w_relp ws then WCrel else WCplain.
+Proof. rewrite /ddev_class /wm_class_of /=. by destruct (w_relp ws). Qed.
+
+(** ... and it is the class of a plain explicit store, spelled through the
+    model's own access kind rather than by hand. *)
+Lemma ddev_ak_plain :
+  ddev_ak =
+  classify (AK_explicit (Build_Explicit_access_kind AV_plain AS_normal)).
+Proof. reflexivity. Qed.
+
+(** THE MALFORMED-CHAIN RESIDUE (assumption 4).  A request whose descriptor
+    chain does not parse lets the device write ANYTHING ANYWHERE; at event
+    granularity that is a chain of ordinary store events, chosen at the
+    [DWild] step. *)
+Inductive dm_wild_chain : DM dres -> Prop :=
+  | dm_wild_ret : dm_wild_chain (DRet DIdle)
+  | dm_wild_write pa bs k :
+      bs <> [] -> dm_wild_chain k -> dm_wild_chain (DWrite pa bs k).
+
+Lemma dm_wild_chain_wf p : dm_wild_chain p -> dm_wf p.
+Proof.
+  induction 1 as [|pa bs k Hne _ IH]; [apply dm_wf_ret|by apply dm_wf_write].
+Qed.
+
+(** THE DISK'S STEP: one arm per node of the residual program, plus the
+    three fabric arms.  Each fabric-touching arm is its own disjunct — that
+    is what [WeakEvInst]'s [LDev] marking keys on. *)
+Definition edisk_step (gen : nat) (dp : option (DM dres)) (dws : wstate)
     (σ : wgstate) (e' : eexpr) (σ' : wgstate) : Prop :=
-  edisk_burst gen pend dws σ e' σ' \/ edisk_emit gen pend dws σ e' σ'.
+  (* START: read the fabric's virtio state and elaborate the program.  No
+     log, no view; FABRIC-TOUCHING. *)
+  (dp = None /\ e' = EDisk gen (Some (virtio_prog (dvirtio (wgdev σ)))) dws
+   /\ σ' = σ)
+  \/
+  (* DRead: EXACTLY the hart's plain RAM-read arm, at [dws].  The
+     continuation receives the byte LIST the label carries. *)
+  (exists pa n aq k tvs,
+     dp = Some (DRead pa n aq k) /\
+     length tvs = n /\
+     read_ok (img_z (wgimg σ)) (wglog σ) dws aq false (pa_z pa) tvs /\
+     e' = EDisk gen (Some (k tvs.*2))
+            (load_post_run dws aq (pa_z pa) tvs.*1) /\
+     σ' = σ)
+  \/
+  (* DWrite: EXACTLY the hart's RAM-write arm, at [dws], tid [Some n_disk],
+     class [ddev_class] (computed, no free binder). *)
+  (exists pa bs k,
+     dp = Some (DWrite pa bs k) /\ bs <> [] /\
+     e' = EDisk gen (Some k)
+            (store_post_run dws false (pa_z pa) (length bs)
+               (S (length (wglog σ)))) /\
+     σ' = ewg_log σ
+            (wglog σ ++ [WMsg (pa_z pa) bs (Some n_disk) (ddev_class dws)]))
+  \/
+  (* DFence: the device-side write barrier, [fence rw,rw]. *)
+  (exists k,
+     dp = Some (DFence k) /\
+     e' = EDisk gen (Some k) (fence_post dws true true true true) /\ σ' = σ)
+  \/
+  (* COMMIT: apply the burst's delta to the CURRENT fabric state.
+     FABRIC-TOUCHING. *)
+  (exists delta,
+     dp = Some (DRet (DDone delta)) /\ e' = EDisk gen None dws /\
+     σ' = ewg_dev σ (set_dvirtio (wgdev σ) (delta (dvirtio (wgdev σ)))))
+  \/
+  (* DWild: the malformed chain becomes an arbitrary store chain. *)
+  (exists prog',
+     dp = Some (DRet DWild) /\ dm_wild_chain prog' /\
+     e' = EDisk gen (Some prog') dws /\ σ' = σ)
+  \/
+  (* nothing pending. *)
+  (dp = Some (DRet DIdle) /\ e' = EDisk gen None dws /\ σ' = σ)
+  \/
+  (* THE PLIC LATCH ([WeakLang.WDiskStepLatch]), at any time.
+     FABRIC-TOUCHING. *)
+  (exists p',
+     dev_irq_level (wgdev σ) virtio_irq_id = true /\
+     plic_latch (dplic (wgdev σ)) virtio_irq_id = Some p' /\
+     e' = EDisk gen dp dws /\
+     σ' = ewg_dev σ (set_dplic (wgdev σ) p')).
+
+(** THE RESIDUAL PROGRAM'S WELL-FORMEDNESS, the invariant that replaces
+    [epend_canon]: every read is of at least one byte and every store
+    carries at least one byte, so the store arm's log message is never
+    empty.  [VirtioProg.virtio_prog_wf] establishes it at every start. *)
+Definition edp_wf (dp : option (DM dres)) : Prop :=
+  match dp with Some p => dm_wf p | None => True end.
+
+Lemma edp_wf_none : edp_wf None.
+Proof. done. Qed.
 
 (* ====================================================================== *)
 (** ** 6. Boot / crash reset
@@ -496,8 +592,8 @@ Definition eprim_step
     ((ethread_live σ gen /\ euart_step σ σ')
      \/ (~ ethread_live σ gen /\ σ' = σ)))
   \/
-  (exists gen pend dws, e = EDisk gen pend dws /\ κ = [] /\ efs = [] /\
-    ((ethread_live σ gen /\ edisk_step gen pend dws σ e' σ')
+  (exists gen dp dws, e = EDisk gen dp dws /\ κ = [] /\ efs = [] /\
+    ((ethread_live σ gen /\ edisk_step gen dp dws σ e' σ')
      \/ (~ ethread_live σ gen /\ e' = e /\ σ' = σ)))
   \/
   (exists gen, e = EPlic gen /\ e' = EPlic gen /\ κ = [] /\ efs = [] /\
@@ -570,11 +666,11 @@ Proof.
   injection Heq as ->. by split_and!.
 Qed.
 
-Lemma eprim_step_disk_inv gen pend dws σ κ e' σ' efs :
-  eprim_step (EDisk gen pend dws) σ κ e' σ' efs ->
+Lemma eprim_step_disk_inv gen dp dws σ κ e' σ' efs :
+  eprim_step (EDisk gen dp dws) σ κ e' σ' efs ->
   κ = [] /\ efs = [] /\
-  ((ethread_live σ gen /\ edisk_step gen pend dws σ e' σ')
-   \/ (~ ethread_live σ gen /\ e' = EDisk gen pend dws /\ σ' = σ)).
+  ((ethread_live σ gen /\ edisk_step gen dp dws σ e' σ')
+   \/ (~ ethread_live σ gen /\ e' = EDisk gen dp dws /\ σ' = σ)).
 Proof.
   intros [(? & ? & ? & ? & Heq & _)
          | [(? & Heq & _)
@@ -751,10 +847,17 @@ Lemma euart_step_ws σ σ' : euart_step σ σ' -> wgws σ' = wgws σ.
 Proof. by intros (d' & _ & ->). Qed.
 Lemma eplic_step_ws σ σ' : eplic_step σ σ' -> wgws σ' = wgws σ.
 Proof. by intros (c0 & ->). Qed.
-Lemma edisk_step_ws gen pend dws σ e' σ' :
-  edisk_step gen pend dws σ e' σ' -> wgws σ' = wgws σ.
+Lemma edisk_step_ws gen dp dws σ e' σ' :
+  edisk_step gen dp dws σ e' σ' -> wgws σ' = wgws σ.
 Proof.
-  by intros [(_ & d' & w & _ & _ & ->)|(m & rest & _ & _ & _ & _ & ->)].
+  intros [(_ & _ & ->)
+         |[(pa & n & aq & k & tvs & _ & _ & _ & _ & ->)
+         |[(pa & bs & k & _ & _ & _ & ->)
+         |[(k & _ & _ & ->)
+         |[(delta & _ & _ & ->)
+         |[(prog' & _ & _ & _ & ->)
+         |[(_ & _ & ->)
+         |(p' & _ & _ & _ & ->)]]]]]]]; reflexivity.
 Qed.
 
 (* ====================================================================== *)
@@ -797,11 +900,11 @@ Proof.
   by right.
 Qed.
 
-Lemma eprim_step_disk_dead gen pend dws σ :
+Lemma eprim_step_disk_dead gen dp dws σ :
   ~ ethread_live σ gen ->
-  eprim_step (EDisk gen pend dws) σ [] (EDisk gen pend dws) σ [].
+  eprim_step (EDisk gen dp dws) σ [] (EDisk gen dp dws) σ [].
 Proof.
-  intros Hd. right; right; left. exists gen, pend, dws.
+  intros Hd. right; right; left. exists gen, dp, dws.
   split_and!; try reflexivity. by right.
 Qed.
 
@@ -841,42 +944,68 @@ Proof.
   split_and!; try reflexivity. left. split; [exact Hl|]. by exists c.
 Qed.
 
-(** THE BUFFER INVARIANT: every message the burst arm can load is a ONE-BYTE
-    message stamped [Some n_disk].  It is what makes the emit arm enabled,
-    and it is what the pf disk agent's [PFStore] needs. *)
-Definition epend_canon (pend : list wmsg) : Prop :=
-  Forall (fun m => wm_data m <> [] /\ wm_tid m = Some n_disk) pend.
-
-Lemma epend_canon_nil : epend_canon [].
-Proof. apply Forall_nil_2. Qed.
-
-Lemma epend_canon_step gen pend dws σ e' σ' :
-  epend_canon pend -> edisk_step gen pend dws σ e' σ' ->
-  exists pend' dws', e' = EDisk gen pend' dws' /\ epend_canon pend'.
+(** THE RESIDUAL-PROGRAM INVARIANT, in the shape [epend_canon] had: the
+    disk's step preserves [edp_wf], because [dm_wf] is closed under
+    continuations at ANY answers, [virtio_prog] is well formed
+    ([VirtioProg.virtio_prog_wf]) and a wild chain is well formed by
+    construction. *)
+Lemma edisk_step_wf gen dp dws σ e' σ' :
+  edp_wf dp -> edisk_step gen dp dws σ e' σ' ->
+  exists dp' dws', e' = EDisk gen dp' dws' /\ edp_wf dp'.
 Proof.
-  intros Hc [(_ & d' & w & _ & -> & _)|(m & rest & Hp & _ & _ & -> & _)].
-  - do 2 eexists. split; [reflexivity|].
-    rewrite /epend_canon. apply Forall_forall. intros m0 Hm0.
-    split; [by eapply wmsgs_of_map_data|by eapply wmsgs_of_map_tid].
-  - do 2 eexists. split; [reflexivity|].
-    rewrite /epend_canon Hp in Hc. by apply Forall_cons in Hc as [_ ?].
+  intros Hwf
+    [(_ & -> & _)
+    |[(pa & n & aq & k & tvs & Hdp & _ & _ & -> & _)
+    |[(pa & bs & k & Hdp & _ & -> & _)
+    |[(k & Hdp & -> & _)
+    |[(delta & _ & -> & _)
+    |[(prog' & _ & Hch & -> & _)
+    |[(_ & -> & _)
+    |(p' & _ & _ & -> & _)]]]]]]];
+    rewrite /edp_wf in Hwf |- *.
+  - do 2 eexists. split; [reflexivity|apply virtio_prog_wf].
+  - rewrite Hdp in Hwf.
+    inversion Hwf as [|pa0 n0 aq0 k0 Hn Hk| |]; simplify_eq.
+    do 2 eexists. split; [reflexivity|apply Hk].
+  - rewrite Hdp in Hwf.
+    inversion Hwf as [| |pa0 bs0 k0 Hne Hk|]; simplify_eq.
+    do 2 eexists. split; [reflexivity|apply Hk].
+  - rewrite Hdp in Hwf.
+    inversion Hwf as [| | |k0 Hk]; simplify_eq.
+    do 2 eexists. split; [reflexivity|apply Hk].
+  - by do 2 eexists.
+  - do 2 eexists. split; [reflexivity|by apply dm_wild_chain_wf].
+  - by do 2 eexists.
+  - by do 2 eexists.
 Qed.
 
-(** The disk is ALWAYS reducible: an empty buffer takes the idle burst
-    ([WeakLang.WDiskStepIdle], whose write set is [∅] and hence buffers
-    nothing), a canonical nonempty one emits. *)
-Lemma eprim_step_disk_reducible gen pend dws σ :
-  ethread_live σ gen -> epend_canon pend ->
-  exists e' σ', eprim_step (EDisk gen pend dws) σ [] e' σ' [].
+(** THE DISK IS REDUCIBLE except at a [DRead] — and a [DRead] whose address
+    has no admissible timestamp assignment is LEGITIMATELY STUCK: that a
+    device read is answerable is the DRIVER's proof obligation (the WP
+    side), not a property of the language.  Every other node — start, a
+    write of a well-formed program, a fence, a commit, a wild chain, idle —
+    always steps. *)
+Lemma eprim_step_disk_reducible gen dp dws σ :
+  ethread_live σ gen -> edp_wf dp ->
+  (forall pa n aq k, dp <> Some (DRead pa n aq k)) ->
+  exists e' σ', eprim_step (EDisk gen dp dws) σ [] e' σ' [].
 Proof.
-  intros Hl Hc. destruct pend as [|m rest].
-  - do 2 eexists. right; right; left. exists gen, [], dws.
-    split_and!; try reflexivity.
-    left. split; [exact Hl|]. left. split; [reflexivity|].
-    exists (wgdev σ), ∅. split; [apply WDiskStepIdle|].
-    rewrite wmsgs_of_map_empty. split; [reflexivity|by destruct σ].
-  - rewrite /epend_canon in Hc. apply Forall_cons in Hc as [[Hd Ht] _].
-    do 2 eexists. right; right; left. exists gen, (m :: rest), dws.
-    split_and!; try reflexivity.
-    left. split; [exact Hl|]. right. exists m, rest. by split_and!.
+  intros Hl Hwf Hnr.
+  have Hstep : forall e' σ', edisk_step gen dp dws σ e' σ' ->
+    exists e0 σ0, eprim_step (EDisk gen dp dws) σ [] e0 σ0 [].
+  { intros e' σ' Hs. exists e', σ'. right; right; left.
+    exists gen, dp, dws. split_and!; try reflexivity. left. by split. }
+  destruct dp as [pgm|].
+  2:{ eapply Hstep. left. by split_and!. }
+  destruct pgm as [a|pa n aq k|pa bs k|k].
+  - destruct a as [delta| |].
+    + eapply Hstep. right; right; right; right; left. by exists delta.
+    + eapply Hstep. right; right; right; right; right; left.
+      exists (DRet DIdle). split_and!; try reflexivity. apply dm_wild_ret.
+    + eapply Hstep. right; right; right; right; right; right; left.
+      by split_and!.
+  - by destruct (Hnr pa n aq k).
+  - rewrite /edp_wf in Hwf. inversion Hwf as [| |pa0 bs0 k0 Hne Hk|]; subst.
+    eapply Hstep. right; right; left. exists pa, bs, k. by split_and!.
+  - eapply Hstep. right; right; right; left. by exists k.
 Qed.

@@ -27,41 +27,47 @@
     mentions Layer 1 at all, so this file is stable under Layer-1 edits.
 
     THE PLACEMENT RULE, restated for this file: the program half owns exactly
-    what the language reads out of the EXPRESSION (the residual monad, the
-    parked fence, the disk's burst buffer) plus the two σ-components that are
-    agent-private or fabric-shared but label-invisible — the hart's REGISTERS
-    and the DEVICE FABRIC.  The memory half owns the log and the [wstate]s.
+    what the language reads out of the EXPRESSION (the hart's residual monad
+    and parked fence, the disk's residual DEVICE PROGRAM) plus the two
+    σ-components that are agent-private or fabric-shared but label-invisible
+    — the hart's REGISTERS and the DEVICE FABRIC.  The memory half owns the
+    log and the [wstate]s.
 
     ------------------------------------------------------------------------
-    ** THE THREE PROVISIONAL POINTS (do not build on them) **
+    ** THE FABRIC MARKER [LDev] (M5, LANDED) **
 
-    (P1) [LDev].  A Layer-1 label [LDev] for fabric-touching silent steps is
-         coming (the PLIC wire and the MMIO arms must be MARKED as device
-         steps, and that is not decidable from [(p, LSilent, p')]).  Every
-         fabric-touching arm is therefore ITS OWN DISJUNCT here — the MMIO
-         read ([pnode_step]'s [dev_addr]-true branch), the MMIO write, the
-         PLIC wire ([pstep_plic]), the disk burst ([pdisk_burst]) and the
-         UART ([pdisk_uart]) — so that swapping its label to [LDev] is a
-         ONE-LINE change per arm.
+    Every arm that READS OR MOVES the device fabric carries the marker label
+    [WeakPromise.LDev], whose memory half is [LSilent]'s verbatim: on the
+    hart side the MMIO read, the MMIO write and the PLIC wire
+    ([pstep_plic]); on the disk side the program START, the burst COMMIT,
+    the PLIC LATCH and the UART thread.  [pdev_ev] therefore reads the
+    marker off the LABEL alone, and [pdev_ev_ok] discharges
+    [WeakPromiseFact.pdev_ok]: every other arm mentions the fabric exactly
+    once, as [d' = d].
 
-    (P2) THE BURST'S MEMORY IS EXISTENTIAL.  [pdisk_burst] takes the DMA's
-         memory as an argument and [pstep_disk] quantifies it existentially,
-         because a Layer-1 program step cannot read the log.  That is an
-         OVER-approximation of the language (whose burst reads
-         [WeakLang.wflat] of image+log), and it is why the ⇒ direction of the
-         eventual instance does not hold at the burst arm.  Phase C (M5)
-         replaces this arm outright; until then the factorization theorem
-         [edisk_step_factor] is stated at the FLAT memory
-         ([pdisk_burst (wflat (wgimg σ) (wglog σ))]), which is an honest ↔,
-         and [pstep_disk_of_at] is the (one-way) weakening to the
-         existential form.
+    ONE LABEL DECISION IS RECORDED IN THE OTHER DIRECTION: the [DWild] arm
+    (a malformed descriptor chain becomes an arbitrary store chain) is
+    [LSilent], NOT [LDev].  It reads nothing and moves nothing — it only
+    replaces the residual program — so it is fabric-blind and
+    fabric-preserving, [pdev_ok] holds for it, and marking it [LDev] would
+    only put a spurious device event into the replay's device order.
 
-    (P3) [pcls_ev] AT THE DISK reads the class off the head of the burst
-         buffer ([wm_ak]) rather than being the constant [WCplain].  On every
-         reachable configuration the two agree ([WeakLang.wmsgs_of_map]
-         stamps [WCplain] and [WeakEvLang.epend_canon] is preserved), but
-         only the [wm_ak] form makes [edisk_step_factor] an ↔ without an
-         extra canonicity hypothesis.
+    ** THE DISK IS AN ORDINARY AGENT (M5) **
+
+    There is NO existential memory anywhere in this file any more.  The
+    disk runs [VirtioProg.virtio_prog] node by node at its own [wstate]:
+    [DRead] is a hart's plain RAM read ([LLoad aq false]), [DWrite] a
+    hart's RAM write ([LStore false]), [DFence] a [fence rw,rw]
+    ([LFence true true true true]).  So the ⇒ direction holds for EVERY
+    disk arm, and [pdisk_burst]/[pstep_disk_at]/[pstep_disk_of_at] — the
+    flat-memory scaffolding of the pre-M5 file — are GONE, together with
+    [pdisk_emit] and the burst buffer's class hack.
+
+    [pcls_ev] at the disk is now [WeakEvLang.ddev_class ws] — the class
+    [WeakInterp.wm_class_of] computes for a PLAIN EXPLICIT store at the
+    disk's own view, i.e. [WCrel] exactly when [w_relp] is armed (right
+    after the device's [DFence]) and [WCplain] otherwise.  That is what the
+    language's [DWrite] arm stamps, so the two agree by construction.
 
     ------------------------------------------------------------------------
     ** TWO RECORDED DEVIATIONS FROM THE COMMISSIONED SHAPE, AND WHY **
@@ -94,12 +100,14 @@
 
       §1  the program state (from [WeakEvPf]) and the class function
       §2  the program half: [pnode_step], [pstep_node], [pstep_plic],
-          [pstep_hart], [pdisk_*], [pstep_disk], [pstep_ev]
+          [pstep_hart], [pdisk_prog], [pdisk_uart], [pstep_disk],
+          [pstep_ev], [pdev_ev]
       §3  the memory half: [elab_ok] / [elab_apply] (harts),
           [edlab_ok] / [edlab_apply] / [edlab_ws] (the disk agent)
       §4  the σ-shape lemmas ([elab_apply] = the language's named updater)
       §5  THE FACTORIZATION THEOREMS
-      §6  lat-freedom and timestamp-obliviousness of the program half *)
+      §6  lat-freedom and timestamp-obliviousness of the program half
+      §7  [pdev_ev_ok] : [WeakPromiseFact.pdev_ok pstep_ev pdev_ev] *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list relations.
 From stdpp Require Import bitvector.definitions.
@@ -109,8 +117,11 @@ Require Import SailStdpp.ConcurrencyInterfaceTypes.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import DevModel.
+(* required BEFORE [WeakInterpProj]: see [WeakEvLang]'s note on [wbytes] *)
+Require Import VirtioProg.
 Require Import WeakMem.
 Require Import WeakPromise.
+Require Import WeakPromiseFact.
 Require Import WeakInterp.
 Require Import WeakInterpProj.
 Require Import RiscvLang.
@@ -149,13 +160,18 @@ Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
   | LStore _ _ _ =>
       match p with
       | PHart _ m _ _ => pnode_wclass m ws
-      | PDisk (msg :: _) => wm_ak msg      (* (P3) *)
-      | PDisk [] => WCplain
+      (* M5: the device's stores are plain explicit stores, so their class
+         is [WeakEvLang.ddev_class] — [WCrel] exactly when the disk's own
+         [w_relp] is armed, i.e. right after its [DFence]. *)
+      | PDisk _ => ddev_class ws
       end
   | _ => WCplain
   end.
 
 Lemma pcls_ev_silent p ws : pcls_ev p LSilent ws = WCplain.
+Proof. reflexivity. Qed.
+
+Lemma pcls_ev_ldev p ws : pcls_ev p LDev ws = WCplain.
 Proof. reflexivity. Qed.
 
 Lemma pcls_ev_fence p ws pr pw sr sw : pcls_ev p (LFence pr pw sr sw) ws = WCplain.
@@ -197,10 +213,10 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
            fn' = None /\ d' = d
        | Interface.MemRead n req => fun k =>
            if dev_addr (Interface.ReadReq.pa req)
-           then (* MMIO READ — a FABRIC-TOUCHING arm, its own disjunct (P1) *)
+           then (* MMIO READ — FABRIC-TOUCHING, hence the marker [LDev] *)
              exists w : bv (8 * n),
                dev_read d (Interface.ReadReq.pa req) n = Some (w, d') /\
-               l = LSilent /\ m' = k (inl (w, None)) /\ ors = None /\
+               l = LDev /\ m' = k (inl (w, None)) /\ ors = None /\
                fn' = None
            else
              ak_coh (classify (Interface.ReadReq.access_kind req)) = false /\
@@ -231,10 +247,10 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
                  m' = m2 /\ ors = Some rs1 /\ fn' = None /\ d' = d))
        | Interface.MemWrite n req => fun k =>
            if dev_addr (Interface.WriteReq.pa req)
-           then (* MMIO WRITE — a FABRIC-TOUCHING arm, its own disjunct (P1) *)
+           then (* MMIO WRITE — FABRIC-TOUCHING, hence the marker [LDev] *)
              dev_write d (Interface.WriteReq.pa req) n
                (Interface.WriteReq.value req) = Some d' /\
-             l = LSilent /\ m' = k (inl None) /\ ors = None /\ fn' = None
+             l = LDev /\ m' = k (inl None) /\ ors = None /\ fn' = None
            else
              n <> 0%N /\
              l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
@@ -295,7 +311,7 @@ Definition pstep_plic (cpu : CPU) (m : M unit) (rs : regstate)
     (fn : option (bool * bool * bool * bool)) (d : dev_state)
     (l : wlabel) (m' : M unit) (ors : option regstate)
     (fn' : option (bool * bool * bool * bool)) (d' : dev_state) : Prop :=
-  l = LSilent /\ m' = m /\ fn' = fn /\ d' = d /\
+  l = LDev /\ m' = m /\ fn' = fn /\ d' = d /\
   ors = Some (register_set sig_seip (bool_to_bit (dev_seip d (fin_to_nat cpu)))
                 rs).
 
@@ -306,41 +322,66 @@ Definition pstep_hart (cpu : CPU) (m : M unit) (rs : regstate)
   pstep_node cpu m rs fn d l m' ors fn' d'
   \/ pstep_plic cpu m rs fn d l m' ors fn' d'.
 
-(** THE DISK AGENT.  Three disjuncts, one per fabric event (P1): the DMA
-    burst (whose memory is a parameter — (P2)), the emit of one buffered
-    message, and the UART thread's move, which is a silent step of the
-    fabric-owning agent. *)
-Definition pdisk_burst (mem : gmap Arch.pa (bv 8)) (pend : list wmsg)
-    (d : dev_state) (l : wlabel) (pend' : list wmsg) (d' : dev_state) : Prop :=
-  pend = [] /\
-  exists w, wdisk_step d mem d' w /\ pend' = wmsgs_of_map w /\ l = LSilent.
+(** THE DISK AGENT (M5).  One disjunct per node of the residual device
+    program plus the three fabric arms; the UART thread is kept SEPARATE
+    ([pdisk_uart]) because it is a step of the same agent but not of the
+    device program, so the two language relations
+    ([WeakEvLang.edisk_step] / [euart_step]) factor one each.  There is no
+    existential memory anywhere any more: every arm that reads memory reads
+    THROUGH THE LABEL. *)
+Definition pdisk_prog (dp : option (DM dres)) (d : dev_state) (l : wlabel)
+    (dp' : option (DM dres)) (d' : dev_state) : Prop :=
+  (* START — reads the fabric *)
+  (dp = None /\ l = LDev /\ dp' = Some (virtio_prog (dvirtio d)) /\ d' = d)
+  \/
+  (* DRead — a hart's plain RAM read, the continuation at the label's bytes *)
+  (exists pa n aq k tvs,
+     dp = Some (DRead pa n aq k) /\ length tvs = n /\
+     l = LLoad aq false (pa_z pa) tvs /\ dp' = Some (k tvs.*2) /\ d' = d)
+  \/
+  (* DWrite — a hart's RAM write *)
+  (exists pa bs k,
+     dp = Some (DWrite pa bs k) /\ bs <> [] /\
+     l = LStore false (pa_z pa) bs /\ dp' = Some k /\ d' = d)
+  \/
+  (* DFence — the device-side write barrier *)
+  (exists k,
+     dp = Some (DFence k) /\ l = LFence true true true true /\
+     dp' = Some k /\ d' = d)
+  \/
+  (* COMMIT — moves the fabric *)
+  (exists delta,
+     dp = Some (DRet (DDone delta)) /\ l = LDev /\ dp' = None /\
+     d' = set_dvirtio d (delta (dvirtio d)))
+  \/
+  (* the malformed chain.  LABEL DECISION (recorded): [LSilent], not
+     [LDev] — this step reads nothing and moves nothing, it only replaces
+     the residual program by an arbitrary store chain, so it is
+     fabric-blind and fabric-preserving and [pdev_ok] holds for it.
+     Marking it [LDev] would put a spurious device event into the
+     replay's device order for no gain. *)
+  (exists prog',
+     dp = Some (DRet DWild) /\ dm_wild_chain prog' /\
+     l = LSilent /\ dp' = Some prog' /\ d' = d)
+  \/
+  (* nothing pending *)
+  (dp = Some (DRet DIdle) /\ l = LSilent /\ dp' = None /\ d' = d)
+  \/
+  (* THE PLIC LATCH — reads and moves the fabric *)
+  (exists p',
+     dev_irq_level d virtio_irq_id = true /\
+     plic_latch (dplic d) virtio_irq_id = Some p' /\
+     l = LDev /\ dp' = dp /\ d' = set_dplic d p').
 
-Definition pdisk_emit (pend : list wmsg) (d : dev_state) (l : wlabel)
-    (pend' : list wmsg) (d' : dev_state) : Prop :=
-  exists msg rest, pend = msg :: rest /\ pend' = rest /\ d' = d /\
-    wm_data msg <> [] /\ wm_tid msg = Some n_disk /\
-    l = LStore false (wm_pa msg) (wm_data msg).
+(** THE UART THREAD, a fabric move of the disk agent that touches neither
+    the residual program nor the log nor any view. *)
+Definition pdisk_uart (dp : option (DM dres)) (d : dev_state) (l : wlabel)
+    (dp' : option (DM dres)) (d' : dev_state) : Prop :=
+  dp' = dp /\ l = LDev /\ uart_step d d'.
 
-Definition pdisk_uart (pend : list wmsg) (d : dev_state) (l : wlabel)
-    (pend' : list wmsg) (d' : dev_state) : Prop :=
-  pend' = pend /\ l = LSilent /\ uart_step d d'.
-
-(** The disk agent's step AT A GIVEN DMA memory — the honest, language-side
-    form. *)
-Definition pstep_disk_at (mem : gmap Arch.pa (bv 8)) (pend : list wmsg)
-    (d : dev_state) (l : wlabel) (pend' : list wmsg) (d' : dev_state) : Prop :=
-  pdisk_burst mem pend d l pend' d' \/ pdisk_emit pend d l pend' d'
-  \/ pdisk_uart pend d l pend' d'.
-
-(** ... and the LAYER-1 form, whose burst memory is existential (P2). *)
-Definition pstep_disk (pend : list wmsg) (d : dev_state) (l : wlabel)
-    (pend' : list wmsg) (d' : dev_state) : Prop :=
-  (exists mem, pdisk_burst mem pend d l pend' d')
-  \/ pdisk_emit pend d l pend' d' \/ pdisk_uart pend d l pend' d'.
-
-Lemma pstep_disk_of_at mem pend d l pend' d' :
-  pstep_disk_at mem pend d l pend' d' -> pstep_disk pend d l pend' d'.
-Proof. intros [H|[H|H]]; [left; by exists mem|by right;left|by right;right]. Qed.
+Definition pstep_disk (dp : option (DM dres)) (d : dev_state) (l : wlabel)
+    (dp' : option (DM dres)) (d' : dev_state) : Prop :=
+  pdisk_prog dp d l dp' d' \/ pdisk_uart dp d l dp' d'.
 
 (** THE PROGRAM STEP, at Layer 1's type [P -> D -> wlabel -> P -> D -> Prop].
     Mismatched constructors are [False]. *)
@@ -351,9 +392,16 @@ Definition pstep_ev (p : pexv6) (d : dev_state) (l : wlabel)
       cpu' = cpu /\
       exists ors, rs' = default rs ors /\
         pstep_hart cpu m rs fn d l m' ors fn' d'
-  | PDisk pend, PDisk pend' => pstep_disk pend d l pend' d'
+  | PDisk dp, PDisk dp' => pstep_disk dp d l dp' d'
   | _, _ => False
   end.
+
+(** THE FABRIC MARKER.  [LDev] is exactly the label of the arms that read or
+    move the device fabric — the two MMIO arms and the PLIC wire on the hart
+    side, start/commit/latch and the UART on the disk side — so the marker
+    is a function of the LABEL alone. *)
+Definition pdev_ev (p : pexv6) (l : wlabel) (p' : pexv6) : bool :=
+  match l with LDev => true | _ => false end.
 
 (* ====================================================================== *)
 (** ** 3. The memory half: a SIDE CONDITION and a σ-TRANSFORMER, both
@@ -418,13 +466,16 @@ Definition elab_apply (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
     ([WeakEvLang.EDisk]'s [dws]), not in σ, so the transformer splits in two:
     [edlab_apply] for σ and [edlab_ws] for the agent's own view.  The message
     tid is [WeakLang.n_disk]. *)
-Definition edlab_ok (σ : wgstate) (l : wlabel) : Prop :=
+Definition edlab_ok (σ : wgstate) (dws : wstate) (l : wlabel) : Prop :=
   match l with
   | LSilent => True
+  | LLoad aq lat base tvs =>
+      read_ok (img_z (wgimg σ)) (wglog σ) dws aq lat base tvs
   | LStore _ _ data => data <> []
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
-  | _ => False
+  (* the device has no atomic read-modify-write *)
+  | LRmw _ _ _ _ _ => False
   end.
 
 Definition edlab_ws (σ : wgstate) (dws : wstate) (l : wlabel) : wstate :=
@@ -466,6 +517,16 @@ Proof. rewrite /elab_apply /=. by destruct σ. Qed.
 
 Lemma elab_apply_dev σ c k d' :
   elab_apply σ c LSilent k None d' = ewg_dev σ d'.
+Proof. reflexivity. Qed.
+
+(** ... and the same at the FABRIC MARKER, whose memory half is [LSilent]'s
+    verbatim.  These are what the MMIO arms and the PLIC wire use since M5. *)
+Lemma elab_apply_ldev σ c k d' :
+  elab_apply σ c LDev k None d' = ewg_dev σ d'.
+Proof. reflexivity. Qed.
+
+Lemma elab_apply_ldev_reg σ c k rs' :
+  elab_apply σ c LDev k (Some rs') (wgdev σ) = ewg_reg σ c rs'.
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_reg σ c k rs' :
@@ -510,7 +571,21 @@ Qed.
 Lemma edlab_apply_silent σ k : edlab_apply σ LSilent k (wgdev σ) = σ.
 Proof. rewrite /edlab_apply /=. by destruct σ. Qed.
 
+Lemma edlab_apply_ldev_id σ k : edlab_apply σ LDev k (wgdev σ) = σ.
+Proof. rewrite /edlab_apply /=. by destruct σ. Qed.
+
+Lemma edlab_apply_load_id σ k aq lat base tvs :
+  edlab_apply σ (LLoad aq lat base tvs) k (wgdev σ) = σ.
+Proof. rewrite /edlab_apply /=. by destruct σ. Qed.
+
+Lemma edlab_apply_fence_id σ k pr pw sr sw :
+  edlab_apply σ (LFence pr pw sr sw) k (wgdev σ) = σ.
+Proof. rewrite /edlab_apply /=. by destruct σ. Qed.
+
 Lemma edlab_apply_dev σ k d' : edlab_apply σ LSilent k d' = ewg_dev σ d'.
+Proof. reflexivity. Qed.
+
+Lemma edlab_apply_ldev σ k d' : edlab_apply σ LDev k d' = ewg_dev σ d'.
 Proof. reflexivity. Qed.
 
 Lemma edlab_apply_store σ k rl base data :
@@ -589,11 +664,11 @@ Proof.
           [reflexivity
           |exists w; split_and!; [exact Hrd|reflexivity..]
           |exact I
-          |by rewrite elab_apply_dev].
+          |by rewrite elab_apply_ldev].
       * intros (l & m' & ors & fn' & d' & He & (w & Hrd & -> & -> & -> & ->)
                 & _ & Hs); subst.
         exists w, d'. split_and!; [exact Hrd|reflexivity|].
-        by rewrite elab_apply_dev.
+        by rewrite elab_apply_ldev.
     + split.
       * intros (Hcoh & [(Hlat & w & tvs & Hlen & Hby & Hrd & -> & ->)
                        |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
@@ -636,11 +711,11 @@ Proof.
       split.
       * intros (d1 & Hwr & -> & ->). do 5 eexists. efac4;
           [reflexivity|split_and!; [exact Hwr|reflexivity..]|exact I
-          |by rewrite elab_apply_dev].
+          |by rewrite elab_apply_ldev].
       * intros (l & m' & ors & fn' & d' & He & (Hwr & -> & -> & -> & ->)
                 & _ & Hs); subst.
         exists d'. split_and!; [exact Hwr|reflexivity|].
-        by rewrite elab_apply_dev.
+        by rewrite elab_apply_ldev.
     + split.
       * intros (Hn & -> & ->). do 5 eexists. efac4;
           [reflexivity|split_and!; [exact Hn|reflexivity..]
@@ -679,128 +754,146 @@ Theorem eplic_step_factor σ σ' :
 Proof.
   rewrite /eplic_step /pstep_plic. split.
   - intros (c & ->).
-    exists c, LSilent,
+    exists c, LDev,
       (Some (register_set sig_seip
                (bool_to_bit (dev_seip (wgdev σ) (fin_to_nat c)))
                (wgregs σ c))), (wgdev σ).
     split_and!; [by intros m fn; split_and!|exact I|].
-    by rewrite elab_apply_reg.
+    by rewrite elab_apply_ldev_reg.
   - intros (c & l & ors & d' & Hp & _ & Hs).
     destruct (Hp (Interface.Ret tt) None) as (-> & _ & _ & -> & ->).
-    exists c. by rewrite Hs elab_apply_reg.
+    exists c. by rewrite Hs elab_apply_ldev_reg.
 Qed.
 
-(** THE UART THREAD, as a silent fabric move of the disk agent: it moves
-    neither the burst buffer nor the disk's own view. *)
-Theorem euart_step_factor (pend : list wmsg) (dws : wstate) σ σ' :
+(** THE UART THREAD, a FABRIC move of the disk agent: it moves neither the
+    residual device program nor the disk's own view. *)
+Theorem euart_step_factor (dp : option (DM dres)) (dws : wstate) σ σ' :
   euart_step σ σ' <->
-  exists (l : wlabel) (pend' : list wmsg) (d' : dev_state),
-    pdisk_uart pend (wgdev σ) l pend' d' /\
-    pend' = pend /\ edlab_ws σ dws l = dws /\
-    edlab_ok σ l /\
-    σ' = edlab_apply σ l (pcls_ev (PDisk pend) l dws) d'.
+  exists (l : wlabel) (dp' : option (DM dres)) (d' : dev_state),
+    pdisk_uart dp (wgdev σ) l dp' d' /\
+    dp' = dp /\ edlab_ws σ dws l = dws /\
+    edlab_ok σ dws l /\
+    σ' = edlab_apply σ l (pcls_ev (PDisk dp) l dws) d'.
 Proof.
   rewrite /euart_step /pdisk_uart. split.
-  - intros (d1 & Hu & ->). exists LSilent, pend, d1.
+  - intros (d1 & Hu & ->). exists LDev, dp, d1.
     split_and!; try reflexivity; try exact I; try exact Hu;
-      try (by rewrite edlab_apply_dev).
-  - intros (l & pend' & d' & (-> & -> & Hu) & _ & _ & _ & Hs).
-    exists d'. split; [exact Hu|]. by rewrite Hs edlab_apply_dev.
+      try (by rewrite edlab_apply_ldev).
+  - intros (l & dp' & d' & (-> & -> & Hu) & _ & _ & _ & Hs).
+    exists d'. split; [exact Hu|]. by rewrite Hs edlab_apply_ldev.
 Qed.
 
-(** THE DISK'S EMIT. *)
-Theorem edisk_emit_factor gen (pend : list wmsg) (dws : wstate) σ e' σ' :
-  edisk_emit gen pend dws σ e' σ' <->
-  exists (l : wlabel) (pend' : list wmsg) (d' : dev_state),
-    e' = EDisk gen pend' (edlab_ws σ dws l) /\
-    pdisk_emit pend (wgdev σ) l pend' d' /\
-    edlab_ok σ l /\
-    σ' = edlab_apply σ l (pcls_ev (PDisk pend) l dws) d'.
+(** THE DISK THREAD (M5) — the whole device program, arm for arm, with NO
+    memory existential anywhere: every arm that reads memory reads through
+    its label, exactly as a hart does.  The disk's [wstate] lives in the
+    EXPRESSION, so the memory half splits: [edlab_ws] updates the
+    expression's view and [edlab_apply] updates σ (the log and the
+    fabric). *)
+Theorem edisk_step_factor gen (dp : option (DM dres)) (dws : wstate) σ e' σ' :
+  edisk_step gen dp dws σ e' σ' <->
+  exists (l : wlabel) (dp' : option (DM dres)) (d' : dev_state),
+    e' = EDisk gen dp' (edlab_ws σ dws l) /\
+    pdisk_prog dp (wgdev σ) l dp' d' /\
+    edlab_ok σ dws l /\
+    σ' = edlab_apply σ l (pcls_ev (PDisk dp) l dws) d'.
 Proof.
-  rewrite /edisk_emit /pdisk_emit. split.
-  - intros (msg & rest & -> & Hne & Htid & -> & ->).
-    exists (LStore false (wm_pa msg) (wm_data msg)), rest, (wgdev σ).
-    split_and!; [reflexivity| |exact Hne|].
-    + exists msg, rest. by split_and!.
-    + rewrite edlab_apply_store /=. do 2 f_equal.
-      rewrite -Htid. by destruct msg.
-  - intros (l & pend' & d' & He & (msg & rest & -> & -> & -> & Hne & Htid & ->)
-            & _ & Hs).
-    exists msg, rest. split_and!; [reflexivity|exact Hne|exact Htid| |].
-    + by rewrite He.
-    + rewrite Hs edlab_apply_store /=. do 2 f_equal.
-      rewrite -Htid. by destruct msg.
+  rewrite /edisk_step /pdisk_prog. split.
+  - intros [(-> & -> & ->)
+           |[(pa & n & aq & k & tvs & Hdp & Hlen & Hrd & -> & ->)
+           |[(pa & bs & k & Hdp & Hne & -> & ->)
+           |[(k & Hdp & -> & ->)
+           |[(delta & Hdp & -> & ->)
+           |[(prog' & Hdp & Hch & -> & ->)
+           |[(Hdp & -> & ->)
+           |(p' & Hlv & Hlt & -> & ->)]]]]]]].
+    + (* START *)
+      exists LDev, (Some (virtio_prog (dvirtio (wgdev σ)))), (wgdev σ).
+      split_and!; [reflexivity| |exact I|by rewrite edlab_apply_ldev_id].
+      left. by split_and!.
+    + (* DRead *)
+      eexists (LLoad aq false (pa_z pa) tvs), (Some (k tvs.*2)), (wgdev σ).
+      split_and!; [reflexivity| |exact Hrd
+                  |by rewrite edlab_apply_load_id].
+      right; left. exists pa, n, aq, k, tvs. by split_and!.
+    + (* DWrite *)
+      exists (LStore false (pa_z pa) bs), (Some k), (wgdev σ).
+      split_and!; [reflexivity| |exact Hne|reflexivity].
+      right; right; left. exists pa, bs, k. by split_and!.
+    + (* DFence *)
+      exists (LFence true true true true), (Some k), (wgdev σ).
+      split_and!; [reflexivity| |exact I|by rewrite edlab_apply_fence_id].
+      right; right; right; left. by exists k.
+    + (* COMMIT *)
+      exists LDev, None,
+        (set_dvirtio (wgdev σ) (delta (dvirtio (wgdev σ)))).
+      split_and!; [reflexivity| |exact I|by rewrite edlab_apply_ldev].
+      right; right; right; right; left. by exists delta.
+    + (* DWild *)
+      exists LSilent, (Some prog'), (wgdev σ).
+      split_and!; [reflexivity| |exact I|by rewrite edlab_apply_silent].
+      right; right; right; right; right; left. by exists prog'.
+    + (* DIdle *)
+      exists LSilent, None, (wgdev σ).
+      split_and!; [reflexivity| |exact I|by rewrite edlab_apply_silent].
+      right; right; right; right; right; right; left. by split_and!.
+    + (* the PLIC latch *)
+      exists LDev, dp, (set_dplic (wgdev σ) p').
+      split_and!; [reflexivity| |exact I|by rewrite edlab_apply_ldev].
+      right; right; right; right; right; right; right. by exists p'.
+  - intros (l & dp' & d' & He &
+            [(-> & -> & -> & ->)
+            |[(pa & n & aq & k & tvs & -> & Hlen & -> & -> & ->)
+            |[(pa & bs & k & -> & Hne & -> & -> & ->)
+            |[(k & -> & -> & -> & ->)
+            |[(delta & -> & -> & -> & ->)
+            |[(prog' & -> & Hch & -> & -> & ->)
+            |[(-> & -> & -> & ->)
+            |(p' & Hlv & Hlt & -> & -> & ->)]]]]]]] & Hok & Hs); subst.
+    + left. split_and!; [reflexivity|reflexivity
+                        |by rewrite edlab_apply_ldev_id].
+    + right; left. exists pa, (length tvs), aq, k, tvs.
+      split_and!; [reflexivity|reflexivity|exact Hok|reflexivity
+                  |by rewrite edlab_apply_load_id].
+    + right; right; left. exists pa, bs, k.
+      split_and!; [reflexivity|exact Hne|reflexivity|reflexivity].
+    + right; right; right; left. exists k.
+      split_and!; [reflexivity|reflexivity|by rewrite edlab_apply_fence_id].
+    + right; right; right; right; left. exists delta.
+      split_and!; [reflexivity|reflexivity|by rewrite edlab_apply_ldev].
+    + right; right; right; right; right; left. exists prog'.
+      split_and!; [reflexivity|exact Hch|reflexivity
+                  |by rewrite edlab_apply_silent].
+    + right; right; right; right; right; right; left.
+      split_and!; [reflexivity|reflexivity|by rewrite edlab_apply_silent].
+    + right; right; right; right; right; right; right. exists p'.
+      split_and!; [exact Hlv|exact Hlt|reflexivity
+                  |by rewrite edlab_apply_ldev].
 Qed.
 
-(** THE DISK'S DMA BURST, at the LANGUAGE's flat memory (P2). *)
-Theorem edisk_burst_factor gen (pend : list wmsg) (dws : wstate) σ e' σ' :
-  edisk_burst gen pend dws σ e' σ' <->
-  exists (l : wlabel) (pend' : list wmsg) (d' : dev_state),
-    e' = EDisk gen pend' (edlab_ws σ dws l) /\
-    pdisk_burst (wflat (wgimg σ) (wglog σ)) pend (wgdev σ) l pend' d' /\
-    edlab_ok σ l /\
-    σ' = edlab_apply σ l (pcls_ev (PDisk pend) l dws) d'.
+(** The two disk relations at the [pstep_disk] shape. *)
+Corollary edisk_step_pstep_disk gen (dp : option (DM dres)) (dws : wstate)
+    σ e' σ' :
+  edisk_step gen dp dws σ e' σ' ->
+  exists (l : wlabel) (dp' : option (DM dres)) (d' : dev_state),
+    e' = EDisk gen dp' (edlab_ws σ dws l) /\
+    pstep_disk dp (wgdev σ) l dp' d' /\
+    edlab_ok σ dws l /\
+    σ' = edlab_apply σ l (pcls_ev (PDisk dp) l dws) d'.
 Proof.
-  rewrite /edisk_burst /pdisk_burst. split.
-  - intros (-> & d1 & w & Hst & -> & ->).
-    exists LSilent, (wmsgs_of_map w), d1.
-    split_and!; try reflexivity; try exact I; try (by exists w);
-      try (by rewrite edlab_apply_dev).
-  - intros (l & pend' & d' & He & (-> & w & Hst & -> & ->) & _ & Hs).
-    split; [reflexivity|]. exists d', w. split_and!; [exact Hst| |].
-    + by rewrite He.
-    + by rewrite Hs edlab_apply_dev.
+  intros H. apply edisk_step_factor in H as (l & dp' & d' & ? & Hd & ? & ?).
+  exists l, dp', d'. split_and!; [done|by left|done|done].
 Qed.
 
-(** ... and the two together, which is [WeakEvLang.edisk_step]. *)
-Theorem edisk_step_factor gen (pend : list wmsg) (dws : wstate) σ e' σ' :
-  edisk_step gen pend dws σ e' σ' <->
-  exists (l : wlabel) (pend' : list wmsg) (d' : dev_state),
-    e' = EDisk gen pend' (edlab_ws σ dws l) /\
-    (pdisk_burst (wflat (wgimg σ) (wglog σ)) pend (wgdev σ) l pend' d'
-     \/ pdisk_emit pend (wgdev σ) l pend' d') /\
-    edlab_ok σ l /\
-    σ' = edlab_apply σ l (pcls_ev (PDisk pend) l dws) d'.
-Proof.
-  rewrite /edisk_step. split.
-  - intros [Hb|He].
-    + apply edisk_burst_factor in Hb as (l & pend' & d' & ? & ? & ? & ?).
-      exists l, pend', d'. split_and!; [done|by left|done|done].
-    + apply edisk_emit_factor in He as (l & pend' & d' & ? & ? & ? & ?).
-      exists l, pend', d'. split_and!; [done|by right|done|done].
-  - intros (l & pend' & d' & He & [Hb|Hm] & Hok & Hs).
-    + left. apply edisk_burst_factor. exists l, pend', d'. by split_and!.
-    + right. apply edisk_emit_factor. exists l, pend', d'. by split_and!.
-Qed.
-
-(** THE ⇐ COROLLARY AT THE LAYER-1 SHAPE: every disk-agent event of the
-    language is a [pstep_disk] (whose burst memory is existential).  The ⇒
-    direction is the one that does NOT hold, by (P2). *)
-Corollary edisk_step_pstep_disk gen (pend : list wmsg) (dws : wstate) σ e' σ' :
-  edisk_step gen pend dws σ e' σ' ->
-  exists (l : wlabel) (pend' : list wmsg) (d' : dev_state),
-    e' = EDisk gen pend' (edlab_ws σ dws l) /\
-    pstep_disk pend (wgdev σ) l pend' d' /\
-    edlab_ok σ l /\
-    σ' = edlab_apply σ l (pcls_ev (PDisk pend) l dws) d'.
-Proof.
-  intros H. apply edisk_step_factor in H as (l & pend' & d' & ? & Hd & ? & ?).
-  exists l, pend', d'. split_and!; [done| |done|done].
-  apply (pstep_disk_of_at (wflat (wgimg σ) (wglog σ))).
-  destruct Hd as [Hb|Hm]; [by left|by right;left].
-Qed.
-
-Corollary euart_step_pstep_disk (pend : list wmsg) (dws : wstate) σ σ' :
+Corollary euart_step_pstep_disk (dp : option (DM dres)) (dws : wstate) σ σ' :
   euart_step σ σ' ->
   exists (l : wlabel) (d' : dev_state),
-    pstep_disk pend (wgdev σ) l pend d' /\
-    edlab_ws σ dws l = dws /\ edlab_ok σ l /\
-    σ' = edlab_apply σ l (pcls_ev (PDisk pend) l dws) d'.
+    pstep_disk dp (wgdev σ) l dp d' /\
+    edlab_ws σ dws l = dws /\ edlab_ok σ dws l /\
+    σ' = edlab_apply σ l (pcls_ev (PDisk dp) l dws) d'.
 Proof.
-  intros H. apply (euart_step_factor pend dws) in H
-    as (l & pend' & d' & Hu & -> & Hws & Hok & Hs).
-  exists l, d'. split_and!; [|done|done|done].
-  apply (pstep_disk_of_at ∅). by right; right.
+  intros H. apply (euart_step_factor dp dws) in H
+    as (l & dp' & d' & Hu & -> & Hws & Hok & Hs).
+  exists l, d'. split_and!; [by right|done|done|done].
 Qed.
 
 (** THE HART ARMS AT THE [pstep_hart] SHAPE: both the cycle event and the
@@ -875,18 +968,76 @@ Proof.
   intros [H|(H & _)]; [by eapply pstep_node_lat_free|done].
 Qed.
 
-Lemma pstep_disk_lat_free pend d aq lat base tvs pend' d' :
-  ~ pstep_disk pend d (LLoad aq lat base tvs) pend' d'.
+(** The disk DOES load since M5 — but, exactly like a hart, never with
+    [lat = true]: the device has no coherent/latest read. *)
+Lemma pdisk_prog_lat_free dp d aq base tvs dp' d' :
+  ~ pdisk_prog dp d (LLoad aq true base tvs) dp' d'.
 Proof.
-  intros [(mem & _ & w & _ & _ & Hl)
-         |[(msg & rest & _ & _ & _ & _ & _ & Hl)|(_ & Hl & _)]]; done.
+  intros [(_ & Hl & _)
+         |[(pa & n & aq0 & k & tvs0 & _ & _ & Hl & _)
+         |[(pa & bs & k & _ & _ & Hl & _)
+         |[(k & _ & Hl & _)
+         |[(delta & _ & Hl & _)
+         |[(prog' & _ & _ & Hl & _)
+         |[(_ & Hl & _)
+         |(p' & _ & _ & Hl & _)]]]]]]]; by simplify_eq.
+Qed.
+
+Lemma pstep_disk_lat_free dp d aq base tvs dp' d' :
+  ~ pstep_disk dp d (LLoad aq true base tvs) dp' d'.
+Proof. intros [H|(_ & Hl & _)]; [by eapply pdisk_prog_lat_free|done]. Qed.
+
+(** ... and no disk arm ever emits an [LRmw]. *)
+Lemma pstep_disk_no_rmw dp d aq rl base tvs data dp' d' :
+  ~ pstep_disk dp d (LRmw aq rl base tvs data) dp' d'.
+Proof.
+  intros [[(_ & Hl & _)
+          |[(pa & n & aq0 & k & tvs0 & _ & _ & Hl & _)
+          |[(pa & bs & k & _ & _ & Hl & _)
+          |[(k & _ & Hl & _)
+          |[(delta & _ & Hl & _)
+          |[(prog' & _ & _ & Hl & _)
+          |[(_ & Hl & _)
+          |(p' & _ & _ & Hl & _)]]]]]]]
+         |(_ & Hl & _)]; by simplify_eq.
+Qed.
+
+(** THE TIMESTAMP-OBLIVIOUSNESS of the disk's own load: the continuation
+    takes [tvs.*2] and nothing else. *)
+Lemma pdisk_prog_ts_load dp d aq base tvs tvs' dp' d' :
+  pdisk_prog dp d (LLoad aq false base tvs) dp' d' ->
+  tvs'.*2 = tvs.*2 ->
+  pdisk_prog dp d (LLoad aq false base tvs') dp' d'.
+Proof.
+  intros [(_ & Hl & _)
+         |[(pa & n & aq0 & k & tvs0 & Hdp & Hlen & Hl & Hdp' & Hd)
+         |[(pa & bs & k & _ & _ & Hl & _)
+         |[(k & _ & Hl & _)
+         |[(delta & _ & Hl & _)
+         |[(prog' & _ & _ & Hl & _)
+         |[(_ & Hl & _)
+         |(p' & _ & _ & Hl & _)]]]]]]] Hts; try by simplify_eq.
+  simplify_eq/=.
+  have Hlen' : length tvs' = length tvs0.
+  { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
+  right; left. exists pa, (length tvs0), aq0, k, tvs'.
+  split_and!; [reflexivity|exact Hlen'|reflexivity|by rewrite Hts|reflexivity].
+Qed.
+
+Lemma pstep_disk_ts_load dp d aq base tvs tvs' dp' d' :
+  pstep_disk dp d (LLoad aq false base tvs) dp' d' ->
+  tvs'.*2 = tvs.*2 ->
+  pstep_disk dp d (LLoad aq false base tvs') dp' d'.
+Proof.
+  intros [H|(_ & Hl & _)] Hts; [|done].
+  left. by eapply pdisk_prog_ts_load.
 Qed.
 
 Theorem pstep_ev_lat_free p d aq base tvs p' d' :
   ~ pstep_ev p d (LLoad aq true base tvs) p' d'.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|pend], p' as [cpu' m' rs' fn'|pend']; simpl;
+  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
     try (by intros []).
   - intros (_ & ors & _ & H). by eapply pstep_hart_lat_free.
   - apply pstep_disk_lat_free.
@@ -972,12 +1123,12 @@ Theorem pstep_ev_ts_load p d aq base tvs tvs' p' d' :
   pstep_ev p d (LLoad aq false base tvs') p' d'.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|pend], p' as [cpu' m' rs' fn'|pend']; simpl;
+  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
     try (by intros ? ?).
   - intros (-> & ors & -> & [H|(H & _)]) Hts; [|done].
     split; [reflexivity|]. exists ors. split; [reflexivity|].
     left. by eapply pstep_node_ts_load.
-  - intros H. by apply pstep_disk_lat_free in H.
+  - apply pstep_disk_ts_load.
 Qed.
 
 Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data p' d' :
@@ -986,11 +1137,108 @@ Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data p' d' :
   pstep_ev p d (LRmw aq rl base tvs' data) p' d'.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|pend], p' as [cpu' m' rs' fn'|pend']; simpl;
+  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
     try (by intros ? ?).
   - intros (-> & ors & -> & [H|(H & _)]) Hts; [|done].
     split; [reflexivity|]. exists ors. split; [reflexivity|].
     left. by eapply pstep_node_ts_rmw.
-  - intros [(mem & _ & w & _ & _ & Hl)
-           |[(msg & rest & _ & _ & _ & _ & _ & Hl)|(_ & Hl & _)]]; done.
+  - intros H. by apply pstep_disk_no_rmw in H.
+Qed.
+
+(* ====================================================================== *)
+(** ** 7. THE FABRIC MARKER IS SOUND ([WeakPromiseFact.pdev_ok])
+
+    The one law Layer 1's factorization asks of the marker: a step the
+    marker calls NOT fabric-touching must leave the fabric alone AND be
+    available at every fabric.  Since [pdev_ev] reads the marker off the
+    LABEL, this is a case analysis in which every arm whose label is not
+    [LDev] mentions the fabric exactly once, as [d' = d]. *)
+
+Lemma pnode_step_dev_free m rs d l m' ors fn' d' :
+  pnode_step m rs d l m' ors fn' d' -> l <> LDev ->
+  d' = d /\ forall d0, pnode_step m rs d0 l m' ors fn' d0.
+Proof.
+  rewrite /pnode_step. destruct m as [y|T oc k].
+  { intros (tick & Hl & -> & -> & -> & ->) _. split; [reflexivity|].
+    intros d0. exists tick. by split_and!. }
+  destruct oc; simpl;
+    try (intros (Hl & -> & -> & -> & ->) _; split; [reflexivity|];
+         intros d0; by split_and!);
+    try (by intros []).
+  - (* MemRead *) destruct (dev_addr _).
+    + intros (w & Hrd & Hl & _) Hne. by destruct (Hne Hl).
+    + intros (Hcoh & [(Hlat & w & tvs & Hlen & Hby & Hl & -> & -> & -> & ->)
+                     |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
+                       Hlen & Hby & Hnl & Hlend & Hsil & Hwr & Hl
+                       & -> & -> & -> & ->)]) _;
+        (split; [reflexivity|]); intros d0.
+      * split; [exact Hcoh|]. left. split; [exact Hlat|].
+        exists w, tvs. by split_and!.
+      * split; [exact Hcoh|]. right. split; [exact Hlat|].
+        exists w, tvs, data, rl, m1, m2, rs1. by split_and!.
+  - (* MemWrite *) destruct (dev_addr _).
+    + intros (Hwr & Hl & _) Hne. by destruct (Hne Hl).
+    + intros (Hn & Hl & -> & -> & -> & ->) _. split; [reflexivity|].
+      intros d0. by split_and!.
+  - (* Choose *) intros (ch & Hl & -> & -> & -> & ->) _.
+    split; [reflexivity|]. intros d0. exists ch. by split_and!.
+Qed.
+
+Lemma pstep_node_dev_free cpu m rs fn d l m' ors fn' d' :
+  pstep_node cpu m rs fn d l m' ors fn' d' -> l <> LDev ->
+  d' = d /\ forall d0, pstep_node cpu m rs fn d0 l m' ors fn' d0.
+Proof.
+  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
+  - intros (Hl & -> & -> & -> & ->) _. split; [reflexivity|].
+    intros d0. by split_and!.
+  - apply pnode_step_dev_free.
+Qed.
+
+Lemma pdisk_prog_dev_free dp d l dp' d' :
+  pdisk_prog dp d l dp' d' -> l <> LDev ->
+  d' = d /\ forall d0, pdisk_prog dp d0 l dp' d0.
+Proof.
+  intros [(Hdp & Hl & _)
+         |[(pa & n & aq & k & tvs & Hdp & Hlen & Hl & Hdp' & ->)
+         |[(pa & bs & k & Hdp & Hbs & Hl & Hdp' & ->)
+         |[(k & Hdp & Hl & Hdp' & ->)
+         |[(delta & Hdp & Hl & _)
+         |[(prog' & Hdp & Hch & Hl & Hdp' & ->)
+         |[(Hdp & Hl & Hdp' & ->)
+         |(p' & Hlv & Hlt & Hl & Hdp' & _)]]]]]]] Hne;
+    try by destruct (Hne Hl).
+  - split; [reflexivity|]. intros d0. right; left.
+    exists pa, n, aq, k, tvs. by split_and!.
+  - split; [reflexivity|]. intros d0. right; right; left.
+    exists pa, bs, k. by split_and!.
+  - split; [reflexivity|]. intros d0. right; right; right; left.
+    exists k. by split_and!.
+  - split; [reflexivity|]. intros d0.
+    right; right; right; right; right; left. exists prog'. by split_and!.
+  - split; [reflexivity|]. intros d0.
+    right; right; right; right; right; right; left. by split_and!.
+Qed.
+
+Lemma pstep_disk_dev_free dp d l dp' d' :
+  pstep_disk dp d l dp' d' -> l <> LDev ->
+  d' = d /\ forall d0, pstep_disk dp d0 l dp' d0.
+Proof.
+  intros [H|(_ & Hl & _)] Hne; [|by destruct (Hne Hl)].
+  destruct (pdisk_prog_dev_free _ _ _ _ _ H Hne) as (-> & Hall).
+  split; [reflexivity|]. intros d0. by left.
+Qed.
+
+Theorem pdev_ev_ok : pdev_ok pstep_ev pdev_ev.
+Proof.
+  intros p d l p' d' Hs Hm.
+  have Hne : l <> LDev.
+  { intros ->. by rewrite /pdev_ev in Hm. }
+  revert Hs. rewrite /pstep_ev.
+  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; try done.
+  - intros (-> & ors & -> & [Hn|(Hl & _)]); [|by destruct (Hne Hl)].
+    destruct (pstep_node_dev_free _ _ _ _ _ _ _ _ _ _ Hn Hne) as (-> & Hall).
+    split; [reflexivity|]. intros d0. split; [reflexivity|].
+    exists ors. split; [reflexivity|]. left. apply Hall.
+  - intros Hs. destruct (pstep_disk_dev_free _ _ _ _ _ Hs Hne) as (-> & Hall).
+    split; [reflexivity|]. intros d0. apply Hall.
 Qed.

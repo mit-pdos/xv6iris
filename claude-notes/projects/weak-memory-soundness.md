@@ -91,10 +91,35 @@ FENCE I/O-bit issue (Sail drops the bits) is MOOT for safety under this
 model; recorded as assumption 3 of the design.
 - **C1** `VirtioModel`: `DM`, `dres`, `virtio_prog`, and the equivalence
   lemma with `virtio_req_step`/`virtio_stalled` over a flat `mv`.
-- **C2** `WeakEvLang`: `EDisk gen (dp : option (DM dres)) dws`; the arms of
-  the design; `wflat`/`wdisk_step`/`pend` leave the event language.
-- **C3** `WeakEvInst`/`WeakEvPf`: the disk arms as `PFLoad`/`PFStore`/
-  `PFFence`/`PFSilent(LDev)`; ⇒ holds for the disk; the capstone closes.
+- **C2** DONE (2026-08-17) `WeakEvLang`: `EDisk gen (dp : option (DM dres))
+  dws`; the eight arms of the design (start / `DRead` / `DWrite` / `DFence`
+  / commit / `DWild` / `DIdle` / latch), each fabric-touching one its own
+  disjunct; the store class spelled once as `ddev_class = wm_class_of
+  ddev_ak` (a PLAIN EXPLICIT store, hence `WCrel` exactly when the disk's
+  own `w_relp` is armed by its `DFence`).  `wflat`/`wdisk_step`/
+  `wmsgs_of_map`/`pend`/`edisk_burst`/`edisk_emit`/`epend_canon` left the
+  event language; `edp_wf`/`edisk_step_wf` and a `DRead`-excepting
+  `eprim_step_disk_reducible` took their place (a `DRead` with no
+  admissible timestamps is legitimately STUCK — the driver's WP
+  obligation).  `WeakEvPf` followed (`ep_dp`, `PDisk dp`, `EPFDisk`,
+  `edlabel_ok` at `LLoad`/`LFence`, `edisk_step_label`); `EPFUart`/
+  `EPFPlic`/the MMIO branches relabelled `LDev`; `WeakEvAdequacy`/
+  `WeakEvLift`/`WeakEvStarted` needed NO change.
+- **C3** DONE (2026-08-17) `WeakEvInst`: `pstep_disk = pdisk_prog ∨
+  pdisk_uart` with one disjunct per arm and NO memory existential anywhere
+  (`pdisk_burst`/`pstep_disk_at`/`pstep_disk_of_at`/`pdisk_emit` deleted);
+  the hart's MMIO arms and `pstep_plic` relabelled `LDev`; `pcls_ev (PDisk
+  _) (LStore …) ws := ddev_class ws`; `pdev_ev _ l _ := (l = LDev)` with
+  `pdev_ev_ok : WeakPromiseFact.pdev_ok pstep_ev pdev_ev`; a new
+  `edisk_step_factor` covering all eight disk arms in BOTH directions,
+  plus `euart_step_factor`, `ecycle_step_factor`, `eplic_step_factor`
+  re-proved at the new labels, and the lat-freedom / ts-obliviousness
+  lemmas extended to the disk's loads.  RECORDED DECISION: the `DWild`
+  arm's label is `LSilent`, not `LDev` (it reads and moves nothing, so it
+  is fabric-blind and `pdev_ok` holds; `LDev` would only add a spurious
+  device event to the replay order).  The remaining step to the capstone is
+  the pf-side WRAPPER (`epf_step` ⇄ `wp_pf_step pstep_ev pcls_ev`), which
+  is B3's ⇒/⇐ statement — now with NO named exception.
 - **C4** (later, M4-port track): per-node EWP rules for the disk thread; the
   driver proof that `DWild` is unreachable.
 

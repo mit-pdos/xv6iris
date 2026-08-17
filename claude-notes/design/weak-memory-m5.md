@@ -75,29 +75,104 @@ answered from a flat `mv` and the writes collected yields exactly
 `virtio_req_step v mv` (`Some (δ v, writes)`), `None`+`DWild` exactly when
 `virtio_stalled v mv`, and `DIdle` exactly when not pending.
 
-## The language (`WeakEvLang`)
+## The language (`WeakEvLang`) — **LANDED 2026-08-17 (C2)**
 
-`EDisk gen (dp : option (DM dres)) (dws : wstate)`.  Arms of the disk
-thread (all under `ethread_live`):
-- **start** (`dp = None`): read the fabric's virtio state `v := dvirtio (wgdev σ)`, `dp' := Some (virtio_prog v)`.  Fabric-touching, log/ws-free: label `LDev`.
-- **`DRead pa n aq k`**: EXACTLY the hart's plain RAM-read arm at `dws` (`read_ok … dws aq false …`, `dws' := load_post_run dws aq …`, continuation `k` gets the bytes).  Label `LLoad aq false`.
-- **`DWrite pa bs k`**: EXACTLY the hart's RAM-write arm at `dws`, tid `Some n_disk`, class `wm_class_of plain dws` (= `WCplain`/`WCrel` per `w_relp`).  Label `LStore`.
-- **`DFence k`**: `dws' := fence_post dws true true true true`.  Label `LFence`.
-- **`DRet (DDone δ)`**: commit: `wgdev' := set_dvirtio (wgdev σ) (δ (dvirtio (wgdev σ)))`, `dp' := None`.  Label `LDev`.
-- **`DRet DWild`**: the retained "anything" arm: `dp' := None` and the disk may then emit ARBITRARY messages — model this as `dp' := Some (arbitrary DWrite chain)` chosen at this step (`∃ prog', prog' is a chain of DWrites ending in DRet DIdle`), so the emits are still ordinary store events.  Label `LDev` (it reads nothing; mark it fabric-free if simpler — decide at build time, record).
-- **`DRet DIdle`**: `dp' := None`, silent (`LSilent`).
-- **latch** (`WDiskStepLatch`, PLIC latch of the virtio irq level): unchanged, at any time, label `LDev`.
-- The UART thread and PLIC thread: unchanged (labels `LDev`).
+`EDisk gen (dp : option (DM dres)) (dws : wstate)`; `epower_fork` forks
+`EDisk gen None ws_init`.  `edisk_step gen dp dws σ e' σ'` has EIGHT
+disjuncts, one per node of the residual program plus the three fabric
+arms — each its own disjunct, which is what the `LDev` marking keys on:
 
-`wflat`, `wdisk_step`, `wmsgs_of_map`, `pend`, `epend_canon` leave the event language (they stay in `WeakLang.v` for the archived instruction-atomic tier).
+- **start** (`dp = None`): `dp' := Some (virtio_prog (dvirtio (wgdev σ)))`,
+  σ unchanged.  Reads the fabric.
+- **`DRead pa n aq k`**: the hart's plain RAM-read arm at `dws` —
+  `length tvs = n`, `read_ok (img_z (wgimg σ)) (wglog σ) dws aq false
+  (pa_z pa) tvs`, `dp' := Some (k tvs.*2)`,
+  `dws' := load_post_run dws aq (pa_z pa) tvs.*1`, σ unchanged.  There is
+  no `nth_byte`/`w` relation as on the hart side: the device monad's read
+  returns the byte LIST, so `tvs.*2` IS the answer.
+- **`DWrite pa bs k`**: the hart's RAM-write arm at `dws` — `bs ≠ []`,
+  message `WMsg (pa_z pa) bs (Some n_disk) (ddev_class dws)`,
+  `dws' := store_post_run dws false (pa_z pa) (length bs)
+  (S (length (wglog σ)))`.
+- **`DFence k`**: `dws' := fence_post dws true true true true`.
+- **`DRet (DDone δ)`**: `wgdev' := set_dvirtio (wgdev σ) (δ (dvirtio
+  (wgdev σ)))`, `dp' := None`.  Moves the fabric.
+- **`DRet DWild`**: `dp' := Some prog'` for any `prog'` with
+  `dm_wild_chain prog'` (a chain of nonempty `DWrite`s ending in
+  `DRet DIdle`), σ unchanged.
+- **`DRet DIdle`**: `dp' := None`, σ unchanged.
+- **latch**: `dev_irq_level (wgdev σ) virtio_irq_id = true`,
+  `plic_latch (dplic (wgdev σ)) virtio_irq_id = Some p'`,
+  `wgdev' := set_dplic (wgdev σ) p'`, `dp` unchanged.  Reads and moves the
+  fabric.
 
-## The instance (`WeakEvInst`)
+**THE STORE CLASS, spelled once** (`ddev_ak`/`ddev_class`, with
+`ddev_class_eq` and `ddev_ak_plain` proving both readings agree):
+```coq
+Definition ddev_ak    : akinfo    := AkInfo false false false.
+Definition ddev_class (ws : wstate) : wm_class := wm_class_of ddev_ak ws.
+Lemma ddev_class_eq ws : ddev_class ws = if w_relp ws then WCrel else WCplain.
+Lemma ddev_ak_plain :
+  ddev_ak = classify (AK_explicit (Build_Explicit_access_kind AV_plain AS_normal)).
+```
+i.e. the device's stores are PLAIN EXPLICIT stores and `wm_class_of` gives
+them `WCrel` exactly when the disk's own `w_relp` is armed — which, by
+`fence_post _ true true true true`, is exactly the used-index store right
+after the `DFence`.  The device's release is therefore a publication in
+the same sense a hart's is, computed and not annotated.
 
-`pstep_disk (PDisk dp) d l (PDisk dp') d'` = the program half of each arm
-above (fabric moves at start/commit/latch, monad advance everywhere else),
-`pcls_ev (PDisk _) (LStore …) ws := wm_class_of plain ws`; `pdev_ev _ l _ :=
-(l = LDev)`.  The ⇒ direction now holds for every disk arm because every
-memory-reading arm reads through the label.
+`wflat`, `wdisk_step`, `wmsgs_of_map`, `pend`, `edisk_burst`,
+`edisk_emit`, `epend_canon`(`_nil`/`_step`) are GONE from the event
+language (they stay in `WeakLang.v` for the archived instruction-atomic
+tier).  Their replacements, keeping the §§8–10 families in shape:
+`edp_wf`(`_none`), `edisk_step_wf` (the `epend_canon_step` twin — `dm_wf`
+is closed under continuations at ANY answers, `virtio_prog_wf` seeds it,
+`dm_wild_chain_wf` covers the wild arm) and `eprim_step_disk_reducible`,
+now stated as *every node but a `DRead` always steps*: a `DRead` whose
+address has no admissible timestamp assignment is LEGITIMATELY STUCK —
+that a device read is answerable is the driver's WP obligation, not a
+property of the language.
+
+`WeakEvPf` followed: `epool.ep_dp : option (DM dres)`, `pexv6.PDisk (dp :
+option (DM dres))`, `edisk_ag`, `ep_dset`, `ep_init`, the `EPFDisk` arm,
+`edisk_step_label` (eight arms), and `edlabel_ok` gained the `LLoad` and
+`LFence` cases spelled at `ep_dws` (the disk now uses the same four memory
+labels a hart does; only `LRmw` never arises).  `EPFUart`/`EPFPlic` and the
+two MMIO branches of `ecycle_step_label` were relabelled `LDev`.
+`WeakEvAdequacy`/`WeakEvLift`/`WeakEvStarted` needed NO change.
+
+## The instance (`WeakEvInst`) — **LANDED 2026-08-17 (C3)**
+
+`pcls_ev (PDisk _) (LStore …) ws := ddev_class ws` — the same term the
+language's `DWrite` arm stamps, so the two agree by construction (the
+pre-M5 "read `wm_ak` off the head of the burst buffer" hack is gone with
+the buffer).  `pdev_ev _ l _ := (l = LDev)`, and
+`pdev_ev_ok : WeakPromiseFact.pdev_ok pstep_ev pdev_ev` is proved: every
+non-`LDev` arm mentions the fabric exactly once, as `d' = d`.
+
+`pstep_disk = pdisk_prog ∨ pdisk_uart`, where `pdisk_prog` has the eight
+disjuncts above (labels: start `LDev`, `DRead` `LLoad aq false (pa_z pa)
+tvs`, `DWrite` `LStore false (pa_z pa) bs`, `DFence`
+`LFence true true true true`, commit `LDev`, `DWild` `LSilent`, `DIdle`
+`LSilent`, latch `LDev`) and `pdisk_uart` is the UART thread's `LDev`
+move.  The UART is kept a SEPARATE disjunct because it is a step of the
+same agent but not of the device program, so the two language relations
+(`edisk_step` / `euart_step`) factor one each.
+
+**THE `DWild` LABEL DECISION (recorded): `LSilent`, not `LDev`.**  The arm
+reads nothing and moves nothing — it only replaces the residual program by
+an arbitrary store chain — so it is fabric-blind and fabric-preserving and
+`pdev_ok` holds for it.  Marking it `LDev` would put a spurious device
+event into the replay's device order for no gain.
+
+The hart's three fabric-touching arms were relabelled `LDev` (MMIO
+`MemRead`, MMIO `MemWrite`, `pstep_plic`); `LDev`'s memory half is
+`LSilent`'s verbatim, so only the labels moved.
+
+NO EXISTENTIAL MEMORY REMAINS: `pdisk_burst mem`, `pstep_disk_at`,
+`pstep_disk_of_at`, `pdisk_emit`, `edisk_burst_factor` and
+`edisk_emit_factor` are deleted.  The ⇒ direction now holds for EVERY disk
+arm, which was the whole point of M5.
 
 ## The label `LDev` (Layer 1, the only change)
 

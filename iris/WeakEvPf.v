@@ -39,7 +39,7 @@
     ([WeakPromise.pa_st]) now comes from the POOL rather than from σ, which is
     what the pf machine wanted all along: [wpcfg]'s agents carry [pa_st], so
     pool-of-expressions maps to agent-list FIELD FOR FIELD ([eags], §1), and
-    the disk expression [EDisk gen pend dws] IS the pf [PDisk] agent.  What
+    the disk expression [EDisk gen dp dws] IS the pf [PDisk] agent.  What
     did NOT change is the finding: the fabric obstruction is a property of
     [wpcfg]'s SHAPE, not of the granularity or of where the program state
     lives.  Layer 1 still does not instantiate at [epf_step]; §6 states the
@@ -72,6 +72,8 @@ Require Import SailStdpp.ConcurrencyInterfaceTypes.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import DevModel.
+(* required BEFORE [WeakInterpProj]: see [WeakEvLang]'s note on [wbytes] *)
+Require Import VirtioProg.
 Require Import WeakMem.
 Require Import WeakPromise.
 Require Import WeakPromiseBridge.
@@ -141,7 +143,7 @@ Definition ehexp (gen : nat) (c : CPU) (h : ehst) : eexpr :=
 Record epool := EPool {
   ep_gen  : nat;
   ep_h    : CPU -> ehst;
-  ep_pend : list wmsg;
+  ep_dp   : option (DM dres);   (* M5: the RESIDUAL DEVICE PROGRAM *)
   ep_dws  : wstate;
 }.
 
@@ -149,19 +151,19 @@ Definition ehexpr (P : epool) (c : CPU) : eexpr := ehexp (ep_gen P) c (ep_h P c)
 
 Definition epool_list (P : epool) : list eexpr :=
   (ehexpr P <$> enum CPU)
-  ++ [EUart (ep_gen P); EDisk (ep_gen P) (ep_pend P) (ep_dws P);
+  ++ [EUart (ep_gen P); EDisk (ep_gen P) (ep_dp P) (ep_dws P);
       EPlic (ep_gen P)].
 
 Definition ep_hset (P : epool) (c : CPU) (h : ehst) : epool :=
   EPool (ep_gen P) (fun c' => if decide (c' = c) then h else ep_h P c')
-        (ep_pend P) (ep_dws P).
+        (ep_dp P) (ep_dws P).
 
-Definition ep_dset (P : epool) (pend : list wmsg) (dws : wstate) : epool :=
-  EPool (ep_gen P) (ep_h P) pend dws.
+Definition ep_dset (P : epool) (dp : option (DM dres)) (dws : wstate)
+    : epool := EPool (ep_gen P) (ep_h P) dp dws.
 
 (** The initial pool of a fresh era IS [WeakEvLang.epower_fork]. *)
 Definition ep_init (gen : nat) : epool :=
-  EPool gen (fun _ => None) [] ws_init.
+  EPool gen (fun _ => None) None ws_init.
 
 Lemma epool_list_init gen : epool_list (ep_init gen) = epower_fork gen.
 Proof. reflexivity. Qed.
@@ -175,7 +177,7 @@ Proof. reflexivity. Qed.
 Inductive pexv6 :=
 | PHart (cpu : CPU) (m : M unit) (rs : regstate)
         (fn : option (bool * bool * bool * bool))
-| PDisk (pend : list wmsg).
+| PDisk (dp : option (DM dres)).
 
 Definition ehart_m (h : ehst) : M unit :=
   match h with Some (m, _) => m | None => Interface.Ret tt end.
@@ -192,7 +194,7 @@ Definition ehart_ag (P : epool) (σ : wgstate) (c : CPU) : wpagent pexv6 :=
           (wgws σ c) ∅.
 
 Definition edisk_ag (P : epool) : wpagent pexv6 :=
-  WPAgent (PDisk (ep_pend P)) (ep_dws P) ∅.
+  WPAgent (PDisk (ep_dp P)) (ep_dws P) ∅.
 
 Definition eags (P : epool) (σ : wgstate) : list (wpagent pexv6) :=
   (ehart_ag P σ <$> enum CPU) ++ [edisk_ag P].
@@ -265,22 +267,31 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
   | LDev => wglog σ' = wglog σ /\ wgws σ' c = wgws σ c
   end.
 
-(** The disk agent's version.  Only two labels ever arise — a burst (and a
-    UART step) is silent, an emit is a store — which is the 1:1 match with the
-    pf disk agent the design promises. *)
+(** The disk agent's version.  Since M5 the disk is an ORDINARY weak-memory
+    agent, so it uses the SAME four memory labels a hart uses (spelled at the
+    disk's own [dws], which lives in the expression rather than in σ) plus
+    the fabric marker; only [LRmw] never arises — the device has no atomic
+    read-modify-write. *)
 Definition edlabel_ok (P : epool) (σ : wgstate) (l : wlabel)
     (dws' : wstate) (σ' : wgstate) : Prop :=
   match l with
   | LSilent => wglog σ' = wglog σ /\ dws' = ep_dws P
+  | LLoad aq lat base tvs =>
+      lat = false /\
+      read_ok (img_z (wgimg σ)) (wglog σ) (ep_dws P) aq lat base tvs /\
+      wglog σ' = wglog σ /\
+      dws' = load_post_run (ep_dws P) aq base tvs.*1
   | LStore rl base data =>
       (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some n_disk) k]) /\
       data <> [] /\
       dws' = store_post_run (ep_dws P) rl base (length data)
                (S (length (wglog σ)))
+  | LFence pr pw sr sw =>
+      wglog σ' = wglog σ /\ dws' = fence_post (ep_dws P) pr pw sr sw
   (* the fabric marker, [LSilent]'s twin: the disk's own fabric reads and
      writes are silent-effect steps that touch the fabric *)
   | LDev => wglog σ' = wglog σ /\ dws' = ep_dws P
-  | _ => False
+  | LRmw _ _ _ _ _ => False
   end.
 
 Lemma wbytes_ne (n : N) {w : N} (v : bv w) : n <> 0%N -> wbytes n v <> [].
@@ -312,18 +323,21 @@ Inductive epf_step :
     elabel_ok σ c l σ' ->
     epf_step (fin_to_nat c) l (P, σ) (ep_hset P c h', σ')
 | EPFDisk (l : wlabel) (P : epool) (σ : wgstate)
-          (pend' : list wmsg) (dws' : wstate) (σ' : wgstate) :
+          (dp' : option (DM dres)) (dws' : wstate) (σ' : wgstate) :
     ethread_live σ (ep_gen P) ->
-    edisk_step (ep_gen P) (ep_pend P) (ep_dws P) σ
-      (EDisk (ep_gen P) pend' dws') σ' ->
+    edisk_step (ep_gen P) (ep_dp P) (ep_dws P) σ
+      (EDisk (ep_gen P) dp' dws') σ' ->
     edlabel_ok P σ l dws' σ' ->
-    epf_step n_disk l (P, σ) (ep_dset P pend' dws', σ')
+    epf_step n_disk l (P, σ) (ep_dset P dp' dws', σ')
+(* THE UART THREAD and THE PLIC WIRE are FABRIC-TOUCHING silent steps, so
+   since M5 they carry the marker label [LDev] (whose memory effect is
+   [LSilent]'s, verbatim). *)
 | EPFUart (P : epool) (σ σ' : wgstate) :
     ethread_live σ (ep_gen P) -> euart_step σ σ' ->
-    epf_step n_disk LSilent (P, σ) (P, σ')
+    epf_step n_disk LDev (P, σ) (P, σ')
 | EPFPlic (c : CPU) (P : epool) (σ : wgstate) :
     ethread_live σ (ep_gen P) ->
-    epf_step (fin_to_nat c) LSilent (P, σ)
+    epf_step (fin_to_nat c) LDev (P, σ)
       (P, ewg_reg σ c
             (register_set sig_seip
                (bool_to_bit (dev_seip (wgdev σ) (fin_to_nat c)))
@@ -343,8 +357,14 @@ Proof.
                 |P σ σ' Hlive Hu
                 |c P σ Hlive]; simpl; try by split_and!.
   - destruct (ecycle_step_era _ _ _ _ _ _ _ Hcy). by split_and!.
-  - destruct Hstep as [(_ & d' & w & _ & _ & ->)
-                      |(mm & rest & _ & _ & _ & _ & ->)]; by split_and!.
+  - destruct Hstep as [(_ & _ & ->)
+                      |[(pa & n & aq & kk & tvs & _ & _ & _ & _ & ->)
+                      |[(pa & bs & kk & _ & _ & _ & ->)
+                      |[(kk & _ & _ & ->)
+                      |[(dl & _ & _ & ->)
+                      |[(pg & _ & _ & _ & ->)
+                      |[(_ & _ & ->)
+                      |(p' & _ & _ & _ & ->)]]]]]]]; by split_and!.
   - destruct Hu as (d' & _ & ->). by split_and!.
 Qed.
 
@@ -418,24 +438,24 @@ Proof.
   rewrite /epool_list /ehexpr.
   rewrite insert_app_l.
   2:{ rewrite length_fmap enum_CPU_length. apply fin_to_nat_lt. }
-  rewrite /ep_hset. cbn [ep_gen ep_h ep_pend ep_dws].
+  rewrite /ep_hset. cbn [ep_gen ep_h ep_dp ep_dws].
   by rewrite (fmap_enum_hset (ep_gen P) (ep_h P) c h).
 Qed.
 
 Lemma epool_list_disk_lookup P :
-  epool_list P !! (S NCPU) = Some (EDisk (ep_gen P) (ep_pend P) (ep_dws P)).
+  epool_list P !! (S NCPU) = Some (EDisk (ep_gen P) (ep_dp P) (ep_dws P)).
 Proof.
   rewrite /epool_list lookup_app_r; rewrite length_fmap enum_CPU_length; [|lia].
   by replace (S NCPU - NCPU)%nat with 1%nat by lia.
 Qed.
 
-Lemma epool_list_dset P pend dws :
-  <[S NCPU := EDisk (ep_gen P) pend dws]> (epool_list P)
-  = epool_list (ep_dset P pend dws).
+Lemma epool_list_dset P dp dws :
+  <[S NCPU := EDisk (ep_gen P) dp dws]> (epool_list P)
+  = epool_list (ep_dset P dp dws).
 Proof.
   rewrite /epool_list /ehexpr.
   rewrite insert_app_r_alt; rewrite length_fmap enum_CPU_length; [|lia].
-  rewrite /ep_dset. cbn [ep_gen ep_h ep_pend ep_dws].
+  rewrite /ep_dset. cbn [ep_gen ep_h ep_dp ep_dws].
   by replace (S NCPU - NCPU)%nat with 1%nat by lia.
 Qed.
 
@@ -470,7 +490,7 @@ Proof.
     split_and!; try reflexivity. left. by split.
   - rewrite -(epool_list_dset P pd dw).
     eapply erased_step_of_lookup; [apply epool_list_disk_lookup|].
-    right; right; left. exists (ep_gen P), (ep_pend P), (ep_dws P).
+    right; right; left. exists (ep_gen P), (ep_dp P), (ep_dws P).
     split_and!; try reflexivity. left. by split.
   - rewrite -(epool_list_id (epool_list P) NCPU (EUart (ep_gen P)));
       [|apply epool_list_uart_lookup].
@@ -516,7 +536,7 @@ Proof.
     try (by intros []).
   - (* MemRead *)
     destruct (dev_addr _).
-    + intros (w & d' & _ & _ & ->). exists LSilent. by split.
+    + intros (w & d' & _ & _ & ->). exists LDev. by split.
     + intros (_ & [(_ & w & tvs & _ & _ & Hrd & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & Hrd & Hex & Hne & Hlend & _ & _ & _ & ->)]).
@@ -528,7 +548,7 @@ Proof.
         apply gws_insert_eq.
   - (* MemWrite *)
     destruct (dev_addr _).
-    + intros (d' & _ & _ & ->). exists LSilent. by split.
+    + intros (d' & _ & _ & ->). exists LDev. by split.
     + intros (Hn & _ & ->). eexists (LStore _ _ _). split_and!.
       * eexists. reflexivity.
       * by apply wbytes_ne.
@@ -545,16 +565,33 @@ Proof.
   - (* Choose *) intros (ch & _ & ->). exists LSilent. by split.
 Qed.
 
+(** THE DISK'S LABEL, one per arm of the M5 device program: the three
+    fabric arms carry the marker [LDev], the three memory nodes carry
+    exactly a hart's labels, and the two program-internal arms are
+    [LSilent]. *)
 Lemma edisk_step_label P σ e' σ' :
-  edisk_step (ep_gen P) (ep_pend P) (ep_dws P) σ e' σ' ->
-  exists l pend' dws', e' = EDisk (ep_gen P) pend' dws' /\
+  edisk_step (ep_gen P) (ep_dp P) (ep_dws P) σ e' σ' ->
+  exists l dp' dws', e' = EDisk (ep_gen P) dp' dws' /\
     edlabel_ok P σ l dws' σ'.
 Proof.
-  intros [(_ & d' & w & _ & -> & ->)|(m & rest & Hp & Hd & Ht & -> & ->)].
+  intros [(_ & -> & ->)
+         |[(pa & n & aq & kk & tvs & _ & _ & Hrd & -> & ->)
+         |[(pa & bs & kk & _ & Hne & -> & ->)
+         |[(kk & _ & -> & ->)
+         |[(dl & _ & -> & ->)
+         |[(pg & _ & _ & -> & ->)
+         |[(_ & -> & ->)
+         |(p' & _ & _ & -> & ->)]]]]]]].
+  - exists LDev. do 2 eexists. split; [reflexivity|by split].
+  - eexists (LLoad _ false _ tvs). do 2 eexists. split; [reflexivity|].
+    by split_and!.
+  - eexists (LStore false _ bs). do 2 eexists. split; [reflexivity|].
+    split_and!; [by eexists|exact Hne|reflexivity].
+  - eexists (LFence _ _ _ _). do 2 eexists. split; [reflexivity|by split].
+  - exists LDev. do 2 eexists. split; [reflexivity|by split].
   - exists LSilent. do 2 eexists. split; [reflexivity|by split].
-  - destruct m as [mpa mdata mtid mak]. simpl in Hd, Ht. subst mtid.
-    exists (LStore false mpa mdata). do 2 eexists. split; [reflexivity|].
-    simpl. split_and!; [by exists mak|exact Hd|reflexivity].
+  - exists LSilent. do 2 eexists. split; [reflexivity|by split].
+  - exists LDev. do 2 eexists. split; [reflexivity|by split].
 Qed.
 
 (* ====================================================================== *)
