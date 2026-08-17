@@ -65,7 +65,6 @@ Require Import BioDefs.
 Require Import IrefSlots InodeRegion ProcAvail.
 Require Import CodeForkret.
 Require Import SpecMyproc SpecRelease SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit SpecKexit.
 Require Import SpecUserretClosed.
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.

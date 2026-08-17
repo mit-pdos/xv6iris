@@ -56,16 +56,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import SmodeCore.
-Require Import KernelText WireInv.
-Require Import KptExecMap.
-Require Import StackOwn CalleeSaved.
 Require Import IntrDefs.
-Require Import CpuOwn.
-Require Import UserPtTree UserExec.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import ProcDefs.
-Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -75,8 +69,6 @@ Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import SpecPrepareReturn.
-Require Import UsertrapRes.
-Require Import SpecUsertrap.
 Require Import SpecForkret.
 Require Import SpecForkretPark SpecForkretParkPaid.
 From Kernel Require KernelSyms.

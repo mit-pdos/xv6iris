@@ -60,8 +60,7 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecPanic.
-Require Import SpecFilealloc SpecKalloc SpecInitlock SpecIput SpecFileclose.
+Require Import SpecFilealloc SpecKalloc SpecInitlock SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.

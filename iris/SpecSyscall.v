@@ -129,7 +129,6 @@ Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import SpecSysExit.
 Require Import SpecSysExec.   (* [K_sys_exec]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

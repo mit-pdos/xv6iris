@@ -49,7 +49,8 @@ Require Import RegFile.
 Require Import WpLock.
 Require Import FdSlots FileInvDefs.
 Require Import IrefSlots InodeRegion ProcAvail.
-Require Import ProcInv ProcPtOwn.
+Require Import IrefSlots.
+Require Import ProcDefs.
 Require Import UserPtTree.
 Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv BioDefs.
 Require Import SpecForkret.

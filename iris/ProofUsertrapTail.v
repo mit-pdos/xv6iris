@@ -66,7 +66,6 @@ Require Import SchedCtx.
 Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts.
 From Kernel Require KernelInstrs.

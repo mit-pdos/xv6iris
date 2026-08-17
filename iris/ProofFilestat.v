@@ -103,7 +103,6 @@ Require Import BioDefs.
 Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
                                 payload's slot names, out of the family *)

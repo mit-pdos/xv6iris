@@ -125,7 +125,6 @@ Require Import SpecWritei.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import SpecNamex.
-Require Import SpecPanic.
 Require Import SpecPrintk.
 Require Import SpecNamei.
 Require Import SpecNameiparent.

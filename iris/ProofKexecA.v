@@ -183,7 +183,6 @@ Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ElfEnc.

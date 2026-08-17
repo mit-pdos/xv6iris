@@ -132,7 +132,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
-Require Import SpecIput.
 Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

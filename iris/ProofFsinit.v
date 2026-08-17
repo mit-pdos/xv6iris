@@ -97,7 +97,6 @@ Require Import CodeFsinit.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
 Require Import SpecPrintk.
-Require Import SpecPanic.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

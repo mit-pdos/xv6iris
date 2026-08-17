@@ -86,7 +86,6 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import CodeInitlog.
-Require Import SpecPanic.
 Require Import SpecInitlock.
 Require Import SpecBread SpecBrelse.
 Require Import SpecInstallTrans SpecWriteHead.

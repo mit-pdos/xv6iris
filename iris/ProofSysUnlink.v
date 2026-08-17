@@ -51,13 +51,11 @@ Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KernelRvcDecode.
-Require Import BvShift.
 Require Import W32Arith.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -77,7 +75,6 @@ Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
 Require Import DirLinks.
-Require Import FsLookup.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.
@@ -113,7 +110,6 @@ Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNamex.
 Require Import SpecNameiparent.
-Require Import SpecFetchstr.
 Require Import CodeSysUnlink.
 Require Import SysUnlinkBudget.
 Require Import SpecSysUnlink.

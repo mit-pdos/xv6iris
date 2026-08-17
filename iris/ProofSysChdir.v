@@ -109,7 +109,6 @@ Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
@@ -126,7 +125,6 @@ Require Import SpecIunlockput.
 Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecPanic.
-Require Import SpecPrintk.
 Require Import SpecNamei.
 Require Import CodeSysChdir.
 Require Import SpecSysChdir.

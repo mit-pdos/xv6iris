@@ -73,7 +73,6 @@ Require Import IcacheRef.             (* the reference algebra the publication
    does not carry our fragment-campaign content.  A surplus import costs a
    rebuild-cone edge; a missing one costs the build.  If the next nightly
    sweep still calls them dead against THIS tree, they can go then. *)
-Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
 Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode

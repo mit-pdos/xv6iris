@@ -141,12 +141,9 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecPrintk.
-Require Import SpecIput.
 Require Import SpecDirlink.
-Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import SpecSysMkdir.
-Require Import SpecPanic.
 Require Import SpecSysChdir.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

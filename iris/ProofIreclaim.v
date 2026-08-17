@@ -114,7 +114,6 @@ Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import CodeIreclaim.
 Require Import SpecPrintk.
-Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecIget.
 Require Import SpecBeginOp SpecEndOp.
 Require Import SpecIlock SpecIunlock SpecIput.
