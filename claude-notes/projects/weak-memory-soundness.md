@@ -1,0 +1,96 @@
+# The one-machine soundness capstone — worklist (Phase B: the instance; Phase C: M5 device views)
+
+**Status (2026-08-17): PLAN OF RECORD, user-approved; work starting.**
+Supersedes the open tail of
+[`weak-memory-fabric.md`](weak-memory-fabric.md) (G6b) — read that file's
+G5c2/G6 findings first; nothing there is retried here.
+
+## The theorem this effort closes
+
+```
+(1) event-language adequacy  ──►  φ at every reachable σ        DONE  WeakEvAdequacy.weak_ev_adequacy_phi
+(2) φ  ──►  epf_violation_free_hart  (over epf_run)               DONE  WeakEvAdequacy.weak_ev_pf_violation_free
+(3) Layer 1: robust_main  (over wp_pf_run pstep pcls, any instance) DONE  WeakRobustMain.robust_main
+(4) full promising machine ⊇ hardware                             NOTE  WeakCompose §6(5) (PARM containment)
+```
+MISSING: (2)→(3), i.e. `epf_step` as a Layer-1 INSTANCE in the ⇒
+direction (every `wp_pf_run` of the instance is an `epf_run`, because
+`pf_violation_free_hart` quantifies over ALL pf runs).  G5c2 named three
+over-approximation points; after G6a the remaining ones are the `pcls`
+arity (mechanical), the PLIC hart index (trivial) and THE DISK'S DMA READ.
+
+## Two findings that fix the plan (2026-08-17, orchestrator analysis)
+
+- **`ev_dma_harmless` (G6a2's fallback packaging) is FALSE for xv6.**  With
+  an existential DMA memory the pf disk agent may take `WDiskStepDma`
+  against a fictional `mv` in which `avail_idx ≠ v_seen` and the descriptor
+  chain points anywhere, so whenever the queue is live it writes disk
+  data/status bytes to ARBITRARY addresses (and `WDiskStepWild` writes
+  arbitrary bytes under a fictional stall).  Such configurations are not
+  reachable by the flat-faithful machine, and garbage in a page table
+  steers a foreign hart's loads onto another hart's owned-unpublished bytes
+  — a real hart violation.  So neither a reachability-inclusion premise nor
+  "violation-freedom of the over-approximating machine" is honest.  There
+  is NO cheap packaging of the disk arm.
+- **The flat DMA read is a HARDWARE-FIDELITY gap, not proof plumbing.**
+  `edisk_burst` reads `wflat img log` — the device can never see stale
+  ring memory — which is STRONGER than hardware (design Decision 6: a
+  missing I/O fence before `QUEUE_NOTIFY` lets real DMA read the ring
+  stale).  The only honest theorem covering the disk makes the DMA read a
+  VIEW-BASED read: M5 ("disk DMA gets a view"), already the design of
+  record.  A "latest-as-of-T" Layer-1 label was considered and rejected:
+  it forces from-read edges into the replay graph, the device-epoch rank
+  does not survive them, and the exact-value form is refuted by xv6's
+  `avail->idx` (a second hart bumps it after the burst reads it, unordered
+  in the graph — harmless for the device, fatal for a value-exact replay).
+
+## Phase B — the hart-side instance (unblocked; subagent work)
+
+- **B1** retype `pcls : P → wlabel → wstate → wm_class` (Bridge → Trace →
+  Sim → Cone/Blocks → Main → Retag → archive at `λ _, lbl_class`), pinned at
+  the FULFILLING agent's pre-step `pa_st`.  `cls_canonical`/`pcls_obl` gain
+  the argument; nothing else changes.
+- **B2** `WeakEvPf`: `pexv6.PHart` gains the CPU; `pstep_ev`/`pcls_ev`/
+  `pdev_ev` over `D := dev_state`; `pcls_ev` reads the access kind off the
+  `MemWrite` node (`wm_class_of (classify ak) ws`), `WCexcl` at `LRmw`,
+  `WCplain` for the disk.  Disk burst arm = the archived existential-memory
+  form FOR NOW (Phase C replaces it).
+- **B3** the factorization, arm by arm: ⇐ (`epf_step i l ρ ρ' → wp_pf_step
+  pstep_ev pcls_ev i l (ecfg_of ρ) (ecfg_of ρ')`) for ALL arms, and ⇒
+  (`wp_pf_step … i l (ecfg_of P σ) c' → ∃ ρ', epf_step i l (P,σ) ρ' ∧
+  ecfg_of ρ' = c'`) for every arm EXCEPT the disk burst, which is the one
+  named exception in the statement.  Plus `lat_free_prog`, `ts_oblivious`,
+  `pdev_ok`, `pcls_obl` for the instance, and `ecfg_of (ep_init gen) σ0 =
+  wp_init …` at a fresh era.
+- **B4** the capstone STATED with the burst arm as its single open case.
+
+## Phase C — M5 device views (design by the orchestrator, then subagents)
+
+Sketch (to be written out as `design/weak-memory-m5.md` before building):
+- The disk's DMA reads become ORDINARY view-based reads at the disk agent's
+  own `wstate` (`EDisk` already carries `dws`): the virtio request
+  processing is rewritten as a small READ MONAD program (`DM`: `Read pa n k`
+  / `Ret`), run node by node in the language exactly like a hart's Sail
+  monad — one `PFLoad`-shaped event per `Read`, commit at `Ret`.  Footprint
+  = the read trace; no multi-address label, no `lat` read anywhere.  The SC
+  tree keeps `virtio_req_step`; a lemma equates the two over a flat memory.
+- The fabric carries a VIEW for the virtio window: a hart's MMIO write
+  publishes its store floor (`w_vwNew`), the disk's burst start acquires
+  it (and symmetrically the disk publishes at completion, hart MMIO reads
+  acquire).  Layer 1: `wpcfg` gains a machine-owned `pc_fv`, two label
+  constructors (`LDevW`/`LDevR`) with view arms; the replay retimes `pc_fv`
+  by π like every view; the `gdev` chain already orders these events.
+- **DEVIATION from Decision 6's "strict I/O bits", recorded:** the
+  generated Sail model DROPS the FENCE I/O bits (`execute_FENCE` looks only
+  at bits 1:0 — `fence iorw,iorw` arrives as `Barrier_RISCV_rw_rw`, and a
+  bare `fence w,o` is NO barrier), so a strict model needs a Sail-fork
+  regeneration.  Phase C models MMIO accesses as ordered by FENCE's MEMORY
+  bits (the QEMU/typical-interconnect behavior; the driver's `iorw,iorw`
+  sites prove identically) and records this as a model assumption in the
+  same slot as no-icache, with the regeneration as the upgrade path.
+
+## After the capstone
+
+Phase-2 discharge of `main_premises` (`weak-memory-premises.md`, exhibit
+level); the RVWMO axiomatic containment (`WeakAxiomatic*`) as the upgrade
+of §6(5); the M4 leaf retarget (separate volume track).

@@ -151,6 +151,13 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`weak-memory-soundness.md`](projects/weak-memory-soundness.md)** — THE
+  CURRENT PLAN OF RECORD (2026-08-17) for closing the one-machine soundness
+  capstone: Phase B (the event language as a Layer-1 instance, hart side)
+  and Phase C (M5 device views: the disk's DMA becomes view-based reads
+  through a read-monad device program; the fabric carries a view).  Read it
+  for the two findings that shaped it (`ev_dma_harmless` is false for xv6;
+  the flat DMA read is a hardware-fidelity gap).
 - **[`weak-memory-fabric.md`](projects/weak-memory-fabric.md)** — the Layer-1
   FABRIC generalization (mini-M5): `WeakPromise.wpcfg` gains a third shared
   component `pc_dev : D`, the trace representation gains a global
