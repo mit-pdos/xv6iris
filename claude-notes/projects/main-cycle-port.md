@@ -220,6 +220,55 @@ keep the `hfrun` form as a corollary for the pilot.  `swp_vmem_write_gen`
 `swp_execute_STORE` still wants it.  An abstract rider `Q` carries `gpr_file`
 through such an obligation; the GPRs stay OUT of every footprint.
 
+**A REAL LIMIT OF THE `goodb` CERTIFICATE, isolated and measured.**
+`HartGoodb.hval_of_goodb`'s second premise is *pointwise* agreement between the
+caller's file and the reference on every register the stretch READS:
+
+    (forall r, Db r = true -> register_lookup r rs = register_lookup r dst.(sregs))
+
+so the route only works when every read register's value is **pinned by the
+reference state**.  True for the decode and for `check_CSR_result` (they read
+only cur_privilege / mseccfg / misa, all fixed by `hw_config`).  FALSE for
+`write_CSR csr_menvcfg`, which reads `menvcfg` — the leaf's own variable.  No
+generalization of the certificate fixes this: adding write-tracking (a
+`goodbw`) would not touch that premise.  I proposed exactly that and it was
+wrong; the read-agreement requirement is the binding constraint.
+
+And a second, independent limit: **`goodb` is not COMPUTABLE when the certified
+stretch carries symbolic data.**  `goodb D_m (legalize_menvcfg o v) dstateM`
+with `o`/`v` free does not finish under `vm_compute`, `cbv` or `lazy` (measured:
+>100 s each, and >15 GB inside a proof).  goodb's ANSWER does not depend on that
+data — only on guards driven by misa at `dstateM` — but the evaluators normalise
+the symbolic bitvector expressions anyway.  Every other `goodb` use in the port
+is at concrete arguments, which is why this had not shown up.
+
+Consequence for the CSR family, counted rather than guessed:
+- **7 of 10 are on the proven cheap path** — the write is shallow register
+  traffic and `hfrun` walks it (`medeleg`, `mcounteren`, `mepc` done or
+  written; `stimecmp`, `sie`, `pmpaddr0`, and `WpGprCsrrCommon`'s).
+- **3 hit the wall** — `menvcfg`, `mideleg`, `satp`, whose writes wrap a
+  MONADIC legalization parameterized by the old value and `v`
+  (`legalize_menvcfg` / `legalize_mideleg` / `legalize_satp_rv64`).
+- Those 3 are on the CRITICAL PATH, not optional: a file is green only when all
+  its leaves are, so `WpGprCsrwA` needs menvcfg and `WpGprCsrwB` needs mideleg
+  and satp.
+
+The route for the 3: peel the legalization at the swp layer.  Each reads misa
+ONLY (~4-5 reads, via `currentlyEnabled`), and misa is pinned in `cw_Dro`, so
+every read is one `swp_read_reg_pinned` and the rest is pure data — roughly ten
+`swp_bind_use` steps per legalization, written once each.
+
+**AND A HARD-WON TACTIC RULE, both directions measured:**
+- NEVER prune `write_CSR`'s ~90-way dispatch inside a `swp` goal.  The exec
+  stack's `skip_csr_false_clauses` is `exec`-shaped so it matches nothing there,
+  and the expansion meets the whole `envs_entails`: 23 GB, OOM at 8 minutes.
+  In a PURE term-equation goal the same peel is **2.5 s**.
+- When a reduction has to be NAMED, PRINT IT — do not write it from the model
+  source.  `write_CSR csr_menvcfg`'s surviving clause associates as
+  `bind (bind0 write read) k`, not `bind0 write (bind read k)`.  Guessing wrong
+  makes the closing `reflexivity` grind on two ISA-sized terms, and it looks
+  exactly like the blowup above.
+
 **WHAT REMAINS, per family:**
 - `WpGprCsrwA/B`, `WpGprCsrrCommon` (8 leaves): substitution, plus one write
   peel each.  Same-shaped CSRs (read old / write legalized / read back) are
