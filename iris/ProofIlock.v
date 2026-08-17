@@ -1684,7 +1684,7 @@ Section IlockLoad.
     assert (HKmm : (2 <= K - 4)%nat) by lia.
     iEval (rewrite /bb_bytes -HG3a0) in "Hdst".
     iEval (rewrite /bb_bytes -HG3a1) in "Hda".
-    iApply (MM.wp_memmove_sconf kt G3 (K - 4)%nat 52%nat
+    iApply (MM.wp_memmove_sconf kt KT0 KT0 G3 (K - 4)%nat 52%nat
               (fun jj => ind_bytes (di_addrs dn) !!! jj)
               (fun jj => ind_bytes l0 !!! jj)
               b (proc_addr j) HKmm Hlen32 HG3a2

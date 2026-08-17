@@ -578,10 +578,10 @@ Section ProofNamexMain.
      path and for the name buffer, both at full ownership. *)
   Lemma nx_buf_acc (a : mword 64) (dqm : dfrac) (f : nat -> bv 8) (N i : nat) :
     (i < N)%nat ->
-    ([∗ list] ii ∈ seq 0 N, pa_add a ii ↦ₘ{dqm} f ii) -∗
-    (pa_add a i ↦ₘ{dqm} f i)
-    ∗ ((pa_add a i ↦ₘ{dqm} f i) -∗
-       [∗ list] ii ∈ seq 0 N, pa_add a ii ↦ₘ{dqm} f ii).
+    ([∗ list] ii ∈ seq 0 N, pa_add a ii ↦ₘ[kt]{dqm} f ii) -∗
+    (pa_add a i ↦ₘ[kt]{dqm} f i)
+    ∗ ((pa_add a i ↦ₘ[kt]{dqm} f i) -∗
+       [∗ list] ii ∈ seq 0 N, pa_add a ii ↦ₘ[kt]{dqm} f ii).
   Proof.
     intro Hi. iIntros "Hbuf".
     iDestruct (big_sepL_lookup_acc _ (seq 0 N) i i with "Hbuf") as "[Hb Hback]".
@@ -646,9 +646,9 @@ Section ProofNamexMain.
 
   Lemma nx_buf_split (q : mword 64) (g : nat -> bv 8) (l N : nat) :
     (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ g i) -∗
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ g i)
-    ∗ ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ g i).
+    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[kt] g i)
+    ∗ ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[kt] g i).
   Proof.
     intro H. iIntros "Hb". rewrite (nx_seq_split l N H) big_sepL_app.
     iDestruct "Hb" as "[H1 H2]". iFrame.
@@ -656,9 +656,9 @@ Section ProofNamexMain.
 
   Lemma nx_buf_join (q : mword 64) (g : nat -> bv 8) (l N : nat) :
     (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ g i) -∗
-    ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ g i) -∗
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ g i).
+    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[kt] g i).
   Proof.
     intro H. iIntros "H1 H2". rewrite (nx_seq_split l N H) big_sepL_app.
     iFrame.
@@ -666,8 +666,8 @@ Section ProofNamexMain.
 
   (* the middle window, re-based: [seq a l] IS [(a +) <$> seq 0 l] *)
   Lemma nx_win_shift (q : mword 64) (g : nat -> bv 8) (a l : nat) :
-    ([∗ list] i ∈ seq a l, pa_add q i ↦ₘ g i)
-    ⊣⊢ ([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ g (a + jj)%nat).
+    ([∗ list] i ∈ seq a l, pa_add q i ↦ₘ[kt] g i)
+    ⊣⊢ ([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ[kt] g (a + jj)%nat).
   Proof.
     replace (seq a l) with ((Nat.add a) <$> seq 0 l)
       by (rewrite fmap_add_seq Nat.add_0_r; reflexivity).
@@ -684,10 +684,10 @@ Section ProofNamexMain.
 
   Lemma nx_win_iff (q : mword 64) (g : nat -> bv 8) (a l N : nat) :
     (a + l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ g i)
-    ⊣⊢ (([∗ list] i ∈ seq 0 a, pa_add q i ↦ₘ g i)
-        ∗ ([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ g (a + jj)%nat)
-        ∗ ([∗ list] i ∈ seq (a + l) (N - a - l), pa_add q i ↦ₘ g i)).
+    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[kt] g i)
+    ⊣⊢ (([∗ list] i ∈ seq 0 a, pa_add q i ↦ₘ[kt] g i)
+        ∗ ([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ[kt] g (a + jj)%nat)
+        ∗ ([∗ list] i ∈ seq (a + l) (N - a - l), pa_add q i ↦ₘ[kt] g i)).
   Proof.
     intro H.
     rewrite (nx_seq_split a N ltac:(lia)) big_sepL_app.
@@ -699,10 +699,10 @@ Section ProofNamexMain.
      bytes, the terminator at [l], and whatever the copy did not touch *)
   Lemma nx_name_split (q : mword 64) (g : nat -> bv 8) (l : nat) :
     (l < 14)%nat ->
-    ([∗ list] i ∈ seq 0 14, pa_add q i ↦ₘ g i)
-    ⊣⊢ (([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ g i)
-        ∗ (pa_add q l ↦ₘ g l)
-        ∗ ([∗ list] i ∈ seq (S l) (13 - l), pa_add q i ↦ₘ g i)).
+    ([∗ list] i ∈ seq 0 14, pa_add q i ↦ₘ[kt] g i)
+    ⊣⊢ (([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[kt] g i)
+        ∗ (pa_add q l ↦ₘ[kt] g l)
+        ∗ ([∗ list] i ∈ seq (S l) (13 - l), pa_add q i ↦ₘ[kt] g i)).
   Proof.
     intro H.
     rewrite (nx_seq_split l 14 ltac:(lia)) big_sepL_app.
@@ -712,16 +712,16 @@ Section ProofNamexMain.
 
   Lemma nx_name_split_l (q : mword 64) (g : nat -> bv 8) (l : nat) :
     (l < 14)%nat ->
-    ([∗ list] i ∈ seq 0 14, pa_add q i ↦ₘ g i) -∗
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ g i) ∗ (pa_add q l ↦ₘ g l)
-    ∗ ([∗ list] i ∈ seq (S l) (13 - l), pa_add q i ↦ₘ g i).
+    ([∗ list] i ∈ seq 0 14, pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[kt] g i) ∗ (pa_add q l ↦ₘ[kt] g l)
+    ∗ ([∗ list] i ∈ seq (S l) (13 - l), pa_add q i ↦ₘ[kt] g i).
   Proof. intro H. rewrite (nx_name_split q g l H). iIntros "$". Qed.
 
   Lemma nx_name_join (q : mword 64) (g : nat -> bv 8) (l : nat) :
     (l < 14)%nat ->
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ g i) -∗ (pa_add q l ↦ₘ g l) -∗
-    ([∗ list] i ∈ seq (S l) (13 - l), pa_add q i ↦ₘ g i) -∗
-    ([∗ list] i ∈ seq 0 14, pa_add q i ↦ₘ g i).
+    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[kt] g i) -∗ (pa_add q l ↦ₘ[kt] g l) -∗
+    ([∗ list] i ∈ seq (S l) (13 - l), pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] i ∈ seq 0 14, pa_add q i ↦ₘ[kt] g i).
   Proof.
     intro H. iIntros "A B C". rewrite (nx_name_split q g l H). iFrame.
   Qed.
@@ -730,8 +730,8 @@ Section ProofNamexMain.
      the element's bytes, and the walk names that content by a FUNCTION *)
   Lemma nx_buf_fun (q : mword 64) (g h : nat -> bv 8) (s t : nat) :
     (forall i : nat, (s <= i)%nat -> (i < s + t)%nat -> g i = h i) ->
-    ([∗ list] i ∈ seq s t, pa_add q i ↦ₘ g i) -∗
-    ([∗ list] i ∈ seq s t, pa_add q i ↦ₘ h i).
+    ([∗ list] i ∈ seq s t, pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] i ∈ seq s t, pa_add q i ↦ₘ[kt] h i).
   Proof.
     intro H. iIntros "Hb". iApply (big_sepL_mono with "Hb").
     intros kk x Hx. apply lookup_seq in Hx. destruct Hx as [Hx Hk].
@@ -740,10 +740,10 @@ Section ProofNamexMain.
 
   Lemma nx_win_acc (q : mword 64) (g : nat -> bv 8) (a l N : nat) :
     (a + l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ g i) -∗
-    ([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ g (a + jj)%nat)
-    ∗ (([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ g (a + jj)%nat) -∗
-       [∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ g i).
+    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[kt] g i) -∗
+    ([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ[kt] g (a + jj)%nat)
+    ∗ (([∗ list] jj ∈ seq 0 l, pa_add (pa_add q a) jj ↦ₘ[kt] g (a + jj)%nat) -∗
+       [∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[kt] g i).
   Proof.
     intro H. iIntros "Hb".
     iEval (rewrite (nx_win_iff q g a l N H)) in "Hb".
@@ -810,7 +810,7 @@ Section ProofNamexMain.
      ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
      sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0xfc)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDe : CpuId =>
        ∀ (off' : nat) (Ms' : regfile),
          ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
@@ -825,7 +825,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0x106)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -840,7 +840,7 @@ Section ProofNamexMain.
      ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
      sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0xb6)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDe : CpuId =>
        ∀ (off' : nat) (Ms' : regfile),
          ⌜(off < off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
@@ -855,7 +855,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0xc0)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -868,7 +868,7 @@ Section ProofNamexMain.
      ⌜Ms !!! Regidx Rs2 = pa_add pv ii⌝ -∗
      sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0x116)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDe : CpuId =>
        ∀ (e : nat) (Ms' : regfile),
          ⌜(ii < e)%nat⌝ -∗ ⌜(e <= plen)%nat⌝ -∗
@@ -881,7 +881,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0x96)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -896,13 +896,13 @@ Section ProofNamexMain.
         = (zero_extend' 64 (pfun a : mword 8) : mword 64)⌝ -∗
      sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0x106)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
      (* EXIT A -- the string is exhausted, at +0x140 *)
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDa : CpuId =>
        ⌜(a = plen)%nat⌝ -∗
        sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
        pc_is (mword_of_int (NX + 0x140)) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
        WP (Loop : expr riscv_lang)) -∗
      (* EXIT B -- an element starts at [a], at +0x116 *)
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDb : CpuId =>
@@ -916,7 +916,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0x116)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -929,7 +929,7 @@ Section ProofNamexMain.
      ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
      sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0xf4)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
      (* EXIT A -- nothing but separators left, at +0x140 *)
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDa : CpuId =>
        ∀ Ms' : regfile,
@@ -941,7 +941,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0x140)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      (* EXIT B -- an element starts at [a], at +0x116 *)
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDb : CpuId =>
@@ -958,7 +958,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0x116)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -971,7 +971,7 @@ Section ProofNamexMain.
      ⌜Ms !!! Regidx Rs3 = (mword_of_int 47 : mword 64)⌝ -∗
      sie_cap_gpr kt Ms (K - 12)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (NX + 0xae)) -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
      wp_next (CID0 := CIDs) true (proc_addr j) (fun CIDe : CpuId =>
        ∀ (off' : nat) (Ms' : regfile),
          ⌜(off <= off')%nat⌝ -∗ ⌜(off' <= plen)%nat⌝ -∗
@@ -984,7 +984,7 @@ Section ProofNamexMain.
          sie_cap_gpr kt Ms' (K - 12)%nat b (proc_addr j) -∗
          pc_is (mword_of_int (NX + 0xc0)) -∗
          ([∗ list] i ∈ seq 0 (S plen),
-            pa_add pv i ↦ₘ pfun i) -∗
+            pa_add pv i ↦ₘ[kt] pfun i) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -1048,8 +1048,8 @@ Section ProofNamexMain.
      p_pid (proc_addr j) ↦₄{dq} pidv -∗
      p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
      inode_held cwdv -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-     ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+     ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[kt] nf i) -∗
      bslots bn 3 -∗
      log_opS g ncur Scur -∗
      (* ---- THE CONTRACT'S OWN CONTINUATION, at the loop's hart.  Kept
@@ -1102,8 +1102,8 @@ Section ProofNamexMain.
      p_pid (proc_addr j) ↦₄{dq} pidv -∗
      p_cwd (proc_addr j) ↦₈{dqc} cwdv -∗
      inode_held cwdv -∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-     ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf' i) -∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+     ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[kt] nf' i) -∗
      bslots bn 3 -∗
      log_opS g ncur Scur -∗
      WP (Loop : expr riscv_lang))%I.
@@ -3767,7 +3767,7 @@ Section ProofNamexMain.
                             cpu_own 0 eb (proc_addr j) b lks -∗
                             pc_is (mword_of_int (NX + 0xde)) -∗
                             ([∗ list] i ∈ seq 0 (S plen),
-                               pa_add pv i ↦ₘ pfun i) -∗
+                               pa_add pv i ↦ₘ[kt] pfun i) -∗
                             WP (Loop : expr riscv_lang)))%I
                          with "[IHl Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                 Hb10 Hb11 Hb12 Hisl Hbmap Hinos Hbits Hppid
@@ -4824,7 +4824,7 @@ Section ProofNamexMain.
                   assert (Hsh14 : ((e - a) < 14)%nat) by lia.
                   iDestruct (nx_name_split_l nb nf (e - a)%nat Hsh14
                                with "Hname") as "(Hdlo & Hdat & Hdhi)".
-                  iApply (MM.wp_memmove_sconf kt S4 (K - 12)%nat (e - a)%nat
+                  iApply (MM.wp_memmove_sconf kt kt kt S4 (K - 12)%nat (e - a)%nat
                             (fun jj => pfun (a + jj)%nat) nf b (proc_addr j)
                             Kmm (nx_len32 (e - a)%nat Hea31) HS4a2
                             with "Hcg Htext Hpc [Hsrc] [Hdlo]").
@@ -4925,7 +4925,7 @@ Section ProofNamexMain.
                                ltac:(intros i Hi1 Hi2;
                                      symmetry; apply Hn1hi; lia)
                                with "Hdhi") as "Hdhi".
-                  iAssert (pa_add nb (e - a)%nat ↦ₘ nf1 (e - a)%nat)%I
+                  iAssert (pa_add nb (e - a)%nat ↦ₘ[kt] nf1 (e - a)%nat)%I
                     with "[Hdat]" as "Hdat".
                   { rewrite Hn1at. iExact "Hdat". }
                   iDestruct (nx_name_join nb nf1 (e - a)%nat Hsh14
@@ -5106,7 +5106,7 @@ Section ProofNamexMain.
                     by (rewrite /T4 upd_ne; [exact HT3a2 | nz]).
                   iDestruct (nx_win_acc pv pfun a 14%nat (S plen)
                                ltac:(lia) with "Hpath") as "[Hsrc Hpback]".
-                  iApply (MM.wp_memmove_sconf kt T4 (K - 12)%nat 14%nat
+                  iApply (MM.wp_memmove_sconf kt kt kt T4 (K - 12)%nat 14%nat
                             (fun jj => pfun (a + jj)%nat) nf b (proc_addr j)
                             Kmm (nx_len32 14%nat ltac:(vm_compute; reflexivity))
                             HT4a2

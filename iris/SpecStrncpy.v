@@ -43,14 +43,14 @@ Definition wp_strncpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
   sie_cap_gpr kt mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
-  ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-  ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ g j) -∗
+  ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[kt]{dq} f j) -∗
+  ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kt] g j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (h : nat -> bv 8),
     sie_cap_gpr kt mr K b p -∗
     pc_is ret_tgt -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[kt]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kt] h j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5) = s⌝ -∗
     ⌜(n = 0%nat /\ h = g) \/ (0 < n)%nat /\ snc_post f h n⌝ -∗

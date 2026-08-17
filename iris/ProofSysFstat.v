@@ -125,12 +125,12 @@ Module SysFstatProof (Argaddr : ARGADDR) (Argfd : ARGFD)
                      (Filestat : FILESTAT) : SYSFSTAT.
 
 Section ProofSysFstat.
-  Context {kt : ktier}.
   (* NO [!icacheG Σ]: [fileG] bundles it (SpecFilestat.v's note, and the
      trap that cost S4' the most). *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context {kt : ktier}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

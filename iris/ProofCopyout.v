@@ -168,6 +168,12 @@ Section ProofCopyout.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := kt)] below). *)
+  Context (ktb : ktier).
+  Context `{!KtierLe ktb kt}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rtp  := (mword_of_int 4 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -453,7 +459,7 @@ Section ProofCopyout.
      pc_is (CID:=CIDh) (mword_of_int (KernelSyms.copyout + 0x88) : mword 64) -∗
      page_own pa0 -∗
      (page_own pa0 -∗ proc_pt Pd) -∗
-     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
      wp_next (CID0:=CIDh) b p (fun (CID : CpuId) =>
        ∀ (mj : regfile) (res : mword 64) (P' : uptd),
          ⌜ mj !!! Regidx csp_rs1 = spr
@@ -464,7 +470,7 @@ Section ProofCopyout.
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
          proc_pt P' -∗
-         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -492,7 +498,7 @@ Section ProofCopyout.
      pc_is (CID:=CIDc) (mword_of_int (KernelSyms.copyout + 0x36) : mword 64) -∗
      page_own pa0 -∗
      (page_own pa0 -∗ proc_pt Pd) -∗
-     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
      wp_next (CID0:=CIDc) b p (fun (CID : CpuId) =>
        ∀ (mj : regfile) (res : mword 64) (P' : uptd),
          ⌜ mj !!! Regidx csp_rs1 = spr
@@ -503,7 +509,7 @@ Section ProofCopyout.
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
          proc_pt P' -∗
-         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -539,7 +545,7 @@ Section ProofCopyout.
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.copyout + 0x54) : mword 64) -∗
     proc_pt Pc -∗
     kalloc_env γa None -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
     wp_next (CID0:=CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd),
         ⌜ mj !!! Regidx csp_rs1 = spr
@@ -550,7 +556,7 @@ Section ProofCopyout.
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
         proc_pt P' -∗
-        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -842,7 +848,7 @@ Section ProofCopyout.
           by (unfold navail in *; lia).
         iEval (rewrite (bb_split3 pa0 off nn (navail - nn) 4096 fpg Hpsplit)) in "Hpg".
         iDestruct "Hpg" as "(HpA & HpB & HpC)".
-        iApply (Memmove.wp_memmove_sconf kt U5 (K - 14)%nat nn
+        iApply (Memmove.wp_memmove_sconf kt ktb KT0 U5 (K - 14)%nat nn
                   (fun j => src_bytes (done + j)%nat) (fun j => fpg (off + j)%nat) b p
                   ltac:(lia) ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia)
                   HU5a2
@@ -862,7 +868,7 @@ Section ProofCopyout.
                      Hpsplit with "HpA HpB HpC") as (fpg') "Hpg".
         iDestruct (bb_page_of_named pa0 fpg' with "Hpg") as "Hpage".
         iDestruct ("Hgive" with "Hpage") as "Hpt".
-        iAssert ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j)%I
+        iAssert ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j)%I
           with "[HsA HsB HsC]" as "Hsrc".
         { rewrite (bb_split3 src done nn (rem - nn) len src_bytes Hsplit).
           iFrame "HsA HsB HsC". }
@@ -1670,7 +1676,7 @@ Section ProofCopyout.
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_body kt γa mm P szv len src_bytes K lvl eb p b lks.
+    : wp_copyout_sconf_body kt ktb γa mm P szv len src_bytes K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_copyout_sconf_body].
     intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
@@ -1820,7 +1826,7 @@ Section ProofCopyout.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x04 .. +0x1c: the thirteen [c.sdsp]s *)
     iPoseProof (coi_04 with "Htext") as "Hi04".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x04)) (mword_of_int 13 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x04)) (mword_of_int 13 : mword 6) Rra
               R1 (K - 14)%nat u1 b with "Hcg Hpc Hi04 [Hk1]").
     { iEval (rewrite HspR1 Hb1). iExact "Hk1". }
     iIntros (CIDpr2 Hspr2) "Hcg Hpc Hk1".
@@ -1830,7 +1836,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     iPoseProof (coi_06 with "Htext") as "Hi06".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x06)) (mword_of_int 12 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x06)) (mword_of_int 12 : mword 6) Rs0
               R1 (K - 14)%nat u2 b with "Hcg Hpc Hi06 [Hk2]").
     { iEval (rewrite HspR1 Hb2). iExact "Hk2". }
     iIntros (CIDpr3 Hspr3) "Hcg Hpc Hk2".
@@ -1840,7 +1846,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     iPoseProof (coi_08 with "Htext") as "Hi08".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x08)) (mword_of_int 11 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x08)) (mword_of_int 11 : mword 6) Rs1
               R1 (K - 14)%nat u3 b with "Hcg Hpc Hi08 [Hk3]").
     { iEval (rewrite HspR1 Hb3). iExact "Hk3". }
     iIntros (CIDpr4 Hspr4) "Hcg Hpc Hk3".
@@ -1850,7 +1856,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     iPoseProof (coi_0a with "Htext") as "Hi0a".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x0a)) (mword_of_int 10 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x0a)) (mword_of_int 10 : mword 6) Rs2
               R1 (K - 14)%nat u4 b with "Hcg Hpc Hi0a [Hk4]").
     { iEval (rewrite HspR1 Hb4). iExact "Hk4". }
     iIntros (CIDpr5 Hspr5) "Hcg Hpc Hk4".
@@ -1860,7 +1866,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     iPoseProof (coi_0c with "Htext") as "Hi0c".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x0c)) (mword_of_int 9 : mword 6) Rs3
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x0c)) (mword_of_int 9 : mword 6) Rs3
               R1 (K - 14)%nat u5 b with "Hcg Hpc Hi0c [Hk5]").
     { iEval (rewrite HspR1 Hb5). iExact "Hk5". }
     iIntros (CIDpr6 Hspr6) "Hcg Hpc Hk5".
@@ -1870,7 +1876,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     iPoseProof (coi_0e with "Htext") as "Hi0e".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x0e)) (mword_of_int 8 : mword 6) Rs4
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x0e)) (mword_of_int 8 : mword 6) Rs4
               R1 (K - 14)%nat u6 b with "Hcg Hpc Hi0e [Hk6]").
     { iEval (rewrite HspR1 Hb6). iExact "Hk6". }
     iIntros (CIDpr7 Hspr7) "Hcg Hpc Hk6".
@@ -1880,7 +1886,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     iPoseProof (coi_10 with "Htext") as "Hi10".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x10)) (mword_of_int 7 : mword 6) Rs5
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x10)) (mword_of_int 7 : mword 6) Rs5
               R1 (K - 14)%nat u7 b with "Hcg Hpc Hi10 [Hk7]").
     { iEval (rewrite HspR1 Hb7). iExact "Hk7". }
     iIntros (CIDpr8 Hspr8) "Hcg Hpc Hk7".
@@ -1890,7 +1896,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     iPoseProof (coi_12 with "Htext") as "Hi12".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x12)) (mword_of_int 6 : mword 6) Rs6
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x12)) (mword_of_int 6 : mword 6) Rs6
               R1 (K - 14)%nat u8 b with "Hcg Hpc Hi12 [Hk8]").
     { iEval (rewrite HspR1 Hb8). iExact "Hk8". }
     iIntros (CIDpr9 Hspr9) "Hcg Hpc Hk8".
@@ -1900,7 +1906,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     iPoseProof (coi_14 with "Htext") as "Hi14".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x14)) (mword_of_int 5 : mword 6) Rs7
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x14)) (mword_of_int 5 : mword 6) Rs7
               R1 (K - 14)%nat u9 b with "Hcg Hpc Hi14 [Hk9]").
     { iEval (rewrite HspR1 Hb9). iExact "Hk9". }
     iIntros (CIDpr10 Hspr10) "Hcg Hpc Hk9".
@@ -1910,7 +1916,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
     iPoseProof (coi_16 with "Htext") as "Hi16".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x16)) (mword_of_int 4 : mword 6) Rs8
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x16)) (mword_of_int 4 : mword 6) Rs8
               R1 (K - 14)%nat u10 b with "Hcg Hpc Hi16 [Hk10]").
     { iEval (rewrite HspR1 Hb10). iExact "Hk10". }
     iIntros (CIDpr11 Hspr11) "Hcg Hpc Hk10".
@@ -1920,7 +1926,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     iPoseProof (coi_18 with "Htext") as "Hi18".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x18)) (mword_of_int 3 : mword 6) Rs9
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x18)) (mword_of_int 3 : mword 6) Rs9
               R1 (K - 14)%nat u11 b with "Hcg Hpc Hi18 [Hk11]").
     { iEval (rewrite HspR1 Hb11). iExact "Hk11". }
     iIntros (CIDpr12 Hspr12) "Hcg Hpc Hk11".
@@ -1930,7 +1936,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
     iPoseProof (coi_1a with "Htext") as "Hi1a".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x1a)) (mword_of_int 2 : mword 6) Rs10
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x1a)) (mword_of_int 2 : mword 6) Rs10
               R1 (K - 14)%nat u12 b with "Hcg Hpc Hi1a [Hk12]").
     { iEval (rewrite HspR1 Hb12). iExact "Hk12". }
     iIntros (CIDpr13 Hspr13) "Hcg Hpc Hk12".
@@ -1940,7 +1946,7 @@ Section ProofCopyout.
                     = mword_of_int (KernelSyms.copyout + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
     iPoseProof (coi_1c with "Htext") as "Hi1c".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.copyout + 0x1c)) (mword_of_int 1 : mword 6) Rs11
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0x1c)) (mword_of_int 1 : mword 6) Rs11
               R1 (K - 14)%nat u13 b with "Hcg Hpc Hi1c [Hk13]").
     { iEval (rewrite HspR1 Hb13). iExact "Hk13". }
     iIntros (CIDpr14 Hspr14) "Hcg Hpc Hk13".
@@ -2191,14 +2197,14 @@ Section ProofCopyout.
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
         proc_pt P' -∗
-        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12 Hk13 Hk14]" as "Hepi".
     { iIntros (CIDe0 Hse0 mj res P')
         "(%Hjsp & %Hja0 & %Hjres & %Hjext) Hcg Hcnt Hpc Hpt Hsrc".
       assert (HspE0 : mj !!! Regidx csp_rs1 = spr) by exact Hjsp.
       iPoseProof (coi_a0 with "Htext") as "HiEa0".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xa0)) (mword_of_int 13 : mword 6) Rra
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xa0)) (mword_of_int 13 : mword 6) Rra
                 mj (K - 14)%nat (mm !!! Regidx Rra) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEa0 [Hk1]").
@@ -2211,7 +2217,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xa2)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEa2) in "Hpc".
       iPoseProof (coi_a2 with "Htext") as "HiEa2".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xa2)) (mword_of_int 12 : mword 6) Rs0
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xa2)) (mword_of_int 12 : mword 6) Rs0
                 E1 (K - 14)%nat (mm !!! Regidx Rs0) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEa2 [Hk2]").
@@ -2224,7 +2230,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xa4)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEa4) in "Hpc".
       iPoseProof (coi_a4 with "Htext") as "HiEa4".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xa4)) (mword_of_int 11 : mword 6) Rs1
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xa4)) (mword_of_int 11 : mword 6) Rs1
                 E2 (K - 14)%nat (mm !!! Regidx Rs1) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEa4 [Hk3]").
@@ -2237,7 +2243,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xa6)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEa6) in "Hpc".
       iPoseProof (coi_a6 with "Htext") as "HiEa6".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xa6)) (mword_of_int 10 : mword 6) Rs2
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xa6)) (mword_of_int 10 : mword 6) Rs2
                 E3 (K - 14)%nat (mm !!! Regidx Rs2) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEa6 [Hk4]").
@@ -2250,7 +2256,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xa8)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEa8) in "Hpc".
       iPoseProof (coi_a8 with "Htext") as "HiEa8".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xa8)) (mword_of_int 9 : mword 6) Rs3
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xa8)) (mword_of_int 9 : mword 6) Rs3
                 E4 (K - 14)%nat (mm !!! Regidx Rs3) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEa8 [Hk5]").
@@ -2263,7 +2269,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xaa)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEaa) in "Hpc".
       iPoseProof (coi_aa with "Htext") as "HiEaa".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xaa)) (mword_of_int 8 : mword 6) Rs4
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xaa)) (mword_of_int 8 : mword 6) Rs4
                 E5 (K - 14)%nat (mm !!! Regidx Rs4) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEaa [Hk6]").
@@ -2276,7 +2282,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xac)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEac) in "Hpc".
       iPoseProof (coi_ac with "Htext") as "HiEac".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xac)) (mword_of_int 7 : mword 6) Rs5
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xac)) (mword_of_int 7 : mword 6) Rs5
                 E6 (K - 14)%nat (mm !!! Regidx Rs5) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEac [Hk7]").
@@ -2289,7 +2295,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xae)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEae) in "Hpc".
       iPoseProof (coi_ae with "Htext") as "HiEae".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xae)) (mword_of_int 6 : mword 6) Rs6
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xae)) (mword_of_int 6 : mword 6) Rs6
                 E7 (K - 14)%nat (mm !!! Regidx Rs6) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEae [Hk8]").
@@ -2302,7 +2308,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xb0)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEb0) in "Hpc".
       iPoseProof (coi_b0 with "Htext") as "HiEb0".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xb0)) (mword_of_int 5 : mword 6) Rs7
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xb0)) (mword_of_int 5 : mword 6) Rs7
                 E8 (K - 14)%nat (mm !!! Regidx Rs7) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEb0 [Hk9]").
@@ -2315,7 +2321,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xb2)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEb2) in "Hpc".
       iPoseProof (coi_b2 with "Htext") as "HiEb2".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xb2)) (mword_of_int 4 : mword 6) Rs8
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xb2)) (mword_of_int 4 : mword 6) Rs8
                 E9 (K - 14)%nat (mm !!! Regidx Rs8) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEb2 [Hk10]").
@@ -2328,7 +2334,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xb4)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEb4) in "Hpc".
       iPoseProof (coi_b4 with "Htext") as "HiEb4".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xb4)) (mword_of_int 3 : mword 6) Rs9
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xb4)) (mword_of_int 3 : mword 6) Rs9
                 E10 (K - 14)%nat (mm !!! Regidx Rs9) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEb4 [Hk11]").
@@ -2341,7 +2347,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xb6)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEb6) in "Hpc".
       iPoseProof (coi_b6 with "Htext") as "HiEb6".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xb6)) (mword_of_int 2 : mword 6) Rs10
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xb6)) (mword_of_int 2 : mword 6) Rs10
                 E11 (K - 14)%nat (mm !!! Regidx Rs10) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEb6 [Hk12]").
@@ -2354,7 +2360,7 @@ Section ProofCopyout.
                       = mword_of_int (KernelSyms.copyout + 0xb8)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite HpEb8) in "Hpc".
       iPoseProof (coi_b8 with "Htext") as "HiEb8".
-      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.copyout + 0xb8)) (mword_of_int 1 : mword 6) Rs11
+      iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyout + 0xb8)) (mword_of_int 1 : mword 6) Rs11
                 E12 (K - 14)%nat (mm !!! Regidx Rs11) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc HiEb8 [Hk13]").

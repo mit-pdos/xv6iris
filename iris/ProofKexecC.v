@@ -3059,7 +3059,7 @@ Section KexecCLoop.
       { rewrite -seq_app. f_equal. lia. }
       iEval (rewrite Hsplit big_sepL_app) in "Hargc".
       iDestruct "Hargc" as "[Hargc1 Hargc2]".
-      iApply (Copyout.wp_copyout_sconf kt ga Z2 P sz1 (S (alen c)) (afun c)
+      iApply (Copyout.wp_copyout_sconf kt KT0 ga Z2 P sz1 (S (alen c)) (afun c)
                 (K - 68)%nat 0%nat true (proc_addr jp) true ∅
                 ltac:(lia) HZ2a0 HZ2a1
                 ltac:(rewrite HZ2a4; f_equal; lia)
@@ -4810,7 +4810,7 @@ Section KexecCClose.
       { rewrite uint_unsigned.
         change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hmax.
         change (2 ^ 38)%Z with 274877906944%Z. lia. }
-      iApply (Copyout.wp_copyout_sconf kt ga X12 P sz1 (8 * S c)%nat ufun
+      iApply (Copyout.wp_copyout_sconf kt KT0 ga X12 P sz1 (8 * S c)%nat ufun
                 (K - 68)%nat 0%nat true (proc_addr jp) true ∅
                 ltac:(lia) HX12a0 HX12a1
                 ltac:(rewrite HX12a4; f_equal; lia)

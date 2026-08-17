@@ -229,7 +229,7 @@ Section MachineProof.
     { rewrite Hmtsp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x3e))
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.strncpy + 0x3e))
               (mword_of_int 1 : mword 6) Rra Mt (K - 2)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3e Hb1").
@@ -246,7 +246,7 @@ Section MachineProof.
     { rewrite HT1sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x40))
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.strncpy + 0x40))
               (mword_of_int 0 : mword 6) Rs0 T1 (K - 2)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi40 Hb2").
@@ -394,8 +394,8 @@ Qed.
         M !!! Regidx r = mm !!! Regidx r) ->
     sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x30) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[kt]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kt] h j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (hf : nat -> bv 8),
         ⌜snc_post f hf n⌝ -∗
@@ -405,8 +405,8 @@ Qed.
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
         sie_cap_gpr kt Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[kt]{dq} f j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kt] hf j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -568,8 +568,8 @@ Qed.
         M !!! Regidx r = mm !!! Regidx r) ->
     sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x0e) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[kt]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kt] h j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (hf : nat -> bv 8),
         ⌜snc_post f hf n⌝ -∗
@@ -579,8 +579,8 @@ Qed.
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
         sie_cap_gpr kt Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[kt]{dq} f j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kt] hf j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1008,7 +1008,7 @@ Qed.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x02,+0x04: save ra and s0. *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x02))
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.strncpy + 0x02))
               (mword_of_int 1 : mword 6) Rra R1 (K - 2)%nat u1 b
               with "Hcg Hpc Hi02 [Hb1]").
     { iEval (rewrite Hpa1). iExact "Hb1". }
@@ -1022,7 +1022,7 @@ Qed.
                    = mword_of_int (KernelSyms.strncpy + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x04))
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.strncpy + 0x04))
               (mword_of_int 0 : mword 6) Rs0 R1 (K - 2)%nat u2 b
               with "Hcg Hpc Hi04 [Hb2]").
     { iEval (rewrite Hpa2). iExact "Hb2". }

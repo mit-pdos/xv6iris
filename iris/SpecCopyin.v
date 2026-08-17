@@ -79,8 +79,13 @@ From Kernel Require KernelSyms.
 Import Defs.
 
 
+(* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [kt].
+   It is FORCED and it is the same two-tier shape [WpSconfMem]'s merged
+   leaves have: this function's kernel buffer is a FRAME local at [kt] for
+   one caller and a KT0 page/bio window for the next, and one shared tier
+   cannot state both.  See SpecMemmove.v's note. *)
 Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile)
+    (kt ktb : ktier) `{!KtierLe ktb kt} (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyin in
@@ -111,14 +116,14 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
     sie_cap_gpr kt mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     proc_pt P' -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_new j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
@@ -129,8 +134,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type COPYIN.
   Parameter wp_copyin_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile)
+      (kt ktb : ktier) `{!KtierLe ktb kt} (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyin_sconf_body kt γa mm P szv len dst_olds K lvl eb p b lks.
+      wp_copyin_sconf_body kt ktb γa mm P szv len dst_olds K lvl eb p b lks.
 End COPYIN.

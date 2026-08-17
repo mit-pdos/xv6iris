@@ -611,7 +611,7 @@ Definition wp_create_sconf_body
   proc_priv γf pj pidv V -∗
   (* ---- the caller's NUL-terminated path buffer (a kernel buffer: every
      caller ran argstr into its own frame) ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv (kt := kt) γs -∗
   dev_inv γu γd -∗
@@ -643,7 +643,7 @@ Definition wp_create_sconf_body
          iunlockput of a link-count-zero inode). *)
       bitmap_res γfs bmapstart cov logstart size used' -∗
       proc_priv γf pj pidv V -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
       bslots bn 3 -∗
       (* at most [create_slots] of the ledger gone, and none gained --
          AND, on the SUCCESS arms, one is still OUT.  The interval alone

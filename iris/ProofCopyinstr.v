@@ -677,7 +677,7 @@ Section ProofCopyinstr.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0xa6) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
-    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] f j) -∗
     (* THE TWO EXITS, as an Iris [∧] and not two separate wands: they are
        ALTERNATIVES, and both need the same resources (the rest of the
        borrowed page, its returning wand, and the function's own exit
@@ -695,7 +695,7 @@ Section ProofCopyinstr.
           sie_cap_gpr kt Mn Kv b pcur -∗
           pc_is (mword_of_int (KernelSyms.copyinstr + 0x40) : mword 64) -∗
           ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
-          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] g j) -∗
           WP (Loop : expr riscv_lang))
         ∧
         ( ∀ (Mc : regfile) (g : nat -> bv 8),
@@ -707,7 +707,7 @@ Section ProofCopyinstr.
           sie_cap_gpr kt Mc Kv b pcur -∗
           pc_is (mword_of_int (KernelSyms.copyinstr + 0x68) : mword 64) -∗
           ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
-          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] g j) -∗
           WP (Loop : expr riscv_lang)) )) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -808,7 +808,7 @@ Section ProofCopyinstr.
         by apply pa_add_assoc.
       iDestruct (bb_byte_acc dst maxn (done + i) f (DfracOwn 1) Hdi with "Hdst")
         as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
+      iApply (wp_sb_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
                 (mword_of_int 0 : mword 12) I3 Kv (f (done + i)%nat) b
                 with "Hcg Hpc Hib2 [Hdb]").
       { iEval (rgne; rewrite HI3a5 addv_sext0 Hcur). iExact "Hdb". }
@@ -937,7 +937,7 @@ Section ProofCopyinstr.
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) -∗
     proc_pt Pc -∗
     kalloc_env γa None -∗
-    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] f j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (g : nat -> bv 8),
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
@@ -950,7 +950,7 @@ Section ProofCopyinstr.
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
-      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] g j) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -980,7 +980,7 @@ Section ProofCopyinstr.
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
-      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] g j) -∗
       WP (Loop : expr riscv_lang)))%I).
     iPoseProof (csi_7c with "Htext") as "Hi7c".
     iPoseProof (csi_80 with "Htext") as "Hi80".
@@ -1119,7 +1119,7 @@ Section ProofCopyinstr.
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
         page_own pa0 -∗
         (page_own pa0 -∗ proc_pt Pd) -∗
-        ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
+        ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[kt] f j) -∗
         EXIT -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
     { iIntros (CIDc mc pa0 Pd) "%Hanchorc %Hextd %Hza0 %Hzsp %Hz1 %Hz2 %Hz3
@@ -1283,7 +1283,7 @@ Section ProofCopyinstr.
                        with "Hcg") as "[%Hz0 Hcg]".
           iDestruct (bb_byte_acc dst maxn (done + i') g (DfracOwn 1) Hdi with "Hdst")
             as "[Hdb Hdback]".
-          iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
+          iApply (wp_sb_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
                     (mword_of_int 0 : mword 12) Mn (K - 12)%nat (g (done + i')%nat) b
                     with "Hcg Hpc Hi40 [Hdb]").
           { iEval (rgne; rewrite Hna5 addv_sext0 Hcur). iExact "Hdb". }

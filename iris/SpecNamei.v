@@ -159,7 +159,7 @@ Definition wp_namei_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
@@ -182,7 +182,7 @@ Definition wp_namei_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -281,7 +281,7 @@ Definition wp_namei_gen_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
@@ -304,7 +304,7 @@ Definition wp_namei_gen_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
       bslots bn 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)

@@ -920,7 +920,7 @@ Section ProofFetchaddr.
         iEval (rewrite -HA7a2) in "Hbuf".
         (* ---- copyin(p->pagetable, p->sz, ip, addr, 8) ---- *)
         iDestruct (cpu_own_transport CID10 CID19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iApply (Copyin.wp_copyin_sconf kt γa A7 (pv_upt V) (pv_sz V) 8%nat
+        iApply (Copyin.wp_copyin_sconf kt kt γa A7 (pv_upt V) (pv_sz V) 8%nat
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p b
                   _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").

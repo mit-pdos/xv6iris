@@ -2366,7 +2366,7 @@ Section ProofDirlinkMain.
            call's own window -- same offset, same booleans, same entry set,
            because dirlookup's readi prefix and the scan above log NOTHING
            and so the count and the set here are still the caller's. *)
-        iApply (WI.wp_writei_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
+        iApply (WI.wp_writei_gen kt kt gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
                   cov logstart inodestart nib bmapstart size dev used gpr
                   ip dinum bm data dn dn0
                   false (16 * k0)%nat 16%nat
@@ -2992,7 +2992,7 @@ Section ProofDirlinkMain.
           { iEval (rewrite HL6a2). iFrame. }
           iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (RD.wp_readi_sconf kt gs j gl gu gd gk pd pav pu bn gfs ga gf
+          iApply (RD.wp_readi_sconf kt kt gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol dl_dummyV
                     pidv dq dqd L6 (K - 10)%nat eb b lks

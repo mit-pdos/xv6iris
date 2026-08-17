@@ -7552,7 +7552,6 @@ Section ProofPrintk.
     Variables (bo : bool) (pcur : mword 64).
     Variables (lks : gset string).
 
-  Context {kt : ktier}.
     Let sp0 : mword 64 := m !!! Regidx csp_rs1.
     Let spd : mword 64 := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))).
     Let s0v : mword 64 := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)).

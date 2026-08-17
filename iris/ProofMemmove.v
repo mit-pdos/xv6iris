@@ -153,6 +153,9 @@ Section ProofMemmove.
 
 
   Context {kt : ktier}.
+  (* the source's and the destination's own tiers -- see SpecMemmove.v's note *)
+  Context (kts ktw : ktier).
+  Context `{!KtierLe kts kt} `{!KtierLe ktw kt}.
   (* [callee_saved] from agreement on the twelve registers the function never
      touches, plus the two frame registers it saves and restores. *)
   Local Lemma cs_from_agree (m M : regfile) :
@@ -228,7 +231,7 @@ Section ProofMemmove.
     { unfold pa_stk, add_vec_int. rewrite pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* ---- +0x28: c.ldsp ra,8(sp) ---- *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.memmove + 0x28)) (mword_of_int 1 : mword 6)
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.memmove + 0x28)) (mword_of_int 1 : mword 6)
               ra_idx M (n - 2) ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 [Hb1]").
@@ -242,7 +245,7 @@ Section ProofMemmove.
     (* ---- +0x2a: c.ldsp s0,0(sp) ---- *)
     assert (HspM4 : M4 !!! Regidx csp_rs1 = pa_stk sp0 2).
     { unfold M4. rewrite upd_ne; [ exact Hsp | vm_compute; discriminate ]. }
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.memmove + 0x2a)) (mword_of_int 0 : mword 6)
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.memmove + 0x2a)) (mword_of_int 0 : mword 6)
               s0_idx M4 (n - 2) s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hb2]").
@@ -335,14 +338,14 @@ Section ProofMemmove.
     sie_cap_gpr kt (CID := CID0) m n b pcur -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x18)) -∗
-    ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
-    ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
+    ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+    ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ[ktw] dst_olds j) -∗
     wp_next (CID0 := CIDh) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr kt mf n b pcur -∗
       pc_is (mword_of_int (KernelSyms.memmove + 0x28)) -∗
-      ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
-      ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
+      ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+      ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ[ktw] src_bytes j) -∗
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
         = m !!! Regidx (mword_of_int 10 : mword 5) ⌝ -∗
       ⌜ callee_saved m mf ⌝ -∗
@@ -416,7 +419,7 @@ Section ProofMemmove.
     assert (Ha1_2' : rget (CID := CID2) m2 a1_idx = pa_add p_src (S off))
       by (rgne; exact Ha1_2).
     (* ---- +0x1c: lbu a3,-1(a1) ---- *)
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memmove + 0x1c)) a3_idx a1_idx
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := kts) (mword_of_int (KernelSyms.memmove + 0x1c)) a3_idx a1_idx
               (mword_of_int 0xfff : mword 12) m2 n (src_bytes off : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hs0]").
@@ -436,7 +439,7 @@ Section ProofMemmove.
     { unfold m3. rewrite upd_ne; [| vm_compute; discriminate]. exact Ha4_2. }
     assert (Ha4v' : rget (CID := CID3) m3 a4_idx = pa_add p_dst (S off))
       by (rgne; exact Ha4v).
-    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memmove + 0x20)) a3_idx a4_idx
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := ktw) (mword_of_int (KernelSyms.memmove + 0x20)) a3_idx a4_idx
               (mword_of_int 0xfff : mword 12) m3 n (dst_olds off) b
               with "Hcg Hpc Hi20 [Hd0]").
     { iEval (rewrite Ha4v' (Hback p_dst off)). iExact "Hd0". }
@@ -548,14 +551,14 @@ Section ProofMemmove.
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x0e)) -∗
     (pa_stk sp0 1) ↦₈[kt] ra0 -∗
     (pa_stk sp0 2) ↦₈[kt] s00 -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ[ktw] dst_olds j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mfin,
       sie_cap_gpr kt mfin n b pcur -∗
       pc_is (ret_pc ra0) -∗
-      ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
-      ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
+      ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+      ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ[ktw] src_bytes j) -∗
       ⌜ mfin !!! Regidx (mword_of_int 10 : mword 5) = p_dst ⌝ -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -701,7 +704,7 @@ Section ProofMemmove.
   (* =================================================================== *)
   Lemma wp_memmove_sconf
       (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memmove_sconf_body kt m0 n len src_bytes dst_olds b pcur.
+    : wp_memmove_sconf_body kt kts ktw m0 n len src_bytes dst_olds b pcur.
   Proof.
     cbv beta delta [wp_memmove_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p_dst p_src ret_tgt Hn Hlen32 Ha2.
@@ -760,14 +763,14 @@ Section ProofMemmove.
     iEval (rewrite -Hpa1) in "Hb1".
     iEval (rewrite -Hpa2) in "Hb2".
     (* ---- +0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.memmove + 0x02)) (mword_of_int 1 : mword 6)
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.memmove + 0x02)) (mword_of_int 1 : mword 6)
               ra_idx m1 (n - 2) v1 b with "Hcg Hpc Hi02 Hb1").
     iIntros (CID2 Hs2) "Hcg Hpc Hb1".
     assert (Hp04 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x02) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
     (* ---- +0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.memmove + 0x04)) (mword_of_int 0 : mword 6)
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.memmove + 0x04)) (mword_of_int 0 : mword 6)
               s0_idx m1 (n - 2) v2 b with "Hcg Hpc Hi04 Hb2").
     iIntros (CID3 Hs3) "Hcg Hpc Hb2".
     assert (Hp06 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x04) : mword 64) 2

@@ -230,12 +230,15 @@ Proof.
   split; [apply Nat2Z.is_nonneg | exact Hx].
 Qed.
 
+(* THE BUFFER CARRIES ITS OWN TIER [ktb] -- the kernel arm's destination is
+   a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
+   next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_readi_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -356,7 +359,7 @@ Definition wp_readi_sconf_body
      shape -- see claude-notes/design/file-table.md.) *)
   (if user
    then proc_priv_core pj pidv V
-   else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ dst_olds i) ∗
+   else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ[ktb] dst_olds i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv (kt := kt) γs -∗
@@ -406,7 +409,7 @@ Definition wp_readi_sconf_body
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n,
-              pa_add dst i ↦ₘ rd_delivered data dst_olds off tot i) ∗
+              pa_add dst i ↦ₘ[ktb] rd_delivered data dst_olds off tot i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslot bn -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -418,7 +421,7 @@ Module Type READI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -433,7 +436,7 @@ Module Type READI.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_readi_sconf_body kt γs j γl γu γd γk pd pav pu bn γfs γa γf
+      wp_readi_sconf_body kt ktb γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V
                           pidv dq dqd m K eb b lks.

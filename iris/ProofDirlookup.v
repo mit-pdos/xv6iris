@@ -1587,12 +1587,12 @@ Section ProofDirlookupMain.
           by (rewrite HL6a4; apply rd_arg32_small; lia).
         (* readi's destination buffer, at the address readi names it by *)
         iAssert (([∗ list] ii ∈ seq 0 16,
-                    pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ dol ii)
+                    pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[kt] dol ii)
                  ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hde Hppid]" as "Hdst".
         { iEval (rewrite HL6a2 Hpjd). iFrame. }
         iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb pj b 
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (RD.wp_readi_sconf kt gs j gl gu gd gk pd pav pu bn gfs ga gf
+        iApply (RD.wp_readi_sconf kt kt gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol dlk_dummyV
                   pidv dq dqd L6 (K - 12)%nat eb b lks

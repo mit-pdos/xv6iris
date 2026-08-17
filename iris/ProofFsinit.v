@@ -1002,7 +1002,7 @@ Section FsinitMain.
       rewrite /N6 upd_ne; [| regne]. exact (HN5thr c Hcs N2' N8 N9 N18). }
     iEval (rewrite -HN6a1) in "Hsrc".
     iEval (rewrite -HN6a0) in "Hsbold".
-    iApply (MM.wp_memmove_sconf kt N6 (K - 4)%nat 32%nat
+    iApply (MM.wp_memmove_sconf kt KT0 KT0 N6 (K - 4)%nat 32%nat
               (fun jj => bs_sb !!! jj) sb_old b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HN6a2
               with "Hcg Htext Hpc Hsrc Hsbold").

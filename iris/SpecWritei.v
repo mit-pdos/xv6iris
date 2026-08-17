@@ -502,12 +502,15 @@ Definition wi_dinode (dn : dinode) (bm' : blkmap) (off tot : nat) : dinode :=
      else di_size dn)
     (bm_cells bm').
 
+(* THE BUFFER CARRIES ITS OWN TIER [ktb] -- the kernel arm's destination is
+   a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
+   next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_writei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -681,7 +684,7 @@ Definition wp_writei_sconf_body
      the same fix, made one stage earlier by fileread.) *)
   (if user
    then proc_priv_core pj pidv V
-   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv (kt := kt) γs -∗
@@ -773,7 +776,7 @@ Definition wp_writei_sconf_body
          buffer, or inside the user arm's block *)
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
-       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
@@ -788,12 +791,15 @@ Definition wp_writei_sconf_body
 (*  [wp_writei_sconf] is this contract with the set forgotten, derived    *)
 (*  at the [log_op] existential's own witness -- so no caller moves.      *)
 (* ===================================================================== *)
+(* THE BUFFER CARRIES ITS OWN TIER [ktb] -- the kernel arm's destination is
+   a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
+   next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_writei_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -957,7 +963,7 @@ Definition wp_writei_gen_body
      the same fix, made one stage earlier by fileread.) *)
   (if user
    then proc_priv_core pj pidv V
-   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv (kt := kt) γs -∗
@@ -1058,7 +1064,7 @@ Definition wp_writei_gen_body
          buffer, or inside the user arm's block *)
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
-       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
       log_opS γ n' Sb' -∗
@@ -1071,7 +1077,7 @@ Module Type WRITEI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -1088,7 +1094,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+      wp_writei_sconf_body kt ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                            cov logstart inodestart nib bmapstart size dev used γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
@@ -1102,7 +1108,7 @@ Module Type WRITEI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -1119,7 +1125,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+      wp_writei_gen_body kt ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                          cov logstart inodestart nib bmapstart size dev used γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb

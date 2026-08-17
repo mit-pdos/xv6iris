@@ -1345,7 +1345,7 @@ Section KexecB2Loops.
       iEval (rewrite -HD6a2) in "Hdst".
       iDestruct (cpu_own_transport CIDd CIDd6 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (Readi.wp_readi_sconf kt gs jp gl gu gd gk pd pav pu bn gfs ga gf
+      iApply (Readi.wp_readi_sconf kt KT0 gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat true
                 true lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb

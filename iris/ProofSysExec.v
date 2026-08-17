@@ -371,7 +371,7 @@ Section SysExecZeros.
   Lemma sx_zero_slot (a : mword 64) (zb : bv 8) :
     (forall j, (j < 8)%nat -> nth_byte (mword_of_int 0 : mword 64) j = zb) ->
     is_aligned_paddr (Physaddr a) 8 = true ->
-    ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ zb) ⊢ a ↦₈ (mword_of_int 0 : mword 64).
+    ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ[kt] zb) ⊢ a ↦₈[kt] (mword_of_int 0 : mword 64).
   Proof.
     intros Hzb Hal. iIntros "H".
     iApply (word_pointsto_intro _ _ _ Hal).

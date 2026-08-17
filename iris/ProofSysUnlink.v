@@ -2848,7 +2848,7 @@ Section ProofSysUnlinkBody.
       by (rewrite /N6; apply su_regs_caller; [exact Hcsra | exact HN5regs]).
     iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Readi.wp_readi_sconf kt (CID := CID6) gs jx gl gu gd gk pd pav pu bn
+    iApply (Readi.wp_readi_sconf kt kt (CID := CID6) gs jx gl gu gd gk pd pav pu bn
               gfs ga gf cov logstart dev (ientry ki) bmi dati dni false
               (16 * jj)%nat 16%nat bcur su_dummyV pidv dq (DfracOwn (1/2))
               N6 (K - 30)%nat eb b lks
@@ -4653,7 +4653,7 @@ Section ProofSysUnlinkBody.
       by (rewrite HB6a4; pcw).
     iDestruct (cpu_own_transport CID0 D12 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Writei.wp_writei_gen kt (CID := D12) gs jx gl gu gd gk pd pav pu bn
+    iApply (Writei.wp_writei_gen kt kt (CID := D12) gs jx gl gu gd gk pd pav pu bn
               g gfs gi ga gf cov logstart inodestart nib bmapstart size dev
               used1 gpr (ientry kd) dinum bmd datd dnd dnd false
               (16 * kk)%nat 16%nat (fun _ => NUL) su_dummyV n1 Sb1 pid
@@ -6098,7 +6098,7 @@ Section ProofSysUnlinkBody.
       by (rewrite HB6a4; pcw).
     iDestruct (cpu_own_transport CID0 D12 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Writei.wp_writei_gen kt (CID := D12) gs jx gl gu gd gk pd pav pu bn
+    iApply (Writei.wp_writei_gen kt kt (CID := D12) gs jx gl gu gd gk pd pav pu bn
               g gfs gi ga gf cov logstart inodestart nib bmapstart size dev
               used1 gpr (ientry kd) dinum bmd datd dnd dnd false
               (16 * kk)%nat 16%nat (fun _ => NUL) su_dummyV n1 Sb1 pid

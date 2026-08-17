@@ -1398,7 +1398,7 @@ Section ProofConsoleread.
     assert (Hstk : (either_copyout_stack <= trap_res true + (av - 12))%nat).
     { assert (trap_res true = 90%nat) as -> by reflexivity.
       lia. }
-    iApply (EitherCopyout.wp_either_copyout_sconf kt γa γf G5
+    iApply (EitherCopyout.wp_either_copyout_sconf kt kt γa γf G5
               (trap_res true + (av - 12))%nat 1%nat true (proc_addr jp) pid
               (upd_upt V P') true 1%nat (fun _ => trunc8 (H8 !!! Regidx Ra4))
               (fun _ => chb0) false ({["cons"]} ∪ lks)

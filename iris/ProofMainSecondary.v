@@ -332,7 +332,7 @@ Section ProofMainSecondary.
     iPoseProof (mni_1c with "Htext") as "Hi1c".
     iPoseProof (mni_1e with "Htext") as "Hi1e".
     (* ---- +0x16 c.lw a5,0(a4) : the spin load, under the invariant ---- *)
-    iApply (wp_load_s_sconf_au 4 true false (mword_of_int (KernelSyms.main + 0x16))
+    iApply (wp_load_s_sconf_au (kt := kt) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (mword_of_int 0 : mword 12) m n
               (fun v => sign_extend' 64 v)

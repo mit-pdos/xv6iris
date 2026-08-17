@@ -295,7 +295,6 @@ Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
                      (PN : PANIC) : FILEREAD.
 
 Section ProofFileread.
-  Context {kt : ktier}.
   (* NO [!icacheG Σ]: [fileG] bundles it, and binding both gives two
      instances whose propositions print identically and do not unify.  The
      carve is what makes that visible (durable-notes.md; SpecFileread.v's
@@ -303,6 +302,7 @@ Section ProofFileread.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context {kt : ktier}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -2033,7 +2033,7 @@ Section ProofFileread.
                by (rewrite HJ6a4; apply rd_arg32_small; lia).
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iApply (Readi.wp_readi_sconf kt γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Readi.wp_readi_sconf kt KT0 γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
                        (frn_cov fn) (frn_logstart fn) icfg_dev (fc_ip Cf)

@@ -194,7 +194,7 @@ Section ProofKexecParts.
     ⌜forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 54) 64.
-  Proof. exact (slotsn_bytes_own sp0 54 8 ltac:(lia)). Qed.
+  Proof. exact (slotsn_bytes_own (KTR := kt) sp0 54 8 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_elf (sp0 : mword 64) :
     (forall i, (i < 8)%nat ->

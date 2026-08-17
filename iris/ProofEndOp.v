@@ -2870,7 +2870,7 @@ Section EndOpBlocks.
     iDestruct (eo_data_fwd (b_data (bpa k2)) bs2 1024%nat Hlen2 with "Hdata2") as "Hdata2".
     iEval (rewrite -HG5a1) in "Hdata2".
     iEval (rewrite -HG5a0) in "Hdata1".
-    iApply (Mm.wp_memmove_sconf kt G5 (K - 8)%nat 1024%nat
+    iApply (Mm.wp_memmove_sconf kt KT0 KT0 G5 (K - 8)%nat 1024%nat
               (fun i => bs2 !!! i) (fun i => bs1 !!! i) eb (proc_addr j)
               ltac:(pose proof (eo_Kmm K HK); lia) ltac:(vm_compute; reflexivity) HG5a2
               with "Hcg Htext Hpc Hdata2 Hdata1").

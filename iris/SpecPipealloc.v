@@ -91,6 +91,9 @@ Definition pipe_name_str : Z := 0x800075b8%Z.
 
 Section SpecPipealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ}.
+  (* [pf0]/[pf1] are the CALLER's two [struct file *] locals -- cells on its
+     own frame -- so they ride the caller's regime. *)
+  Context {kt : ktier}.
 
   (* the four content fields pipealloc writes into each [struct file]: it makes
      the [w = false] file the READ end and the [w = true] file the WRITE end,
@@ -120,7 +123,7 @@ Section SpecPipealloc.
         could break that. *)
      ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
      kalloc_avail γk on ∗ fd_slot ∗ fd_slot ∗
-     (∃ w0 w1 : mword 64, pf0 ↦₈ w0 ∗ pf1 ↦₈ w1)
+     (∃ w0 w1 : mword 64, pf0 ↦₈[kt] w0 ∗ pf1 ↦₈[kt] w1)
      ∨
      (* SUCCESS (a0 = 0): the two files, each owning one end of a live pipe.
         Each [file_ref] is EXCLUSIVE (fraction 1) -- pipealloc's own unlocked
@@ -134,7 +137,7 @@ Section SpecPipealloc.
      (∃ (pi : mword 64) (k0 k1 : nat) (C0 C1 : fcontent),
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
         ⌜pipe_file pi false C0⌝ ∗ ⌜pipe_file pi true C1⌝ ∗
-        pf0 ↦₈ fnode k0 ∗ pf1 ↦₈ fnode k1 ∗
+        pf0 ↦₈[kt] fnode k0 ∗ pf1 ↦₈[kt] fnode k1 ∗
         file_ref γf k0 1 C0 ∗ file_ref γf k1 1 C1))%I.
 
 End SpecPipealloc.
@@ -193,8 +196,8 @@ Definition wp_pipealloc_sconf_body
   fd_slot -∗
   (* the caller's two [struct file *] cells; both are overwritten on entry, so
      their incoming contents are arbitrary *)
-  pf0 ↦₈ v0 -∗
-  pf1 ↦₈ v1 -∗
+  pf0 ↦₈[kt] v0 -∗
+  pf1 ↦₈[kt] v1 -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  pipealloc's error paths
      call fileclose, whose crossing is [true] on every arm, so pipealloc can
      return on another hart; the cost is the CALLER's, which must supply its
@@ -207,7 +210,7 @@ Definition wp_pipealloc_sconf_body
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+    pipealloc_post (kt := kt) γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -1869,7 +1869,7 @@ Section ProofKwait.
                    with "Hxstate") as %Halx.
       iDestruct (word4_pointsto_bytes (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as "Hbytes".
-      iApply (Copyout.wp_copyout_sconf kt γa F6 (pv_upt V) (pv_sz V) 4%nat
+      iApply (Copyout.wp_copyout_sconf kt KT0 γa F6 (pv_upt V) (pv_sz V) 4%nat
                 (fun i => nth_byte xs i) (trap_res eb + (K - 10))%nat 2%nat eb pme false
                 ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
                 ltac:(pose proof (kw_K52 K HK); lia) HF6a0 HF6a1

@@ -126,6 +126,12 @@ Section EitherCopyEpilogue.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := kt)] below). *)
+  Context (ktb : ktier).
+  Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -192,7 +198,7 @@ Section EitherCopyEpilogue.
     { rewrite Hmtsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf q2a (mword_of_int 5 : mword 6) Rra Mt (av - 6)%nat ra0 b
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) q2a (mword_of_int 5 : mword 6) Rra Mt (av - 6)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c Hb1").
     iIntros (CID1 Hs1) "Hcg Hpc Hb1".
@@ -208,7 +214,7 @@ Section EitherCopyEpilogue.
     { rewrite HT1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf q2c (mword_of_int 4 : mword 6) Rs0 T1 (av - 6)%nat s00 b
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) q2c (mword_of_int 4 : mword 6) Rs0 T1 (av - 6)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2e Hb2").
     iIntros (CID2 Hs2) "Hcg Hpc Hb2".
@@ -224,7 +230,7 @@ Section EitherCopyEpilogue.
     { rewrite HT2sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa3) in "Hb3".
-    iApply (wp_cldsp_s_sconf q2e (mword_of_int 3 : mword 6) Rs1 T2 (av - 6)%nat s10 b
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) q2e (mword_of_int 3 : mword 6) Rs1 T2 (av - 6)%nat s10 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi30 Hb3").
     iIntros (CID3 Hs3) "Hcg Hpc Hb3".
@@ -240,7 +246,7 @@ Section EitherCopyEpilogue.
     { rewrite HT3sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa4) in "Hb4".
-    iApply (wp_cldsp_s_sconf q30 (mword_of_int 2 : mword 6) Rs2 T3 (av - 6)%nat s20 b
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) q30 (mword_of_int 2 : mword 6) Rs2 T3 (av - 6)%nat s20 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi32 Hb4").
     iIntros (CID4 Hs4) "Hcg Hpc Hb4".
@@ -256,7 +262,7 @@ Section EitherCopyEpilogue.
     { rewrite HT4sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa5) in "Hb5".
-    iApply (wp_cldsp_s_sconf q32 (mword_of_int 1 : mword 6) Rs3 T4 (av - 6)%nat s30 b
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) q32 (mword_of_int 1 : mword 6) Rs3 T4 (av - 6)%nat s30 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 Hb5").
     iIntros (CID5 Hs5) "Hcg Hpc Hb5".
@@ -272,7 +278,7 @@ Section EitherCopyEpilogue.
     { rewrite HT5sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa6) in "Hb6".
-    iApply (wp_cldsp_s_sconf q34 (mword_of_int 0 : mword 6) Rs4 T5 (av - 6)%nat s40 b
+    iApply (wp_cldsp_s_sconf (kt := kt) (ktd := kt) q34 (mword_of_int 0 : mword 6) Rs4 T5 (av - 6)%nat s40 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi36 Hb6").
     iIntros (CID6 Hs6) "Hcg Hpc Hb6".
@@ -390,6 +396,12 @@ Section ProofEitherCopyout.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := kt)] below). *)
+  Context (ktb : ktier).
+  Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -411,7 +423,7 @@ Section ProofEitherCopyout.
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyout_sconf_body kt γa γf m av lvl eb p pid V user len
+    : wp_either_copyout_sconf_body kt ktb γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
@@ -506,7 +518,7 @@ Section ProofEitherCopyout.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0x02 .. +0x0c: save ra / s0 / s1 / s2 / s3 / s4 ---- *)
     iEval (rewrite -Hb1) in "Hk1".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x02)) (mword_of_int 5 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyout + 0x02)) (mword_of_int 5 : mword 6) Rra
               R1 (av - 6)%nat u1 b with "Hcg Hpc Hi02 Hk1").
     iIntros (CID2 Hs2) "Hcg Hpc Hk1".
     iEval (rewrite Hb1) in "Hk1".
@@ -514,7 +526,7 @@ Section ProofEitherCopyout.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     iEval (rewrite -Hb2) in "Hk2".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x04)) (mword_of_int 4 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyout + 0x04)) (mword_of_int 4 : mword 6) Rs0
               R1 (av - 6)%nat u2 b with "Hcg Hpc Hi04 Hk2").
     iIntros (CID3 Hs3) "Hcg Hpc Hk2".
     iEval (rewrite Hb2) in "Hk2".
@@ -522,7 +534,7 @@ Section ProofEitherCopyout.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     iEval (rewrite -Hb3) in "Hk3".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x06)) (mword_of_int 3 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyout + 0x06)) (mword_of_int 3 : mword 6) Rs1
               R1 (av - 6)%nat u3 b with "Hcg Hpc Hi06 Hk3").
     iIntros (CID4 Hs4) "Hcg Hpc Hk3".
     iEval (rewrite Hb3) in "Hk3".
@@ -530,7 +542,7 @@ Section ProofEitherCopyout.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     iEval (rewrite -Hb4) in "Hk4".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x08)) (mword_of_int 2 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyout + 0x08)) (mword_of_int 2 : mword 6) Rs2
               R1 (av - 6)%nat u4 b with "Hcg Hpc Hi08 Hk4").
     iIntros (CID5 Hs5) "Hcg Hpc Hk4".
     iEval (rewrite Hb4) in "Hk4".
@@ -538,7 +550,7 @@ Section ProofEitherCopyout.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     iEval (rewrite -Hb5) in "Hk5".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x0a)) (mword_of_int 1 : mword 6) Rs3
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyout + 0x0a)) (mword_of_int 1 : mword 6) Rs3
               R1 (av - 6)%nat u5 b with "Hcg Hpc Hi0a Hk5").
     iIntros (CID6 Hs6) "Hcg Hpc Hk5".
     iEval (rewrite Hb5) in "Hk5".
@@ -546,7 +558,7 @@ Section ProofEitherCopyout.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     iEval (rewrite -Hb6) in "Hk6".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x0c)) (mword_of_int 0 : mword 6) Rs4
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyout + 0x0c)) (mword_of_int 0 : mword 6) Rs4
               R1 (av - 6)%nat u6 b with "Hcg Hpc Hi0c Hk6").
     iIntros (CID7 Hs7) "Hcg Hpc Hk6".
     iEval (rewrite Hb6) in "Hk6".
@@ -882,7 +894,7 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyout.wp_copyout_sconf kt γa U5 (pv_upt V) (pv_sz V) len src_bytes
+      iApply (Copyout.wp_copyout_sconf kt ktb γa U5 (pv_upt V) (pv_sz V) len src_bytes
                 (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
@@ -1026,7 +1038,7 @@ Section ProofEitherCopyout.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hsrc".
       iEval (rewrite -HK4a0) in "Hres".
-      iApply (Memmove.wp_memmove_sconf kt K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf kt KT0 ktb K4 (av - 6)%nat len src_bytes dst_olds b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hsrc Hres").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
@@ -1107,6 +1119,12 @@ Section ProofEitherCopyin.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [kt].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := kt)] below). *)
+  Context (ktb : ktier).
+  Context `{!KtierLe ktb kt}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -1128,7 +1146,7 @@ Section ProofEitherCopyin.
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyin_sconf_body kt γa γf m av lvl eb p pid V user len
+    : wp_either_copyin_sconf_body kt ktb γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
@@ -1223,7 +1241,7 @@ Section ProofEitherCopyin.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0x02 .. +0x0c: save ra / s0 / s1 / s2 / s3 / s4 ---- *)
     iEval (rewrite -Hb1) in "Hk1".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x02)) (mword_of_int 5 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyin + 0x02)) (mword_of_int 5 : mword 6) Rra
               R1 (av - 6)%nat u1 b with "Hcg Hpc Hi02 Hk1").
     iIntros (CID2 Hs2) "Hcg Hpc Hk1".
     iEval (rewrite Hb1) in "Hk1".
@@ -1231,7 +1249,7 @@ Section ProofEitherCopyin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     iEval (rewrite -Hb2) in "Hk2".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x04)) (mword_of_int 4 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyin + 0x04)) (mword_of_int 4 : mword 6) Rs0
               R1 (av - 6)%nat u2 b with "Hcg Hpc Hi04 Hk2").
     iIntros (CID3 Hs3) "Hcg Hpc Hk2".
     iEval (rewrite Hb2) in "Hk2".
@@ -1239,7 +1257,7 @@ Section ProofEitherCopyin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     iEval (rewrite -Hb3) in "Hk3".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x06)) (mword_of_int 3 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyin + 0x06)) (mword_of_int 3 : mword 6) Rs1
               R1 (av - 6)%nat u3 b with "Hcg Hpc Hi06 Hk3").
     iIntros (CID4 Hs4) "Hcg Hpc Hk3".
     iEval (rewrite Hb3) in "Hk3".
@@ -1247,7 +1265,7 @@ Section ProofEitherCopyin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     iEval (rewrite -Hb4) in "Hk4".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x08)) (mword_of_int 2 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyin + 0x08)) (mword_of_int 2 : mword 6) Rs2
               R1 (av - 6)%nat u4 b with "Hcg Hpc Hi08 Hk4").
     iIntros (CID5 Hs5) "Hcg Hpc Hk4".
     iEval (rewrite Hb4) in "Hk4".
@@ -1255,7 +1273,7 @@ Section ProofEitherCopyin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     iEval (rewrite -Hb5) in "Hk5".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x0a)) (mword_of_int 1 : mword 6) Rs3
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyin + 0x0a)) (mword_of_int 1 : mword 6) Rs3
               R1 (av - 6)%nat u5 b with "Hcg Hpc Hi0a Hk5").
     iIntros (CID6 Hs6) "Hcg Hpc Hk5".
     iEval (rewrite Hb5) in "Hk5".
@@ -1263,7 +1281,7 @@ Section ProofEitherCopyin.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     iEval (rewrite -Hb6) in "Hk6".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x0c)) (mword_of_int 0 : mword 6) Rs4
+    iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.either_copyin + 0x0c)) (mword_of_int 0 : mword 6) Rs4
               R1 (av - 6)%nat u6 b with "Hcg Hpc Hi0c Hk6").
     iIntros (CID7 Hs7) "Hcg Hpc Hk6".
     iEval (rewrite Hb6) in "Hk6".
@@ -1592,7 +1610,7 @@ Section ProofEitherCopyin.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyin. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyin.wp_copyin_sconf kt γa U5 (pv_upt V) (pv_sz V) len dst_olds
+      iApply (Copyin.wp_copyin_sconf kt ktb γa U5 (pv_upt V) (pv_sz V) len dst_olds
                 (av - 6)%nat lvl eb p b
                 _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
@@ -1738,7 +1756,7 @@ Section ProofEitherCopyin.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hres".
       iEval (rewrite -HK4a0) in "Hdst".
-      iApply (Memmove.wp_memmove_sconf kt K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf kt KT0 ktb K4 (av - 6)%nat len src_bytes dst_olds b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hres Hdst").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".

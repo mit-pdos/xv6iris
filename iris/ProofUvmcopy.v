@@ -1340,7 +1340,7 @@ Section ProofUvmcopy.
       as "[Hsrc Hsrcback]".
     iDestruct (bb_page_named (page_base (pte_ppn wu)) with "Hsrc") as (fsrc) "Hsrc".
     iDestruct (bb_page_named r with "Hpage") as (fdst) "Hdst".
-    iApply (Memmove.wp_memmove_sconf kt C5 (K - 10)%nat 4096%nat fsrc fdst b p
+    iApply (Memmove.wp_memmove_sconf kt KT0 KT0 C5 (K - 10)%nat 4096%nat fsrc fdst b p
               HKmm ltac:(vm_compute; reflexivity) Hmmlen
               with "Hcg Htext Hpc [Hsrc] [Hdst]").
     { iEval (rewrite HC5a1). iExact "Hsrc". }

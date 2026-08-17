@@ -1100,7 +1100,7 @@ Section KexecB3Body.
     iDestruct (cpu_own_transport CID0 CIDf 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iEval (rewrite -HU5a2) in "Hphb".
-    iApply (Readi.wp_readi_sconf kt gs jp gl gu gd gk pd pav pu bn gfs ga gf
+    iApply (Readi.wp_readi_sconf kt KT0 gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry kf) bmf datl dnf false offn 56%nat phb V
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) U5 (K - 68)%nat true
               true ∅ ltac:(lia) Hlg Hbmwf Hbmcov Hszb

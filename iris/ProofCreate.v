@@ -1481,9 +1481,9 @@ Section ProofCreateMain.
   (* the sixteen-byte local is FOURTEEN bytes of [name] and two of slack;
      [nameiparent] and [dirlookup] both want exactly the fourteen. *)
   Lemma cr_split14 (a : Arch.pa) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ f j) ⊣⊢
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ f j) ∗
-    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] f j) ⊣⊢
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j) ∗
+    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ[kt] f j).
   Proof.
     change 16%nat with (14 + 2)%nat. rewrite seq_app big_sepL_app.
     reflexivity.
@@ -1494,9 +1494,9 @@ Section ProofCreateMain.
      functions ([nameiparent] rewrote only the fourteen), so the join has to
      produce the pointwise splice rather than reuse either. *)
   Lemma cr_join14 (a : Arch.pa) (f g : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ g j) -∗
-    ∃ h : nat -> bv 8, ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ h j).
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j) -∗
+    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ[kt] g j) -∗
+    ∃ h : nat -> bv 8, ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] h j).
   Proof.
     iIntros "H1 H2".
     iExists (fun j => if decide (j < 14)%nat then f j else g j).

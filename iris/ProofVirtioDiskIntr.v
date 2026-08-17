@@ -1146,7 +1146,7 @@ Section VtDevRam.
     assert (Hcan2 : forall j, (j < 2)%nat ->
               (uint (pa_add (pa_add pu 2%nat) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add. exact (Hcanu (2 + j)%nat (vt_two_add_lt j Hj)). }
-    iApply (wp_load_s_sconf_au (CID:=CID) 2 false true pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au (CID:=CID) (kt := kt) (ktd := KT0) 2 false true pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
               (fun w => (∃ nc : nat, ⌜w = wrap16 nc⌝ ∗
                           ⌜(nr <= nc)%nat /\ (nc <= np)%nat⌝ ∗
@@ -1253,7 +1253,7 @@ Section VtDevRam.
               (uint (pa_add (pa_add pu (vt_uoff p)) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add.
       exact (Hcanu (vt_uoff p + j)%nat (vt_uoff_add_lt p j Hj)). }
-    iApply (wp_load_s_sconf_au (CID:=CID) 4 true false pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au (CID:=CID) (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
               (fun w => (⌜w = (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
                                : SailStdpp.Values.mword 32)⌝ ∗

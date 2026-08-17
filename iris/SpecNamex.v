@@ -330,10 +330,10 @@ Definition namex_post
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[kt] nf i) -∗
       bslots bn 3 -∗
       ⌜((n - (length (path_elems pl) + 1) * iput_units)%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
@@ -384,10 +384,10 @@ Definition namex_postS
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[kt] nf i) -∗
       bslots bn 3 -∗
       (* THE SET ONLY GROWS.  What the walk MUST do is not LOSE the
          caller's set across the loop, which against the counted contract
@@ -525,9 +525,9 @@ Definition wp_namex_sconf_body
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
   (* ---- THE PATH: [plen] content bytes and the terminator ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
   (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[kt] nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
   bslots bn 3 -∗
   (* ---- the ledger: see (5) in the header ---- *)
@@ -677,9 +677,9 @@ Definition wp_namex_gen_body
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
   (* ---- THE PATH: [plen] content bytes and the terminator ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
   (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[kt] nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
   bslots bn 3 -∗
   (* ---- the ledger: see (5) in the header ---- *)
