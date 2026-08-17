@@ -84,6 +84,7 @@ ZicondGpr.v
 WpMmodeLeafBase.v
 WpMmodeSwpBase.v
 WpMmodeJump.v
+WpMmodeCsrSwp.v
 MbootVocab.v
 MemAccessGen.v
 WpMmodeItype.v

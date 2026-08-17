@@ -168,9 +168,18 @@ Qed.
 (* a jump leaf reason -- which is the answer to "what does JALR need": not  *)
 (* a wider obligation, just its own footprint.                              *)
 (* ====================================================================== *)
-Definition jr_Drw : gset register := {[ (R_bitvector_64 nextPC : register) ]}.
-Definition jr_Dro : gset register :=
+(* THE FOOTPRINT, over the ONE register the stretch writes.
+   [cw_Dro] is the read-only half every M-mode config-reading stretch needs:
+   cur_privilege / mseccfg / misa is exactly [WpDecodeBridge.D_m], so a
+   [goodb]-transported fact lands in it without widening.  [cw_Drw] is
+   whatever the stretch writes -- nextPC for a jump, the CSR for a CSR write
+   -- which is why it is a parameter. *)
+Definition cw_Drw (r : register) : gset register := {[ r ]}.
+Definition cw_Dro : gset register :=
   {[ (cur_privilege : register); (mseccfg : register); (misa : register) ]}.
+
+Definition jr_Drw : gset register := cw_Drw (R_bitvector_64 nextPC).
+Definition jr_Dro : gset register := cw_Dro.
 Definition jr_Df (dq : dfrac) : register -> dfrac := fun r =>
   if decide (r = (misa : register)) then DfracDiscarded
   else if decide (r = (mseccfg : register)) then DfracDiscarded
@@ -183,17 +192,17 @@ Definition jr_rs (npc0 : SailStdpp.Values.mword 64) : regstate :=
           (register_set cur_privilege Machine init_regstate))).
 
 Lemma jr_disj : jr_Drw ## jr_Dro.
-Proof. rewrite /jr_Drw /jr_Dro. set_solver. Qed.
+Proof. rewrite /jr_Drw /jr_Dro /cw_Drw /cw_Dro. set_solver. Qed.
 Lemma jr_w_nPC : (R_bitvector_64 nextPC : register) ∈ jr_Drw.
-Proof. rewrite /jr_Drw. set_solver. Qed.
+Proof. rewrite /jr_Drw /cw_Drw. set_solver. Qed.
 Lemma jr_in_nPC : (R_bitvector_64 nextPC : register) ∈ jr_Drw ∪ jr_Dro.
-Proof. rewrite /jr_Drw /jr_Dro. set_solver. Qed.
+Proof. rewrite /jr_Drw /jr_Dro /cw_Drw /cw_Dro. set_solver. Qed.
 Lemma jr_in_priv : (cur_privilege : register) ∈ jr_Drw ∪ jr_Dro.
-Proof. rewrite /jr_Drw /jr_Dro. set_solver. Qed.
+Proof. rewrite /jr_Drw /jr_Dro /cw_Drw /cw_Dro. set_solver. Qed.
 Lemma jr_in_sec : (mseccfg : register) ∈ jr_Drw ∪ jr_Dro.
-Proof. rewrite /jr_Drw /jr_Dro. set_solver. Qed.
+Proof. rewrite /jr_Drw /jr_Dro /cw_Drw /cw_Dro. set_solver. Qed.
 Lemma jr_in_misa : (misa : register) ∈ jr_Drw ∪ jr_Dro.
-Proof. rewrite /jr_Drw /jr_Dro. set_solver. Qed.
+Proof. rewrite /jr_Drw /jr_Dro /cw_Drw /cw_Dro. set_solver. Qed.
 
 (* NOT [rewrite (irrelevant_register_set _ _ _ _ ltac:(vm_compute; …))]: the
    [ltac:] runs before the register evar is solved.  [apply] fixes it from the
@@ -233,7 +242,7 @@ Lemma jr_set_agree (npc0 target : SailStdpp.Values.mword 64) :
   reg_agree_on (jr_Drw ∪ jr_Dro)
     (register_set (R_bitvector_64 nextPC) target (jr_rs npc0)) (jr_rs target).
 Proof.
-  intros r Hr. rewrite /jr_Drw /jr_Dro in Hr.
+  intros r Hr. rewrite /jr_Drw /jr_Dro /cw_Drw /cw_Dro in Hr.
   repeat (apply elem_of_union in Hr as [Hr|Hr]);
     apply elem_of_singleton in Hr; subst r.
   - etransitivity; [apply register_lookup_set|]. symmetry. apply jr_rs_nPC.
@@ -261,7 +270,7 @@ Section jump.
         reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
         reg_pointsto misa DfracDiscarded MISA_C).
   Proof.
-    rewrite /hreg_frame /hreg_frame_ro /jr_Drw /jr_Dro.
+    rewrite /hreg_frame /hreg_frame_ro /jr_Drw /jr_Dro /cw_Drw /cw_Dro.
     repeat (rewrite big_sepS_union; last set_solver).
     rewrite !big_sepS_singleton.
     rewrite jr_rs_nPC jr_rs_priv jr_rs_sec jr_rs_misa.
