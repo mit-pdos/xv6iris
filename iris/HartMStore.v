@@ -572,6 +572,87 @@ Section store.
      address and the stored data are the leaf's business, and stating them
      this way keeps every register value out of this file while leaving the
      walk complete. *)
+  (* ------------------------------------------------------------------ *)
+  (* [vmem_write], with the ADDRESS COMPUTATION as an obligation.          *)
+  (*                                                                      *)
+  (* [get_transformed_data_addr base offset ..] is [rX_bits base >>= ..],   *)
+  (* and [rX_bits] at a SYMBOLIC index is the one node no walker can take   *)
+  (* -- so the [hfrun] premise below only ever discharges at a CONCRETE     *)
+  (* register (which is what the pilot has, and why the corollary keeps     *)
+  (* that form).  A generic store leaf quantifies its operands, so it hands *)
+  (* in a [swp] for that stretch instead and peels the read itself with     *)
+  (* [HartMFrame.swp_rX_file].                                             *)
+  (*                                                                      *)
+  (* [Q] is an abstract rider so the leaf can carry [gpr_file] through the  *)
+  (* obligation and get it back; the lemma never looks inside it.          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_vmem_write_gen (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
+      (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (R Q : iProp Σ) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    is_aligned_vaddr (Virtaddr pa) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
+      = returnM (4, 0) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    Q -∗
+    (Q -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (get_transformed_data_addr base offset (Store Data) 4)
+         (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ Q ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 4
+                   (Interface.WriteReq.value (mwrite_req pa v)))
+                σ.(mdev)) ∗ R)) -∗
+    swp (vmem_write base offset 4 v (Store Data) false false false)
+      (fun r => ⌜r = Values.Ok true⌝ ∗ Q ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+  Proof.
+    intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
+      Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit.
+    iIntros "#Hcert Hrw Hro HQ Hgta Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold vmem_write.
+    iApply (swp_use_cer
+              (get_transformed_data_addr base offset (Store Data) 4)
+              _ _ C HC with "[HQ Hgta Hrw Hro] [-]").
+    { iApply ("Hgta" with "HQ Hrw Hro"). }
+    iIntros (v0) "(-> & HQ & Hrw & Hro)". s_glue.
+    rewrite mbind_ret. s_glue.
+    iApply (swp_use_cer0
+              (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false
+                 false) _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg R Hdisj
+                HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
+                Hunlock Hpallow Hram Hva Hpa Hsplit
+                with "Hcert Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro & HR)".
+    iApply ("Hcont" $! (Values.Ok true)). by iFrame.
+  Qed.
+
+  (* the ORIGINAL form, for callers at concrete register indices (the pilot):
+     the address stretch is a computed walk, so [swp_hfrun] discharges the
+     obligation and [Q] is [emp]. *)
   Lemma swp_vmem_write (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
@@ -615,24 +696,22 @@ Section store.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta.
     iIntros "#Hcert Hrw Hro Hmem".
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    unfold vmem_write.
-    iApply (swp_use_cer
-              (get_transformed_data_addr base offset (Store Data) 4)
-              _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj Hgta
-                with "Hcert Hrw Hro"). }
-    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
-    rewrite mbind_ret. s_glue.
-    iApply (swp_use_cer0
-              (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false
-                 false) _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg R Hdisj
-                HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
-                Hunlock Hpallow Hram Hva Hpa Hsplit
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro & HR)".
-    iApply ("Hcont" $! (Values.Ok true)). by iFrame.
+    iAssert (emp -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+             swp (get_transformed_data_addr base offset (Store Data) 4)
+               (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ emp ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro))%I
+      as "Hgtaobl".
+    { iIntros "_ Hrw Hro".
+      iApply (swp_mono with "[] [-]");
+        [| iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj Hgta
+                     with "Hcert Hrw Hro") ].
+      iIntros (r) "(-> & Hrw & Hro)". by iFrame. }
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_vmem_write_gen Drw Dro Df rs base offset pa v pmar0 pcfg
+                   R emp%I Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma
+                   Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit
+                   with "Hcert Hrw Hro [//] Hgtaobl Hmem") ].
+    iIntros (r) "(-> & _ & Hrw & Hro & HR)". by iFrame.
   Qed.
 
   Lemma swp_execute_STORE (Drw Dro : gset register) (Df : register -> dfrac)
