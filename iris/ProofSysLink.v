@@ -522,6 +522,13 @@ Lemma sl_wi_mono (crb crd cru al ind : bool) :
   (wi16_spend crb crd cru al ind <= wi16_spend crb crd false al ind)%nat.
 Proof. destruct crb, crd, cru, al, ind; vm_compute; lia. Qed.
 
+Lemma sl_sub_le (n k : nat) : (n - k <= n)%nat.
+Proof. lia. Qed.
+
+Lemma sl_atomic_lt16 (tot : nat) :
+  (tot = 0%nat \/ tot = 16%nat) -> (tot < 16)%nat -> tot = 0%nat.
+Proof. lia. Qed.
+
 (* ARM G, the success append: the parent's free and then [iput(ip)]. *)
 Lemma sl_ok_close (crb crd cru al ind w1 w2 wd : bool) (n2 n3 n4 : nat) :
   sl_crok crb w1 w2 -> (sl_u3 w1 w2 <= n2)%nat ->
@@ -2009,7 +2016,7 @@ Section ProofSysLinkBody.
                   by exact (sl_regs_cs m sp0 _ _ T2 mnp Hcsnp HT2regs).
                 assert (Hmem2 : IBLOCK inum inodestart
                                 ∈ (Sb1 ∪ {[IBLOCK inum inodestart]}))
-                  by set_solver.
+                  by (apply elem_of_union_r, elem_of_singleton; reflexivity).
                 assert (Hmem2' : IBLOCK inum inodestart ∈ Sb2)
                   by exact (HSb2 _ Hmem2).
                 (* ===== +0x7c c.mv s2,a0 ===== *)
@@ -2708,6 +2715,10 @@ Section ProofSysLinkBody.
                                                 (dir_nrec (bv_unsigned (di_size dnd)))
                                          + tot)))
                          by (rewrite Hdne; exact (sl_wi_size_max dnd bmd' _ tot Hoff32)).
+                       assert (Hszmono :
+                                 (bv_unsigned (di_size dnd)
+                                  <= bv_unsigned (di_size dnd'))%Z)
+                         by (clear -Hszmax; rewrite Hszmax; lia).
                        assert (Hddok' : dir_ok icfg_nib dnd' datd').
                        { apply (dir_ok_dirlink icfg_nib dnd dnd' datd datd'
                                  (sl_low16 inum) (bname 14 nf)
@@ -2727,7 +2738,7 @@ Section ProofSysLinkBody.
                                  (dir_nrec (bv_unsigned (di_size dnd)))
                                  (dir_slot datd (dir_nrec (bv_unsigned (di_size dnd))))
                                  tot eq_refl eq_refl Htotle Htyeq Hnleq
-                                 ltac:(rewrite Hszmax; lia) Hrng Hddixd). }
+                                 Hszmono Hrng Hddixd). }
                        (* ...and the COMPLEMENT clause, which the KERNEL FIX
                           is what makes free: xv6 f60ff58's orphan guard at
                           +0x84 has already refused an orphaned parent, so
@@ -2770,6 +2781,10 @@ Section ProofSysLinkBody.
                                     (proj2 (proj2 (proj2 (proj2 (proj2 (proj2 Hdiok))))))). }
                        destruct Hbl as [[Ha0z Ht16] | [Ha0m Htlt]].
                        ++++ (* ====== ARM G: the whole record went in ====== *)
+                            assert (Htot2 : (2 <= tot)%nat)
+                              by (clear -Ht16; lia).
+                            assert (Htotpos : (0 < tot)%nat)
+                              by (clear -Ht16; lia).
                             iApply (wp_blt_x0_fall_s_sconf (CID := CID60)
                                       (mword_of_int (SL + 0xa0))
                                       (mword_of_int 78 : mword 13) Ra0 mdl
@@ -2791,7 +2806,7 @@ Section ProofSysLinkBody.
                                          (bname 14 nf)
                                          (dir_slot datd
                                             (dir_nrec (bv_unsigned (di_size dnd))))
-                                         tot ltac:(lia) Hrng with "[Hilink]")
+                                         tot Htot2 Hrng with "[Hilink]")
                               as "Hk0".
                             { rewrite Hli. iExact "Hilink". }
                             (* V5': the appended slot is not the [".."] the
@@ -2837,7 +2852,7 @@ Section ProofSysLinkBody.
                               iFrame "Ha Hi Hblocksd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
-                            destruct (Hmemtrio ltac:(lia))
+                            destruct (Hmemtrio Htotpos)
                               as (Hmtgt & Hmiblk & Hmbmap).
                             (* ===== +0xa4 c.mv a0,s2 ===== *)
                             iApply (wp_cmv_s_sconf (CID := CID61)
@@ -2884,7 +2899,8 @@ Section ProofSysLinkBody.
                                   [exact Hcsra | exact HW0regs]).
                             assert (Hiu3 : (iput_units <= n3)%nat)
                               by exact (proj1 (sl_ok_close _ _ _ _ _ w1 w2 false
-                                          n2 n3 n3 Hcrok2 Hu3 Hspend ltac:(lia))).
+                                          n2 n3 n3 Hcrok2 Hu3 Hspend
+                                          (sl_sub_le _ _))).
                             iDestruct (log_opS_named with "HopS") as (e0) "HopE".
                             iDestruct (cpu_own_transport CID60 CID63 0 eb pj b
                                          ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -3192,7 +3208,7 @@ Section ProofSysLinkBody.
                             { right. rewrite Ha0f HW7a5. reflexivity. }
                        ++++ (* ====== ARM F-0: the EMPTY append ====== *)
                             assert (Htot0 : tot = 0%nat)
-                              by (destruct Hatom as [Hz | Hs]; [exact Hz | lia]).
+                              by exact (sl_atomic_lt16 tot Hatom Htlt).
                             iApply (wp_blt_x0_taken_s_sconf (CID := CID60)
                                       (mword_of_int (SL + 0xa0))
                                       (mword_of_int 78 : mword 13) Ra0 mdl

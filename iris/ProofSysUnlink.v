@@ -403,6 +403,14 @@ Qed.
 Lemma su_wi_cost (k : nat) : wi_cost_bmonly (16 * k) 16 = 4%nat.
 Proof. unfold wi_cost_bmonly. rewrite (su_wi_blocks k). reflexivity. Qed.
 
+(* [iunlockput] can report at most one bitmap unit spent on this credited
+   call.  Keep that arithmetic out of the whole-function Iris context. *)
+Lemma su_iunlockput_from5 (w : bool) (n n' : nat) :
+  (5 <= n)%nat ->
+  ((n - ip_spend_w w true false)%nat <= n')%nat ->
+  (4 <= n')%nat.
+Proof. unfold ip_spend_w, ip_bm. destruct w; cbn; lia. Qed.
+
 (* the zero record: its inum field and each of its sixteen bytes *)
 Lemma su_dz_inum : de_inum dirent_zero = bv_0 16.
 Proof. reflexivity. Qed.
@@ -5007,7 +5015,7 @@ Section ProofSysUnlinkBody.
       by exact (su_regs_cs m sp0 _ _ _ C5 mup Hcsup HC5regs).
     assert (Hn24 : (4 <= n2)%nat).
     { destruct Hn2 as [Hn2a Hn2b].
-      revert Hn2a. unfold ip_spend_w, ip_bm. destruct wg; cbn; intro; lia. }
+      exact (su_iunlockput_from5 wg nw n2 Hnw5 Hn2a). }
     iClear "Hiae Hib2 Hib4 Hib8 Hiba".
     iPoseProof (suli_0be with "Htext") as "Hibe".
     iPoseProof (suli_0c2 with "Htext") as "Hic2".
@@ -6825,7 +6833,7 @@ Section ProofSysUnlinkBody.
       by exact (su_regs_cs m sp0 _ _ _ C5 mup Hcsup HC5regs).
     assert (Hn24 : (4 <= n2)%nat).
     { destruct Hn2 as [Hn2a Hn2b].
-      revert Hn2a. unfold ip_spend_w, ip_bm. destruct wg; cbn; intro; lia. }
+      exact (su_iunlockput_from5 wg (S c1) n2 Hnw5 Hn2a). }
     iClear "Hiae Hib2 Hib4 Hib8 Hiba".
     iPoseProof (suli_0be with "Htext") as "Hibe".
     iPoseProof (suli_0c2 with "Htext") as "Hic2".

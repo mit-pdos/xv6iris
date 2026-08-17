@@ -311,6 +311,16 @@ worth 20× on individual files.
   to delta, so it peels straight *through* a named abstraction that already has
   its own instance and then backtracks over everything underneath.
   **Descend through the connectives, never through a name.**
+- **Pay deeply nested polymorphic structure once behind a fully typed
+  wrapper.** `IcacheRef` applied `prod_local_update'` six levels down the same
+  named seven-component CMRA at twelve callers; elaboration rediscovered the
+  outer product at every site, and the first application alone cost 4.5 s each
+  time. A helper stated over the named constructor and all seven component
+  updates pays that inference once in its proof; callers then supply identity
+  or component-local updates to the fixed signature. The profile now has one
+  4.5 s structural application instead of twelve. This is useful when the
+  repeated cost is in the first polymorphic constructor application, not when
+  the component updates themselves are slow.
 - **Mark big concrete literals `Global Typeclasses Opaque`** (`kernel_bytes`,
   `kernel_data`, `kernel_symbols`, `mem_pointsto`) or instance search unfolds a
   23K-entry gmap, ~108 s a time. Use `Typeclasses Opaque`, never `Opaque` — a
