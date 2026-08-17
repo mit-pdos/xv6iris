@@ -1569,6 +1569,185 @@ nothing about. `UsertrapRes.ut_trap_open` now MINTS the witness from its own
 `kpt_on` (`strans_ktier_wit_intro`) instead. The rule is: thread it, or mint
 it from `kpt_on`; never re-conjure it.
 
+### F2 findings — the leaf merge (`b3d969c1`, `01ebba6f`, `493adeb1`)
+
+**The blocker is GONE at the leaf: `WpSconfMem`'s memory family is now ONE
+tier-generic rule per instruction, and a frame slot at a variable `kt`
+drives it with no annotation.** What the increment cost is not the leaf
+work (that is ~270 lines in one file) but the F1 residue it exposes: the
+tier had reached `stack_own` and stopped there, so every OTHER spelling of
+a frame slot in the tree was still at the ambient KT0 default.
+
+#### The `KtierLe` mechanism: the verdict is "none of the three; refl is
+#### the right answer and the annotation goes on the DATA"
+
+Measured on standalone 30-line Iris probes (a `cell : ktier -> nat -> PROP`,
+a `cap : ktier -> PROP`, the three instances, the leaf as an `Admitted`
+lemma) and then on the tree. The failing shape reproduces exactly:
+`iApply (leaf n with "Hcg [Hd] [Hk]")` where the datum is KT0 under a
+variable `kt` gives `iExact: "Hd" : (cell KT0 n) does not match goal` with
+goal `cell kt n`.
+
+| mechanism | verdict |
+|---|---|
+| `KtierLe` at the END of the binder telescope | **NO EFFECT.** Byte-identical failure to the front-placed `_t` form. The whole application elaborates — and its typeclass evars are resolved — before any bracketed subgoal is touched, so binder ORDER cannot matter. Kept anyway (it is where the premise belongs). |
+| `Hint Mode KtierLe ! -` + `Unshelve. all: apply _.` | **WORKS ON THE PROBE, UNUSABLE ON THE TREE.** The mode does defer resolution so the bracket's `iExact` pins the tier, and `Unshelve` then closes it (334 proofs would need the line). But an `ltac:(...)` splice in argument position forces the application to elaborate STRICTLY, and a mode-blocked goal is then reported as `Could not find an instance for KtierLe ?ktd kt` instead of being shelved. **1444 of the tree's 2640 leaf call sites pass a pure premise that way**, so the mode converts a silent over-constraint into a hard error at more than half of them. |
+| the order as a PURE premise at the telescope's end | **WORSE.** The premise becomes a goal emitted BEFORE the datum's, where `?ktd` is not yet known and nothing can discharge it; `iApply` then fails to unify the Iris entailment with `ktier_leb ?ktd kt = true`. Supplying it positionally means knowing the tier — i.e. the annotation we were trying to avoid, at every site. |
+
+**What is used instead: nothing.** `KtierLe ?ktd kt` resolves eagerly by
+`ktier_le_refl`, i.e. the datum defaults to the ACCESSING HART's own tier.
+That is the right default — it is the frame slots' tier, and frame slots
+are 1821 of the 2640 leaf call sites — so the prologue/epilogue sites that
+were the whole blocker need no annotation at all. A datum at a different
+tier says so explicitly. Ktier.v carries the reasoning at the instances.
+
+**THE ANNOTATION IS TWO NAMED ARGUMENTS, NOT ONE**, and this is the trap
+worth knowing: at a call site the HART's tier is an implicit argument too
+(`kt` is `Section WpSconfMem`'s `Context {kt : ktier}`, discharged), so
+`ktier_le_refl` ties the pair and `(ktd := KT0)` alone drags the capability
+down with it — the symptom is `iSpecialize: cannot instantiate
+(sie_cap_gpr KT0 ...)` at a site where nothing mentions the capability's
+tier. Write `(kt := kt) (ktd := KT0)`. And `KT0`, not `cur_ktier`:
+`cur_ktier` is `Typeclasses Opaque`, so instance search cannot see through
+it to `ktier_le_bot` and the application fails to elaborate.
+
+**Rocq's `(name := value)` IS IMPLICIT-ONLY.** An EXPLICIT binder of the
+same name fails with the identical `Wrong argument name kt` you get when
+there is no such binder at all — so "add the missing `kt` binder" is only
+half a fix: it has to be added as `{kt : ktier}` wherever the call sites
+already say `(kt := kt)`. Nine `_body` definitions needed exactly that.
+
+#### The merge roster
+
+Ten names became five, and every consumer's text is unchanged:
+
+| the `_t` generic | its KT0/KT0 corollary | the merged name |
+|---|---|---|
+| `wp_load_s_sconf_au_t` | `wp_load_s_sconf_au` | `wp_load_s_sconf_au` |
+| `wp_store_s_sconf_au_t` | `wp_store_s_sconf_au` | `wp_store_s_sconf_au` |
+| `wp_sb_s_sconf_t` | `wp_sb_s_sconf` | `wp_sb_s_sconf` |
+| `wp_sd_zero_s_sconf_t` | `wp_sd_zero_s_sconf` | `wp_sd_zero_s_sconf` |
+| `wp_sw_zero_s_sconf_t` | `wp_sw_zero_s_sconf` | `wp_sw_zero_s_sconf` |
+
+Shape of the merged rule: `{ktd : ktier}` implicit (the DATUM's tier), the
+hart's tier the section's `kt` (the CAPABILITY's), `` `{!KtierLe ktd kt} ``
+last in the telescope, datum and give-back both at `[ktd]`, and **no witness
+premise**: `sie_cap`'s fourth conjunct IS `sr_ktier_wit strans_regime kt`
+and the funnel's σ-callback delivers the capability AT THE REBOUND HART, so
+the phase-D hart-crossing step `sie_ktier_wit_rebind` is **deleted** along
+with its section. The sixteen derived wrappers
+(`wp_load_s_sconf_gen_u`/`_gen`/`_ugen`, `wp_lbu`/`lwu`/`cld`/`ld`/`clw`/`lw`,
+`wp_store_s_sconf_gen`, `wp_csd`/`sd`/`csw`/`sw`, `wp_cldsp`/`csdsp`) thread
+`ktd` through and pin it explicitly at their own internal applications —
+which they must, because eager refl would otherwise re-derive it as `kt`.
+
+#### THE REAL COST: the tier had only reached `stack_own`
+
+F1 annotated `stack_own (KTR := kt)` (245 + 358 sites) and stopped. Every
+other way the tree spells a frame slot was still ambient, and the merged
+leaves — which hand the slot back AT THE DATUM'S OWN TIER — are what makes
+that visible. The repair is at the source, not at the call sites:
+
+| what was still ambient | sites | files |
+|---|---|---|
+| `pa_stk … ↦₈ v` / `*_fcell … ↦₈ v` (notation) | 1709 | 93 |
+| `word_pointsto (pa_stk …) dq v` (the APPLICATION form the notation sweep cannot see) | 521 | 39 |
+| `ProofKernelvec`'s trap-frame cells (`kv_sp1`-based) | 136 | 1 |
+| `StackBytes.bytes_own` — the whole file had no tier binder | 90 | 15 |
+| frame BUNDLES with no tier parameter (`wk_frame`, `rp_frame`, `kx_frame`, `it_frame`, `pd_frame`) | 5 defs | 5 |
+
+`StackBytes.v` now takes `` Context `{KTR : !CurKtier} `` exactly as
+`StackOwn.v` does: a byte run in that file is always stack scratch, so it
+rides the frame's tier.
+
+**THE LESSON, and it is the durable one: `stack_own` is not the only name a
+frame slot goes by.** A tier (or any index) added to a frame abstraction has
+to be chased through (i) the `↦₈`/`↦₄` notation, (ii) the spelled-out
+`word_pointsto` application, (iii) per-file frame BUNDLE definitions, (iv)
+per-file frame ADDRESS helpers (`pa_stk`, `rp_fcell`, `kx_fcell`, `wk_fcell`,
+`kv_sp1`, `a8_p24`, bare `spd`/`spm`), and (v) `bytes_own`. Grepping for the
+abstraction's own name finds none of (i)–(v).
+
+#### Repair statistics
+
+**Trajectory (direct errors / red files, of 1164):** F1 baseline 171/235 →
+merge lands 127/318 (the leaves stop defaulting the datum to KT0, so every
+data site under a variable `kt` breaks at once) → frame-slot sweep 119/347
+→ `word_pointsto` applications + `bytes_own` + the binder residue 51/279 →
+60/240 → **70/251** at the last full build (the count rises as files stop
+being BLOCKED and start reaching their own first error).
+
+Errors are first-error-per-file, so a round's count understates progress;
+the mechanical categories were driven to a fixpoint by a build-loop script
+(`/mnt/rocq/f2fix.py` on the VM: compile → parse the first error → apply the
+one repair its shape implies → recompile, 40 files in parallel).
+
+| category | repair | count |
+|---|---|---|
+| frame-slot spellings (the five rows above) | tier at the source | 2461 |
+| DATA datum through a leaf under a variable `kt` | `(kt := kt) (ktd := KT0)` at the site | build-driven |
+| `Cannot infer the implicit parameter kt of X` | `(kt := kt)` at the site | build-driven |
+| `_body` Definitions with no `kt` binder | `{kt : ktier}` (implicit — see above) | 9 |
+| Module Type `Parameter` binder ORDER | `kt` before `GEN`/`CID`, matching the proofs | 10 |
+| `iAssert trap_csrs kt with …` | re-parenthesise (`kt` made it two tokens) | 3 |
+
+#### WHAT IS NOT DONE, AND WHAT SHAPE IT IS
+
+**The tree is NOT green: 913 of 1164 files, 70 direct errors, 251 red
+(181 of them only blocked behind a failed dependency).** Against F1's
+929/235/171 that is a WORSE file count and a much better error count, and
+the difference is the whole story of the increment: **not one of the 70 is
+the frame-slot blocker** (F1: 152 of 171), and every one of them is the
+SAME kind of F1 residue one layer further out — a tier that stops at some
+per-file abstraction. The tier has to be threaded through one more of them
+each time, and there is no single grep that finds them. What is left, by
+shape:
+
+- **A CALLER-STACK CELL STATED IN A `Spec*.v` FILE.** `SpecArgint`/
+  `SpecArgaddr`/`SpecFetchaddr`'s destination cell `ip` is the caller's
+  LOCAL — it rides `kt`, not the ambient — and each such spec has to be
+  found by the mismatch it causes at its caller. Expect more of these:
+  any spec whose resource is a pointer the CALLER passed into a callee.
+- **`iSpecialize: cannot instantiate` where the two propositions print
+  identically.** That is the tier, invisible: the printer shows
+  `↦₈[curktier_default]` for one occurrence and bare `↦₈` for another in
+  the SAME goal purely on notation precedence, so THE BRACKET IS NOT
+  EVIDENCE OF A TIER DIFFERENCE and the absence of one is not evidence of
+  agreement. Read the two sides' provenance instead.
+- **`The following term contains unresolved implicit arguments`** on a
+  `_body` Definition — the F1 "a tier a definition mentions only under an
+  opaque layer cannot be inferred" case, one `(kt := kt)` at a time.
+- a handful of `iApply: cannot apply` / `iFrame: cannot frame` /
+  `iIntuitionistic … not persistent` singletons that each need reading.
+
+**The repair loop is on the VM and is worth keeping** (`/mnt/rocq/f2fix.py`
++ `f2loop.sh`): compile → parse the FIRST error → apply the one repair its
+shape implies (`(kt := kt) (ktd := KT0)` at the governing leaf, or
+`(kt := kt)` at a non-inferable name) → recompile, 40 files in parallel,
+looped until the count stops moving. It never pins `wp_csdsp`/`wp_cldsp`
+(always a frame slot, so a mismatch there means the CALLER's spelling is
+wrong, not the leaf's) and it reports the shapes it cannot handle.
+
+**TWO PROCESS TRAPS, both of which cost real work here.** (i) The pull-back
+step (`tar` the VM's `iris/*.v`, extract locally) OVERWRITES un-synced local
+edits — always `--sync-only` BEFORE pulling, or the driver's copy silently
+reverts what you just wrote. (ii) `git add -A .` must be run from `iris/`;
+from the parent it sweeps `rocq/`, `lean/`, `iris-archive/` and
+`coq-sail-stdpp*/` into the commit (35k lines), exactly as durable-notes
+warns.
+
+#### The `_s_r_t` family is a DELIBERATE exception to "one name per rule"
+
+`WpSmodePtLeaves`/`WpSmodePtMem` keep `wp_cld_s_r_t`, `wp_csd_s_r_t`,
+`wp_clw_s_r_t`, `wp_ld_s_r_t`, `wp_csw_s_r_t`, `wp_sd_s_r_t` beside their
+KT0/KT0 corollaries, and that is not the same fossil the `_sconf` family
+was. Those leaves are REGIME-GENERIC (`R : s_regime` is a parameter) and
+have no capability to read the witness off, so the generic form must carry
+an explicit `sr_ktier_wit R kt` premise that the corollary discharges —
+merging them would push a witness argument onto all 14 consumers
+(`VcGenS.v`, `WpSmodePtMemWrap.v`) for no gain, since every one of them is
+at KT0. Merge them when a KT1 consumer appears, not before.
+
 #### What K3 should do
 
 1. **Do the leaf increment FIRST, before any further tier work.** It is the
