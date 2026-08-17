@@ -472,7 +472,12 @@ Section IcacheEscrow.
 
   Definition ipool_shape (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
-    (ipool_alloc γfs γi cov logstart inum ∨ imark γi (bv_unsigned inum))%I.
+    (ipool_alloc γfs γi cov logstart inum ∨ imark γi (bv_unsigned inum)
+     (* OPTION A, STAGE 1b: the PENDING-FREE pool arm -- an entry whose region
+        record was cleared off-lock but whose imark is still escrowed.  Dead in
+        the current binary ([offlock_enabled] is [False]); Stage 3 replaces it
+        with the escrow (esc_inv + redemption ticket) the redeemer consumes. *)
+     ∨ InodeRegion.offlock_enabled)%I.
 
   Global Instance ipool_alloc_timeless γfs γi cov logstart inum :
     Timeless (ipool_alloc γfs γi cov logstart inum).

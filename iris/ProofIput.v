@@ -2438,7 +2438,7 @@ Section ProofIput.
       - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn) |].
         iExists (bm_cells bm_empty). iSplitR; [iPureIntro; reflexivity |].
         iExact "Haddrs".
-      - rewrite /ipool_shape. iRight. iExact "Hdat". }
+      - rewrite /ipool_shape. iRight. iLeft. iExact "Hdat". }
     iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum ga') ga'
                  false dev inum eq_refl with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
       as "(Hbody & Hictok & Hrefo)".

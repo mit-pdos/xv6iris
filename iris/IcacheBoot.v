@@ -619,7 +619,7 @@ Section IcacheBootRegion.
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
+        iLeft. iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
@@ -628,7 +628,7 @@ Section IcacheBootRegion.
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
+        iLeft. iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
     iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
@@ -673,7 +673,7 @@ Section IcacheBootPool.
   Lemma ipool_shape_free (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) :
     imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
-  Proof. iIntros "Hmk". rewrite /ipool_shape. iRight. iExact "Hmk". Qed.
+  Proof. iIntros "Hmk". rewrite /ipool_shape. iRight. iLeft. iExact "Hmk". Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
      image-wf family for exactly the reason [inode_ok] did: it is a fact

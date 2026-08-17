@@ -171,6 +171,7 @@ Section IregBox.
     iIntros (Hnz)
       "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt &
          %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin Hfrg] | [%Ht2 Hmk]]"; last first.
     { iLeft. iExact "Hmk". }
     iRight.

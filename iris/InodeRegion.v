@@ -1251,6 +1251,22 @@ Section InodeRegion.
      [wdu + wdt], (T1') at [wl], and [ireg_par_ok] tying the register to
      the tagged count.  Separate conjuncts throughout -- each mover
      re-establishes exactly the ones its components move. *)
+  (* OPTION A, STAGE 1b: the gate that demarcates the binary.  The current
+     (free-under-lock) binary has NO off-lock free, so no slot is ever in the
+     pending-free state; the reordered binary (Stage 3) redefines this to the
+     real escrow-gated content and the pending arm becomes producible.  Realised
+     DEFINITIONALLY (not as a boot-minted ghost token) so that every consumer
+     refutes the pending arm in one line via [False] with no token threaded into
+     ireg_claim_au / the fill / their specs.  Timeless (it is [False]). *)
+  Definition offlock_enabled : iProp Σ := ⌜False⌝%I.
+  Global Instance offlock_enabled_timeless : Timeless offlock_enabled.
+  Proof. rewrite /offlock_enabled. apply _. Qed.
+  Global Instance offlock_enabled_persistent : Persistent offlock_enabled.
+  Proof. rewrite /offlock_enabled. apply _. Qed.
+  (* the one-line refutation every pending branch uses in the current binary *)
+  Lemma offlock_enabled_absurd (P : iProp Σ) : offlock_enabled -∗ P.
+  Proof. rewrite /offlock_enabled. iIntros "%Hf". destruct Hf. Qed.
+
   Definition ireg_slot (γi : gname) (z : Z) (d : dinode) : iProp Σ :=
     ((∃ (wl wdu wdt g r : nat) (c : option (excl unit))
         (p : option (dfrac_agreeR (leibnizO Z))),
@@ -1268,8 +1284,13 @@ Section InodeRegion.
            are timeless AND persistent. *)
         ∗ (⌜c = None⌝ ∨ ireg_open))
      ∗ ireg_ep z d
-     ∗ ((⌜ireg_in d⌝ ∗ z ↪[γi] d)
-        ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z)))%I.
+     ∗ (((⌜ireg_in d⌝ ∗ z ↪[γi] d)
+         ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z))
+        (* OPTION A, STAGE 1b: the PENDING-FREE arm.  A freed inode whose
+           off-lock ifree cleared the type but whose imark is escrowed rather
+           than pool-parked.  Dead in the current binary ([offlock_enabled] is
+           [False]); the redeemer flips it back before any claim in Stage 3. *)
+        ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d ∗ offlock_enabled)))%I.
 
   Global Instance ireg_slot_timeless γi z d : Timeless (ireg_slot γi z d).
   Proof. rewrite /ireg_slot. apply _. Qed.
@@ -1287,8 +1308,9 @@ Section InodeRegion.
     link_auth z wl wdu wdt g c r p -∗
     ireg_ep z d -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
-    ((⌜ireg_in d⌝ ∗ z ↪[γi] d)
-     ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z)) -∗
+    (((⌜ireg_in d⌝ ∗ z ↪[γi] d)
+      ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z))
+     ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d ∗ offlock_enabled)) -∗
     ireg_slot γi z d.
   Proof.
     intros Hok Hrt Hdir Hwl0 Hpar. iIntros "Hla Hep Hdisj Harm".
@@ -1720,6 +1742,7 @@ Section InodeRegion.
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     (* THE ARM IS THE OUT ONE: the region cannot also hold this inum's
        fragment, because the caller does ([dinode_at_excl]). *)
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
@@ -1802,7 +1825,7 @@ Section InodeRegion.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 Hlok' Hrt' Hdir' Hwl0' Hpar
                 with "Hla Hep Hdisj").
-      iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
+      iLeft. iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
     iModIntro. iExact "Hdn".
   Qed.
 
@@ -1864,6 +1887,7 @@ Section InodeRegion.
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     (* the OUT arm claims a nonzero type; the caller's buffer says zero *)
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin1 Hfrg] | [%Ht2 Hmk]]"; last first.
     { iExFalso. iPureIntro. exact (Ht2 Ht0). }
     (* (L3) AT THE CLAIMED SLOT: the record the caller's buffer showed
@@ -1939,7 +1963,7 @@ Section InodeRegion.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 Hlok' Hrt' Hdir' Hwl0' Hpar
                 with "Hla Hep Hdisj").
-      iLeft. iSplitR; [iPureIntro; right; exact Hfr | iExact "Hfrg"]. }
+      iLeft. iLeft. iSplitR; [iPureIntro; right; exact Hfr | iExact "Hfrg"]. }
     iModIntro. done.
   Qed.
 
@@ -2021,6 +2045,7 @@ Section InodeRegion.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
@@ -2107,7 +2132,7 @@ Section InodeRegion.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
                 Hlok' Hrt' Hdir' Hwl0' Hpar
                 with "Hla Hep Hdisj").
-      iLeft. iSplitR; [iPureIntro; left; exact Hz | iExact "Hdn"]. }
+      iLeft. iLeft. iSplitR; [iPureIntro; left; exact Hz | iExact "Hdn"]. }
     iModIntro. iExact "Hmk".
   Qed.
 
@@ -2163,6 +2188,7 @@ Section InodeRegion.
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     (* the marker in the caller's hand refutes the OUT arm *)
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk']]"; last first.
     { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
     assert (Hfresh : fresh_shape (ds !!! islot inum))
@@ -2181,7 +2207,7 @@ Section InodeRegion.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
                 with "Hla Hep Hdisj").
-      iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
+      iLeft. iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
     iModIntro. iFrame "Hfr Hhalf". iPureIntro. exact Hfresh.
   Qed.
 
@@ -2284,6 +2310,7 @@ Section InodeRegion.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
@@ -2413,7 +2440,7 @@ Section InodeRegion.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl' wdu' wdt' gl cl rl
                 p' Hlok' Hrt' Hdir' Hwl0' Hpar' with "Hla Hep Hdisj").
-      iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
+      iLeft. iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
     iModIntro. iFrame "Hdn Hfrag".
   Qed.
 
@@ -2612,6 +2639,7 @@ Section InodeRegion.
     assert (Hds0 : ds0 = ds) by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
     subst ds0.
     iDestruct ("Hepback" $! dn' with "Hrc") as "Hep".
+    iDestruct "Harm" as "[Harm | Hpend]"; [|iDestruct "Hpend" as "(_ & _ & %Hf)"; destruct Hf].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
       iApply (dinode_at_excl γi inum (ds !!! islot inum) dn with "Hfr Hdn"). }
@@ -2743,7 +2771,7 @@ Section InodeRegion.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl' wdu' wdt' gl cl rl
                 p' Hlok' Hrt' Hdir' Hwl0' Hpar' with "Hla Hep Hdisj").
-      iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
+      iLeft. iRight. iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"]. }
     iModIntro. iExact "Hdn".
   Qed.
 
