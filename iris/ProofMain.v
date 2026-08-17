@@ -160,7 +160,6 @@ Section ProofMain.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -168,7 +167,7 @@ Section ProofMain.
 
   (* [hw_config] + [minstret_inv], both persistent, out of the ambient
      bundle -- what [Kernelvec.kernelvec_handler_spec] consumes. *)
-  Local Lemma mn_dup_hw m avail b p :
+  Local Lemma mn_dup_hw {kt : ktier} m avail b p :
     sie_cap_gpr kt m avail b p -∗ hw_config ∗ minstret_inv ∗ sie_cap_gpr kt m avail b p.
   Proof.
     iIntros "Hcg".
@@ -191,7 +190,7 @@ Section ProofMain.
   (* idempotent and never touches sp.  Same move ProofCopyin /            *)
   (* ProofCopyout make for vmfault's identical leftover premise.          *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma mn_pin_sie_cap_gpr (M : regfile) (avail : nat) (bb : bool)
+  Local Lemma mn_pin_sie_cap_gpr {kt : ktier} (M : regfile) (avail : nat) (bb : bool)
       (pp : mword 64) :
     sie_cap_gpr kt M avail bb pp -∗ sie_cap_gpr kt (tp_pin M) avail bb pp.
   Proof.
@@ -213,10 +212,10 @@ Section ProofMain.
       (m : regfile) (K : nat) (p0 : mword 64) :
     cid_word = (zero_reg : mword 64) ->
     (K_main <= K)%nat ->
-    sie_cap_gpr kt m K false p0 -∗ kernel_text -∗
+    sie_cap_gpr KT0 m K false p0 -∗ kernel_text -∗
     pc_is (mword_of_int KernelSyms.main : mword 64) -∗
     ( ∀ m1 : regfile,
-        sie_cap_gpr kt m1 (K - 2)%nat false p0 -∗
+        sie_cap_gpr KT0 m1 (K - 2)%nat false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -257,7 +256,7 @@ Section ProofMain.
     pose (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1)
@@ -314,7 +313,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.cpuid : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtcp) in "Hpc".
-    iApply (Cpuid.wp_cpuid_sconf kt W3 (K - 2)%nat p0 ltac:(lia) with "Hcg Htext Hpc").
+    iApply (Cpuid.wp_cpuid_sconf KT0 W3 (K - 2)%nat p0 ltac:(lia) with "Hcg Htext Hpc").
     iIntros (m4) "Hcg Hpc %Hcp".
     destruct Hcp as (Hcpcs & Hcpa0).
     assert (Hretcp : ret_pc (W3 !!! Regidx (mword_of_int 1 : mword 5))
@@ -382,7 +381,7 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool) :
     (K_userinit <= n)%nat ->
-    sie_cap_gpr kt m n false p0 -∗
+    sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
     cpu_ctx_free -∗
@@ -397,7 +396,7 @@ Section ProofMain.
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     ( ∀ (γpr : gname) (m' : regfile),
-        sie_cap_gpr kt m' n false p0 -∗
+        sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
@@ -457,7 +456,7 @@ Section ProofMain.
        exactly [WpLock.newlock]'s premises.  The two [newlock]s are taken
        twenty lines below, once [printkinit] has returned; together they are
        [SpecConsoleintr.console_caps]. *)
-    iApply (Consoleinit.wp_consoleinit_sconf kt γd C0 n l0 b0
+    iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab
                     Hcw Hcn Hcc Hltx Hdr Hdw").
@@ -480,7 +479,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.printkinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpi) in "Hpc".
-    iApply (Printkinit.wp_printkinit_sconf kt C1 n vpl vpn vpc false p0 ltac:(lia)
+    iApply (Printkinit.wp_printkinit_sconf C1 n vpl vpn vpc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hpw Hpn Hpc2").
     iApply wp_next_off_intro.
     iIntros (mp) "Hcg Hpc %Hcspi Hprw #Hprnm Hprcpu".
@@ -582,7 +581,7 @@ Section ProofMain.
     assert (HA3a0 : A3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_nl_addr : mword 64))
       by (rewrite /A3 upd_ne; [exact HA2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf kt γpr γd γv A3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv A3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -640,7 +639,7 @@ Section ProofMain.
     assert (HB3a0 : B3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_boot_addr : mword 64))
       by (rewrite /B3 upd_ne; [exact HB2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf kt γpr γd γv B3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv B3 n false p0
               mn_boot [] false ∅ ltac:(lia) Hlbt Hnbt ltac:(rewrite Hkbt; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -698,7 +697,7 @@ Section ProofMain.
     assert (HD3a0 : D3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_nl_addr : mword 64))
       by (rewrite /D3 upd_ne; [exact HD2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf kt γpr γd γv D3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv D3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -735,7 +734,7 @@ Section ProofMain.
                         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv ->
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
-    sie_cap_gpr kt m n false p0 -∗
+    sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
     cpu_ctx_free -∗
@@ -757,12 +756,12 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
-        sie_cap_gpr kt m' n false p0 -∗
+        sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
-        procs_inv (kt := kt) γs -∗
+        procs_inv γs -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -800,7 +799,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.kinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtki) in "Hpc".
-    iApply (Kinit.wp_kinit_sconf kt V1 ps n 0%nat false p0 vkl vkn vkc
+    iApply (Kinit.wp_kinit_sconf V1 ps n 0%nat false p0 vkl vkn vkc
               false ∅ ltac:(lia) eq_refl Hprun (locks_below_empty _)
               with "Hcg Hcpu Htext Hkdata Hpc Hkw Hkn Hkc Hkmem24 Hpages").
     all: try lkbelow.
@@ -828,7 +827,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.kvminit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkv) in "Hpc".
-    iApply (Kvminit.wp_kvminit_sconf kt γl V2 0%nat n false p0
+    iApply (Kvminit.wp_kvminit_sconf γl V2 0%nat n false p0
               (Some (length ps)) kpt0 false ∅ eq_refl ltac:(lia)
               ltac:(exists (length ps); split; [reflexivity | lia])
               with "Hcg Hcpu Htext Hpc Hkpt Hkenv").
@@ -874,7 +873,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.kvminithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkh) in "Hpc".
-    iApply (Kvminithart.wp_kvminithart_sconf kt V3 0%nat n (pt_base t) tlbvec0 p0
+    iApply (Kvminithart.wp_kvminithart_sconf V3 0%nat n (pt_base t) tlbvec0 p0
               eq_refl ltac:(lia)
               with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
     (* kvminithart's KPT RECEIPT, kept rather than dropped: it is a member of
@@ -882,7 +881,13 @@ Section ProofMain.
        table is installed), so the boot chain must carry it to the fold in
        [wp_main_boot_sconf].  Named [Hkptr] -- [Hkpt] in this lemma is the
        [kernel_pagetable] CELL, a different thing. *)
-    iIntros (mkh) "Hcg Hpc %Hcskh Hkptr Hstvec".
+    iIntros (mkh) "Hcg Hpc %Hcskh #Hkptr Hstvec".
+    (* ---- THE BOOT SEAM: kvminithart has installed the kernel table, so
+       this hart's regime moves KT0 -> KT1.  [sie_cap_gpr_ktier_up] carries
+       the capability across, weakening its (static, boot-stack) frame
+       through [StackOwn.stack_ktier_mono] and re-minting the tier witness
+       from the receipt.  Everything below this line is post-boot. ---- *)
+    iDestruct (sie_cap_gpr_ktier_up KT0 KT1 with "Hcg Hkptr") as "Hcg".
     assert (Hretkh : ret_pc (V3 !!! Regidx (mword_of_int 1))
                      = (mword_of_int (KernelSyms.main + 0x7a) : mword 64)).
     { rewrite /V3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -901,7 +906,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.procinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpr) in "Hpc".
-    iApply (Procinit.wp_procinit_sconf kt V4 n false p0 ltac:(lia)
+    iApply (Procinit.wp_procinit_sconf V4 n false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds Hirs").
     iApply wp_next_off_intro.
     iIntros (mpr) "Hcg Hpc %Hcspr _ _ Hready".
@@ -943,7 +948,7 @@ Section ProofMain.
       (p0 : mword 64) :
     (K_userinit <= n)%nat ->
     cid_word = (zero_reg : mword 64) ->
-    sie_cap_gpr kt m n false p0 -∗
+    sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
     lk_raw (mword_of_int KernelSyms.tickslock) -∗
@@ -960,7 +965,7 @@ Section ProofMain.
        [intr_res] is folded and where [trap_csrs_raw] was already waiting to
        be completed. *)
     ( ∀ (m' : regfile) (γtl : gname),
-        sie_cap_gpr kt m' n false p0 -∗
+        sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
         is_tickslock γtl -∗
         stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
@@ -993,7 +998,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.trapinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtti) in "Hpc".
-    iApply (Trapinit.wp_trapinit_sconf kt T1 n vtl vtn vtc false p0 ltac:(lia)
+    iApply (Trapinit.wp_trapinit_sconf T1 n vtl vtn vtc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Htw Htn Htc").
     iApply wp_next_off_intro.
     iIntros (mt) "Hcg Hpc %Hcsti Htw2 #Htn2 Htc2".
@@ -1028,7 +1033,7 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtth) in "Hpc".
     iDestruct "Hstvec" as (tv0) "Hstvec".
-    iApply (Trapinithart.wp_trapinithart_sconf kt T2 n tv0 p0 ltac:(lia)
+    iApply (Trapinithart.wp_trapinithart_sconf T2 n tv0 p0 ltac:(lia)
               with "Hcg Htext Hpc Hstvec").
     iIntros (mth) "Hcg Hpc %Hcsth Hstvec".
     assert (Hretth : ret_pc (T2 !!! Regidx (mword_of_int 1))
@@ -1052,7 +1057,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.plicinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpl) in "Hpc".
-    iApply (Plicinit.wp_plicinit_sconf kt T3 n p0 ltac:(lia)
+    iApply (Plicinit.wp_plicinit_sconf T3 n p0 ltac:(lia)
               with "Hcg Htext Hpc Hpinv").
     iApply wp_next_off_intro.
     iIntros (mpl) "Hcg Hpc %Hcspl".
@@ -1080,7 +1085,7 @@ Section ProofMain.
     assert (Hdc : (bv_unsigned (rget T4 (mword_of_int 4 : mword 5))
                    < Z.of_nat dev_ncpu)%Z).
     { rewrite (rget_tp T4) Hcidz. vm_compute. reflexivity. }
-    iApply (Plicinithart.wp_plicinithart_sconf kt γd γv T4 n p0 Hdc ltac:(lia)
+    iApply (Plicinithart.wp_plicinithart_sconf γd γv T4 n p0 Hdc ltac:(lia)
               with "Hcg Htext Hpc Hdev").
     iIntros (mph) "Hcg Hpc %Hcsph".
     destruct Hcsph as (Hcsph & _).
@@ -1102,12 +1107,12 @@ Section ProofMain.
     (K_userinit <= n)%nat ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
-    sie_cap_gpr kt m n false p0 -∗
+    sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1127,7 +1132,7 @@ Section ProofMain.
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) -∗
     ( ∀ (γk : gname) (pd pav pu : mword 64) (m' : regfile),
-        sie_cap_gpr kt m' n false p0 -∗
+        sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
@@ -1175,7 +1180,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.binit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbi) in "Hpc".
-    iApply (Binit.wp_binit_sconf kt F1 n vbl vbn vbc false p0 ltac:(lia)
+    iApply (Binit.wp_binit_sconf F1 n vbl vbn vbc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hbw Hbn Hbc Hbufl Hbufn Hbhead").
     iApply wp_next_off_intro.
     iIntros (mbi) "Hcg Hpc %Hcsbi _ _ _ _ _".
@@ -1197,7 +1202,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.iinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtii) in "Hpc".
-    iApply (Iinit.wp_iinit_sconf kt F2 n vil vin vic false p0 ltac:(lia)
+    iApply (Iinit.wp_iinit_sconf F2 n vil vin vic false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hiw Hin Hic Hinl").
     iApply wp_next_off_intro.
     iIntros (mii) "Hcg Hpc %Hcsii _ _ _ _".
@@ -1219,7 +1224,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.fileinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtfi) in "Hpc".
-    iApply (Fileinit.wp_fileinit_sconf kt F3 n vfl vfn vfc false p0 ltac:(lia)
+    iApply (Fileinit.wp_fileinit_sconf F3 n vfl vfn vfc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hfw Hfn Hfc").
     iApply wp_next_off_intro.
     iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _".
@@ -1244,7 +1249,7 @@ Section ProofMain.
     (* the pinned-map re-point [mn_pin_sie_cap_gpr] exists for: virtio_disk_init
        is the ONE callee left demanding a raw-map tp fact. *)
     iDestruct (mn_pin_sie_cap_gpr with "Hcg") as "Hcg".
-    iApply (VirtioDiskInit.wp_virtio_disk_init_sconf kt γv γa (tp_pin F4) n false p0
+    iApply (VirtioDiskInit.wp_virtio_disk_init_sconf γv γa (tp_pin F4) n false p0
               (avail_sub (Some (length ps)) K_kvmmake) c0
               vdl vdn vdc pd0 pav0 pu0 free0 ∅ ltac:(lia)
               Hnb3 (rget_tp F4) Hlive
@@ -1311,7 +1316,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.userinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtui) in "Hpc".
-    iApply (Userinit.wp_userinit_sconf kt γa γs F5 n false p0
+    iApply (Userinit.wp_userinit_sconf γa γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3) iv0 false ∅
               ltac:(lia) Hnb8
               with "Hcg Htext Hkdata Hpc Hcpu Hpinv Hkenv Hinitproc").
@@ -1339,17 +1344,17 @@ Section ProofMain.
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 20 <= n)%nat ->
     p0 = zero_reg ->
-    sie_cap_gpr kt m n false p0 -∗
+    sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
-    trap_csrs kt -∗
+    trap_csrs KT1 -∗
     started_inv P -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
-         procs_inv (kt := kt) γs' -∗
+         procs_inv γs' -∗
          console_caps γd -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
          disk_geom γv pd' pav' pu' -∗
@@ -1360,7 +1365,7 @@ Section ProofMain.
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
          P) -∗
     printk_env γpr γd γv -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     console_caps γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
@@ -1447,7 +1452,7 @@ Section ProofMain.
     assert (Hsvst : trunc32 (rget S3 (mword_of_int 14 : mword 5)) = started_set).
     { rewrite HS3a4 /trunc32 /started_set. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0xb0 sw a4,0(a5) : started = 1, paying [P] into the escrow ---- *)
-    iApply (wp_store_s_sconf_au (kt := kt) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
+    iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
               (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
@@ -1491,7 +1496,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
-    iApply (Scheduler.wp_scheduler_sconf kt γs SS n p0 Hp0 ltac:(lia)
+    iApply (Scheduler.wp_scheduler_sconf γs SS n p0 Hp0 ltac:(lia)
               with "Hcg Hfree Hcpu Htext Hpc Hpinv Htcsr").
   Qed.
 
@@ -1505,7 +1510,7 @@ Section ProofMain.
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P}
-    : wp_main_boot_sconf_body (kt := kt) m K p0 ps s1entry phystop
+    : wp_main_boot_sconf_body m K p0 ps s1entry phystop
         γd γv l0 b0 c0 tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
@@ -1574,13 +1579,13 @@ Section ProofMain.
     (* THE TICK KEEPER IS NOT ASSUMED: hart 0 IS the tick hart
        ([tick_hart] is [cpuid() == 0]), so it owes the real arm -- the lock
        trapinit's group brought up, plus [procs_inv]. *)
-    iAssert (tick_keeper (kt := kt) γtl γs) as "#Htick".
+    iAssert (tick_keeper γtl γs) as "#Htick".
     { iRight. iFrame "Htl Hpinv". }
-    iAssert (devintr_caps (kt := kt) γd γv γk γtl γs pd pav pu) as "#Hcaps".
+    iAssert (devintr_caps γd γv γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    iPoseProof (Kernelvec.kernelvec_handler_spec kt γd γv γk γtl γs pd pav pu
+    iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
                   Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
                  kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")

@@ -152,7 +152,6 @@ Section ProofNameiparentMain.
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* THE WALK IS THE SET FORM; the counted seal follows it. *)
   Lemma wp_nameiparent_gen
       (gs : list gname) (j : nat) (gl : gname)
@@ -172,7 +171,7 @@ Section ProofNameiparentMain.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_nameiparent_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n Sb
                                 pidv dq dqb dqs dqc m K eb b lks.
@@ -220,7 +219,7 @@ Section ProofNameiparentMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
     assert (HR1sp : npi_sp m R1) by (rewrite /npi_sp /R1 upd_eq; exact Hpush).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1 : mword 64)
@@ -357,7 +356,7 @@ Section ProofNameiparentMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
               plen pfun nfun true n Sb pidv dq dqb dqs dqc R5 (K - 2)%nat eb b
               _ Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
@@ -442,8 +441,8 @@ Section ProofNameiparentMain.
                    = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv HP2sp; reflexivity).
-    iAssert (stack_own (KTR := kt) sp0 2) with "[Hf1 Hf2]" as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 2) with "[Hf1 Hf2]" as "Hstk".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       done. }
@@ -565,7 +564,7 @@ Section ProofNameiparentMain.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_nameiparent_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun n
                           pidv dq dqb dqs dqc m K eb b lks.

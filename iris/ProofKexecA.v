@@ -265,7 +265,6 @@ Section KexecABody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
-  Context {kt : ktier}.
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -338,10 +337,10 @@ Section KexecABody.
     m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Ra0 = pv ->
     m !!! Regidx Ra1 = av ->
-    sie_cap_gpr kt m K b (proc_addr jp) -∗
+    sie_cap_gpr KT1 m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -360,7 +359,7 @@ Section KexecABody.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -396,7 +395,7 @@ Section KexecABody.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr kt mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -457,7 +456,7 @@ Section KexecABody.
       by (rewrite /N1; apply upd_eq).
     iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Myproc.wp_myproc_sconf kt N1 (K - 68)%nat 0%nat true (proc_addr jp) true lks
+    iApply (Myproc.wp_myproc_sconf N1 (K - 68)%nat 0%nat true (proc_addr jp) true lks
               ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcnt Htext Hpc").
     iIntros (CIDm Hsm ms M2) "%Hmsf Hcg Hcnt Hpc %Hmp".
@@ -500,7 +499,7 @@ Section KexecABody.
       by (rewrite /N3 upd_ne; [exact HN2s1 | nz]).
     iDestruct (cpu_own_transport CIDm CIDj2 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (BeginOp.wp_begin_op_sconf kt gs jp gl bn g gfs cov logstart dev
+    iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat true true lks
               ltac:(lia) Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hlogc Hppid Hprocs").
@@ -565,7 +564,7 @@ Section KexecABody.
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
     iDestruct "Hlog" as (Sb0) "Hlog".
-    iApply (Namei.wp_namei_gen kt gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used
               (pv_cwd V) plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs
               (DfracOwn 1) N5 (K - 68)%nat true true lks
@@ -719,7 +718,7 @@ Section KexecABody.
         by (rewrite /P1; apply upd_eq).
       iDestruct (cpu_own_transport CIDn CIDj4 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (EndOp.wp_end_op_sconf kt gs jp gl gu gd gk pd pav pu bn g gfs
+      iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
                 true true lks ltac:(lia) Hlg Hjp Hgs
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
@@ -855,7 +854,7 @@ Section KexecABody.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
               used used1 plen pfun na avf aslen afun pidv V dqb dqs dqa
@@ -866,7 +865,7 @@ Section KexecABody.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -899,7 +898,7 @@ Section KexecABody.
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
-        sie_cap_gpr kt M90 (K - 68)%nat b (proc_addr jp) -∗
+        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
@@ -933,7 +932,7 @@ Section KexecABody.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr kt mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1076,7 +1075,7 @@ Section KexecABody.
       by (rewrite /Q2 upd_ne; [exact HQ1a0 | nz]).
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Ilock.wp_ilock_sconf kt gs jp gl gu gd gk pd pav pu bn gfs gi cn
+    iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true true lks
               ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
@@ -1260,7 +1259,7 @@ Section KexecABody.
     iEval (rewrite -HQ8a2) in "Helfb".
     iDestruct (cpu_own_transport CIDil CID9 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Readi.wp_readi_sconf kt kt gs jp gl gu gd gk pd pav pu bn gfs ga gf
+    iApply (Readi.wp_readi_sconf KT1 gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry k) bml datl dnl false 0%nat 64%nat fb V
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true true lks
               ltac:(lia) Hlg Hbmwf Hbmcov Hszb
@@ -1412,11 +1411,11 @@ Section KexecABody.
         rewrite /Q10 upd_ne; [| regne]. exact (HQ9thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
       (* ---- give the magic word back and re-form the elf buffer ---- *)
       iDestruct (kxc_named_of_word4 (pa_stk sp0 54) gb with "Hw4") as "Helf4".
-      iAssert ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] gb j)%I
+      iAssert ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] gb j)%I
         with "[Helf4 Helfr]" as "Helfb".
       { iApply (kxc_named_join4 (pa_stk sp0 54) gb 64 ltac:(lia)
                   with "Helf4 Helfr"). }
-      iAssert (stack_own (KTR := kt) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
+      iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
         rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
       (* ---- +0x060: beq a4,a5 -- the second BLIND split ---- *)
@@ -1588,7 +1587,7 @@ Section KexecABody.
         iSplitL "Haddrs"; [iExact "Haddrs" |].
         iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
       iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
-      iAssert (stack_own (KTR := kt) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
+      iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
         rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
       (* same re-anchoring as the bad-magic tail: [T.kxc_bad64] runs at [CID11] *)
@@ -1647,7 +1646,6 @@ Section KexecAMain.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -1719,10 +1717,10 @@ Section KexecAMain.
     m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Ra0 = pv ->
     m !!! Regidx Ra1 = av ->
-    sie_cap_gpr kt m K b (proc_addr jp) -∗
+    sie_cap_gpr KT1 m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1741,7 +1739,7 @@ Section KexecAMain.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1774,7 +1772,7 @@ Section KexecAMain.
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
-        sie_cap_gpr kt M90 (K - 68)%nat b (proc_addr jp) -∗
+        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
@@ -1812,7 +1810,7 @@ Section KexecAMain.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr kt mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

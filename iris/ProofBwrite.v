@@ -122,7 +122,6 @@ Section ProofBwrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_bwrite_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -132,7 +131,7 @@ Section ProofBwrite.
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ) (lks : gset string)
-    : wp_bwrite_sconf_body kt γs j γl γu γd γk pd pav pu bn V k
+    : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
                            pidv dev bno dq m K eb bs bsd b Q lks.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
@@ -182,7 +181,7 @@ Section ProofBwrite.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -330,7 +329,7 @@ Section ProofBwrite.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
-    iApply (HSL.wp_holdingsleep_sconf kt (fst (bn_slk bn k)) (snd (bn_slk bn k))
+    iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
     all: try lkbelow.
@@ -447,7 +446,7 @@ Section ProofBwrite.
     (* [_transport] lemma could carry them across it; rw's contract hands   *)
     (* the pair back itself, exactly like [Hcnt]/[Hcg] above it never is.  *)
     (* ================================================================== *)
-    iApply (RW.wp_virtio_disk_rw_sconf kt γs j γl γu γd γk pd pav pu D3
+    iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat eb bno (mword_of_int 0 : mword 32) bs bsd b
               Q
               _ HKrw Hbno Hkdata Hj Hgl
@@ -559,8 +558,8 @@ Section ProofBwrite.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP3sp. unfold pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].

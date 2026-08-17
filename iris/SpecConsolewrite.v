@@ -114,7 +114,7 @@ Definition wp_consolewrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (γf : gname)
+    (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (γu : uart_names) (γv : disk_names) (γl : gname)
     (m : regfile) (av : nat) (eb : bool)
@@ -139,7 +139,7 @@ Definition wp_consolewrite_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "proc" ->
-  sie_cap_gpr kt m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
      released inside uartwrite's own loop -- be the only lock held. *)
   cpu_own 0%nat eb pj b lks -∗
@@ -150,7 +150,7 @@ Definition wp_consolewrite_sconf_body
      (UartTxInv.v).  Both persistent. *)
   dev_inv γu γv -∗
   is_txlock γl γu -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* THE CROSSING IS [true], NOT [b] -- consolewrite reaches a park, so the
      porting guide's rule applies: a parking function's [wp_next] index is
      [true] unconditionally.  With [eb = true] above and [cpu_own_eb_agree]
@@ -163,7 +163,7 @@ Definition wp_consolewrite_sconf_body
          between nothing and all of it. *)
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
-      sie_cap_gpr kt mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗
@@ -175,9 +175,9 @@ Module Type CONSOLEWRITE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_consolewrite_sconf_body kt γa γf γs j γlp γu γv γl m av eb pid V n b lks.
+      wp_consolewrite_sconf_body γa γf γs j γlp γu γv γl m av eb pid V n b lks.
 End CONSOLEWRITE.

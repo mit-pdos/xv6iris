@@ -66,7 +66,6 @@ Section ProofUvmcreate.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -104,18 +103,18 @@ Section ProofUvmcreate.
        r <> csp_rs1 -> r <> mword_of_int 8 -> r <> mword_of_int 9 ->
        Mt !!! Regidx r = mm !!! Regidx r) ->
     mm !!! Regidx csp_rs1 = sp0 ->
-    sie_cap_gpr kt Mt (K - 4)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 4)%nat b p -∗
     cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmcreate + 0x1a)) -∗
-    pa_stk sp0 1 ↦₈[kt] (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈[kt] v4 -∗
+    pa_stk sp0 1 ↦₈[KT1] (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] v4 -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) rv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr : regfile,
-      sie_cap_gpr kt mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is (ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ⌜ callee_saved mm mr ⌝ -∗
@@ -196,8 +195,8 @@ Section ProofUvmcreate.
     assert (Hpop : E3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3sp. reflexivity. }
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       iSplitL "Hc3". { iExists (mm !!! Regidx (mword_of_int 9)). iExact "Hc3". }
@@ -273,7 +272,7 @@ Section ProofUvmcreate.
   Lemma wp_uvmcreate_sconf (γa : gname)
       (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
       (on : option nat) (b : bool) (lks : gset string)
-    : wp_uvmcreate_sconf_body kt γa mm lvl K eb p on b lks.
+    : wp_uvmcreate_sconf_body γa mm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_uvmcreate_sconf_body].
     intros ret_tgt Hlvl HK Hcid Hbelow.
@@ -326,7 +325,7 @@ Section ProofUvmcreate.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     iDestruct "S3" as (v3) "Hc3". iDestruct "S4" as (v4) "Hc4".
@@ -408,7 +407,7 @@ Section ProofUvmcreate.
        line, no case split on [b] -- exactly the ProofKvmmap.v pattern. ---- *)
     iDestruct (cpu_own_transport CID CID6 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (AK.wp_kalloc_sconf kt γa γk (mword_of_int (KernelSyms.kmem + 24))
+    iApply (AK.wp_kalloc_sconf KT1 γa γk (mword_of_int (KernelSyms.kmem + 24))
               J on lvl eb p (K - 4)%nat b
               _ Hc14
               ltac:(reflexivity)
@@ -544,7 +543,7 @@ Section ProofUvmcreate.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
-    iApply (MS.wp_memset_sconf kt M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    iApply (MS.wp_memset_sconf KT1 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }

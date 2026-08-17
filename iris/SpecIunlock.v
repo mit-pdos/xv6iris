@@ -105,7 +105,7 @@ Definition wp_iunlock_sconf_body
       !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (gs : list gname)
+    (gs : list gname)
     (gfs : fs_names) (gi : gname)
     (cn : ic_names)
     (gil gisl : gname)
@@ -127,7 +127,7 @@ Definition wp_iunlock_sconf_body
      releases the sleeplock's inner "sleep lock" spinlock internally, so
      the caller must already hold only locks BELOW its rank. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the [ref] words, and the entry's content escrow *)
@@ -140,7 +140,7 @@ Definition wp_iunlock_sconf_body
   sl_pid (i_lock ip) ↦₄ pidv -∗
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
-  procs_inv (kt := kt) gs -∗
+  procs_inv gs -∗
   (* THE CHECKED-OUT ENTRY, surrendered back into the escrow.  Exactly
      SpecIlock v3's postcondition, and exactly [ic_swap_park]'s input;
      [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation, and
@@ -160,7 +160,7 @@ Definition wp_iunlock_sconf_body
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
@@ -182,7 +182,7 @@ Module Type IUNLOCK.
              !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
-      (kt : ktier) (gs : list gname)
+      (gs : list gname)
       (gfs : fs_names) (gi : gname)
       (cn : ic_names)
       (gil gisl : gname)
@@ -192,6 +192,6 @@ Module Type IUNLOCK.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
-      wp_iunlock_sconf_body kt gs gfs gi cn gil gisl cov logstart k s g dev inum
+      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p b lks.
 End IUNLOCK.

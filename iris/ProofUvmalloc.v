@@ -215,7 +215,6 @@ Section UvmallocDefs.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
   Definition ua_pay (P : uptd) (vpn0 : mword 27) (n : nat) (xperm : Z)
       (oldsz newsz res : mword 64) : iProp Σ :=
@@ -253,11 +252,11 @@ Section UvmallocDefs.
               c <> csp_rs1 -> c <> URs0 -> c <> URs2 -> c <> URs4 ->
               c <> URs5 -> c <> URs7 ->
               mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
-      sie_cap_gpr kt mj (K - 10)%nat b p -∗
+      sie_cap_gpr KT1 mj (K - 10)%nat b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.uvmalloc + 0x78) : mword 64) -∗
       (∃ w1 w3 w6 : mword 64,
-         pa_stk sp0 3 ↦₈[kt] w1 ∗ pa_stk sp0 5 ↦₈[kt] w3 ∗ pa_stk sp0 8 ↦₈[kt] w6) -∗
+         pa_stk sp0 3 ↦₈[KT1] w1 ∗ pa_stk sp0 5 ↦₈[KT1] w3 ∗ pa_stk sp0 8 ↦₈[KT1] w6) -∗
       ua_pay P vpn0 n xperm oldsz newsz res -∗
       WP (Loop : expr riscv_lang) )%I.
 
@@ -276,7 +275,6 @@ Section ProofUvmalloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := URra.
   Notation Rtp := URtp.
   Notation Rs0 := URs0.
@@ -408,16 +406,16 @@ Section ProofUvmalloc.
        c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
        c <> Rs4 -> c <> Rs5 -> c <> Rs6 -> c <> Rs7 ->
        M !!! Regidx c = mm !!! Regidx c) ->
-    sie_cap_gpr kt (CID:=CID0) M (K - 10)%nat b p -∗
+    sie_cap_gpr KT1 (CID:=CID0) M (K - 10)%nat b p -∗
     cpu_own (CID:=CID0) 0%nat eb p b lks -∗
     kernel_text -∗
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.uvmalloc + 0x36) : mword 64) -∗
     proc_pt Pi -∗
     kalloc_env γa None -∗
-    pa_stk sp0 3 ↦₈[kt] (mm !!! Regidx Rs1) -∗
-    pa_stk sp0 5 ↦₈[kt] (mm !!! Regidx Rs3) -∗
-    pa_stk sp0 8 ↦₈[kt] (mm !!! Regidx Rs6) -∗
-    ua_exit (kt := kt) (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
+    pa_stk sp0 3 ↦₈[KT1] (mm !!! Regidx Rs1) -∗
+    pa_stk sp0 5 ↦₈[KT1] (mm !!! Regidx Rs3) -∗
+    pa_stk sp0 8 ↦₈[KT1] (mm !!! Regidx Rs6) -∗
+    ua_exit (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hab Hoin Hnchar Hfresh Hbelow.
@@ -527,7 +525,7 @@ Section ProofUvmalloc.
               B1 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       rewrite /B1. rewrite upd_ne; [| ua_thr_ne]. apply Hthr; assumption. }
-    iApply (Kalloc.wp_kalloc_sconf kt γa γk (mword_of_int (KernelSyms.kmem + 24))
+    iApply (Kalloc.wp_kalloc_sconf KT1 γa γk (mword_of_int (KernelSyms.kmem + 24))
               B1 None 0%nat eb p (K - 10)%nat b
               _ HKka ltac:(reflexivity) ltac:(vm_compute; reflexivity)
               Hbelow
@@ -687,7 +685,7 @@ Section ProofUvmalloc.
          handed to [Uvmdealloc] as-is; no [tp_pin] re-tagging needed. *)
       assert (Hudo : (uint (N4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
         by (rewrite HN4a1; exact Hudold).
-      iApply (Uvmdealloc.wp_uvmdealloc_sconf kt γa N4 Pi (K - 10)%nat eb p b
+      iApply (Uvmdealloc.wp_uvmdealloc_sconf γa N4 Pi (K - 10)%nat eb p b
                 _ HKud HN4a0 Hudo
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
       all: try lkbelow.
@@ -870,7 +868,7 @@ Section ProofUvmalloc.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       ua_thr_peel. apply Hmkthr; assumption. }
     assert (Hmspv : page_valid (B5 !!! Regidx Ra0)) by (rewrite HB5a0; exact Hpv).
-    iApply (MemsetPage.wp_memset_page_sconf kt B5 (K - 10)%nat (mword_of_int 0 : mword 64) b p
+    iApply (MemsetPage.wp_memset_page_sconf KT1 B5 (K - 10)%nat (mword_of_int 0 : mword 64) b p
               HKms Hmspv HB5a1 HB5a2 with "Hcg Htext Hpc [Hpage]").
     { iEval (rewrite HB5a0). iExact "Hpage". }
     iIntros (CIDu18 Hsu18 ms) "Hcg Hpc Hpage %Hmscs".
@@ -1066,7 +1064,7 @@ Section ProofUvmalloc.
               m_ad !! vpn_at (svpn_of (B11 !!! Regidx Ra1)) j = None).
     { intros j Hj. assert (Hj0 : j = 0%nat) by (clear -Hj; lia). subst j.
       rewrite vpn_at_0 HB11a1. exact Hmadnone. }
-    iApply (Mappages.wp_mappages_sconf kt γa B11 t m_ad 1%nat (Z.lor xperm 18) 0%nat
+    iApply (Mappages.wp_mappages_sconf KT1 γa B11 t m_ad 1%nat (Z.lor xperm 18) 0%nat
               (K - 10)%nat eb p None b _
               ltac:(reflexivity) HKmp HB11root Hmpva Hmppa Hmpsz ltac:(clear; lia)
               HB11a4 (proj1 Hperm) Hmpvab Hmppab Hrep Hmpfresh
@@ -1203,8 +1201,8 @@ Section ProofUvmalloc.
            last known-good anchor was [CIDu25], Mappages' own return hart). *)
         assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDu28 : CPU) = (CID0 : CPU)) by wp_next_chain.
         assert (Hexit_shift1 :
-                  ⊢ (ua_exit (kt := kt) (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
-                     ua_exit (kt := kt) (CID0 := CIDu28) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz)).
+                  ⊢ (ua_exit (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
+                     ua_exit (CID0 := CIDu28) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz)).
         { rewrite /ua_exit. exact (wp_next_shift Hshiftrec). }
         iDestruct (Hexit_shift1 with "Hexit") as "Hexit".
         iDestruct (cpu_own_transport CIDu25 CIDu28 0%nat eb p b ltac:(wp_next_chain)
@@ -1393,7 +1391,7 @@ Section ProofUvmalloc.
               F2 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       ua_thr_peel. apply Hmgthr; assumption. }
-    iApply (Kfree.wp_kfree_sconf kt γa γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf KT1 γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) F2 None 0%nat eb p (K - 10)%nat b
               _
               HKka ltac:(reflexivity) ltac:(reflexivity)
@@ -1494,7 +1492,7 @@ Section ProofUvmalloc.
        re-tagging needed. *)
     assert (Hudo2 : (uint (G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
       by (rewrite HG4a1; exact Hudold).
-    iApply (Uvmdealloc.wp_uvmdealloc_sconf kt γa G4 Pi (K - 10)%nat eb p b
+    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa G4 Pi (K - 10)%nat eb p b
               _ HKud HG4a0 Hudo2
               with "Hcg Hcnt Htext Hpc Hpt Henv").
     all: try lkbelow.
@@ -1601,7 +1599,7 @@ Section ProofUvmalloc.
       (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_uvmalloc_sconf_body kt γa mm P xperm K eb p b lks.
+    : wp_uvmalloc_sconf_body γa mm P xperm K eb p b lks.
   Proof.
     cbv beta delta [wp_uvmalloc_sconf_body].
     intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr Hbelow.
@@ -1738,7 +1736,7 @@ Section ProofUvmalloc.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (u72) "Hk1". iDestruct "S2" as (u64) "Hk2".
     iDestruct "S3" as (u56) "Hk3". iDestruct "S4" as (u48) "Hk4".
@@ -2022,7 +2020,7 @@ Section ProofUvmalloc.
     iPoseProof (uai_82 with "Htext") as "Hi82".
     iPoseProof (uai_84 with "Htext") as "Hi84".
     iPoseProof (uai_86 with "Htext") as "Hi86".
-    iAssert (ua_exit (kt := kt) (CID0 := CID) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)
+    iAssert (ua_exit (CID0 := CID) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)
       with "[Hcont Hk1 Hk2 Hk4 Hk6 Hk7 Hk9 Hk10]" as "Hepi".
     { rewrite /ua_exit.
       iIntros (CIDu86) "%Hsu86".
@@ -2117,9 +2115,9 @@ Section ProofUvmalloc.
                      = pa_stk (add_vec (E6 !!! Regidx csp_rs1)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
       { rewrite Hwv HE6sp. symmetry. exact Hsprstk. }
-      iAssert (stack_own (KTR := kt) sp0 10) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10]"
+      iAssert (stack_own (KTR := KT1) sp0 10) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10]"
         as "Hframe10".
-      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
         iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
         iSplitL "Hk3"; [iExists _; iExact "Hk3" |].
@@ -2384,8 +2382,8 @@ Section ProofUvmalloc.
     { rewrite Hpuv. change (Z.of_nat 0) with 0%Z.
       rewrite Z.mul_0_r Z.add_0_r. reflexivity. }
     assert (Hshiftepi : b = false \/ p = zero_reg -> (CIDu85 : CPU) = (CID : CPU)) by wp_next_chain.
-    assert (Hexit_shift0 : ⊢ (ua_exit (kt := kt) (CID0 := CID) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz -∗
-                              ua_exit (kt := kt) (CID0 := CIDu85) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)).
+    assert (Hexit_shift0 : ⊢ (ua_exit (CID0 := CID) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz -∗
+                              ua_exit (CID0 := CIDu85) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)).
     { rewrite /ua_exit. exact (wp_next_shift Hshiftepi). }
     iDestruct (Hexit_shift0 with "Hepi") as "Hepi".
     iDestruct (cpu_own_transport CID CIDu85 0%nat eb p b ltac:(wp_next_chain)

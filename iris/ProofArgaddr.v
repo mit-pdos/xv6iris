@@ -51,7 +51,6 @@ Section ProofArgaddr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -60,7 +59,7 @@ Section ProofArgaddr.
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (old : mword 64) (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_argaddr_sconf_body kt m av n eb p i tfp ws v old dqt b lks.
+    : wp_argaddr_sconf_body m av n eb p i tfp ws v old dqt b lks.
   Proof.
     cbv beta delta [wp_argaddr_sconf_body].
     intros pcE ip ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
@@ -86,7 +85,7 @@ Section ProofArgaddr.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -192,7 +191,7 @@ Section ProofArgaddr.
     (* carry [Hcpu] (cpu_own, hart-indexed) from the entry hart to the current
        chain hart [CID7] before the callee wants it. *)
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argraw.wp_argraw_sconf kt A3 (av - 4)%nat n eb p i tfp ws v dqt b lks
+    iApply (Argraw.wp_argraw_sconf A3 (av - 4)%nat n eb p i tfp ws v dqt b lks
               Hi HA3a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
     iIntros (CID8 Hs8 MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
@@ -274,8 +273,8 @@ Section ProofArgaddr.
                    = pa_stk (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE4csp. symmetry. exact Hspd4. }
     iPoseProof (aai_18 with "Htext") as "Hi18".
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HMFcsp). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HE2csp). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HE3csp). iExact "Hr8". }

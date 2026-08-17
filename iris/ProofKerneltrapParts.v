@@ -75,7 +75,6 @@ Section ProofKerneltrapParts.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
-  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
   Notation s1_idx := (mword_of_int 9 : mword 5).
@@ -181,7 +180,7 @@ Section ProofKerneltrapParts.
       (m : regfile) (av : nat) (ep sc : mword 64) :
     (6 <= av)%nat ->
     ret_pc ep = ep ->
-    sie_cap_gpr kt m av false p -∗
+    sie_cap_gpr KT1 m av false p -∗
     sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kerneltrap : mword 64) -∗
@@ -196,17 +195,17 @@ Section ProofKerneltrapParts.
         ⌜ _get_Mstatus_SPP ms0 = ('b"1" : mword 1) ⌝ -∗
         ⌜ _get_Mstatus_SPIE ms0 = ('b"1" : mword 1) ⌝ -∗
         ⌜ kt_thr m M ⌝ -∗
-        sie_cap_gpr kt M (av - 6) false p -∗
+        sie_cap_gpr KT1 M (av - 6) false p -∗
         sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
         sepc ↦ᵣ ep -∗
         scause ↦ᵣ sc -∗
         pc_is (mword_of_int (KernelSyms.kerneltrap + 0x2a) : mword 64) -∗
-        pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[kt] (m !!! Regidx ra_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[kt] (m !!! Regidx s0_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[kt] (m !!! Regidx s1_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 4 ↦₈[kt] (m !!! Regidx s2_idx) -∗
-        pa_stk (m !!! Regidx csp_rs1) 5 ↦₈[kt] (m !!! Regidx s3_idx) -∗
-        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈[kt] v) -∗
+        pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[KT1] (m !!! Regidx ra_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[KT1] (m !!! Regidx s0_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[KT1] (m !!! Regidx s1_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 4 ↦₈[KT1] (m !!! Regidx s2_idx) -∗
+        pa_stk (m !!! Regidx csp_rs1) 5 ↦₈[KT1] (m !!! Regidx s3_idx) -∗
+        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈[KT1] v) -∗
         WP (Loop : expr riscv_lang) ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -235,7 +234,7 @@ Section ProofKerneltrapParts.
                     = mword_of_int (KernelSyms.kerneltrap + 0x02)) by pcw.
     iEval (rewrite Hpc02) in "Hpc".
     (* split the fresh frame into its six slots *)
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -551,24 +550,24 @@ Section ProofKerneltrapParts.
     _get_Mstatus_SPP ms0 = ('b"1" : mword 1) ->
     _get_Mstatus_SPIE ms0 = ('b"1" : mword 1) ->
     kt_thr m0 M ->
-    sie_cap_gpr kt M k false p -∗
+    sie_cap_gpr KT1 M k false p -∗
     sret_bits va vb -∗
     cpu_own lvl false p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kerneltrap + 0x36) : mword 64) -∗
     sepc ↦ᵣ epold -∗
-    pa_stk sp0 1 ↦₈[kt] ra0 -∗
-    pa_stk sp0 2 ↦₈[kt] s00 -∗
-    pa_stk sp0 3 ↦₈[kt] s10 -∗
-    pa_stk sp0 4 ↦₈[kt] s20 -∗
-    pa_stk sp0 5 ↦₈[kt] s30 -∗
-    pa_stk sp0 6 ↦₈[kt] vgap -∗
+    pa_stk sp0 1 ↦₈[KT1] ra0 -∗
+    pa_stk sp0 2 ↦₈[KT1] s00 -∗
+    pa_stk sp0 3 ↦₈[KT1] s10 -∗
+    pa_stk sp0 4 ↦₈[KT1] s20 -∗
+    pa_stk sp0 5 ↦₈[KT1] s30 -∗
+    pa_stk sp0 6 ↦₈[KT1] vgap -∗
     ( ∀ (mf : regfile) (ms_f : mword 64),
         ⌜ callee_saved m0 mf ⌝ -∗
         ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗
         ⌜ _get_Mstatus_SPIE ms_f = ('b"1" : mword 1) ⌝ -∗
         ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
-        sie_cap_gpr_at kt ms_f mf (k + 6) false p -∗
+        sie_cap_gpr_at KT1 ms_f mf (k + 6) false p -∗
         sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
         cpu_own lvl false p false lks -∗
         sepc ↦ᵣ ep -∗
@@ -719,8 +718,8 @@ Section ProofKerneltrapParts.
     iEval (rewrite HE2sp Hpa3) in "Hb3".
     iEval (rewrite HE3sp Hpa4) in "Hb4".
     iEval (rewrite HE4sp Hpa5) in "Hb5".
-    iAssert (stack_own (KTR := kt) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe6".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1". { iExists _. iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iExact "Hb3". }

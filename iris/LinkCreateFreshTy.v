@@ -56,7 +56,7 @@ Module CreateFreshTy : CREATE_FRESH_TY.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -69,7 +69,7 @@ Module CreateFreshTy : CREATE_FRESH_TY.
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      create_fresh_ty_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
                            u Sb pidv dq dqs dqn Ma K eb b lks.
 End CreateFreshTy.

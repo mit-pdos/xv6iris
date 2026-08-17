@@ -418,7 +418,6 @@ Section IputCommon.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
-  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
   Notation Rs1  := (mword_of_int 9 : mword 5).
@@ -433,7 +432,7 @@ Section IputCommon.
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Lemma ip_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
       `{GEN : GenId} `{CID : CpuId} (p : mword 64) (lks : gset string) :
-    sie_cap_gpr kt m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -495,7 +494,6 @@ Section IputTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
-  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
   Notation Rs1  := (mword_of_int 9 : mword 5).
@@ -541,23 +539,23 @@ Section IputTail.
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x26) : mword 64) -∗
-    sie_cap_gpr kt D (trap_res eb + (K - 4))%nat false pj -∗
+    sie_cap_gpr KT1 D (trap_res eb + (K - 4))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-    arm_pay kt 0 eb pj -∗
+    arm_pay KT1 0 eb pj -∗
     (* the trap-CSR complement: a PURE PASS-THROUGH, threaded from the
        caller's own entry straight to release's continuation -- iput never
        itself needs the bare pair, since every one of its sleeping callees
        (acquiresleep_nested excepted -- it never parks) takes the complement
        directly.  See claude-notes/completed/eb-generic-sweep.md. *)
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     locked gtl cpu_id -∗
     itable_res2 cn gfs gi cov logstart nib dev -∗
     iref_slot -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈[kt] vg4 -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[KT1] vg4 -∗
     p_pid pj ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -567,9 +565,9 @@ Section IputTail.
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z) (w : bool),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr kt mf K eb pj -∗
+        sie_cap_gpr KT1 mf K eb pj -∗
         cpu_own 0 eb pj eb lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb pj -∗
         pc_is ret_tgt -∗
         p_pid pj ↦₄{dq} pidv -∗
@@ -659,7 +657,7 @@ Section IputTail.
       rewrite /D3 upd_ne; [reflexivity | regne]. }
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spd)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
-    iApply (Release.wp_release_sconf kt gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) D5
               0%nat eb pj (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
@@ -720,8 +718,8 @@ Section IputTail.
                    = pa_stk (add_vec (P3 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP3sp. unfold spd, pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3); iExists _; iExact "Hr8"|].
@@ -840,11 +838,11 @@ Section IputTail.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart k -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
-    sie_cap_gpr kt M (trap_res eb + (K - 4))%nat false pj -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-    arm_pay kt 0 eb pj -∗
+    arm_pay KT1 0 eb pj -∗
     (* pure pass-through, exactly as in [ip_tail_exit] above *)
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     locked gtl cpu_id -∗
     itable_half Mt -∗
@@ -853,10 +851,10 @@ Section IputTail.
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
     ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
     IcacheRef.inode_ref k q dev inum -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈[kt] vg4 -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[KT1] vg4 -∗
     p_pid pj ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -866,9 +864,9 @@ Section IputTail.
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z) (w : bool),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr kt mf K eb pj -∗
+        sie_cap_gpr KT1 mf K eb pj -∗
         cpu_own 0 eb pj eb lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb pj -∗
         pc_is ret_tgt -∗
         p_pid pj ↦₄{dq} pidv -∗
@@ -1150,7 +1148,6 @@ Section ProofIput.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
   Notation Rs1  := (mword_of_int 9 : mword 5).
@@ -1194,7 +1191,7 @@ Section ProofIput.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iput_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+    : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
                        k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
   Proof.
@@ -1248,7 +1245,7 @@ Section ProofIput.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -1378,7 +1375,7 @@ Section ProofIput.
                 [ reflexivity | vm_compute; reflexivity | nz | nz | nz ] ]. }
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt gtl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) mA
               0%nat eb pj (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
@@ -1902,7 +1899,7 @@ Section ProofIput.
     rewrite (isl_slot_some Mt k q 1%positive HMk).
     iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
     iMod (slh_return_last (icfg_isl k) q with "Hisl Hrslh") as "Hisl".
-    iApply (ASL.wp_acquiresleep_nb_sconf kt (dq := dq) j gil gisl "inode"%string
+    iApply (ASL.wp_acquiresleep_nb_sconf (dq := dq) j gil gisl "inode"%string
               (ic_tok cn k) (icfg_isl k) q G4 pidv (trap_res eb + (K - 4))%nat eb 0%nat
               ({["itable"]} ∪ lks)
               ltac:(lia) ltac:(cbn; lia) Hslfresh
@@ -2068,7 +2065,7 @@ Section ProofIput.
                        H3 !!! Regidx c = mfa !!! Regidx c).
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf kt gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) H3
               0%nat eb pj (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
@@ -2219,7 +2216,7 @@ Section ProofIput.
         iApply (log_credit_own g (cru || false) Sb e0 (IBLOCK inum inodestart)).
         intros Hc. apply Hcru. destruct cru; [reflexivity | cbn in Hc; discriminate]. }
     iModIntro.
-    iApply (IT.wp_itrunc_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi
+    iApply (IT.wp_itrunc_gen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart bmapstart inodestart nib size dev used
               (ientry k) inum dn dn bm data2 uit Sb crb (cru || crz)%bool e0
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
@@ -2349,7 +2346,7 @@ Section ProofIput.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iPoseProof (log_credit_own g true Sb1 e1 (IBLOCK inum inodestart)
                   ltac:(intros _; exact Hib1)) as "#Hcrdu".
-    iApply (IU.wp_iupdate_credgen kt gs j gl gu gd gk pd pav pu bn g gfs gi
+    iApply (IU.wp_iupdate_credgen gs j gl gu gd gk pd pav pu bn g gfs gi
               cov logstart inodestart nib dev (ientry k) inum
               (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true e1 0%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
@@ -2487,7 +2484,7 @@ Section ProofIput.
     { intros c Hcs. rewrite /J6 upd_ne; [| regne]. exact (HJ5c c Hcs). }
     iDestruct (cpu_own_transport CIDiu CIDm6 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (RS.wp_releasesleep_gen_sconf kt gs gil gisl "inode"%string (ic_tok cn k)
+    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string (ic_tok cn k)
               (slh_tok (icfg_isl k)) q
               J6 pidv pj (K - 4)%nat eb eb lks ltac:(lia)
               (* releasesleep's bound is "sleep lock"(6); iput's own is
@@ -2556,7 +2553,7 @@ Section ProofIput.
       rewrite /J8 upd_ne; [| regne]. rewrite /J7 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt gtl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) J9
               0%nat eb pj (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
@@ -2686,7 +2683,7 @@ Section ProofIput.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_iput_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb b lks.
   Proof.

@@ -238,7 +238,7 @@ Definition wp_readi_sconf_body
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -311,7 +311,7 @@ Definition wp_readi_sconf_body
      locks_below premise of their own, so "bcache" is the lowest -- and
      only -- bound this contract states. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires
      anything itself -- its interior sleepers (bmap's bread, its own
@@ -321,7 +321,7 @@ Definition wp_readi_sconf_body
      the caller holds it because the trap handed it over, and readi
      threads it to bmap and bread unchanged and takes it back from each in
      turn.  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -362,7 +362,7 @@ Definition wp_readi_sconf_body
    else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ[ktb] dst_olds i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -393,9 +393,9 @@ Definition wp_readi_sconf_body
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)
            /\ tot = rd_clamp (di_size dn) off n)⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
@@ -421,7 +421,7 @@ Module Type READI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (kt ktb : ktier) `{!KtierLe ktb kt} (γs : list gname) (j : nat) (γl : gname)
+      (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -436,7 +436,7 @@ Module Type READI.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_readi_sconf_body kt ktb γs j γl γu γd γk pd pav pu bn γfs γa γf
+      wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V
                           pidv dq dqd m K eb b lks.

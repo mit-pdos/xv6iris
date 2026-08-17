@@ -55,7 +55,7 @@ Import Defs.
 
 
 Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-     (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.killed in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -70,15 +70,15 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "proc"'s rank. *)
   locks_below lks "proc" ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (kl : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 kl ⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -87,7 +87,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 Module Type KILLED.
   Parameter wp_killed_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_killed_sconf_body kt γs j γl m av n eb p b lks.
+      wp_killed_sconf_body γs j γl m av n eb p b lks.
 End KILLED.

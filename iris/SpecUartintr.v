@@ -67,7 +67,7 @@ Require Import ProcAvail.
 Notation uartintr_stack := (36%nat) (only parsing).
 Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γu : uart_names) (γv : disk_names)
+    (γu : uart_names) (γv : disk_names)
      (γs : list gname)
     (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
@@ -81,7 +81,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      THRE arm's wakeup call needs only the higher "proc" (11), which
      [locks_below_mono] recovers from this one bound. *)
   locks_below lks "cons" ->
-  sie_cap_gpr kt m av b pme -∗
+  sie_cap_gpr KT1 m av b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE DEVICE, AND NOTHING ELSE.  The transmit lock is gone from this
@@ -94,7 +94,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      nothing to reach. *)
   dev_inv γu γv -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* CONSOLEINTR'S OWN CREDENTIAL, and the one premise the rx loop adds.
      The handler itself touches neither lock; [console_caps] is passed
      straight through to [consoleintr], which takes cons.lock and -- through
@@ -105,7 +105,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-      sie_cap_gpr kt mf av b pme -∗
+      sie_cap_gpr KT1 mf av b pme -∗
       cpu_own lvl eb pme b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -115,8 +115,8 @@ Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γu : uart_names) (γv : disk_names)
+      (γu : uart_names) (γv : disk_names)
       (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string),
-      wp_uartintr_sconf_body kt γu γv γs m av lvl eb pme b lks.
+      wp_uartintr_sconf_body γu γv γs m av lvl eb pme b lks.
 End UARTINTR.

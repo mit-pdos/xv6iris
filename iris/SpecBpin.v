@@ -44,7 +44,7 @@ Local Open Scope Z_scope.
 
 Definition wp_bpin_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
-    `{GEN : GenId} `{CID : CpuId} (kt : ktier) (bn : bio_names) (V : bio_view Σ) (k : nat)
+    `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bpin in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -56,7 +56,7 @@ Definition wp_bpin_sconf_body
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
   locks_below lks "bcache" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
@@ -64,7 +64,7 @@ Definition wp_bpin_sconf_body
   bslot bn -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -75,7 +75,7 @@ Definition wp_bpin_sconf_body
 Module Type BPIN.
   Parameter wp_bpin_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
-      `{GEN : GenId} `{CID : CpuId} (kt : ktier) (bn : bio_names) (V : bio_view Σ) (k : nat)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
-      wp_bpin_sconf_body kt bn V k m n eb p K b lks.
+      wp_bpin_sconf_body bn V k m n eb p K b lks.
 End BPIN.

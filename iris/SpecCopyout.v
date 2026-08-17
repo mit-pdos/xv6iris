@@ -108,13 +108,13 @@ Import Defs.
 
 (* THE ONE CONTRACT.  Every caller -- either_copyout, piperead, kwait, readi,
    sys_pipe, and now kexec -- speaks this one; see ProofCopyout.v. *)
-(* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [kt].
+(* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [KT1].
    It is FORCED and it is the same two-tier shape [WpSconfMem]'s merged
-   leaves have: this function's kernel buffer is a FRAME local at [kt] for
+   leaves have: this function's kernel buffer is a FRAME local at [KT1] for
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt ktb : ktier) `{!KtierLe ktb kt} (γa : gname) (mm : regfile)
+    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
@@ -146,7 +146,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* copyout -> walkaddr -> walk; [walk] states its bound at "kmem" whether or
      not the alloc arm is taken *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -155,7 +155,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd),
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     proc_pt P' -∗
@@ -170,8 +170,8 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type COPYOUT.
   Parameter wp_copyout_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt ktb : ktier) `{!KtierLe ktb kt} (γa : gname) (mm : regfile)
+      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyout_sconf_body kt ktb γa mm P szv len src_bytes K lvl eb p b lks.
+      wp_copyout_sconf_body ktb γa mm P szv len src_bytes K lvl eb p b lks.
 End COPYOUT.

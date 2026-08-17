@@ -186,7 +186,6 @@ Section KexecBBody.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -265,10 +264,10 @@ Section KexecBBody.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
         M90 !!! Regidx r = m !!! Regidx r) ->
     kernel_text -∗
-    fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     pc_is (mword_of_int (KXB + 0x90) : mword 64) -∗
-    sie_cap_gpr kt M90 (K - 68)%nat b (proc_addr jp) -∗
+    sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
@@ -291,7 +290,7 @@ Section KexecBBody.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -327,7 +326,7 @@ Section KexecBBody.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr kt mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -365,7 +364,7 @@ Section KexecBBody.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr kt mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -548,7 +547,7 @@ Section KexecBBody.
     { apply kxc_page_base_inj. rewrite Hbasetf. reflexivity. }
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (PPT.wp_proc_pagetable_core kt ga G2 tfr (DfracOwn (1/4)) 0%nat
+    iApply (PPT.wp_proc_pagetable_core ga G2 tfr (DfracOwn (1/4)) 0%nat
               (K - 68)%nat true (proc_addr jp) None true lks
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)

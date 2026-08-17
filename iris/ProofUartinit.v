@@ -87,7 +87,6 @@ Section ProofUartinit.
   Context `{!uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* the "uart" literal in rodata, where the [auipc a1,0x6 / addi a1,a1,1942]
      pair at +0x3a lands. *)
   Definition uart_name_str : Z := 0x80007030.
@@ -139,7 +138,7 @@ Section ProofUartinit.
 
   Lemma wp_uartinit_sconf (γd : uart_names)
       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool) (p : mword 64)
-    : wp_uartinit_sconf_body kt γd m K l b0 p.
+    : wp_uartinit_sconf_body γd m K l b0 p.
   Proof.
     cbv beta delta [wp_uartinit_sconf_body].
     intros pcE ret_tgt HK.
@@ -206,7 +205,7 @@ Section ProofUartinit.
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (vra0) "Hras". iDestruct "S2" as (vs00) "Hs0s".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.uartinit + 0x02)) by (unfold pcE; apply bv_eq; vm_compute; reflexivity).
@@ -262,7 +261,7 @@ Section ProofUartinit.
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c sb zero,1(a5) : IER <- 0.  Offset 1 is IER (or DLM under DLAB);
        either way nothing tracked moves, so the tokens pass straight through. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 1 (mword_of_int (KernelSyms.uartinit + 0x0c)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 1 (mword_of_int (KernelSyms.uartinit + 0x0c)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
               R3 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) b0)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) b0)%I
@@ -309,7 +308,7 @@ Section ProofUartinit.
        [true] together, acc/out are untouched. *)
     assert (Hblcr1 : (autocast (T := mword) (subrange_vec_dec (R5 !!! Regidx (mword_of_int 13 : mword 5)) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = Z_to_bv 8 128).
     { rewrite /R5 upd_eq. rgne. rewrite HR4x0. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 3 (mword_of_int (KernelSyms.uartinit + 0x18)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 3 (mword_of_int (KernelSyms.uartinit + 0x18)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
               R5 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) b0)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
@@ -369,7 +368,7 @@ Section ProofUartinit.
     iEval (rewrite Hpp22) in "Hpc".
     (* +0x22 sb a3,0(a2) : DLL <- 3.  Offset 0 is the divisor latch, not THR --
        and it is the caller's DLAB half that says so. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 0 (mword_of_int (KernelSyms.uartinit + 0x22)) false (mword_of_int 13 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 0 (mword_of_int (KernelSyms.uartinit + 0x22)) false (mword_of_int 13 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 0 : mword 12)
               R7 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
@@ -389,7 +388,7 @@ Section ProofUartinit.
     assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.uartinit + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.uartinit + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
     (* +0x26 sb zero,1(a5) : DLM <- 0.  Offset 1 again -- stable at either DLAB. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 1 (mword_of_int (KernelSyms.uartinit + 0x26)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 1 (mword_of_int (KernelSyms.uartinit + 0x26)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
               R7 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
@@ -411,7 +410,7 @@ Section ProofUartinit.
        [false]; from here the half is freezable. *)
     assert (Hblcr2 : (autocast (T := mword) (subrange_vec_dec (R7 !!! Regidx (mword_of_int 13 : mword 5)) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = Z_to_bv 8 3).
     { rewrite HR7a3. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 3 (mword_of_int (KernelSyms.uartinit + 0x2a)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 3 (mword_of_int (KernelSyms.uartinit + 0x2a)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
               R7 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
@@ -466,7 +465,7 @@ Section ProofUartinit.
        clear is the write the invariant would forbid; the token plus the
        carried [uart_out_lb] prove the FIFO already empty, so it shrinks
        nothing. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 2 (mword_of_int (KernelSyms.uartinit + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 2 (mword_of_int (KernelSyms.uartinit + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
               R9 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
@@ -487,7 +486,7 @@ Section ProofUartinit.
     iEval (rewrite Hpp36) in "Hpc".
     (* +0x36 sb a3,1(a5) : IER <- 3 -- enable tx/rx interrupts.  Offset 1
        again, stable. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf kt (CID:=CID) γd 1 (mword_of_int (KernelSyms.uartinit + 0x36)) false (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf KT0 (CID:=CID) γd 1 (mword_of_int (KernelSyms.uartinit + 0x36)) false (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
               R9 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
@@ -592,7 +591,7 @@ Section ProofUartinit.
     assert (HA5ra : A5 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (KernelSyms.uartinit + 0x4e))
       by (rewrite /A5 upd_eq; apply bv_eq; vm_compute; reflexivity).
     (* ---- initlock(&tx_lock, "uart") ---- *)
-    iApply (Initlock.wp_initlock_sconf kt A5
+    iApply (Initlock.wp_initlock_sconf KT0 A5
               vtlock vtname vtcpu "uart"%string (K - 2)%nat false p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hf1] [Hf2] [Hf3]").
@@ -651,8 +650,8 @@ Section ProofUartinit.
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HE2sp. exact Hspr2. }
-    iAssert (stack_own (KTR := kt) sp0 2) with "[Hras Hs0s]" as "Hframe".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT0) sp0 2) with "[Hras Hs0s]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT0)). cbn [seq].
       iSplitL "Hras"; [iExists _; iExact "Hras"|].
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|]. done. }
     iEval (rewrite -Hwv) in "Hframe".

@@ -15,7 +15,7 @@
    So the one ghost move here is the FRAME CARVE, dirlookup's [de] move at a
    different depth: two [stack_own] words become sixteen bytes
    ([StackBytes.slot_bytes_own]), the sixteen are named by a function
-   ([ByteBuf.bb_any_named (KTR := kt)]) and split 14 + 2, the fourteen are what namex's
+   ([ByteBuf.bb_any_named (KTR := KT1)]) and split 14 + 2, the fourteen are what namex's
    contract asks for, and after the call the fourteen (now at namex's
    UNSPECIFIED [nf]) and the untouched two are re-joined and folded back into
    two words for the pop.  Nothing about the buffer reaches this contract --
@@ -149,14 +149,13 @@ Section ProofNameiMain.
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)
 
   Lemma nam_slots_bytes (sp0 : mword 64) (w1 w2 : bv 64) :
-    (pa_stk sp0 4) ↦₈[kt] w1 -∗ (pa_stk sp0 3) ↦₈[kt] w2 -∗
+    (pa_stk sp0 4) ↦₈[KT1] w1 -∗ (pa_stk sp0 3) ↦₈[KT1] w2 -∗
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 4)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 3)) 8 = true⌝ ∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 4) 16.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 4) 16.
   Proof.
     assert (E1 : pa_add (pa_stk sp0 4) 8 = pa_stk sp0 3)
       by (rewrite (pa_stk_next sp0 4 ltac:(lia)); reflexivity).
@@ -171,8 +170,8 @@ Section ProofNameiMain.
   Lemma nam_bytes_slots (sp0 : mword 64) :
     is_aligned_paddr (Physaddr (pa_stk sp0 4)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 3)) 8 = true ->
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 4) 16 ⊢
-    ∃ w1 w2 : bv 64, (pa_stk sp0 4) ↦₈[kt] w1 ∗ (pa_stk sp0 3) ↦₈[kt] w2.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 4) 16 ⊢
+    ∃ w1 w2 : bv 64, (pa_stk sp0 4) ↦₈[KT1] w1 ∗ (pa_stk sp0 3) ↦₈[KT1] w2.
   Proof.
     intros Ha1 Ha2.
     assert (E1 : pa_add (pa_stk sp0 4) 8 = pa_stk sp0 3)
@@ -185,28 +184,28 @@ Section ProofNameiMain.
   Qed.
 
   Lemma nam_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := kt) a N). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
   Lemma nam_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := kt) a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 16 = 14 + 2: namex writes at most fourteen; the two above ride through *)
   Lemma nam_buf_split (a : mword 64) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] f j) -∗
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j)
-    ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[kt] f (14 + j)%nat).
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j) -∗
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] f j)
+    ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[KT1] f (14 + j)%nat).
   Proof.
     change 16%nat with (14 + 2)%nat.
     rewrite (bb_split a 14 2 f). iIntros "[$ $]".
   Qed.
 
   Lemma nam_buf_join (a : mword 64) (f nf : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] nf j) -∗
-    ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[kt] f (14 + j)%nat) -∗
-    bytes_own (KTR := kt) (DfracOwn 1) a 16.
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] nf j) -∗
+    ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[KT1] f (14 + j)%nat) -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) a 16.
   Proof.
     iIntros "H1 H2".
     iDestruct (nam_name_bytes a 14 nf with "H1") as "B1".
@@ -234,7 +233,7 @@ Section ProofNameiMain.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_namei_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n Sb
                           pidv dq dqb dqs dqc m K eb b lks.
@@ -282,7 +281,7 @@ Section ProofNameiMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : nam_sp m R1) by (rewrite /nam_sp /R1 upd_eq; exact Hpush).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -427,7 +426,7 @@ Section ProofNameiMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_gen kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
               plen pfun nfun false n Sb pidv dq dqb dqs dqc R5 (K - 4)%nat eb b
               _ Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
@@ -514,8 +513,8 @@ Section ProofNameiMain.
                    = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HP2sp; reflexivity).
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -636,7 +635,7 @@ Section ProofNameiMain.
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_namei_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    : wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n
                           pidv dq dqb dqs dqc m K eb b lks.

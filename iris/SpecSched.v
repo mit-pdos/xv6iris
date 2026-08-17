@@ -64,7 +64,7 @@ Import Defs.
 
 Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
+    (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
   (* THE SET IS THE PROC SINGLETON, not a parameter: sched is reachable only
      while holding exactly this proc's lock (its own [noff != 1] check says
@@ -105,9 +105,9 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      that called it -- which is false twice over ([SpecSwtch]'s continuation
      is over an arbitrary hart, and the post-resume release exits at
      [outb = eb = true]).  There is consequently no [b] binder left. *)
-  sie_cap_gpr kt m av false pj -∗
+  sie_cap_gpr KT1 m av false pj -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   proc_held cpu_id j γl st ch -∗
   (* WHAT THE PARKED SLOT OWES BESIDES THE SAVED CONTEXT (SchedCtx.park_pay):
      [emp] at a resumable park -- the private block stays in the parking
@@ -125,9 +125,9 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      sched needs its frame after the swtch -- but so is the closer:
      [park_pay] is [emp] there, so the caller passes [fun _ => emp] and
      nothing is promised. *)
-  (stack_own (KTR := kt) (m !!! Regidx csp_rs1) av -∗ park_pay pj st) -∗
+  (stack_own (KTR := KT1) (m !!! Regidx csp_rs1) av -∗ park_pay pj st) -∗
   (* handed over at the crossing, taken back from the dispatch payload. *)
-  trap_csrs kt -∗
+  trap_csrs KT1 -∗
   (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:
      the parked-scheduler slot content is the ▷ sched_vc premise below.
      sched PRESERVES [eb] across the park -- its intena save/restore is
@@ -143,7 +143,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      which is what lets the resumed thread rebuild [run_slot] and its own
      [cpu_claim] out of one resource. *)
   hart_full j cpu_id -∗
-  ▷ sched_vc (kt := kt) γs (a_cpu_ctx cid_word) pj -∗
+  ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
   (* THE POST-RESUME HALF EXISTS ONLY AT A RESUMABLE PARK.  [needs_ctx st] is
      the proc lock's own predicate for "this slot owns a saved context", and
      it is exactly the [back] flag sched hands the crossing
@@ -155,16 +155,16 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      wp_next true pj (fun (CID : CpuId) =>
        ∀ (mf : regfile) (ch' : mword 64),
          ⌜callee_saved m mf⌝ -∗
-         sie_cap_gpr kt mf av false pj -∗
+         sie_cap_gpr KT1 mf av false pj -∗
          pc_is ret_tgt -∗
          proc_held cpu_id j γl RUNNING ch' -∗
          (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
             rides inside it, which is what the caller's own retune needs. *)
-         trap_csrs kt -∗
+         trap_csrs KT1 -∗
          cpu_own 1 eb pj false {["proc"]} -∗
          own_ctx (p_context pj) -∗
          hart_full j cpu_id -∗
-         ▷ sched_vc (kt := kt) γs (a_cpu_ctx cid_word) pj -∗
+         ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
          WP (Loop : expr riscv_lang))
    else emp) -∗
   WP (Loop : expr riscv_lang).
@@ -196,7 +196,7 @@ Module Type SCHED.
   Parameter wp_sched_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),
-      wp_sched_sconf_body kt γs j γl st ch m av eb.
+      wp_sched_sconf_body γs j γl st ch m av eb.
 End SCHED.

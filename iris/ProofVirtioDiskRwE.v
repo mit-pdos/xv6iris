@@ -192,7 +192,6 @@ Section ProofVirtioDiskRwE.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1  : mword 5).
   Notation Rtp := (mword_of_int 4  : mword 5).
   Notation Rs0 := (mword_of_int 8  : mword 5).
@@ -244,9 +243,9 @@ Section ProofVirtioDiskRwE.
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr kt M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-       trap_csrs kt -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) -∗
        locked γk cpu_id -∗
@@ -274,9 +273,9 @@ Section ProofVirtioDiskRwE.
         /\ M !!! Regidx Rs1 = (d_lock : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Rs2 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ vdrw_hi M m0⌝ -∗
-       sie_cap_gpr kt M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-       trap_csrs kt -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b4) : mword 64) -∗
        locked γk cpu_id -∗
@@ -383,7 +382,7 @@ Section ProofVirtioDiskRwE.
        "proc" (11) follow from this by [locks_below_mono]. *)
     locks_below lks "virtio_disk" ->
     kernel_text -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf bs_disk
@@ -475,7 +474,7 @@ Section ProofVirtioDiskRwE.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
       (* ================= sleep_prepare(b) ================= *)
-      iApply (SleepPrepare.wp_sleep_prepare_sconf kt γs j γl W2
+      iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl W2
                 (trap_res eb + (K - 12))%nat 1%nat eb false
                 ({["virtio_disk"]} ∪ lks)
                 Hj Hjl ltac:(rewrite HW2a0; exact Hbnz) vdrwb_lvl1
@@ -533,7 +532,7 @@ Section ProofVirtioDiskRwE.
       iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm")
         as "[Hpay [Hextc Hextm]]".
       (* ================= release(&disk.vdisk_lock) ================= *)
-      iApply (Release.wp_release_sconf kt γk d_lock "virtio_disk"%string
+      iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
                 (disk_res γd pd pav pu) W4 0%nat eb (proc_addr j) (K - 12)%nat
                 ({["virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
@@ -573,7 +572,7 @@ Section ProofVirtioDiskRwE.
       (* the release above gave the virtio rank back; spell the set as the
          bare entry one sleep's contract names. *)
       iEval (rewrite (locks_add_del_below "virtio_disk" lks Hbelow)) in "Hown".
-      iApply (Sleep.wp_sleep_sconf kt γs j γl W5 (K - 12)%nat eb lks
+      iApply (Sleep.wp_sleep_sconf γs j γl W5 (K - 12)%nat eb lks
                 Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
                 with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
       all: try lkbelow.
@@ -629,7 +628,7 @@ Section ProofVirtioDiskRwE.
       (* ================= acquire(&disk.vdisk_lock) ================= *)
       iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf kt γk "virtio_disk"%string
+      iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
                 (disk_res γd pd pav pu) W7 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                 vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Hown Htext Hpc []").

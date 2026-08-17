@@ -287,19 +287,18 @@ Qed.
 Section SpProps.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Context {kt : ktier}.
   (* the scratch slots: 3/4/5 (only spilled on the loop path), 6 and 8 (never
      touched at all).  Slot 7 is the [int n] local and rides separately. *)
   Definition sp_free (sp0 : mword 64) : iProp Σ :=
-    ((∃ w : bv 64, pa_stk sp0 3 ↦₈[kt] w) ∗ (∃ w : bv 64, pa_stk sp0 4 ↦₈[kt] w) ∗
-     (∃ w : bv 64, pa_stk sp0 5 ↦₈[kt] w) ∗ (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) ∗
-     (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w))%I.
+    ((∃ w : bv 64, pa_stk sp0 3 ↦₈[KT1] w) ∗ (∃ w : bv 64, pa_stk sp0 4 ↦₈[KT1] w) ∗
+     (∃ w : bv 64, pa_stk sp0 5 ↦₈[KT1] w) ∗ (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) ∗
+     (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w))%I.
 
   (* the right to put frame slot 7 back together once the [int n] cell is
      done with -- the lower half plus its 8-alignment, packaged so no join
      predicate has to carry a pure alignment fact. *)
   Definition sp_join7 (sp0 : mword 64) : iProp Σ :=
-    (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w)%I.
+    (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w)%I.
 
   (* +0x7e -- the shared epilogue.  [r] is the value already parked in a0. *)
   Definition sp_tail `{GEN : GenId} (CID0 : CPU)  (j : nat)
@@ -310,10 +309,10 @@ Section SpProps.
         ⌜ sp_base m M sp0 /\ sp_saved m M /\
           M !!! Regidx (mword_of_int 10 : mword 5) = r /\
           (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
-        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
-        sie_cap_gpr kt M (av - 8) true pj -∗
+        pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w) -∗
+        sie_cap_gpr KT1 M (av - 8) true pj -∗
         cpu_own 0 eb pj true lks -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x8e)) -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -325,12 +324,12 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_saved m M ⌝ -∗
-        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
+        pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w) -∗
         locked γt cpu_id -∗ ticks_res -∗
-        sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+        sie_cap_gpr KT1 M (trap_res true + (av - 8))%nat false pj -∗
+        cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x80)) -∗
         sp_tail CID0 j m av eb sp0 pj lks -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -343,16 +342,16 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_lregs M tk ⌝ -∗
-        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-        pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-        pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-        (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
-        (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
+        pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+        pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+        pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+        (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w) -∗
+        (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w) -∗
         locked γt cpu_id -∗ ticks_res -∗
-        sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+        sie_cap_gpr KT1 M (trap_res true + (av - 8))%nat false pj -∗
+        cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x9c)) -∗
         sp_tail CID0 j m av eb sp0 pj lks -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -364,16 +363,16 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ sp_base m M sp0 /\ sp_lregs M tk ⌝ -∗
-        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-        pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-        pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-        pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-        (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
-        pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
+        pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+        pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+        pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+        (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w) -∗
+        pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ sp_join7 sp0 -∗
         locked γt cpu_id -∗ ticks_res -∗
-        sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+        sie_cap_gpr KT1 M (trap_res true + (av - 8))%nat false pj -∗
+        cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
         sp_exit0 CID0 γt j m av eb sp0 pj lks -∗
         sp_exitk CID0 γt j m av eb sp0 pj tk lks -∗
@@ -389,11 +388,11 @@ Section SpProps.
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (M : regfile) (nv : mword 32),
         ⌜ sp_base m M sp0 /\ sp_saved m M ⌝ -∗
-        pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-        pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+        pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+        pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
         sp_free sp0 -∗
-        pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 sp0 -∗
-        sie_cap_gpr kt M (av - 8) true pj -∗
+        pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ sp_join7 sp0 -∗
+        sie_cap_gpr KT1 M (av - 8) true pj -∗
         cpu_own 0 eb pj true lks -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
         sp_tail CID0 j m av eb sp0 pj lks -∗
@@ -423,7 +422,6 @@ Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 Section SpBodies.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
-  Context {kt : ktier}.
   (* ---- the shared epilogue: +0x7e .. +0x84 (c.ret) ---- *)
   Lemma sp_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (j : nat)
       (m M : regfile) (r : mword 64) (av : nat) (eb : bool)
@@ -436,10 +434,10 @@ Section SpBodies.
     (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ->
     sp0 = m !!! Regidx csp_rs1 ->
     kernel_text -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    sp_free (kt := kt) sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
-    sie_cap_gpr kt M (av - 8) true pj -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w) -∗
+    sie_cap_gpr KT1 M (av - 8) true pj -∗
     cpu_own 0 eb pj true lks -∗
     p_trapframe pj ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
@@ -449,7 +447,7 @@ Section SpBodies.
         ⌜ callee_saved m mf /\
           mf !!! Regidx (mword_of_int 10 : mword 5) = rr /\
           (rr = (zero_reg : mword 64) \/ rr = mword_of_int (-1)) ⌝ -∗
-        sie_cap_gpr kt mf av true pj -∗
+        sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0 eb pj true lks -∗
         pc_is ret_tgt -∗
         p_trapframe pj ↦₈{dqt} page_base tfp -∗
@@ -506,8 +504,8 @@ Section SpBodies.
     assert (HE2sp : E2 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /E2 upd_ne; [exact HE1sp | reg_neq]).
     (* +0x82 c.addi16sp sp,64 -- the frame pop *)
-    iAssert (stack_own (KTR := kt) sp0 8) with "[Hs1 Hs2 Hf3 Hf4 Hf5 Hf6 Hs7 Hf8]" as "Hframe".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 8) with "[Hs1 Hs2 Hf3 Hf4 Hf5 Hf6 Hs7 Hf8]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hs1". { iExists _. iExact "Hs1". }
       iSplitL "Hs2". { iExists _. iExact "Hs2". }
       iSplitL "Hf3". { iExact "Hf3". }
@@ -594,14 +592,14 @@ Section SpBodies.
     locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    sp_free (kt := kt) sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w) -∗
     locked γt cpu_id -∗ ticks_res -∗
-    sie_cap_gpr kt N (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+    sie_cap_gpr KT1 N (trap_res true + (av - 8))%nat false pj -∗
+    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x80)) -∗
-    sp_tail (kt := kt) CID0 j m av eb sp0 pj lks -∗
+    sp_tail CID0 j m av eb sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hanch Hbn Hsn Hfresh. subst eb.
@@ -661,7 +659,7 @@ Section SpBodies.
     { rewrite /X2 upd_ne; [| reg_neq]. rewrite /X1 upd_eq. rewrite /X0 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
     (* release(&tickslock) *)
-    iApply (Release.wp_release_sconf kt γt a_tickslock "time"%string ticks_res X2
+    iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string ticks_res X2
               0%nat true pj (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HX2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
@@ -713,18 +711,18 @@ Section SpBodies.
     locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[kt] w) -∗
-    (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w) -∗
+    (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w) -∗
     locked γt cpu_id -∗ ticks_res -∗
-    sie_cap_gpr kt N (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+    sie_cap_gpr KT1 N (trap_res true + (av - 8))%nat false pj -∗
+    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x9c)) -∗
-    sp_tail (kt := kt) CID0 j m av eb sp0 pj lks -∗
+    sp_tail CID0 j m av eb sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hanch Hbn Hln Hfresh. subst eb.
@@ -787,7 +785,7 @@ Section SpBodies.
     assert (HK2a0 : K2 !!! Regidx (mword_of_int 10 : mword 5) = a_tickslock).
     { rewrite /K2 upd_ne; [| reg_neq]. rewrite /K1 upd_eq. rewrite /K0 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Release.wp_release_sconf kt γt a_tickslock "time"%string ticks_res K2
+    iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string ticks_res K2
               0%nat true pj (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HK2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
@@ -923,20 +921,20 @@ Section SpBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m M sp0 -> sp_lregs M tk ->
     kernel_text -∗
-    ▷ sp_loop (kt := kt) CID0 γt j m av eb sp0 pj tk nv lks -∗
-    sp_exit0 (kt := kt) CID0 γt j m av eb sp0 pj lks -∗
-    sp_exitk (kt := kt) CID0 γt j m av eb sp0 pj tk lks -∗
-    sp_tail (kt := kt) CID0 j m av eb sp0 pj lks -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
-    pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 (kt := kt) sp0 -∗
+    ▷ sp_loop CID0 γt j m av eb sp0 pj tk nv lks -∗
+    sp_exit0 CID0 γt j m av eb sp0 pj lks -∗
+    sp_exitk CID0 γt j m av eb sp0 pj tk lks -∗
+    sp_tail CID0 j m av eb sp0 pj lks -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w) -∗
+    pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
-    sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+    sie_cap_gpr KT1 M (trap_res true + (av - 8))%nat false pj -∗
+    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x6a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -960,7 +958,7 @@ Section SpBodies.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = a_ticks).
     { rgne. rewrite Hs18. apply sp_add_vec_0. }
     iEval (rewrite -Hlwt) in "Hticks".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_pause + 0x6a)) (mword_of_int 15 : mword 5)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_pause + 0x6a)) (mword_of_int 15 : mword 5)
               (mword_of_int 18 : mword 5) (mword_of_int 0 : mword 12)
               M (trap_res true + (av - 8))%nat t1 false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1138,21 +1136,21 @@ Section SpBodies.
     locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
-    procs_inv (kt := kt) γs -∗
-    ▷ sp_loop (kt := kt) CID0 γt j m av eb sp0 pj tk nv lks -∗
-    sp_exit0 (kt := kt) CID0 γt j m av eb sp0 pj lks -∗
-    sp_exitk (kt := kt) CID0 γt j m av eb sp0 pj tk lks -∗
-    sp_tail (kt := kt) CID0 j m av eb sp0 pj lks -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    (∃ w : bv 64, pa_stk sp0 6 ↦₈[kt] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[kt] w) -∗
-    pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 (kt := kt) sp0 -∗
+    procs_inv γs -∗
+    ▷ sp_loop CID0 γt j m av eb sp0 pj tk nv lks -∗
+    sp_exit0 CID0 γt j m av eb sp0 pj lks -∗
+    sp_exitk CID0 γt j m av eb sp0 pj tk lks -∗
+    sp_tail CID0 j m av eb sp0 pj lks -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) -∗ (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w) -∗
+    pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
-    sie_cap_gpr kt M (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay kt 0 eb pj -∗
+    sie_cap_gpr KT1 M (trap_res true + (av - 8))%nat false pj -∗
+    cpu_own 1 eb pj false ({["time"]} ∪ lks) -∗ arm_pay KT1 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1207,7 +1205,7 @@ Section SpBodies.
     assert (Hfresh_proc : locks_below ({["time"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Htime_lt_proc |].
       lkbelow. }
-    iApply (Myproc.wp_myproc_sconf kt L0 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) false
+    iApply (Myproc.wp_myproc_sconf L0 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) false
               ({["time"]} ∪ lks) Hn1 ltac:(lia)
               with "Hcg Hown Htext Hpc").
     iApply wp_next_off_intro. iIntros (msM mfm) "%HmsM Hcg Hown Hpc %Hmp".
@@ -1238,7 +1236,7 @@ Section SpBodies.
                     = add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x4e) : mword 64) 4) by (rewrite /L1; apply upd_eq).
     assert (HL1a0 : L1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
     { rewrite /L1 upd_ne; [| reg_neq]. rewrite Hmpa0. reflexivity. }
-    iApply (Killed.wp_killed_sconf kt γs j γl L1 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) false
+    iApply (Killed.wp_killed_sconf γs j γl L1 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) false
               ({["time"]} ∪ lks)
               HL1a0 Hj Hjl Hn1 ltac:(lia) Hfresh_proc
               with "Hcg Hown Htext Hpc Hpinv").
@@ -1333,7 +1331,7 @@ Section SpBodies.
       assert (Hpav : (14 <= trap_res eb + (av - 8))%nat)
         by (rewrite Heb; change (trap_res true) with kv_frame_slots; lia).
       (* =================== sleep_prepare(&ticks) =================== *)
-      iApply (SleepPrepare.wp_sleep_prepare_sconf kt γs j γl L3
+      iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl L3
                 (trap_res eb + (av - 8))%nat 1%nat eb false ({["time"]} ∪ lks)
                 Hj Hjl HL3nz Hn1 Hpav Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpinv").
@@ -1381,7 +1379,7 @@ Section SpBodies.
       assert (HL5a0 : L5 !!! Regidx (mword_of_int 10 : mword 5) = a_tickslock).
       { rewrite /L5 upd_ne; [| reg_neq]. rewrite /L4 upd_eq. rewrite Hp9. apply add_vec_zero_l. }
       (* ==================== release(&tickslock) ==================== *)
-      iApply (Release.wp_release_sconf kt γt a_tickslock "time"%string ticks_res L5
+      iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string ticks_res L5
                 0%nat eb (proc_addr j) (av - 8)%nat ({["time"]} ∪ lks)
                 ltac:(rewrite HL5a0; apply sp_add_vec_0) ltac:(lia)
                 with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
@@ -1421,7 +1419,7 @@ Section SpBodies.
          extra premises are both [emp]. *)
       iDestruct (cpu_own_transport CIDr CIDj 0 eb (proc_addr j) eb ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Sleep.wp_sleep_sconf kt γs j γl L6 (av - 8)%nat eb lks Hj Hjl ltac:(lia)
+      iApply (Sleep.wp_sleep_sconf γs j γl L6 (av - 8)%nat eb lks Hj Hjl ltac:(lia)
                 ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv [] []").
       all: try lkbelow.
@@ -1474,7 +1472,7 @@ Section SpBodies.
       (* ==================== acquire(&tickslock) ==================== *)
       iDestruct (cpu_own_transport CIDs CIDn 0 eb (proc_addr j) eb ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf kt γt "time"%string ticks_res L8 0%nat eb (proc_addr j)
+      iApply (Acquire.wp_acquire_sconf KT1 γt "time"%string ticks_res L8 0%nat eb (proc_addr j)
                 (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HL8a0). iExact "Hlk2". }
@@ -1509,15 +1507,15 @@ Section SpBodies.
     locks_below lks "time" ->
     kernel_text -∗
     is_tickslock γt -∗
-    procs_inv (kt := kt) γs -∗
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    sp_free (kt := kt) sp0 -∗
-    pa_add (pa_stk sp0 7) 4 ↦₄[kt] nv -∗ sp_join7 (kt := kt) sp0 -∗
-    sie_cap_gpr kt M (av - 8)%nat true pj -∗
+    procs_inv γs -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    sp_free sp0 -∗
+    pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ sp_join7 sp0 -∗
+    sie_cap_gpr KT1 M (av - 8)%nat true pj -∗
     cpu_own 0 eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
-    sp_tail (kt := kt) CID0 j m av eb sp0 pj lks -∗
+    sp_tail CID0 j m av eb sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hj Hjl Hpjv Hanch Hb Hsv Hfresh.
@@ -1581,7 +1579,7 @@ Section SpBodies.
     (* ===================== acquire(&tickslock) ===================== *)
     iDestruct (cpu_own_transport CID CIDq3 0 eb pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf kt γt "time"%string ticks_res Q2 0%nat eb pj (av - 8)%nat true lks
+    iApply (Acquire.wp_acquire_sconf KT1 γt "time"%string ticks_res Q2 0%nat eb pj (av - 8)%nat true lks
               Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
@@ -1703,7 +1701,7 @@ Section SpBodies.
       { rgne. rewrite /P0 upd_eq. rewrite /a_ticks. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite -Hat0) in "Hticks".
       iPoseProof (spi_36 with "Htext") as "Hi36".
-      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_pause + 0x36)) (mword_of_int 19 : mword 5)
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_pause + 0x36)) (mword_of_int 19 : mword 5)
                 (mword_of_int 19 : mword 5) (mword_of_int 0x8be : mword 12) P0 (trap_res true + (av - 8))%nat t0 false
                 (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 Hticks").
@@ -1845,12 +1843,11 @@ Section ProofSysPause.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_sys_pause_sconf  (γs : list gname)
       (j : nat) (γl : gname) (γt : gname) (m : regfile) (av : nat) (eb : bool)
       (i : nat) (tfp : mword 44) (ws : list (mword 64))
       (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_sys_pause_sconf_body kt γs j γl γt m av eb i tfp ws v dqt b lks.
+    : wp_sys_pause_sconf_body γs j γl γt m av eb i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_pause_sconf_body].
     intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb Hfresh Hpv.
@@ -1887,7 +1884,7 @@ Section ProofSysPause.
       by (rewrite /R1 upd_eq; rewrite Hpush; reflexivity).
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_pause + 0x02)) by pcstep.
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (vw1) "Hs1". iDestruct "S2" as (vw2) "Hs2".
     iDestruct "S7" as (w7) "Hs7".
@@ -2025,7 +2022,7 @@ Section ProofSysPause.
     iEval (rewrite -HR5a1) in "Hs7hi".
     iDestruct (cpu_own_transport CID CID7 0 eb pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Argint.wp_argint_sconf kt R5 (av - 8)%nat 0%nat eb pj
+    iApply (Argint.wp_argint_sconf R5 (av - 8)%nat 0%nat eb pj
               0%nat tfp ws v (word_hi w7) dqt true lks
               ltac:(unfold NARG; lia) HR5a0 Hws Hn0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hs7hi").

@@ -129,7 +129,6 @@ Section ProofSysRead.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
-  Context {kt : ktier}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -148,11 +147,11 @@ Section ProofSysRead.
   Lemma sr_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (bb : bool) (pp : mword 64) :
     (0 < kk)%nat ->
-    sie_cap_gpr kt mm kk bb pp -∗
+    sie_cap_gpr KT1 mm kk bb pp -∗
     ⌜(8 <= uint (mm !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds (KTR := kt) _ (trap_res bb + kk)%nat with "Hstk").
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res bb + kk)%nat with "Hstk").
     destruct bb; unfold trap_res; lia.
   Qed.
 
@@ -174,19 +173,19 @@ Section ProofSysRead.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr kt Mt (av - 6)%nat b pp -∗
+    sie_cap_gpr KT1 Mt (av - 6)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_read + 0x40) : mword 64) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr kt mf av b pp -∗
+        sie_cap_gpr KT1 mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -245,8 +244,8 @@ Section ProofSysRead.
       by (rewrite Hwv; exact HT2sp).
     (* NO [stack_own_6_elim]/[_intro] exists: ProofSysPipe's slot recipe is
        what rebundles a frame of any width. *)
-    iAssert (stack_own (KTR := kt) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -322,7 +321,7 @@ Section ProofSysRead.
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names) (pidv : mword 32) (V : pprivate) (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_read_sconf_body kt γa γf γs j γlp fn pidv V v v2 m av eb b lks.
+    : wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hn0 Hnmax Heb.
@@ -385,7 +384,7 @@ Section ProofSysRead.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M1 upd_eq; apply stk_push_48).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(P1 & P2 & P3 & P4 & P5 & P6 & _)".
     iDestruct "P1" as (u1) "Hs1". iDestruct "P2" as (u2) "Hs2".
     iDestruct "P3" as (w3) "Hs3". iDestruct "P4" as (w4) "Hs4".
@@ -508,7 +507,7 @@ Section ProofSysRead.
     iEval (rewrite -HM5a1) in "Hs5".
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Argaddr.wp_argaddr_sconf kt M5 (av - 6)%nat 0%nat eb pj 1%nat
+    iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(lia) Hpv
@@ -584,7 +583,7 @@ Section ProofSysRead.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
     iDestruct (cpu_own_transport CID8 CID11 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf kt B3 (av - 6)%nat 0%nat eb pj 2%nat
+    iApply (Argint.wp_argint_sconf B3 (av - 6)%nat 0%nat eb pj 2%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_hi w4) (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp [Hs4hi]").
@@ -687,7 +686,7 @@ Section ProofSysRead.
                  with "Hcpu") as "Hcpu".
     (* ---- argfd(0, 0, &f).  [pfd] IS NULL and carries no resource --
        [SpecArgfd.ofd_out_null] is exactly this case. ---- *)
-    iApply (Argfd.wp_argfd_sconf kt γf N4 (av - 6)%nat 0%nat eb pj 0%nat v
+    iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
               ltac:(lia)
@@ -922,7 +921,7 @@ Section ProofSysRead.
       iDestruct (read_env_frame γf fn Cf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Fileread.wp_fileread_sconf kt γa γf γs j γlp kk qq Cf fn pidv V
+      iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 Hn0 Hnmax Heb

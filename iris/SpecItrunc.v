@@ -305,7 +305,7 @@ Definition wp_itrunc_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -394,7 +394,7 @@ Definition wp_itrunc_sconf_body
      indirect arm, and its closing iupdate ("log", 3) -- "log" is the
      lowest, so one premise there covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  itrunc itself never
      acquires or releases anything -- it is a pure PASS-THROUGH to its
@@ -407,7 +407,7 @@ Definition wp_itrunc_sconf_body
      through to each callee and back, unused, all the way to its own exit.
      See claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -434,7 +434,7 @@ Definition wp_itrunc_sconf_body
   (* the caller's own pid cell *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -460,9 +460,9 @@ Definition wp_itrunc_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -518,7 +518,7 @@ Definition wp_itrunc_gen_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -567,9 +567,9 @@ Definition wp_itrunc_gen_body
      indirect arm, and its closing iupdate ("log", 3) -- "log" is the
      lowest, so one premise there covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -586,7 +586,7 @@ Definition wp_itrunc_gen_body
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   p_pid pj ↦₄{dq} pidv -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -611,9 +611,9 @@ Definition wp_itrunc_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -656,7 +656,7 @@ Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
-      (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -673,7 +673,7 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_itrunc_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart bmapstart inodestart nib size dev used
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks.
@@ -683,7 +683,7 @@ Module Type ITRUNC.
   Parameter wp_itrunc_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
-      (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -700,7 +700,7 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_itrunc_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                          cov logstart bmapstart inodestart nib size dev used
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks.

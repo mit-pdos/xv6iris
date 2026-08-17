@@ -90,7 +90,7 @@ Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa γp γw γl γf γil γic : gname) (γs : list gname)
+    (γa γp γw γl γf γil γic : gname) (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -101,10 +101,10 @@ Definition wp_sys_fork_sconf_body
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (* straight through to kfork, whose cone floors at wait_lock (8) *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
@@ -118,7 +118,7 @@ Definition wp_sys_fork_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       (* the caller's block comes back verbatim: kfork only reads it *)
@@ -137,10 +137,10 @@ Module Type SYSFORK.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body kt γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
                              m lvl av eb p b pid V lks.
 End SYSFORK.

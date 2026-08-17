@@ -27,7 +27,7 @@
    * the trap-CSR set must ALREADY be folded when this block is entered: the
      [csrsi] consumes [trap_csrs] whole (it re-forms [intr_res] inside the
      arm), and so does the [kexit(-1)] on the killed path.  Both are covered
-     by taking [ut_hold (kt := kt)] at [false], whose [trap_csrs_ext false] IS the bundle.
+     by taking [ut_hold] at [false], whose [trap_csrs_ext false] IS the bundle.
 
    The [j +0x96] after the [jal kexit] at +0xca is DEAD and never decoded:
    kexit has no continuation. *)
@@ -99,7 +99,6 @@ Section UtSysBlock.
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* the trapframe page's own [page_valid], read off [proc_priv] without
      consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
      does not spend the resource (durable-notes.md), so [Hpv] is still
@@ -133,12 +132,12 @@ Section UtSysBlock.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
-    sie_cap_gpr kt m nx false (un_pj N) -∗
-    ut_hold (kt := kt) (SY.syscall_env (kt := kt)) N V false lks -∗
-    ut_frame (kt := kt) ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
+    sie_cap_gpr KT1 m nx false (un_pj N) -∗
+    ut_hold (SY.syscall_env) N V false lks -∗
+    ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (kt := kt) SY.syscall_env (kt := kt)) pt ksp m0
+      (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -152,7 +151,7 @@ Section UtSysBlock.
     (* depth 0 forces the held set empty, so killed/kexit's order premises
        need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
-    iAssert (procs_inv (kt := kt) (un_s N)) with "[]" as "#Hpi".
+    iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
     { iDestruct "Hcaps" as "(_ & $ & _)". }
@@ -182,7 +181,7 @@ Section UtSysBlock.
       by (rewrite /M1 upd_eq; pcw).
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
-    iApply (KI.wp_killed_sconf kt (un_s N) (un_j N) (un_l N)
+    iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
               M1 nx 0%nat false (un_pj N) false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpi [-]").
@@ -246,7 +245,7 @@ Section UtSysBlock.
                        (sign_extend' 64 (mword_of_int 2095532 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
-      iApply (T.ut_kexit SY.syscall_env (kt := kt) N V
+      iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
                 nx false lks Hwf' ltac:(lia)
@@ -434,7 +433,7 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
-      iApply (SY.wp_syscall_sconf kt (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
+      iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
                 (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; lia)
@@ -458,7 +457,7 @@ Section UtSysBlock.
       (* rebuilt via the dedicated lemma, not an inline [rewrite; iFrame] --
          see [UsertrapRes.ut_own_rebuild_us]'s header on why that inline
          shape degenerates in a proof state this large. *)
-      iPoseProof (ut_own_rebuild_us SY.syscall_env (kt := kt) N V2 us2
+      iPoseProof (ut_own_rebuild_us SY.syscall_env N V2 us2
                     with "Hbs Hbm Hip Hfd Hir Hpv Hsy") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
@@ -468,7 +467,7 @@ Section UtSysBlock.
                        ltac:(vm_compute; reflexivity)); exact HS4s1).
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
-      iApply (T.ut_a6 (CID := CID2) SY.syscall_env (kt := kt) N2 V2 pt ksp m0 mg av
+      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N2 V2 pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)

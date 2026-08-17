@@ -57,7 +57,7 @@ Definition wp_virtio_disk_rw_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* fabric + lock ghosts *)
     (pd pav pu : mword 64)
     (m : regfile) (K : nat) (eb : bool)
@@ -98,7 +98,7 @@ Definition wp_virtio_disk_rw_sconf_body
   γs !! j = Some γl ->
   (* order premise at the lowest rank this cone reaches. *)
   locks_below lks "virtio_disk" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
@@ -108,10 +108,10 @@ Definition wp_virtio_disk_rw_sconf_body
      caller brings nothing -- which is why this used to be an [eb = true]
      premise instead.  At [eb = false] the push_off frees nothing and the
      caller brings the pair, holding it because the TRAP handed it over. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -150,9 +150,9 @@ Definition wp_virtio_disk_rw_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* the exchange: a read fills the buffer from the block, a write
@@ -173,12 +173,12 @@ Module Type VIRTIODISKRW.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool)
       (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
       (Q : iProp Σ) (lks : gset string),
-      wp_virtio_disk_rw_sconf_body kt γs j γl γu γd γk pd pav pu
+      wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
                                    m K eb bno dsk0 bs_buf bs_disk b Q lks.
 End VIRTIODISKRW.

@@ -277,7 +277,6 @@ Section KernelvecCore.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the trap frame kernelvec carves is STACK memory, so its cells ride the
      hart's regime like every other frame slot. *)
-  Context {kt : ktier}.
 
   (* Congruence for [gpr_file]: two register files that agree on every
      register total-lookup hold the SAME resource (regfile is a total
@@ -392,44 +391,44 @@ Section KernelvecCore.
     pc_is (mword_of_int (KernelSyms.kernelvec + 0x2)) -∗
     gpr_file m -∗
     kernel_text -∗
-    (m !!! Regidx csp_rs1) ↦₈[kt] vold1 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[kt] vold2 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[kt] vold3 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[kt] vold4 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[kt] vold5 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[kt] vold6 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[kt] vold7 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[kt] vold8 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[kt] vold9 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[kt] vold10 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[kt] vold11 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[kt] vold12 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[kt] vold13 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[kt] vold14 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[kt] vold15 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[kt] vold16 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[kt] vold17 -∗
+    (m !!! Regidx csp_rs1) ↦₈[KT1] vold1 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[KT1] vold2 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[KT1] vold3 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[KT1] vold4 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[KT1] vold5 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[KT1] vold6 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[KT1] vold7 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[KT1] vold8 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[KT1] vold9 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[KT1] vold10 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[KT1] vold11 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[KT1] vold12 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[KT1] vold13 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[KT1] vold14 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] vold15 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] vold16 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] vold17 -∗
     ( smode_config γ dq -∗
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kernelvec + 0x24)) -∗
       gpr_file m -∗
-      (m !!! Regidx csp_rs1) ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[kt] (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[kt] (m !!! Regidx (mword_of_int 5 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[kt] (m !!! Regidx (mword_of_int 6 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[kt] (m !!! Regidx (mword_of_int 7 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[kt] (m !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[kt] (m !!! Regidx (mword_of_int 11 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[kt] (m !!! Regidx (mword_of_int 12 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[kt] (m !!! Regidx (mword_of_int 13 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[kt] (m !!! Regidx (mword_of_int 14 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[kt] (m !!! Regidx (mword_of_int 15 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[kt] (m !!! Regidx (mword_of_int 16 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[kt] (m !!! Regidx (mword_of_int 17 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[kt] (m !!! Regidx (mword_of_int 28 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[kt] (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[kt] (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[kt] (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
+      (m !!! Regidx csp_rs1) ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[KT1] (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[KT1] (m !!! Regidx (mword_of_int 5 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[KT1] (m !!! Regidx (mword_of_int 6 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[KT1] (m !!! Regidx (mword_of_int 7 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[KT1] (m !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[KT1] (m !!! Regidx (mword_of_int 11 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[KT1] (m !!! Regidx (mword_of_int 12 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[KT1] (m !!! Regidx (mword_of_int 13 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[KT1] (m !!! Regidx (mword_of_int 14 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[KT1] (m !!! Regidx (mword_of_int 15 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[KT1] (m !!! Regidx (mword_of_int 16 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[KT1] (m !!! Regidx (mword_of_int 17 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[KT1] (m !!! Regidx (mword_of_int 28 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -557,44 +556,44 @@ Section KernelvecCore.
     pc_is (mword_of_int (KernelSyms.kernelvec + 0x28)) -∗
     gpr_file m -∗
     kernel_text -∗
-    (m !!! Regidx csp_rs1) ↦₈[kt] w1 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[kt] w2 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[kt] w3 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[kt] w4 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[kt] w5 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[kt] w6 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[kt] w7 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[kt] w8 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[kt] w9 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[kt] w10 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[kt] w11 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[kt] w12 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[kt] w13 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[kt] w14 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[kt] w15 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[kt] w16 -∗
-    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[kt] w17 -∗
+    (m !!! Regidx csp_rs1) ↦₈[KT1] w1 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[KT1] w2 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[KT1] w3 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[KT1] w4 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[KT1] w5 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[KT1] w6 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[KT1] w7 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[KT1] w8 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[KT1] w9 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[KT1] w10 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[KT1] w11 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[KT1] w12 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[KT1] w13 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[KT1] w14 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] w15 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] w16 -∗
+    (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] w17 -∗
     ( smode_config γ dq -∗
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kernelvec + 0x4a)) -∗
       gpr_file (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) -∗
-      (m !!! Regidx csp_rs1) ↦₈[kt] w1 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[kt] w2 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[kt] w3 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[kt] w4 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[kt] w5 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[kt] w6 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[kt] w7 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[kt] w8 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[kt] w9 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[kt] w10 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[kt] w11 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[kt] w12 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[kt] w13 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[kt] w14 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[kt] w15 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[kt] w16 -∗
-      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[kt] w17 -∗
+      (m !!! Regidx csp_rs1) ↦₈[KT1] w1 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈[KT1] w2 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 32)) ↦₈[KT1] w3 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 40)) ↦₈[KT1] w4 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 48)) ↦₈[KT1] w5 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 72)) ↦₈[KT1] w6 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 80)) ↦₈[KT1] w7 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 88)) ↦₈[KT1] w8 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 96)) ↦₈[KT1] w9 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 104)) ↦₈[KT1] w10 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 112)) ↦₈[KT1] w11 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 120)) ↦₈[KT1] w12 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 128)) ↦₈[KT1] w13 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 216)) ↦₈[KT1] w14 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈[KT1] w15 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈[KT1] w16 -∗
+      (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈[KT1] w17 -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -803,44 +802,44 @@ Section KernelvecCore.
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
-    ((((kv_sp1 m)))) ↦₈[kt] vold1 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[kt] vold2 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[kt] vold3 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[kt] vold4 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[kt] vold5 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[kt] vold6 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[kt] vold7 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[kt] vold8 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[kt] vold9 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[kt] vold10 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[kt] vold11 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[kt] vold12 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[kt] vold13 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[kt] vold14 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[kt] vold15 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[kt] vold16 -∗
-    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[kt] vold17 -∗
+    ((((kv_sp1 m)))) ↦₈[KT1] vold1 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[KT1] vold2 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[KT1] vold3 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[KT1] vold4 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[KT1] vold5 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[KT1] vold6 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[KT1] vold7 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[KT1] vold8 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[KT1] vold9 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[KT1] vold10 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[KT1] vold11 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[KT1] vold12 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[KT1] vold13 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[KT1] vold14 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] vold15 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] vold16 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] vold17 -∗
     ( smode_config γ (DfracOwn (1/2)) -∗
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
       gpr_file (kv_m2 m) -∗
-      ((((kv_sp1 m)))) ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 5 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 6 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 7 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 11 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 12 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 13 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 14 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 15 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 16 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 17 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 28 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
-      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[kt] (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
+      ((((kv_sp1 m)))) ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 5 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 6 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 7 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 11 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 12 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 13 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 14 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 15 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 16 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 17 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 28 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1022,23 +1021,23 @@ Section KernelvecCore.
     pc_is (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) -∗
     gpr_file mt -∗
     kernel_text -∗
-    (((spv))) ↦₈[kt] v1 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[kt] v2 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[kt] v3 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[kt] v4 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[kt] v5 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[kt] v6 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[kt] v7 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[kt] v8 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[kt] v9 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[kt] v10 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[kt] v11 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[kt] v12 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[kt] v13 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[kt] v14 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[kt] v15 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[kt] v16 -∗
-    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[kt] v17 -∗
+    (((spv))) ↦₈[KT1] v1 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[KT1] v2 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[KT1] v3 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[KT1] v4 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[KT1] v5 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[KT1] v6 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[KT1] v7 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[KT1] v8 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[KT1] v9 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[KT1] v10 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[KT1] v11 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[KT1] v12 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[KT1] v13 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[KT1] v14 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] v15 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] v16 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] v17 -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ mstatus0 -∗
@@ -1049,23 +1048,23 @@ Section KernelvecCore.
       tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> (<[Regidx (mword_of_int 31 : mword 5) := regval_into_reg v17]> (<[Regidx (mword_of_int 30 : mword 5) := regval_into_reg v16]> (<[Regidx (mword_of_int 29 : mword 5) := regval_into_reg v15]> (<[Regidx (mword_of_int 28 : mword 5) := regval_into_reg v14]> (<[Regidx (mword_of_int 17 : mword 5) := regval_into_reg v13]> (<[Regidx (mword_of_int 16 : mword 5) := regval_into_reg v12]> (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v11]> (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg v10]> (<[Regidx (mword_of_int 13 : mword 5) := regval_into_reg v9]> (<[Regidx (mword_of_int 12 : mword 5) := regval_into_reg v8]> (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg v7]> (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg v6]> (<[Regidx (mword_of_int 7 : mword 5) := regval_into_reg v5]> (<[Regidx (mword_of_int 6 : mword 5) := regval_into_reg v4]> (<[Regidx (mword_of_int 5 : mword 5) := regval_into_reg v3]> (<[Regidx (mword_of_int 3 : mword 5) := regval_into_reg v2]> (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg v1]> (mt))))))))))))))))))) -∗
-      (((spv))) ↦₈[kt] v1 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[kt] v2 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[kt] v3 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[kt] v4 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[kt] v5 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[kt] v6 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[kt] v7 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[kt] v8 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[kt] v9 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[kt] v10 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[kt] v11 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[kt] v12 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[kt] v13 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[kt] v14 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[kt] v15 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[kt] v16 -∗
-      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[kt] v17 -∗
+      (((spv))) ↦₈[KT1] v1 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈[KT1] v2 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈[KT1] v3 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈[KT1] v4 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈[KT1] v5 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈[KT1] v6 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈[KT1] v7 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈[KT1] v8 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈[KT1] v9 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈[KT1] v10 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈[KT1] v11 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈[KT1] v12 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈[KT1] v13 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈[KT1] v14 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈[KT1] v15 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈[KT1] v16 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈[KT1] v17 -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1418,10 +1417,9 @@ Section KernelvecHandler.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
-    kernelvec_handler_spec_body kt γu γv γdk γtl γs pd pav pu.
+    kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
   Proof.
     cbv beta delta [kernelvec_handler_spec_body].
     iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
@@ -1494,7 +1492,7 @@ Section KernelvecHandler.
            [kv_frame_slots - 32] and moves with it. ---- *)
     assert (Hkvs : (trap_res false + (trap_res true + av))%nat = (32 + (58 + av))%nat)
       by (unfold trap_res; lia).
-    iEval (rewrite Hkvs (stack_own_app (KTR := kt))) in "Hstk".
+    iEval (rewrite Hkvs (stack_own_app (KTR := KT1))) in "Hstk".
     iDestruct "Hstk" as "[Hstk Hdeep]".
 
     pose proof (kv_slot_addr0 Me) as Hb32.
@@ -1531,7 +1529,7 @@ Section KernelvecHandler.
     assert (Hb2 : add_vec (kv_sp1 Me) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) = pa_stk (Me !!! Regidx csp_rs1) 2)
       by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
     (* open the 32-slot frame and pull out the 17 save slots *)
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hstk".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hstk".
     iDestruct "Hstk" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 &
       S11 & S12 & S13 & S14 & S15 & S16 & S17 & S18 & S19 & S20 & S21 & S22 &
       S23 & S24 & S25 & S26 & S27 & S28 & S29 & S30 & S31 & S32 & _)".
@@ -1670,7 +1668,7 @@ Section KernelvecHandler.
       { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    iAssert (sie_cap kt (kv_m2 Me) (58 + av) false p)
+    iAssert (sie_cap KT1 (kv_m2 Me) (58 + av) false p)
       with "[Hdeep Hbit1 Htlbinv Hq0]" as "Hcapn".
     { rewrite /sie_cap. iSplitL "Hdeep". { rewrite Hsp_l. iExact "Hdeep". }
       iSplitL "Hbit1 Htlbinv".
@@ -1678,7 +1676,7 @@ Section KernelvecHandler.
       iSplitL "Hq0"; [ iExact "Hq0" |]. iExact "Hwit0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
-    iApply (Kerneltrap.wp_kerneltrap_sconf kt γu γv γdk γtl γs pd pav pu
+    iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
               (kv_m2 Me) (58 + av) p pc0 sc tv ∅
               Hgs ltac:(lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
@@ -1773,12 +1771,12 @@ Section KernelvecHandler.
     iEval (rewrite Hb4) in "Hw15".
     iEval (rewrite Hb3) in "Hw16".
     iEval (rewrite Hb2) in "Hw17".
-    iAssert (stack_own (KTR := kt) (Me !!! Regidx csp_rs1) 32)
+    iAssert (stack_own (KTR := KT1) (Me !!! Regidx csp_rs1) 32)
       with "[S1 S6 S7 S8 S9 S10 S11 S12 S13 S14 S15 S24 S25 S29 S31
             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17]"
       as "Hstk".
     {
-      rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+      rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "S1"; [iExact "S1" |].
       iSplitL "Hw17"; [by iExists _ |].
       iSplitL "Hw16"; [by iExists _ |].
@@ -1814,11 +1812,11 @@ Section KernelvecHandler.
       done. }
     (* ...and the whole carve, exactly as it arrived: kernelvec's 32 on top,
        the callee budget underneath. *)
-    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res true + av)) with "[Hstk Hstkf]" as "Hstk".
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1) (trap_res true + av)) with "[Hstk Hstkf]" as "Hstk".
     { iEval (rewrite -Hsppin).
       assert (Hkvs' : (trap_res true + av)%nat = (32 + (58 + av))%nat)
         by (unfold trap_res; lia).
-      rewrite Hkvs'. iApply (stack_own_app (KTR := kt)). iSplitL "Hstk"; [iExact "Hstk" |].
+      rewrite Hkvs'. iApply (stack_own_app (KTR := KT1)). iSplitL "Hstk"; [iExact "Hstk" |].
       rewrite -(kv_slot_addr0 Me) -Hspf. iExact "Hstkf". }
     (* ---- instr #38: THE SRET, at the sconf tier.  It is the instruction
            that flips the SIE ghost '0' -> '1' and re-forms the enabled arm,
@@ -1836,7 +1834,7 @@ Section KernelvecHandler.
       { iExists mdvf. iFrame "Hmief Hmdlf". iPureIntro. exact Hmmf. }
       iExists MENVCFG_S. iFrame "Hmenvf". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    iAssert (sie_cap kt (CID := CIDn) m (trap_res true + av) false p)
+    iAssert (sie_cap KT1 (CID := CIDn) m (trap_res true + av) false p)
       with "[Hstk Hbit1f Htlbinvf Hq0f]" as "Hcapf".
     { rewrite /sie_cap. iSplitL "Hstk". { iExact "Hstk". }
       iSplitL "Hbit1f Htlbinvf".

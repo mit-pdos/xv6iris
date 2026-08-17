@@ -69,7 +69,6 @@ Section SpecClockintr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* "this hart keeps time": the branch clockintr tests, [cpuid() == 0]. *)
   Definition tick_hart : bool := eq_vec (cid_word : mword 64) (zero_reg : mword 64).
 
@@ -81,7 +80,7 @@ Section SpecClockintr.
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
     ∨ ( is_tickslock γl ∗
-        procs_inv (kt := kt) γs ) )%I.
+        procs_inv γs ) )%I.
 
 End SpecClockintr.
 
@@ -106,7 +105,7 @@ End SpecClockintr.
    trap handler, with SIE already off.  Stated at the literal [false] there is
    no [wp_next] wrapper at all ([wp_next_off] would collapse it). *)
 Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-     (kt : ktier) (γl : gname) (γs : list gname)
+     (γl : gname) (γs : list gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -115,24 +114,24 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (20 <= av)%nat ->
   locks_below lks "time" ->
-  sie_cap_gpr kt m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   cpu_own n eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   timer_cap -∗
-  tick_keeper (kt := kt) γl γs -∗
+  tick_keeper γl γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr kt mf av false p -∗
+      sie_cap_gpr KT1 mf av false p -∗
       cpu_own n eb p false lks -∗
       pc_is ret_tgt -∗
-      tick_keeper (kt := kt) γl γs -∗
+      tick_keeper γl γs -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (γl : gname) (γs : list gname)
+       (γl : gname) (γs : list gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_clockintr_sconf_body kt γl γs m n eb p av lks.
+      wp_clockintr_sconf_body γl γs m n eb p av lks.
 End CLOCKINTR.

@@ -110,7 +110,6 @@ Section ProofPlicinithart.
 
 
 
-  Context {kt : ktier}.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plicinithart(), entry to return.  *)
   (*  Interrupts-off (see SpecPlicinithart.v's header): no [b] binder, no *)
@@ -119,7 +118,7 @@ Section ProofPlicinithart.
   (*  collapse at all since its own contract has no wrapper either. *)
   (* =================================================================== *)
   Lemma wp_plicinithart_sconf (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plicinithart_sconf_body kt γd γv m0 n p.
+    : wp_plicinithart_sconf_body γd γv m0 n p.
   Proof.
     cbv beta delta [wp_plicinithart_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
@@ -211,7 +210,7 @@ Section ProofPlicinithart.
        [b = false]-only with no [wp_next] wrapper, matching plicinithart's
        own now-[b = false] contract, so the call's continuation is entered
        directly. ---- *)
-    iApply (Cpuid.wp_call_cpuid_sconf_cs kt (mword_of_int (KernelSyms.plicinithart + 0x08))
+    iApply (Cpuid.wp_call_cpuid_sconf_cs KT1 (mword_of_int (KernelSyms.plicinithart + 0x08))
               (mword_of_int 2081526 : mword 21) m2 (n - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

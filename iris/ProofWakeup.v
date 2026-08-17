@@ -70,11 +70,11 @@ Local Open Scope Z_scope.
 (* wakeup's 7-entry callee-save frame, over [SpecWakeupParts.wk_fcell]: ra/s0
    and s1..s5 at spF+56 down to spF+8, written by the prologue and read back
    by the epilogue. *)
-Definition wk_frame `{!riscvGS Σ} (kt : ktier) (spF : mword 64)
+Definition wk_frame `{!riscvGS Σ} (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) : iProp Σ :=
-  (wk_fcell spF 7 ↦₈[kt] vra ∗ wk_fcell spF 6 ↦₈[kt] vs0 ∗ wk_fcell spF 5 ↦₈[kt] vs1 ∗
-   wk_fcell spF 4 ↦₈[kt] vs2 ∗ wk_fcell spF 3 ↦₈[kt] vs3 ∗ wk_fcell spF 2 ↦₈[kt] vs4 ∗
-   wk_fcell spF 1 ↦₈[kt] vs5)%I.
+  (wk_fcell spF 7 ↦₈[KT1] vra ∗ wk_fcell spF 6 ↦₈[KT1] vs0 ∗ wk_fcell spF 5 ↦₈[KT1] vs1 ∗
+   wk_fcell spF 4 ↦₈[KT1] vs2 ∗ wk_fcell spF 3 ↦₈[KT1] vs3 ∗ wk_fcell spF 2 ↦₈[KT1] vs4 ∗
+   wk_fcell spF 1 ↦₈[KT1] vs5)%I.
 
 (* a state cell holding a value whose 64-bit sign-extension is 2 is SLEEPING;
    used in the wake path where the c.lw-loaded [sext st] compared equal to
@@ -111,7 +111,6 @@ Module WakeupProof (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUP
 
 Section ProofWakeup.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
-  Context {kt : ktier}.
   (* NO [Context `{GEN : GenId} `{CID : CpuId}]: the loop lemma is applied at the hart the
      prologue's own [wp_next] hands back, which a section variable could not
      express.  Every lemma below takes its own implicit [CID0]. *)
@@ -132,7 +131,7 @@ Section ProofWakeup.
      [wakeup+0x54]: the SAME statement is both the lemma's own [Hqexit]
      hypothesis below and the tail [wk_loop_body] hands [wp_next] on exit
      (both anchored at the lemma's own [CID0], per the file header). *)
-  Definition wk_exit_body `{GEN : GenId} {kt : ktier}
+  Definition wk_exit_body `{GEN : GenId}
       (pme spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
       (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -146,10 +145,10 @@ Section ProofWakeup.
          /\ Mexit !!! Regidx (mword_of_int 26) = vs10
          /\ Mexit !!! Regidx (mword_of_int 27) = vs11
          /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
-       sie_cap_gpr kt Mexit av b pme -∗
+       sie_cap_gpr KT1 Mexit av b pme -∗
        cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
-       wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* the fuel-indexed scan invariant at the loop head [wakeup+0x38]; the
@@ -164,12 +163,12 @@ Section ProofWakeup.
        ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
        ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
        wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
-         wk_exit_body (kt := kt) pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
+         wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
            vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CIDq) -∗
-       sie_cap_gpr kt M av b pme -∗
+       sie_cap_gpr KT1 M av b pme -∗
        cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
-       wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* the shared release tail [Hrel] both arms of the state test (and the
@@ -195,9 +194,9 @@ Section ProofWakeup.
          Mr !!! Regidx (mword_of_int 26 : mword 5) = vs10 /\
          Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
          (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
-       sie_cap_gpr kt (CID := CID) Mr (trap_res b + av)%nat false pme -∗
+       sie_cap_gpr KT1 (CID := CID) Mr (trap_res b + av)%nat false pme -∗
        pc_is (CID := CID) (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
-       locked γk CID -∗ proc_lock_res (kt := kt) γs γk (proc_addr k) -∗
+       locked γk CID -∗ proc_lock_res γs γk (proc_addr k) -∗
        WP (LoopE gen_id CID : expr riscv_lang))%I.
 
   (* wakeup only RELAYS parked contexts (SLEEPING->RUNNABLE, untouched), never
@@ -217,19 +216,19 @@ Section ProofWakeup.
     (* acquire's order premise, threaded to every iteration's acquire/release
        pair -- see [wp_wakeup_sconf] where it originates *)
     locks_below lks "proc" ->
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     (* acquire's "already holding" arm sits above panic() *)
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x54],
        at whatever hart the scan ended on. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
-      wk_exit_body (kt := kt) pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
+      wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
         vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-      sie_cap_gpr kt M av b pme -∗
+      sie_cap_gpr KT1 M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
-      wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+      wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hlvl Hav Hfresh.
@@ -256,10 +255,10 @@ Section ProofWakeup.
       iAssert (wp_next (CID0 := CID0) b pme (fun (CIDt : CpuId) =>
                  ∀ Mt : regfile,
                    ⌜ wkl_regs Mt spF chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
-                   sie_cap_gpr kt Mt av b pme -∗
+                   sie_cap_gpr KT1 Mt av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗
-                   wk_frame kt spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+                   wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                    WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
       { iIntros (CIDt Hst Mt) "%Hmt Hcg Hown Hpc Hframe".
@@ -402,7 +401,7 @@ Section ProofWakeup.
          here or below needs to know, see the file header. *)
       iDestruct (cpu_own_transport CIDk CIDe lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf kt (CID := CIDe) γk "proc"%string (proc_lock_res (kt := kt) γs γk (proc_addr k)) M3a
+      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDe) γk "proc"%string (proc_lock_res γs γk (proc_addr k)) M3a
                 lvl eb pme av b lks
                 ltac:(lia)
                 ltac:(lia)
@@ -512,7 +511,7 @@ Section ProofWakeup.
         (* [b] IS [outb] ([cpu_own] forces it, = [Hbmatch]); pure re-spelling
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf kt (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res (kt := kt) γs γk (proc_addr k)) Mr2c
+        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
                   lvl eb pme av ({["proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)
@@ -591,7 +590,7 @@ Section ProofWakeup.
         replace (sign_extend' 64 (mword_of_int 32 : mword 12)) with (mword_of_int 32 : mword 64)
           by (apply bv_eq; vm_compute; reflexivity).
         reflexivity. }
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x3e))
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x3e))
                 (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12)
                 Macq (trap_res b + av)%nat ch false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e [Hpch]").
@@ -682,7 +681,7 @@ Section ProofWakeup.
           replace (sign_extend' 64 (mword_of_int 32 : mword 12)) with (mword_of_int 32 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           reflexivity. }
-        iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x44))
+        iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x44))
                   (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12)
                   M3e (trap_res b + av)%nat ch false
                   with "Hcg Hpc Hi44 [Hpch]").
@@ -702,7 +701,7 @@ Section ProofWakeup.
           replace (sign_extend' 64 (mword_of_int 24 : mword 12)) with (mword_of_int 24 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           reflexivity. }
-        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
                   (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                   M3e (trap_res b + av)%nat st false ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi48 [Hpst]").
@@ -795,7 +794,7 @@ Section ProofWakeup.
             replace (sign_extend' 64 (mword_of_int 24 : mword 12)) with (mword_of_int 24 : mword 64)
               by (apply bv_eq; vm_compute; reflexivity).
             reflexivity. }
-          iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
+          iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
                     (mword_of_int 21 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                     M48 (trap_res b + av)%nat st false with "Hcg Hpc Hi4e [Hpst]").
           { iEval (rewrite Hea4e). iExact "Hpst". }
@@ -854,13 +853,13 @@ Section ProofWakeup.
       
       (m : regfile) (γs : list gname) (pme : mword 64)
       (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_wakeup_sconf_body kt m γs pme lvl K eb b lks.
+    : wp_wakeup_sconf_body m γs pme lvl K eb b lks.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hlvl Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
-    iApply (WakeupParts.wp_wakeup_prologue_sconf kt (CID := CID0) m K b pme ltac:(lia) Hdom
+    iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
     iIntros (CIDpro Hspro M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM19 & HM20 & HM21 & HM18 & HMcsp & HM1 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
@@ -884,7 +883,7 @@ Section ProofWakeup.
       iIntros (CIDex Hsex Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
                        Hcg Hown Htextx Hpc Hframe".
       iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
-      iApply (WakeupParts.wp_wakeup_epilogue_sconf kt (CID := CIDex) Mexit K
+      iApply (WakeupParts.wp_wakeup_epilogue_sconf (CID := CIDex) Mexit K
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))

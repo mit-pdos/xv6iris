@@ -48,7 +48,6 @@ Section KvminitBody.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   (* [CID] is bound HERE, per-hypothesis, rather than reused from the
      Section's own [Context `{GEN : GenId} `{CID : CpuId}] -- this Hypothesis stands in for
      [KMK.wp_kvmmake_sconf] (a Module Type Parameter, hence ALREADY fully
@@ -64,7 +63,7 @@ Section KvminitBody.
   Hypothesis wp_kvmmake :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmake_sconf_body kt γa mm lvl K eb p on b lks.
+      wp_kvmmake_sconf_body γa mm lvl K eb p on b lks.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -73,7 +72,7 @@ Section KvminitBody.
 
   Lemma wp_kvminit_sconf_gen (γa : gname) (mm : regfile)
       (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :
-    wp_kvminit_sconf_body kt γa mm lvl K eb p on kpt0 b lks.
+    wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
     intros Hlvl HK Hex Hlkbelow.
@@ -104,7 +103,7 @@ Section KvminitBody.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /W1 upd_eq; reflexivity).
@@ -184,7 +183,7 @@ Section KvminitBody.
     assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 300 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HA0_10 : A0 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10)) by (rewrite /A0 upd_ne; [reflexivity | reg_neq]).
-    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.kvminit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 300 : mword 12)
+    iApply (wp_sd_s_sconf (kt := KT0) (ktd := KT0) (mword_of_int (KernelSyms.kvminit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 300 : mword 12)
               A0 (K - 2)%nat kpt0 b with "Hcg Hpc Hi10 [Hcell]").
     { (* the leaf's [pa] is [rget A0 rs1], let-bound outside its own
          [wp_next] -- read at the CALLER's ambient hart (CID7). *)
@@ -228,8 +227,8 @@ Section KvminitBody.
     { rewrite HL2sp. apply frame_cancel_16. }
     assert (Hpop : L2 !!! Regidx csp_rs1 = pa_stk (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HL2sp. exact Hpush. }
-    iAssert (stack_own (KTR := kt) (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
-    { rewrite (stack_own_slots (KTR := kt)); cbn [seq].
+    iAssert (stack_own (KTR := KT0) (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT0)); cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }
@@ -280,11 +279,11 @@ End KvminitBody.
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      {kt : ktier} (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
-      : wp_kvminit_sconf_body kt γa mm lvl K eb p on kpt0 b lks :=
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
+      : wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument
        insertion would silently resolve [KMK.wp_kvmmake_sconf]'s [CID] at
        THIS definition's own ambient hart, defeating [wp_kvminit_sconf_gen]'s
        hypothesis (which needs it callable at ANY hart). *)
-    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf kt (CID:=CID')) γa mm lvl K eb p on kpt0 b lks.
+    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa mm lvl K eb p on kpt0 b lks.
 End KvminitProof.

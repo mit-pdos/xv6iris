@@ -40,7 +40,7 @@
    [memset] writes BYTES and the array is read as WORDS, and the zero has to
    survive the round trip: the loop's [bad:] exit walks argv until it finds
    a NULL, and the NULL it finds at index [i] is memset's, not one the code
-   wrote.  [bytes_own_slotsn (KTR := kt)] would give the words back EXISTENTIALLY and
+   wrote.  [bytes_own_slotsn (KTR := KT1)] would give the words back EXISTENTIALLY and
    lose exactly that, so the rebuild goes through [sx_zeros_slots] instead,
    which reassembles each eight zero bytes into a zero WORD.  That is the
    one place this proof cannot use the generic frame vocabulary.
@@ -366,15 +366,14 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section SysExecZeros.
   Context `{!riscvGS Σ}.
-  Context {kt : ktier}.
 
   Lemma sx_zero_slot (a : mword 64) (zb : bv 8) :
     (forall j, (j < 8)%nat -> nth_byte (mword_of_int 0 : mword 64) j = zb) ->
     is_aligned_paddr (Physaddr a) 8 = true ->
-    ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ[kt] zb) ⊢ a ↦₈[kt] (mword_of_int 0 : mword 64).
+    ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ[KT1] zb) ⊢ a ↦₈[KT1] (mword_of_int 0 : mword 64).
   Proof.
     intros Hzb Hal. iIntros "H".
-    iApply (word_pointsto_intro (KTR := kt) _ _ _ Hal).
+    iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
     iApply (big_sepL_mono with "H"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite (Hzb i Hlt). done.
   Qed.
@@ -384,8 +383,8 @@ Section SysExecZeros.
     (n <= S k)%nat ->
     (forall i, (i < n)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 (8 * n), pa_add (pa_stk sp k) j ↦ₘ[kt] zb) ⊢
-    [∗ list] i ∈ seq 0 n, pa_stk sp (k - i) ↦₈[kt] (mword_of_int 0 : mword 64).
+    ([∗ list] j ∈ seq 0 (8 * n), pa_add (pa_stk sp k) j ↦ₘ[KT1] zb) ⊢
+    [∗ list] i ∈ seq 0 n, pa_stk sp (k - i) ↦₈[KT1] (mword_of_int 0 : mword 64).
   Proof.
     intro Hzb. revert k. induction n as [| n IH]; intros k Hk Hal.
     - iIntros "_". by rewrite big_sepL_nil.
@@ -409,7 +408,6 @@ End SysExecZeros.
 Section SysExecFrame.
   Context `{!riscvGS Σ}.
 
-  Context {kt : ktier}.
   Definition sx_alp (sp0 : mword 64) : Prop :=
     forall i, (i < 16)%nat ->
       is_aligned_paddr (Physaddr (pa_stk sp0 (26 - i)%nat)) 8 = true.
@@ -418,27 +416,27 @@ Section SysExecFrame.
       is_aligned_paddr (Physaddr (pa_stk sp0 (58 - i)%nat)) 8 = true.
 
   Lemma sx_frame_carve (sp0 : mword 64) :
-    stack_own (KTR := kt) sp0 60 -∗
+    stack_own (KTR := KT1) sp0 60 -∗
     ⌜sx_alp sp0⌝ ∗ ⌜sx_ala sp0⌝ ∗
-    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 5) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 6) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 7) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 8) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 9) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 10) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 59) ↦₈[kt] w) ∗
-    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) ∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 26) 128 ∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 58) 256.
+    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 5) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 6) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 7) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 8) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 9) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 10) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 59) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) ∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 26) 128 ∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 58) 256.
   Proof.
-    iIntros "H". rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iIntros "H". rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iDestruct "H" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & S13 & S14 & S15 & S16 & S17 & S18 & S19 & S20 & S21 & S22 & S23 & S24 & S25 & S26 & S27 & S28 & S29 & S30 & S31 & S32 & S33 & S34 & S35 & S36 & S37 & S38 & S39 & S40 & S41 & S42 & S43 & S44 & S45 & S46 & S47 & S48 & S49 & S50 & S51 & S52 & S53 & S54 & S55 & S56 & S57 & S58 & S59 & S60 & _)".
     change 128%nat with (8 * 16)%nat. change 256%nat with (8 * 32)%nat.
-    iDestruct (slotsn_bytes_own (KTR := kt) sp0 26 16 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := KT1) sp0 26 16 ltac:(lia)
                  with "[S26 S25 S24 S23 S22 S21 S20 S19 S18 S17 S16 S15 S14 S13 S12 S11]") as "[%Halp Hpb]".
     { cbn [seq].
       iSplitL "S26"; [iExact "S26" |].
@@ -458,7 +456,7 @@ Section SysExecFrame.
       iSplitL "S12"; [iExact "S12" |].
       iSplitL "S11"; [iExact "S11" |].
       done. }
-    iDestruct (slotsn_bytes_own (KTR := kt) sp0 58 32 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := KT1) sp0 58 32 ltac:(lia)
                  with "[S58 S57 S56 S55 S54 S53 S52 S51 S50 S49 S48 S47 S46 S45 S44 S43 S42 S41 S40 S39 S38 S37 S36 S35 S34 S33 S32 S31 S30 S29 S28 S27]") as "[%Hala Hab]".
     { cbn [seq].
       iSplitL "S58"; [iExact "S58" |].
@@ -513,30 +511,30 @@ Section SysExecFrame.
   Lemma sx_frame_join (sp0 : mword 64)
       (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v59 v60 : mword 64) :
     sx_alp sp0 -> sx_ala sp0 ->
-    (pa_stk sp0 1) ↦₈[kt] v1 -∗
-    (pa_stk sp0 2) ↦₈[kt] v2 -∗
-    (pa_stk sp0 3) ↦₈[kt] v3 -∗
-    (pa_stk sp0 4) ↦₈[kt] v4 -∗
-    (pa_stk sp0 5) ↦₈[kt] v5 -∗
-    (pa_stk sp0 6) ↦₈[kt] v6 -∗
-    (pa_stk sp0 7) ↦₈[kt] v7 -∗
-    (pa_stk sp0 8) ↦₈[kt] v8 -∗
-    (pa_stk sp0 9) ↦₈[kt] v9 -∗
-    (pa_stk sp0 10) ↦₈[kt] v10 -∗
-    (pa_stk sp0 59) ↦₈[kt] v59 -∗
-    (pa_stk sp0 60) ↦₈[kt] v60 -∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 26) 128 -∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 58) 256 -∗
-    stack_own (KTR := kt) sp0 60.
+    (pa_stk sp0 1) ↦₈[KT1] v1 -∗
+    (pa_stk sp0 2) ↦₈[KT1] v2 -∗
+    (pa_stk sp0 3) ↦₈[KT1] v3 -∗
+    (pa_stk sp0 4) ↦₈[KT1] v4 -∗
+    (pa_stk sp0 5) ↦₈[KT1] v5 -∗
+    (pa_stk sp0 6) ↦₈[KT1] v6 -∗
+    (pa_stk sp0 7) ↦₈[KT1] v7 -∗
+    (pa_stk sp0 8) ↦₈[KT1] v8 -∗
+    (pa_stk sp0 9) ↦₈[KT1] v9 -∗
+    (pa_stk sp0 10) ↦₈[KT1] v10 -∗
+    (pa_stk sp0 59) ↦₈[KT1] v59 -∗
+    (pa_stk sp0 60) ↦₈[KT1] v60 -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 26) 128 -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 58) 256 -∗
+    stack_own (KTR := KT1) sp0 60.
   Proof.
     intros Halp Hala. iIntros "S1 S2 S3 S4 S5 S6 S7 S8 S9 S10 S59 S60 Hpb Hab".
     change 128%nat with (8 * 16)%nat. change 256%nat with (8 * 32)%nat.
-    iDestruct (bytes_own_slotsn (KTR := kt) sp0 26 16 ltac:(lia) Halp with "Hpb") as "Hp".
-    iDestruct (bytes_own_slotsn (KTR := kt) sp0 58 32 ltac:(lia) Hala with "Hab") as "Ha".
+    iDestruct (bytes_own_slotsn (KTR := KT1) sp0 26 16 ltac:(lia) Halp with "Hpb") as "Hp".
+    iDestruct (bytes_own_slotsn (KTR := KT1) sp0 58 32 ltac:(lia) Hala with "Hab") as "Ha".
     cbn [seq].
     iDestruct "Hp" as "(P26 & P25 & P24 & P23 & P22 & P21 & P20 & P19 & P18 & P17 & P16 & P15 & P14 & P13 & P12 & P11 & _)".
     iDestruct "Ha" as "(A58 & A57 & A56 & A55 & A54 & A53 & A52 & A51 & A50 & A49 & A48 & A47 & A46 & A45 & A44 & A43 & A42 & A41 & A40 & A39 & A38 & A37 & A36 & A35 & A34 & A33 & A32 & A31 & A30 & A29 & A28 & A27 & _)".
-    rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iSplitL "S1"; [iExists v1; iExact "S1" |].
     iSplitL "S2"; [iExists v2; iExact "S2" |].
     iSplitL "S3"; [iExists v3; iExact "S3" |].
@@ -603,13 +601,13 @@ Section SysExecFrame.
   (* the path buffer, named as bytes and back, and split at the NUL that
      [fetchstr] reports: kexec reads the prefix, the rest rides through. *)
   Lemma sx_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := kt) a N). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
   Lemma sx_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := kt) a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   Lemma sx_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
@@ -630,7 +628,7 @@ Section SysExecFrame.
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat, pa_add (pa_add a (S k)) j ↦ₘ g j) -∗
-    bytes_own (KTR := kt) (DfracOwn 1) a 128.
+    bytes_own (KTR := KT1) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
     iDestruct (sx_name_bytes a (S k) f with "H1") as "B1".
@@ -650,7 +648,6 @@ End SysExecFrame.
 Section SysExecEpilogue.
   Context `{!riscvGS Σ, !sieG Σ}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -664,23 +661,23 @@ Section SysExecEpilogue.
 
   (* everything in the frame the epilogue does not itself touch *)
   Definition sx_rest (sp0 : mword 64) : iProp Σ :=
-    ((∃ w : mword 64, (pa_stk sp0 3) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 4) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 5) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 6) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 7) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 8) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 9) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 10) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 59) ↦₈[kt] w) ∗
-    ((∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) ∗
-     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 26) 128 ∗
-     bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 58) 256))))))))))%I.
+    ((∃ w : mword 64, (pa_stk sp0 3) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 4) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 5) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 6) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 7) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 8) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 9) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 10) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 59) ↦₈[KT1] w) ∗
+    ((∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) ∗
+     bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 26) 128 ∗
+     bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 58) 256))))))))))%I.
 
   Lemma sx_rest_join (sp0 v1 v2 : mword 64) :
     sx_alp sp0 -> sx_ala sp0 ->
-    (pa_stk sp0 1) ↦₈[kt] v1 -∗ (pa_stk sp0 2) ↦₈[kt] v2 -∗ sx_rest sp0 -∗
-    stack_own (KTR := kt) sp0 60.
+    (pa_stk sp0 1) ↦₈[KT1] v1 -∗ (pa_stk sp0 2) ↦₈[KT1] v2 -∗ sx_rest sp0 -∗
+    stack_own (KTR := KT1) sp0 60.
   Proof.
     intros Halp Hala. iIntros "S1 S2 Hr". rewrite /sx_rest.
     iDestruct "Hr" as "(E3 & E4 & E5 & E6 & E7 & E8 & E9 & E10 & E59 & E60 & Hpb & Hab)".
@@ -720,16 +717,16 @@ Section SysExecEpilogue.
     (M !!! Regidx Rs6 : mword 64) = (m !!! Regidx Rs6 : mword 64) ->
     (M !!! Regidx Rs7 : mword 64) = (m !!! Regidx Rs7 : mword 64) ->
     sx_alp sp0 -> sx_ala sp0 ->
-    sie_cap_gpr kt M (K - 60) b pj -∗
+    sie_cap_gpr KT1 M (K - 60) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SX + 0x104)) -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     sx_rest sp0 -∗
     wp_next b pj (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra0 : mword 64)⌝ -∗
-        sie_cap_gpr kt mf K b pj -∗
+        sie_cap_gpr KT1 mf K b pj -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -915,7 +912,6 @@ Section SysExecHead.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -947,7 +943,7 @@ Section SysExecHead.
     pv_tf V !! tf_arg_idx 0 = Some v0 ->
     pv_tf V !! tf_arg_idx 1 = Some v1 ->
     locks_below lks "kmem" ->
-    sie_cap_gpr kt m K b (proc_addr jp) -∗
+    sie_cap_gpr KT1 m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int SX : mword 64) -∗
     proc_priv γf (proc_addr jp) pid V -∗
@@ -964,7 +960,7 @@ Section SysExecHead.
         (rest : nat -> bv 8) (v59 v60 : mword 64),
         ((⌜ callee_saved m M /\ uptd_ext (pv_upt V) P' /\
              (M !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64) ⌝ ∗
-           sie_cap_gpr kt M K b (proc_addr jp) ∗
+           sie_cap_gpr KT1 M K b (proc_addr jp) ∗
            cpu_own 0 eb (proc_addr jp) b lks ∗
            pc_is (ret_pc (m !!! Regidx Rra : mword 64)) ∗
            proc_priv γf (proc_addr jp) pid (upd_upt V P'))
@@ -976,30 +972,30 @@ Section SysExecHead.
             sx_alp (m !!! Regidx csp_rs1 : mword 64) /\
             sx_ala (m !!! Regidx csp_rs1 : mword 64) ⌝ ∗
           pc_is (mword_of_int (SX + 0x28) : mword 64) ∗
-          sie_cap_gpr kt M (K - 60)%nat b (proc_addr jp) ∗
+          sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) ∗
           cpu_own 0 eb (proc_addr jp) b lks ∗
           proc_priv γf (proc_addr jp) pid (upd_upt V P') ∗
           (* the frame: ra and s0 spilled, s1..s7 and slot 10 still free,
              the path buffer holding its NUL-terminated string, the argv
              array untouched, and the two out-parameter cells *)
-          (pa_stk (m !!! Regidx csp_rs1) 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
-          (pa_stk (m !!! Regidx csp_rs1) 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 3) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 4) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 5) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 6) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 7) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 8) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 9) ↦₈[kt] w) ∗
-          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 10) ↦₈[kt] w) ∗
+          (pa_stk (m !!! Regidx csp_rs1) 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+          (pa_stk (m !!! Regidx csp_rs1) 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 3) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 4) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 5) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 6) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 7) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 8) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 9) ↦₈[KT1] w) ∗
+          (∃ w : mword 64, (pa_stk (m !!! Regidx csp_rs1) 10) ↦₈[KT1] w) ∗
           ([∗ list] j ∈ seq 0 (S plen),
-             pa_add (pa_stk (m !!! Regidx csp_rs1) 26) j ↦ₘ[kt] pfun j) ∗
+             pa_add (pa_stk (m !!! Regidx csp_rs1) 26) j ↦ₘ[KT1] pfun j) ∗
           ([∗ list] j ∈ seq 0 (127 - plen)%nat,
              pa_add (pa_add (pa_stk (m !!! Regidx csp_rs1) 26) (S plen)) j
-               ↦ₘ[kt] rest j) ∗
-          bytes_own (KTR := kt) (DfracOwn 1) (pa_stk (m !!! Regidx csp_rs1) 58) 256 ∗
-          (pa_stk (m !!! Regidx csp_rs1) 59) ↦₈[kt] v59 ∗
-          (pa_stk (m !!! Regidx csp_rs1) 60) ↦₈[kt] v60)) -∗
+               ↦ₘ[KT1] rest j) ∗
+          bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk (m !!! Regidx csp_rs1) 58) 256 ∗
+          (pa_stk (m !!! Regidx csp_rs1) 59) ↦₈[KT1] v59 ∗
+          (pa_stk (m !!! Regidx csp_rs1) 60) ↦₈[KT1] v60)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1181,7 +1177,7 @@ Section SysExecHead.
     iEval (rewrite -HM5a1) in "F59".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Argaddr.wp_argaddr_sconf kt M5 (K - 60)%nat 0%nat eb (proc_addr jp)
+    iApply (Argaddr.wp_argaddr_sconf M5 (K - 60)%nat 0%nat eb (proc_addr jp)
               1%nat (ud_tfp (pv_upt V)) (pv_tf V) v1 u59 (DfracOwn (1/4)) b lks
               sx_arg1_lt ltac:(rewrite HM5a0; reflexivity) Harg1 sx_noff0 Kaa
               Hpv
@@ -1306,7 +1302,7 @@ Section SysExecHead.
     iEval (rewrite -HM10a1) in "Hbuf".
     iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Argstr.wp_argstr_sconf kt γa γf M10 (K - 60)%nat 0%nat eb
+    iApply (Argstr.wp_argstr_sconf γa γf M10 (K - 60)%nat 0%nat eb
               (proc_addr jp) 0%nat v0 pid V 128%nat bf b lks
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
@@ -1467,7 +1463,6 @@ Section SysExecSetup.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -1495,16 +1490,16 @@ Section SysExecSetup.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     sx_sp sp0 M -> (M !!! Regidx Rs0 : mword 64) = sp0 -> sx_thr2 m M ->
     sx_ala sp0 ->
-    sie_cap_gpr kt M (K - 60)%nat b pj -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SX + 0x28) : mword 64) -∗
-    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[kt] w) -∗
-    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[kt] w) -∗
-    (∃ w : mword 64, (pa_stk sp0 5) ↦₈[kt] w) -∗
-    (∃ w : mword 64, (pa_stk sp0 6) ↦₈[kt] w) -∗
-    (∃ w : mword 64, (pa_stk sp0 7) ↦₈[kt] w) -∗
-    (∃ w : mword 64, (pa_stk sp0 8) ↦₈[kt] w) -∗
-    (∃ w : mword 64, (pa_stk sp0 9) ↦₈[kt] w) -∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 58) 256 -∗
+    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[KT1] w) -∗
+    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[KT1] w) -∗
+    (∃ w : mword 64, (pa_stk sp0 5) ↦₈[KT1] w) -∗
+    (∃ w : mword 64, (pa_stk sp0 6) ↦₈[KT1] w) -∗
+    (∃ w : mword 64, (pa_stk sp0 7) ↦₈[KT1] w) -∗
+    (∃ w : mword 64, (pa_stk sp0 8) ↦₈[KT1] w) -∗
+    (∃ w : mword 64, (pa_stk sp0 9) ↦₈[KT1] w) -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 58) 256 -∗
     wp_next b pj (fun (CID : CpuId) =>
       ∀ M' : regfile,
         ⌜ sx_sp sp0 M' /\ sx_thr m M' /\
@@ -1517,18 +1512,18 @@ Section SysExecSetup.
           (M' !!! Regidx Rs6 : mword 64) = (mword_of_int 4096 : mword 64) /\
           (M' !!! Regidx Rs7 : mword 64) = (mword_of_int 32 : mword 64) ⌝ -∗
         pc_is (mword_of_int (SX + 0x56) : mword 64) -∗
-        sie_cap_gpr kt M' (K - 60)%nat b pj -∗
+        sie_cap_gpr KT1 M' (K - 60)%nat b pj -∗
         (* the seven spill slots, at the values the epilogue reloads *)
-        (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-        (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-        (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
-        (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-        (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-        (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
-        (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) -∗
+        (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+        (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+        (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+        (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+        (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+        (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+        (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) -∗
         (* argv, zeroed, as thirty-two WORDS *)
         ([∗ list] i ∈ seq 0 32,
-           (pa_stk sp0 (58 - i)) ↦₈[kt] (mword_of_int 0 : mword 64)) -∗
+           (pa_stk sp0 (58 - i)) ↦₈[KT1] (mword_of_int 0 : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1774,7 +1769,7 @@ Section SysExecSetup.
       by (rewrite /N5 upd_ne; [exact HN4s0 | nz]).
     iDestruct (sx_bytes_name (pa_stk sp0 58) 256 with "Hab") as (af) "Haz".
     iEval (rewrite -HN5a0) in "Haz".
-    iApply (Memset.wp_memset_sconf kt N5 (K - 60)%nat 256%nat
+    iApply (Memset.wp_memset_sconf KT1 N5 (K - 60)%nat 256%nat
               (mword_of_int 0 : mword 64) af b pj
               K2 ltac:(lia) HN5a1 HN5a2 with "Hcg Htext Hpc Haz").
     iIntros (CIDa6 Hqa6 N6) "Hcg Hpc Haz %Hcsa6".
@@ -1980,7 +1975,6 @@ Section SysExecFree.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
   Notation Rs4 := (mword_of_int 20 : mword 5).
@@ -2086,10 +2080,10 @@ Section SysExecFree.
      the seam a re-derivation. *)
   Definition sx_argv_at (sp0 : mword 64) (k t : nat) (pg : nat -> mword 64)
       : iProp Σ :=
-    (([∗ list] j ∈ seq 0 k, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[kt] w) ∗
-     ([∗ list] j ∈ seq k (t - k), (pa_stk sp0 (58 - j)) ↦₈[kt] pg j) ∗
+    (([∗ list] j ∈ seq 0 k, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w) ∗
+     ([∗ list] j ∈ seq k (t - k), (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j) ∗
      ([∗ list] j ∈ seq t (32 - t),
-        (pa_stk sp0 (58 - j)) ↦₈[kt] (mword_of_int 0 : mword 64)))%I.
+        (pa_stk sp0 (58 - j)) ↦₈[KT1] (mword_of_int 0 : mword 64)))%I.
 
   (* the pages themselves, as the named byte runs kexec was handed and kfree
      wants back *)
@@ -2101,12 +2095,12 @@ Section SysExecFree.
   (* every slot back in the caller's hands, contents forgotten: what the
      epilogue's [bytes_own] carve is rebuilt from *)
   Definition sx_argv_free (sp0 : mword 64) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 32, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[kt] w)%I.
+    ([∗ list] j ∈ seq 0 32, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w)%I.
 
   Local Lemma sx_ex_app (sp0 : mword 64) (t n : nat) :
-    ([∗ list] j ∈ seq 0 t, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[kt] w) -∗
-    ([∗ list] j ∈ seq t n, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[kt] w) -∗
-    ([∗ list] j ∈ seq 0 (t + n), ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[kt] w).
+    ([∗ list] j ∈ seq 0 t, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w) -∗
+    ([∗ list] j ∈ seq t n, ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w) -∗
+    ([∗ list] j ∈ seq 0 (t + n), ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w).
   Proof. rewrite seq_app big_sepL_app. iIntros "A B". iSplitL "A"; done. Qed.
 
   (* both exits leave the cursor AT the first NULL -- the early one because
@@ -2117,7 +2111,7 @@ Section SysExecFree.
     intro Ht. rewrite /sx_argv_at /sx_argv_free Nat.sub_diag.
     iIntros "(H1 & _ & H3)".
     iAssert ([∗ list] j ∈ seq t (32 - t),
-               ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[kt] w)%I
+               ∃ w : mword 64, (pa_stk sp0 (58 - j)) ↦₈[KT1] w)%I
       with "[H3]" as "H3".
     { iApply (big_sepL_mono with "H3"). intros i j _. iIntros "H".
       iExists (mword_of_int 0 : mword 64). iExact "H". }
@@ -2137,8 +2131,8 @@ Section SysExecFree.
   Local Lemma sx_argv_peel (sp0 : mword 64) (k t : nat) (pg : nat -> mword 64) :
     (k < t)%nat ->
     sx_argv_at sp0 k t pg -∗
-    (pa_stk sp0 (58 - k)) ↦₈[kt] pg k ∗
-    ((∃ w : mword 64, (pa_stk sp0 (58 - k)) ↦₈[kt] w) -∗ sx_argv_at sp0 (S k) t pg).
+    (pa_stk sp0 (58 - k)) ↦₈[KT1] pg k ∗
+    ((∃ w : mword 64, (pa_stk sp0 (58 - k)) ↦₈[KT1] w) -∗ sx_argv_at sp0 (S k) t pg).
   Proof.
     intro Hk. rewrite /sx_argv_at.
     rewrite (_ : (t - k)%nat = S (t - S k)%nat); [| lia].
@@ -2153,8 +2147,8 @@ Section SysExecFree.
   Local Lemma sx_argv_null (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t < 32)%nat ->
     sx_argv_at sp0 t t pg -∗
-    (pa_stk sp0 (58 - t)) ↦₈[kt] (mword_of_int 0 : mword 64) ∗
-    ((pa_stk sp0 (58 - t)) ↦₈[kt] (mword_of_int 0 : mword 64) -∗ sx_argv_free sp0).
+    (pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) ∗
+    ((pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) -∗ sx_argv_free sp0).
   Proof.
     intro Ht. iIntros "H". rewrite /sx_argv_at.
     rewrite (_ : (32 - t)%nat = S (32 - S t)%nat); [| lia].
@@ -2211,7 +2205,7 @@ Section SysExecFree.
                   creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) ->
     kernel_text -∗
     pc_is (mword_of_int (SX + base) : mword 64) -∗
-    sie_cap_gpr kt M (K - 60)%nat b pj -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b pj -∗
     cpu_own 0 eb pj b lks -∗
     sx_argv_at sp0 t t pg -∗
     wp_next b pj (fun (CID : CpuId) =>
@@ -2221,7 +2215,7 @@ Section SysExecFree.
         ⌜forall c : mword 5, is_cs_idx c = true -> c <> Rs1 ->
            (M' !!! Regidx c : mword 64) = (M !!! Regidx c : mword 64)⌝ -∗
         pc_is pcx -∗
-        sie_cap_gpr kt M' (K - 60)%nat b pj -∗
+        sie_cap_gpr KT1 M' (K - 60)%nat b pj -∗
         cpu_own 0 eb pj b lks -∗
         sx_argv_free sp0 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -2323,7 +2317,7 @@ Section SysExecFree.
     kernel_text -∗
     kalloc_env ga None -∗
     pc_is (mword_of_int (SX + base) : mword 64) -∗
-    sie_cap_gpr kt M (K - 60)%nat b pj -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b pj -∗
     cpu_own 0 eb pj b lks -∗
     sx_argv_at sp0 k t pg -∗
     sx_pages pg afun k t -∗
@@ -2334,7 +2328,7 @@ Section SysExecFree.
         ⌜forall c : mword 5, is_cs_idx c = true -> c <> Rs1 ->
            (M' !!! Regidx c : mword 64) = (M !!! Regidx c : mword 64)⌝ -∗
         pc_is pcx -∗
-        sie_cap_gpr kt M' (K - 60)%nat b pj -∗
+        sie_cap_gpr KT1 M' (K - 60)%nat b pj -∗
         cpu_own 0 eb pj b lks -∗
         sx_argv_free sp0 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -2431,7 +2425,7 @@ Section SysExecFree.
     iDestruct (cpu_own_transport CID0 CID3 0%nat eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (bb_page_of_named (pg k) (afun k) with "Hpage") as "Hpage".
-    iApply (Kfree.wp_kfree_sconf kt ga γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf KT1 ga γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) M2 None 0%nat eb pj
               (K - 60)%nat b lks K14 eq_refl eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav").
@@ -2632,16 +2626,16 @@ Section SysExecLoop.
          zero from [t] up ---- *)
   Definition sx_argv0 (sp0 : mword 64) (t : nat) (pg : nat -> mword 64)
       : iProp Σ :=
-    (([∗ list] j ∈ seq 0 t, (pa_stk sp0 (58 - j)) ↦₈[kt] pg j) ∗
+    (([∗ list] j ∈ seq 0 t, (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j) ∗
      ([∗ list] j ∈ seq t (32 - t),
-        (pa_stk sp0 (58 - j)) ↦₈[kt] (mword_of_int 0 : mword 64)))%I.
+        (pa_stk sp0 (58 - j)) ↦₈[KT1] (mword_of_int 0 : mword 64)))%I.
 
   (* the array MINUS the slot at the cursor *)
   Definition sx_argv_rest (sp0 : mword 64) (t : nat) (pg : nat -> mword 64)
       : iProp Σ :=
-    (([∗ list] j ∈ seq 0 t, (pa_stk sp0 (58 - j)) ↦₈[kt] pg j) ∗
+    (([∗ list] j ∈ seq 0 t, (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j) ∗
      ([∗ list] j ∈ seq (S t) (31 - t),
-        (pa_stk sp0 (58 - j)) ↦₈[kt] (mword_of_int 0 : mword 64)))%I.
+        (pa_stk sp0 (58 - j)) ↦₈[KT1] (mword_of_int 0 : mword 64)))%I.
 
   Lemma sx_seq00 : seq 0 0 = @nil nat.
   Proof. reflexivity. Qed.
@@ -2659,7 +2653,7 @@ Section SysExecLoop.
   Lemma sx_argv0_open (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t < 32)%nat ->
     sx_argv0 sp0 t pg ⊢
-    (pa_stk sp0 (58 - t)) ↦₈[kt] (mword_of_int 0 : mword 64) ∗
+    (pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) ∗
     sx_argv_rest sp0 t pg.
   Proof.
     intro Ht. rewrite /sx_argv0 /sx_argv_rest.
@@ -2671,7 +2665,7 @@ Section SysExecLoop.
 
   Lemma sx_argv0_shut (sp0 : mword 64) (t : nat) (pg : nat -> mword 64) :
     (t < 32)%nat ->
-    (pa_stk sp0 (58 - t)) ↦₈[kt] (mword_of_int 0 : mword 64) -∗
+    (pa_stk sp0 (58 - t)) ↦₈[KT1] (mword_of_int 0 : mword 64) -∗
     sx_argv_rest sp0 t pg -∗ sx_argv0 sp0 t pg.
   Proof.
     intro Ht. iIntros "Hcell [Hmid Hhi]". rewrite /sx_argv0.
@@ -2683,7 +2677,7 @@ Section SysExecLoop.
 
   Lemma sx_argv0_close (sp0 : mword 64) (t : nat) (pg pg' : nat -> mword 64) :
     (t < 32)%nat -> (forall j, (j < t)%nat -> pg' j = pg j) ->
-    (pa_stk sp0 (58 - t)) ↦₈[kt] pg' t -∗ sx_argv_rest sp0 t pg -∗
+    (pa_stk sp0 (58 - t)) ↦₈[KT1] pg' t -∗ sx_argv_rest sp0 t pg -∗
     sx_argv0 sp0 (S t) pg'.
   Proof.
     intros Ht Hag. iIntros "Hcell [Hmid Hhi]". rewrite /sx_argv0.
@@ -2718,19 +2712,19 @@ Section SysExecLoop.
          path buffer, split at the NUL argstr reported ---- *)
   Definition sx_carry (sp0 : mword 64) (m : regfile) (plen : nat)
       (pfun rest : nat -> bv 8) : iProp Σ :=
-    ((pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
-     (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
-     (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) ∗
-     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) ∗
-     (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) ∗
-     (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) ∗
-     (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) ∗
-     (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) ∗
-     (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64) ∗
-     (∃ w : mword 64, (pa_stk sp0 10) ↦₈[kt] w) ∗
-     ([∗ list] j ∈ seq 0 (S plen), pa_add (pa_stk sp0 26) j ↦ₘ[kt] pfun j) ∗
+    ((pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     (∃ w : mword 64, (pa_stk sp0 10) ↦₈[KT1] w) ∗
+     ([∗ list] j ∈ seq 0 (S plen), pa_add (pa_stk sp0 26) j ↦ₘ[KT1] pfun j) ∗
      ([∗ list] j ∈ seq 0 (127 - plen)%nat,
-        pa_add (pa_add (pa_stk sp0 26) (S plen)) j ↦ₘ[kt] rest j))%I.
+        pa_add (pa_add (pa_stk sp0 26) (S plen)) j ↦ₘ[KT1] rest j))%I.
 
   (* ---- the nine register equations, as one transportable proposition ---- *)
   Definition sx_regs (sp0 : mword 64) (m M : regfile) (i : nat) : Prop :=
@@ -2852,7 +2846,6 @@ Section SysExecState.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -2875,12 +2868,12 @@ Section SysExecState.
     (⌜ (i < 32)%nat /\ uptd_ext (pv_upt V) P /\ sx_ok pg alen afun i /\
        sx_regs sp0 m M i ⌝ ∗
      pc_is pcv ∗
-     sie_cap_gpr kt M (K - 60)%nat b (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) b lks ∗
      proc_priv γf (proc_addr jp) pid (upd_upt V P) ∗
      sx_carry sp0 m plen pfun rest ∗
-     (pa_stk sp0 59) ↦₈[kt] uav ∗
-     (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) ∗
+     (pa_stk sp0 59) ↦₈[KT1] uav ∗
+     (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) ∗
      sx_argv0 sp0 i pg ∗
      sx_pages pg afun 0 i)%I.
 
@@ -2894,12 +2887,12 @@ Section SysExecState.
     (⌜ (t <= 32)%nat /\ uptd_ext (pv_upt V) P /\ sx_pgok pg t /\
        sx_bregs sp0 m M ⌝ ∗
      pc_is (mword_of_int (SX + 0x92) : mword 64) ∗
-     sie_cap_gpr kt M (K - 60)%nat b (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) b lks ∗
      proc_priv γf (proc_addr jp) pid (upd_upt V P) ∗
      sx_carry sp0 m plen pfun rest ∗
-     (pa_stk sp0 59) ↦₈[kt] uav ∗
-     (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) ∗
+     (pa_stk sp0 59) ↦₈[KT1] uav ∗
+     (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) ∗
      sx_argv0 sp0 t pg ∗
      sx_pages pg afun 0 t)%I.
 
@@ -2914,15 +2907,15 @@ Section SysExecState.
     (i < 32)%nat -> uptd_ext (pv_upt V) P -> sx_ok pg alen afun i ->
     sx_regs sp0 m M i ->
     pc_is pcv -∗
-    sie_cap_gpr kt M (K - 60)%nat b (proc_addr jp) -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     proc_priv γf (proc_addr jp) pid (upd_upt V P) -∗
     sx_carry sp0 m plen pfun rest -∗
-    (pa_stk sp0 59) ↦₈[kt] uav -∗
-    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) -∗
+    (pa_stk sp0 59) ↦₈[KT1] uav -∗
+    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) -∗
     sx_argv0 sp0 i pg -∗
     sx_pages pg afun 0 i -∗
-    sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+    sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun pcv.
   Proof.
     intros H1 H2 H3 H4.
@@ -2943,12 +2936,12 @@ Section SysExecState.
     (t <= 32)%nat -> uptd_ext (pv_upt V) P -> sx_pgok pg t ->
     sx_bregs sp0 m M ->
     pc_is (mword_of_int (SX + 0x92) : mword 64) -∗
-    sie_cap_gpr kt M (K - 60)%nat b (proc_addr jp) -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     proc_priv γf (proc_addr jp) pid (upd_upt V P) -∗
     sx_carry sp0 m plen pfun rest -∗
-    (pa_stk sp0 59) ↦₈[kt] uav -∗
-    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) -∗
+    (pa_stk sp0 59) ↦₈[KT1] uav -∗
+    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) -∗
     sx_argv0 sp0 t pg -∗
     sx_pages pg afun 0 t -∗
     sx_bad γf jp pid V K eb b lks sp0 m plen pfun rest uav M P t pg afun.
@@ -2975,7 +2968,6 @@ Section SysExecStep.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -3049,17 +3041,17 @@ Section SysExecStep.
     locks_below lks "kmem" ->
     kernel_text -∗
     kalloc_env γa None -∗
-    sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+    sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0x56) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (i' : nat)
         (pg' : nat -> mword 64) (alen' : nat -> nat)
         (afun' : nat -> nat -> bv 8),
         ((⌜i' = S i⌝ ∗
-          sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+          sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
                   M' P' i' pg' alen' afun'
                   (mword_of_int (SX + 0x56) : mword 64))
-         ∨ sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+         ∨ sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
                    M' P' i' pg' alen' afun'
                    (mword_of_int (SX + 0xb6) : mword 64)
          ∨ sx_bad γf jp pid V K eb b lks sp0 m plen pfun rest uav
@@ -3188,7 +3180,7 @@ Section SysExecStep.
     iEval (rewrite -HN5a1) in "F60".
     iDestruct (cpu_own_transport CID0 CID5 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Fetchaddr.wp_fetchaddr_sconf kt γa γf N5 (K - 60)%nat eb (proc_addr jp)
+    iApply (Fetchaddr.wp_fetchaddr_sconf γa γf N5 (K - 60)%nat eb (proc_addr jp)
               pid (upd_upt V P) u0 b lks Kfa
               with "Hcg Hcnt Htext Hpc Hpriv Hka F60").
     iIntros (CID6 Hq6 mf Pa) "%Hcsa %Hexta Hcg Hcnt Hpc Hpriv Hfa".
@@ -3337,7 +3329,7 @@ Section SysExecStep.
       by (rewrite /Q2 upd_eq; pcw).
     iDestruct (cpu_own_transport CID6 CID10 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf kt γa γk
+    iApply (Kalloc.wp_kalloc_sconf KT1 γa γk
               (mword_of_int (KernelSyms.kmem + 24)) Q2 None 0%nat eb
               (proc_addr jp) (K - 60)%nat b lks K14 eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk Hav").
@@ -3494,7 +3486,7 @@ Section SysExecStep.
     iEval (rewrite -HQ6a1) in "Hpg".
     iDestruct (cpu_own_transport CID11 CID17 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Fetchstr.wp_fetchstr_sconf kt γa γf Q6 (K - 60)%nat 0%nat eb
+    iApply (Fetchstr.wp_fetchstr_sconf γa γf Q6 (K - 60)%nat 0%nat eb
               (proc_addr jp) pid (upd_upt V Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
@@ -3699,13 +3691,13 @@ Section SysExecStep.
     (32 - i <= W)%nat ->
     kernel_text -∗
     kalloc_env γa None -∗
-    sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+    sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0x56) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (i' : nat)
         (pg' : nat -> mword 64) (alen' : nat -> nat)
         (afun' : nat -> nat -> bv 8),
-        (sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+        (sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
                  M' P' i' pg' alen' afun'
                  (mword_of_int (SX + 0xb6) : mword 64)
          ∨ sx_bad γf jp pid V K eb b lks sp0 m plen pfun rest uav
@@ -3753,7 +3745,6 @@ Section SysExecReload.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -3772,13 +3763,13 @@ Section SysExecReload.
   (* the seven lazily-spilled callee-saved registers, at the values the
      epilogue's premises want them back at *)
   Definition sx_spill (sp0 : mword 64) (m : regfile) : iProp Σ :=
-    ((pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) ∗
-     (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) ∗
-     (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) ∗
-     (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) ∗
-     (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) ∗
-     (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) ∗
-     (pa_stk sp0 9) ↦₈[kt] (m !!! Regidx Rs7 : mword 64))%I.
+    ((pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64))%I.
 
   (* what a reload step preserves: everything the epilogue reads except the
      seven registers it is putting back *)
@@ -3833,7 +3824,7 @@ Section SysExecReload.
              sp, Regidx Rs7, false, 8)) ->
     kernel_text -∗
     pc_is (mword_of_int (SX + base) : mword 64) -∗
-    sie_cap_gpr kt M (K - 60)%nat b pj -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b pj -∗
     sx_spill sp0 m -∗
     wp_next b pj (fun (CID : CpuId) =>
       ∀ M' : regfile,
@@ -3846,7 +3837,7 @@ Section SysExecReload.
           (M' !!! Regidx Rs6 : mword 64) = (m !!! Regidx Rs6 : mword 64) /\
           (M' !!! Regidx Rs7 : mword 64) = (m !!! Regidx Rs7 : mword 64) ⌝ -∗
         pc_is (mword_of_int (SX + base + 14) : mword 64) -∗
-        sie_cap_gpr kt M' (K - 60)%nat b pj -∗
+        sie_cap_gpr KT1 M' (K - 60)%nat b pj -∗
         sx_spill sp0 m -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -4040,13 +4031,13 @@ Section SysExecReload.
   Lemma sx_carry_open (sp0 : mword 64) (m : regfile) (plen : nat)
       (pfun rest : nat -> bv 8) :
     sx_carry sp0 m plen pfun rest -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
     sx_spill sp0 m ∗
-    (∃ w : mword 64, (pa_stk sp0 10) ↦₈[kt] w) ∗
-    ([∗ list] j ∈ seq 0 (S plen), pa_add (pa_stk sp0 26) j ↦ₘ[kt] pfun j) ∗
+    (∃ w : mword 64, (pa_stk sp0 10) ↦₈[KT1] w) ∗
+    ([∗ list] j ∈ seq 0 (S plen), pa_add (pa_stk sp0 26) j ↦ₘ[KT1] pfun j) ∗
     ([∗ list] j ∈ seq 0 (127 - plen)%nat,
-       pa_add (pa_add (pa_stk sp0 26) (S plen)) j ↦ₘ[kt] rest j).
+       pa_add (pa_add (pa_stk sp0 26) (S plen)) j ↦ₘ[KT1] rest j).
   Proof.
     rewrite /sx_carry /sx_spill.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & Hp & Hs)".
@@ -4063,12 +4054,12 @@ Section SysExecReload.
       (pfun rest : nat -> bv 8) (uav : mword 64) :
     (plen < 128)%nat ->
     sx_spill sp0 m -∗
-    (∃ w : mword 64, (pa_stk sp0 10) ↦₈[kt] w) -∗
-    ([∗ list] j ∈ seq 0 (S plen), pa_add (pa_stk sp0 26) j ↦ₘ[kt] pfun j) -∗
+    (∃ w : mword 64, (pa_stk sp0 10) ↦₈[KT1] w) -∗
+    ([∗ list] j ∈ seq 0 (S plen), pa_add (pa_stk sp0 26) j ↦ₘ[KT1] pfun j) -∗
     ([∗ list] j ∈ seq 0 (127 - plen)%nat,
-       pa_add (pa_add (pa_stk sp0 26) (S plen)) j ↦ₘ[kt] rest j) -∗
-    (pa_stk sp0 59) ↦₈[kt] uav -∗
-    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) -∗
+       pa_add (pa_add (pa_stk sp0 26) (S plen)) j ↦ₘ[KT1] rest j) -∗
+    (pa_stk sp0 59) ↦₈[KT1] uav -∗
+    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) -∗
     sx_argv_free sp0 -∗
     sx_rest sp0.
   Proof.
@@ -4076,7 +4067,7 @@ Section SysExecReload.
     iIntros "(H3 & H4 & H5 & H6 & H7 & H8 & H9) H10 Hp Hs F59 F60 Ha".
     iDestruct (sx_buf_join (pa_stk sp0 26) pfun rest plen Hplen with "Hp Hs") as "Hpb".
     change 256%nat with (8 * 32)%nat.
-    iDestruct (slotsn_bytes_own (KTR := kt) sp0 58 32 ltac:(lia) with "Ha") as "[_ Hab]".
+    iDestruct (slotsn_bytes_own (KTR := KT1) sp0 58 32 ltac:(lia) with "Ha") as "[_ Hab]".
     iSplitL "H3"; [iExists (m !!! Regidx Rs1 : mword 64); iExact "H3" |].
     iSplitL "H4"; [iExists (m !!! Regidx Rs2 : mword 64); iExact "H4" |].
     iSplitL "H5"; [iExists (m !!! Regidx Rs3 : mword 64); iExact "H5" |].
@@ -4091,16 +4082,16 @@ Section SysExecReload.
   Qed.
 
   (* THE ALIGNMENT FACTS ARE READ BACK OFF THE ARRAY, not threaded: a word
-     points-to carries its own alignment, and [slotsn_bytes_own (KTR := kt)] hands the
-     whole run's out.  The round trip through [bytes_own_slotsn (KTR := kt)] is what
+     points-to carries its own alignment, and [slotsn_bytes_own (KTR := KT1)] hands the
+     whole run's out.  The round trip through [bytes_own_slotsn (KTR := KT1)] is what
      makes the extraction non-consuming. *)
   Lemma sx_argv_ala (sp0 : mword 64) :
     sx_argv_free sp0 ⊢ ⌜sx_ala sp0⌝ ∗ sx_argv_free sp0.
   Proof.
     rewrite /sx_argv_free. iIntros "H".
-    iDestruct (slotsn_bytes_own (KTR := kt) sp0 58 32 ltac:(lia) with "H") as "[%Hal Hb]".
+    iDestruct (slotsn_bytes_own (KTR := KT1) sp0 58 32 ltac:(lia) with "H") as "[%Hal Hb]".
     iSplitR; [iPureIntro; exact Hal |].
-    iApply (bytes_own_slotsn (KTR := kt) sp0 58 32 ltac:(lia) Hal with "Hb").
+    iApply (bytes_own_slotsn (KTR := KT1) sp0 58 32 ltac:(lia) Hal with "Hb").
   Qed.
 
 End SysExecReload.
@@ -4118,7 +4109,6 @@ Section SysExecBadTail.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -4165,7 +4155,7 @@ Section SysExecBadTail.
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜uptd_ext (pv_upt V) P⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv γf (proc_addr jp) pid (upd_upt V P) -∗
@@ -4335,7 +4325,6 @@ Section SysExecSuccTail.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -4372,19 +4361,19 @@ Section SysExecSuccTail.
     kernel_text -∗
     kalloc_env γa None -∗
     pc_is (mword_of_int (SX + 0xce) : mword 64) -∗
-    sie_cap_gpr kt M (K - 60)%nat b (proc_addr jp) -∗
+    sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     proc_priv γf (proc_addr jp) pid W -∗
     sx_carry sp0 m plen pfun rest -∗
-    (pa_stk sp0 59) ↦₈[kt] uav -∗
-    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[kt] w) -∗
+    (pa_stk sp0 59) ↦₈[KT1] uav -∗
+    (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) -∗
     sx_argv0 sp0 t pg -∗
     sx_pages pg afun 0 t -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = rv⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv γf (proc_addr jp) pid W -∗
@@ -4541,7 +4530,6 @@ Section SysExecBreak.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -4579,14 +4567,14 @@ Section SysExecBreak.
     (i < 32)%nat ->
     sx_argv0 sp0 i pg ⊣⊢
     (([∗ list] j ∈ seq 0 (S i),
-        pa_add (pa_stk sp0 58) (8 * j) ↦₈[kt] sx_avf pg i j) ∗
+        pa_add (pa_stk sp0 58) (8 * j) ↦₈[KT1] sx_avf pg i j) ∗
      ([∗ list] j ∈ seq (S i) (31 - i),
-        (pa_stk sp0 (58 - j)) ↦₈[kt] (mword_of_int 0 : mword 64)))%I.
+        (pa_stk sp0 (58 - j)) ↦₈[KT1] (mword_of_int 0 : mword 64)))%I.
   Proof.
     intro Hi.
     assert (Haddr : forall f : nat -> mword 64,
-      ([∗ list] j ∈ seq 0 (S i), pa_add (pa_stk sp0 58) (8 * j) ↦₈[kt] f j)
-      ⊣⊢ ([∗ list] j ∈ seq 0 (S i), (pa_stk sp0 (58 - j)) ↦₈[kt] f j)).
+      ([∗ list] j ∈ seq 0 (S i), pa_add (pa_stk sp0 58) (8 * j) ↦₈[KT1] f j)
+      ⊣⊢ ([∗ list] j ∈ seq 0 (S i), (pa_stk sp0 (58 - j)) ↦₈[KT1] f j)).
     { intro f. apply big_sepL_proper. intros n j Hj.
       apply lookup_seq in Hj as [Hj0 Hlt]. subst j.
       rewrite (pa_stk_addn sp0 58 (0 + n)%nat ltac:(lia)). reflexivity. }
@@ -4597,8 +4585,8 @@ Section SysExecBreak.
     rewrite (seq_S i 0) big_sepL_app big_sepL_singleton.
     rewrite (_ : (0 + i)%nat = i); [| lia].
     rewrite sx_avf_eq.
-    assert (Hlo : ([∗ list] j ∈ seq 0 i, (pa_stk sp0 (58 - j)) ↦₈[kt] pg j)
-                  ⊣⊢ ([∗ list] j ∈ seq 0 i, (pa_stk sp0 (58 - j)) ↦₈[kt] sx_avf pg i j)).
+    assert (Hlo : ([∗ list] j ∈ seq 0 i, (pa_stk sp0 (58 - j)) ↦₈[KT1] pg j)
+                  ⊣⊢ ([∗ list] j ∈ seq 0 i, (pa_stk sp0 (58 - j)) ↦₈[KT1] sx_avf pg i j)).
     { apply big_sepL_proper. intros n j Hj.
       apply lookup_seq in Hj as [Hj0 Hlt]. subst j.
       rewrite (sx_avf_lt pg i (0 + n)%nat ltac:(lia)). reflexivity. }
@@ -4676,7 +4664,7 @@ Section SysExecBreak.
     (jp < NPROC)%nat -> gs !! jp = Some gl ->
     b = true -> eb = true ->
     kernel_text -∗
-    fs_fabric (kt := kt) gs gu gd gk pd pav pu bn g gfs gi cn gtl
+    fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kalloc_env γa None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -4684,7 +4672,7 @@ Section SysExecBreak.
     bitmap_res gfs bmapstart cov logstart size used -∗
     bslots bn 3 -∗
     iref_slots 2 -∗
-    sx_body (kt := kt) γf jp pid V K eb b lks sp0 m plen pfun rest uav
+    sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -4693,7 +4681,7 @@ Section SysExecBreak.
         ⌜kexec_ok (upd_upt V P) V' (mf !!! Regidx Ra0) entry spv szv' i alen⌝ -∗
         ⌜used' ⊆ used⌝ -∗
         ⌜uptd_ext (pv_upt V) P⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -4857,7 +4845,7 @@ Section SysExecBreak.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kexec.wp_kexec_sconf kt gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               γa γf cov logstart bmapstart inodestart nib size dev used
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (upd_upt V P) dqb dqs (DfracOwn 1) N6 (K - 60)%nat eb b lks
@@ -4937,7 +4925,6 @@ Section SysExecWhole.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -4953,7 +4940,7 @@ Section SysExecWhole.
      not a dependency any other one may take. *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
       (p : mword 64) (lks : gset string) :
-    sie_cap_gpr kt m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -4982,7 +4969,7 @@ Section SysExecWhole.
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-      wp_sys_exec_sconf_body kt γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
+      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                              cn gtl cov logstart bmapstart inodestart nib
                              size dev used dqb dqs v0 v1 pid V m K eb b lks.
   Proof.
@@ -5048,7 +5035,7 @@ Section SysExecWhole.
     { split_and!;
         [ exact H2sp | exact H2thr | exact H2s0 | exact H2s1 | exact H2s2
         | exact H2s3 | exact H2s4 | exact H2s5 | exact H2s6 | exact H2s7 ]. }
-    iAssert (sx_body (kt := kt) γf j pid V K true true ∅ sp0 m plen pfun rst v59
+    iAssert (sx_body γf j pid V K true true ∅ sp0 m plen pfun rst v59
                M2 P' 0%nat (fun _ => (mword_of_int 0 : mword 64))
                (fun _ => 0%nat) (fun _ _ => (mword_of_int 0 : mword 8))
                (mword_of_int (SX + 0x56) : mword 64))

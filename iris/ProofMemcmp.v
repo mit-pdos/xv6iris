@@ -70,7 +70,6 @@ Section ProofMemcmp.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -180,15 +179,15 @@ Section ProofMemcmp.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
+    sie_cap_gpr KT1 (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memcmp + 0x2e) : mword 64) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr kt mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -330,7 +329,7 @@ Section ProofMemcmp.
     M !!! Regidx Ra3 = add_vec (mword_of_int (Z.of_nat n) : mword 64) s1 ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr kt (CID := CID0) M (K - 2)%nat b p -∗
+    sie_cap_gpr KT1 (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memcmp + 0x12) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
@@ -341,7 +340,7 @@ Section ProofMemcmp.
         ⌜memcmp_res f g n (Mt !!! Regidx Ra0)⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr kt Mt (K - 2)%nat b p -∗
+        sie_cap_gpr KT1 Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.memcmp + 0x2e) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
@@ -359,7 +358,7 @@ Section ProofMemcmp.
     (* ---- +0x12: lbu a5,0(a0) ---- *)
     iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
     assert (HMa0 : rget M Ra0 = pa_add s1 t) by (rgne; exact Ha0).
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memcmp + 0x12)) Ra5 Ra0
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.memcmp + 0x12)) Ra5 Ra0
               (mword_of_int 0 : mword 12) M (K - 2)%nat (f t : mword 8) b (dqm:=dq1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [Hb1]").
@@ -378,7 +377,7 @@ Section ProofMemcmp.
     assert (HM1a1 : M1 !!! Regidx Ra1 = pa_add s2 t)
       by (rewrite /M1 upd_ne; [exact Ha1 | reg_neq]).
     assert (HM1a1' : rget M1 Ra1 = pa_add s2 t) by (rgne; exact HM1a1).
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memcmp + 0x16)) Ra4 Ra1
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.memcmp + 0x16)) Ra4 Ra1
               (mword_of_int 0 : mword 12) M1 (K - 2)%nat (g t : mword 8) b (dqm:=dq2)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [Hb2]").
@@ -628,7 +627,7 @@ Section ProofMemcmp.
   (* =================================================================== *)
   Lemma wp_memcmp_sconf (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64)
-    : wp_memcmp_sconf_body kt mm n f g K dq1 dq2 b p.
+    : wp_memcmp_sconf_body mm n f g K dq1 dq2 b p.
   Proof.
     cbv beta delta [wp_memcmp_sconf_body].
     intros pcE s1 s2 ret_tgt HK Ha2 Hn32.

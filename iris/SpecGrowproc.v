@@ -127,14 +127,14 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Pr
      \/ ((uint szv <= uint (add_vec szv n))%Z /\ szv' = szv) )).
 
 Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (γf : gname)
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.growproc in
   let n := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (growproc_stack <= av)%nat ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: uvmalloc's kalloc runs with interrupts un-pushed *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -145,7 +145,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜callee_saved m mf⌝ -∗
       ⌜growproc_ok (pv_sz V) n (pv_upt V) P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
@@ -155,7 +155,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type GROWPROC.
   Parameter wp_growproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_growproc_sconf_body kt γa γf m av eb p pid V b lks.
+      wp_growproc_sconf_body γa γf m av eb p pid V b lks.
 End GROWPROC.

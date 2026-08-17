@@ -160,7 +160,6 @@ Section ProofFilestat.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -198,7 +197,7 @@ Section ProofFilestat.
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_filestat_sconf_body kt γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
+    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
@@ -245,7 +244,7 @@ Section ProofFilestat.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> m) with R1.
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /R1 upd_eq; apply fst_push_80).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -397,7 +396,7 @@ Section ProofFilestat.
       by (rewrite /R5; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Myproc.wp_myproc_sconf kt R5 (K - 10)%nat 0%nat eb pj b
+    iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj b
               _ fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
     iIntros (CID10 Hs10 ms P0) "%Hms Hcg Hcnt Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
@@ -689,7 +688,7 @@ Section ProofFilestat.
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
          payload's slice already does, so nothing has to be introduced here. *)
-      iApply (Ilock.wp_ilock_sconf kt γs j γlp (fsn_uart fn) (fsn_disk fn)
+      iApply (Ilock.wp_ilock_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
                 gil gisl
@@ -867,7 +866,7 @@ Section ProofFilestat.
         rewrite /I3 upd_ne; [| regne].
         rewrite /I2 upd_ne; [| regne].
         exact (HI1thr c Hcs N2 N8 N9 N18 N19 N20). }
-      iApply (Stati.wp_stati_sconf kt I4 (fc_ip Cf) (pa_stk sp0 9)
+      iApply (Stati.wp_stati_sconf I4 (fc_ip Cf) (pa_stk sp0 9)
                 icfg_dev inm dnl dev0 ino0 ty0 nl0 sz0
                 (K - 10)%nat (DfracOwn (1/2)) (DfracOwn (1/2)) b pj
                 (fst_av_stati K HK) HI4a0 HI4a1
@@ -973,7 +972,7 @@ Section ProofFilestat.
       iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Iunlock.wp_iunlock_sconf kt γs (fsn_fs fn) (fsn_ireg fn)
+      iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
                 (fsn_ic fn) gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
                 ikk (ssh/2)%Qp gsh icfg_dev inm
@@ -1173,7 +1172,7 @@ Section ProofFilestat.
       iEval (rewrite -HU6a3) in "Hbuf".
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf kt KT0 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
+      iApply (Copyout.wp_copyout_sconf KT0 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
                 (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").

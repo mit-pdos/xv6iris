@@ -40,13 +40,12 @@ Section ProofKvmmap.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   Lemma wp_kvmmap_sconf
       (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_kvmmap_sconf_body kt γa mm t m npages perm lvl K eb p on b lks.
+    : wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -84,7 +83,7 @@ Section ProofKvmmap.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm) with W1.
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v8) "Hc1". iDestruct "S2" as (v0) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = spr)
@@ -220,7 +219,7 @@ Section ProofKvmmap.
        them.  ONE line, no case split on [b]. ---- *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf kt γa P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks
+    iApply (Mappages.wp_mappages_sconf KT0 γa P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)
@@ -308,8 +307,8 @@ Section ProofKvmmap.
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HspE2. symmetry. exact Hsprstk. }
-    iAssert (stack_own (KTR := kt) sp0 2) with "[Hc1 Hc2]" as "Hfr".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT0) sp0 2) with "[Hc1 Hc2]" as "Hfr".
+    { rewrite (stack_own_slots (KTR := KT0)). cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }

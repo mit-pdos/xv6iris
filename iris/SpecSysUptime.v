@@ -39,7 +39,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
-Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname)
+Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_uptime in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -62,7 +62,7 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
      "time"'s -- sys_uptime acquires and releases [tickslock] in the same
      call, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "time" ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_tickslock γl -∗
@@ -70,7 +70,7 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
     ∀ (mf : regfile) (t : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = zero_extend' 64 t ⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -78,7 +78,7 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
 
 Module Type SYSUPTIME.
   Parameter wp_sys_uptime_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string),
-      wp_sys_uptime_sconf_body kt γl m n eb p av b lks.
+      wp_sys_uptime_sconf_body γl m n eb p av b lks.
 End SYSUPTIME.

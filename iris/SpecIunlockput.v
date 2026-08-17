@@ -111,7 +111,7 @@ Definition wp_iunlockput_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -155,14 +155,14 @@ Definition wp_iunlockput_sconf_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
      caller holds it because the TRAP gave it to it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -195,7 +195,7 @@ Definition wp_iunlockput_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
   p_pid pj ↦₄{dq} pidv -∗
-  procs_inv (kt := kt) gs -∗
+  procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -207,9 +207,9 @@ Definition wp_iunlockput_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -238,7 +238,7 @@ Definition wp_iunlockput_gen_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
+    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -285,14 +285,14 @@ Definition wp_iunlockput_gen_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
      caller holds it because the TRAP gave it to it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -325,7 +325,7 @@ Definition wp_iunlockput_gen_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
   p_pid pj ↦₄{dq} pidv -∗
-  procs_inv (kt := kt) gs -∗
+  procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -344,9 +344,9 @@ Definition wp_iunlockput_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -375,7 +375,7 @@ Module Type IUNLOCKPUT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
+      (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -390,7 +390,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_iunlockput_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb b lks.
@@ -401,7 +401,7 @@ Module Type IUNLOCKPUT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
+      (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -416,7 +416,7 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_iunlockput_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
                              crz e0 pidv dq dqb dqs m K eb b lks.

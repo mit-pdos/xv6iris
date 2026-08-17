@@ -601,7 +601,6 @@ Section EndOpDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
-  Context {kt : ktier}.
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
      hart (durable-notes: a whole-function post must not be spelled inline). *)
   Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
@@ -610,9 +609,9 @@ Section EndOpDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -636,22 +635,22 @@ Section EndOpDefs.
      written only on the two arms that clobber them, and slot 8 (offset 0)
      is never touched at all. *)
   Definition eo_frame4 (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[kt] (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[kt] (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   Definition eo_frameJ (m : regfile) : iProp Σ :=
-    ((∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[kt] v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[kt] v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[kt] v))%I.
+    ((∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] v))%I.
 
   Definition eo_frameS (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[kt] (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[kt] (m !!! Regidx Rs5 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[kt] v))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] v))%I.
 
   Lemma eo_frameS_J (m : regfile) : eo_frameS m -∗ eo_frameJ m.
   Proof.
@@ -887,7 +886,6 @@ Section EndOpBlocks.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
-  Context {kt : ktier}.
   (* ================================================================== *)
   (*  +0x92 .. +0x9c : the four-register epilogue and the return.        *)
   (*  Entered from the fast path's release AND, through the [c.j] at     *)
@@ -900,16 +898,16 @@ Section EndOpBlocks.
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     (K_end_op <= K)%nat ->
     eo_regsE m M ->
-    sie_cap_gpr kt M (K - 8)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x92) : mword 64) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    eo_frame4 (kt := kt) m -∗
-    eo_frameJ (kt := kt) m -∗
-    eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb b lks -∗
+    eo_frame4 m -∗
+    eo_frameJ m -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs.
@@ -1031,9 +1029,9 @@ Section EndOpBlocks.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8).
     { rewrite Hwv HP4sp Hsp Hpush. reflexivity. }
-    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 8)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 8)
       with "[Hr56 Hr48 Hr40 Hr32 Hg24 Hg16 Hg8 Hg0]" as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr56"; [iExists _; iExact "Hr56"|].
       iSplitL "Hr48"; [iExists _; iExact "Hr48"|].
       iSplitL "Hr40"; [iExists _; iExact "Hr40"|].
@@ -1158,19 +1156,19 @@ Section EndOpBlocks.
        (rank 3), from the OUTER set [lks] (the lock is not held on entry --
        the first critical section already released it before commit() ran). *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 8)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 8)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x42) : mword 64) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    eo_frame4 (kt := kt) m -∗
-    eo_frameJ (kt := kt) m -∗
+    eo_frame4 m -∗
+    eo_frameJ m -∗
     log_batch bn γfs cov logstart 0 ∅ -∗
-    eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs Hbelow.
@@ -1280,7 +1278,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa4)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (Acq.wp_acquire_sconf kt (ln_lk γ) "log"%string
+    iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) E4 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
@@ -1349,7 +1347,7 @@ Section EndOpBlocks.
     { rgne. rewrite Hqs1. exact eo_addr_nc. }
     iEval (rewrite -Hnca) in "Hncc".
     iPoseProof (eoi_54 with "Htext") as "Hi54".
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x54)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x54)) Ra5 Rs1
               (mword_of_int 40 : mword 12) macq (trap_res eb + (K - 8))%nat nc false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi54 Hncc").
@@ -1443,7 +1441,7 @@ Section EndOpBlocks.
     assert (Hbelow_wk1 : locks_below ({["log"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hlog_lt_proc |].
       lkbelow. }
-    iApply (Wk.wp_wakeup_sconf kt F4 γs (proc_addr j) 1%nat
+    iApply (Wk.wp_wakeup_sconf F4 γs (proc_addr j) 1%nat
               (trap_res eb + (K - 8))%nat eb false ({["log"]} ∪ lks)
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomF Hlen eo_noff1
               Hbelow_wk1
@@ -1578,7 +1576,7 @@ Section EndOpBlocks.
       { iPureIntro. intros b' Hin. exfalso.
         pose proof (Hcap (S Ep) b' Hin). lia. }
       iExact "Hbatch". }
-    iApply (Rel.wp_release_sconf kt (ln_lk γ) log_addr "log"%string
+    iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G2 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
@@ -1708,9 +1706,9 @@ Section EndOpBlocks.
     (* threaded through unchanged to [eo_tail]'s own re-acquire of "log" --
        [eo_commit] itself never touches the lock. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 8)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 8)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x104) : mword 64) -∗
@@ -1722,15 +1720,15 @@ Section EndOpBlocks.
     fs_crash_seam cov logstart -∗
     era_registered gen_id riscv_eraGS -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    eo_frame4 (kt := kt) m -∗
-    eo_frameS (kt := kt) m -∗
+    eo_frame4 m -∗
+    eo_frameS m -∗
     log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
-    eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw Hregs Hbelow.
@@ -1779,7 +1777,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa1)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (WH.wp_write_head_sconf kt γs j γl γu γd γk pd pav pu bn γfs
+    iApply (WH.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev n W L pidv dq A1 (K - 8)%nat eb eb
               (log_mirror_at (n, map uint W)
                ∗ ∃ Dc : gmap Z (list (bv 8)), fs_receipt_any Dc)%I lks
@@ -1892,7 +1890,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CIDa1) (CIDb := CIDa3)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (IT.wp_install_trans_sconf kt γs j γl γu γd γk pd pav pu bn γfs
+    iApply (IT.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev false n W Lw (<[log_hdr_bno logstart := bs1]> L) D
               pidv dq A3 (K - 8)%nat eb eb (log_mirror_at (n, map uint W)) lks
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl (or_introl eq_refl) HA3a0
@@ -2007,7 +2005,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     assert (Hshape0 : (0%nat = length (@nil (mword 32)) /\ (0 <= LOGBLOCKS)%nat))
       by (split; [reflexivity | unfold LOGBLOCKS; lia]).
-    iApply (WH.wp_write_head_sconf kt γs j γl γu γd γk pd pav pu bn γfs
+    iApply (WH.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
               A5 (K - 8)%nat eb eb log_mirror_clean lks
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
@@ -2239,9 +2237,9 @@ Section EndOpBlocks.
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat t) : mword 64) ->
     M !!! Regidx Rs4 = log_addr ->
     M !!! Regidx Rs5 = (lh_block t : mword 64) ->
-    sie_cap_gpr kt M (K - 8)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 8)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0xb4) : mword 64) -∗
@@ -2253,15 +2251,15 @@ Section EndOpBlocks.
     fs_crash_seam cov logstart -∗
     era_registered gen_id riscv_eraGS -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    eo_frame4 (kt := kt) m -∗
-    eo_frameS (kt := kt) m -∗
+    eo_frame4 m -∗
+    eo_frameS m -∗
     log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
-    eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok Hbelow.
@@ -2321,7 +2319,7 @@ Section EndOpBlocks.
     { rgne. rewrite HMs4. exact eo_addr_start. }
     iEval (rewrite -Hastart) in "Hstc".
     iPoseProof (eoi_b4 with "Htext") as "Hib4".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xb4)) Ra1 Rs4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xb4)) Ra1 Rs4
               (mword_of_int 24 : mword 12) M (K - 8)%nat
               (mword_of_int logstart : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2407,7 +2405,7 @@ Section EndOpBlocks.
     { rgne. rewrite HA3s4. exact eo_addr_dev. }
     iEval (rewrite -Hadev) in "Hdevc".
     iPoseProof (eoi_be with "Htext") as "Hibe".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xbe)) Ra0 Rs4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xbe)) Ra0 Rs4
               (mword_of_int 36 : mword 12) A3 (K - 8)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hibe Hdevc").
@@ -2476,7 +2474,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa5)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (BR.wp_bread_sconf kt γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnol dq A5 (K - 8)%nat eb eb lks
               ltac:(pose proof (eo_Kbread K HK); lia)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
@@ -2542,7 +2540,7 @@ Section EndOpBlocks.
     { rgne. rewrite HB1s5. exact (eo_cursor_at t). }
     iEval (rewrite -Hacur) in "Hblk".
     iPoseProof (eoi_c8 with "Htext") as "Hic8".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xc8)) Ra1 Rs5
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xc8)) Ra1 Rs5
               (mword_of_int 0 : mword 12) B1 (K - 8)%nat w eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hic8 Hblk").
@@ -2576,7 +2574,7 @@ Section EndOpBlocks.
     { rgne. rewrite HB2s4. exact eo_addr_dev. }
     iEval (rewrite -Hadev2) in "Hdevc".
     iPoseProof (eoi_cc with "Htext") as "Hicc".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xcc)) Ra0 Rs4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xcc)) Ra0 Rs4
               (mword_of_int 36 : mword 12) B2 (K - 8)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hicc Hdevc").
@@ -2650,7 +2648,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CIDa5) (CIDb := CIDa9)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (BR.wp_bread_sconf kt γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev w dq B4 (K - 8)%nat eb eb lks
               ltac:(pose proof (eo_Kbread K HK); lia)
               ltac:(exact (eo_lt_lit _ Hwrange))
@@ -2870,7 +2868,7 @@ Section EndOpBlocks.
     iDestruct (eo_data_fwd (b_data (bpa k2)) bs2 1024%nat Hlen2 with "Hdata2") as "Hdata2".
     iEval (rewrite -HG5a1) in "Hdata2".
     iEval (rewrite -HG5a0) in "Hdata1".
-    iApply (Mm.wp_memmove_sconf kt KT0 KT0 G5 (K - 8)%nat 1024%nat
+    iApply (Mm.wp_memmove_sconf KT1 KT0 KT0 G5 (K - 8)%nat 1024%nat
               (fun i => bs2 !!! i) (fun i => bs1 !!! i) eb (proc_addr j)
               ltac:(pose proof (eo_Kmm K HK); lia) ltac:(vm_compute; reflexivity) HG5a2
               with "Hcg Htext Hpc Hdata2 Hdata1").
@@ -3000,7 +2998,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CIDa9) (CIDb := CIDa17)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (BW.wp_bwrite_sconf kt γs j γl γu γd γk pd pav pu bn
+    iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k1 pidv dev bnol dq H2 (K - 8)%nat eb
               bs2 bsd1 eb log_mirror_clean lks
               ltac:(pose proof (eo_Kbwrite K HK); lia)
@@ -3121,7 +3119,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CIDa17) (CIDb := CIDa19)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) k2 pidv dev w dq
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k2 pidv dev w dq
               H4 (K - 8)%nat eb (proc_addr j) bs2 bsd2 d2 eb lks
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk2 HH4a0
               ltac:(lkbelow)
@@ -3218,7 +3216,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CIDa19) (CIDb := CIDa21)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) k1 pidv dev bnol dq
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k1 pidv dev bnol dq
               H6 (K - 8)%nat eb (proc_addr j) bs2 bs2 d1 eb lks
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk1 HH6a0
               ltac:(lkbelow)
@@ -3307,7 +3305,7 @@ Section EndOpBlocks.
     { rgne. rewrite HJ2s4. exact eo_addr_lhn. }
     iEval (rewrite -Halhn) in "Hncell".
     iPoseProof (eoi_fc with "Htext") as "Hifc".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xfc)) Ra5 Rs4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xfc)) Ra5 Rs4
               (mword_of_int 44 : mword 12) J2 (K - 8)%nat
               (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -3473,21 +3471,21 @@ Section EndOpBlocks.
        [{["log"]} ∪ lks], not bare [lks] -- the interior release
        (below) is what brings it back down to bare [lks] for [Hcont]. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (trap_res eb + (K - 8))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 8))%nat false (proc_addr j) -∗
     cpu_own 1 eb (proc_addr j) false ({["log"]} ∪ lks) -∗
-    arm_pay kt 0 eb (proc_addr j) -∗
-    trap_csrs_ext kt eb -∗
+    arm_pay KT1 0 eb (proc_addr j) -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x7a) : mword 64) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    eo_frame4 (kt := kt) m -∗
-    eo_frameJ (kt := kt) m -∗
-    eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
+    eo_frame4 m -∗
+    eo_frameJ m -∗
+    eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs Hbelow.
@@ -3568,7 +3566,7 @@ Section EndOpBlocks.
     assert (Hbelow_wk2 : locks_below ({["log"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hlog_lt_proc |].
       lkbelow. }
-    iApply (Wk.wp_wakeup_sconf kt E3 γs (proc_addr j) 1%nat
+    iApply (Wk.wp_wakeup_sconf E3 γs (proc_addr j) 1%nat
               (trap_res eb + (K - 8))%nat eb false ({["log"]} ∪ lks)
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomE Hlen eo_noff1
               Hbelow_wk2
@@ -3655,7 +3653,7 @@ Section EndOpBlocks.
               G3 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /G3 upd_ne; [| regne]. exact (HG2thr c Hcs N2 N8 N9 N18). }
-    iApply (Rel.wp_release_sconf kt (ln_lk γ) log_addr "log"%string
+    iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G3 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
@@ -3696,7 +3694,6 @@ Section ProofEndOp.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_end_op_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -3708,7 +3705,7 @@ Section ProofEndOp.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_end_op_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart dev u pidv dq m K eb b lks.
   Proof.
     cbv beta zeta delta [wp_end_op_sconf_body].
@@ -3738,7 +3735,7 @@ Section ProofEndOp.
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx".
     { rewrite /log_ctx. iSplitR; [iExact "Hlock"|]. iSplitR; [iExact "Hdevc"|].
       iSplitR; [iExact "Hstc" | iExact "Hswlb"]. }
-    iAssert (eo_cont (kt := kt) (CID0 := CID)  j pidv dq m K eb eb lks)%I
+    iAssert (eo_cont (CID0 := CID)  j pidv dq m K eb eb lks)%I
       with "[Hcont]" as "Hcont"; [rewrite /eo_cont; iExact "Hcont"|].
     (* ===== PROLOGUE: the eight-slot frame ===== *)
     pose (R1 := <[Regidx csp_rs1 := regval_into_reg
@@ -3761,7 +3758,7 @@ Section ProofEndOp.
                     = add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hstk".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hstk".
     iDestruct "Hstk" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (v1) "Hr56". iDestruct "S2" as (v2) "Hr48".
     iDestruct "S3" as (v3) "Hr40". iDestruct "S4" as (v4) "Hr32".
@@ -3992,7 +3989,7 @@ Section ProofEndOp.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (eo_cont_shift (CIDa := CID) (CIDb := CID10)  j pidv dq m K eb eb lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (Acq.wp_acquire_sconf kt (ln_lk γ) "log"%string
+    iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) R6 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
@@ -4056,7 +4053,7 @@ Section ProofEndOp.
     { rgne. rewrite Hqs1. exact eo_addr_out. }
     iEval (rewrite -Houta) in "Houtc".
     iPoseProof (eoi_1a with "Htext") as "Hi1a".
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x1a)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x1a)) Ra5 Rs1
               (mword_of_int 28 : mword 12) macq (trap_res eb + (K - 8))%nat
               (mword_of_int (Z.of_nat out) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -4145,7 +4142,7 @@ Section ProofEndOp.
     { rgne. rewrite HT3s1. exact eo_addr_cmt. }
     iEval (rewrite -Hcmta) in "Hcmtc".
     iPoseProof (eoi_22 with "Htext") as "Hi22".
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x22)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x22)) Ra5 Rs1
               (mword_of_int 32 : mword 12) T3 (trap_res eb + (K - 8))%nat
               (mword_of_int 0 : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -4368,7 +4365,7 @@ Section ProofEndOp.
                 U5 !!! Regidx c = (m !!! Regidx c : mword 64)).
       { intros c Hcs N2 N8 N9 N18.
         rewrite /U5 upd_ne; [| regne]. exact (HU4thr c Hcs N2 N8 N9 N18). }
-      iApply (Rel.wp_release_sconf kt (ln_lk γ) log_addr "log"%string
+      iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
                 (log_res γ bn γfs cov logstart) U5 0%nat eb (proc_addr j) (K - 8)%nat
                 ({["log"]} ∪ lks)
                 ltac:(rewrite HU5a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -4413,7 +4410,7 @@ Section ProofEndOp.
       { rgne. rewrite Hrs1. exact eo_addr_lhn. }
       iEval (rewrite -Hlhna) in "Hncell".
       iPoseProof (eoi_3c with "Htext") as "Hi3c".
-      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x3c)) Ra5 Rs1
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x3c)) Ra5 Rs1
                 (mword_of_int 44 : mword 12) mr (K - 8)%nat
                 (mword_of_int (Z.of_nat nl) : mword 32) eb
                 ltac:(vm_compute; discriminate) ltac:(rdok)

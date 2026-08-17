@@ -62,9 +62,8 @@ Section ProofSwtch.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
-    Timeless (stack_own (KTR := kt) sp n).
+    Timeless (stack_own (KTR := KT1) sp n).
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
@@ -90,7 +89,7 @@ Section ProofSwtch.
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) (back : bool) :
-    wp_swtch_sconf_body kt P An Ao oldc newc m0 old_vs av eb p back.
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -288,7 +287,7 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
-    iAssert (sie_cap kt (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
+    iAssert (sie_cap KT1 (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
     { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit". iExact "Hq0". }
     (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
        rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it

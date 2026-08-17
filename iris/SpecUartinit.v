@@ -97,7 +97,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
    [wp_next_off] anyway, since the hart cannot move). *)
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γd : uart_names) (m : regfile) (K : nat)
+    (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -105,7 +105,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
      slots, and [initlock] demands [(2 <= av)] of what is left, so the budget
      is 2 + 2. *)
   (4 <= K)%nat ->
-  sie_cap_gpr kt m K false p -∗
+  sie_cap_gpr KT0 m K false p -∗
   (* [kernel_data] is load-bearing again: it is where the "uart" string
      literal that the [auipc a1 / addi a1] pair points at comes from -- the
      name uartinit hands [initsleeplock] -- alongside the device-register
@@ -122,7 +122,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
      [struct spinlock tx_lock], contents arbitrary. *)
   lk_raw a_tx_lock -∗
   ( ∀ mr,
-    sie_cap_gpr kt mr K false p -∗
+    sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* no THR write, so the accepted trace is untouched *)
@@ -144,7 +144,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γd : uart_names) (m : regfile) (K : nat)
+      (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (p : mword 64),
-      wp_uartinit_sconf_body kt γd m K l b0 p.
+      wp_uartinit_sconf_body γd m K l b0 p.
 End UARTINIT.

@@ -960,7 +960,6 @@ Section ProofFilewrite.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -988,7 +987,7 @@ Section ProofFilewrite.
   Local Lemma fw_env_dev (γf' : gname)
       (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_DEVICE ->
-    filewrite_env (kt := kt) γf' fn' Cf' -∗ filewrite_dev_env fn' Cf'.
+    filewrite_env γf' fn' Cf' -∗ filewrite_dev_env fn' Cf'.
   Proof.
     intro Ht. rewrite /filewrite_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1048,7 +1047,7 @@ Section ProofFilewrite.
   Local Lemma fw_env_fs (gf' : gname)
       (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    filewrite_env (kt := kt) gf' fn' Cf' -∗ filewrite_fs_env (kt := kt) gf' fn'.
+    filewrite_env gf' fn' Cf' -∗ filewrite_fs_env gf' fn'.
   Proof.
     intro Ht. rewrite /filewrite_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1098,7 +1097,7 @@ Section ProofFilewrite.
     M !!! Regidx Rs5 = (mword_of_int nz : mword 64) ->
     M !!! Regidx Rs7 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
     M !!! Regidx Rs9 = (mword_of_int SpecFilewrite.FW_MAX : mword 64) ->
-    sie_cap_gpr kt M Kn b p -∗
+    sie_cap_gpr KT1 M Kn b p -∗
     kernel_text -∗
     InstrBytes.pc_is (mword_of_int (FW + 0xcc) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1107,7 +1106,7 @@ Section ProofFilewrite.
           /\ P !!! Regidx Rs3 = (mword_of_int c : mword 64)
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> Rs3 ->
                 P !!! Regidx r = M !!! Regidx r)⌝ -∗
-        sie_cap_gpr kt P Kn b p -∗
+        sie_cap_gpr KT1 P Kn b p -∗
         InstrBytes.pc_is (mword_of_int (FW + 0x82) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1276,7 +1275,7 @@ Section ProofFilewrite.
     (-1 <= rz)%Z ->
     off_wf v ->
     (bv_unsigned v + rz <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z ->
-    sie_cap_gpr kt Mt Kn b p -∗
+    sie_cap_gpr KT1 Mt Kn b p -∗
     kernel_text -∗
     InstrBytes.pc_is (mword_of_int (FW + 0xa6) : mword 64) -∗
     a_foff kx ↦₄ v -∗
@@ -1285,7 +1284,7 @@ Section ProofFilewrite.
         ⌜off_wf v'
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 P !!! Regidx r = Mt !!! Regidx r)⌝ -∗
-        sie_cap_gpr kt P Kn b p -∗
+        sie_cap_gpr KT1 P Kn b p -∗
         InstrBytes.pc_is (mword_of_int (FW + 0xb4) : mword 64) -∗
         a_foff kx ↦₄ v' -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1341,7 +1340,7 @@ Section ProofFilewrite.
       { rewrite (rget_ne Mt Rs2 ltac:(vm_compute; discriminate)) Hs2.
         reflexivity. }
       iEval (rewrite -Hpoff) in "Hcell".
-      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0xaa)) Ra5 Rs2
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0xaa)) Ra5 Rs2
                 (mword_of_int 32 : mword 12) Mt Kn v b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hiaa Hcell").
@@ -1473,7 +1472,7 @@ Section ProofFilewrite.
          ∉ log_region_set (fwn_logstart fn)) ->
     BitmapInv.bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn)
       (fwn_bmapstart fn) (fwn_size fn) ->
-    SpecPrintk.printk_gen_contract (kt := kt) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
+    SpecPrintk.printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
     forall (W : nat) (iz : Z) (PI : uptd) (SI : gset Z) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
@@ -1498,24 +1497,24 @@ Section ProofFilewrite.
        4), iunlock ("sleep lock", 6) -- "log" is the lowest, on this
        recursion's own binder list so the back-edge re-proves it. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 12)%nat b pj -∗
+    sie_cap_gpr KT1 M (K - 12)%nat b pj -∗
     cpu_own 0%nat eb pj b lks -∗
     kernel_text -∗
     InstrBytes.pc_is (mword_of_int (FW + 0xcc) : mword 64) -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     (* the twelve frame slots, none of which the body touches *)
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     file_ref gf kx qx Cf -∗
     proc_priv_core pj pidv (upd_upt V PI) -∗
     KvmSpec.kalloc_env ga None -∗
@@ -1550,7 +1549,7 @@ Section ProofFilewrite.
         ⌜uptd_ext (pv_upt V) P'⌝ -∗
         ⌜filewrite_ret n r⌝ -∗
         ⌜mf !!! Regidx Ra0 = r⌝ -∗
-        sie_cap_gpr kt mf K b pj -∗
+        sie_cap_gpr KT1 mf K b pj -∗
         cpu_own 0%nat eb pj b lks -∗
         InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
         file_ref gf kx qx Cf -∗
@@ -1780,7 +1779,7 @@ Section ProofFilewrite.
       as "[Hppid Hpbk1]".
    iDestruct (cpu_own_transport CID0 CIDa1 0%nat eb (proc_addr jx) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (BeginOp.wp_begin_op_sconf kt gs jx glp (fwn_bio fn) (fwn_log fn)
+    iApply (BeginOp.wp_begin_op_sconf gs jx glp (fwn_bio fn) (fwn_log fn)
               (fwn_fs fn) (fwn_cov fn) (fwn_logstart fn) icfg_dev
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb b
               _ (fw_av_begin_op K HK) Hjp Hgsj
@@ -1807,7 +1806,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne mbo Rs2 ltac:(vm_compute; discriminate)) Hbos2.
       reflexivity. }
     iEval (rewrite -Hpip) in "Hcip".
-    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x88)) Ra0 Rs2
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x88)) Ra0 Rs2
               (mword_of_int 24 : mword 12) mbo (K - 12)%nat (fc_ip Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi88 Hcip").
@@ -1851,7 +1850,7 @@ Section ProofFilewrite.
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Ilock.wp_ilock_sconf kt gs jx glp (fwn_uart fn) (fwn_disk fn)
+    iApply (Ilock.wp_ilock_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_fs fn) (fwn_ireg fn) (fwn_ic fn)
               gil gisl
@@ -1946,7 +1945,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne Q1 Rs2 ltac:(vm_compute; discriminate)) HQ1s2.
       reflexivity. }
     iEval (rewrite -Hpoff) in "Hcell".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x92)) Ra3 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x92)) Ra3 Rs2
               (mword_of_int 32 : mword 12) Q1 (K - 12)%nat v b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi92 Hcell").
@@ -1998,7 +1997,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne Q4 Rs2 ltac:(vm_compute; discriminate)) HQ4s2.
       reflexivity. }
     iEval (rewrite -Hpip2) in "Hcip".
-    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x9c)) Ra0 Rs2
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x9c)) Ra0 Rs2
               (mword_of_int 24 : mword 12) Q4 (K - 12)%nat (fc_ip Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi9c Hcip").
@@ -2059,7 +2058,7 @@ Section ProofFilewrite.
     { rewrite fw_bslots3. iFrame "Hbsl1 Hbsl2". }
     iDestruct (cpu_own_transport CIDil CIDa9 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Writei.wp_writei_sconf kt KT0 gs jx glp (fwn_uart fn) (fwn_disk fn)
+    iApply (Writei.wp_writei_sconf KT0 gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn) (fwn_ireg fn) ga gf
               (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn) icfg_nib
@@ -2250,7 +2249,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne X0 Rs2 ltac:(vm_compute; discriminate)) HX0s2.
       reflexivity. }
     iEval (rewrite -Hpip3) in "Hcip".
-    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0xb4)) Ra0 Rs2
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0xb4)) Ra0 Rs2
               (mword_of_int 24 : mword 12) X0 (K - 12)%nat (fc_ip Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib4 Hcip").
@@ -2289,7 +2288,7 @@ Section ProofFilewrite.
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk3]".
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Iunlock.wp_iunlock_sconf kt gs (fwn_fs fn) (fwn_ireg fn)
+    iApply (Iunlock.wp_iunlock_sconf gs (fwn_fs fn) (fwn_ireg fn)
               (fwn_ic fn) gil gisl
               (fwn_cov fn) (fwn_logstart fn)
               ik (sh / 2)%Qp g icfg_dev
@@ -2351,7 +2350,7 @@ Section ProofFilewrite.
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk4]".
     iDestruct (cpu_own_transport CIDiu CIDb5 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (EndOp.wp_end_op_sconf kt gs jx glp (fwn_uart fn) (fwn_disk fn)
+    iApply (EndOp.wp_end_op_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn)
               (fwn_cov fn) (fwn_logstart fn) icfg_dev n'
@@ -2691,7 +2690,7 @@ Section ProofFilewrite.
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
       (lks : gset string)
-    : wp_filewrite_sconf_body kt γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
+    : wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hbelow.
@@ -2725,7 +2724,7 @@ Section ProofFilewrite.
                    = a_fwritable k).
     { rewrite (rget_ne m Ra0 ltac:(vm_compute; discriminate)) Ha0. reflexivity. }
     iEval (rewrite -Hpwr) in "Hcwr".
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) pcE Ra5 Ra0 (mword_of_int 9 : mword 12) m K
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) pcE Ra5 Ra0 (mword_of_int 9 : mword 12) m K
               (fc_writable Cf : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi00 Hcwr").
@@ -2930,7 +2929,7 @@ Section ProofFilewrite.
       { rewrite (rget_ne G3 Ra0 ltac:(vm_compute; discriminate)) HG3a0.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hpty) in "Hcty".
-      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x1c)) Ra5 Ra0
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x1c)) Ra5 Ra0
                 (mword_of_int 0 : mword 12) G3 (K - 12)%nat (fc_type Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1c Hcty").
@@ -3014,7 +3013,7 @@ Section ProofFilewrite.
                        = a_fpipe k).
         { rewrite (rget_ne G5 Ra0 ltac:(vm_compute; discriminate)) HG5a0. reflexivity. }
         iEval (rewrite -Hppi) in "Hcpp".
-        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x54)) Ra0 Ra0
+        iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x54)) Ra0 Ra0
                   (mword_of_int 16 : mword 12) G5 (K - 12)%nat (fc_pipe Cf) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi54 Hcpp").
@@ -3062,7 +3061,7 @@ Section ProofFilewrite.
           exact (HG5thr c Hcs N2 N8 N18 N21 N22). }
         iDestruct (cpu_own_transport CID CID11 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Pipewrite.wp_pipewrite_sconf kt γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
+        iApply (Pipewrite.wp_pipewrite_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q P2 (K - 12)%nat eb pidv V n b lks
                   Hj Hgs Hlens HP2a2 (fw_n_range n Hn) (fw_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
@@ -3486,7 +3485,7 @@ Section ProofFilewrite.
                   exact (HDrthrm c Hcs N2 N8 N18 N21 N22). }
                 iDestruct (cpu_own_transport CID CID20 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (Consolewrite.wp_consolewrite_sconf kt γa γf γs j γlp
+                iApply (Consolewrite.wp_consolewrite_sconf γa γf γs j γlp
                           (fwn_uart fn) (fwn_disk fn) (fwn_txlock fn)
                           E2 (K - 12)%nat eb pidv V n b lks
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn)
@@ -4217,7 +4216,7 @@ Section ProofFilewrite.
                 [CID0], and the walk still holds the ENTRY hart's copy. *)
              iDestruct (cpu_own_transport CID CID13 0%nat eb pj b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-             iApply (fw_panic (fun (h : CpuId) => PN.wp_panic_sconf kt (CID := h)) (CID0 := CID13) G7 (K - 12)%nat sp0
+             iApply (fw_panic (fun (h : CpuId) => PN.wp_panic_sconf KT1 (CID := h)) (CID0 := CID13) G7 (K - 12)%nat sp0
                        w3 w5 w6 w9 w10 w11 pj eb b lks HG7sp
                        (fw_panic_K K HK) Hbelow
                        with "Hcg Hcnt Htext Hkd Hpc Hpenv Hb3 Hb5 Hb6 Hb9 Hb10 Hb11").

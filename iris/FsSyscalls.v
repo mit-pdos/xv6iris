@@ -207,7 +207,6 @@ Section FsBundles.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   (* THE AMBIENT, AND IT IS PERSISTENT.  Every invariant, lock handle and
      certificate the fs cone runs on, plus the printk credential PAIR (the
      resource and its pure contract, which travel together and are wanted
@@ -224,7 +223,7 @@ Section FsBundles.
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       : iProp Σ :=
     (kernel_text ∗ kernel_data ∗
-     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := kt) γpr γu γd⌝ ∗
+     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
      bio_ctx bn (fs_view γfs γd dev cov) ∗
      log_ctx glog bn γfs cov logstart dev ∗
      fs_crash_seam cov logstart ∗
@@ -238,7 +237,7 @@ Section FsBundles.
      ic_sleeplocks cn ∗
      ireg_inv γi γfs inodestart nib ∗
      kalloc_env γa None ∗
-     procs_inv (kt := kt) γs)%I.
+     procs_inv γs)%I.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
       γfs γi cn gtl cov logstart inodestart nib dev :
@@ -296,7 +295,7 @@ Definition wp_sys_mkdir_friendly_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
+    (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)     (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -319,10 +318,10 @@ Definition wp_sys_mkdir_friendly_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
-  fs_world (kt := kt) γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
+  fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
            cov logstart inodestart nib dev -∗
   fs_res bn γfs cov logstart bmapstart inodestart ninodes size used ns
          dqb dqs dqbs dqn -∗
@@ -333,7 +332,7 @@ Definition wp_sys_mkdir_friendly_body
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       fs_res bn γfs cov logstart bmapstart inodestart ninodes size used' ns'
@@ -352,7 +351,7 @@ Module FsSysMkdir (M : SYSMKDIR).
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      {kt : ktier} (γf γa γpr : gname)
+      (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -366,7 +365,7 @@ Module FsSysMkdir (M : SYSMKDIR).
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
-      wp_sys_mkdir_friendly_body kt γf γa γpr γs j γl γu γd γk pd pav pu bn
+      wp_sys_mkdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
                                  glog γfs γi cn gtl cov logstart bmapstart
                                  inodestart nib ninodes size dev used ns
                                  dqb dqs dqbs dqn v pid V m K b lks.
@@ -380,7 +379,7 @@ Module FsSysMkdir (M : SYSMKDIR).
                         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
                         Hesc & Hisl & Hireg & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
-    iApply (M.wp_sys_mkdir_sconf kt γf γa γpr γs j γl γu γd γk pd pav pu bn
+    iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
               ninodes size dev used ns dqb dqs dqbs dqn v pid V m K true
               b lks
@@ -455,7 +454,7 @@ Definition wp_sys_chdir_friendly_body
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γf γa γpr : gname)
+    (γf γa γpr : gname)
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
@@ -477,10 +476,10 @@ Definition wp_sys_chdir_friendly_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
-  fs_world (kt := kt) γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
+  fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
            cov logstart inodestart nib dev -∗
   fs_res bn γfs cov logstart bmapstart inodestart ninodes size used 2
          dqb dqs dqbs dqn -∗
@@ -490,7 +489,7 @@ Definition wp_sys_chdir_friendly_body
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜used' ⊆ used⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)
@@ -508,7 +507,7 @@ Module FsSysChdir (M : SYSCHDIR).
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      {kt : ktier} (γf γa γpr : gname)
+      (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -522,7 +521,7 @@ Module FsSysChdir (M : SYSCHDIR).
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
-      wp_sys_chdir_friendly_body kt γf γa γpr γs j γl γu γd γk pd pav pu bn
+      wp_sys_chdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
                                  glog γfs γi cn gtl cov logstart bmapstart
                                  inodestart nib ninodes size dev used
                                  dqb dqs dqbs dqn v pid V m K b lks.
@@ -537,7 +536,7 @@ Module FsSysChdir (M : SYSCHDIR).
                         Hesc & Hisl & Hireg & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
-    iApply (M.wp_sys_chdir_sconf kt γf γa γs j γl γu γd γk pd pav pu bn
+    iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
               size dev used dqb dqs v pid V m K true b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout

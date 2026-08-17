@@ -123,7 +123,7 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
        szv' = add_vec (pv_sz V) (sbrk_arg v0) ) )).
 
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (γf : gname)
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sbrk in
@@ -133,7 +133,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
   (sys_sbrk_stack <= av)%nat ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: growproc's uvmalloc reaches kalloc with interrupts un-pushed *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -144,7 +144,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜callee_saved m mf⌝ -∗
       ⌜sys_sbrk_ok V v0 v1 P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
@@ -154,7 +154,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type SYSSBRK.
   Parameter wp_sys_sbrk_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string),
-      wp_sys_sbrk_sconf_body kt γa γf m av eb p pid V v0 v1 b lks.
+      wp_sys_sbrk_sconf_body γa γf m av eb p pid V v0 v1 b lks.
 End SYSSBRK.

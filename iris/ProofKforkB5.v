@@ -128,7 +128,6 @@ Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (FP : FORKRET_PARK).
 Section ProofKforkB5.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
@@ -166,12 +165,12 @@ Section ProofKforkB5.
        EXIT below is at [(K - 8)] with arm [b] -- same physical carve
        [trap_res b + (K - 8)] -- so the reserve is conserved across the block;
        the three releases and two acquires inside it each conserve it too. *)
-    sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-    IntrDefs.arm_pay kt lvl eb pme -∗
+    IntrDefs.arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
-    SchedCtx.procs_inv (kt := kt) γs -∗
+    SchedCtx.procs_inv γs -∗
     WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string WaitInv.wait_res -∗
     SchedCtx.proc_held cpu_id j γl USED ch -∗
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
@@ -189,7 +188,7 @@ Section ProofKforkB5.
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved Mt mf⌝ -∗
-        sie_cap_gpr kt mf (K - 8)%nat b pme -∗
+        sie_cap_gpr KT1 mf (K - 8)%nat b pme -∗
         cpu_own lvl eb pme b lks -∗
         pc_is (mword_of_int (KF + 0xf6) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -201,7 +200,7 @@ Section ProofKforkB5.
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
     (* on the raw context allocproc left, before releasing.               *)
     (* -------------------------------------------------------------- *)
-    iMod (FP.forkret_park kt γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd Hirsp")
+    iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd Hirsp")
       as "Hpctx".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
@@ -256,8 +255,8 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf kt (CID := CID0) γl (proc_addr j) "proc"%string
-              (SchedCtx.proc_lock_res (kt := kt) γs γl (proc_addr j)) M2 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string
+              (SchedCtx.proc_lock_res γs γl (proc_addr j)) M2 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka1 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
@@ -329,7 +328,7 @@ Section ProofKforkB5.
       rewrite /M3. apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     (* carry [cpu_own] hart-generically across the three plain leaves *)
     iDestruct (cpu_own_transport CID1 CID4 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf kt (CID := CID4) γw "wait_lock"%string WaitInv.wait_res
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string WaitInv.wait_res
               M5 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh
               with "Hcg Hown Htext Hpc [Hwl]").
@@ -355,7 +354,7 @@ Section ProofKforkB5.
     { assert (Hr : rget mr5 Rs4 = mr5 !!! Regidx Rs4) by (rgne; reflexivity).
       rewrite Hr Hr5s4. apply WaitInv.p_parent_sext. }
     iPoseProof (kfk_0d4 with "Htext") as "Hi_d4".
-    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
               mr5 (trap_res b + (K - 8))%nat vold false with "Hcg Hpc Hi_d4 [Hpcell]").
               iClear "Hi_d4".
     { iEval (rewrite Hea_d4). iExact "Hpcell". }
@@ -428,7 +427,7 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf kt (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
+    iApply (RL.wp_release_sconf KT1 (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
               WaitInv.wait_res M8 lvl eb pme (K - 8)%nat
               ({["wait_lock"]} ∪ lks)
               Hlka2 (kfkb5_stack_ok K HK)
@@ -484,7 +483,7 @@ Section ProofKforkB5.
     assert (HM10a0 : M10 !!! Regidx Ra0 = (proc_addr j))
       by (rewrite /M10 upd_ne; [exact HM9a0 | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CID6 CID8 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf kt (CID := CID8) γl "proc"%string (SchedCtx.proc_lock_res (kt := kt) γs γl (proc_addr j))
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID8) γl "proc"%string (SchedCtx.proc_lock_res γs γl (proc_addr j))
               M10 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh_proc
               with "Hcg Hown Htext Hpc [Hpinv]").
@@ -536,7 +535,7 @@ Section ProofKforkB5.
     { assert (Hr : rget M11 Rs4 = M11 !!! Regidx Rs4) by (rgne; reflexivity).
       rewrite Hr HM11s4. apply ProcGeom.p_state_sext. }
     iPoseProof (kfk_0ec with "Htext") as "Hi_ec".
-    iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0xec)) Ra5 Rs4 (mword_of_int 24 : mword 12)
+    iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xec)) Ra5 Rs4 (mword_of_int 24 : mword 12)
               M11 (trap_res b + (K - 8))%nat USED false with "Hcg Hpc Hi_ec [Hpst2]").
               iClear "Hi_ec".
     { iEval (rewrite Hea_ec). iExact "Hpst2". }
@@ -605,8 +604,8 @@ Section ProofKforkB5.
        for the call.  (The [rewrite -Hb] after the call does the reverse
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
-    iApply (RL.wp_release_sconf kt (CID := CID9) γl (proc_addr j) "proc"%string
-              (SchedCtx.proc_lock_res (kt := kt) γs γl (proc_addr j)) M13 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 (CID := CID9) γl (proc_addr j) "proc"%string
+              (SchedCtx.proc_lock_res γs γl (proc_addr j)) M13 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka3 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok2 HR3 Hown Hpay").

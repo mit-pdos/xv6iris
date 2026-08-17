@@ -253,7 +253,7 @@ Section BootBridge.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* NO [kt] BINDER: the boot capability is at KT0 by construction
+  (* NO [KT0] BINDER: the boot capability is at KT0 by construction
      ([sie_cap_intro_bare]); see the note in [Section BootStack] above. *)
   (* [mmode_config]'s two persistent conjuncts, kept while the bundle is
      handed to [wp_entry_boot] (which consumes it and never gives it back).

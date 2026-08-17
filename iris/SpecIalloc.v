@@ -180,7 +180,7 @@ Definition wp_ialloc_sconf_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -214,7 +214,7 @@ Definition wp_ialloc_sconf_body
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract (kt := kt) γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
@@ -228,7 +228,7 @@ Definition wp_ialloc_sconf_body
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -246,7 +246,7 @@ Definition wp_ialloc_sconf_body
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle and the disk fabric *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -273,7 +273,7 @@ Definition wp_ialloc_sconf_body
   ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -323,7 +323,7 @@ Definition wp_ialloc_gen_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -357,7 +357,7 @@ Definition wp_ialloc_gen_body
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract (kt := kt) γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
@@ -371,7 +371,7 @@ Definition wp_ialloc_gen_body
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -389,7 +389,7 @@ Definition wp_ialloc_gen_body
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle and the disk fabric *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -420,7 +420,7 @@ Definition wp_ialloc_gen_body
   ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -458,7 +458,7 @@ Module Type IALLOC.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -472,7 +472,7 @@ Module Type IALLOC.
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_ialloc_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
                          pidv dq dqs dqn m K eb b lks.
 
@@ -480,7 +480,7 @@ Module Type IALLOC.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      (kt : ktier) `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -494,7 +494,7 @@ Module Type IALLOC.
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_ialloc_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
                            pidv dq dqs dqn m K eb b lks.
 End IALLOC.

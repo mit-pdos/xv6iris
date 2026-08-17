@@ -94,7 +94,6 @@ Section ProofSysExit.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -118,7 +117,7 @@ Section ProofSysExit.
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string)
-    : wp_sys_exit_sconf_body kt γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
                              γi cn γtl bmapstart inodestart nib size dqb dqs us
                              on fn m av eb b pid V v0 lks.
@@ -151,7 +150,7 @@ Section ProofSysExit.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -264,7 +263,7 @@ Section ProofSysExit.
     iDestruct (proc_priv_tf γf pj pid V with "Hpriv") as "(Htf & Hpage & Hback)".
     iEval (rewrite -HA4a1) in "Hb3hi".
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf kt A4 (av - 4)%nat 0%nat eb pj 0%nat
+    iApply (Argint.wp_argint_sconf A4 (av - 4)%nat 0%nat eb pj 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (word_hi w3) (DfracOwn (1/4)) b
               _ sex_arg0 HA4a0 Hv0 sex_ilvl0 (sex_Kai av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
@@ -309,7 +308,7 @@ Section ProofSysExit.
        Hb3lo/Hb4) is simply framed away in [-] -- nothing ever reloads
        them, because nothing after this call is reachable. *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kexit.wp_kexit_sconf kt γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
+    iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev ip dqi γkl γka
               γi cn γtl bmapstart inodestart nib size dqb dqs us
               on fn B2 (av - 4)%nat eb b lks pid V

@@ -79,7 +79,6 @@ Section ProofVirtioDiskRwDSeam.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
@@ -114,9 +113,9 @@ Section ProofVirtioDiskRwDSeam.
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr kt M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false lks -∗
-       trap_csrs kt -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
        locked γk cpu_id -∗
@@ -146,9 +145,9 @@ Section ProofVirtioDiskRwDSeam.
        ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr kt M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false lks -∗
-       trap_csrs kt -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
        locked γk cpu_id -∗

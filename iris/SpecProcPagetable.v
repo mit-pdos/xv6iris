@@ -94,7 +94,7 @@ Definition ppt_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : Gen
    charged anyway: a stack budget is a property of the code, not of the path
    a particular caller proves it takes. *)
 Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -105,14 +105,14 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (uint tf + 4096 < 2 ^ 56)%Z ->
   (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
@@ -133,7 +133,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
    allocproc's own failure tails (and anything else outside the counted
    regime) have to call it. *)
 Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -143,14 +143,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   (uint tf + 4096 < 2 ^ 56)%Z ->
   (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
@@ -162,13 +162,13 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
 Module Type PROC_PAGETABLE_GEN.
   Parameter wp_proc_pagetable_core :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_pagetable_core_body kt γa mm tf dqtf lvl K eb p on b lks.
+      (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_proc_pagetable_core_body γa mm tf dqtf lvl K eb p on b lks.
 End PROC_PAGETABLE_GEN.
 
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_pagetable_sconf_body kt γa mm tf dqtf lvl K eb p on b lks.
+      (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_proc_pagetable_sconf_body γa mm tf dqtf lvl K eb p on b lks.
 End PROC_PAGETABLE.

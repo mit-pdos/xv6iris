@@ -97,7 +97,7 @@ Import Defs.
 
 Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+    (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.yield in
   let pj := proc_addr j in
@@ -106,19 +106,19 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (20 <= av)%nat ->
-  sie_cap_gpr kt m av eb pj -∗
+  sie_cap_gpr KT1 m av eb pj -∗
   cpu_own 0 eb pj eb ∅ -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
-  trap_csrs_ext kt eb -∗
+  procs_inv γs -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf av eb pj -∗
+      sie_cap_gpr KT1 mf av eb pj -∗
       cpu_own 0 eb pj eb ∅ -∗
       pc_is ret_tgt -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -127,7 +127,7 @@ Module Type YIELD.
   Parameter wp_yield_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool),
-      wp_yield_sconf_body kt γs j γl m av eb.
+      wp_yield_sconf_body γs j γl m av eb.
 End YIELD.

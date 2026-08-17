@@ -74,7 +74,7 @@ Definition userinit_pages : nat := 8%nat.
 Definition wp_userinit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname)  (γs : list gname)
+    (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
     (eb : bool) (pj : mword 64)
     (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string) :=
@@ -86,19 +86,19 @@ Definition wp_userinit_sconf_body
   (* enough pages for allocproc's trapframe + page table and uvmfirst's first
      user page; stated exactly as virtio_disk_init states its three *)
   (exists nb, on = Some nb /\ (userinit_pages <= nb)%nat) ->
-  sie_cap_gpr kt m0 K b pj -∗
+  sie_cap_gpr KT1 m0 K b pj -∗
   (* [kernel_data] supplies the "initcode" / "/" string literals *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   cpu_own 0%nat eb pj b lks -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   kalloc_env γa on -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
-    sie_cap_gpr kt mf K b pj -∗
+    sie_cap_gpr KT1 mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     cpu_own 0%nat eb pj b lks -∗
@@ -111,9 +111,9 @@ Module Type USERINIT.
   Parameter wp_userinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (γs : list gname)
+      (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64)
       (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body kt γa γs m0 K eb pj on v0 b lks.
+      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
 End USERINIT.

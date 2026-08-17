@@ -211,7 +211,6 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
     1%positive 0 0 0%nat 0 (DfracOwn 1) (DfracOwn 1)).
 
 Section SpecFileclose.
-  Context {kt : ktier}.
   (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
      two instance paths print identically and do not unify), and iput's
      contract is applied at the one that comes with the file table. *)
@@ -227,7 +226,7 @@ Section SpecFileclose.
   Definition fileclose_pipe_env (fn : fclose_names)
       (on : option nat) (n : nat) : iProp Σ :=
     (⌜(Z.of_nat n + 2 < 2 ^ 31)%Z⌝ ∗
-     procs_inv (kt := kt) (fcn_procs fn) ∗
+     procs_inv (fcn_procs fn) ∗
      is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
        (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail (fcn_kalloc fn) on)%I.
@@ -355,7 +354,7 @@ Section SpecFileclose.
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv (kt := kt) (fcn_procs fn) ∗
+     procs_inv (fcn_procs fn) ∗
      bio_ctx (fcn_bio fn)
        (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
      log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
@@ -617,7 +616,7 @@ Definition wp_fileclose_sconf_body
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γfl γf : gname)            (* ftable.lock, ftable  *)
+    (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
     (fn : fclose_names) (on : option nat) (us : gset Z) (* the arms' ghosts   *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -631,7 +630,7 @@ Definition wp_fileclose_sconf_body
   (* a0 is the file being closed *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where
      fileclose's own acquire mints what the FS arm's interior sleeps need;
@@ -640,13 +639,13 @@ Definition wp_fileclose_sconf_body
      [fileclose_fs_env] -- see that bundle's banner for why the FS arm is
      the wrong home for it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
   panic_env -∗
   file_ref γf k q Cf -∗
-  fileclose_env (kt := kt) fn on us n eb p Cf -∗
+  fileclose_env fn on us n eb p Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  The FD_INODE / FD_DEVICE
      arm parks (begin_op / iput / end_op), so fileclose can return on
      another hart whatever SIE was doing.  It used to say [b], which was
@@ -659,9 +658,9 @@ Definition wp_fileclose_sconf_body
      continuation hart-generically.) *)
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -676,10 +675,10 @@ Module Type FILECLOSE.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γfl γf : gname)
+      (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_fileclose_sconf_body kt γfl γf k q Cf fn on us m n eb p K b lks.
+      wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks.
 End FILECLOSE.

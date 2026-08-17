@@ -151,7 +151,6 @@ Section ProcinitSeals.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γ : gname)  (γs : list gname).
 
-  Context {kt : ktier}.
   (* ---- what the postcondition is FOR ----
      One [proc_ready i], plus the two public cells procinit does not touch,
      IS the body of [SchedCtx.proc_lock_res] at UNUSED.  So the caller's
@@ -168,7 +167,7 @@ Section ProcinitSeals.
     pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
-    proc_lock_res (kt := kt) γs γl (proc_addr i).
+    proc_lock_res γs γl (proc_addr i).
   Proof.
     iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
     iFrame "Hlk Hks".
@@ -202,7 +201,6 @@ Section ProcinitProcsInv.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γ : gname) .
 
-  Context {kt : ktier}.
   (* [lk_fresh] in the three pieces [newlock]/[newlock_delayed] take.  The
      only content is that [lk_cpu] and [WpLock.lock_cpu] are the same address
      spelled twice (0x10 and 16). *)
@@ -272,7 +270,7 @@ Section ProcinitProcsInv.
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
          proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
        pstate_full i UNUSED)
-    ={E}=∗ ∃ γs : list gname, procs_inv (kt := kt) γs.
+    ={E}=∗ ∃ γs : list gname, procs_inv γs.
   Proof.
     iIntros "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
@@ -300,13 +298,13 @@ Section ProcinitProcsInv.
                  (fun i g => ((∀ R : iProp Σ, R ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
                  (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string
-                                        (proc_lock_res (kt := kt) γs g (proc_addr i)) ∗
+                                        (proc_lock_res γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
     { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg)]".
       iMod (word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
-      iMod ("Hmk" $! (proc_lock_res (kt := kt) γs g (proc_addr i))
+      iMod ("Hmk" $! (proc_lock_res γs g (proc_addr i))
               with "[Hst Hg Hch Hpub Hdorm Hpark]") as "#Hlk".
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
                   with "Hst Hg Hch Hpub [Hdorm Hpark]").
@@ -322,13 +320,13 @@ Section ProcinitProcsInv.
 
 End ProcinitProcsInv.
 
-Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
      wants 2 below that. *)
   (10 <= K)%nat ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two standalone locks ... *)
   lk_raw pid_lock_addr -∗
@@ -346,7 +344,7 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
   iref_slots (NPROC * (1 + IREFSPARE)) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk_fresh pid_lock_addr "nextpid"%string -∗
@@ -357,6 +355,6 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
 
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
-      wp_procinit_sconf_body kt m K b p.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
+      wp_procinit_sconf_body m K b p.
 End PROCINIT.

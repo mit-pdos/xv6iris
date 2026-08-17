@@ -222,7 +222,6 @@ Section ProofFdalloc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -258,17 +257,17 @@ Section ProofFdalloc.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr kt Mt (av - 4)%nat b p -∗
+    sie_cap_gpr KT1 Mt (av - 4)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fdalloc + 0x28) : mword 64) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr kt mf av b p -∗
+        sie_cap_gpr KT1 mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -426,7 +425,7 @@ Section ProofFdalloc.
       (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_fdalloc_sconf_body kt γf k D m av n eb p pid V b lks.
+    : wp_fdalloc_sconf_body γf k D m av n eb p pid V b lks.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].
     intros pcE ret_tgt Ha0 Hk Hn Hav.
@@ -453,7 +452,7 @@ Section ProofFdalloc.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.fdalloc + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -571,7 +570,7 @@ Section ProofFdalloc.
        transporting to [CID7] before myproc wants it. *)
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ===================== myproc() ===================== *)
-    iApply (Myproc.wp_myproc_sconf kt A3 (av - 4)%nat n eb p b
+    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MP) "%Hms Hcg Hcpu Hpc %HcsMP".
@@ -696,19 +695,19 @@ Section ProofFdalloc.
         /\ (forall r : mword 5, is_cs_idx r = true ->
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 ->
               M !!! Regidx r = m !!! Regidx r) ⌝ -∗
-      sie_cap_gpr kt (CID:=CID0) M (av - 4)%nat b p -∗
+      sie_cap_gpr KT1 (CID:=CID0) M (av - 4)%nat b p -∗
       cpu_own (CID:=CID0) n eb p b lks -∗
       pc_is (CID:=CID0) (mword_of_int (KernelSyms.fdalloc + 0x1a) : mword 64) -∗
       proc_priv_core p pid V -∗
       proc_ofiles_owe γf p (pv_ofile V) D -∗
-      (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-      (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-      (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-      (pa_stk sp0 4) ↦₈[kt] (vgap : mword 64) -∗
+      (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+      (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+      (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+      (pa_stk sp0 4) ↦₈[KT1] (vgap : mword 64) -∗
       wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
         ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
-          sie_cap_gpr kt mf av b p -∗
+          sie_cap_gpr KT1 mf av b p -∗
           cpu_own n eb p b lks -∗
           pc_is ret_tgt -∗
           proc_priv_core p pid V -∗
@@ -734,7 +733,7 @@ Section ProofFdalloc.
       iDestruct (proc_ofiles_owe_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
       assert (Haddr : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                       = p_ofile p fd) by (rewrite HMa5; apply addv_sext0).
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
                 M (av - 4)%nat w b (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a [Hcell]").
@@ -842,7 +841,7 @@ Section ProofFdalloc.
           as "(Hcell & Hfdslot & Hpvback)".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                           = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
-        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
+        iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
                   G3 (av - 4)%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi3c [Hcell]").
         { iEval (rgne; rewrite Haddr3c). iExact "Hcell". }

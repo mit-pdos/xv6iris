@@ -106,7 +106,6 @@ Section ProofNamexRoot.
             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -131,7 +130,7 @@ Section ProofNamexRoot.
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_namex_root_body kt gtl cn gfs gi cov logstart nib dev dqp
+    : wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
                          m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namex_root_body].
@@ -206,7 +205,7 @@ Section ProofNamexRoot.
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 12)
       by (rewrite /R1 upd_eq; exact Hpush).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -414,7 +413,7 @@ Section ProofNamexRoot.
     assert (HR5a0 : R5 !!! Regidx Ra0 = pv).
     { rewrite /R5 upd_ne; [| nz]. rewrite /R4 upd_ne; [| nz].
       rewrite /R3 upd_ne; [exact HR2a0 | nz]. }
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0x22)) Ra4 Ra0
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0x22)) Ra4 Ra0
               (mword_of_int 0 : mword 12) R5 (K - 12)%nat SLASH b (dqm := dqp)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi022 [Hp0]").
     { iEval (rgne; rewrite HR5a0 addv_sext0). iExact "Hp0". }
@@ -552,7 +551,7 @@ Section ProofNamexRoot.
        this walk nothing.  This is the root clause's first consumer. *)
     iAssert (iname gi gfs ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf kt gtl cn gfs gi cov logstart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
@@ -698,7 +697,7 @@ Section ProofNamexRoot.
     iIntros (CIDK5 HqK5). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt0f4) in "Hpc".
     (* ===== +0x0f4 lbu a5,0(s1) : path[0] again ===== *)
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xf4)) Ra5 Rs1
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0xf4)) Ra5 Rs1
               (mword_of_int 0 : mword 12) A8 (K - 12)%nat SLASH b (dqm := dqp)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0f4 [Hp0]").
     { iEval (rgne; rewrite HA8s1 addv_sext0). iExact "Hp0". }
@@ -742,7 +741,7 @@ Section ProofNamexRoot.
                      = mword_of_int (NX + 0xfe)) by pcw.
     iEval (rewrite Hpp0fe) in "Hpc".
     (* ===== +0x0fe lbu a5,0(s1) : path[1], the terminator ===== *)
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (NX + 0xfe)) Ra5 Rs1
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0xfe)) Ra5 Rs1
               (mword_of_int 0 : mword 12) Q1 (K - 12)%nat NUL b (dqm := dqp)
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0fe [Hp1]").
     { iEval (rgne; rewrite HQ1s1 addv_sext0). iExact "Hp1". }
@@ -1019,9 +1018,9 @@ Section ProofNamexRoot.
     iEval (rewrite HT7) in "Hb7".   iEval (rewrite HT8) in "Hb8".
     iEval (rewrite HT9) in "Hb9".   iEval (rewrite HT10) in "Hb10".
     iEval (rewrite HT11) in "Hb11". iEval (rewrite HT12) in "Hb12".
-    iAssert (stack_own (KTR := kt) sp0 12) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]"
+    iAssert (stack_own (KTR := KT1) sp0 12) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]"
       as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
       iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
       iSplitL "Hb3"; [iExists _; iExact "Hb3" |].

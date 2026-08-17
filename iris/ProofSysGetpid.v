@@ -85,14 +85,13 @@ Section ProofSysGetpid.
 
 
 
-  Context {kt : ktier}.
   (* =================================================================== *)
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_getpid_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_getpid_sconf_body kt γf m av n eb p pid V b lks.
+    : wp_sys_getpid_sconf_body γf m av n eb p pid V b lks.
   Proof.
     cbv beta delta [wp_sys_getpid_sconf_body].
     intros pcE ret_tgt Hn Hav.
@@ -181,7 +180,7 @@ Section ProofSysGetpid.
        the ENTRY hart -- re-anchor it at [CID5] before crossing into myproc. *)
     iDestruct (cpu_own_transport CID CID5 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- myproc(): a0 = p, callee-saved preserved ---- *)
-    iApply (Myproc.wp_myproc_sconf kt Bj (av - 2)%nat n eb p b
+    iApply (Myproc.wp_myproc_sconf Bj (av - 2)%nat n eb p b
               _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hs6 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
@@ -196,7 +195,7 @@ Section ProofSysGetpid.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       reflexivity. }
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_getpid + 0x0c)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_getpid + 0x0c)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) MF (av - 2)%nat pid b
               (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)

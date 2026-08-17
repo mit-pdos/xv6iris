@@ -88,7 +88,6 @@ Section SpecFreeproc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* p->pagetable, and what comes with it.  The [Some] arm's two pure facts
      are proc_freepagetable's size premises; see the header. *)
   Definition fp_pt (pa : mword 64) (szv : mword 64) (opt : option uptd) : iProp Σ :=
@@ -246,7 +245,7 @@ Section SpecFreeproc.
        proc_freepagetable arm's own callees carry no order premise of their
        own yet, so this is the whole cone this contract needs to state. *)
     locks_below lks "kmem" ->
-    sie_cap_gpr kt mm K false pme -∗
+    sie_cap_gpr KT1 mm K false pme -∗
     cpu_own ilvl eb pme false lks -∗
     kernel_text -∗
     pc_is pcE -∗
@@ -257,7 +256,7 @@ Section SpecFreeproc.
     kalloc_env γa None -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
-      sie_cap_gpr kt mr K false pme -∗
+      sie_cap_gpr KT1 mr K false pme -∗
       cpu_own ilvl eb pme false lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
@@ -275,10 +274,10 @@ Module Type FREEPROC.
        Parameter must not re-introduce it. *)
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string),
-      wp_freeproc_sconf_body (kt := kt) γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
+      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
 End FREEPROC.

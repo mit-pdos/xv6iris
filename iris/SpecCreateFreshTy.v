@@ -399,7 +399,7 @@ Definition create_fresh_ty_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+    (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -423,7 +423,7 @@ Definition create_fresh_ty_body
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
   bv_unsigned ty <> 0 ->
-  printk_gen_contract (kt := kt) γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   dev = ROOTDEV ->
@@ -455,7 +455,7 @@ Definition create_fresh_ty_body
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string),
-     wp_ialloc_gen_body kt (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
+     wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                         γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks') ->
@@ -469,12 +469,12 @@ Definition create_fresh_ty_body
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string),
-     wp_ilock_sconf_body kt (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
+     wp_ilock_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                          γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
                          nib' k' s' g' dev' inum' pidv' dq' dqs'
                          m' K' eb' b' lks') ->
   (* ================= THE SPAN ================= *)
-  sie_cap_gpr kt Ma K b pj -∗
+  sie_cap_gpr KT1 Ma K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   kernel_data -∗
@@ -486,7 +486,7 @@ Definition create_fresh_ty_body
   ic_escrows cn γfs γi cov logstart -∗
   SpecDirlink.ic_sleeplocks cn -∗
   ireg_inv γi γfs inodestart nib -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -505,7 +505,7 @@ Definition create_fresh_ty_body
     (kslot : nat) (q : Qp) (g : gname) (inum : mword 32)
     (gil gisl : gname) (dn : dinode) (bm : blkmap),
       ⌜cr_cs_but_s3 Ma Mo⌝ -∗
-      sie_cap_gpr kt Mo K b pj -∗
+      sie_cap_gpr KT1 Mo K b pj -∗
       cpu_own 0 eb pj b lks -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -556,7 +556,7 @@ Module Type CREATE_FRESH_TY.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -569,7 +569,7 @@ Module Type CREATE_FRESH_TY.
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      create_fresh_ty_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
+      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
                            u Sb pidv dq dqs dqn Ma K eb b lks.
 End CREATE_FRESH_TY.

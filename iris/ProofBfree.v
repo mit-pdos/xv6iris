@@ -456,7 +456,6 @@ Section WpBfreeSllw.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
-  Context {kt : ktier}.
   Lemma wp_sllw_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
@@ -466,11 +465,11 @@ Section WpBfreeSllw.
       (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
          (subrange_vec_dec
             (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) = wval ->
-    sie_cap_gpr kt m n b p -∗
+    sie_cap_gpr KT1 m n b p -∗
     pc_is pc -∗
     instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -516,13 +515,12 @@ Section BfreeDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Context {kt : ktier}.
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition bf_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[kt] (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[kt] (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[kt] (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[kt] (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new
      byte list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
@@ -566,13 +564,13 @@ Section BfreeDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 b (proc_addr j) b lks -∗
         (* bfree's own crossing established [eb = b] once at entry
            (cpu_own_eb_agree, n = 0); the whole function is a PURE
            PASS-THROUGH of the trap-CSR complement (it does no acquire of
            its own), so it stays [b] rather than a fresh [eb]. *)
-        trap_csrs_ext kt b -∗
+        trap_csrs_ext KT1 b -∗
         cpu_claim_ext b (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -602,7 +600,6 @@ Section BfreeTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Context {kt : ktier}.
   Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
@@ -622,16 +619,16 @@ Section BfreeTail.
     bmapstart ∈ cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     bitmap_ok cov logstart size (used ∖ {[ bi ]}) ->
-    sie_cap_gpr kt M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 b (proc_addr j) b lks -∗
-    trap_csrs_ext kt b -∗
+    trap_csrs_ext KT1 b -∗
     cpu_claim_ext b (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bfree + 0x4a) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
-    bf_frame (kt := kt) m -∗
+    procs_inv γs -∗
+    bf_frame m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗
@@ -641,7 +638,7 @@ Section BfreeTail.
     free_pool γfs size (used ∖ {[ bi ]}) -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bnoB
        (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 -∗
-    bf_cont (kt := kt) (CID0 := CID0) γfs bn γ cov logstart bmapstart size used bi
+    bf_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used bi
             (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
             pidv dq dqb j m K b lks -∗
     WP (Loop : expr riscv_lang).
@@ -694,7 +691,7 @@ Section BfreeTail.
     (* log_write does not thread the trap-CSR complement at all: [Hextc]/
        [Hextm] are stranded at bf_tail's entry hart and are not touched
        here -- transported across the whole span, right before [bf_cont]. *)
-    iApply (LW.wp_log_write_gene kt bn γ γfs γd cov logstart dev kk pidv bnoB
+    iApply (LW.wp_log_write_gene bn γ γfs γd cov logstart dev kk pidv bnoB
               (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 u cr Sb e0
               T0 0%nat b (proc_addr j) (K - 4)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT0a0
@@ -772,7 +769,7 @@ Section BfreeTail.
     assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
     (* brelse does not thread the trap-CSR complement either: same
        stranding as log_write above. *)
-    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq T2 (K - 4)%nat b (proc_addr j)
               (bitmap_bytes (used ∖ {[ bi ]})) bsd true b lks
               HKbl Hkk HT2a0
@@ -922,9 +919,9 @@ Section BfreeTail.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -1025,7 +1022,6 @@ Section ProofBfreeMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_bfree_gen 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1038,7 +1034,7 @@ Section ProofBfreeMain.
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_bfree_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
                         pidv dq dqb m K eb b lks.
   Proof.
@@ -1079,7 +1075,7 @@ Section ProofBfreeMain.
        own, so this holds at EVERY hart the function touches, not just at
        entry. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst eb.
-    iAssert (bf_cont (kt := kt) (CID0 := CID) γfs bn γ cov logstart bmapstart size used bi
+    iAssert (bf_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size used bi
                (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
                pidv dq dqb j m K b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /bf_cont; iExact "Hcont" |].
@@ -1117,7 +1113,7 @@ Section ProofBfreeMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : bf_sp m R1) by (rewrite /bf_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -1188,7 +1184,7 @@ Section ProofBfreeMain.
     iEval (rewrite Hb2; rgne; rewrite HR1s0) in "Hf2".
     iEval (rewrite Hb3; rgne; rewrite HR1s1) in "Hf3".
     iEval (rewrite Hb4; rgne; rewrite HR1s2) in "Hf4".
-    iAssert (bf_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
+    iAssert (bf_frame m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
     { rewrite /bf_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |]. iExact "Hf4". }
@@ -1294,7 +1290,7 @@ Section ProofBfreeMain.
                      = sb_bmapstart).
     { rgne. rewrite HR5a1. rewrite /sb_bmapstart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
               (mword_of_int 2504 : mword 12) R5 (K - 4)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 Hsb").
@@ -1382,7 +1378,7 @@ Section ProofBfreeMain.
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
-    iApply (BR.wp_bread_sconf kt γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 4)%nat b b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
@@ -1601,7 +1597,7 @@ Section ProofBfreeMain.
                      = pa_add (b_data (bpa kk)) d).
     { rgne. rewrite HB5a4. apply bf_data_off. }
     iEval (rewrite -Hbyadr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
               (mword_of_int 88 : mword 12) B5 (K - 4)%nat
               (bm_byte used q) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi32 Hbyte").
@@ -1856,7 +1852,7 @@ Section ProofBfreeMain.
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_bfree_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
                           pidv dq dqb m K eb b lks.
   Proof.

@@ -11,7 +11,7 @@
 
    S4 IS SAVED CONDITIONALLY.  [sd s4,0(sp)] is at +0x50 and [ld s4,0(sp)]
    at +0x90, both INSIDE the indirect arm, so the direct-only path owns the
-   sixth frame slot without ever giving it a value.  [it_frame kt]'s sixth
+   sixth frame slot without ever giving it a value.  [it_frame]'s sixth
    conjunct is existential for exactly that reason. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -84,7 +84,6 @@ Section ItruncCont.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
-  Context {kt : ktier}.
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (γfs : fs_names) (γi : gname) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
@@ -96,9 +95,9 @@ Section ItruncCont.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -191,7 +190,6 @@ Section ItruncTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
-  Context {kt : ktier}.
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -222,17 +220,17 @@ Section ItruncTail.
     (* it_tail's only lock-touching callee is the closing iupdate, at "log"
        (3). *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 6)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
-    it_frame kt m -∗
+    procs_inv γs -∗
+    it_frame m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -252,7 +250,7 @@ Section ItruncTail.
        a RESOURCE at the walk's own birth epoch (fs-log.md §G.20) *)
     log_credit γ cru Sb0 e0 (IBLOCK inum inodestart) -∗
     log_opSe γ (S u) Sb0 e0 -∗
-    it_cont (kt := kt) (CID0 := CID0) γ γfs γi bn cov logstart bmapstart inodestart size
+    it_cont (CID0 := CID0) γ γfs γi bn cov logstart bmapstart inodestart size
             used dev ip inum dn bm (if cru then S u else u)
             (Sb0 ∪ {[IBLOCK inum inodestart]})
             pidv dq dqd dqn dqb dqs j m K b eb lks -∗
@@ -366,7 +364,7 @@ Section ItruncTail.
        iput can present a GROUP witness through the whole walk, and the
        birth epoch NAMED, because a credit is only sound against the epoch
        of the op presenting it.  iupdate's own post re-closes the epoch. *)
-    iApply (IU.wp_iupdate_credgen kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+    iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
               bm_empty u Sb0 cru e0 0%nat
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb b
@@ -561,9 +559,9 @@ Section ItruncTail.
                    = pa_stk (add_vec (P5 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HP5sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (KTR := kt) (m !!! Regidx csp_rs1 : mword 64) 6)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 6)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -672,7 +670,6 @@ Section ItruncDLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
-  Context {kt : ktier}.
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names)
@@ -685,9 +682,9 @@ Section ItruncDLoop.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
-        sie_cap_gpr kt Mx (K - 6)%nat b (proc_addr j) -∗
+        sie_cap_gpr KT1 Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x32) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -732,16 +729,16 @@ Section ItruncDLoop.
     (* it_dloop's only lock-touching callee is bfree, at "log" (3), on its
        own binder list so the recursive back-edge re-proves it. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 6)%nat b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x20) : mword 64) -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -789,7 +786,7 @@ Section ItruncDLoop.
                                 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz Z.add_0_r. apply bvw64_small, bv_unsigned_in_range. }
     iEval (rewrite -Hca) in "Hcell".
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x20)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x20)) Ra1 Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat (bm_dir bm !!! k) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi20 Hcell").
     iIntros (CID1 Hq1) "Hcg Hpc Hcell".
@@ -997,7 +994,7 @@ Section ItruncDLoop.
                      = i_dev ip).
       { rgne. rewrite HL0s3. reflexivity. }
       iEval (rewrite -Hdva) in "Hidev".
-      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x24)) Ra0 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x24)) Ra0 Rs3
                 (mword_of_int 0 : mword 12) L0 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24 Hidev").
       iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -1064,7 +1061,7 @@ Section ItruncDLoop.
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (lia).
-      iApply (BF.wp_bfree_gen kt γs jx γl γu γd γk pd pav pu bn γ γfs
+      iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev (used ∖ bm_dir_freed bm k)
                 (bm_dir bm !!! k : mword 32) (data k) u' cr Sq e0
                 pidv dq dqb L3 (K - 6)%nat eb b
@@ -1254,7 +1251,6 @@ Section ItruncELoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
-  Context {kt : ktier}.
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
@@ -1267,9 +1263,9 @@ Section ItruncELoop.
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr4 m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         ⌜Mx !!! Regidx Rs4 = bnode kk⌝ -∗
-        sie_cap_gpr kt Mx (K - 6)%nat b (proc_addr j) -∗
+        sie_cap_gpr KT1 Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x7a) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1317,16 +1313,16 @@ Section ItruncELoop.
     (* it_eloop's only lock-touching callee is bfree, at "log" (3), on its
        own binder list so the recursive back-edge re-proves it. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 6)%nat b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x6c) : mword 64) -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1374,7 +1370,7 @@ Section ItruncELoop.
                                 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz Z.add_0_r. apply bvw64_small, bv_unsigned_in_range. }
     iEval (rewrite -Hca) in "Hcell".
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x6c)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x6c)) Ra1 Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat (bm_ent bm !!! q) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi6c Hcell").
     iIntros (CID1 Hq1) "Hcg Hpc Hcell".
@@ -1558,7 +1554,7 @@ Section ItruncELoop.
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
       { rgne. rewrite HE0s3. reflexivity. }
       iEval (rewrite -Hdva) in "Hidev".
-      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x70)) Ra0 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x70)) Ra0 Rs3
                 (mword_of_int 0 : mword 12) E0 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi70 Hidev").
       iIntros (CIDy Hqy) "Hcg Hpc Hidev".
@@ -1626,7 +1622,7 @@ Section ItruncELoop.
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDz)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (lia).
-      iApply (BF.wp_bfree_gen kt γs jx γl γu γd γk pd pav pu bn γ γfs
+      iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev
                 (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q))
                 (bm_ent bm !!! q : mword 32) (data (NDIRECT + q)%nat) u' cr Sq e0
@@ -1794,7 +1790,6 @@ Section ItruncIArm.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
-  Context {kt : ktier}.
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (γfs : fs_names) (bn : bio_names)
@@ -1806,15 +1801,15 @@ Section ItruncIArm.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
-        sie_cap_gpr kt Mx (K - 6)%nat b (proc_addr j) -∗
+        sie_cap_gpr KT1 Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] v) -∗
+        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
         inode_map γfs ip bm_empty -∗
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
@@ -1855,16 +1850,16 @@ Section ItruncIArm.
     (* it_iarm's cone: bread/brelse ("bcache", 4) for the indirect block,
        it_eloop and the block's own bfree ("log", 3) -- "log" is lowest. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M (K - 6)%nat b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x50) : mword 64) -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1872,7 +1867,7 @@ Section ItruncIArm.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     (* the sixth frame slot -- this arm is the only writer *)
-    (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[kt] v) -∗
+    (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
     bslots bn 3 -∗
     inode_map γfs ip (bm_dir_zeroed bm NDIRECT) -∗
     it_ent_res γfs bm data 0 -∗
@@ -1939,7 +1934,7 @@ Section ItruncIArm.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite Hs3. reflexivity. }
     iEval (rewrite -Hdva) in "Hidev".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x52)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x52)) Ra0 Rs3
               (mword_of_int 0 : mword 12) M (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi52 Hidev").
     iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -2017,7 +2012,7 @@ Section ItruncIArm.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
-    iApply (BR.wp_bread_sconf kt γs jx γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs jx γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bm : mword 32) dq
               A1 (K - 6)%nat eb b lks
               HKbr
@@ -2248,7 +2243,7 @@ Section ItruncIArm.
     (* Hcnt arrived with the loop's exit at CID9 *)
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (BL.wp_brelse_sconf kt γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat eb
               (proc_addr jx) (ind_bytes (bm_ent bm)) bsd0 d0 b lks
               HKbl Hkk HB1a0
@@ -2285,7 +2280,7 @@ Section ItruncIArm.
                    = i_addr ip NDIRECT).
     { rgne. rewrite HmRs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica) in "Hindcell".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x80)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x80)) Ra1 Rs3
               (mword_of_int 128 : mword 12) mR (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi80 Hindcell").
@@ -2311,7 +2306,7 @@ Section ItruncIArm.
                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite HC0s3. reflexivity. }
     iEval (rewrite -Hdva2) in "Hidev".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x84)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x84)) Ra0 Rs3
               (mword_of_int 0 : mword 12) C0 (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 Hidev").
     iIntros (CID14 Hq14) "Hcg Hpc Hidev".
@@ -2380,7 +2375,7 @@ Section ItruncIArm.
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID15)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     assert (HKbf2 : (K_bfree <= K - 6)%nat) by (lia).
-    iApply (BF.wp_bfree_gen kt γs jx γl γu γd γk pd pav pu bn γ γfs
+    iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev
               (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT))
               (bm_ind bm : mword 32) (ind_bytes (bm_ent bm)) u' cr Sq e0
@@ -2530,7 +2525,6 @@ Section ItruncMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
-  Context {kt : ktier}.
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  [log_opS] is an exclusive
      ghost_map element with no auth-monotone shadow, so a counted post hands
      back an element at an unrelated existential set and NOTHING recovers a
@@ -2551,7 +2545,7 @@ Section ItruncMain.
       (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_itrunc_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                          cov logstart bmapstart inodestart nib size dev used
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks.
@@ -2605,7 +2599,7 @@ Section ItruncMain.
         [reflexivity | intros Hq; injection Hq as Hq'; exact (N2 Hq')]. }
     assert (HP0a0 : P0 !!! Regidx Ra0 = ip)
       by (rewrite /P0 upd_ne; [exact Ha0 | nz]).
-    rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iDestruct "Hstk" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & _)".
     iDestruct "Hf1" as (v1) "Hf1". iDestruct "Hf2" as (v2) "Hf2".
     iDestruct "Hf3" as (v3) "Hf3". iDestruct "Hf4" as (v4) "Hf4".
@@ -2703,7 +2697,7 @@ Section ItruncMain.
     iEval (rewrite Hp0c) in "Hpc".
     (* the frame is complete: five saved registers and the sixth slot,
        which only the indirect arm ever writes *)
-    iAssert (it_frame kt m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
+    iAssert (it_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
     { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hf6". }
     (* ===== +0x0c c.addi4spn s0,sp,48 : the frame pointer, unused below ==== *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (IT + 0x0c))
@@ -2852,7 +2846,7 @@ Section ItruncMain.
                     = i_addr ip NDIRECT).
     { rgne. rewrite HMs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica0) in "Hindcell".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (IT + 0x32)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x32)) Ra1 Rs3
               (mword_of_int 128 : mword 12) Mx (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 Hindcell").
@@ -3077,7 +3071,7 @@ Section ItruncMain.
       (data : nat -> list (bv 8)) (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_itrunc_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+    : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart bmapstart inodestart nib size dev used
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks.

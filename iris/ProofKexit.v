@@ -20,7 +20,7 @@
 
    * THERE IS NO EPILOGUE, AND THAT IS THE POINT.  kexit diverges, so the
      six frame cells are never reloaded and the six stack slots are never
-     given back: [kx_frame kt] is EXISTENTIAL in the saved values (nothing will
+     given back: [kx_frame] is EXISTENTIAL in the saved values (nothing will
      ever read them) and is simply carried to the [jal sched], where the
      post-resume arm drops it into the diverging panic along with everything
      else.
@@ -185,10 +185,10 @@ Proof. intros Hi Hfd Heq. apply (p_ofile_end_inj i (S fd) Hi ltac:(lia) Heq). Qe
 Definition kx_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition kx_frame `{!riscvGS Σ} (kt : ktier) (spF : mword 64) : iProp Σ :=
+Definition kx_frame `{!riscvGS Σ} (spF : mword 64) : iProp Σ :=
   (∃ v5 v4 v3 v2 v1 v0 : mword 64,
-     kx_fcell spF 5 ↦₈[kt] v5 ∗ kx_fcell spF 4 ↦₈[kt] v4 ∗ kx_fcell spF 3 ↦₈[kt] v3 ∗
-     kx_fcell spF 2 ↦₈[kt] v2 ∗ kx_fcell spF 1 ↦₈[kt] v1 ∗ kx_fcell spF 0 ↦₈[kt] v0)%I.
+     kx_fcell spF 5 ↦₈[KT1] v5 ∗ kx_fcell spF 4 ↦₈[KT1] v4 ∗ kx_fcell spF 3 ↦₈[KT1] v3 ∗
+     kx_fcell spF 2 ↦₈[KT1] v2 ∗ kx_fcell spF 1 ↦₈[KT1] v1 ∗ kx_fcell spF 0 ↦₈[KT1] v0)%I.
 
 (* the register shape the fd loop threads: the cursor, its end pointer, the
    process and the exit status.  s0 is dead after the prologue and s5..s11
@@ -266,7 +266,6 @@ Section KexitPro.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* +0x00 .. +0x10: carve the 6-slot frame, save ra/s0..s4, set s0, and
      park the argument in s4.  Control lands on the [jal myproc]. *)
   Lemma kx_prologue (m : regfile) (K : nat)
@@ -275,15 +274,15 @@ Section KexitPro.
     let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     (6 <= K)%nat ->
     (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-    sie_cap_gpr kt m K b pme -∗
+    sie_cap_gpr KT1 m K b pme -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.kexit) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ M : regfile,
         ⌜ M !!! Regidx (mword_of_int 20) = m !!! Regidx (mword_of_int 10)
         /\ (forall r : regidx, r ∈ dom (rf_to_gmap M)) ⌝ -∗
-        sie_cap_gpr kt M (K - 6) b pme -∗
+        sie_cap_gpr KT1 M (K - 6) b pme -∗
         pc_is (mword_of_int (KX + 0x12)) -∗
-        kx_frame kt spF -∗
+        kx_frame spF -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -309,7 +308,7 @@ Section KexitPro.
               with "Hcg Hpc Hi00").
     iIntros (CID1 Hst1) "Hcg Hframe Hpc".
     assert (Hsp0f : m !!! Regidx csp_rs1 = sp0) by reflexivity.
-    iEval (rewrite Hsp0f (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite Hsp0f (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & _)".
     iDestruct "C1" as (v1) "Hc1". iDestruct "C2" as (v2) "Hc2".
     iDestruct "C3" as (v3) "Hc3". iDestruct "C4" as (v4) "Hc4".
@@ -419,7 +418,6 @@ Section KexitLoop.
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
-  Context {kt : ktier}.
   Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId}
        (γft γf : gname) (fn : fclose_names)
       (j : nat) (pid : mword 32) (sv : mword 64) (cwdv : mword 64)
@@ -455,28 +453,28 @@ Section KexitLoop.
         ⌜ kxt_regs Mx pj sv ⌝ -∗
         ⌜ pv_ofile Vx = replicate NOFILE (zero_reg : mword 64) ⌝ -∗
         ⌜ pv_cwd Vx = cwdv ⌝ -∗
-        sie_cap_gpr kt Mx av b pj -∗
+        sie_cap_gpr KT1 Mx av b pj -∗
         cpu_own 0 eb pj b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (mword_of_int (KX + 0x4c)) -∗
         proc_priv γf pj pid Vx -∗
-        (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
-        (∃ usx : gset Z, fileclose_fs_env_nopid (kt := kt) fn usx 0%nat eb pj) -∗
+        (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
+        (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (fd : nat) (M : regfile) (V : pprivate),
       ⌜(fd < NOFILE)%nat⌝ -∗ ⌜kxl_regs M pj sv fd⌝ -∗ ⌜kx_nulled cwdv fd V⌝ -∗
-      sie_cap_gpr kt M av b pj -∗
+      sie_cap_gpr KT1 M av b pj -∗
       cpu_own 0 eb pj b lks -∗
       (* IN and OUT: kexit still needs the pair past the loop, for
          begin_op / iput / end_op, and at [eb = false] fileclose is the only
          thing that can re-index it. *)
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is (mword_of_int (KX + 0x3e)) -∗
       proc_priv γf pj pid V -∗
-      (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
-      (∃ usx : gset Z, fileclose_fs_env_nopid (kt := kt) fn usx 0%nat eb pj) -∗
+      (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
+      (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.
@@ -491,22 +489,22 @@ Section KexitLoop.
                        ⌜ kxt_regs Mx pj sv ⌝ -∗
                        ⌜ pv_ofile Vx = replicate NOFILE (zero_reg : mword 64) ⌝ -∗
                        ⌜ pv_cwd Vx = cwdv ⌝ -∗
-                       sie_cap_gpr kt Mx av b pj -∗
+                       sie_cap_gpr KT1 Mx av b pj -∗
                        cpu_own 0 eb pj b lks -∗
-                       trap_csrs_ext kt eb -∗
+                       trap_csrs_ext KT1 eb -∗
                        cpu_claim_ext eb pj -∗
                        pc_is (mword_of_int (KX + 0x4c)) -∗
                        proc_priv γf pj pid Vx -∗
-                       (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
+                       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
                        (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
                        WP (Loop : expr riscv_lang)) -∗
-                   sie_cap_gpr kt M av b pj -∗
+                   sie_cap_gpr KT1 M av b pj -∗
                    cpu_own 0 eb pj b lks -∗
-                   trap_csrs_ext kt eb -∗
+                   trap_csrs_ext KT1 eb -∗
                    cpu_claim_ext eb pj -∗
                    pc_is (mword_of_int (KX + 0x3e)) -∗
                    proc_priv γf pj pid V -∗
-                   (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
+                   (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
                    (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -524,13 +522,13 @@ Section KexitLoop.
       iAssert (wp_next (CID0 := CID0) true pj (fun (CIDt : CpuId) =>
                  ∀ (Mt : regfile) (Vt : pprivate),
                    ⌜ kxl_regs Mt pj sv fd ⌝ -∗ ⌜ kx_nulled cwdv (S fd) Vt ⌝ -∗
-                   sie_cap_gpr kt Mt av b pj -∗
+                   sie_cap_gpr KT1 Mt av b pj -∗
                    cpu_own 0 eb pj b lks -∗
-                   trap_csrs_ext kt eb -∗
+                   trap_csrs_ext KT1 eb -∗
                    cpu_claim_ext eb pj -∗
                    pc_is (mword_of_int (KX + 0x38)) -∗
                    proc_priv γf pj pid Vt -∗
-                   (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
+                   (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
                    (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
                    WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
@@ -754,7 +752,7 @@ Section KexitLoop.
         iDestruct (fileclose_loop_open fn onk usk 0%nat eb pj Cf
                      with "Hpenv Hfenv [Hpidq]") as "[Hfcenv Hfcback]".
         { rewrite Hfnj Hfndq Hfnpid. iExact "Hpidq". }
-        iApply (Fileclose.wp_fileclose_sconf kt (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks
+        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
                   with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href Hfcenv").
         all: try lkbelow.
@@ -840,7 +838,6 @@ End KexitLoop.
 Section KexitPark.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
-  Context {kt : ktier}.
   Lemma kx_park `{GEN : GenId} `{CID0 : CpuId}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname) (ip sv : mword 64) (dqi : dfrac)
@@ -858,7 +855,7 @@ Section KexitPark.
        [locks_below_mono] / [locks_below_union_singleton] at the nested
        acquire below. *)
     locks_below lks "wait_lock" ->
-    sie_cap_gpr kt M av b pj -∗
+    sie_cap_gpr KT1 M av b pj -∗
     cpu_own 0 eb pj b lks -∗
     (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE.  The park is
        what needs it: sched's crossing takes [trap_csrs] and [cpu_claim]
@@ -866,10 +863,10 @@ Section KexitPark.
        [eb = true] ([IntrDefs.arm_pay] is [emp] at the disabled index).  At
        [eb = false] they can only have come from the trap, through the
        caller.  Nothing is handed back -- kexit does not return. *)
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
@@ -952,7 +949,7 @@ Section KexitPark.
       rewrite /P0 upd_ne; [exact Hs4 | vm_compute; discriminate]. }
     iDestruct (cpu_own_transport CID0 CIDw 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf kt (CID := CIDw) γw "wait_lock"%string wait_res
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string wait_res
               P2 0 eb pj av b lks ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hown Htext Hpc []").
@@ -1032,7 +1029,7 @@ Section KexitPark.
     assert (Hfresh_proc : locks_below ({["wait_lock"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hwl_lt_proc |].
       lkbelow. }
-    iApply (Reparent.wp_reparent_sconf kt (CID := CIDa)  P4 γs pj ip ps dqi 1%nat (trap_res b + av)%nat eb false
+    iApply (Reparent.wp_reparent_sconf (CID := CIDa)  P4 γs pj ip ps dqi 1%nat (trap_res b + av)%nat eb false
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
               Hfresh_proc
@@ -1099,7 +1096,7 @@ Section KexitPark.
     (* [Hfresh_proc] ("proc" outranks the held "wait_lock") was already
        derived above for reparent's call; wakeup and kexit's own
        [acquire(&p->lock)] below reuse it unchanged. *)
-    iApply (Wakeup.wp_wakeup_sconf kt (CID := CIDa)  P6 γs
+    iApply (Wakeup.wp_wakeup_sconf (CID := CIDa)  P6 γs
               pj 1%nat (trap_res b + av)%nat eb false
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen
@@ -1164,8 +1161,8 @@ Section KexitPark.
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* [Hfresh_proc], derived above for wakeup's own call, is exactly what
        this nested acquire needs too. *)
-    iApply (Acquire.wp_acquire_sconf kt (CID := CIDa) γl "proc"%string
-              (proc_lock_res (kt := kt) γs γl pj) P8 1%nat eb pj (trap_res b + av)%nat false
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDa) γl "proc"%string
+              (proc_lock_res γs γl pj) P8 1%nat eb pj (trap_res b + av)%nat false
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(lia)
               Hfresh_proc
@@ -1309,7 +1306,7 @@ Section KexitPark.
       by (rewrite /PC; apply upd_eq).
     assert (HPCa0 : PC !!! Regidx (mword_of_int 10 : mword 5) = wait_lock_addr)
       by (rewrite /PC upd_ne; [exact HPBa0 | vm_compute; discriminate]).
-    iApply (Release.wp_release_sconf kt (CID := CIDa) γw wait_lock_addr "wait_lock"%string
+    iApply (Release.wp_release_sconf KT1 (CID := CIDa) γw wait_lock_addr "wait_lock"%string
               (* release's [av] is its EXIT index, i.e. the index of the window
                  it returns to -- here the LEVEL-1 window (p->lock still held),
                  which runs at [trap_res b + av], not at the function's own
@@ -1357,7 +1354,7 @@ Section KexitPark.
     (* sched() is called with p->lock held, i.e. from inside the level-1
        window, whose index carries the reserve: [trap_res b + av].  The park is
        index-generic, so it just rides through at that index. *)
-    iApply (Sched.wp_sched_sconf kt (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
+    iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
                     [Hpriv Hsp Hir] Hpay Hcpuemp Hoc Htag Hvc").
@@ -1393,7 +1390,6 @@ Section KexitRest.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
-  Context {kt : ktier}.
   Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname)
@@ -1433,14 +1429,14 @@ Section KexitRest.
        "log", 3) and the tail [kx_park] (rank "wait_lock", 10) both follow
        by [locks_below_mono]. *)
     locks_below lks "log" ->
-    sie_cap_gpr kt M av b pj -∗
+    sie_cap_gpr KT1 M av b pj -∗
     cpu_own 0 eb pj b lks -∗
     (* THREADED, not framed: begin_op / iput / end_op all take the complement
        and give it back, and all three cross at the literal [true]. *)
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
-    procs_inv (kt := kt) γs -∗ panic_env -∗
+    procs_inv γs -∗ panic_env -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1522,7 +1518,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (BeginOp.wp_begin_op_sconf kt (CID := CID1)  γs j γl bn γ γfs cov logstart dev
+    iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn γ γfs cov logstart dev
               pid (DfracOwn (1/4)) Q0 av eb b lks
               ltac:(lia) Hj Hgl
               (* "log" (3) outranks "itable" (2), [Hfresh]'s own bound. *)
@@ -1587,7 +1583,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID2 CID4 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iput.wp_iput_sconf kt (CID := CID4) γs j γl γu γd γk pd pav pu bn γ γfs
+    iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl γu γd γk pd pav pu bn γ γfs
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
               Q2 av eb b lks
@@ -1640,7 +1636,7 @@ Section KexitRest.
     (* "log" (3) outranks "itable" (2): weaken [Hfresh]'s bound. *)
     assert (Hfresh_log : locks_below lks "log")
       by lkbelow.
-    iApply (EndOp.wp_end_op_sconf kt (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
+    iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb b lks
               ltac:(lia) Hgeom Hj Hgl
               Hfresh_log
@@ -1709,7 +1705,6 @@ Section ProofKexit.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
-  Context {kt : ktier}.
   Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
@@ -1726,7 +1721,7 @@ Section ProofKexit.
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate)
-    : wp_kexit_sconf_body kt γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
                           γi cn γtl bmapstart inodestart nib size dqb dqs us
                           on fn m av eb b lks pid V.
@@ -1776,7 +1771,7 @@ Section ProofKexit.
       by (rewrite /A0 upd_ne; [exact Hs4 | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CIDp CID1 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Myproc.wp_myproc_sconf kt (CID := CID1) A0 (av - 6)%nat 0 eb pj b lks
+    iApply (Myproc.wp_myproc_sconf (CID := CID1) A0 (av - 6)%nat 0 eb pj b lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hown Htext Hpc").
     iIntros (CID2 Hs2 ms mp) "%Hmsf Hcg Hown Hpc %Hmp".
@@ -1964,7 +1959,7 @@ Section ProofKexit.
       assert (Ha0msg : B2 !!! Regidx (mword_of_int 10 : mword 5)
                        = (mword_of_int kx_msg_a : mword 64))
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (PN.wp_panic_sconf kt (CID := CIDB) B2 (av - 6)%nat
+      iApply (PN.wp_panic_sconf KT1 (CID := CIDB) B2 (av - 6)%nat
                 0%nat eb b pj (PkAStr DfracDiscarded kx_msg) lks
                 (kx_panic_K av HK) eq_refl kx_panic_noff
                 (kx_panic_below lks Hfresh)
@@ -2000,7 +1995,7 @@ Section ProofKexit.
          The pid cell is NOT in it: it comes out of [proc_priv] one call at a
          time ([ProcInv.proc_priv_pid_ofile]), since the block is what the
          loop is walking. *)
-      iAssert (∃ on', fileclose_pipe_env (kt := kt) (MkFCloseNames γs j γl γkl γka γu γd γk
+      iAssert (∃ on', fileclose_pipe_env (MkFCloseNames γs j γl γkl γka γu γd γk
                         pd pav pu bn γ γfs cov logstart dev pid (DfracOwn (1/4))
                         γi cn γtl bmapstart inodestart nib size dqb dqs)
                         on' 0%nat)%I with "[Hav0]" as "Hpenv".

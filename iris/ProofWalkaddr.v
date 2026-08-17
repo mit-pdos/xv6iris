@@ -173,10 +173,9 @@ Section ProofWalkaddr.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_walkaddr_sconf (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_walkaddr_sconf_body kt mm t m K dq b p.
+    : wp_walkaddr_sconf_body mm t m K dq b p.
   Proof.
     cbv beta delta [wp_walkaddr_sconf_body].
     intros pcE va vpn ret_tgt HK Hroot Hrep.
@@ -328,7 +327,7 @@ Section ProofWalkaddr.
     iIntros (CID7 Hs7) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (V2 !!! Regidx csp_rs1)
         (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> V2) with W1.
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v8) "Hc1". iDestruct "S2" as (v0) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = spr) by (rewrite /W1 upd_eq; reflexivity).
@@ -429,7 +428,7 @@ Section ProofWalkaddr.
       by (rewrite HW4a1; exact Hvalt).
     assert (HKw : (8 <= K - 2)%nat) by lia.
     (* ---- the call ---- *)
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf kt W4 t m (K - 2)%nat dq b p
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 W4 t m (K - 2)%nat dq b p
               HKw HW4a0 HW4a2 Hwkva Hrep
               with "Hcg Htext Hpc Hptree").
     iIntros (CID13 Hs13 mw) "Hcg Hpc Hptree %Hkcs %Hpay".
@@ -469,7 +468,7 @@ Section ProofWalkaddr.
     iAssert (∀ (CIDe : CpuId) (M : regfile),
                ⌜b = false \/ p = zero_reg -> (CIDe : CPU) = (CID : CPU)⌝ -∗
                ⌜callee_saved mw M⌝ -∗
-               sie_cap_gpr kt (CID := CIDe) M (K - 2)%nat b p -∗
+               sie_cap_gpr KT1 (CID := CIDe) M (K - 2)%nat b p -∗
                pc_is (CID := CIDe) (mword_of_int (KernelSyms.walkaddr + 0x2a) : mword 64) -∗
                ptree_own 2 dq t -∗
                ⌜ (M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0 /\
@@ -539,8 +538,8 @@ Section ProofWalkaddr.
                      = pa_stk (add_vec (E2 !!! Regidx csp_rs1)
                          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
       { rewrite Hwv HspE2. symmetry. exact Hsprstk. }
-      iAssert (stack_own (KTR := kt) sp0 2) with "[Hc1 Hc2]" as "Hfr".
-      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 2) with "[Hc1 Hc2]" as "Hfr".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
         iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
         done. }
@@ -665,7 +664,7 @@ Section ProofWalkaddr.
       apply kv_addv_zero. }
     assert (Ha0vg : rget (CID := CID19) mw (mword_of_int 10 : mword 5) = pt_addr0 p1 vpn)
       by (rgne; exact Ha0v).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.walkaddr + 0x1c)) (mword_of_int 15 : mword 5)
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.walkaddr + 0x1c)) (mword_of_int 15 : mword 5)
               (mword_of_int 10 : mword 5) (mword_of_int 0 : mword 12)
               mw (K - 2)%nat w0 b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)

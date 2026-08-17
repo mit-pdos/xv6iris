@@ -18,13 +18,13 @@
      ...    epilogue
 
    So this contract is argint's with the narrowing removed: argaddr stores
-   the WHOLE 64-bit trapframe slot, and its postcondition is [ip ↦₈[kt] v] where
+   the WHOLE 64-bit trapframe slot, and its postcondition is [ip ↦₈[KT1] v] where
    [v] is argraw's result.  There is no [trunc32] and no range clause -- a
    [uint64] argument is whatever the user put in the register, which is
    precisely why the C comment says argaddr "doesn't check for legality,
    since copyin/copyout will do that".
 
-   Resources are argraw's, plus the caller's destination cell [ip ↦₈[kt] old].
+   Resources are argraw's, plus the caller's destination cell [ip ↦₈[KT1] old].
    Nothing about [proc_priv] appears: see SpecArgraw.v for why the trapframe
    pointer travels as a bare fraction (a caller holding the block splits it
    out with [ProcInv.proc_priv_tf]). *)
@@ -58,7 +58,7 @@ Import Defs.
    since the two functions have identical frames. *)
 Notation argaddr_stack := (18%nat) (only parsing).
 Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (old : mword 64) (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argaddr in
@@ -71,28 +71,28 @@ Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   (argaddr_stack <= av)%nat ->
   (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
-  ip ↦₈[kt] old -∗
+  ip ↦₈[KT1] old -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
-      ip ↦₈[kt] v -∗
+      ip ↦₈[KT1] v -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type ARGADDR.
   Parameter wp_argaddr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (old : mword 64) (dqt : dfrac) (b : bool) (lks : gset string),
-      wp_argaddr_sconf_body kt m av n eb p i tfp ws v old dqt b lks.
+      wp_argaddr_sconf_body m av n eb p i tfp ws v old dqt b lks.
 End ARGADDR.

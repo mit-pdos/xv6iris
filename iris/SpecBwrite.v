@@ -61,7 +61,7 @@ Definition wp_bwrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -85,7 +85,7 @@ Definition wp_bwrite_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  bwrite has NO acquire of
@@ -96,14 +96,14 @@ Definition wp_bwrite_sconf_body
      at [eb = true] this is [emp] (virtio_disk_rw's own acquire mints what it
      needs) and at [eb = false] it is the honest pair, held because the TRAP
      handed it over. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle rw's sleeps thread through *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -134,9 +134,9 @@ Definition wp_bwrite_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -154,7 +154,7 @@ Module Type BWRITE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -162,6 +162,6 @@ Module Type BWRITE.
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ) (lks : gset string),
-      wp_bwrite_sconf_body kt γs j γl γu γd γk pd pav pu bn V k
+      wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
                            pidv dev bno dq m K eb bs bsd b Q lks.
 End BWRITE.

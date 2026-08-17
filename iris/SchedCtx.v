@@ -90,7 +90,6 @@ Qed.
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context {kt : ktier}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
 
@@ -204,7 +203,7 @@ Section SchedCtx.
                        mword 64 -d> mword 64 -d> bool -d> iPropO Σ :=
     fun h A' c cret tpv p back =>
     (⌜tpv = cid_word_of h⌝ ∗
-     trap_csrs kt (CID := h) ∗
+     trap_csrs KT1 (CID := h) ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states.  [A'] -- the
@@ -236,7 +235,7 @@ Section SchedCtx.
      partner's own hart, so a parking function's continuation states the
      slot with [sched_vc_at h]. *)
   Definition sched_vc_at (h : CPU) (c p : mword 64) : iProp Σ :=
-    valid_context (kt := kt) p_sched (Some h) c p.
+    valid_context p_sched (Some h) c p.
 
   Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id c p.
 
@@ -252,7 +251,7 @@ Section SchedCtx.
   Lemma p_sched_to_cpu (i : CPU) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> park_ok st = true ->
-    trap_csrs kt (CID := i) -∗
+    trap_csrs KT1 (CID := i) -∗
     proc_held i j γl st ch -∗
     hart_full j i -∗
     park_pay (proc_addr j) st -∗
@@ -271,7 +270,7 @@ Section SchedCtx.
      hart's ghost. *)
   Lemma p_sched_to_proc (i : CPU) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
-    trap_csrs kt (CID := i) -∗
+    trap_csrs KT1 (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
     hart_full j i -∗
     p_sched i (Some i) (p_context (proc_addr j))
@@ -291,7 +290,7 @@ Section SchedCtx.
     p_sched i A' (p_context (proc_addr j)) cret tpv p back -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
     ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗ ⌜back = true⌝ ∗
-    trap_csrs kt (CID := i) ∗
+    trap_csrs KT1 (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch ∗ hart_full j i.
   Proof.
@@ -325,7 +324,7 @@ Section SchedCtx.
     (j < NPROC)%nat ->
     p_sched i A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) back -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
-    ⌜A' = None⌝ ∗ trap_csrs kt (CID := i) ∗
+    ⌜A' = None⌝ ∗ trap_csrs KT1 (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
       ⌜γs !! j = Some γl /\ park_ok st = true /\ back = needs_ctx st⌝ ∗
       proc_held i j γl st ch ∗ hart_full j i ∗ park_pay (proc_addr j) st.
@@ -364,7 +363,7 @@ Section SchedCtx.
      [procs_inv] below mention neither -- which is what lets ONE [procs_inv]
      ride the [started] payload to every secondary hart. *)
   Definition proc_ctx (pa : mword 64) : iProp Σ :=
-    valid_context (kt := kt) p_sched None (p_context pa) pa.
+    valid_context p_sched None (p_context pa) pa.
 
   (* the resource protected by [p->lock].  The context slot is ▷-guarded:
      its producer (the scheduler, releasing a freshly parked proc) only ever

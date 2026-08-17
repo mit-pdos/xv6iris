@@ -533,7 +533,7 @@ Definition wp_dirlookup_tree_body
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -579,7 +579,7 @@ Definition wp_dirlookup_tree_body
   eq_vec (m !!! Regidx (mword_of_int 12 : mword 5)) zero_reg = negb hasp ->
   eb = true ->
   locks_below lks "bcache" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -591,13 +591,13 @@ Definition wp_dirlookup_tree_body
   inode_map γfs ip bm -∗
   fdir γi γfs dpi ents dn bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's [f]) ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- poff: a 4-byte cell, or nothing ---- *)
   (if hasp then pf ↦₄ pofv else emp) -∗
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -613,7 +613,7 @@ Definition wp_dirlookup_tree_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED, NODE FRAGMENT INCLUDED --
@@ -624,7 +624,7 @@ Definition wp_dirlookup_tree_body
       inode_meta ip dn -∗
       inode_map γfs ip bm -∗
       fdir γi γfs dpi ents dn bm data -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       p_pid pj ↦₄{dq} pidv -∗
       bslot bn -∗
       fedges dpi dn data -∗
@@ -660,7 +660,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
         ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      {kt : ktier} (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -677,7 +677,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-      wp_dirlookup_tree_body kt γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
+      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                              γa γf cov logstart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks.
@@ -697,7 +697,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iAssert (dir_links (bv_unsigned (inum_of dpi)) dn data)
       with "[Hedges]" as "Hedges".
     { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
-    iApply (DL.wp_dirlookup_sconf kt γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
+    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
               γa γf cov logstart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks

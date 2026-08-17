@@ -96,7 +96,7 @@ Import Defs.
 
 
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
@@ -123,7 +123,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      uvmunmap, kfree again -- all bound at "kmem" (13), the lowest rank
      the cone touches. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -132,7 +132,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -163,8 +163,8 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmcopy_sconf_body kt γa mm Pold Pnew K eb p ilvl b lks.
+      wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p ilvl b lks.
 End UVMCOPY.

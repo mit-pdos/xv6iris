@@ -86,7 +86,6 @@ Notation Rs8 := (mword_of_int 24 : mword 5).
 Section VdrwbFreeAt.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
 
-  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -110,10 +109,10 @@ Section VdrwbFreeAt.
     ret_pc (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + off + 4) : mword 64) 4)
       = (mword_of_int (KernelSyms.virtio_disk_rw + off + 8) : mword 64) ->
     locks_below lks "proc" ->
-    sie_cap_gpr kt M av false pme -∗
+    sie_cap_gpr KT1 M av false pme -∗
     cpu_own 1 eb pme false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) -∗
- procs_inv (kt := kt) γs -∗
+ procs_inv γs -∗
     d_desc_ptr ↦₈□ pd -∗
     instr (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) false
           (LOAD (imm, Regidx Rs0, Regidx Ra0, false, 4)) -∗
@@ -122,7 +121,7 @@ Section VdrwbFreeAt.
     free_bundles pd fr -∗ free_slot_res pd i -∗
     ( ∀ Mf : regfile,
         ⌜forall r : mword 5, is_cs_idx r = true -> Mf !!! Regidx r = M !!! Regidx r⌝ -∗
-        sie_cap_gpr kt Mf av false pme -∗
+        sie_cap_gpr KT1 Mf av false pme -∗
         cpu_own 1 eb pme false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off + 8) : mword 64) -∗
         idxa ↦₄ (mword_of_int (Z.of_nat i) : mword 32) -∗
@@ -169,7 +168,7 @@ Section VdrwbFreeAt.
     (* take the slot apart: free_desc wants the four descriptor words *)
     iDestruct "Hslot" as "(Hde & Hops & Hst & Hib)".
     iDestruct "Hde" as (va vl vf vn) "(Hd0 & Hd8 & Hd12 & Hd14)".
-    iApply (FreeDesc.wp_free_desc_sconf kt γs pd i N2 av 1%nat eb pme va vl vf vn false lks
+    iApply (FreeDesc.wp_free_desc_sconf γs pd i N2 av 1%nat eb pme va vl vf vn false lks
               Hav Hi8 HN2a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
               with "Hcg Hown Htext Hpc Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
     all: try lkbelow.
@@ -198,7 +197,6 @@ Section ProofVirtioDiskRwB.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   Local Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
@@ -248,16 +246,16 @@ Section ProofVirtioDiskRwB.
        ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr kt M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-       trap_csrs kt -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0c4) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
        free_slot_res pd h -∗ free_slot_res pd m2 -∗ free_slot_res pd t -∗
-       vdrw_idx (KTR := kt) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -273,14 +271,14 @@ Section ProofVirtioDiskRwB.
         /\ M !!! Regidx Rs4 = (mword_of_int (Z.of_nat 3) : mword 64)
         /\ M !!! Regidx Rs5 = (disk_base : mword 64)
         /\ vdrw_hi M m0⌝ -∗
-       sie_cap_gpr kt M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-       trap_csrs kt -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc) : mword 64) -∗
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
-       vdrw_scratch (KTR := kt) sp0 -∗
+       vdrw_scratch (KTR := KT1) sp0 -∗
        vdrw_p2_exit CID0 γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -300,17 +298,17 @@ Section ProofVirtioDiskRwB.
        [SleepPrepare]/[Sleep] calls, both of which run with the lock
        released, against this same [lks]. *)
     locks_below lks "virtio_disk" ->
-    sie_cap_gpr kt M0 (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M0 (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
     cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-    trap_csrs kt -∗
+    trap_csrs KT1 -∗
     cpu_claim (proc_addr j) -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
- procs_inv (kt := kt) γs -∗
+ procs_inv γs -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗
     disk_res γd pd pav pu -∗
-    vdrw_scratch (KTR := kt) sp0 -∗
+    vdrw_scratch (KTR := KT1) sp0 -∗
     vdrw_p2_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -520,14 +518,14 @@ Section ProofVirtioDiskRwB.
       iAssert ( ∀ (Mz : regfile),
                   ⌜forall r : mword 5, is_cs_idx r = true ->
                      Mz !!! Regidx r = M1 !!! Regidx r⌝ -∗
-                  sie_cap_gpr kt Mz (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+                  sie_cap_gpr KT1 Mz (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
                   cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-                  trap_csrs kt -∗
+                  trap_csrs KT1 -∗
                   cpu_claim (proc_addr j) -∗
                   pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x094) : mword 64) -∗
                   locked γk cpu_id -∗
                   free_bundles pd fr -∗
-                  vdrw_scratch (KTR := kt) sp0 -∗
+                  vdrw_scratch (KTR := KT1) sp0 -∗
                   vdrw_p2_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
                   WP (Loop : expr riscv_lang))%I
         with "[Hpub Hlb Hcl Huidx Hflight Hparked Hring IH]" as "Hsleep".
@@ -644,7 +642,7 @@ Section ProofVirtioDiskRwB.
         (* ============== sleep_prepare(&disk.free[0]) ==============
            Noff-balanced and index-generic: it neither parks nor touches the
            lock, so the condition lock and its resource just ride along. *)
-        iApply (SleepPrepare.wp_sleep_prepare_sconf kt γs j γl B3
+        iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl B3
                   (trap_res eb + (K - 12))%nat 1%nat eb false
                   ({["virtio_disk"]} ∪ lks)
                   Hj Hjl ltac:(rewrite HB3a0; vm_compute; reflexivity) vdrwb_lvl1
@@ -726,7 +724,7 @@ Section ProofVirtioDiskRwB.
         iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm")
           as "[Hpay [Hextc Hextm]]".
         (* ==================== release(&disk.vdisk_lock) ==================== *)
-        iApply (Release.wp_release_sconf kt γk d_lock "virtio_disk"%string
+        iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
                   (disk_res γd pd pav pu) C3 0%nat eb (proc_addr j) (K - 12)%nat
                   ({["virtio_disk"]} ∪ lks)
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
@@ -773,7 +771,7 @@ Section ProofVirtioDiskRwB.
                      ltac:(wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDlp CIDjs eb (proc_addr j)
                      ltac:(wp_next_chain) with "Hextm") as "Hextm".
-        iApply (Sleep.wp_sleep_sconf kt γs j γl C4 (K - 12)%nat eb lks
+        iApply (Sleep.wp_sleep_sconf γs j γl C4 (K - 12)%nat eb lks
                   Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
                   ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
@@ -849,7 +847,7 @@ Section ProofVirtioDiskRwB.
         (* ==================== acquire(&disk.vdisk_lock) ==================== *)
         iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Acquire.wp_acquire_sconf kt γk "virtio_disk"%string
+        iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
                   (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                   vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc []").

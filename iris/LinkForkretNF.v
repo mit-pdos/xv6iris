@@ -63,11 +63,11 @@ Axiom wp_forkret_nf_ax :
            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) {kt : ktier} (pt : uptd) (j : nat)
+    (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-    wp_forkret_nf_body kt
+    wp_forkret_nf_body
       (fun h : CpuId => UserretClosedD.usertrap_res_bare (CID := h))
       pt j γl γf s Rlk pid V ks m av av2 eb.
 

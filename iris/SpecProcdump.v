@@ -150,7 +150,7 @@ End ProcdumpView.
 
 Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
+    (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE : mword 64 := mword_of_int KernelSyms.procdump in
@@ -159,12 +159,12 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* ten slots of its own, forty-eight for printk (printk_stack) *)
   (58 <= K)%nat ->
   (* the callee, as a hypothesis and not a functor -- see the header *)
-  printk_gen_contract (kt := kt) γpr γd γv ->
+  printk_gen_contract (kt := KT1) γpr γd γv ->
   (* procdump takes no lock of its own (the header's whole point); its one
      callee, printk, is entered at rank "pr" -- the lowest (only) rank this
      cone touches, so this is the whole order premise. *)
   locks_below lks "pr" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   (* the interrupt level is left exactly as found: printk's acquire/release *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -173,7 +173,7 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   procdump_view -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
-      sie_cap_gpr kt mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
       cpu_own 0%nat eb p b lks -∗
@@ -185,7 +185,7 @@ Module Type PROCDUMP.
   Parameter wp_procdump_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
+      (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_procdump_sconf_body kt γpr γd γv m K eb p b lks.
+      wp_procdump_sconf_body γpr γd γv m K eb p b lks.
 End PROCDUMP.

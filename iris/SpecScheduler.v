@@ -50,7 +50,7 @@ Import Defs.
 
 Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
+    (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
   (* scheduler() runs with NO current proc -- that is the fact [wp_next_idle]
      turns into "the scheduler thread cannot migrate".  So the index is the
@@ -73,11 +73,11 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      [2 * kv_frame_slots + 20], which is the pathology the arm-dependent carve
      exists to remove. *)
   (kv_frame_slots + 20 <= av)%nat ->
-  sie_cap_gpr kt m av false p0 -∗
+  sie_cap_gpr KT1 m av false p0 -∗
   cpu_ctx_free -∗
   cpu_own 0 false p0 false ∅ -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
      and its [p = zero_reg] hatch express -- but that is not the point: the
      [acquire] it calls in the scan asked for a hart-generic credential, a resource
@@ -87,13 +87,13 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      the installed vector and its contract -- as its fifth member, so the
      scheduler's level-0 SIE flip gets the handler out of the same bundle it
      already took the trap cells from. *)
-  trap_csrs kt -∗
+  trap_csrs KT1 -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
-      wp_scheduler_sconf_body kt γs m av p0.
+      (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
+      wp_scheduler_sconf_body γs m av p0.
 End SCHEDULER.

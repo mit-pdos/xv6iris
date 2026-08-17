@@ -197,7 +197,6 @@ Section ProofFreeDesc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
   Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -219,7 +218,7 @@ Section ProofFreeDesc.
       (b0 : bv 8) (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :
     (i < 8)%nat ->
     (M !!! Regidx a0_idx : mword 64) = mword_of_int (Z.of_nat i) ->
-    sie_cap_gpr kt M n b pme -∗
+    sie_cap_gpr KT1 M n b pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.free_desc + 0x1e) : mword 64) -∗
     d_desc_ptr ↦₈□ pd -∗
     d_free_cell i ↦ₘ b0 -∗
@@ -231,7 +230,7 @@ Section ProofFreeDesc.
       ∀ M' : regfile,
         ⌜ forall r : mword 5, r <> a0_idx -> r <> a3_idx -> r <> a4_idx -> r <> a5_idx ->
             M' !!! Regidx r = M !!! Regidx r ⌝ -∗
-        sie_cap_gpr kt M' n b pme -∗
+        sie_cap_gpr KT1 M' n b pme -∗
         pc_is (mword_of_int (KernelSyms.free_desc + 0x4a) : mword 64) -∗
         d_free_cell i ↦ₘ Z_to_bv 8 1 -∗
         d_desc pd i ↦₈ (zero_reg : mword 64) -∗
@@ -306,7 +305,7 @@ Section ProofFreeDesc.
               = (d_desc_ptr : mword 64)).
     { intros CID'; rgne. rewrite HV3a5 addv_sext0. unfold d_desc_ptr. symmetry. apply pa_add_0. }
     iPoseProof (fdi_2a with "Htext") as "Hi2a".
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDc3) (mword_of_int (KernelSyms.free_desc + 0x2a)) a4_idx a5_idx
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDc3) (mword_of_int (KernelSyms.free_desc + 0x2a)) a4_idx a5_idx
               (mword_of_int 0 : mword 12) V3 n pd b (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a []").
@@ -339,7 +338,7 @@ Section ProofFreeDesc.
               = (d_desc pd i : mword 64)).
     { intros CID'; rgne. rewrite HV5a4 fd_sext_0. apply fd_desc_addr0. }
     iPoseProof (fdi_2e with "Htext") as "Hi2e".
-    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (CID := CIDc5) (mword_of_int (KernelSyms.free_desc + 0x2e)) a4_idx
+    iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDc5) (mword_of_int (KernelSyms.free_desc + 0x2e)) a4_idx
               (mword_of_int 0 : mword 12) V5 n va b
               with "Hcg Hpc Hi2e [Hva]").
     { iEval (rewrite (Haddr0 CIDc5)). iExact "Hva". }
@@ -357,7 +356,7 @@ Section ProofFreeDesc.
               = (d_desc_ptr : mword 64)).
     { intros CID'; rgne. rewrite HV5a5 addv_sext0. unfold d_desc_ptr. symmetry. apply pa_add_0. }
     iPoseProof (fdi_32 with "Htext") as "Hi32".
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDc6) (mword_of_int (KernelSyms.free_desc + 0x32)) a4_idx a5_idx
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDc6) (mword_of_int (KernelSyms.free_desc + 0x32)) a4_idx a5_idx
               (mword_of_int 0 : mword 12) V5 n pd b (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi32 []").
@@ -393,7 +392,7 @@ Section ProofFreeDesc.
               = (pa_add pd (16 * i + 8)%nat : mword 64)).
     { intros CID'; rgne. rewrite HV7a4 fd_sext_8. apply fd_desc_addr8. }
     iPoseProof (fdi_36 with "Htext") as "Hi36".
-    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (CID := CIDc8) (mword_of_int (KernelSyms.free_desc + 0x36)) a4_idx
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDc8) (mword_of_int (KernelSyms.free_desc + 0x36)) a4_idx
               (mword_of_int 8 : mword 12) V7 n vl b
               with "Hcg Hpc Hi36 [Hvl]").
     { iEval (rewrite (Haddr8 CIDc8)). iExact "Hvl". }
@@ -483,7 +482,7 @@ Section ProofFreeDesc.
     assert (Hsv8 : forall CID' : CpuId, trunc8 (rget (CID := CID') V9 a4_idx) = Z_to_bv 8 1).
     { intros CID'; rgne. rewrite /V9 upd_eq. exact fd_trunc8_one. }
     iPoseProof (fdi_46 with "Htext") as "Hi46".
-    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (CID := CIDc13) (mword_of_int (KernelSyms.free_desc + 0x46)) a4_idx a5_idx
+    iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDc13) (mword_of_int (KernelSyms.free_desc + 0x46)) a4_idx a5_idx
               (mword_of_int 24 : mword 12) V9 n b0 b
               with "Hcg Hpc Hi46 [Hfree]").
     { iEval (rewrite (Hfaddr CIDc13)). iExact "Hfree". }
@@ -514,7 +513,7 @@ Section ProofFreeDesc.
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string)
-    : wp_free_desc_sconf_body kt γs pd i m K lvl eb pme va vl vf vn b lks.
+    : wp_free_desc_sconf_body γs pd i m K lvl eb pme va vl vf vn b lks.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
     intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl Hbelow.
@@ -685,7 +684,7 @@ Section ProofFreeDesc.
               = (d_free_cell i : mword 64)).
     { intros CID'; rgne. rewrite HA5a5 fd_sext_24. apply fd_free_addr. }
     iPoseProof (fdi_18 with "Htext") as "Hi18".
-    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (CID := CIDd9) (mword_of_int (KernelSyms.free_desc + 0x18)) a5_idx a5_idx
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDd9) (mword_of_int (KernelSyms.free_desc + 0x18)) a5_idx a5_idx
               (mword_of_int 24 : mword 12) A5 (K - 2)%nat byte_zero b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [Hfree]").
@@ -807,7 +806,7 @@ Section ProofFreeDesc.
     (* ===================== wakeup(&disk.free[0]) ===================== *)
     iDestruct (cpu_own_transport CID CIDd15 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Wakeup.wp_wakeup_sconf kt (CID := CIDd15)  E2 γs
+    iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15)  E2 γs
               pme lvl (K - 2)%nat eb b
               _ HKw HE2dom Hlen Hlvl
               Hbelow

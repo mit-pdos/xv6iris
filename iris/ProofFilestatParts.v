@@ -201,7 +201,7 @@ Proof. intro Hj. apply nth_byte_assemble_len; cbn [length]; lia. Qed.
 Section FilestatParts.
   Context `{!riscvGS Σ}.
   (* tier-generic: these are byte-arithmetic facts about a stack buffer,
-     so they ride the ambient tier and a [kt]-file instantiates them at [kt]. *)
+     so they ride the ambient tier and a [KT1]-file instantiates them at [KT1]. *)
   Context `{KTR : !CurKtier}.
 
   Lemma fst_bytes_w4 (a : Arch.pa) :
@@ -632,7 +632,6 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Section ProofFilestatParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -649,7 +648,7 @@ Section ProofFilestatParts.
      route is to peel the twenty-four existentials and read the function off
      the resulting list -- no [big_sepL_exist] and no list/function bridge. *)
   Lemma fst_bytes_name24 (a : Arch.pa) :
-    bytes_own (KTR := kt) (DfracOwn 1) a 24 ⊢
+    bytes_own (KTR := KT1) (DfracOwn 1) a 24 ⊢
     ∃ f : nat -> bv 8, ([∗ list] j ∈ seq 0 24, (pa_add a j) ↦ₘ f j).
   Proof.
     rewrite /bytes_own. cbn [seq].
@@ -693,23 +692,23 @@ Section ProofFilestatParts.
        exit never spilled them. *)
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr kt Mt (K - 10)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 10)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FST + 0x56) : mword 64) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr kt mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -794,9 +793,9 @@ Section ProofFilestatParts.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10)
       by (rewrite Hwv; exact HT4sp).
-    iAssert (stack_own (KTR := kt) sp0 10) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10]"
+    iAssert (stack_own (KTR := KT1) sp0 10) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10]"
       as "Hframe".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].

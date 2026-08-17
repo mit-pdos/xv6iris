@@ -166,7 +166,6 @@ Section KexecTail.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -206,7 +205,7 @@ Section KexecTail.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K true (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
           cpu_own 0 true (proc_addr jp) true ∅ -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -227,7 +226,7 @@ Section KexecTail.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K true (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
           cpu_own 0 true (proc_addr jp) true ∅ -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -295,7 +294,7 @@ Section KexecTail.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K true (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
           cpu_own 0 true (proc_addr jp) true ∅ -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -371,7 +370,7 @@ Section KexecTail.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr kt mf K true (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
           cpu_own 0 true (proc_addr jp) true ∅ -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -483,7 +482,6 @@ Section KexecMain.
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -518,7 +516,7 @@ Section KexecMain.
       (dqb dqs dqa : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_kexec_sconf_body kt gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used plen pfun na avf alen aslen afun
                         pidv V dqb dqs dqa m K eb b lks.
@@ -614,7 +612,7 @@ Section KexecMain.
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
       iIntros (CIDl) "%Hsl". iIntros (Ml efl Pl) "Hst12c Hcont".
-      iApply (PB3.kxc_b2 kt (CID0 := CIDl) gs jp gl gu gd gk pd pav pu bn g gfs
+      iApply (PB3.kxc_b2 (CID0 := CIDl) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev used used2 kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa

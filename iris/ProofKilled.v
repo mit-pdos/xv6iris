@@ -66,7 +66,6 @@ Section ProofKilled.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation kl_s0 := (mword_of_int 8 : mword 5).
   Notation kl_s1 := (mword_of_int 9 : mword 5).
   Notation kl_a0 := (mword_of_int 10 : mword 5).
@@ -95,7 +94,7 @@ Section ProofKilled.
 
   Lemma wp_killed_sconf  (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_killed_sconf_body kt γs j γl m av n eb p b lks.
+    : wp_killed_sconf_body γs j γl m av n eb p b lks.
   Proof.
     cbv beta delta [wp_killed_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav Hfresh.
@@ -120,7 +119,7 @@ Section ProofKilled.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with M1.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.killed + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (v1) "Hb1". iDestruct "S2c" as (v2) "Hb2".
     iDestruct "S3c" as (v3) "Hb3". iDestruct "S4c" as (v4) "Hb4".
@@ -225,8 +224,8 @@ Section ProofKilled.
        at [CID8]. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf kt γl "proc"%string
-              (proc_lock_res (kt := kt) γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
+              (proc_lock_res γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia)
               Hfresh
               with "Hcg Hcpu Htext Hpc [Hislock]").
@@ -248,7 +247,7 @@ Section ProofKilled.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))))
                     = p_killed (proc_addr j))
       by (rewrite Hmacq_s1; apply kl_killed_off).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
               (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) macq (trap_res b + (av - 4))%nat kl false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -313,7 +312,7 @@ Section ProofKilled.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* reassemble the lock resource: nothing moved, so the slots go back as-is *)
-    iAssert (proc_lock_res (kt := kt) γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
+    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
     { iApply (proc_lock_res_intro γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
       iExists kl, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
     (* ===================== release(&p->lock) ===================== *)
@@ -323,8 +322,8 @@ Section ProofKilled.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf kt γl (proc_addr j) "proc"%string
-              (proc_lock_res (kt := kt) γs γl (proc_addr j)) C4 n eb p (av - 4)%nat ({["proc"]} ∪ lks)
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
+              (proc_lock_res γs γl (proc_addr j)) C4 n eb p (av - 4)%nat ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
@@ -423,8 +422,8 @@ Section ProofKilled.
                    = pa_stk (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HE4csp; symmetry; exact Hspd4).
     iPoseProof (kli_26 with "Htext") as "Hi26".
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1". { iExists _. iEval (rewrite Hb1a -HE0csp). iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iEval (rewrite Hb2a -HE1csp). iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iEval (rewrite Hb3a -HE2csp). iExact "Hb3". }

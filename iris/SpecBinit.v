@@ -49,7 +49,7 @@ Local Open Scope Z_scope.
 Definition bcache_name_str : Z := 0x800073b0.
 Definition buffer_name_str : Z := 0x800073b8.
 
-Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat)
+Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
     (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.binit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -59,7 +59,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
   (* binit's own frame is 6 slots and its deepest callee (initsleeplock) wants
      6 more below that. *)
   (12 <= K)%nat ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
@@ -69,7 +69,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
   blink_raw bhead -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -82,7 +82,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
 
 Module Type BINIT.
   Parameter wp_binit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
-      wp_binit_sconf_body kt m K vlock vname vcpu b p.
+      wp_binit_sconf_body m K vlock vname vcpu b p.
 End BINIT.

@@ -210,7 +210,6 @@ Section ProofArgraw.
 
 
 
-  Context {kt : ktier}.
   (* the switch index is in range, so [bltu a5,s1] (5 <u n) does not fire *)
   Lemma ar_bltu_false (i : nat) : (i < NARG)%nat ->
     zopz0zI_u (mword_of_int 5 : mword 64) (mword_of_int (Z.of_nat i) : mword 64) = false.
@@ -270,12 +269,12 @@ Section ProofArgraw.
   Lemma ar_tail `{CID0 : CpuId}
       (M : regfile) (sp0 ra0 s00 s10 gapv : mword 64) (k : nat) (b : bool) (p : mword 64) :
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
-    sie_cap_gpr kt M k b p -∗
+    sie_cap_gpr KT1 M k b p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
@@ -285,7 +284,7 @@ Section ProofArgraw.
           (forall r : mword 5, is_cs_idx r = true ->
              r <> csp_rs1 -> r <> ar_s0 -> r <> ar_s1 ->
              Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr kt Mf (k + 4)%nat b p -∗
+        sie_cap_gpr KT1 Mf (k + 4)%nat b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -353,8 +352,8 @@ Section ProofArgraw.
                    = pa_stk (add_vec (T3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HT3sp; reflexivity).
     iPoseProof (ari_32 with "Htext") as "Hi32".
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HMsp). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HT1sp). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HT2sp). iExact "Hr8". }
@@ -461,10 +460,10 @@ Section ProofArgraw.
 
   Lemma ar_join `{CID0 : CpuId} (M : regfile) (k : nat) (av' : nat) (b : bool) (p : mword 64) :
     (k < NARG)%nat ->
-    kernel_text -∗ sie_cap_gpr kt M av' b p -∗
+    kernel_text -∗ sie_cap_gpr KT1 M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr kt M av' b p -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
+      sie_cap_gpr KT1 M av' b p -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -516,14 +515,14 @@ Section ProofArgraw.
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     page_valid (page_base tfp) ->
     kernel_text -∗ kernel_data -∗
-    sie_cap_gpr kt M av' b p -∗
+    sie_cap_gpr KT1 M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + 0x22) : mword 64) -∗
     p_trapframe p ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) vgap -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) vgap -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
@@ -533,7 +532,7 @@ Section ProofArgraw.
           (forall r : mword 5, is_cs_idx r = true ->
              r <> csp_rs1 -> r <> ar_s0 -> r <> ar_s1 ->
              Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr kt Mf (av' + 4)%nat b p -∗
+        sie_cap_gpr KT1 Mf (av' + 4)%nat b p -∗
         pc_is (ret_pc ra0) -∗
         p_trapframe p ↦₈{dqt} page_base tfp -∗
         tf_page tfp ws -∗
@@ -561,7 +560,7 @@ Section ProofArgraw.
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 0%nat))
       by (rewrite HMs1 ar_lw_off; apply kv_addv_zero).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M av' (ar_entry 0%nat) b
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -604,7 +603,7 @@ Section ProofArgraw.
                      (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))))
                    = p_trapframe p)
       by (rewrite HB6a0; apply ar_tf_off).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 0%nat)) ar_a5 ar_a0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 0%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hitf [Htfp]").
@@ -622,7 +621,7 @@ Section ProofArgraw.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 0%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 0%nat Hk)).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 0%nat)) ar_a0 ar_a5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 0%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hild [Hw]").
@@ -681,7 +680,7 @@ Section ProofArgraw.
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 1%nat))
       by (rewrite HMs1 ar_lw_off; apply kv_addv_zero).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M av' (ar_entry 1%nat) b
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -724,7 +723,7 @@ Section ProofArgraw.
                      (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))))
                    = p_trapframe p)
       by (rewrite HB6a0; apply ar_tf_off).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 1%nat)) ar_a5 ar_a0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 1%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hitf [Htfp]").
@@ -742,7 +741,7 @@ Section ProofArgraw.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 1%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 1%nat Hk)).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 1%nat)) ar_a0 ar_a5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 1%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hild [Hw]").
@@ -801,7 +800,7 @@ Section ProofArgraw.
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 2%nat))
       by (rewrite HMs1 ar_lw_off; apply kv_addv_zero).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M av' (ar_entry 2%nat) b
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -844,7 +843,7 @@ Section ProofArgraw.
                      (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))))
                    = p_trapframe p)
       by (rewrite HB6a0; apply ar_tf_off).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 2%nat)) ar_a5 ar_a0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 2%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hitf [Htfp]").
@@ -862,7 +861,7 @@ Section ProofArgraw.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 2%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 2%nat Hk)).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 2%nat)) ar_a0 ar_a5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 2%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hild [Hw]").
@@ -921,7 +920,7 @@ Section ProofArgraw.
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 3%nat))
       by (rewrite HMs1 ar_lw_off; apply kv_addv_zero).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M av' (ar_entry 3%nat) b
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -964,7 +963,7 @@ Section ProofArgraw.
                      (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))))
                    = p_trapframe p)
       by (rewrite HB6a0; apply ar_tf_off).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 3%nat)) ar_a5 ar_a0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 3%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hitf [Htfp]").
@@ -982,7 +981,7 @@ Section ProofArgraw.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 3%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 3%nat Hk)).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 3%nat)) ar_a0 ar_a5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 3%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hild [Hw]").
@@ -1041,7 +1040,7 @@ Section ProofArgraw.
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 4%nat))
       by (rewrite HMs1 ar_lw_off; apply kv_addv_zero).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M av' (ar_entry 4%nat) b
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1084,7 +1083,7 @@ Section ProofArgraw.
                      (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))))
                    = p_trapframe p)
       by (rewrite HB6a0; apply ar_tf_off).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 4%nat)) ar_a5 ar_a0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 4%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hitf [Htfp]").
@@ -1102,7 +1101,7 @@ Section ProofArgraw.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 4%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 4%nat Hk)).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 4%nat)) ar_a0 ar_a5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 4%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hild [Hw]").
@@ -1161,7 +1160,7 @@ Section ProofArgraw.
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 5%nat))
       by (rewrite HMs1 ar_lw_off; apply kv_addv_zero).
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + 0x22)) ar_a5 ar_s1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M av' (ar_entry 5%nat) b
               (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1204,7 +1203,7 @@ Section ProofArgraw.
                      (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))))
                    = p_trapframe p)
       by (rewrite HB6a0; apply ar_tf_off).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 5%nat)) ar_a5 ar_a0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 5%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hitf [Htfp]").
@@ -1222,7 +1221,7 @@ Section ProofArgraw.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 5%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 5%nat Hk)).
-    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 5%nat)) ar_a0 ar_a5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 5%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hild [Hw]").
@@ -1281,7 +1280,7 @@ Section ProofArgraw.
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_argraw_sconf_body kt m av n eb p i tfp ws v dqt b lks.
+    : wp_argraw_sconf_body m av n eb p i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_argraw_sconf_body].
     intros pcE ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
@@ -1306,7 +1305,7 @@ Section ProofArgraw.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.argraw + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24". iDestruct "S2c" as (vr16) "Hr16".
     iDestruct "S3c" as (vr8) "Hr8".  iDestruct "S4c" as (vgap) "Hgap".
@@ -1388,7 +1387,7 @@ Section ProofArgraw.
     assert (HA3ra : A3 !!! Regidx ar_ra = add_vec_int (mword_of_int (KernelSyms.argraw + 0x0c) : mword 64) 4)
       by (rewrite /A3 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf kt A3 (av - 4)%nat n eb p b
+    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].

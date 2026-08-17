@@ -95,7 +95,6 @@ Section ProofPlicComplete.
 
 
 
-  Context {kt : ktier}.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plic_complete(), entry to return. *)
   (*  Interrupts-off (see SpecPlicComplete.v's header): no [b] binder, no  *)
@@ -104,7 +103,7 @@ Section ProofPlicComplete.
   (*  collapse at all since its own contract has no wrapper either. *)
   (* =================================================================== *)
   Lemma wp_plic_complete_sconf (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plic_complete_sconf_body kt γd γv m0 n p.
+    : wp_plic_complete_sconf_body γd γv m0 n p.
   Proof.
     cbv beta delta [wp_plic_complete_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
@@ -155,7 +154,7 @@ Section ProofPlicComplete.
     iEval (rewrite Hpp02) in "Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)))]> m0) with R1.
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -219,7 +218,7 @@ Section ProofPlicComplete.
        [b = false]-only with no [wp_next] wrapper, matching plic_complete's
        own now-[b = false] contract, so the call's continuation is entered
        directly. ---- *)
-    iApply (Cpuid.wp_call_cpuid_sconf_cs kt (mword_of_int (KernelSyms.plic_complete + 0x0c))
+    iApply (Cpuid.wp_call_cpuid_sconf_cs KT1 (mword_of_int (KernelSyms.plic_complete + 0x0c))
               (mword_of_int 2081438 : mword 21) R3 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -357,8 +356,8 @@ Section ProofPlicComplete.
     assert (Hpop : N7 !!! Regidx csp_rs1
                    = pa_stk (add_vec (N7 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HN7sp. unfold sp', imm_entry, sp0. exact Hpush. }
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1 Hcsp1 -HN4sp); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2 Hcsp1 -HN4sp -HN5sp); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3 Hcsp1 -HN4sp -HN6sp); iExists _; iExact "Hr8"|].

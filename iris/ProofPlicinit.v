@@ -94,13 +94,12 @@ Section ProofPlicinit.
 
 
 
-  Context {kt : ktier}.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plicinit(), entry through return.  *)
   (* =================================================================== *)
   Lemma wp_plicinit_sconf
       (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_plicinit_sconf_body kt m0 n p.
+    : wp_plicinit_sconf_body m0 n p.
   Proof.
     cbv beta delta [wp_plicinit_sconf_body].
     intros ra_idx pcE ra0 ret_tgt Hn.

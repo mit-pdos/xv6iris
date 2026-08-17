@@ -40,7 +40,7 @@ Import Defs.
 Notation K_free_desc := (20%nat) (only parsing).
 Definition wp_free_desc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-     (kt : ktier) (γs : list gname)
+     (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
     (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string) :=
@@ -54,10 +54,10 @@ Definition wp_free_desc_sconf_body
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* free_desc's only callee is wakeup, whose bound is "proc" (11). *)
   locks_below lks "proc" ->
-  sie_cap_gpr kt m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
- procs_inv (kt := kt) γs -∗
+ procs_inv γs -∗
   (* the descriptor-page pointer cell: free_desc RE-READS [disk.desc] (twice)
      to reach entry [i], so it needs the persistent half of [disk_geom] that
      names the page [pd] the four descriptor words below live on. *)
@@ -72,7 +72,7 @@ Definition wp_free_desc_sconf_body
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr kt mf K b pme -∗
+      sie_cap_gpr KT1 mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       d_free_cell i ↦ₘ Z_to_bv 8 1 -∗
@@ -86,9 +86,9 @@ Definition wp_free_desc_sconf_body
 Module Type FREEDESC.
   Parameter wp_free_desc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (γs : list gname)
+       (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string),
-      wp_free_desc_sconf_body kt γs pd i m K lvl eb pme va vl vf vn b lks.
+      wp_free_desc_sconf_body γs pd i m K lvl eb pme va vl vf vn b lks.
 End FREEDESC.

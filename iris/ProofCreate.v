@@ -1411,7 +1411,6 @@ Section ProofCreateMain.
             !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
@@ -1447,16 +1446,16 @@ Section ProofCreateMain.
      sixteen named bytes and put back.  ProofDirlink's [de] record
      verbatim -- same two slots, same alignment obligation. *)
   Lemma cr_slots_bytes (sp0 : Arch.pa) (w1 w2 : bv 64) :
-    (pa_stk sp0 10) ↦₈[kt] w1 -∗ (pa_stk sp0 9) ↦₈[kt] w2 -∗
+    (pa_stk sp0 10) ↦₈[KT1] w1 -∗ (pa_stk sp0 9) ↦₈[KT1] w2 -∗
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true⌝ ∗
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 10) 16.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 10) 16.
   Proof.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "H1 H2".
-    iDestruct (slot_bytes_own (KTR := kt) with "H1") as "[%Ha1 B1]".
-    iDestruct (slot_bytes_own (KTR := kt) with "H2") as "[%Ha2 B2]".
+    iDestruct (slot_bytes_own (KTR := KT1) with "H1") as "[%Ha1 B1]".
+    iDestruct (slot_bytes_own (KTR := KT1) with "H2") as "[%Ha2 B2]".
     iSplitR; [done |].
     change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iSplitL "B1"; [iExact "B1" | iExact "B2"].
@@ -1465,25 +1464,25 @@ Section ProofCreateMain.
   Lemma cr_bytes_slots (sp0 : Arch.pa) :
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
-    bytes_own (KTR := kt) (DfracOwn 1) (pa_stk sp0 10) 16 ⊢
-    ∃ w1 w2 : bv 64, (pa_stk sp0 10) ↦₈[kt] w1 ∗ (pa_stk sp0 9) ↦₈[kt] w2.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 10) 16 ⊢
+    ∃ w1 w2 : bv 64, (pa_stk sp0 10) ↦₈[KT1] w1 ∗ (pa_stk sp0 9) ↦₈[KT1] w2.
   Proof.
     intros Ha1 Ha2.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "B". change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iDestruct "B" as "[B1 B2]".
-    iDestruct (bytes_own_slot (KTR := kt) _ Ha1 with "B1") as (w1) "H1".
-    iDestruct (bytes_own_slot (KTR := kt) _ Ha2 with "B2") as (w2) "H2".
+    iDestruct (bytes_own_slot (KTR := KT1) _ Ha1 with "B1") as (w1) "H1".
+    iDestruct (bytes_own_slot (KTR := KT1) _ Ha2 with "B2") as (w2) "H2".
     iExists w1, w2. iFrame.
   Qed.
 
   (* the sixteen-byte local is FOURTEEN bytes of [name] and two of slack;
      [nameiparent] and [dirlookup] both want exactly the fourteen. *)
   Lemma cr_split14 (a : Arch.pa) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] f j) ⊣⊢
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j) ∗
-    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ[kt] f j).
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j) ⊣⊢
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] f j) ∗
+    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     change 16%nat with (14 + 2)%nat. rewrite seq_app big_sepL_app.
     reflexivity.
@@ -1494,9 +1493,9 @@ Section ProofCreateMain.
      functions ([nameiparent] rewrote only the fourteen), so the join has to
      produce the pointwise splice rather than reuse either. *)
   Lemma cr_join14 (a : Arch.pa) (f g : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j) -∗
-    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ[kt] g j) -∗
-    ∃ h : nat -> bv 8, ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] h j).
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] f j) -∗
+    ([∗ list] j ∈ seq 14 2, pa_add a j ↦ₘ[KT1] g j) -∗
+    ∃ h : nat -> bv 8, ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] h j).
   Proof.
     iIntros "H1 H2".
     iExists (fun j => if decide (j < 14)%nat then f j else g j).
@@ -1566,7 +1565,7 @@ Section ProofCreateMain.
        (dn : dinode) (bm : blkmap)
        (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
        ⌜callee_saved m mf⌝ -∗
-       sie_cap_gpr kt mf K b (proc_addr j) -∗
+       sie_cap_gpr KT1 mf K b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is ret_tgt -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -1575,7 +1574,7 @@ Section ProofCreateMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used' -∗
        proc_priv γf (proc_addr j) pidv V -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
        ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat
          /\ (ok = true -> (S ns' <= ns)%nat)⌝ -∗
@@ -1610,22 +1609,22 @@ Section ProofCreateMain.
       (lks : gset string) (CIDt : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (w5 : mword 64) (dnew : nat -> bv 8),
        ⌜cr_tregs m sp0 Mt⌝ -∗
-       sie_cap_gpr kt Mt (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mt (K - 10)%nat b (proc_addr j) -∗
        pc_is (mword_of_int (CK + 0x70)) -∗
-       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[kt] w5 -∗
-       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] dnew jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dnew jj) -∗
        wp_next (CID0 := CIDt) true (proc_addr j) (fun CIDf : CpuId =>
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
            ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Rs2 : mword 64)⌝ -∗
-           sie_cap_gpr kt mf K b (proc_addr j) -∗
+           sie_cap_gpr KT1 mf K b (proc_addr j) -∗
            pc_is ret_tgt -∗
            WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
@@ -1795,9 +1794,9 @@ Section ProofCreateMain.
     (* the [name] local goes back to being two frame slots *)
     iDestruct (dlk_name_bytes with "Hnb") as "Hnbb".
     iDestruct (cr_bytes_slots sp0 Hal10 Hal9 with "Hnbb") as (w10 w9) "[Hc10 Hc9]".
-    iAssert (stack_own (KTR := kt) sp0 10) with
+    iAssert (stack_own (KTR := KT1) sp0 10) with
       "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
       iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
       iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
@@ -1967,19 +1966,19 @@ Section ProofCreateMain.
        ⌜((u - (SpecNamex.walk_spend w + 0))%nat <= n1)%nat /\ (n1 <= u)%nat⌝ -∗
        ⌜used1 ⊆ used⌝ -∗
        (* the machine *)
-       sie_cap_gpr kt Ma (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Ma (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (CK + 0xa2)) -∗
-       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[kt] w5 -∗
-       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nf jj) -∗
-       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nsl jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
@@ -2003,7 +2002,7 @@ Section ProofCreateMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used1 -∗
        proc_priv γf (proc_addr j) pidv V -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 1) -∗
        log_opS γ n1 Sb1 -∗
@@ -2119,19 +2118,19 @@ Section ProofCreateMain.
        ⌜bmapstart ∈ Sb3 \/ (9 <= n3)%nat⌝ -∗
        ⌜used3 ⊆ used⌝ -∗
        (* the machine *)
-       sie_cap_gpr kt Mx (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mx (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (CK + 0xf8)) -∗
-       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nf jj) -∗
-       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nsl jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
@@ -2176,7 +2175,7 @@ Section ProofCreateMain.
        p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
           proc_priv γf (proc_addr j) pidv V) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n3 Sb3 -∗
@@ -2294,19 +2293,19 @@ Section ProofCreateMain.
           [S iput_units <= n4] would have re-blocked those two. *)
        ⌜(S iput_units <= n4)%nat \/ bmapstart ∈ Sb4⌝ -∗
        (* the machine *)
-       sie_cap_gpr kt Mx (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mx (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (CK + 0x146)) -∗
-       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nf jj) -∗
-       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nsl jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces, at the POST-dirlink indices --
           with [dir_links] still at the ENTRY ones and the ticket in hand *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
@@ -2353,7 +2352,7 @@ Section ProofCreateMain.
        p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
           proc_priv γf (proc_addr j) pidv V) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n4 Sb4 -∗
@@ -2411,7 +2410,7 @@ Section ProofCreateMain.
     ninodes <= 16 * Z.of_nat nib ->
     ninodes < 2 ^ 31 ->
     bv_unsigned ty <> 0 ->
-    printk_gen_contract (kt := kt) γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     (create_units <= u)%nat ->
     (create_slots <= ns)%nat ->
     (j < NPROC)%nat ->
@@ -2420,7 +2419,7 @@ Section ProofCreateMain.
     m !!! Regidx Ra2 = (sign_extend' 64 major : mword 64) ->
     m !!! Regidx Ra3 = (sign_extend' 64 minor : mword 64) ->
     eb = true ->
-    sie_cap_gpr kt m K b (proc_addr j) -∗
+    sie_cap_gpr KT1 m K b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.create) -∗
     kernel_data -∗
@@ -2440,8 +2439,8 @@ Section ProofCreateMain.
     bitmap_res γfs bmapstart cov logstart size used -∗
     proc_priv γf (proc_addr j) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen),
-       pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[kt] pfun i) -∗
-    procs_inv (kt := kt) γs -∗
+       pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[KT1] pfun i) -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -2530,7 +2529,7 @@ Section ProofCreateMain.
         [reflexivity
         | intro Hq; apply Hc;
           first [ exact (regidx_inj _ _ Hq) | symmetry; exact (regidx_inj _ _ Hq) ]]. }
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -2771,7 +2770,7 @@ Section ProofCreateMain.
     iEval (rewrite -HR7a1) in "Hnb14".
     iDestruct (cpu_own_transport CID CID14 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (NP.wp_nameiparent_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+    iApply (NP.wp_nameiparent_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γa γf cov logstart bmapstart inodestart nib size dev used
               (pv_cwd V) plen pfun nf0 u Sb pidv (DfracOwn (1/4)) dqb dqs
               (DfracOwn 1) R7 (K - 10)%nat eb b lks
@@ -2897,7 +2896,7 @@ Section ProofCreateMain.
         by (rewrite /Q2; apply cr_regs_caller; [exact Hcsra | exact HQ1regs]).
       iDestruct (cpu_own_transport CIDnp CID17 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (IL.wp_ilock_sconf kt γs j γl γu γd γk pd pav pu bn γfs γi cn
+      iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
                 gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd dev dind
                 pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
                 ltac:(exact HKil) Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
@@ -3028,7 +3027,7 @@ Section ProofCreateMain.
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-        iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+        iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
@@ -3162,14 +3161,14 @@ Section ProofCreateMain.
                        the T_DIR sub-branch spends it. *)
                     ⌜ty = SpecDirlookup.T_DIR ->
                        di_nlink dnl <> (mword_of_int 32767 : mword 16)⌝ -∗
-                    sie_cap_gpr kt (CID := CIDj) Mj (K - 10)%nat b (proc_addr j) -∗
+                    sie_cap_gpr KT1 (CID := CIDj) Mj (K - 10)%nat b (proc_addr j) -∗
                     pc_is (CID := CIDj) (mword_of_int (CK + 0x3e)) -∗
                     WP (Loop : expr riscv_lang)))
                  ∧ (wp_next (CID0 := CID19) b (proc_addr j) (fun CIDg : CpuId =>
                     ∀ Mg : regfile,
                     ⌜cr_regs m sp0 ipv (m !!! Regidx Rs2 : mword 64)
                        ty major minor Mg⌝ -∗
-                    sie_cap_gpr kt (CID := CIDg) Mg (K - 10)%nat b (proc_addr j) -∗
+                    sie_cap_gpr KT1 (CID := CIDg) Mg (K - 10)%nat b (proc_addr j) -∗
                     pc_is (CID := CIDg) (mword_of_int (CK + 0x8e)) -∗
                     WP (Loop : expr riscv_lang))))%I
           with "[-Hcg Hpc]" as "Hgate".
@@ -3305,7 +3304,7 @@ Section ProofCreateMain.
            dirlookup's iget and come straight back on both arms -- nothing
            is spent, and both are already in hand out of
            [IcacheEscrow.ic_loaded]. *)
-        iApply (DL.wp_dirlookup_sconf kt γs j γl γu γd γk pd pav pu bn γfs γi cn
+        iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
                   gtl γa γf cov logstart nib dev (ientry kd) dind bml datl
                   dnl dnl nfp
                   false (mword_of_int 0 : mword 32)
@@ -3456,7 +3455,7 @@ Section ProofCreateMain.
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-          iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+          iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                     cn gtl gild gisld cov logstart bmapstart inodestart nib size
                     dev used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                     false false false e0 pidv (DfracOwn (1/4)) dqb dqs
@@ -3539,7 +3538,7 @@ Section ProofCreateMain.
           iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDu1 CID29 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (IL.wp_ilock_sconf kt γs j γl γu γd γk pd pav pu bn γfs γi cn
+          iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
                     gilc gislc cov logstart inodestart nib kslot (qq/2)%Qp gc
                     dev cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
                     ltac:(exact HKil) Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
@@ -3573,21 +3572,21 @@ Section ProofCreateMain.
           iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDb : CpuId =>
                      ∀ Mb : regfile,
                        ⌜cr_regs m sp0 ipv (ientry kslot) ty major minor Mb⌝ -∗
-                       sie_cap_gpr kt Mb (K - 10)%nat b (proc_addr j) -∗
+                       sie_cap_gpr KT1 Mb (K - 10)%nat b (proc_addr j) -∗
                        cpu_own 0 eb (proc_addr j) b lks -∗
                        pc_is (mword_of_int (CK + 0x98)) -∗
-                       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-                       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-                       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-                       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-                       (pa_stk sp0 5) ↦₈[kt] u5 -∗
-                       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-                       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-                       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
+                       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+                       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+                       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+                       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+                       (pa_stk sp0 5) ↦₈[KT1] u5 -∗
+                       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+                       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+                       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
                        ([∗ list] jj ∈ seq 0 14,
-                          pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nfp jj) -∗
+                          pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nfp jj) -∗
                        ([∗ list] jj ∈ seq 14 2,
-                          pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nf0 jj) -∗
+                          pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf0 jj) -∗
                        sleeplocked_q gislc (qq/2)%Qp -∗
                        sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
                        ic_deposit cn kslot (DepShr (qq/2)%Qp dev cinum gc) -∗
@@ -3607,13 +3606,13 @@ Section ProofCreateMain.
                        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
                           proc_priv γf (proc_addr j) pidv V) -∗
                        ([∗ list] i ∈ seq 0 (S plen),
-                          pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[kt] pfun i) -∗
+                          pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[KT1] pfun i) -∗
                        bslots bn 3 -∗
                        iref_slots 1 -∗ iref_slots (ns - 2) -∗
                        log_opS γ n2 Sb2 -∗
                        wp_next (CID0 := CID) true (proc_addr j)
                          (fun CIDc : CpuId =>
-                            cr_cont_body (kt := kt) γfs γi cn γ γf bn cov logstart bmapstart
+                            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart
                               inodestart nib ninodes size dev used plen pfun
                               (m !!! Regidx Ra0 : mword 64) ty major minor V u Sb
                               ns pidv dqb dqs dqbs dqn m K eb b lks j ret_tgt
@@ -3674,7 +3673,7 @@ Section ProofCreateMain.
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (log_opS_named with "Hop") as (ec) "Hop".
             iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckeep2".
-            iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+            iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                       cn gtl gilc gislc cov logstart bmapstart inodestart nib
                       size dev used2 kslot (qq/2)%Qp (qq/2)%Qp gc cinum dnc bmc
                       n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
@@ -4197,7 +4196,7 @@ Section ProofCreateMain.
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-        iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+        iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
@@ -4586,7 +4585,7 @@ Section ProofCreateMain.
        halfword argument. *)
     16 * Z.of_nat nib <= 2 ^ 16 ->
     bv_unsigned ty <> 0 ->
-    printk_gen_contract (kt := kt) γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     (create_units <= u)%nat ->
     (create_slots <= ns)%nat ->
     (j < NPROC)%nat ->
@@ -4606,7 +4605,7 @@ Section ProofCreateMain.
     ic_escrows cn γfs γi cov logstart -∗
     SpecDirlink.ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -4615,7 +4614,7 @@ Section ProofCreateMain.
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
        (nf nsl : nat -> bv 8),
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDm : CpuId =>
-         cr_mkdir_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+         cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                        cov logstart bmapstart inodestart nib ninodes size dev
                        used plen pfun pv ty major minor V u Sb ns pidv
                        dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -4625,7 +4624,7 @@ Section ProofCreateMain.
        (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
        (nf nsl : nat -> bv 8),
        wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
-         cr_fail_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+         cr_fail_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                       cov logstart bmapstart inodestart nib ninodes size dev
                       used plen pfun pv ty major minor V u Sb ns pidv
                       dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -4639,7 +4638,7 @@ Section ProofCreateMain.
        relates [CIDa] to [CID]), and this is also the shape [cr_found_half]
        takes its premise in, so the seal is one [iApply]. *)
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
-      cr_alloc_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+      cr_alloc_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                     cov logstart bmapstart inodestart nib ninodes size dev used
                     plen pfun pv ty major minor V u Sb ns pidv dqb dqs dqbs dqn
                     m sp0 ret_tgt K eb b lks CIDa).
@@ -4710,13 +4709,13 @@ Section ProofCreateMain.
     iDestruct (cpu_own_transport CIDa CIDA1 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     (* ===== +0xa4 .. +0xb0 : THE FRESH-TYPE GATE SPAN ================= *)
-    iApply (CFT.create_fresh_ty kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+    iApply (CFT.create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γpr cov logstart inodestart ninodes nib dev ty kd (DfracOwn (1/2))
               q1 Sb1 pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
-              (fun CIDx : CpuId => IA.wp_ialloc_gen kt (CID := CIDx))
-              (fun CIDx : CpuId => IL.wp_ilock_sconf kt (CID := CIDx))
+              (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
+              (fun CIDx : CpuId => IL.wp_ilock_sconf (CID := CIDx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi Hppid
                     Hbsl Hisl1 Hidev Hop").
@@ -4908,7 +4907,7 @@ Section ProofCreateMain.
       iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
       iDestruct (cpu_own_transport CIDo CIDB6 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (IU.wp_iupdate_link kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+      iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart inodestart nib dev (ientry kslot) cinum
                 (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dnc bmc
                 q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true (cr_flav ty (bv_unsigned dind)) pidv
@@ -5192,7 +5191,7 @@ Section ProofCreateMain.
         iDestruct "Hislr" as "[Hislk Hislrr]".
         iDestruct (cpu_own_transport CIDiu CIDC4 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (DLK.wp_dirlink_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+        iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                   used1 (ientry kd) dind bm data dn dn nf (cr_low16 cinum)
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
@@ -5461,7 +5460,7 @@ Section ProofCreateMain.
              iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
              iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
              { rewrite Hty'. iExact "Hshotl". }
-             iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs
+             iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
                        size dev used' kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
                        n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
@@ -5802,7 +5801,7 @@ Section ProofCreateMain.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (log_opS_named with "Hop") as (e0) "Hop".
       iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-      iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+      iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γil γisl cov logstart bmapstart inodestart nib size dev
                 used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dn bm (S q1) Sb1
                 false false false e0 pidv (DfracOwn (1/4)) dqb dqs
@@ -6006,12 +6005,12 @@ Section ProofCreateMain.
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     ireg_inv γi γfs inodestart nib -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
-      cr_fail_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+      cr_fail_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                    cov logstart bmapstart inodestart nib ninodes size dev
                    used plen pfun pv ty major minor V u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -6148,7 +6147,7 @@ Section ProofCreateMain.
     iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CIDf CIDG3 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IU.wp_iupdate_unlink kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+    iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
@@ -6257,7 +6256,7 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iDestruct (cpu_own_transport CIDG4 CIDG6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used4 kslot (q/2)%Qp (q/2)%Qp g cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc
@@ -6428,7 +6427,7 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iDestruct (cpu_own_transport CIDG7 CIDG9 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
@@ -6679,19 +6678,19 @@ Section ProofCreateMain.
        ⌜(iput_units <= n4)%nat /\ (n4 <= u)%nat⌝ -∗
        ⌜(S iput_units <= n4)%nat \/ bmapstart ∈ Sb4⌝ -∗
        (* the machine *)
-       sie_cap_gpr kt Mx (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mx (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (CK + 0x146)) -∗
-       (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nf jj) -∗
-       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[kt] nsl jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
+       ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
@@ -6733,13 +6732,13 @@ Section ProofCreateMain.
        p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
        (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
           proc_priv γf (proc_addr j) pidv V) -∗
-       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[kt] pfun i) -∗
+       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n4 Sb4 -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body (kt := kt) γfs γi cn γ γf bn cov logstart bmapstart inodestart
+            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
                          nib ninodes size dev used plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -6791,12 +6790,12 @@ Section ProofCreateMain.
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     ireg_inv γi γfs inodestart nib -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
-      cr_fail_mkdir_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+      cr_fail_mkdir_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                    cov logstart bmapstart inodestart nib ninodes size dev
                    used plen pfun pv ty major minor V u Sb ns pidv
                    dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -6949,7 +6948,7 @@ Section ProofCreateMain.
     iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CIDf CIDG3 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IU.wp_iupdate_unlink kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+    iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) dc bmc
               u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
@@ -7060,7 +7059,7 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iDestruct (cpu_own_transport CIDG4 CIDG6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used4 kslot (q/2)%Qp (q/2)%Qp g cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc
@@ -7164,7 +7163,7 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iDestruct (cpu_own_transport CIDG7 CIDG9 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dp bmp
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
@@ -7322,7 +7321,7 @@ Section ProofCreateMain.
     ninodes <= 16 * Z.of_nat nib ->
     ninodes < 2 ^ 31 ->
     16 * Z.of_nat nib <= 2 ^ 16 ->
-    printk_gen_contract (kt := kt) γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     (create_units <= u)%nat ->
     (create_slots <= ns)%nat ->
     (j < NPROC)%nat ->
@@ -7342,12 +7341,12 @@ Section ProofCreateMain.
     ic_escrows cn γfs γi cov logstart -∗
     SpecDirlink.ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDm : CpuId =>
-      cr_mkdir_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+      cr_mkdir_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                     cov logstart bmapstart inodestart nib ninodes size dev
                     used plen pfun pv ty major minor V u Sb ns pidv
                     dqb dqs dqbs dqn m sp0 ret_tgt K eb b lks
@@ -7643,7 +7642,7 @@ Section ProofCreateMain.
     (* THE LICENCE'S LEFT DISJUNCT HERE IS [ip->nlink = 1], flushed by the
        three [sh]s at +0xfc..+0x102 before this call (§7.5.6, row 3): the
        record the contract runs at IS [cr_setf dnc _ _ 1]. *)
-    iApply (DLK.wp_dirlink_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+    iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
               used3 (ientry kslot) cinum bmc datc
               (cr_setf dnc major minor (mword_of_int 1 : mword 16))
@@ -7987,7 +7986,7 @@ Section ProofCreateMain.
         rewrite Hc1nrec Hc1k0 Hind1 Hcrb2
                 (proj1 (proj2 SpecDirlink.dl_need_values)).
         pose proof (cr_mkdir_dl1 n3 n4 _ _ _ Hspend1); lia. }
-      iApply (DLK.wp_dirlink_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+      iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                 usd1 (ientry kslot) cinum bm1 dat1 dc1 dc1
                 cr_dotdot_f (cr_low16 dind) n4 Sb4
@@ -8332,7 +8331,7 @@ Section ProofCreateMain.
         { rewrite /inode_map. iFrame. }
         iDestruct (cpu_own_transport CIDd2 CIDe11 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (DLK.wp_dirlink_gen kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn
+        iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                   usd2 (ientry kd) dind bm data dn dn nf (cr_low16 cinum)
                   n5 Sb5
@@ -8713,7 +8712,7 @@ Section ProofCreateMain.
           iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDd3 CIDh6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (IU.wp_iupdate_link kt γs j γl γu γd γk pd pav pu bn γ γfs γi
+          iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γfs γi
                     cov logstart inodestart nib dev (ientry kd) dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
@@ -8929,7 +8928,7 @@ Section ProofCreateMain.
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep2".
-          iApply (IUP.wp_iunlockput_gen kt γs j γl γu γd γk pd pav pu bn γ γfs
+          iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γil γisl cov logstart bmapstart inodestart nib
                     size dev usd3 kd (qd/2)%Qp (qd/2)%Qp gd dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
@@ -9320,11 +9319,11 @@ Section ProofCreateMain.
      hart's stack, and the prologue's [c.addi16sp] is exactly the split
      that would hand it out.  So the seal READS them off the capability and
      keeps the resource: the conclusion is PURE, so the [iDestruct .. as %_]
-     leaves [Hcg] in place (the same idiom [StackBytes.slot_bytes_own (KTR := kt)] uses
+     leaves [Hcg] in place (the same idiom [StackBytes.slot_bytes_own (KTR := KT1)] uses
      on its own argument). *)
   Lemma cr_cap_align (m : regfile) (avail : nat) (b : bool) (pp : mword 64) :
     (10 <= avail)%nat ->
-    sie_cap_gpr kt m avail b pp ⊢
+    sie_cap_gpr KT1 m avail b pp ⊢
     ⌜is_aligned_paddr
        (Physaddr (pa_stk (m !!! Regidx csp_rs1 : mword 64) 10)) 8 = true
      /\ is_aligned_paddr
@@ -9335,7 +9334,7 @@ Section ProofCreateMain.
                  (<[Regidx csp_rs1 := regval_into_reg
                       (pa_stk (m !!! Regidx csp_rs1 : mword 64) 10)]> m)
                  avail 10 b Hn ltac:(apply upd_eq) with "Hcap") as "[_ Hfr]".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hfr".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hfr".
     iDestruct "Hfr" as "(_ & _ & _ & _ & _ & _ & _ & _ & S9 & S10 & _)".
     iDestruct "S9" as (w9) "H9". iDestruct "S10" as (w10) "H10".
     iDestruct (word_pointsto_aligned_p with "H9") as %Ha9.
@@ -9358,7 +9357,7 @@ Section ProofCreateMain.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_create_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+    wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                          γa γf γpr cov logstart bmapstart inodestart nib
                          ninodes size dev used plen pfun ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.

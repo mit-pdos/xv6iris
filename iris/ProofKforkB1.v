@@ -97,7 +97,6 @@ Section KforkB1Proof.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -151,22 +150,22 @@ Section KforkB1Proof.
        reserve of the exit arm [b].  EXIT below is at [K] and arm [b]: the
        physical carve [trap_res b + (K - 8)] -> [trap_res b + K] is exactly the
        8-slot epilogue pop, i.e. the reserve is CONSERVED across this block. *)
-    sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-    arm_pay kt lvl eb pme -∗
+    arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    (∃ w4, word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4) -∗
-    (∃ w5, word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    (∃ w8, word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    (∃ w4, word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4) -∗
+    (∃ w5, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8) -∗
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
-    is_lock γl (proc_addr j) "proc"%string (proc_lock_res (kt := kt) γs γl (proc_addr j)) -∗
+    is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
     kalloc_env γa None -∗
     fp_rest (proc_addr j) V pid -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
@@ -174,7 +173,7 @@ Section KforkB1Proof.
     wp_next (match lvl with O => eb | S _ => false end) pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr kt mf K (match lvl with O => eb | S _ => false end) pme -∗
+        sie_cap_gpr KT1 mf K (match lvl with O => eb | S _ => false end) pme -∗
         pc_is (ret_pc ra0) -∗
         cpu_own lvl eb pme (match lvl with O => eb | S _ => false end) lks -∗
         kalloc_env γa None -∗
@@ -222,7 +221,7 @@ Section KforkB1Proof.
     assert (HT1a0 : T1 !!! Regidx Ra0 = proc_addr j)
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
-    iApply (FP.wp_freeproc_sconf kt γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
+    iApply (FP.wp_freeproc_sconf γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
               (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
               with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henv").
@@ -285,7 +284,7 @@ Section KforkB1Proof.
     iDestruct "Hheld" as "(Hlocked & Hstate & Hpst & Hchan & Hpub)".
     iDestruct (pstate_whole_split (proc_addr j) UNUSED) as "[Hwb _]".
     iDestruct ("Hwb" with "Hpst") as "[Hpst _]".
-    iAssert (proc_lock_res (kt := kt) γs γl (proc_addr j))
+    iAssert (proc_lock_res γs γl (proc_addr j))
       with "[Hstate Hpst Hchan Hpub Hdorm Hhaa]" as "HR".
     { iApply (proc_lock_res_intro γs γl (proc_addr j) UNUSED (zero_reg : mword 64)
                 with "Hstate Hpst Hchan Hpub [Hdorm Hhaa]").
@@ -300,8 +299,8 @@ Section KforkB1Proof.
        with no reserve summand at all (the arm is [b] there), so nothing needs
        undoing afterwards. *)
     iEval (rewrite -Hb) in "Hcg".
-    iApply (RL.wp_release_sconf kt γl (proc_addr j) "proc"%string
-              (proc_lock_res (kt := kt) γs γl (proc_addr j)) T3 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
+              (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").

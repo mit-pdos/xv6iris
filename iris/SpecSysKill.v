@@ -54,7 +54,7 @@ Import Defs.
 
 
 Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-     (kt : ktier) (γs : list gname)
+     (γs : list gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_kill in
@@ -71,20 +71,20 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   locks_below lks "proc" ->
   (* what argint's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
   (* kkill's *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (rv : mword 64),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = rv /\
         (rv = (zero_reg : mword 64) \/ rv = mword_of_int (-1)) ⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
@@ -95,8 +95,8 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 Module Type SYSKILL.
   Parameter wp_sys_kill_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (γs : list gname)
+       (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset string),
-      wp_sys_kill_sconf_body kt γs m av n eb p tfp ws v dqt b lks.
+      wp_sys_kill_sconf_body γs m av n eb p tfp ws v dqt b lks.
 End SYSKILL.

@@ -89,7 +89,7 @@ Local Open Scope Z_scope.
 Notation uartwrite_stack := (30%nat) (only parsing).
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γu : uart_names) (γv : disk_names) 
+    (γu : uart_names) (γv : disk_names) 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
@@ -121,7 +121,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      "uart" for the acquire call.  uartwrite is BALANCED overall (each byte's
      acquire/release pair cancels), so [lks] is unchanged end to end. *)
   locks_below lks "proc" ->
-  sie_cap_gpr kt m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -143,11 +143,11 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* the buffer, read-only *)
   ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
   (* the running-thread bundle (SpecSleep.v) *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
@@ -160,9 +160,9 @@ Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
+      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
       (pidv : mword 32) (dqp : dfrac) (lks : gset string),
-      wp_uartwrite_sconf_body kt γu γv γs j γlp γl m av eb n f dq b pidv dqp lks.
+      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb n f dq b pidv dqp lks.
 End UARTWRITE.

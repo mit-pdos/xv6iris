@@ -217,7 +217,6 @@ Section ProofUvmfree.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -237,7 +236,7 @@ Section ProofUvmfree.
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmfree_sconf_body kt γa mm uroot um K eb p ilvl b lks.
+    : wp_uvmfree_sconf_body γa mm uroot um K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmfree_sconf_body].
     intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom Hlkbelow.
@@ -283,7 +282,7 @@ Section ProofUvmfree.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm) with A0.
     assert (HA0sp : A0 !!! Regidx csp_rs1 = spd) by (rewrite /A0 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -426,7 +425,7 @@ Section ProofUvmfree.
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
-        sie_cap_gpr kt (CID := CIDj) mj (K - 4)%nat b p -∗
+        sie_cap_gpr KT1 (CID := CIDj) mj (K - 4)%nat b p -∗
         cpu_own (CID := CIDj) ilvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.uvmfree + 0x0e) : mword 64) -∗
         bare_pt uroot ∅ -∗
@@ -489,7 +488,7 @@ Section ProofUvmfree.
       iDestruct (cpu_own_transport CIDj CIDk2 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* ---- freewalk() at lvl = 2 ---- *)
-      iApply (Freewalk.wp_freewalk_sconf kt γa J1 t 2%nat (K - 4)%nat eb p ilvl b lks
+      iApply (Freewalk.wp_freewalk_sconf γa J1 t 2%nat (K - 4)%nat eb p ilvl b lks
                 HKfw Hilvl HJ1a0 Hfree with "Hcg Hcpu Htext Hpc Ht Henv").
       all: try lkbelow.
       iIntros (CIDk3 Hsk3 mr) "Hcg Hcpu Hpc %Hcs".
@@ -568,8 +567,8 @@ Section ProofUvmfree.
                      = pa_stk (add_vec (E2 !!! Regidx csp_rs1)
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HE2sp. symmetry. exact Hspd4. }
-      iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hr24". { iExists _. iEval (rewrite Hb1). iExact "Hr24". }
         iSplitL "Hr16". { iExists _. iEval (rewrite Hb2). iExact "Hr16". }
         iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3). iExact "Hr8". }
@@ -864,7 +863,7 @@ Section ProofUvmfree.
     { rewrite HB7a1.
       assert (Hz : uint (mword_of_int 0 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz. rewrite Z.add_0_l. exact Hnrange. }
-    iApply (Uvmunmap.wp_uvmunmap_bare_sconf kt γa B7 uroot um n (K - 4)%nat eb p ilvl b lks
+    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa B7 uroot um n (K - 4)%nat eb p ilvl b lks
               HKuu Hilvl HB7a0 Halign HB7a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv").
     all: try lkbelow.

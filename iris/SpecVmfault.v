@@ -68,7 +68,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
@@ -96,7 +96,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      page and, on the mappages-failure arm, the kfree that undoes it.
      ismapped/mappages take no lock, so one premise covers everything. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -104,7 +104,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -121,8 +121,8 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
-      wp_vmfault_sconf_body kt γa mm P szv K lvl eb p b lks.
+      wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
 End VMFAULT.

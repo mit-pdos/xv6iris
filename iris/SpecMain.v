@@ -187,7 +187,6 @@ Section SpecMain.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* ------------------------------------------------------------------- *)
   (* The eleven [struct spinlock]s the init sequence brings up, each as   *)
   (* [SpecProcinit.lk_raw] -- the three cells [lk ↦₄ _],                  *)
@@ -358,7 +357,7 @@ Section SpecMain.
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->
-    sie_cap_gpr kt m K false p0 -∗
+    sie_cap_gpr KT0 m K false p0 -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
@@ -379,7 +378,7 @@ Section SpecMain.
     □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
-         procs_inv (kt := kt) γs -∗
+         procs_inv γs -∗
          console_caps γd -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
@@ -450,13 +449,13 @@ Module Type MAIN.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (m : regfile) (K : nat)
+      (m : regfile) (K : nat)
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P},
-      wp_main_boot_sconf_body (kt := kt) m K p0 ps s1entry phystop
+      wp_main_boot_sconf_body m K p0 ps s1entry phystop
         γd γv l0 b0 c0 tlbvec0 P.
 End MAIN.

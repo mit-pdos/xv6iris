@@ -46,7 +46,7 @@ Notation K_virtio_disk_intr := (22%nat) (only parsing).
 Definition wp_virtio_disk_intr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-     (kt : ktier) (γs : list gname)
+     (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :=
@@ -60,17 +60,17 @@ Definition wp_virtio_disk_intr_sconf_body
      "virtio_disk"'s -- virtio_disk_intr acquires and releases [disk.vdisk_lock]
      once, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "virtio_disk" ->
-  sie_cap_gpr kt m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
- procs_inv (kt := kt) γs -∗
+ procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr kt mf K b pme -∗
+      sie_cap_gpr KT1 mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -80,9 +80,9 @@ Module Type VIRTIODISKINTR.
   Parameter wp_virtio_disk_intr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-       (kt : ktier) (γs : list gname)
+       (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string),
-      wp_virtio_disk_intr_sconf_body kt γs γu γd γk pd pav pu m K lvl eb pme b lks.
+      wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme b lks.
 End VIRTIODISKINTR.

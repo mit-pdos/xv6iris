@@ -94,7 +94,7 @@ Definition wp_sys_sync_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -110,17 +110,17 @@ Definition wp_sys_sync_sconf_body
      (possibly many times, around each wait iteration's [sleep]) but is
      BALANCED overall, so [lks] is unchanged end to end. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM: see the header note, and
      SpecBeginOp.v, whose wait loop this one is a transcription of. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the running-thread bundle threaded through the interior sleep *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_sync PARKS (its wait
      loop sleeps), and a park moves the hart with interrupts off, which has
      nothing to do with SIE (the porting guide's "a PARKING function's
@@ -130,9 +130,9 @@ Definition wp_sys_sync_sconf_body
       ⌜callee_saved m mf⌝ -∗
       (* the syscall's return value: [return 0] *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -143,11 +143,11 @@ Module Type SYS_SYNC.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_sync_sconf_body kt γs j γl bn γ γfs cov logstart dev m K eb b lks.
+      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks.
 End SYS_SYNC.

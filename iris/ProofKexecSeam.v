@@ -389,7 +389,6 @@ Section KexecBFrame.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   (* the elf slots as 64 NAMED bytes, with the per-slot 8-alignment facts kept
      as a PURE side product: a byte run does not carry alignment and
      [bytes_own_slotsn] demands it back.  [ProofKexecA.kxc_elf_acc] is the
@@ -397,11 +396,11 @@ Section KexecBFrame.
      alignment as DATA, because the naming survives into the loop invariant
      while the giveback happens much later. *)
   Lemma kxc_elf_take (sp0 : mword 64) :
-    stack_own (KTR := kt) (pa_stk sp0 46) 8 ⊢
+    stack_own (KTR := KT1) (pa_stk sp0 46) 8 ⊢
     ⌜forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
     ∃ f : nat -> bv 8,
-      [∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] f j.
+      [∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] f j.
   Proof.
     iIntros "H".
     iDestruct (kxc_elf_slots_of_stack with "H") as "H".
@@ -414,8 +413,8 @@ Section KexecBFrame.
   Lemma kxc_elf_give (sp0 : mword 64) (g : nat -> bv 8) :
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] g j)
-    ⊢ stack_own (KTR := kt) (pa_stk sp0 46) 8.
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] g j)
+    ⊢ stack_own (KTR := KT1) (pa_stk sp0 46) 8.
   Proof.
     intro Hal. iIntros "Hg".
     iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
@@ -485,7 +484,6 @@ Section KexecBFrameB.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
      they travel named, see the file header -- and (b) slots 5..13 and 67
      PINNED, because from here on every one of them holds a value some later
@@ -495,26 +493,26 @@ Section KexecBFrameB.
      dead or written-before-read here, so they stay [stack_own]. *)
   Definition kxc_frameB (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64) : iProp Σ :=
-    (word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (KTR := kt) (pa_stk sp0 13) 33 ∗
-     stack_own (KTR := kt) (pa_stk sp0 54) 9 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 64) (DfracOwn 1) av ∗
-     (∃ w65, word_pointsto (KTR := kt) (pa_stk sp0 65) (DfracOwn 1) w65) ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) pv ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 67) (DfracOwn 1) w67 ∗
-     (∃ w68, word_pointsto (KTR := kt) (pa_stk sp0 68) (DfracOwn 1) w68))%I.
+    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
+     stack_own (KTR := KT1) (pa_stk sp0 13) 33 ∗
+     stack_own (KTR := KT1) (pa_stk sp0 54) 9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 64) (DfracOwn 1) av ∗
+     (∃ w65, word_pointsto (KTR := KT1) (pa_stk sp0 65) (DfracOwn 1) w65) ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 67) (DfracOwn 1) w67 ∗
+     (∃ w68, word_pointsto (KTR := KT1) (pa_stk sp0 68) (DfracOwn 1) w68))%I.
 
 End KexecBFrameB.
 
@@ -527,7 +525,6 @@ Section KexecBSeam.
             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come
               from [fileG] -- ProofKexecA.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
-  Context {kt : ktier}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -614,7 +611,7 @@ Section KexecBSeam.
        um_below (mword_of_int 0 : mword 64) P.(ud_um) /\
        um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -631,7 +628,7 @@ Section KexecBSeam.
      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) ∗
      ([∗ list] i ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
   (* --------------------------------------------------------------- *)
@@ -697,7 +694,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -714,7 +711,7 @@ Section KexecBSeam.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
   (* --------------------------------------------------------------- *)
@@ -761,7 +758,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
@@ -778,7 +775,7 @@ Section KexecBSeam.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
   (* --------------------------------------------------------------- *)
@@ -813,7 +810,7 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
@@ -827,7 +824,7 @@ Section KexecBSeam.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
   (* --------------------------------------------------------------- *)
@@ -843,28 +840,28 @@ Section KexecBSeam.
   Definition kxc_frameC (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (c : nat) (sz1 : mword 64) (alen : nat -> nat) : iProp Σ :=
-    (word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (KTR := kt) (pa_stk sp0 13) (33 - c) ∗
+    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
+     stack_own (KTR := KT1) (pa_stk sp0 13) (33 - c) ∗
      ([∗ list] j ∈ seq 0 c,
-        pa_stk sp0 (46 - j) ↦₈[kt] (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) ∗
-     stack_own (KTR := kt) (pa_stk sp0 54) 9 ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) ∗
-     (∃ w65, word_pointsto (KTR := kt) (pa_stk sp0 65) (DfracOwn 1) w65) ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) pv ∗
-     word_pointsto (KTR := kt) (pa_stk sp0 67) (DfracOwn 1) w67 ∗
-     (∃ w68, word_pointsto (KTR := kt) (pa_stk sp0 68) (DfracOwn 1) w68))%I.
+        pa_stk sp0 (46 - j) ↦₈[KT1] (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) ∗
+     stack_own (KTR := KT1) (pa_stk sp0 54) 9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) ∗
+     (∃ w65, word_pointsto (KTR := KT1) (pa_stk sp0 65) (DfracOwn 1) w65) ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 67) (DfracOwn 1) w67 ∗
+     (∃ w68, word_pointsto (KTR := KT1) (pa_stk sp0 68) (DfracOwn 1) w68))%I.
 
   (* THE FOURTEEN RESOURCES NEITHER THE LOOP'S HEAD NOR ITS EXIT LOOKS      *)
   (* INSIDE -- [kxc_res]'s phase-C analogue, minus the FS/icache pieces     *)
@@ -893,7 +890,7 @@ Section KexecBSeam.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameC sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen)%I.
 
@@ -931,7 +928,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
@@ -985,7 +982,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
@@ -1023,7 +1020,7 @@ Section KexecBSeam.
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[kt] ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 pv (pa_add av (8 * c))
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
@@ -1063,7 +1060,7 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x2a6) : mword 64) ∗
-     sie_cap_gpr kt M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_d_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa

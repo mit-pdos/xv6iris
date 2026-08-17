@@ -123,7 +123,7 @@ Definition wp_iput_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)          (* the running process *)
+    (gs : list gname) (j : nat) (gl : gname)          (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -178,13 +178,13 @@ Definition wp_iput_sconf_body
      (Note (B1): under Route B the truncate arm's acquiresleep is the
      NESTED one, which does not park; bread under itrunc/iupdate still
      does, so this premise stays.) *)
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
      to it.  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -216,7 +216,7 @@ Definition wp_iput_sconf_body
   (* the caller's own pid cell (acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv (kt := kt) gs -∗
+  procs_inv gs -∗
   (* the disk fabric *)
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
@@ -230,13 +230,13 @@ Definition wp_iput_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
      to it.  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -323,7 +323,7 @@ Definition wp_iput_gen_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
-    (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
+    (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -364,9 +364,9 @@ Definition wp_iput_gen_body
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   (* THE FRESHNESS PREMISE -- see [wp_iput_sconf_body]. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -387,7 +387,7 @@ Definition wp_iput_gen_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
   p_pid pj ↦₄{dq} pidv -∗
-  procs_inv (kt := kt) gs -∗
+  procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -413,9 +413,9 @@ Definition wp_iput_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -445,7 +445,7 @@ Module Type IPUT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
+      (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -459,7 +459,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_iput_sconf_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb b lks.
   (* the credited set-form contract; [wp_iput_sconf] is this at
@@ -471,7 +471,7 @@ Module Type IPUT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (gs : list gname) (j : nat) (gl : gname)
+      (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -485,7 +485,7 @@ Module Type IPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_iput_gen_body kt gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
                        k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
 End IPUT.

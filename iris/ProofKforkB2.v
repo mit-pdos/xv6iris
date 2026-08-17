@@ -153,7 +153,6 @@ Section KforkTfLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra2 := (mword_of_int 12 : mword 5).
@@ -185,7 +184,7 @@ Section KforkTfLoop.
        -- and what the capstone actually wants -- is preservation relative to
        ITS OWN entry map [M].  (durable-notes / S11: getting this wrong
        compiles, and only fails when the capstone tries to apply the block.) *)
-    sie_cap_gpr kt M n false p -∗
+    sie_cap_gpr KT1 M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     tf_page tfsrc ws -∗
@@ -195,7 +194,7 @@ Section KforkTfLoop.
         ⌜callee_saved M mf /\
          mf !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 36) /\
          mf !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 36)⌝ -∗
-        sie_cap_gpr kt mf n false p -∗
+        sie_cap_gpr KT1 mf n false p -∗
         pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
         tf_page tfsrc ws -∗
         tf_page tfdst ws -∗
@@ -242,7 +241,7 @@ Section KforkTfLoop.
        Mk !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat (4*k)) /\
        Mk !!! Regidx Ra3 = tf_pa tfsrc (8 * Z.of_nat 36) /\
        (forall r : mword 5, is_cs_idx r = true -> Mk !!! Regidx r = M !!! Regidx r)⌝ -∗
-      sie_cap_gpr kt Mk n false p -∗
+      sie_cap_gpr KT1 Mk n false p -∗
       pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
       tf_page tfsrc ws -∗
       tf_page tfdst cur -∗
@@ -251,7 +250,7 @@ Section KforkTfLoop.
           ⌜callee_saved M mf /\
            mf !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 36) /\
            mf !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 36)⌝ -∗
-          sie_cap_gpr kt mf n false p -∗
+          sie_cap_gpr KT1 mf n false p -∗
           pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
           tf_page tfsrc ws -∗
           tf_page tfdst ws -∗
@@ -311,7 +310,7 @@ Section KforkTfLoop.
       (*  +0x4a: c.ld a0,0(a5)                                             *)
       (* ================================================================ *)
       iDestruct (tf_page_word_mem tfsrc ws ((4*k+0)%nat) w0 ltac:(lia) Hw0 with "Hptcsrc Hsrcp") as "[Hr0 Hsrcback0]".
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x4a) : mword 64) Ra0 Ra5 (mword_of_int 0 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x4a) : mword 64) Ra0 Ra5 (mword_of_int 0 : mword 12)
                 Mk n w0 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi04a [Hr0]").
@@ -335,7 +334,7 @@ Section KforkTfLoop.
       (*  +0x4c: c.ld a1,8(a5)                                             *)
       (* ================================================================ *)
       iDestruct (tf_page_word_mem tfsrc ws ((4*k+1)%nat) w1 ltac:(lia) Hw1 with "Hptcsrc Hsrcp") as "[Hr1 Hsrcback1]".
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x4c) : mword 64) Ra1 Ra5 (mword_of_int 8 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x4c) : mword 64) Ra1 Ra5 (mword_of_int 8 : mword 12)
                 M1 n w1 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi04c [Hr1]").
@@ -361,7 +360,7 @@ Section KforkTfLoop.
       (*  +0x4e: c.ld a2,16(a5)                                            *)
       (* ================================================================ *)
       iDestruct (tf_page_word_mem tfsrc ws ((4*k+2)%nat) w2 ltac:(lia) Hw2 with "Hptcsrc Hsrcp") as "[Hr2 Hsrcback2]".
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x4e) : mword 64) Ra2 Ra5 (mword_of_int 16 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x4e) : mword 64) Ra2 Ra5 (mword_of_int 16 : mword 12)
                 M2 n w2 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi04e [Hr2]").
@@ -392,7 +391,7 @@ Section KforkTfLoop.
       assert (Hcb0 : ((4*k+0)%nat < length cur)%nat) by (rewrite Hcurlen36; exact (kfk_idx_lt36_0 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur ((4*k+0)%nat) Hcb0) as [c0 Hc0].
       iDestruct (tf_page_word_upd_mem tfdst cur ((4*k+0)%nat) c0 ltac:(lia) Hc0 with "Hptcdst Hdstp") as "[Hw0 Hback0]".
-      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x50) : mword 64) Ra0 Ra4 (mword_of_int 0 : mword 12)
+      iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x50) : mword 64) Ra0 Ra4 (mword_of_int 0 : mword 12)
                 M3 n c0 false
                 with "Hcg Hpc Hi050 [Hw0]").
       { iEval (rgne; rewrite HM3a4 Hd0). iExact "Hw0". }
@@ -409,7 +408,7 @@ Section KforkTfLoop.
         by (rewrite /cur1 length_insert Hcurlen36; exact (kfk_idx_lt36_1 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur1 ((4*k+1)%nat) Hcb1) as [c1 Hc1].
       iDestruct (tf_page_word_upd_mem tfdst cur1 ((4*k+1)%nat) c1 ltac:(lia) Hc1 with "Hptcdst Hdstp") as "[Hw1 Hback1]".
-      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x52) : mword 64) Ra1 Ra4 (mword_of_int 8 : mword 12)
+      iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x52) : mword 64) Ra1 Ra4 (mword_of_int 8 : mword 12)
                 M3 n c1 false
                 with "Hcg Hpc Hi052 [Hw1]").
       { iEval (rgne; rewrite HM3a4 Hd1). iExact "Hw1". }
@@ -426,7 +425,7 @@ Section KforkTfLoop.
         by (rewrite /cur2 length_insert /cur1 length_insert Hcurlen36; exact (kfk_idx_lt36_2 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur2 ((4*k+2)%nat) Hcb2) as [c2 Hc2].
       iDestruct (tf_page_word_upd_mem tfdst cur2 ((4*k+2)%nat) c2 ltac:(lia) Hc2 with "Hptcdst Hdstp") as "[Hw2 Hback2]".
-      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x54) : mword 64) Ra2 Ra4 (mword_of_int 16 : mword 12)
+      iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x54) : mword 64) Ra2 Ra4 (mword_of_int 16 : mword 12)
                 M3 n c2 false
                 with "Hcg Hpc Hi054 [Hw2]").
       { iEval (rgne; rewrite HM3a4 Hd2). iExact "Hw2". }
@@ -443,7 +442,7 @@ Section KforkTfLoop.
       (*  +0x56: c.ld a2,24(a5) -- reloads a2, off the SAME map M3          *)
       (* ================================================================ *)
       iDestruct (tf_page_word_mem tfsrc ws ((4*k+3)%nat) w3 ltac:(lia) Hw3 with "Hptcsrc Hsrcp") as "[Hr3 Hsrcback3]".
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x56) : mword 64) Ra2 Ra5 (mword_of_int 24 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x56) : mword 64) Ra2 Ra5 (mword_of_int 24 : mword 12)
                 M3 n w3 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi056 [Hr3]").
@@ -471,7 +470,7 @@ Section KforkTfLoop.
             exact (kfk_idx_lt36_3 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur3 ((4*k+3)%nat) Hcb3) as [c3 Hc3].
       iDestruct (tf_page_word_upd_mem tfdst cur3 ((4*k+3)%nat) c3 ltac:(lia) Hc3 with "Hptcdst Hdstp") as "[Hw3 Hback3]".
-      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x58) : mword 64) Ra2 Ra4 (mword_of_int 24 : mword 12)
+      iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x58) : mword 64) Ra2 Ra4 (mword_of_int 24 : mword 12)
                 M4 n c3 false
                 with "Hcg Hpc Hi058 [Hw3]").
       { iEval (rgne; rewrite HM4a4 Hd3). iExact "Hw3". }

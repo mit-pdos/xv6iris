@@ -228,7 +228,6 @@ Section KforkB3Proof.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -284,13 +283,13 @@ Section KforkB3Proof.
           ⌜Mx !!! Regidx csp_rs1 = sp0v /\ Mx !!! Regidx Rs0 = s00v /\
             Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
             kfkb3_thr m0 Mx⌝ -∗
-          sie_cap_gpr kt Mx (rsv + (K - 8))%nat b pme -∗
+          sie_cap_gpr KT1 Mx (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
           WP (Loop : expr riscv_lang)) -∗
-      sie_cap_gpr kt M (rsv + (K - 8))%nat b pme -∗
+      sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
       cpu_own n eb pme b lks -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Vp -∗
@@ -320,13 +319,13 @@ Section KforkB3Proof.
               ⌜Mx !!! Regidx csp_rs1 = sp0v /\ Mx !!! Regidx Rs0 = s00v /\
                 Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
                 kfkb3_thr m0 Mx⌝ -∗
-              sie_cap_gpr kt Mx (rsv + (K - 8))%nat b pme -∗
+              sie_cap_gpr KT1 Mx (rsv + (K - 8))%nat b pme -∗
               cpu_own n eb pme b lks -∗
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Vp -∗
               proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
               WP (Loop : expr riscv_lang)) -∗
-          sie_cap_gpr kt M (rsv + (K - 8))%nat b pme -∗
+          sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
@@ -348,7 +347,7 @@ Section KforkB3Proof.
             Mt !!! Regidx Rs1 = p_ofile pme i /\ Mt !!! Regidx Rs2 = p_ofile npa i /\
             Mt !!! Regidx Rs3 = p_cwd pme /\ Mt !!! Regidx Rs4 = npa /\
             Mt !!! Regidx Rs5 = pme /\ kfkb3_thr m0 Mt⌝ -∗
-          sie_cap_gpr kt Mt (rsv + (K - 8))%nat b pme -∗
+          sie_cap_gpr KT1 Mt (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
@@ -482,7 +481,7 @@ Section KforkB3Proof.
       (* ---- +0x96: c.ld a0,0(s1) ---- *)
       assert (Haddr : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                      = p_ofile pme i) by (rewrite Hs1; apply addv_sext0).
-      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x96)) Ra0 Rs1 (mword_of_int 0 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x96)) Ra0 Rs1 (mword_of_int 0 : mword 12)
                 M (rsv + (K - 8))%nat v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi096 [Hcell]").
       { iEval (rewrite Haddr). iExact "Hcell". }
@@ -607,7 +606,7 @@ Section KforkB3Proof.
         assert (HL2a0k : L2 !!! Regidx Ra0 = fnode k) by (rewrite HL2a0; exact Hfn).
         iDestruct (cpu_own_transport CIDk CIDn n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
-        iApply (FD.wp_filedup_sconf kt γl γf k q Cf L2 n eb pme (rsv + (K - 8))%nat b
+        iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme (rsv + (K - 8))%nat b
                   _ HK14 Hn HL2a0k Hbelow
                   with "Hcg Hown Htext Hpc Hft Hfds Href").
         all: try lkbelow.
@@ -636,7 +635,7 @@ Section KforkB3Proof.
         (* ---- +0x9e: sd a0,0(s2) -- np->ofile[i] = the duplicate ---- *)
         assert (Haddr2 : add_vec (mr !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = p_ofile npa i) by (rewrite Hmrs2; apply addv_sext0).
-        iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x9e)) Ra0 Rs2 (mword_of_int 0 : mword 12)
+        iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x9e)) Ra0 Rs2 (mword_of_int 0 : mword 12)
                   mr (rsv + (K - 8))%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi09e [Hcell2]").
         { iEval (rgne; rewrite Haddr2). iExact "Hcell2". }

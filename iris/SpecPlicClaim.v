@@ -72,7 +72,7 @@ Definition plic_claim_a0_ok (v : mword 64) : Prop :=
    [wp_next] wrapper (it would collapse via [wp_next_off] anyway, since the
    hart cannot move). *)
 Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
+    (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -83,11 +83,11 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !
   (* plic_claim's own max depth: its 16-byte frame (2 slots) plus the two
      slots cpuid's frame needs below it. *)
   (4 <= n)%nat ->
-  sie_cap_gpr kt m0 n false p -∗
+  sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   ( ∀ m' : regfile,
-    sie_cap_gpr kt m' n false p -∗
+    sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 /\
       plic_claim_a0_ok (m' !!! Regidx a0_idx) ⌝ -∗
@@ -97,6 +97,6 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !
 Module Type PLIC_CLAIM.
   Parameter wp_plic_claim_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plic_claim_sconf_body kt γd γv m0 n p.
+      (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plic_claim_sconf_body γd γv m0 n p.
 End PLIC_CLAIM.

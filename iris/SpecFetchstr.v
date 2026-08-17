@@ -106,7 +106,7 @@ Definition fetchstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   \/ r = (mword_of_int (-1) : mword 64).
 
 Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (γf : gname)
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchstr in
@@ -119,21 +119,21 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (Z.of_nat maxn < 2 ^ 31)%Z ->
   (* fetchstr -> copyinstr -> walkaddr -> walk *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[kt] buf_olds j) -∗
+  ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[KT1] buf_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗
-      ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[kt] buf_new j) -∗
+      ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[KT1] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -141,7 +141,7 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type FETCHSTR.
   Parameter wp_fetchstr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_fetchstr_sconf_body kt γa γf m av n eb p pid V maxn buf_olds b lks.
+      wp_fetchstr_sconf_body γa γf m av n eb p pid V maxn buf_olds b lks.
 End FETCHSTR.

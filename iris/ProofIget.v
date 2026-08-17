@@ -386,7 +386,6 @@ Section ProofIget.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
   Notation Rs1  := (mword_of_int 9 : mword 5).
@@ -407,7 +406,7 @@ Section ProofIget.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
-    sie_cap_gpr kt m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -469,7 +468,7 @@ Section ProofIget.
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_iget_sconf_body kt γl cn γfs γi cov logstart nib dev inum l
+    : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
@@ -516,7 +515,7 @@ Section ProofIget.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (w1) "Hf1". iDestruct "S2" as (w2) "Hf2".
     iDestruct "S3" as (w3) "Hf3". iDestruct "S4" as (w4) "Hf4".
@@ -674,7 +673,7 @@ Section ProofIget.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt γl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -810,7 +809,7 @@ Section ProofIget.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
                 c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr kt (CID := CIDt) mt (K - 6)%nat b p -∗
+        sie_cap_gpr KT1 (CID := CIDt) mt (K - 6)%nat b p -∗
         cpu_own (CID := CIDt) n eb p b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
@@ -905,8 +904,8 @@ Section ProofIget.
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
       { rewrite Hwv HP7sp. unfold spr, sp0, pa_stk, add_vec_int.
         apply f_equal. pcw. }
-      iAssert (stack_own (KTR := kt) sp0 6) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe6".
-      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe6".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hf1"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hf1"|].
         iSplitL "Hf2"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hf2"|].
         iSplitL "Hf3"; [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hf3"|].
@@ -1021,10 +1020,10 @@ Section ProofIget.
       ⌜ Mr !!! Regidx Rs3 = (zero_reg : mword 64)
         \/ (exists e : nat, (e < NINODE)%nat /\ Mr !!! Regidx Rs3 = ientry e
                             /\ M !! e = None) ⌝ -∗
-      sie_cap_gpr kt Mr (trap_res b + (K - 6))%nat false p -∗
+      sie_cap_gpr KT1 Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
       cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
-      arm_pay kt n eb p -∗
+      arm_pay KT1 n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
       iref_slots_auth -∗
@@ -1057,10 +1056,10 @@ Section ProofIget.
         ⌜ Ms !!! Regidx Rs3 = (zero_reg : mword 64)
           \/ (exists e : nat, (e < NINODE)%nat /\ Ms !!! Regidx Rs3 = ientry e
                               /\ M !! e = None) ⌝ -∗
-        sie_cap_gpr kt Ms (trap_res b + (K - 6))%nat false p -∗
+        sie_cap_gpr KT1 Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
         cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
-        arm_pay kt n eb p -∗
+        arm_pay KT1 n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗
         iref_slots_auth -∗
@@ -1177,7 +1176,7 @@ Section ProofIget.
                                (mword_of_int (KernelSyms.iget + 0xa6) : mword 64) 4)]> PA2).
             assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int ig_msg_a : mword 64))
               by pcw.
-            iApply (PN.wp_panic_sconf kt PA3 (trap_res b + (K - 6))%nat
+            iApply (PN.wp_panic_sconf KT1 PA3 (trap_res b + (K - 6))%nat
                       (S n) eb false p (PkAStr DfracDiscarded ig_msg)
                       ({["itable"]} ∪ lks)
                       (ig_panic_K K b HK) eq_refl (ig_panic_noff n HnZ)
@@ -1554,7 +1553,7 @@ Section ProofIget.
                are the same bool.  Pure re-spelling; it is what makes the
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
-            iApply (Release.wp_release_sconf kt γl itable_lock "itable"%string
+            iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
                       (itable_res2 cn γfs γi cov logstart nib dev) V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
@@ -1680,7 +1679,7 @@ Section ProofIget.
         assert (Hpa4a : add_vec (rget L1 Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = i_dev (ientry j)).
         { rewrite (rget_ne L1 Rs1 ltac:(nz)) HL1s1. reflexivity. }
-        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x4a)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x4a)) Ra4 Rs1
                   (mword_of_int 0 : mword 12) L1 (trap_res b + (K - 6))%nat dj false
                   (dqm := DfracOwn qj') ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi4a [Hdcell]").
@@ -1752,7 +1751,7 @@ Section ProofIget.
         assert (Hpa50 : add_vec (rget L2 Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                         = i_inum (ientry j)).
         { rewrite (rget_ne L2 Rs1 ltac:(nz)) HL2s1. reflexivity. }
-        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x50)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x50)) Ra4 Rs1
                   (mword_of_int 4 : mword 12) L2 (trap_res b + (K - 6))%nat ij false
                   (dqm := DfracOwn qj') ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi50 [Hncell]").
@@ -1974,7 +1973,7 @@ Section ProofIget.
           by (rewrite (HL7thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HL3sp).
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (Release.wp_release_sconf kt γl itable_lock "itable"%string
+        iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
                   (itable_res2 cn γfs γi cov logstart nib dev) L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)

@@ -102,7 +102,7 @@ Definition wp_bfree_gen_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -145,7 +145,7 @@ Definition wp_bfree_gen_body
   (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
      touches ranks lower.  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
      release of its own -- it is a pure PASS-THROUGH to bread, which is
@@ -156,7 +156,7 @@ Definition wp_bfree_gen_body
      unchanged to bread and back.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -174,7 +174,7 @@ Definition wp_bfree_gen_body
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -214,9 +214,9 @@ Definition wp_bfree_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -234,7 +234,7 @@ Definition wp_bfree_sconf_body
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (kt : ktier) (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -277,7 +277,7 @@ Definition wp_bfree_sconf_body
   (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
      touches ranks lower.  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
      release of its own -- it is a pure PASS-THROUGH to bread, which is
@@ -288,7 +288,7 @@ Definition wp_bfree_sconf_body
      unchanged to bread and back.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext kt eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -306,7 +306,7 @@ Definition wp_bfree_sconf_body
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -327,9 +327,9 @@ Definition wp_bfree_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext kt eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -351,7 +351,7 @@ Module Type BFREE.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -362,7 +362,7 @@ Module Type BFREE.
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_bfree_gen_body kt γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
                         pidv dq dqb m K eb b lks.
 
@@ -371,7 +371,7 @@ Module Type BFREE.
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (kt : ktier) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -382,7 +382,7 @@ Module Type BFREE.
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_bfree_sconf_body kt γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
                           pidv dq dqb m K eb b lks.
 End BFREE.

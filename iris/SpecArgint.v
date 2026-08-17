@@ -18,11 +18,11 @@
 
    argint is a thin wrapper: it holds [ip] in the callee-saved s1 across the
    argraw call and narrows the 64-bit result to the [int] cell with a
-   [c.sw].  So its postcondition is [ip ↦₄[kt] trunc32 v] where [v] is argraw's
+   [c.sw].  So its postcondition is [ip ↦₄[KT1] trunc32 v] where [v] is argraw's
    result -- the low 32 bits of the trapframe slot, which is exactly C's
    [int] conversion.
 
-   Resources are argraw's, plus the caller's destination cell [ip ↦₄[kt] old].
+   Resources are argraw's, plus the caller's destination cell [ip ↦₄[KT1] old].
    Nothing about [proc_priv] appears: see SpecArgraw.v for why the trapframe
    pointer travels as a bare fraction. *)
 From Stdlib Require Import ZArith Lia List.
@@ -58,7 +58,7 @@ Import Defs.
 Notation arg_int32 := trunc32.
 
 Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argint in
@@ -72,28 +72,28 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (18 <= av)%nat ->
   (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
-  ip ↦₄[kt] old -∗
+  ip ↦₄[KT1] old -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
-      ip ↦₄[kt] arg_int32 v -∗
+      ip ↦₄[KT1] arg_int32 v -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type ARGINT.
   Parameter wp_argint_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string),
-      wp_argint_sconf_body kt m av n eb p i tfp ws v old dqt b lks.
+      wp_argint_sconf_body m av n eb p i tfp ws v old dqt b lks.
 End ARGINT.

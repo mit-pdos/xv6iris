@@ -176,7 +176,6 @@ Section ProofProcFreepagetable.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -231,7 +230,7 @@ Section ProofProcFreepagetable.
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_proc_freepagetable_sconf_body kt γa mm P K eb p ilvl b lks.
+    : wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_proc_freepagetable_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
@@ -277,7 +276,7 @@ Section ProofProcFreepagetable.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm) with A0.
     assert (HA0sp : A0 !!! Regidx csp_rs1 = spd) by (rewrite /A0 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -530,7 +529,7 @@ Section ProofProcFreepagetable.
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
     iDestruct (cpu_own_transport CID CID14 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf kt γa B5
+    iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa B5
               (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) tramp_vpn
               (K - 4)%nat eb p ilvl b
               _ HKuu Hilvl HB5a0
@@ -683,7 +682,7 @@ Section ProofProcFreepagetable.
       by (rewrite /C6 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID15 CID22 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf kt γa C6
+    iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa C6
               {[tf_vpn := pte_tf P.(ud_tfp)]} P.(ud_root) P.(ud_um) tf_vpn
               (K - 4)%nat eb p ilvl b
               _ HKuu Hilvl HC6a0
@@ -774,7 +773,7 @@ Section ProofProcFreepagetable.
       by (rewrite /D2 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID23 CID26 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmfree.wp_uvmfree_sconf kt γa D2 P.(ud_root) P.(ud_um)
+    iApply (Uvmfree.wp_uvmfree_sconf γa D2 P.(ud_root) P.(ud_um)
               (K - 4)%nat eb p ilvl b
               _ HKuf Hilvl HD2a0
               ltac:(rewrite HD2a1; exact Hbnd)
@@ -880,8 +879,8 @@ Section ProofProcFreepagetable.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3sp. symmetry. exact Hspd4. }
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3). iExact "Hr8". }

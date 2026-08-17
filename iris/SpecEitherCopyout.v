@@ -97,7 +97,6 @@ Section SpecEitherCopyout.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   (* the kernel arm's destination is the CALLER's buffer; the body supplies
      its tier ([ktb]) at the use below. *)
-  Context {kt : ktier}.
 
   (* What comes back, keyed by the flag and by the returned a0. *)
   Definition either_copyout_post (user : bool) (γf : gname) (p : mword 64)
@@ -107,17 +106,17 @@ Section SpecEitherCopyout.
      then ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
           ∃ P' : uptd, ⌜uptd_ext (pv_upt V) P'⌝ ∗ proc_priv_core p pid (upd_upt V P')
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
-          [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[kt] src_bytes j)%I.
+          [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[KT1] src_bytes j)%I.
 
 End SpecEitherCopyout.
 
-(* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [kt].
+(* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [KT1].
    It is FORCED and it is the same two-tier shape [WpSconfMem]'s merged
-   leaves have: this function's kernel buffer is a FRAME local at [kt] for
+   leaves have: this function's kernel buffer is a FRAME local at [KT1] for
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
 Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt ktb : ktier) `{!KtierLe ktb kt} (γa : gname) (γf : gname)
+    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
@@ -136,7 +135,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
   (* either_copyout -> copyout -> walkaddr -> walk *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kalloc_env γa None -∗
@@ -147,11 +146,11 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-      either_copyout_post (kt := ktb) user γf p pid V dst len src_bytes
+      either_copyout_post user γf p pid V dst len src_bytes
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -159,9 +158,9 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
 Module Type EITHER_COPYOUT.
   Parameter wp_either_copyout_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt ktb : ktier) `{!KtierLe ktb kt} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
+      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_either_copyout_sconf_body kt ktb γa γf m av lvl eb p pid V user len
+      wp_either_copyout_sconf_body ktb γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
 End EITHER_COPYOUT.

@@ -160,7 +160,6 @@ Module SchedProof (Myproc : MYPROC) (Holding : HOLDING) (Swtch : SWTCH) : SCHED.
 Section SchedPostSwtch.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Context {kt : ktier}.
   Lemma sched_post_swtch `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
@@ -187,7 +186,7 @@ Section SchedPostSwtch.
     m' !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) ->
     m' !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
-    sie_cap_gpr kt m' (av - 6)%nat false pj -∗
+    sie_cap_gpr KT1 m' (av - 6)%nat false pj -∗
     (* at the RESUMER's base [eb'] -- swtch stores nothing to struct cpu.
        THE SET IS {proc}, BOTH WAYS, in every real instantiation: sched is
        entered holding exactly this proc's lock ([sched]'s own [noff != 1]
@@ -201,28 +200,28 @@ Section SchedPostSwtch.
     cpu_own 1 eb' pj false {["proc"]} -∗
     pc_is (mword_of_int (KernelSyms.sched + 0x72)) -∗
     (* the five saved callee-saved words + the frame's bottom slot *)
-    pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈[kt] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
-    pa_stk sp0 5 ↦₈[kt] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
-    pa_stk sp0 6 ↦₈[kt] vgap -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx (mword_of_int 19 : mword 5)) -∗
+    pa_stk sp0 6 ↦₈[KT1] vgap -∗
     (* what the dispatch payload delivered *)
     proc_held cpu_id j γl RUNNING ch' -∗
-    trap_csrs kt -∗
+    trap_csrs KT1 -∗
     own_ctx (p_context pj) -∗
     hart_full j cpu_id -∗
-    ▷ sched_vc_at (kt := kt) γs cpu_id (a_cpu_ctx cid_word) pj -∗
+    ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
     ( ∀ (mf : regfile) (ch0 : mword 64),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr kt mf av false pj -∗
+        sie_cap_gpr KT1 mf av false pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         proc_held cpu_id j γl RUNNING ch0 -∗
-        trap_csrs kt -∗
+        trap_csrs KT1 -∗
         cpu_own 1 eb pj false {["proc"]} -∗
         own_ctx (p_context pj) -∗
         hart_full j cpu_id -∗
-        ▷ sched_vc_at (kt := kt) γs cpu_id (a_cpu_ctx cid_word) pj -∗
+        ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
         WP (Loop : expr riscv_lang) ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -315,7 +314,7 @@ Section SchedPostSwtch.
       unfold a_cpu_int, mycpu_ret. rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
       apply sched_reconcile. vm_compute. reflexivity. }
     iPoseProof (sdi_7a with "Htext") as "Hi7a".
-    iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x7a)) (mword_of_int 19 : mword 5) (mword_of_int 18 : mword 5)
+    iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x7a)) (mword_of_int 19 : mword 5) (mword_of_int 18 : mword 5)
               (mword_of_int 172 : mword 12) E3 (av - 6)%nat iv' false
               with "Hcg Hpc Hi7a [Hint2]").
     { iEval (rewrite Hrec_int2). iExact "Hint2". }
@@ -445,8 +444,8 @@ Section SchedPostSwtch.
     iEval (rewrite Hsp_E3) in "Hr1". iEval (rewrite Hsp_E4) in "Hr2".
     iEval (rewrite Hsp_E5) in "Hr3". iEval (rewrite Hsp_E6) in "Hr4".
     iEval (rewrite Hsp_E7) in "Hr5".
-    iAssert (stack_own (KTR := kt) sp0 6) with "[Hr1 Hr2 Hr3 Hr4 Hr5 Hgap]" as "Hframe6".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hr1 Hr2 Hr3 Hr4 Hr5 Hgap]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr1". { iExists _. iEval (rewrite Hb1). iExact "Hr1". }
       iSplitL "Hr2". { iExists _. iEval (rewrite Hb2). iExact "Hr2". }
       iSplitL "Hr3". { iExists _. iEval (rewrite Hb3). iExact "Hr3". }
@@ -548,11 +547,10 @@ Section ProofSched.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_sched_sconf 
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool)
-    : wp_sched_sconf_body kt γs j γl st ch m av eb.
+    : wp_sched_sconf_body γs j γl st ch m av eb.
   Proof.
     cbv beta delta [wp_sched_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hneeds Hav.
@@ -586,7 +584,7 @@ Section ProofSched.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sched + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
     (* split the 6-slot frame into cells. *)
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & S5c & S6c & _)".
     iDestruct "S1c" as (vr1) "Hr1". iDestruct "S2c" as (vr2) "Hr2".
     iDestruct "S3c" as (vr3) "Hr3". iDestruct "S4c" as (vr4) "Hr4".
@@ -681,7 +679,7 @@ Section ProofSched.
     (* ------------------------------------------------------------------ *)
     assert (HA2ra : A2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x0e) : mword 64) 4)
       by (rewrite /A2 upd_eq; reflexivity).
-    iApply (Myproc.wp_myproc_sconf kt A2 (av - 6)%nat 1 eb (proc_addr j) false {["proc"]}
+    iApply (Myproc.wp_myproc_sconf A2 (av - 6)%nat 1 eb (proc_addr j) false {["proc"]}
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
@@ -737,8 +735,8 @@ Section ProofSched.
       rewrite H0. apply kv_addv_zero. }
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf kt γl (proc_addr j) "proc"
-              (proc_lock_res (kt := kt) γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf KT1 γl (proc_addr j) "proc"
+              (proc_lock_res γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked").
     { iApply (is_lock_openable with "Hislock"). }
@@ -861,7 +859,7 @@ Section ProofSched.
       rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
       apply sched_reconcile. vm_compute. reflexivity. }
     iPoseProof (sdi_2a with "Htext") as "Hi2a".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x2a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x2a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 168 : mword 12) C5 (av - 6)%nat (mword_of_int 1 : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hnoff]").
@@ -917,7 +915,7 @@ Section ProofSched.
       assert (H24 : sign_extend' 64 (mword_of_int 24 : mword 12) = (mword_of_int 24 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H24. reflexivity. }
     iPoseProof (sdi_34 with "Htext") as "Hi34".
-    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x34)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x34)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 24 : mword 12) C7 (av - 6)%nat st false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [Hstate]").
@@ -1116,7 +1114,7 @@ Section ProofSched.
       rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
       apply sched_reconcile. vm_compute. reflexivity. }
     iPoseProof (sdi_54 with "Htext") as "Hi54".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x54)) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sched + 0x54)) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 172 : mword 12) D5 (av - 6)%nat iv false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi54 [Hint]").
@@ -1316,8 +1314,8 @@ Section ProofSched.
            which is what lets the dying thread leave its slot a WHOLE free
            kernel stack (ProcDefs.kstack_free) instead of a page with a hole
            where this frame used to be. ---- *)
-      iAssert (stack_own (KTR := kt) sp0 6) with "[Hr1 Hr2 Hr3 Hr4 Hr5 Hgap]" as "Hframe6".
-      { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 6) with "[Hr1 Hr2 Hr3 Hr4 Hr5 Hgap]" as "Hframe6".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hr1". { iExists _. iEval (rewrite Hb1 -HcspA0). iExact "Hr1". }
         iSplitL "Hr2". { iExists _. iEval (rewrite Hb2 -HcspA0). iExact "Hr2". }
         iSplitL "Hr3". { iExists _. iEval (rewrite Hb3 -HcspA0). iExact "Hr3". }
@@ -1331,17 +1329,17 @@ Section ProofSched.
       iEval (rewrite /sie_cap) in "Hcap".
       iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit2)".
       iEval (rewrite Hcsp_Mc) in "Hstk".
-      iAssert (sie_cap kt Mc 0%nat false pj) with "[Htr Harm]" as "Hcap0".
+      iAssert (sie_cap KT1 Mc 0%nat false pj) with "[Htr Harm]" as "Hcap0".
       { rewrite /sie_cap. iSplitR "Htr Harm".
-        { rewrite Hcsp_Mc. by iApply (stack_own_0 (KTR := kt)). }
+        { rewrite Hcsp_Mc. by iApply (stack_own_0 (KTR := KT1)). }
         iFrame "Htr Harm Hwit2". }
       iDestruct (sie_cap_gpr_join Mc 0%nat false pj with "Hhs Hsc Hcap0 Hfile") as "Hcg0".
       (* frame ++ tail = the whole region sched was called with *)
       assert (Hgeom6 : pa_stk sp0 6 = spd).
       { rewrite /spd -Hpush. reflexivity. }
       assert (Havsplit : av = (6 + (av - 6))%nat) by lia.
-      iAssert (stack_own (KTR := kt) sp0 av) with "[Hframe6 Hstk]" as "Hfull".
-      { iEval (rewrite {1}Havsplit (stack_own_app (KTR := kt) sp0 6 (av - 6))).
+      iAssert (stack_own (KTR := KT1) sp0 av) with "[Hframe6 Hstk]" as "Hfull".
+      { iEval (rewrite {1}Havsplit (stack_own_app (KTR := KT1) sp0 6 (av - 6))).
         iSplitL "Hframe6"; [iExact "Hframe6" |].
         iEval (rewrite Hgeom6). iExact "Hstk". }
       iPoseProof ("Hpay" with "Hfull") as "Hpp".
@@ -1349,7 +1347,7 @@ Section ProofSched.
                     with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpp") as "HP".
       { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
       iEval (rewrite Hnc) in "HP".
-      iApply (Swtch.wp_swtch_sconf kt (p_sched γs) (Some cpu_id) None
+      iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
                 (p_context (proc_addr j)) (a_cpu_ctx cid_word)
                 Mc ctxvs 0%nat eb pj false
                 Hctxlen Holdc Hnewc (adm_pin cpu_id)
@@ -1372,7 +1370,7 @@ Section ProofSched.
        record sched deposits for ITSELF is a PROC context, hence MIGRATABLE
        ([Ao = None]) -- which is what makes the whole post-resume half below
        ∀-hart, and what lets [procs_inv] be hart-free. *)
-    iApply (Swtch.wp_swtch_sconf kt (p_sched γs) (Some cpu_id) None
+    iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
               (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj true
               Hctxlen Holdc Hnewc (adm_pin cpu_id)

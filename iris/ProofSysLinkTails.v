@@ -113,7 +113,6 @@ Section ProofSysLinkTails.
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -147,9 +146,9 @@ Section ProofSysLinkTails.
     sl_sp sp0 M -> sl_thr m M ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr kt M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xbc)) -∗
     panic_env -∗
@@ -158,25 +157,25 @@ Section ProofSysLinkTails.
     fs_crash_seam cov logstart -∗
     gen_cert -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] w4 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[kt] bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[kt] bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -220,7 +219,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (EndOp.wp_end_op_sconf kt (CID := CID1) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -372,9 +371,9 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr kt M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xc6)) -∗
     panic_env -∗
@@ -400,27 +399,27 @@ Section ProofSysLinkTails.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] w4 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[kt] bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[kt] bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -495,7 +494,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iunlockput.wp_iunlockput_sconf kt (CID := CID2) gs jx gl gu gd gk
+    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
@@ -549,7 +548,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (EndOp.wp_end_op_sconf kt (CID := CID4) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -691,9 +690,9 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr kt M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext kt eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xd6)) -∗
     panic_env -∗
@@ -719,27 +718,27 @@ Section ProofSysLinkTails.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] w4 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[kt] bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[kt] bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -814,7 +813,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iunlockput.wp_iunlockput_sconf kt (CID := CID2) gs jx gl gu gd gk
+    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
@@ -868,7 +867,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (EndOp.wp_end_op_sconf kt (CID := CID4) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1051,7 +1050,7 @@ Section ProofSysLinkTails.
        CALLER minted before its [iunlock] pins the type, and the generation
        is carriable because [SpecIunlock] returns the share gen-named. *)
     bv_unsigned ty <> T_DIR_z ->
-    sie_cap_gpr kt M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xf4)) -∗
     panic_env -∗
@@ -1075,27 +1074,27 @@ Section ProofSysLinkTails.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_opS g (S u) Sb -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[kt] bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[kt] bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -1174,7 +1173,7 @@ Section ProofSysLinkTails.
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
-    iApply (Ilock.wp_ilock_sconf kt (CID := CID2) gs jx gl gu gd gk pd pav pu bn
+    iApply (Ilock.wp_ilock_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib kk s gy dev inum
               pidv dq dqs M2 (K - 38)%nat eb b lks
               HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
@@ -1351,7 +1350,7 @@ Section ProofSysLinkTails.
       by exact (blkmap_wf_dir_len cov logstart bm (proj1 Hiok)).
     iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iupdate.wp_iupdate_unlink kt (CID := CID8) gs jx gl gu gd gk pd pav pu
+    iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart inodestart nib dev (ientry kk) inum
               dn' dn bm u Sb true None pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               P4 (K - 38)%nat eb b lks
@@ -1443,7 +1442,7 @@ Section ProofSysLinkTails.
       exact (HQ1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iunlockput.wp_iunlockput_sconf kt (CID := CID11) gs jx gl gu gd gk
+    iApply (Iunlockput.wp_iunlockput_sconf (CID := CID11) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn' bm (S u) pidv dq
               dqb dqs Q2 (K - 38)%nat eb b lks
@@ -1491,7 +1490,7 @@ Section ProofSysLinkTails.
       exact (Hupthr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID12 CID13 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (EndOp.wp_end_op_sconf kt (CID := CID13) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -1676,7 +1675,7 @@ Section ProofSysLinkTails.
        CALLER minted before its [iunlock] pins the type, and the generation
        is carriable because [SpecIunlock] returns the share gen-named. *)
     bv_unsigned ty <> T_DIR_z ->
-    sie_cap_gpr kt M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xee)) -∗
     panic_env -∗
@@ -1710,27 +1709,27 @@ Section ProofSysLinkTails.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_opSe g n Sb e0 -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[kt] bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[kt] bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -1799,7 +1798,7 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iunlockput.wp_iunlockput_gen kt (CID := CID2) gs jx gl gu gd gk
+    iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
@@ -1944,7 +1943,7 @@ Section ProofSysLinkTails.
        CALLER minted before its [iunlock] pins the type, and the generation
        is carriable because [SpecIunlock] returns the share gen-named. *)
     bv_unsigned ty <> T_DIR_z ->
-    sie_cap_gpr kt M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
     panic_env -∗
@@ -1978,27 +1977,27 @@ Section ProofSysLinkTails.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
-    procs_inv (kt := kt) gs -∗
+    procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_opSe g n Sb e0 -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[kt] bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[kt] bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[kt] bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr kt mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext kt eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -2068,7 +2067,7 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iunlockput.wp_iunlockput_gen kt (CID := CID2) gs jx gl gu gd gk
+    iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs

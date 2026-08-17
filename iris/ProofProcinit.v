@@ -171,7 +171,6 @@ Section ProofProcinit.
   Context `{!lockG Σ}.
   Context `{!fileG Σ}.
   Context `{!fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context {kt : ktier}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]
@@ -267,19 +266,19 @@ Section ProofProcinit.
        c <> s6i -> c <> csp_rs1 ->
        Me !!! Regidx c = m !!! Regidx c) ->
     kernel_text -∗
-    sie_cap_gpr kt Me (K - 8) b p -∗
+    sie_cap_gpr KT1 Me (K - 8) b p -∗
     pc_is (mword_of_int (KernelSyms.procinit + 0xa2)) -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx rai : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0i : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx s1i : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx s3i : mword 64) -∗
-    (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx s4i : mword 64) -∗
-    (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx s5i : mword 64) -∗
-    (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx s6i : mword 64) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx rai : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx s0i : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx s1i : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx s3i : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx s4i : mword 64) -∗
+    (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx s5i : mword 64) -∗
+    (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx s6i : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
-      sie_cap_gpr kt mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -422,8 +421,8 @@ Section ProofProcinit.
     assert (Hpop : E8 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E8 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8).
     { rewrite Hwv HE8sp Hspr8. reflexivity. }
-    iAssert (stack_own (KTR := kt) sp0 8) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8]" as "Hframe8".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 8) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8]" as "Hframe8".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1"; [iExists _; iExact "Hc1"|].
       iSplitL "Hc2"; [iExists _; iExact "Hc2"|].
       iSplitL "Hc3"; [iExists _; iExact "Hc3"|].
@@ -543,22 +542,22 @@ Section ProofProcinit.
        c <> s0i -> c <> s1i -> c <> s2i -> c <> s3i -> c <> s4i -> c <> s5i ->
        c <> s6i -> c <> csp_rs1 ->
        M !!! Regidx c = m !!! Regidx c) ->
-    sie_cap_gpr kt M (K - 8) b p -∗
+    sie_cap_gpr KT1 M (K - 8) b p -∗
     kernel_text -∗
     name_proc ↦ₛ□ "proc"%string -∗
     pc_is (mword_of_int (KernelSyms.procinit + 0x78)) -∗
     ([∗ list] i ∈ seq 0 j, proc_ready i) -∗
     ([∗ list] i ∈ seq j (NPROC - j), proc_seal (proc_addr i)) -∗
-    (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx rai : mword 64) -∗
-    (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx s0i : mword 64) -∗
-    (pa_stk sp0 3) ↦₈[kt] (m !!! Regidx s1i : mword 64) -∗
-    (pa_stk sp0 4) ↦₈[kt] (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈[kt] (m !!! Regidx s3i : mword 64) -∗
-    (pa_stk sp0 6) ↦₈[kt] (m !!! Regidx s4i : mword 64) -∗
-    (pa_stk sp0 7) ↦₈[kt] (m !!! Regidx s5i : mword 64) -∗
-    (pa_stk sp0 8) ↦₈[kt] (m !!! Regidx s6i : mword 64) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx rai : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx s0i : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx s1i : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx s3i : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx s4i : mword 64) -∗
+    (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx s5i : mword 64) -∗
+    (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx s6i : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
-      ∀ mr, sie_cap_gpr kt mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
+      ∀ mr, sie_cap_gpr KT1 mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -661,7 +660,7 @@ Section ProofProcinit.
     assert (HM3ra : M3 !!! Regidx rai = mword_of_int (KernelSyms.procinit + 0x80)).
     { rewrite /M3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     (* ---- initlock(&p->lock, "proc") ---- *)
-    iApply (Initlock.wp_initlock_sconf kt M3 vlock vname vcpu "proc"%string (K - 8) b p
+    iApply (Initlock.wp_initlock_sconf KT1 M3 vlock vname vcpu "proc"%string (K - 8) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlkw] [Hlkn] [Hlkc]").
     { iEval (rewrite HM3a1). iExact "Hstr_proc". }
@@ -701,7 +700,7 @@ Section ProofProcinit.
     (* +0x80 sw zero,24(s1) -- p->state = UNUSED.  The store leaf spells its
        address [rget mil s1i]; bridge it at THIS hart before applying. *)
     assert (Hils1r : rget (CID:=CID54) mil s1i = proc_addr j) by (rgne; exact Hils1).
-    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.procinit + 0x80)) s1i (mword_of_int 24 : mword 12)
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.procinit + 0x80)) s1i (mword_of_int 24 : mword 12)
               mil (K - 8)%nat vst b with "Hcg Hpc Hi80 [Hst]").
     { iEval (rewrite Hils1r pi_state_addr). iExact "Hst". }
     iIntros (CID55 Hs55) "Hcg Hpc Hst".
@@ -804,7 +803,7 @@ Section ProofProcinit.
        the stored value are [rget]-spelled; bridge them at THIS hart. *)
     assert (HN7s1r : rget (CID:=CID62) N7 s1i = proc_addr j) by (rgne; exact HN7s1).
     assert (HN7a5r : rget (CID:=CID62) N7 a5i = kstack_va j) by (rgne; exact HN7a5).
-    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.procinit + 0x98)) a5i s1i (mword_of_int 64 : mword 12)
+    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.procinit + 0x98)) a5i s1i (mword_of_int 64 : mword 12)
               N7 (K - 8)%nat vks b with "Hcg Hpc Hi98 [Hks]").
     { iEval (rewrite HN7s1r pi_kstack_addr). iExact "Hks". }
     iIntros (CID63 Hs63) "Hcg Hpc Hks".
@@ -924,7 +923,7 @@ Section ProofProcinit.
   (* ================================================================= *)
   Lemma wp_procinit_sconf `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
       (b : bool) (p : mword 64)
-    : wp_procinit_sconf_body kt m K b p.
+    : wp_procinit_sconf_body m K b p.
   Proof.
     cbv beta delta [wp_procinit_sconf_body].
     intros pcE ret_tgt HK.
@@ -999,7 +998,7 @@ Section ProofProcinit.
     iIntros (CID11 Hs11) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (vra0) "Hc1". iDestruct "S2" as (vs00) "Hc2".
     iDestruct "S3" as (vs10) "Hc3". iDestruct "S4" as (vs20) "Hc4".
@@ -1162,7 +1161,7 @@ Section ProofProcinit.
       rewrite /R3 upd_ne; [| congruence]. rewrite /R2 upd_ne; [| congruence].
       rewrite /R1 upd_ne; [reflexivity | congruence]. }
     iDestruct "Hpid" as (vlk1 vnm1 vcp1) "(Hpl & Hpn & Hpc0)".
-    iApply (Initlock.wp_initlock_sconf kt R7 vlk1 vnm1 vcp1 "nextpid"%string (K - 8) b p
+    iApply (Initlock.wp_initlock_sconf KT1 R7 vlk1 vnm1 vcp1 "nextpid"%string (K - 8) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hpl] [Hpn] [Hpc0]").
     { iEval (rewrite HR7a1). iExact "Hstr_nextpid". }
@@ -1257,7 +1256,7 @@ Section ProofProcinit.
       rewrite /T3 upd_ne; [| congruence]. rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence]. apply Hil1cs'; assumption. }
     iDestruct "Hwait" as (vlk2 vnm2 vcp2) "(Hwl & Hwn & Hwc)".
-    iApply (Initlock.wp_initlock_sconf kt T5 vlk2 vnm2 vcp2 "wait_lock"%string (K - 8) b p
+    iApply (Initlock.wp_initlock_sconf KT1 T5 vlk2 vnm2 vcp2 "wait_lock"%string (K - 8) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hwl] [Hwn] [Hwc]").
     { iEval (rewrite HT5a1). iExact "Hstr_waitlock". }
@@ -1524,7 +1523,7 @@ Section ProofProcinit.
        [wp_next]-wrapped, since the ORIGINAL "Hcont" is generic in [b] and its
        [wp_next] stays deferred until the loop's exit arm resolves it. *)
     iAssert (wp_next (CID0 := CID) b p (fun (CID' : CpuId) =>
-              ∀ mr, sie_cap_gpr kt mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
+              ∀ mr, sie_cap_gpr KT1 mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
               ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
               WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hpidfresh Hwaitfresh]" as "Hpost".

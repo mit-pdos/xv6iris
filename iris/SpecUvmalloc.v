@@ -74,7 +74,7 @@ Import Defs.
 
 
 Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
@@ -137,7 +137,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      rollback) are both bound at "kmem" (13); nothing else uvmalloc touches
      ranks lower.  One premise covers the whole cone. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -145,7 +145,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own 0%nat eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -178,8 +178,8 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type UVMALLOC.
   Parameter wp_uvmalloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
-      wp_uvmalloc_sconf_body kt γa mm P xperm K eb p b lks.
+      wp_uvmalloc_sconf_body γa mm P xperm K eb p b lks.
 End UVMALLOC.

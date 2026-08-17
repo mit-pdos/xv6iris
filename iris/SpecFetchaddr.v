@@ -99,15 +99,15 @@ Section SpecFetchaddr.
   Context `{!riscvGS Σ}.
 
   (* fetchaddr's result, keyed by the returned a0 (the [argfd_post] shape). *)
-  Definition fetchaddr_post (kt : ktier) (ip oldv addr szv r : mword 64) : iProp Σ :=
-    (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[kt] oldv
+  Definition fetchaddr_post (ip oldv addr szv r : mword 64) : iProp Σ :=
+    (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[KT1] oldv
      ∨ ⌜(r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64))
-        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[kt] w)%I.
+        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[KT1] w)%I.
 
 End SpecFetchaddr.
 
 Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (γf : gname)
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchaddr in
@@ -115,23 +115,23 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (fetchaddr_stack <= av)%nat ->
-  sie_cap_gpr kt m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: copyin's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyin.v) *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  ip ↦₈[kt] oldv -∗
+  ip ↦₈[KT1] oldv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr kt mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗
-      fetchaddr_post kt ip oldv addr (pv_sz V)
+      fetchaddr_post ip oldv addr (pv_sz V)
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -139,7 +139,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
 Module Type FETCHADDR.
   Parameter wp_fetchaddr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string),
-      wp_fetchaddr_sconf_body kt γa γf m av eb p pid V oldv b lks.
+      wp_fetchaddr_sconf_body γa γf m av eb p pid V oldv b lks.
 End FETCHADDR.

@@ -185,11 +185,11 @@ Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    {kt : ktier} (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
+    (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
-  ( sie_cap_gpr kt mr K b pme ∗
+  ( sie_cap_gpr KT1 mr K b pme ∗
     cpu_own lvl eb pme b lks ∗
     (* THE PARENT COMES BACK VERBATIM on every arm -- kfork only reads it.
        Its cwd reference comes back INSIDE it: idup halves the fraction on
@@ -213,7 +213,7 @@ Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa γp γw γl γf γil γic : gname)  (γs : list gname)
+    (γa γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
@@ -234,10 +234,10 @@ Definition wp_kfork_sconf_body
      released; allocproc's "proc" (9), the fd scan's "ftable"/"itable" and
      kalloc/uvmcopy's "kmem" all follow by [LockRank.locks_below_mono]. *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr kt m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv (kt := kt) γs -∗
+  procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
@@ -255,7 +255,7 @@ Definition wp_kfork_sconf_body
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post (kt := kt) γa γf cn lvl eb pme b pid_p Vp K mr
+      kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -265,10 +265,10 @@ Module Type KFORK.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
-      wp_kfork_sconf_body kt γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+      wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
         m lvl K eb pme b pid_p Vp lks.
 End KFORK.

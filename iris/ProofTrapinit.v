@@ -65,10 +65,9 @@ Section ProofTrapinit.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Context {kt : ktier}.
   Lemma wp_trapinit_sconf
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
-    : wp_trapinit_sconf_body kt m K vlock vname vcpu b p.
+    : wp_trapinit_sconf_body m K vlock vname vcpu b p.
   Proof.
     cbv beta delta [wp_trapinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK.
@@ -85,7 +84,7 @@ Section ProofTrapinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl ltac:(unfold text_end, time_name_str; lia) Htime
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf kt m K KernelSyms.trapinit
+    iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.trapinit
               (mword_of_int 5) (mword_of_int 22) (mword_of_int 3658) (mword_of_int 3522)
               (mword_of_int 2090764) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)

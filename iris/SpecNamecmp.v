@@ -64,14 +64,14 @@ Local Open Scope Z_scope.
    which wants 2. *)
 Notation K_namecmp := (4%nat) (only parsing).
 Definition wp_namecmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
+    (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
     (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namecmp in
   let s1 := mm !!! Regidx (mword_of_int 10 : mword 5) in
   let s2 := mm !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_namecmp <= K)%nat ->
-  sie_cap_gpr kt mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   ([∗ list] j ∈ seq 0 14, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
@@ -79,7 +79,7 @@ Definition wp_namecmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
     ⌜callee_saved mm mr⌝ -∗
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ([∗ list] j ∈ seq 0 14, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
     ([∗ list] j ∈ seq 0 14, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
@@ -92,7 +92,7 @@ Definition wp_namecmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 Module Type NAMECMP.
   Parameter wp_namecmp_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
+      (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
       (b : bool) (p : mword 64),
-      wp_namecmp_sconf_body kt mm f g K dq1 dq2 b p.
+      wp_namecmp_sconf_body mm f g K dq1 dq2 b p.
 End NAMECMP.

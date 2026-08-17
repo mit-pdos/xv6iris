@@ -89,7 +89,7 @@ Notation K_log_write := (18%nat) (only parsing).
 Definition wp_log_write_gen_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (bn : bio_names)
+    (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
@@ -129,7 +129,7 @@ Definition wp_log_write_gen_body
      which every landed caller is at (a caller of log_write holds sleeplocks,
      not spinlocks). *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -152,7 +152,7 @@ Definition wp_log_write_gen_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -199,7 +199,7 @@ Definition wp_log_write_gen_body
 Definition wp_log_write_au_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (bn : bio_names)
+    (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
@@ -220,7 +220,7 @@ Definition wp_log_write_au_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -279,7 +279,7 @@ Definition wp_log_write_au_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -361,7 +361,7 @@ Qed.
 Definition wp_log_write_gene_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (bn : bio_names)
+    (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
@@ -381,7 +381,7 @@ Definition wp_log_write_gene_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -401,7 +401,7 @@ Definition wp_log_write_gene_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -421,7 +421,7 @@ Definition wp_log_write_gene_body
 Definition wp_log_write_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (bn : bio_names)
+    (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (k : nat) (pidv bno : mword 32)
@@ -448,7 +448,7 @@ Definition wp_log_write_sconf_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr kt m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -465,7 +465,7 @@ Definition wp_log_write_sconf_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr kt mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -487,7 +487,7 @@ Module Type LOG_WRITE.
      kept as their own parameters so no existing caller moves. *)
   Parameter wp_log_write_au :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId} (kt : ktier) (bn : bio_names)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -496,7 +496,7 @@ Module Type LOG_WRITE.
       (Efs : coPset) (Φfsb : iProp Σ)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_log_write_au_body kt bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
                            bs bsl bsd d u cr Sb e0 vlb Efs Φfsb m n eb p K b lks.
 
   (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20).  Derived from the
@@ -504,7 +504,7 @@ Module Type LOG_WRITE.
      [wp_log_write_gen] that is derived from THIS, by closing the epoch. *)
   Parameter wp_log_write_gene :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId} (kt : ktier) (bn : bio_names)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -512,7 +512,7 @@ Module Type LOG_WRITE.
       (cr : bool) (Sb : gset Z) (e0 : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_log_write_gene_body kt bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_gene_body bn γ γfs γd cov logstart dev k pidv bno
                              bs bsl bsd d u cr Sb e0 m n eb p K b lks.
 
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
@@ -521,7 +521,7 @@ Module Type LOG_WRITE.
      neither knows nor cares which blocks this op has logged -- is unchanged. *)
   Parameter wp_log_write_gen :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId} (kt : ktier) (bn : bio_names)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -529,18 +529,18 @@ Module Type LOG_WRITE.
       (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_log_write_gen_body kt bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_gen_body bn γ γfs γd cov logstart dev k pidv bno
                             bs bsl bsd d u cr Sb m n eb p K b lks.
 
   Parameter wp_log_write_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId} (kt : ktier) (bn : bio_names)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_log_write_sconf_body kt bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_sconf_body bn γ γfs γd cov logstart dev k pidv bno
                               bs bsl bsd d u m n eb p K b lks.
 End LOG_WRITE.

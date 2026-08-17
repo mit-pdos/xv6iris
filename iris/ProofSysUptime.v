@@ -115,10 +115,9 @@ Section ProofSysUptime.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Context {kt : ktier}.
   Lemma wp_sys_uptime_sconf (γl : gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
-    : wp_sys_uptime_sconf_body kt γl m n eb p av b lks.
+    : wp_sys_uptime_sconf_body γl m n eb p av b lks.
   Proof.
     cbv beta delta [wp_sys_uptime_sconf_body].
     intros pcE ret_tgt Hn Hav Hfresh.
@@ -145,7 +144,7 @@ Section ProofSysUptime.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_uptime + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -254,7 +253,7 @@ Section ProofSysUptime.
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspA0. }
     (* ===================== acquire(&tickslock) ===================== *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf kt γl "time"%string ticks_res A4
+    iApply (Acquire.wp_acquire_sconf KT1 γl "time"%string ticks_res A4
               n eb p (av - 4)%nat b lks
               ltac:(exact Hn)
               ltac:(lia)
@@ -289,7 +288,7 @@ Section ProofSysUptime.
     assert (Haddrt : add_vec (B0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0x806 : mword 12)) = a_ticks).
     { rewrite /B0 upd_eq. rewrite /a_ticks. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (sui_1a with "Htext") as "Hi1a".
-    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.sys_uptime + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_uptime + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0x806 : mword 12) B0 (trap_res b + (av - 4))%nat t false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [Hticks]").
@@ -379,7 +378,7 @@ Section ProofSysUptime.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf kt γl a_tickslock "time"%string ticks_res B5
+    iApply (Release.wp_release_sconf KT1 γl a_tickslock "time"%string ticks_res B5
               n eb p (av - 4)%nat
               ({["time"]} ∪ lks)
               ltac:(rewrite HB5a0; apply addv_sext0)
@@ -514,8 +513,8 @@ Section ProofSysUptime.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3csp. symmetry. exact Hspd4. }
     iPoseProof (sui_38 with "Htext") as "Hi38".
-    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HC1csp). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HE1csp). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HE2csp). iExact "Hr8". }

@@ -240,7 +240,7 @@ Proof. lia. Qed.
 Definition wp_kerneltrap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64)
     (ep sc tv : mword 64) (lks : gset string) :=
@@ -258,7 +258,7 @@ Definition wp_kerneltrap_sconf_body
      tickslock (8) and virtio's (9), and a bound has to be stated at the
      minimum, since [locks_below_mono] raises but never lowers. *)
   locks_below lks "cons" ->
-  sie_cap_gpr kt m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
      carries the fact past the four instructions before the check. *)
@@ -282,7 +282,7 @@ Definition wp_kerneltrap_sconf_body
      bought nothing across the one boundary (the park) that mattered.  The
      trap CSRs beside it are threaded piecewise at PINNED values here, which
      is why this is its own conjunct rather than folded into [trap_csrs]. *)
-  intr_res kt -∗
+  intr_res KT1 -∗
   (* THE KPT RECEIPT, [trap_csrs]' sixth member (IntrDefs §6b), threaded for
      EXACTLY [intr_res]'s reasons and by the same route.  kernelvec's sret
      re-enables interrupts, and the arm it rebuilds carries the receipt, so a
@@ -293,7 +293,7 @@ Definition wp_kerneltrap_sconf_body
   cpu_own 0 false p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
-  devintr_caps (kt := kt) γu γv γdk γtl γs pd pav pu -∗
+  devintr_caps γu γv γdk γtl γs pd pav pu -∗
   (* THE RUNNING CLAIM, handed over by the TRAP: taking the trap cleared SIE
      and so dismantled [sie_arm true p], and the claim was one of its
      conjuncts.  This is what a preempting kerneltrap spends on [yield] --
@@ -309,10 +309,10 @@ Definition wp_kerneltrap_sconf_body
       ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗
       ⌜ _get_Mstatus_SPIE ms_f = ('b"1" : mword 1) ⌝ -∗
       ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
-      sie_cap_gpr_at kt ms_f mf av false p -∗
+      sie_cap_gpr_at KT1 ms_f mf av false p -∗
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       (* at the RESUMING hart -- see the premise *)
-      intr_res kt -∗
+      intr_res KT1 -∗
       kpt_on cpu_id -∗
       cpu_own 0 false p false lks -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
@@ -327,10 +327,10 @@ Module Type KERNELTRAP.
   Parameter wp_kerneltrap_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (kt : ktier) (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+      (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64)
       (ep sc tv : mword 64) (lks : gset string),
-      wp_kerneltrap_sconf_body kt γu γv γdk γtl γs pd pav pu
+      wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu
         m av p ep sc tv lks.
 End KERNELTRAP.

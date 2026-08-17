@@ -205,7 +205,6 @@ Section KforkArms.
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -250,17 +249,17 @@ Section KforkArms.
        placement in LockRank.v, and kalloc/uvmcopy's "kmem" above that.  All
        four follow from this one by [locks_below_mono]. *)
     locks_below lks "wait_lock" ->
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
-    sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-    arm_pay kt lvl eb pme -∗
+    arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at (kt := kt) sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
+    (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv_nocwd γf npa pid_c Vc -∗
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
@@ -273,7 +272,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post (kt := kt) γa γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -286,9 +285,9 @@ Section KforkArms.
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
-    iAssert (∃ w4', word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
+    iAssert (∃ w4', word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
     { iExists w4. iExact "Hb4". }
-    iAssert (∃ w5', word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
+    iAssert (∃ w5', word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
@@ -342,11 +341,11 @@ Section KforkArms.
     Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr kt Mt (K - 8)%nat b pme -∗
+    sie_cap_gpr KT1 Mt (K - 8)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
-    kfk_frame (kt := kt) sp0 ra0 s00 s10 s50 -∗
+    kfk_frame sp0 ra0 s00 s10 s50 -∗
     proc_priv γf pme pid_p Vp -∗
     (* at [on = None] allocproc's two not-found disjuncts are the SAME
        resource -- [avail_sub None n] is [None] and [avail_zero None] is
@@ -357,7 +356,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post (kt := kt) γa γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -452,15 +451,15 @@ Section KforkArms.
        four follow from this one by [locks_below_mono]. *)
     locks_below lks "wait_lock" ->
     kernel_text -∗
-    procs_inv (kt := kt) γs -∗
+    procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
-    sie_cap_gpr kt Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
-    kfk_frame_at (kt := kt) sp0 ra0 s00 s10 s50
+    kfk_frame_at sp0 ra0 s00 s10 s50
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv_nocwd γf npa pid_c Vc' -∗
@@ -476,7 +475,7 @@ Section KforkArms.
        ProcDefs.is_kstack npa ks ∗
        SwtchCtx.ctx_cells (p_context npa)
          (SpecAllocproc.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
-    IntrDefs.arm_pay kt lvl eb pme -∗
+    IntrDefs.arm_pay KT1 lvl eb pme -∗
     kalloc_env γa None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
@@ -487,7 +486,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post (kt := kt) γa γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -684,7 +683,6 @@ Section KforkMain.
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
-  Context {kt : ktier}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -697,7 +695,7 @@ Section KforkMain.
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
-    wp_kfork_sconf_body kt γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+    wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
       m lvl K eb pme b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
@@ -716,7 +714,7 @@ Section KforkMain.
                  (∀ mr : regfile,
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
-                    kfork_post (kt := kt) γa γf cn lvl eb pme b pid_p Vp
+                    kfork_post γa γf cn lvl eb pme b pid_p Vp
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
