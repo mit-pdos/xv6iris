@@ -56,15 +56,21 @@ one fupd.  Deleting it turned 22 more files green and revealed the two real
 gates above.
 
 **IMMEDIATE NEXT STEPS, in the order I would do them:**
-0. **THE S-MODE `run_hart_active`, DISJUNCTIVE** — see §"the arm nobody can
-   pick".  Its cycle rule is done; this is what feeds it, and it is also the
-   entry to the fetch.  The two engines turn out to be ONE piece of work, not
-   two: the interrupt arm cannot be reached without going through the same
-   rule the fetch does.
+0. ~~THE S-MODE `run_hart_active`, DISJUNCTIVE~~ — **DONE**: `HartRunGen`,
+   see §"the arm nobody can pick".  The two engines were ONE piece of work,
+   and what is left of it is exactly one obligation: the S-mode fetch.
 1. **The S-MODE FETCH itself** — `swp_fetch_ram`'s twin through Sv39 and the TLB.
-   Everything else on that side reuses M-mode machinery: the cycle rule
-   (`swp_exec_step_decode_execute`) is now privilege-agnostic, the four
-   fetch SHAPES are `WpInstrRun.swp_run_hart_active_instr`'s business, and
+   It now has a NAMED INTERFACE to hit, which is the whole point of doing
+   `HartRunGen` first:
+
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+         swp (fetch tt) (fun r => ⌜r = F_Base w⌝ ∗
+                                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)
+
+   with `rsf` free — that is where the TLB fill goes.  Everything else on that
+   side reuses M-mode machinery: the cycle rule
+   (`swp_exec_step_decode_execute`) is privilege-agnostic, the fetch SHAPES are
+   `WpInstrRun.swp_run_hart_active_instr`'s business, and
    `instr` itself is privilege-generic by construction.  What is genuinely new
    is one fetch that WALKS, and it is the reason the port exists — a page walk
    interleaving with other harts is the thing whole-instruction stepping could
@@ -156,25 +162,49 @@ clear the dispatch short-circuits BEFORE the wires
 both sound and complete for this kernel.  The S-mode side has no such
 shortcut.
 
-`HartStepAny.swp_exec_step_any` is the rule this forces, and it is proved.  What
-feeds it is the piece to write next:
-
-**an S-mode `run_hart_active` rule with a DISJUNCTIVE conclusion** —
+`HartStepAny.swp_exec_step_any` is the rule this forces, and it is proved.
+**`HartRunGen` is what feeds it, and it is proved too** (`HartRunGen.v`):
 
     swp (run_hart_active 0)
-      (fun st => (∃ w, ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗ <execute post>)
-                 ∨ (∃ i p, ⌜st = Step_Pending_Interrupt (i, p)⌝ ∗ <frames, unchanged>))
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗ <execute post>))
 
-i.e. peel the privilege read and the dispatch, and on `Some` land in the second
-disjunct with the state untouched (the dispatch only reads), on `None` continue
-into the fetch exactly as `WpInstrRun.swp_run_hart_active_instr` does.  It has
-to be ONE rule rather than a caller-side case split, because the region is
-inside `catch_early_return` and the continuation after the dispatch is not a
-nameable model function — the four `swp_run_hart_active_*` rules are where the
-dispatch is peeled, so that is where the disjunction belongs.
+It has to be ONE rule rather than a caller-side case split, because the region
+is inside `catch_early_return` and the continuation after the dispatch is not a
+nameable model function — so the disjunction belongs where the dispatch is
+peeled.  The trap arm is cheap once you see it: `early_return` is `throw (inl
+r)`, `bind` absorbs a throw, and `catch_early_return (throw (inl r))` is
+`Ret r`, so the whole arm is one `reflexivity` lemma (`mcer_early_return`) and
+then the continuation.
 
-That rule is also the entry point to the S-MODE FETCH, which is the other big
-piece: `SmodeCorePt.s_regime_fetch` is the exec-side version (a bupd over the
+THREE THINGS BECAME PARAMETERS, and the third is the one that matters:
+
+- the PRIVILEGE — read off the file and handed to `dispatchInterrupt`;
+- the DISPATCH — an obligation whose postcondition MATCHES on the answer
+  (`Some (ii,pr) => Qi ii pr | None => frames`), which is what makes the
+  conclusion disjunctive;
+- the FETCH — an obligation, allowed to land on a DIFFERENT FILE `rsf` than it
+  started from.  That is the S-mode fetch's TLB fill, and it is the only place
+  the two modes genuinely differ.
+
+**FOUR RULES BECAME TWO.**  `HartMRun`'s 4-aligned / 2-mod-4 split was never
+about `run_hart_active`: it is how many chunks the PHYSICAL fetch reads, and it
+belongs to the fetch obligation's discharge.  What is left is the SHAPE — base
+(4 bytes, nextPC+4, one `execute`) and compressed (the `Ext_Zca` gate,
+nextPC+2, the `ExecuteAs` second `execute`).  `HartMRun`'s four rules are now
+~25-line instances with their statements UNCHANGED: with the dispatch pinned to
+`None` by `swp_dispatchInterrupt_M`, `Qi := False` and the trap disjunct drops
+out under `swp_mono`.  That round trip is the evidence the abstraction is the
+right one.
+
+`swp_run_hart_active_intr` (trap only) is NOT an instance of the two: a caller
+that knows the dispatch traps has no instruction to fetch, so it owes neither
+the fetch nor the execute obligation.
+
+What is left on this path is therefore ONE thing, not two:
+
+**the S-MODE FETCH**, now the only unfilled obligation.
+`SmodeCorePt.s_regime_fetch` is the exec-side version (a bupd over the
 `s_regime` abstraction: `sr_inv` / `sr_absorb`, producing `exec (fetch tt) σ =
 Some (r, σf)` plus σf's frame properties), and its `swp` twin is the work.  It
 WRITES (the TLB fill), so it is not a `goodb` transport; it is a walk with
@@ -234,7 +264,9 @@ every remaining case, and the per-family costs), then `iris/WpInstr.v`
 (`wp_instr_ex` + `wp_instr` + `mm_cycle`), `iris/WpInstrRun.v` (the fetch
 dispatch both wrappers share), `iris/WpInstrConfig.v` (the raw-cell wrapper),
 `iris/HartMCycle.v` (`swp_exec_step_decode_execute`, mode-agnostic on
-purpose), and `iris/WpMmodeCsrSwp.v` (both CSR engines and the three
+purpose), `iris/HartRunGen.v` (`run_hart_active` with the privilege, the
+dispatch and the fetch all open — read this one before touching the S-mode
+side), and `iris/WpMmodeCsrSwp.v` (both CSR engines and the three
 footprints).
 
 ## What exists
@@ -369,7 +401,10 @@ Evidence:
 
 | where | what | why it exists |
 |---|---|---|
-| `HartMCycle.swp_exec_step_decode_execute` | the cycle rule: resources in, ONE obligation, resources back with PC at the new value | replaces `wp_exec_step_decode_execute_inv`.  **MODE-AGNOSTIC ON PURPOSE** — no privilege, misa or mstatus.  S-mode reuses it verbatim; baking M-mode in here was a bug I had to undo |
+| `HartMCycle.swp_exec_step_decode_execute` | the cycle rule: resources in, ONE obligation, resources back with PC at the new value | replaces `wp_exec_step_decode_execute_inv`.  **MODE-AGNOSTIC** — no misa, no mstatus, and the privilege only as the value the prelude reads and forwards (see §"the privilege belongs on the FILE").  S-mode reuses it verbatim |
+| `HartRunGen.swp_run_hart_active_gen` / `_gen_rvc` | `run_hart_active` with the privilege a parameter, the DISPATCH and the FETCH as obligations, and a DISJUNCTIVE conclusion | the machine picks the arm (the PLIC wires can move between the dispatch's nodes), and the fetch is the only thing that differs by mode — it may land on a different file `rsf`, which is the TLB fill.  `HartMRun`'s four rules are instances, statements unchanged |
+| `HartRunGen.swp_run_hart_active_intr` | the trap-only rule: dispatch obligation in, `Step_Pending_Interrupt` out | not an instance of the two above — a caller that knows the dispatch traps owes neither a fetch nor an execute |
+| `HartRunGen.mcer_early_return` | `catch_early_return (bind (early_return r) K) = Ret r` | `reflexivity`.  It is what makes the trap arm cheap: `early_return` is `throw (inl r)` and `bind` absorbs a throw |
 | `HartStepAny.swp_try_step_any` / `swp_exec_step_any` | the cycle rule that does NOT pick the arm: the body's postcondition MATCHES on the step reached, and the post-file is a PREDICATE | `dispatchInterrupt` reads the PLIC wires, which live in `WireInv.wire_inv` and can move BETWEEN the dispatch's nodes, so no caller can promise whether a cycle retires or traps.  The predicate post-file is independently what `csrw stimecmp` needs.  `swp_try_step_gen` / `swp_exec_step_decode_execute` are the singleton-`Q`, retire-only instances and should become instances at the fold-back.  PRIVILEGE-AGNOSTIC — see §"the privilege belongs on the FILE" |
 | `HartMCycle.swp_step_ex` | introduces the fetched word's existential | the word must be existential in the obligation, or a caller that dispatches on fetch SHAPE cannot instantiate it per branch |
 | `HartMCycle.reg_agree_l/_r` | footprint weakening | |
@@ -755,6 +790,10 @@ painful once B′ puts those leaves back in scope.
 All measured.  **The first group now lives in design §5 item 1** (the
 reduction discipline, heads (a)–(g)) — read it there, and do not duplicate
 it here.  What is left is the rest:
+
+- **DO NOT EDIT A SOURCE FILE WHILE `make` IS RUNNING**, not even a comment:
+  the touched file's whole cone rebuilds on the next `make`, and in this tree
+  a bottom-of-tree file's cone is ~1000 files.  Queue the edit.
 
 - **PRINTING A MODEL TERM IS HOW YOU GET A `_red` LEMMA — do not guess the
   bind structure.**  A pruned model function is a term equation both

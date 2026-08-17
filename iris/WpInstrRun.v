@@ -8,6 +8,12 @@
    resource and DISPATCHES -- on the fetch result hidden inside it and on
    [pc]'s 4-alignment, four cases in all.
 
+   The four ARE the M-mode PHYSICAL FETCH's cases, not [run_hart_active]'s:
+   [HartRunGen] has two rules (base and compressed) and takes the fetch as an
+   obligation.  So the S-mode twin of this file dispatches on the same [instr]
+   resource but discharges that obligation with the walking fetch, and the
+   alignment split it needs is whatever the walk's own cases are.
+
    It exists because that dispatch is the same for every M-mode wrapper.
    [WpInstr.wp_instr] (config read-only, fraction-parameterised bundle) and
    [WpInstrConfig.wp_instr_config] (config WRITTEN, raw cells) differ in

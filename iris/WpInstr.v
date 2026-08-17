@@ -14,7 +14,7 @@ From iris.base_logic.lib Require Import ghost_map.
 From iris.program_logic Require Import language.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords.
-Require Import HartSwp HartLift HartLift2 HartSpan HartSpanChar
+Require Import HartSwp HartLift HartLift2 HartSpan HartSpanChar HartRunGen
         HartRegNode HartMCycle HartMRun HartMFrame RegFile WpGpr.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.

@@ -1,7 +1,18 @@
-(* HartMRun.v -- [run_hart_active] GENERIC IN THE INSTRUCTION: the [swp]
-   replacement for the fetch/decode half of the old tree's
+(* HartMRun.v -- [run_hart_active] AT MACHINE PRIVILEGE, from PHYSICAL text:
+   the [swp] replacement for the fetch/decode half of the old tree's
    [InstrBytes.wp_exec_step_decode_execute_inv] and
    [SmodeCore.wp_exec_step_decode_execute_inv_priv].
+
+   THE FOUR RULES HERE ARE INSTANCES.  [HartRunGen] owns the shape -- the
+   privilege is a parameter there, the dispatch and the fetch are
+   obligations, and the conclusion is a disjunction because the machine, not
+   the caller, picks the arm.  What this file adds is the M-mode discharge of
+   those two obligations: [HartMDispatch.swp_dispatchInterrupt_M] (at Machine
+   with mstatus.MIE clear the dispatch short-circuits BEFORE the PLIC wires,
+   so its answer is [None] and the trap disjunct is [False]) and one of
+   [HartMFetch]'s three physical fetches.  The 4-aligned / 2-mod-4 split that
+   doubles the rule count is entirely about how many chunks the physical
+   fetch reads; it is invisible to [HartRunGen].
 
    THE SHAPE THIS FILE EXISTS TO GET RIGHT.  The old rules handed the caller
    the WHOLE machine state and asked for a successor in one fupd:
@@ -33,8 +44,8 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
-        HartSpan HartSpanChar HartEvents HartMCycle HartMDispatch HartMPmp
-        HartMFetch.
+        HartSpan HartSpanChar HartRunGen HartEvents HartMCycle HartMDispatch
+        HartMPmp HartMFetch.
 Require Import RiscvTryStep RiscvExtras RiscvFetchExec.
 Local Open Scope Z_scope.
 
@@ -46,49 +57,6 @@ Local Ltac r_glue :=
   cbn beta iota zeta delta
     [Defs.returnm returnM returnR Defs.returnR andb orb negb not
      Instances.generic_eq Instances.generic_neq get_config_rvfi].
-
-(* the compressed-extension gate, as a read equation (HartMDecode carries the
-   same fact for the pilot's decode; restated here so this file does not
-   depend on the pilot) *)
-Lemma cE_Zca_read :
-  currentlyEnabled Ext_Zca
-  = Defs.bind (Defs.read_reg misa)
-      (fun v : SailStdpp.Values.mword 64 =>
-         if eq_vec (_get_Misa_C v) (MachineWord.MachineWord.N_to_word 1 1%N)
-         then returnM true else returnM false).
-Proof. reflexivity. Qed.
-
-Lemma hfrun_cE_Zca (D Drw : gset register) (rs : regstate) :
-  (misa : register) ∈ D ->
-  eq_vec (_get_Misa_C (register_lookup misa rs))
-    (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
-  hfrun 4 D Drw rs (currentlyEnabled Ext_Zca) = Some (true, rs).
-Proof.
-  intros HD HC. rewrite cE_Zca_read.
-  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
-    Defs.returnm returnM].
-  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
-  cbn beta iota zeta delta [Defs.returnm returnM].
-  rewrite HC.
-  cbn beta iota zeta delta [Defs.returnm returnM].
-  apply hfrun_ret.
-Qed.
-
-(* the landing-pad gate: generic, and needed by every arm below (it was
-   sitting in the pilot file, which no other caller can reach) *)
-Lemma hfrun_lpad (D Drw : gset register) (rs : regstate) :
-  (elp : register) ∈ D ->
-  eq_vec (register_lookup elp rs)
-    (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  hfrun 8 D Drw rs (is_landing_pad_expected tt) = Some (false, rs).
-Proof.
-  intros HD Help. unfold is_landing_pad_expected.
-  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
-    Defs.returnm returnM].
-  rewrite hfrun_read (bool_decide_eq_true_2 _ HD) Help.
-  cbn beta iota zeta delta [Defs.returnm returnM].
-  apply hfrun_ret.
-Qed.
 
 Section run.
   Context `{!riscvGS Σ}.
@@ -157,59 +125,27 @@ Section run.
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE Hunlock Hpallow Hram
       Hb0 Hb1 Hva Hpa Hrvc Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hmem Hinstr".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt Machine) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa HDmst
-                HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer (fetch tt) _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_fetch_ram Drw Dro Df rs pc pmar0 pcfg w Hdisj HDpc
-                HDmst HDpriv HDpma HDcfg HDhtif Hpc Hpriv Hpma Hpcfg
-                Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v) "(-> & Hrw & Hro)".
-    rewrite Hrvc. cbn beta iota.
-    cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-      fetch_callback get_config_print_instr].
-    iApply (swp_use_cer (ext_decode w) _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun nl Drw Dro Df rs rs _ _ Hdisj Hlpad
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    (* the [and_boolM] SHORT-CIRCUITS at [elp <> LP_EXPECTED]: the model
-       never evaluates [is_lpad_instruction], so -- unlike the old
-       exec-shaped rule -- no premise about it is needed. *)
-    rewrite mbind_ret. r_glue.
-    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
-    iApply (swp_use_cer2
-              (Defs.write_reg (R_bitvector_64 nextPC)
-                 (add_vec_int pc 4)) _ _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDnpc
-                with "Hcert Hrw Hro"). }
-    iIntros (u) "[Hrw Hro]".
-    iApply (swp_use_cer (execute i) _ _ C HC with "[Hrw Hro Hinstr] [-]").
-    { iApply ("Hinstr" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
-    rewrite mcer_ret.
-    iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w))).
-    by iFrame.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_gen Drw Dro Df rs rs rs2 Machine pc w i
+                   nl R (fun _ _ => False)%I Hdisj HDpriv HDpc HDnpc
+                   Hpriv Hpc Hdec Hlpad
+                   with "Hcert Hrw Hro [] [Hmem] Hinstr") ].
+    - iIntros (st) "[Hi | Hr]"; [ by iDestruct "Hi" as (ii pr) "[_ []]" |].
+      iApply "Hr".
+    - (* the dispatch: at Machine with MIE clear it never reaches the wires *)
+      iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro]");
+        [| iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa
+                     HDmst HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro") ].
+      by iIntros (o) "(-> & Hrw & Hro)"; iFrame.
+    - (* the fetch: one physical 4-byte read *)
+      iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro Hmem]");
+        [| iApply (swp_fetch_ram Drw Dro Df rs pc pmar0 pcfg w Hdisj HDpc
+                     HDmst HDpriv HDpma HDcfg HDhtif Hpc Hpriv Hpma Hpcfg
+                     Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
+                     with "Hcert Hrw Hro Hmem") ].
+      iIntros (r) "(-> & Hrw & Hro)". rewrite Hrvc. by iFrame.
   Qed.
 
   (* the 2-mod-4 BASE twin: two halfword fetches, then the base decode *)
@@ -280,59 +216,27 @@ Section run.
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE Hunlock Hpallow Hram
       Hb0 Hb1 Hal4 Hpa Hram2 Hpa2 HmisaC Hnrvc Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hlo Hhi Hinstr".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt Machine) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa HDmst
-                HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer (fetch tt) _ _ C HC
-              with "[Hrw Hro Hlo Hhi] [-]").
-    { iApply (swp_fetch_ram_base2 Drw Dro Df rs pc pmar0 pcfg ilo ihi Hdisj
-                HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc Hpriv Hpma
-                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2 Hb0 Hb1 Hal4 Hpa
-                Hpa2 Hnrvc with "Hcert Hrw Hro Hlo Hhi"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-      fetch_callback get_config_print_instr].
-    iApply (swp_use_cer (ext_decode (concat_vec ihi ilo)) _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun nl Drw Dro Df rs rs _ _ Hdisj Hlpad
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    (* the [and_boolM] SHORT-CIRCUITS at [elp <> LP_EXPECTED]: the model
-       never evaluates [is_lpad_instruction], so -- unlike the old
-       exec-shaped rule -- no premise about it is needed. *)
-    rewrite mbind_ret. r_glue.
-    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
-    iApply (swp_use_cer2
-              (Defs.write_reg (R_bitvector_64 nextPC)
-                 (add_vec_int pc 4)) _ _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDnpc
-                with "Hcert Hrw Hro"). }
-    iIntros (u) "[Hrw Hro]".
-    iApply (swp_use_cer (execute i) _ _ C HC with "[Hrw Hro Hinstr] [-]").
-    { iApply ("Hinstr" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
-    rewrite mcer_ret.
-    iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 (concat_vec ihi ilo)))).
-    by iFrame.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_gen Drw Dro Df rs rs rs2 Machine pc
+                   (concat_vec ihi ilo) i nl R (fun _ _ => False)%I
+                   Hdisj HDpriv HDpc HDnpc Hpriv Hpc Hdec Hlpad
+                   with "Hcert Hrw Hro [] [Hlo Hhi] Hinstr") ].
+    - iIntros (st) "[Hi | Hr]"; [ by iDestruct "Hi" as (ii pr) "[_ []]" |].
+      iApply "Hr".
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro]");
+        [| iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa
+                     HDmst HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro") ].
+      by iIntros (o) "(-> & Hrw & Hro)"; iFrame.
+    - (* the fetch: two physical halfword reads *)
+      iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro Hlo Hhi]");
+        [| iApply (swp_fetch_ram_base2 Drw Dro Df rs pc pmar0 pcfg ilo ihi
+                     Hdisj HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc
+                     Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2
+                     Hb0 Hb1 Hal4 Hpa Hpa2 Hnrvc
+                     with "Hcert Hrw Hro Hlo Hhi") ].
+      iIntros (r) "(-> & Hrw & Hro)". by iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -406,68 +310,25 @@ Section run.
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC Hunlock Hpallow Hram
       Hb0 Hb1 Hva Hpa Hrvc Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hmem Hexp Hinstr".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt Machine) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa HDmst
-                HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer (fetch tt) _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_fetch_ram Drw Dro Df rs pc pmar0 pcfg w Hdisj HDpc
-                HDmst HDpriv HDpma HDcfg HDhtif Hpc Hpriv Hpma Hpcfg
-                Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v) "(-> & Hrw & Hro)".
-    rewrite Hrvc. cbn beta iota.
-    cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-      fetch_callback get_config_print_instr].
-    iApply (swp_use_cer (ext_decode_compressed (subrange_vec_dec w 15 0))
-              _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun nl Drw Dro Df rs rs _ _ Hdisj Hlpad
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    rewrite mbind_ret. r_glue.
-    iApply (swp_use_cer (currentlyEnabled Ext_Zca) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 4 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_cE_Zca (Drw ∪ Dro) Drw rs HDmisa HmisaC)
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
-    iApply (swp_use_cer2
-              (Defs.write_reg (R_bitvector_64 nextPC)
-                 (add_vec_int pc 2)) _ _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDnpc
-                with "Hcert Hrw Hro"). }
-    iIntros (u) "[Hrw Hro]".
-    iApply (swp_use_cer (execute i) _ _ C HC with "[Hrw Hro Hexp] [-]").
-    { iApply ("Hexp" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    iApply (swp_use_cer (execute other) _ _ C HC
-              with "[Hrw Hro Hinstr] [-]").
-    { iApply ("Hinstr" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
-    rewrite mcer_ret.
-    iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS,
-                          zero_extend' 32 (subrange_vec_dec w 15 0)))).
-    by iFrame.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_gen_rvc Drw Dro Df rs rs rs2 Machine pc
+                   (subrange_vec_dec w 15 0) i other nl R (fun _ _ => False)%I
+                   Hdisj HDpriv HDmisa HDpc HDnpc Hpriv Hpc HmisaC Hdec Hlpad
+                   with "Hcert Hrw Hro [] [Hmem] Hexp Hinstr") ].
+    - iIntros (st) "[Hi | Hr]"; [ by iDestruct "Hi" as (ii pr) "[_ []]" |].
+      iApply "Hr".
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro]");
+        [| iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa
+                     HDmst HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro") ].
+      by iIntros (o) "(-> & Hrw & Hro)"; iFrame.
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro Hmem]");
+        [| iApply (swp_fetch_ram Drw Dro Df rs pc pmar0 pcfg w Hdisj HDpc
+                     HDmst HDpriv HDpma HDcfg HDhtif Hpc Hpriv Hpma Hpcfg
+                     Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
+                     with "Hcert Hrw Hro Hmem") ].
+      iIntros (r) "(-> & Hrw & Hro)". rewrite Hrvc. by iFrame.
   Qed.
 
   (* the 2-mod-4 twin: one HALFWORD fetch, no F_Base branch *)
@@ -535,67 +396,26 @@ Section run.
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC Hunlock Hpallow Hram
       Hb0 Hb1 Hal4 Hpa Hrvc Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hmem Hexp Hinstr".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt Machine) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa HDmst
-                HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer (fetch tt) _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_fetch_ram_rvc2 Drw Dro Df rs pc pmar0 pcfg h Hdisj
-                HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc Hpriv Hpma
-                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hal4 Hpa Hrvc
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-      fetch_callback get_config_print_instr].
-    iApply (swp_use_cer (ext_decode_compressed h)
-              _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun nl Drw Dro Df rs rs _ _ Hdisj Hlpad
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    rewrite mbind_ret. r_glue.
-    iApply (swp_use_cer (currentlyEnabled Ext_Zca) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 4 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_cE_Zca (Drw ∪ Dro) Drw rs HDmisa HmisaC)
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
-    iApply (swp_use_cer2
-              (Defs.write_reg (R_bitvector_64 nextPC)
-                 (add_vec_int pc 2)) _ _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDnpc
-                with "Hcert Hrw Hro"). }
-    iIntros (u) "[Hrw Hro]".
-    iApply (swp_use_cer (execute i) _ _ C HC with "[Hrw Hro Hexp] [-]").
-    { iApply ("Hexp" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". r_glue.
-    iApply (swp_use_cer (execute other) _ _ C HC
-              with "[Hrw Hro Hinstr] [-]").
-    { iApply ("Hinstr" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
-    rewrite mcer_ret.
-    iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS,
-                          zero_extend' 32 h))).
-    by iFrame.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_gen_rvc Drw Dro Df rs rs rs2 Machine pc
+                   h i other nl R (fun _ _ => False)%I
+                   Hdisj HDpriv HDmisa HDpc HDnpc Hpriv Hpc HmisaC Hdec Hlpad
+                   with "Hcert Hrw Hro [] [Hmem] Hexp Hinstr") ].
+    - iIntros (st) "[Hi | Hr]"; [ by iDestruct "Hi" as (ii pr) "[_ []]" |].
+      iApply "Hr".
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro]");
+        [| iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa
+                     HDmst HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro") ].
+      by iIntros (o) "(-> & Hrw & Hro)"; iFrame.
+    - (* the fetch: ONE physical halfword read *)
+      iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [Hrw Hro Hmem]");
+        [| iApply (swp_fetch_ram_rvc2 Drw Dro Df rs pc pmar0 pcfg h Hdisj
+                     HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc Hpriv
+                     Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1
+                     Hal4 Hpa Hrvc with "Hcert Hrw Hro Hmem") ].
+      iIntros (r) "(-> & Hrw & Hro)". by iFrame.
   Qed.
 
 End run.
