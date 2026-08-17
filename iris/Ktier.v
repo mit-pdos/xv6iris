@@ -124,3 +124,19 @@ Global Typeclasses Opaque cur_ktier.
    whole mechanism: a [Local Instance : CurKtier := KT1] in a post-boot file
    resolves first, whether it is declared before or after this one. *)
 Global Instance curktier_default : CurKtier | 100 := KT0.
+
+(* THE THREE [KtierLe] INSTANCES AGAIN, AT THE CLASS TYPE.  [CurKtier] is a
+   definitional class, so a section variable [KTR : CurKtier] IS a tier --
+   but Coq's INSTANCE unification does not unfold the class, so a goal
+   [KtierLe KTR KTR] matches none of the three above and reports "Unable to
+   unify CurKtier with ktier".  These cover exactly that case and cannot
+   perturb the literal ones (their conclusions unify only when the tier
+   argument is already typed at [CurKtier]).  Same root cause as the
+   pointsto family's [Persistent]/[Timeless] instances, which must bind
+   their tier as a plain [(ktr : CurKtier)] for the mirror-image reason:
+   a BACKTICK CLASS binder is resolved by instance SEARCH (so it only ever
+   produces the KT0 default) and a [(ktr : ktier)] binder cannot take a
+   [CurKtier] argument. *)
+Global Instance ktier_le_bot_c (t : CurKtier) : KtierLe KT0 t := ktier_le_bot t.
+Global Instance ktier_le_top_c (t : CurKtier) : KtierLe t KT1 := ktier_le_top t.
+Global Instance ktier_le_refl_c (t : CurKtier) : KtierLe t t := ktier_le_refl t.

@@ -385,6 +385,9 @@ Section VcGenSIris.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
+    (* the block's heap cells ride the accessing hart's tier; at the shared
+       kernel-table regime this witness is [emp] ([SRegime.sr_ktier_wit_kpt_share]). *)
+    (⊢ sr_ktier_wit R KTR) ->
     vc_block_s st prog = Some st' ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -407,7 +410,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hwit.
     revert st. induction prog as [|op rest IH]; intros st Hblk.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
@@ -501,11 +504,12 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csdsp_gpr_s_r R (mword_of_int (vpc st)) uimm rs2
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_csdsp_gpr_s_r_t R KTR KTR (mword_of_int (vpc st)) uimm rs2
                   (vregs_den ρ (vregs st)) (sval_den ρ vold)
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -534,12 +538,13 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_cldsp_gpr_s_r R (mword_of_int (vpc st)) uimm rd
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_cldsp_gpr_s_r_t R KTR KTR (mword_of_int (vpc st)) uimm rd
                   (vregs_den ρ (vregs st)) (sval_den ρ vv)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -572,12 +577,13 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_clw_s_r R (mword_of_int (vpc st)) rd rs1 imm
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_clw_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                   (vregs_den ρ (vregs st)) (sval32_den ρ w32)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -611,12 +617,13 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csw_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_csw_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                   (vregs_den ρ (vregs st)) (sval32_den ρ wold)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -682,11 +689,12 @@ Section VcGenSIris.
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
         destruct rvc.
-        * iApply (wp_csd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_csd_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -695,11 +703,12 @@ Section VcGenSIris.
             as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                   Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_sd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_sd_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -733,11 +742,12 @@ Section VcGenSIris.
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
         destruct rvc.
-        * iApply (wp_cld_s_r R (mword_of_int (vpc st)) rd rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_cld_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -746,11 +756,12 @@ Section VcGenSIris.
           iEval (rewrite Egpr) in "Hgpr".
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                   Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_ld_s_r R (mword_of_int (vpc st)) rd rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_ld_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -784,6 +795,9 @@ Section VcGenSIris.
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+    (* the [KtierLe KTR KTR] side conditions of the tier-generic leaves are
+       shelved by [iApply]'s elaboration, not solved in place. *)
+    Unshelve. all: apply _.
   Qed.
 
   Lemma wp_vc_block_s_den (root_ppn : mword 44) (prog : list vop_s)
@@ -820,7 +834,9 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_vc_block_s_den_r (kpt_share_regime root_ppn) prog st st' ρ mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
+    exact (fun H1 H2 H3 H4 H5 H6 H7 H8 =>
+             wp_vc_block_s_den_r (kpt_share_regime root_ppn) prog st st' ρ mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+               H1 H2 H3 H4 H5 H6 H7 H8 (sr_ktier_wit_kpt_share root_ppn KTR)).
   Qed.
 
 
@@ -867,6 +883,9 @@ Section VcGenSIris.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
+    (* the block's heap cells ride the accessing hart's tier; at the shared
+       kernel-table regime this witness is [emp] ([SRegime.sr_ktier_wit_kpt_share]). *)
+    (⊢ sr_ktier_wit R KTR) ->
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
     agree_off st.(vregs) m m0 ->
@@ -893,7 +912,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hwit.
     revert st m. induction prog as [|op rest IH]; intros st m Hblk Hmatch Hao.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
@@ -981,11 +1000,12 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csdsp_gpr_s_r R (mword_of_int (vpc st)) uimm rs2
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_csdsp_gpr_s_r_t R KTR KTR (mword_of_int (vpc st)) uimm rs2
                   m (sval_den ρ vold)
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -1015,12 +1035,13 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_cldsp_gpr_s_r R (mword_of_int (vpc st)) uimm rd
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_cldsp_gpr_s_r_t R KTR KTR (mword_of_int (vpc st)) uimm rd
                   m (sval_den ρ vv)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -1050,12 +1071,13 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_clw_s_r R (mword_of_int (vpc st)) rd rs1 imm
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_clw_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                   m (sval32_den ρ w32)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -1085,12 +1107,13 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csw_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
+        iPoseProof Hwit as "#Hwit".
+        iApply (wp_csw_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                   m (sval32_den ρ wold)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                  with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
         iEval (rewrite avi_mword) in "Hpc".
@@ -1151,11 +1174,12 @@ Section VcGenSIris.
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
         destruct rvc.
-        * iApply (wp_csd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_csd_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -1165,11 +1189,12 @@ Section VcGenSIris.
           iApply (IH _ _ Hblk Hmatch Hao
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_sd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_sd_s_r_t R KTR KTR (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -1200,11 +1225,12 @@ Section VcGenSIris.
         iEval (rewrite Hea) in "Hcell".
         assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv) by reflexivity.
         destruct rvc.
-        * iApply (wp_cld_s_r R (mword_of_int (vpc st)) rd rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_cld_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -1213,11 +1239,12 @@ Section VcGenSIris.
           iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_ld_s_r R (mword_of_int (vpc st)) rd rs1 imm
+        * iPoseProof Hwit as "#Hwit".
+          iApply (wp_ld_s_r_t R KTR KTR (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    with "Hwit Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
           iEval (rewrite avi_mword) in "Hpc".
@@ -1288,7 +1315,9 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_vc_block_s_aux_r (kpt_share_regime root_ppn) prog st st' ρ m m0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
+    exact (fun H1 H2 H3 H4 H5 H6 H7 H8 =>
+             wp_vc_block_s_aux_r (kpt_share_regime root_ppn) prog st st' ρ m m0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+               H1 H2 H3 H4 H5 H6 H7 H8 (sr_ktier_wit_kpt_share root_ppn KTR)).
   Qed.
 
   (* Thin wrapper over [wp_vc_block_s_aux]: instantiate the auxiliary
@@ -1300,6 +1329,7 @@ Section VcGenSIris.
       (st st' : vstate) (ρ : nat -> mword 64)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
+    (⊢ sr_ktier_wit R KTR) ->
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
     smode_config γ dq -∗
@@ -1320,7 +1350,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hblk Hmatch.
+    intros Hwit Hblk Hmatch.
     iIntros "Hsm Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
@@ -1328,7 +1358,7 @@ Section VcGenSIris.
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iApply (wp_vc_block_s_aux_r R prog st st' ρ m m mstatus0 mie_v mdv0 menvcfg0
-              (dq:=dq) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hblk Hmatch
+              (dq:=dq) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hwit Hblk Hmatch
               (fun r _ => eq_refl)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hbi Hheap Hheap4 [Hcont Hsie]").
     iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hheap Hheap4".
@@ -1362,7 +1392,8 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_vc_block_s_r (kpt_share_regime root_ppn) prog st st' ρ m γ (dq:=dq)).
+    exact (wp_vc_block_s_r (kpt_share_regime root_ppn) prog st st' ρ m γ (dq:=dq)
+             (sr_ktier_wit_kpt_share root_ppn KTR)).
   Qed.
 
   (* ================================================================== *)
