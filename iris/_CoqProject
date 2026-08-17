@@ -27,6 +27,7 @@ HartRegNode.v
 HartSpan.v
 HartSpanChar.v
 HartMCycle.v
+HartMIntr.v
 HartMPmp.v
 HartMFetch.v
 HartMDecode.v
