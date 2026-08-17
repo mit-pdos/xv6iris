@@ -463,6 +463,37 @@ Section UtSysBlock.
          takes no premise at all -- [cpu_own] carries no caller frame to
          fold in any more. *)
       { rewrite Hlkempty. iApply cpu_own_on_intro. }
+      (* ---- THE EXIT SLOT IS NOW ADDITIVE, AND USERTRAP PAYS BOTH HALVES
+         OUT OF THE SAME FRAME CELLS.  syscall() may dispatch to an entry
+         that never returns ([sys_exit], which parks the thread as a ZOMBIE),
+         and the choice is the syscall number -- so the contract asks for the
+         return continuation AND a stack closer, joined by [∧] rather than
+         [∗] or [∨] (SpecSyscall.v's note says why).  [∧] is what makes this
+         affordable: each branch is proved from the WHOLE context, and
+         [Hframe] is spent only in the branch where the thread dies.
+
+         The closer itself is free at this altitude and that is the reason
+         this change stops at syscall(): usertrap is entered with sp AT THE
+         PAGE TOP ([Hksp]), where [kstack_closer_top] mints one out of the
+         PERSISTENT [is_kstack] alone; wrapping usertrap's own dead frame
+         around it re-anchors it at syscall's entry sp.  Identical
+         construction to the [jal kexit] arm above, at the other place a
+         usertrap round can stop returning. ---- *)
+      iSplit.
+      2:{ iAssert (is_kstack (un_pj N) (un_ks N)) as "#Hkstk".
+          { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+          iDestruct (ut_frame_stack with "Hframe") as "Hfr".
+          iDestruct (kstack_closer_top (un_pj N) (un_ks N) av
+                       ltac:(unfold KSTACK_AV; lia) with "Hkstk") as "Hkcl".
+          iEval (rewrite Hksp) in "Hkcl".
+          iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
+                       with "Hkcl Hfr") as "Hkcl4".
+          (* the depth the contract names is syscall's own, and it is
+             [av - 4] on the nose: [trap_res true = kv_frame_slots] and
+             [n2 = nx - kv_frame_slots] with [nx = av - 4]. *)
+          assert (Hdep : (trap_res true + n2)%nat = (av - 4)%nat)
+            by (rewrite Hn2; unfold trap_res in *; lia).
+          rewrite Hdep HS4sp. iExact "Hkcl4". }
       iIntros (CID2 Hk2 mg V2 us2) "%Hcsg %Htfg Hcg Hcpu Hbs Hbm Hip Hfd Hir Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

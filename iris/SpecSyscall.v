@@ -82,7 +82,14 @@
        [p->trapframe]), and prepare_return's stores land there;
      - callee-saved registers are preserved and the pc returns to ra;
      - the crossing is REAL ([wp_next]): sys_wait / sys_pause / sys_read
-       park, so syscall can return on a different hart.
+       park, so syscall can return on a different hart;
+     - and syscall MIGHT NOT RETURN AT ALL, without the contract having to
+       say when.  [sys_exit] parks the thread as a ZOMBIE, and which entry
+       runs is the syscall number, decided inside the dispatch -- so the exit
+       slot is an ADDITIVE CONJUNCTION of the return continuation and a
+       [ProcDefs.kstack_closer], and the callee picks.  The note at the slot
+       itself is the argument for why [∧] is the only one of the three
+       connectives that can be paid here.
 
    THE INDEX IS PINNED AT [true], AND UNLIKE prepare_return'S THAT IS NOT A
    GAP.  syscall has exactly one call site -- usertrap's [jal syscall] --
@@ -107,6 +114,8 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
+Require Import WpMmodeLeafBase.  (* [csp_rs1] *)
+Require Import ProcDefs.  (* [kstack_closer] -- the exit slot's right conjunct *)
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import UserPtTree.
@@ -187,7 +196,37 @@ Definition wp_syscall_sconf_body
      UNREACHABLE one. *)
   R γf pj bn fn -∗
   proc_priv γf pj pid V -∗
-  wp_next true pj (fun (CID : CpuId) =>
+  (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
+     TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
+
+     Twenty-one entries return; [sys_exit] parks the thread as a ZOMBIE and
+     never does.  The choice is made INSIDE the dispatch (it is the table
+     index), so both outcomes have to be available at entry -- and the two
+     are funded by the SAME resources, namely the caller's own frame cells,
+     since only one of them ever happens.  That is exactly what [∧] means in
+     a separation logic and what neither of its neighbours can say:
+
+       [∗] would make the caller supply both AT ONCE, out of disjoint
+           resources -- usertrap cannot, its frame cells are needed by each;
+       [∨] would make the CALLER pick -- usertrap cannot, it does not know
+           the syscall number;
+       [∧] makes the caller prove EACH from its full context and lets the
+           CALLEE pick, which is the real control flow.
+
+     So syscall() never has to expose whether it returns.  What is proved is
+     only the conditional: IF an entry declines to return, THEN it can
+     reclaim the kernel stack.  A returning arm takes the left conjunct and
+     is written exactly as it was before this slot changed.
+
+     The right conjunct is anchored at syscall's OWN entry sp with depth
+     [trap_res true + av], which is the anchor and depth [SpecSysExit] wants
+     one frame further down: an arm walks it there with
+     [ProcDefs.kstack_closer_frame] over syscall's own four slots.  It costs
+     the caller nothing it did not already have -- usertrap is entered with
+     sp AT THE PAGE TOP, where [ProcDefs.kstack_closer_top] mints a closer
+     out of the PERSISTENT [is_kstack] alone -- which is why this change
+     stops here and reaches neither [SpecUsertrap] nor [SpecUservec]. *)
+  (wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (V' : pprivate) (us' : gset Z),
       ⌜ callee_saved m mf ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
@@ -207,7 +246,8 @@ Definition wp_syscall_sconf_body
       R γf pj bn fn -∗
       proc_priv γf pj pid V' -∗
       pc_is ret_tgt -∗
-      WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang))
+   ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SYSCALL.

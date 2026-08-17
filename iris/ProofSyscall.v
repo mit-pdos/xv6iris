@@ -171,28 +171,26 @@
        lock and `kalloc_avail` at `fn`'s OWN `fcn_kmem`/`fcn_kalloc`, where
        the bundle has `kalloc_env γa None`.  That is the same naming fix
        `sysc_fs_env` already is, applied once more.
-     - WHAT ACTUALLY BLOCKS IT IS `kstack_closer`, WHICH NOTHING HERE CAN
-       MINT.  `ProcDefs.kstack_closer pj sp av` is the plain wand `stack_own
-       sp av -∗ kstack_free pj` -- NOT persistent, and `SpecSyscall.v` threads
-       neither it nor `is_kstack` nor any `stack_own` above syscall's own
-       frame.  `kstack_closer_top` is free (its input `is_kstack` is
-       persistent) but is anchored at the PAGE TOP; walking the anchor down to
-       sys_exit's entry sp costs `kstack_closer_frame` the cells between, i.e.
-       USERTRAP'S OWN FRAME, which usertrap still needs in order to return on
-       the other twenty-one entries.  So the closer cannot be built by the
-       caller either: the decision is made inside the dispatch.
-       The shape that works is to thread the INGREDIENTS rather than the
-       closer -- `is_kstack pj ks` (persistent, free) plus the `stack_own` of
-       the region above syscall's entry sp -- in through
-       `wp_syscall_sconf_body` and back out of its continuation, so the nine
-       returning arms hand them back untouched and only the sys_exit arm
-       spends them.  That is a real contract change with a real ripple
-       (`SpecUsertrap.v`, `UsertrapRes.v`, `ProofUsertrapSys.v`, plus
-       threading through `sysc_arm_pre`/`sysc_hcont_ty`/`sysc_ret_tail`/
-       `sysc_epilogue_tail` and all nine arms), which is why sys_exit is
-       still on this list.  Its BUDGET premise, by contrast, is exactly
-       dischargeable: `K_syscall = 4 + K_sys_exec` and `K_sys_exit` is below
-       it, and an arm runs at `av - 4`.
+     - `kstack_closer` USED TO BLOCK IT AND NO LONGER DOES.  It is the plain
+       non-persistent wand `stack_own sp av -∗ kstack_free pj`, and nothing
+       in the dispatch could mint one: `kstack_closer_top` is free (its input
+       `is_kstack` is persistent) but anchored at the PAGE TOP, and walking
+       the anchor down to sys_exit's entry sp costs `kstack_closer_frame` the
+       cells in between -- usertrap's own frame, which usertrap still needs
+       to return on the other twenty-one entries.  The fix is the ADDITIVE
+       exit slot (`sysc_exit_ty`, and SpecSyscall.v's note at the slot): the
+       caller proves the continuation AND the closer, each from its whole
+       context, and the callee picks.  Usertrap pays it out of the frame
+       cells it would otherwise return on, because only one branch ever runs.
+       So the closer now reaches every arm; `sysc_arm_exit` has only to take
+       the right conjunct and walk it down syscall's own four slots with
+       `kstack_closer_frame`, which lands exactly on the anchor and depth
+       `SpecSysExit` names (`trap_res true + av` at the entry sp becomes
+       `trap_res true + (av - 4)` one frame down).
+       WHAT IS LEFT for sys_exit is therefore only the allocator naming above
+       plus writing the arm.  Its BUDGET premise is exactly dischargeable:
+       `K_syscall = 4 + K_sys_exec` and `K_sys_exit` is below it, and an arm
+       runs at `av - 4`.
 
    THE ACTUAL SHAPE OF THE REMAINING WORK, worked out by reading the
    precedents below (do this before touching the proof, it will save many
@@ -1034,6 +1032,41 @@ Section SyscallVocab.
         pc_is ret_tgt -∗
         WP (Loop : expr riscv_lang))%I).
 
+  (* THE EXIT SLOT, as the dispatch sees it: the caller's return
+     continuation AND, additively, a closer for the kernel stack.  See
+     SpecSyscall.v's own note for why [∧] and not [∗] or [∨] -- in one line,
+     the caller funds both branches out of the same frame cells and the
+     CALLEE picks, because the pick is the syscall number.
+
+     A RETURNING ARM'S FIRST MOVE IS [iDestruct "Hcont" as "[Hcont _]"],
+     after which it is written exactly as it was before this slot existed --
+     [sysc_ret_tail], [sysc_epilogue_tail] and [sysc_fallback] still take the
+     bare [wp_next] and never learn that the conjunction happened. *)
+  Definition sysc_exit_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m : regfile) (ret_tgt : mword 64) : iProp Σ :=
+    (sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m ret_tgt
+     ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av))%I.
+
+  (* the crossing, for the whole slot.  Only the LEFT conjunct is
+     hart-indexed: [ProcDefs] names no [CpuId] at all (nor does [StackOwn]),
+     so [kstack_closer] crosses a migration untouched and the right branch is
+     a bare re-assertion. *)
+  Lemma sysc_exit_retarget (CID0 CID1 : CpuId) (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m : regfile) (ret_tgt : mword 64) :
+    (true = false \/ pj = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+    sysc_exit_ty (CIDh := CID0) γf pj bn fn dqi ip pid V lks av m ret_tgt -∗
+    sysc_exit_ty (CIDh := CID1) γf pj bn fn dqi ip pid V lks av m ret_tgt.
+  Proof.
+    intro Hcr. iIntros "H". rewrite /sysc_exit_ty. iSplit.
+    - iDestruct "H" as "[H _]".
+      iApply (wp_next_retarget CID0 CID1 true pj _ Hcr with "H").
+    - iDestruct "H" as "[_ $]".
+  Qed.
+
   (* the stack-slot arithmetic ([pa_stk sp0 j] as an offset from the
      PUSHED sp [pa_stk sp0 4]) -- mirrors [ProofArgraw.ar_stk] exactly
      (that one is local to ProofArgraw.v's own section, hence re-derived
@@ -1098,7 +1131,7 @@ Section SyscallVocab.
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
-    sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_exit_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
@@ -1592,6 +1625,8 @@ Section SyscallArms.
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     (* the table entry's address IS [sys_getpid]'s entry pc *)
     assert (Hpce : (mword_of_int (sysc_target 11) : mword 64)
                    = mword_of_int KernelSyms.sys_getpid) by reflexivity.
@@ -1661,6 +1696,8 @@ Section SyscallArms.
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 12) : mword 64)
                    = mword_of_int KernelSyms.sys_sbrk) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -1732,6 +1769,8 @@ Section SyscallArms.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 3) : mword 64)
                    = mword_of_int KernelSyms.sys_wait) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -1810,6 +1849,8 @@ Section SyscallArms.
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 14) : mword 64)
                    = mword_of_int KernelSyms.sys_uptime) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -1865,6 +1906,8 @@ Section SyscallArms.
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 6) : mword 64)
                    = mword_of_int KernelSyms.sys_kill) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -1925,6 +1968,8 @@ Section SyscallArms.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 13) : mword 64)
                    = mword_of_int KernelSyms.sys_pause) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -2003,6 +2048,8 @@ Section SyscallArms.
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 10) : mword 64)
                    = mword_of_int KernelSyms.sys_dup) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -2063,6 +2110,8 @@ Section SyscallArms.
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 1) : mword 64)
                    = mword_of_int KernelSyms.sys_fork) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -2166,6 +2215,8 @@ Section SyscallArms.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    (* a RETURNING arm takes the left conjunct and forgets the closer *)
+    iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 7) : mword 64)
                    = mword_of_int KernelSyms.sys_exec) by reflexivity.
     iEval (rewrite Hpce) in "Hpc".
@@ -3067,7 +3118,11 @@ Section SyscallMain.
          continuation, still anchored at [CID], is re-anchored here. *)
       assert (Hcr22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID : CPU))
         by wp_next_chain.
-      iDestruct (wp_next_retarget CID CID22 true pj _ Hcr22 with "Hcont") as "Hcont".
+      (* the WHOLE slot crosses here -- the arm this resolves to may be the
+         one that never returns, so the closer has to survive the crossing
+         with the continuation *)
+      iDestruct (sysc_exit_retarget CID CID22 γf pj bn fn dqi ip pid V lks av m
+                   (ret_pc (m !!! Regidx Rra)) Hcr22 with "Hcont") as "Hcont".
       assert (Hcr8_22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
@@ -3145,6 +3200,8 @@ Section SyscallMain.
       (* the landing hart again -- see the note at [sysc_arm_placeholder]. *)
       assert (Hcr15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID : CPU))
         by wp_next_chain.
+      (* the fallback RETURNS, so it wants the bare continuation *)
+      iDestruct "Hcont" as "[Hcont _]".
       iDestruct (wp_next_retarget CID CID15 true pj _ Hcr15 with "Hcont") as "Hcont".
       assert (Hcr8_15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID8 : CPU))
         by wp_next_chain.
