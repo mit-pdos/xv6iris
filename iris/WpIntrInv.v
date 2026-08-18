@@ -1291,6 +1291,62 @@ Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
   register_lookup (R_bool minstret_increment) rs2 = flag /\
   register_lookup cur_privilege rs2 = Supervisor.
 
+(* THE LEAF-FACING CALLBACK, once.  It is spelled in three places (the
+   engine's premise, the rider's trap arm, and the resource the S-mode
+   run rule threads to whichever arm the machine picks), so it is a
+   definition rather than three copies that can drift.
+   [_clock] is the general one: the leaf ALSO borrows the three clock
+   cells.  They are stable across the instruction -- the tick runs at the
+   cycle boundary, not inside it -- so lending them costs the engine
+   nothing, and [csrr time] / [csrr sip] / [csrw stimecmp] cannot be
+   written without them. *)
+Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+    (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
+    (i : instruction) (R : mword 64 -> regfile -> nat -> iProp Σ)
+    `{CID : CpuId} : iProp Σ :=
+  ((sconf -∗
+    sie_cap kt m av true p -∗
+    gpr_file (tp_pin m) -∗
+    (R_bitvector_64 PC) ↦ᵣ pc0 -∗
+    (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
+    resv_any cpu_id -∗
+    clock_res -∗
+    swp (execute i)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+         ∃ (npc : mword 64) (m' : regfile) (av' : nat),
+           (R_bitvector_64 PC) ↦ᵣ pc0 ∗
+           (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+           resv_any cpu_id ∗ clock_res ∗
+           sconf ∗ sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
+           R npc m' av'))
+   ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
+        sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗ R npc m' av' -∗
+        WP (Loop : expr riscv_lang)))%I.
+
+(* ...and the CLOCK-FREE reading, for the leaves that never touch a clock
+   cell: the same callback with the three cells passed straight through. *)
+Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+    (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
+    (i : instruction) (R : mword 64 -> regfile -> nat -> iProp Σ)
+    `{CID : CpuId} : iProp Σ :=
+  ((sconf -∗
+    sie_cap kt m av true p -∗
+    gpr_file (tp_pin m) -∗
+    (R_bitvector_64 PC) ↦ᵣ pc0 -∗
+    (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
+    resv_any cpu_id -∗
+    swp (execute i)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+         ∃ (npc : mword 64) (m' : regfile) (av' : nat),
+           (R_bitvector_64 PC) ↦ᵣ pc0 ∗
+           (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+           resv_any cpu_id ∗
+           sconf ∗ sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
+           R npc m' av'))
+   ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
+        sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗ R npc m' av' -∗
+        WP (Loop : expr riscv_lang)))%I.
+
 (* the CYCLE'S RIDER, keyed on the file the body landed on ([rs2]): its
    [nextPC] is the pc the cycle commits, so both arms name their landing pc
    by reading it off rather than by an existential the continuation could
@@ -1326,24 +1382,9 @@ Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
                      (register_lookup (R_bitvector_64 nextPC) rs2) ∗
                    gpr_file (tp_pin m) ∗ resv_any cpu_id ∗
                    wp_next true p (fun CID =>
-                     (sconf -∗ sie_cap kt m av true p -∗ gpr_file (tp_pin m) -∗
-                      (R_bitvector_64 PC) ↦ᵣ pc0 -∗
-                      (R_bitvector_64 nextPC) ↦ᵣ
-                        (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
-                      resv_any cpu_id -∗
-                      swp (execute i)
-                        (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                           ∃ (npc : mword 64) (m' : regfile) (av' : nat),
-                             (R_bitvector_64 PC) ↦ᵣ pc0 ∗
-                             (R_bitvector_64 nextPC) ↦ᵣ npc ∗
-                             resv_any cpu_id ∗ sconf ∗
-                             sie_cap kt m' av' true p ∗
-                             gpr_file (tp_pin m') ∗ R npc m' av'))
-                     ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
-                          sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗
-                          R npc m' av' -∗ WP (Loop : expr riscv_lang)))))%I.
+                     intr_cb_clock kt m av p pc0 is_rvc i R (CID := CID))))%I.
 
-Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_exec_step_intr_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction)
     (R : mword 64 -> regfile -> nat -> iProp Σ) :
@@ -1352,23 +1393,7 @@ Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId
   pc_is pc0 -∗
   instr pc0 is_rvc i -∗
   ▷ wp_next true p (fun CID =>
-      (sconf -∗
-       sie_cap kt m av true p -∗
-       gpr_file (tp_pin m) -∗
-       (R_bitvector_64 PC) ↦ᵣ pc0 -∗
-       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
-       resv_any cpu_id -∗
-       swp (execute i)
-         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-            ∃ (npc : mword 64) (m' : regfile) (av' : nat),
-              (R_bitvector_64 PC) ↦ᵣ pc0 ∗
-              (R_bitvector_64 nextPC) ↦ᵣ npc ∗
-              resv_any cpu_id ∗
-              sconf ∗ sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
-              R npc m' av'))
-      ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
-           sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗ R npc m' av' -∗
-           WP (Loop : expr riscv_lang))) -∗
+      intr_cb_clock kt m av p pc0 is_rvc i R (CID := CID)) -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros Hpc0.
@@ -1477,22 +1502,7 @@ Proof.
          mdv0 MENVCFG_S tlbv) root_ppn pc0 is_rvc i
                       ip mdv0 mst0
                       (wp_next true p (fun CID =>
-                     (sconf -∗ sie_cap kt m av true p -∗ gpr_file (tp_pin m) -∗
-                      (R_bitvector_64 PC) ↦ᵣ pc0 -∗
-                      (R_bitvector_64 nextPC) ↦ᵣ
-                        (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
-                      resv_any cpu_id -∗
-                      swp (execute i)
-                        (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                           ∃ (npc : mword 64) (m' : regfile) (av' : nat),
-                             (R_bitvector_64 PC) ↦ᵣ pc0 ∗
-                             (R_bitvector_64 nextPC) ↦ᵣ npc ∗
-                             resv_any cpu_id ∗ sconf ∗
-                             sie_cap kt m' av' true p ∗
-                             gpr_file (tp_pin m') ∗ R npc m' av'))
-                     ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
-                          sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗
-                          R npc m' av' -∗ WP (Loop : expr riscv_lang)))
+                         intr_cb_clock kt m av p pc0 is_rvc i R (CID := CID))
                        ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
                        ∗ sret_tie mst0
                        ∗ stack_own (KTR := kt) (m !!! Regidx csp_rs1)
@@ -1662,15 +1672,24 @@ Proof.
               iNext. iExact "Hsp". }
             iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hwn")
               as "[Hobl Hcont]".
-            iApply (swp_mono with "[Hmsr Hmi Hcy Hti Hip Hhs Hcont] [-]").
-            2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv'"). }
+            (* THE CLOCK CELLS ARE LENT, NOT KEPT: [csrr time] reads mtime and
+               [csrw stimecmp] rewrites mip, and both are inside the cycle's
+               own frame.  They are stable across the instruction (the tick
+               runs at the boundary), so the leaf gets them at existential
+               values and hands them back at whatever it left. *)
+            iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
+            { iExists cy, ti, ip. iFrame. }
+            iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
+            2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv' Hclk"). }
             iIntros (e) "(-> & Hres)".
             iDestruct "Hres" as (npc m' av')
-              "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
+              "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
+            iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
             iDestruct (sconf_priv_open with "Hsc'") as (msT)
               "(Hcl & Hpriv' & Hmsown)".
             iSplitR; [done|].
-            iExists (s_rs pc0 npc msr (minstret_inc_flag mc micfg Supervisor) cy ti ip
+            iExists (s_rs pc0 npc msr (minstret_inc_flag mc micfg Supervisor)
+                   cy' ti' ip'
                    mst0 pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
                    pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbf).
             iSplitR.
@@ -1768,6 +1787,40 @@ Proof.
       iIntros (c' Hs'). rewrite /ihs_post_of. iIntros "Hcg Hpc".
       iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hwn") as "Hwn".
       iApply ("IH" $! c' with "Hcg Hpc [Hwn]"). iNext. iExact "Hwn". }
+Qed.
+
+(* ===================================================================== *)
+(* §4' THE CLOCK-FREE READING.  The three clock cells go straight through,
+   which is what every leaf that does not name one wants -- and it is what
+   keeps the 68 call sites of the funnel unchanged.                        *)
+(* ===================================================================== *)
+Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
+    (is_rvc : bool) (i : instruction)
+    (R : mword 64 -> regfile -> nat -> iProp Σ) :
+  ret_pc pc0 = pc0 ->
+  sie_cap_gpr kt m av true p -∗
+  pc_is pc0 -∗
+  instr pc0 is_rvc i -∗
+  ▷ wp_next true p (fun CID => intr_cb kt m av p pc0 is_rvc i R (CID := CID)) -∗
+  WP (Loop : expr riscv_lang).
+Proof.
+  intros Hpc0. iIntros "Hcg Hpc Hinstr Hbody".
+  iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i R Hpc0
+            with "Hcg Hpc Hinstr [Hbody]").
+  iNext. iIntros (CID Hs).
+  iDestruct (wp_next_at true p _ CID Hs with "Hbody") as "Hb".
+  iEval (rewrite /intr_cb) in "Hb".
+  iDestruct "Hb" as "[Hobl Hcont]".
+  rewrite /intr_cb_clock.
+  iSplitR "Hcont"; [| iExact "Hcont" ].
+  iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".
+  iApply (swp_mono (CID := CID) with "[Hclk] [-]");
+    [| iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv") ].
+  iIntros (e) "(-> & Hres)".
+  iDestruct "Hres" as (npc m' av')
+    "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
+  iSplitR; [done|]. iExists npc, m', av'. iFrame.
 Qed.
 
 (* ===================================================================== *)
