@@ -25,6 +25,7 @@ HartEvents.v
 HartRegNode.v
 HartSpan.v
 HartSpanChar.v
+HartMemRun.v
 HartRunGen.v
 HartSFrame.v
 WpSFrames.v
