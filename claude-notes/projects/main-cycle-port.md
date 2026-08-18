@@ -235,7 +235,17 @@ same 9 files fail, for the same reasons.  The counts above are the post-merge
 ones; the pre-merge numbers were 464 / 442 / 39 over 1186 files.)
 
 **`WpIntrInv`'s cone is a strict SUBSET of `SmodeCorePt`'s** (446 shared, 0
-unique) and NEITHER depends on the other.  So the two are independent roots
+unique) and NEITHER depends on the other.
+
+**AND THE TWO ROOTS SHARE ONE BLOCKER, so "which root first" is not a real
+choice.**  `SmodeCorePt.wp_instr_s_regime` fetches through `s_regime_fetch`;
+`WpSmodeIntr.wp_instr_s_intr` (the consumer that `WpIntrInv`'s engine exists
+for) fetches through `tlb_inv_pt_fetch` — and `tlb_inv_pt_fetch` IS
+`s_regime_fetch` at `kpt_share_regime`, a five-line restatement
+(`SmodeCorePt:921`).  So both roots bottom out in the same missing thing, and
+it is the one this page already named: **the S-mode fetch at the `swp` layer,
+through the shared kernel page table.**  Converting `WpIntrInv` first buys no
+detour around it.  So the two are independent roots
 over the same downstream files: **fixing either alone unblocks nothing**, and
 both must fall before any of the 501 uncompiled files move.
 

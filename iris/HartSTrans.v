@@ -35,10 +35,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
-        RiscvFetchExec.
+        RiscvFetchExec RiscvTryStep.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb.
 Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree PtTreeAdue.
-Require Import HartMFetch.
+Require Import HartMFetch HartMPmp SmodePte.
 Local Open Scope Z_scope.
 
 (* the same spelling [HartMFetch] uses for the misalignment tests *)
@@ -107,6 +107,142 @@ Proof.
   rewrite Htlb Hvec.
   cbn beta iota zeta delta [Defs.returnm returnM].
   apply hfrun_ret.
+Qed.
+
+(* ====================================================================== *)
+(* THE SUPERVISOR PMP CHECK, FOOTPRINTED.                                  *)
+(*                                                                        *)
+(* [HartMPmp.mpmp_hval] cannot serve here and the reason is not the        *)
+(* privilege argument, it is the DEFAULT.  At Machine a walk that matches  *)
+(* no entry falls through to ALLOW, so that proof is a 16-entry loop        *)
+(* induction whose every exit is [Ret None].  At Supervisor the fall-      *)
+(* through is DENY, so a granting walk must actually MATCH -- and the      *)
+(* xv6 configuration grants through entry 0 (TOR, base 0, R/W/X set),      *)
+(* which the exec side already states as                                  *)
+(* [SmodePte.exec_pmpCheck_supervisor_grant_load].                        *)
+(*                                                                        *)
+(* That makes this the SHORTER proof of the two: entry 0 matches, so the   *)
+(* walk early-returns on the FIRST iteration and no loop invariant is      *)
+(* needed at all.  What it costs instead is that the walk cannot go        *)
+(* through the [goodb] bridge -- [goodb] rejects [ExtraOutcome], which is  *)
+(* exactly the node an early return is -- so the reads are peeled at the   *)
+(* [hspan] level, the way the M-mode walk peels its own.                   *)
+(* ====================================================================== *)
+
+Local Ltac spmp_red H :=
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.liftR Defs.try_catch
+     Defs.catch_early_return Defs.returnm returnM returnR Defs.read_reg
+     pmpReadAddrReg Defs.early_return Defs.throw sys_pmp_grain Z.geb
+     Z.compare andb not negb pmpCheckRWX Defs.or_boolM] in H.
+
+Local Ltac spmp_peel_any reg H Hstop v rsN HagN :=
+  apply hspan_peel in H; [ | reflexivity | exact Hstop ];
+  let c := fresh "c" in
+  let Hstep := fresh "Hstep" in
+  destruct H as (c & Hstep & H);
+  let Hat := fresh "Hat" in
+  match type of Hstep with
+  | hspani _ _ (?m, _) _ =>
+      assert (Hat : hregread_at reg m = true)
+        by (cbn [hregread_at]; apply bool_decide_eq_true_2; reflexivity)
+  end;
+  destruct (hspani_read_any_inv _ _ reg _ _ _ Hat Hstep) as (v & rsN & HagN & ->);
+  clear Hat Hstep;
+  rewrite hregread_resume_red in H.
+
+Local Ltac spmp_peel_D reg H Hstop HD rsN HagN :=
+  apply hspan_peel in H; [ | reflexivity | exact Hstop ];
+  let c := fresh "c" in
+  let Hstep := fresh "Hstep" in
+  destruct H as (c & Hstep & H);
+  let Hat := fresh "Hat" in
+  match type of Hstep with
+  | hspani _ _ (?m, _) _ =>
+      assert (Hat : hregread_at reg m = true)
+        by (cbn [hregread_at]; apply bool_decide_eq_true_2; reflexivity)
+  end;
+  destruct (hspani_read_D_inv _ _ reg _ _ _ Hat HD Hstep) as (rsN & HagN & ->);
+  clear Hat Hstep;
+  rewrite hregread_resume_red in H.
+
+(* [SmodePte.exec_pmpMatchAddr_TOR_match] with the state dropped: its proof
+   is three rewrites and never touches [s], so the PURE equation is what a
+   footprint peel can actually rewrite with. *)
+Lemma pmpMatchAddr_TOR_match_pure (addr width : mword 64) (ent : mword 8)
+    (pmpaddr prev : mword 64) :
+  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent) = TOR ->
+  zopz0zKzJ_u prev pmpaddr = false ->
+  pmpRangeMatch (Z.mul (uint prev) 4) (Z.mul (uint pmpaddr) 4)
+    (uint addr) (uint width) = PMP_Match ->
+  pmpMatchAddr (Physaddr addr) width ent pmpaddr prev = returnM PMP_Match.
+Proof.
+  intros HA Hord Hrange. unfold pmpMatchAddr. cbn zeta.
+  rewrite HA. cbn match. rewrite Hord. rewrite Hrange. reflexivity.
+Qed.
+
+Lemma spmp_hval_grant (D Drw : gset register)
+    (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+    (addr : SailStdpp.Values.mword 64) (rs : regstate) (wd : Z)
+    (acc : MemoryAccessType mem_payload) :
+  (pmpcfg_n : register) ∈ D ->
+  (pmpaddr_n : register) ∈ D ->
+  register_lookup pmpcfg_n rs = pcfg ->
+  register_lookup pmpaddr_n rs = paddr ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec paddr 0)) 4)
+    (uint addr) (uint (to_bits 64 wd)) = PMP_Match ->
+  (* the entry GRANTS this access class.  Pure: [pmpCheckRWX] only reads the
+     entry's permission bits, so the caller supplies it as an equation and no
+     state reaches this premise. *)
+  pmpCheckRWX (vec_access_dec pcfg 0) acc = returnM true ->
+  hval D Drw rs (pmpCheck (Physaddr addr) wd acc Supervisor) None rs.
+Proof.
+  intros HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx rs0 l Hag0 Hchain Hstop.
+  unfold pmpCheck in Hchain.
+  replace (Z.eqb sys_pmp_count 0) with false in Hchain
+    by (vm_compute; reflexivity).
+  replace (Z.sub sys_pmp_count 1) with 15 in Hchain
+    by (vm_compute; reflexivity).
+  unfold Defs.foreach_ZM_up in Hchain.
+  replace (S (Z.abs_nat (Z.sub 0 15))) with 16%nat in Hchain
+    by (vm_compute; reflexivity).
+  spmp_red Hchain.
+  (* ONE iteration: entry 0 matches, so the walk never reaches entry 1 *)
+  cbn [Defs.foreach_ZM_up'] in Hchain.
+  spmp_red Hchain.
+  (* the entry's cfg byte, pinned *)
+  spmp_peel_D pmpcfg_n Hchain Hstop HDcfg rs1 Hag1.
+  rewrite (Hag0 _ HDcfg) Hpcfg in Hchain.
+  spmp_red Hchain.
+  (* [pmpReadAddrReg 0] reads cfg again (value-dead: the grain adjustment is
+     [false] at [sys_pmp_grain = 0] whatever the entry says) then pmpaddr *)
+  spmp_peel_any pmpcfg_n Hchain Hstop w2 rs2 Hag2. spmp_red Hchain.
+  (* the peel substitutes the value read from the file it was AT, so the
+     agreement that transports it is the one for the PRE-peel file *)
+  assert (Hag12 : reg_agree_on D rs2 rs).
+  { intros r Hr. rewrite (Hag2 r Hr) (Hag1 r Hr). exact (Hag0 r Hr). }
+  spmp_peel_D pmpaddr_n Hchain Hstop HDaddr rs3 Hag3.
+  rewrite (Hag12 _ HDaddr) Hpaddr in Hchain.
+  assert (Hag13 : reg_agree_on D rs3 rs).
+  { intros r Hr. rewrite (Hag3 r Hr). exact (Hag12 r Hr). }
+  spmp_red Hchain.
+  (* the address match is now on concrete values: TOR + in range = Match *)
+  rewrite (pmpMatchAddr_TOR_match_pure addr (to_bits 64 wd)
+             (vec_access_dec pcfg 0) (vec_access_dec paddr 0) (zeros' 64)
+             HA Hord Hrange) in Hchain.
+  spmp_red Hchain.
+  (* granted by the entry's permission bit -- at Supervisor the second
+     disjunct of [or_boolM] (Machine and unlocked) is unavailable, and this
+     is the whole difference from the M-mode walk *)
+  rewrite Hrwx in Hchain.
+  spmp_red Hchain.
+  assert (Hl : l = (Interface.Ret None, rs3))
+    by (apply (hspan_stop_refl D Drw _ rs3 l); [reflexivity | exact Hchain]).
+  rewrite Hl. cbn. split; [reflexivity | exact Hag13].
 Qed.
 
 Section strans.
@@ -520,5 +656,36 @@ Section strans.
                 with "Hcert Hrw Hro Htr2 Hcmr2").
   Qed.
 
+
+  (* the [swp] face of [spmp_hval_grant] -- one [swp_span], as with
+     [HartMPmp]'s M-mode instances. *)
+  Lemma swp_pmpCheck_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (addr : SailStdpp.Values.mword 64) (wd : Z) :
+    Drw ## Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec paddr 0)) 4)
+      (uint addr) (uint (to_bits 64 wd)) = PMP_Match ->
+    pmpCheckRWX (vec_access_dec pcfg 0) acc = returnM true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (pmpCheck (Physaddr addr) wd acc Supervisor)
+      (fun r => ⌜r = None⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx.
+    exact (swp_span Drw Dro Df rs rs _ None Hdisj
+             (spmp_hval_grant (Drw ∪ Dro) Drw pcfg paddr addr rs wd acc
+                HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx)).
+  Qed.
 
 End strans.
