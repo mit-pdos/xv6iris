@@ -1371,3 +1371,26 @@ an import set that pulls in `iris.proofmode` that `if` has ALREADY
 iota-reduced when the walk reaches it, so the `match` has no applicable
 clause and fails with a bare *"No matching clauses for match"* —
 indistinguishable from a wrong proof.  Wrap such a `change` in `try`.
+
+**WHAT THE SPLIT LANE HAD TO BUILD, and where it belongs at the fold-back.**
+The N-chunk split loop had no `goodmb` counterpart anywhere in the tree, so
+`UserMemMis.v` now also carries `gm_untilMT'_last` / `_step` / `_chain` (the
+twin of `MemAccessGen.execR_untilMT'_chain`; every iteration's certificate is
+read back at the ORIGINAL map by `goodmb_after_dom`, so a WRITING iteration
+costs no map bookkeeping), the three split composers
+`goodmb_checked_mem_read_split` / `_write_split` / `goodmb_mem_write_ea_split`,
+and `goodmb_mem_write_value_of_checked_plain` — the last one generic in the
+post state, which `UserMemPt`'s aligned `goodmb_mem_write_value_U` is not,
+because a misaligned chain lands on `wchain … N` rather than on
+`MState … (write_bytes …)`.  The `gm_untilMT'_*` trio belongs in
+`HartMemAsm`; the composers belong beside their exec twins.
+
+**TWO MORE SHAPE TRAPS.**  (i) **Sail's `>>` binds TIGHTER than `>>=`**, so a
+collapsed `returnR tt >> B` node left by a `pmpCheck` peel sits one bind IN,
+and the `execR_bind0_Some (execR_returnR_fwd tt s)` rewrite that works
+verbatim in `MemAccessGen` finds no subterm — one `change` covers all four
+cases (`exec`/`goodmb` × top-level/one-bind-in).  (ii) **`cbn beta zeta` is
+not enough after peeling `split_on_page_boundary` / `split_misaligned`**: the
+`let '(p, q) := …` is a `match`, so `cbn beta zeta match` is what exposes the
+next head to `gmm_lift`.  The exec proofs get away without it because
+`rewrite` works on subterms and the tactics do not.
