@@ -433,13 +433,37 @@ store arm (`RiscvLang.wr_node`'s comment), which is why
 
 #### What is left, in order
 
-1. **THE `swp` FACE OF `HartAmo.wp_hart_amo`** -- the fused exclusive-read /
-   silent-steps / conditional-write step, which is what `update_and_write_pte`
-   is.  `HartEvents` already has the pattern for turning a `wp_hart_*` event
-   rule into its `swp` face (`swp_hart_ram_read` / `_write`); this is the same
-   move on the fused rule.  Note `wp_hart_amo` takes ONE frame
-   (`hreg_frame rs D`), not the `Drw`/`Dro` split, so the face has to decide
-   how the read-only half rides along.
+1. **THE `swp` FACE OF `HartAmo.wp_hart_amo`**, and it is blocked on ONE
+   thing that is worth naming precisely before starting.
+
+   The fused rule names its window with `hsil k D (rs, hread_resume … m)` --
+   `HartLift`'s computable silent stepper.  Under `swp` the region always
+   sits inside a context (`update_and_write_pte` is inside
+   `translate_TLB_hit` inside `translate` inside `translateAddr` inside
+   `fetch`), and `swp`'s ∀-bound `C` is opaque, so the premise has to be
+   discharged for `C m` from a fact about `m`.  `mctx C` gives exactly that
+   at the head node -- and `hsil_node` looks only at the head node -- but the
+   commutation CANNOT EVEN BE STATED, because `hsil` is pinned at `M unit`
+   (`hcur := regstate * M unit`) while the inner `m` is an `M X`.
+
+   Two ways out; the first is the one to take.
+
+   - **Generalize `hsil_node` / `hrun_silent` / `hsil` / `hcur` from
+     `M unit` to `M X`, in place.**  The bodies are already X-agnostic --
+     nothing in `hsil_node` uses unit-ness -- so this is an additive
+     generalization with every existing use instantiating at `X := unit`.
+     Touches `HartLift`, `HartAmo`, `HartSpan`, `HartLift2`, `HartPilot`.
+     Then the commutation (`hsil_node D rs (C m)` follows the inner walk,
+     given `mctx C`) is statable and cheap.
+   - Bridge `hspan` (the swp layer's walker: X-generic, relational, and it
+     already STOPS at memory nodes, which is exactly the window's shape) to
+     `hsil`.  No such bridge exists -- `HartSpanChar` has none -- and the two
+     walkers are different in kind (computable vs relational), so this is the
+     larger job despite looking like the natural one.
+
+   Also note for when it is unblocked: `wp_hart_amo` takes ONE frame
+   (`hreg_frame rs D`), not the `Drw`/`Dro` split the swp layer uses, so the
+   face has to decide how the read-only half rides along.
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
    `swp_translate_miss` both carry `update_PTE_Bits … = None` -- i.e. they
