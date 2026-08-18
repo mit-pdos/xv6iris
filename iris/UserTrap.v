@@ -63,7 +63,7 @@ Import Defs.
 (* discharged.  Those are the hand-peeled [swp] walk (user-tier-port       *)
 (* §3.3, §4.4 item 2), not a twin.                                         *)
 (* ===================================================================== *)
-Require Import HartMemRun UserExecFacts.
+Require Import HartSwp HartLift HartSpan HartRegNode HartMemRun UserExecFacts.
 
 
 (* ONE PEEL FOR EVERY BIND SHAPE the generated code produces: [bind0], the
@@ -575,6 +575,268 @@ Section UTrapReduce.
     gm_peel (Gr stvec s9 HRstvec) Hrt. cbn beta.
     unfold tvec_addr. rewrite Htvd. cbn match.
     apply goodmb_returnm.
+  Qed.
+
+
+  (* ------------------------------------------------------------------- *)
+  (* THE TOWER AT THE [swp] LAYER, SPLIT AT [reset_elp].                   *)
+  (*                                                                       *)
+  (* [goodmb_trap_handler_U] above demands [Dw elp = true], and NO U-mode   *)
+  (* footprint can supply it: [HartLift.hreg_frame] is full-fraction and    *)
+  (* the only owner of [elp] in the tree is [RiscvFetchExec.hw_config],     *)
+  (* which holds it [box].  Nobody can write [elp], ever -- which is right, *)
+  (* because the model's write is a NO-OP: [hw_config] pins                 *)
+  (* [elp <> LP_EXPECTED] and [elp] is one bit, so it already holds exactly *)
+  (* what [reset_elp] writes.                                              *)
+  (*                                                                       *)
+  (* So the tower SPLITS at that node and takes                             *)
+  (* [HartRegNode.swp_write_reg_same] -- the write that changes nothing:    *)
+  (* write a register you do NOT own, with the value already there --       *)
+  (* which accepts a points-to at ANY dfrac, [box] included.  It is the     *)
+  (* same cut the M-mode tier already makes for MRET's elp reset.          *)
+  (*                                                                       *)
+  (* THE DECOMPOSITION NEEDS NO TERM TO BE NAMED, and that is the payoff of *)
+  (* [swp] quantifying over a CONTEXT rather than a continuation:           *)
+  (* [swp_bind] / [swp_bind0] peel the model's own binds and leave the      *)
+  (* residual IN THE GOAL.  Three peels expose exactly the three pieces --  *)
+  (* [bind0 (returnM tt) (hartSupports Ext_Zicfilp)] (read-only), the two   *)
+  (* reads and one mstatus write of [zicfilp_preserve_elp_on_trap], and     *)
+  (* [reset_elp] itself -- and everything AFTER the cut is certified by the *)
+  (* UNCHANGED tail of [goodmb_trap_handler_U], reached by a [match goal]   *)
+  (* and copied verbatim.  That is why this lemma lives INSIDE this         *)
+  (* section: [s1] .. [s9] are already [Let]-bound here, so the tail needs  *)
+  (* no renaming at all.                                                    *)
+  (* ------------------------------------------------------------------- *)
+  Lemma swp_trap_handler_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+      (Dr Dw : register -> bool) (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    Dr mstatus = true -> Dr elp = true -> Dr misa = true -> Dr scause = true ->
+    Dr cur_privilege = true -> Dr stvec = true ->
+    Dr stval = true -> Dr sepc = true ->
+    Dw mstatus = true -> Dw scause = true ->
+    Dw stval = true -> Dw sepc = true -> Dw cur_privilege = true ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    elp_v = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    gen_cert -∗ resv_any cpu_id -∗
+    (R_bitvector_1 elp) ↦ᵣ□ (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (trap_handler Supervisor c pc0 info None)
+      (fun v => ⌜v = stvec_base stvec_v⌝ ∗
+        ∃ rs' : regstate,
+          ⌜reg_agree_on (Drw ∪ Dro) rs' s9.(sregs)⌝ ∗
+          hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗ resv_any cpu_id)%I.
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd.
+    intros Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+           HWms HWsc HWstval HWsepc HWcp Hag0 Helpv.
+    assert (Gr : forall (r : register) (st : mstate), Dr r = true ->
+              goodmb Dr Dw (Defs.read_reg r : M _) st ∅ = true)
+      by (intros r st H; etransitivity; [ apply goodmb_read_reg | exact H ]).
+    assert (Gw : forall (r : register) (v : type_of_register r) (st : mstate),
+              Dw r = true ->
+              goodmb Dr Dw (Defs.write_reg r v : M _) st ∅ = true)
+      by (intros r v st H; etransitivity; [ apply goodmb_write_reg | exact H ]).
+    (* the two facts of the pieces before the cut, and the REST's exec fact *)
+    assert (HZ : exec (Defs.bind0 (returnM tt) (hartSupports Ext_Zicfilp)) s
+                 = Some (true, s))
+      by apply (exec_hartSupports_Zicfilp s).
+    assert (HgZ : goodmb Dr Dw
+                    (Defs.bind0 (returnM tt) (hartSupports Ext_Zicfilp)) s ∅ = true).
+    { erewrite goodmb_bind0_empty; [ | apply goodmb_returnm | apply exec_returnm ].
+      apply goodmb_hartSupports_Zicfilp. }
+    assert (HZP : exec (zicfilp_preserve_elp_on_trap Supervisor) s = Some (tt, s1e)).
+    { unfold zicfilp_preserve_elp_on_trap. cbn match.
+      match goal with |- exec (Defs.bind0 ?A _) _ = _ =>
+        assert (HARM0 : exec A s = Some (tt, s1)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg elp s)). cbn beta.
+        rewrite Hms Help. apply exec_write_reg. }
+      rewrite (exec_bind0_Some _ _ _ _ _ HARM0).
+      unfold reset_elp. apply exec_write_reg. }
+    pose proof exec_trap_handler_U as HTH.
+    unfold trap_handler in HTH.
+    change (orb (get_config_print_exception tt) (get_config_print_interrupt tt))
+      with false in HTH.
+    cbn match in HTH.
+    rewrite (exec_bind_Some _ _ _ _ _ HZ) in HTH. cbn beta in HTH. cbn match in HTH.
+    rewrite (exec_bind0_Some _ _ _ _ _ HZP) in HTH.
+    iIntros "#Hcert Hany #Helpc Hrw Hro".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    unfold trap_handler.
+    change (orb (get_config_print_exception tt) (get_config_print_interrupt tt))
+      with false.
+    cbn match.
+    (* ---- piece 1: the hartSupports gate, read-only ---- *)
+    iApply (swp_bind_use (Defs.bind0 (returnM tt) (hartSupports Ext_Zicfilp))
+              _ _ _ with "[Hany Hrw Hro] [-]").
+    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                (Defs.bind0 (returnM tt) (hartSupports Ext_Zicfilp)) s s true
+                rs ∅ Hdisj HDr HDw Hag0 (map_empty_subseteq _) HgZ HZ
+                with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (b) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    cbn match.
+    iApply swp_bind0.
+    unfold zicfilp_preserve_elp_on_trap. cbn match.
+    iApply swp_bind0.
+    (* ---- piece 2: the two reads and the mstatus write ---- *)
+    match goal with |- environments.envs_entails _ (swp ?A _) =>
+      assert (HARM : exec A s = Some (tt, s1));
+      [ | assert (HgARM : goodmb Dr Dw A s ∅ = true) ] end.
+    { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg elp s)). cbn beta.
+      rewrite Hms Help. apply exec_write_reg. }
+    { gm_peel (Gr mstatus s HRms) (exec_read_reg mstatus s). cbn beta.
+      gm_peel (Gr elp s HRelp) (exec_read_reg elp s). cbn beta.
+      rewrite Hms Help. etransitivity; [ apply goodmb_write_reg | exact HWms ]. }
+    iApply (swp_mono with "[] [Hany Hrw Hro]").
+    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df _ s s1 tt rs1 ∅
+                  Hdisj HDr HDw Hag1 (map_empty_subseteq _) HgARM HARM
+                  with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (u) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2 mm2) "(%Hag2 & _ & _ & Hrw & Hro & _ & Hany)".
+    (* ---- piece 3: THE elp NODE, a write of the value already there ---- *)
+    unfold reset_elp.
+    iApply (swp_write_reg_same (R_bitvector_1 elp) DfracDiscarded
+              (landing_pad_bits_backwards NO_LP_EXPECTED)
+              (Defs.write_reg (R_bitvector_1 elp)
+                 (landing_pad_bits_backwards NO_LP_EXPECTED)) _ _
+              with "Hcert Helpc").
+    iIntros "_".
+    rewrite hregwrite_resume_red.
+    iApply swp_ret.
+    (* the frame's file agrees with [s1e] -- INCLUDING at [elp], which is
+       the whole point of the no-op *)
+    assert (Hag2e : reg_agree_on (Drw ∪ Dro) rs2 s1e.(sregs)).
+    { intros r Hr. rewrite (Hag2 r Hr).
+      unfold s1e; rewrite ?sregs_set_reg.
+      destruct (register_beq r (R_bitvector_1 elp)) eqn:Hb.
+      - apply register_beq_true in Hb. subst r.
+        rewrite register_lookup_set. unfold s1; rewrite ?sregs_set_reg.
+        rewrite (irrelevant_register_set (R_bitvector_1 elp)
+                   (R_bitvector_64 mstatus) _ _ eq_refl).
+        rewrite Help. exact Helpv.
+      - symmetry. apply irrelevant_register_set. exact Hb. }
+    (* ---- everything after the cut: ONE certified stretch ---- *)
+    match goal with |- environments.envs_entails _ (swp ?R _) =>
+      assert (HgREST : goodmb Dr Dw R s1e ∅ = true) end.
+    {
+    assert (HES1 : exec (currentlyEnabled Ext_S) s1e = Some (true, s1e)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal.
+      unfold s1e, s1; rewrite ?sregs_set_reg.
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      exact HmisaS. }
+    gm_peel (goodmb_currentlyEnabled_S Dr Dw s1e HRmisa) HES1. cbn beta.
+    assert (HAE : exec (Defs.assert_exp' true
+                          "no supervisor mode present for delegation") s1e
+                  = Some (eq_refl, s1e)).
+    { unfold Defs.assert_exp'. cbn match. apply exec_returnm. }
+    assert (HgAE : goodmb Dr Dw (Defs.assert_exp' (E := exception) true
+                          "no supervisor mode present for delegation") s1e ∅ = true).
+    { unfold Defs.assert_exp'. cbn match. apply goodmb_returnm. }
+    gm_peel HgAE HAE. cbn beta.
+    (* scause chain *)
+    assert (Hrd1 : exec (Defs.read_reg scause : M _) s1e = Some (sc_old, s1e)).
+    { rewrite (exec_read_reg scause s1e). unfold s1e, s1; rewrite ?sregs_set_reg.
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      rewrite Hsc. reflexivity. }
+    gm_peel (Gr scause s1e HRsc) Hrd1. cbn beta.
+    gm_peel_w scause HWsc.
+    assert (Hrd2 : exec (Defs.read_reg scause : M _) s2 = Some (c1, s2)).
+    { rewrite (exec_read_reg scause s2). unfold s2; rewrite ?sregs_set_reg.
+      rewrite register_lookup_set. reflexivity. }
+    gm_peel (Gr scause s2 HRsc) Hrd2. cbn beta.
+    gm_peel_w scause HWsc.
+    (* mstatus chain *)
+    assert (Hrm1 : exec (Defs.read_reg mstatus : M _) s3 = Some (ms_e, s3)).
+    { rewrite (exec_read_reg mstatus s3). unfold s3, s2, s1e; rewrite ?sregs_set_reg.
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      unfold s1; rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
+    gm_peel (Gr mstatus s3 HRms) Hrm1. cbn beta.
+    gm_peel (Gr mstatus s3 HRms) Hrm1. cbn beta.
+    gm_peel_w mstatus HWms.
+    assert (Hrm2 : exec (Defs.read_reg mstatus : M _) s4 = Some (ms_a, s4)).
+    { rewrite (exec_read_reg mstatus s4). unfold s4; rewrite ?sregs_set_reg.
+      rewrite register_lookup_set. reflexivity. }
+    gm_peel (Gr mstatus s4 HRms) Hrm2. cbn beta.
+    gm_peel_w mstatus HWms.
+    assert (Hrm3 : exec (Defs.read_reg mstatus : M _) s5 = Some (ms_b, s5)).
+    { rewrite (exec_read_reg mstatus s5). unfold s5; rewrite ?sregs_set_reg.
+      rewrite register_lookup_set. reflexivity. }
+    gm_peel (Gr mstatus s5 HRms) Hrm3. cbn beta.
+    assert (Hrp : exec (Defs.read_reg cur_privilege : M _) s5 = Some (User, s5)).
+    { rewrite (exec_read_reg cur_privilege s5).
+      unfold s5, s4, s3, s2, s1e, s1; rewrite ?sregs_set_reg.
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      rewrite Hpriv. reflexivity. }
+    gm_peel (Gr cur_privilege s5 HRcp) Hrp. cbn beta. cbn match.
+    gm_peel (goodmb_returnm (E := exception) Dr Dw ('b"0" : mword 1) s5 ∅)
+            (exec_returnM ('b"0" : mword 1) s5). cbn beta.
+    (* FOUR consecutive register writes: Sail's [>>] is LEFT associative, so
+       this reads as [(((W1 >> W2) >> W3) >> W4) >> rest] and the outermost
+       bind equation asks for the COMPOSITE head.  Build the prefixes'
+       certificates and exec facts inside-out, then peel the top once. *)
+    match goal with
+    | |- goodmb _ _ (Defs.bind (Defs.bind (Defs.bind (Defs.bind ?W1 ?f2) ?f3) ?f4) _)
+                _ _ = _ =>
+        assert (Hg2 : goodmb Dr Dw (Defs.bind W1 f2) s5 ∅ = true);
+        [ | assert (He2 : exec (Defs.bind W1 f2) s5 = Some (tt, s7));
+          [ | assert (Hg3 : goodmb Dr Dw (Defs.bind (Defs.bind W1 f2) f3) s5 ∅ = true);
+            [ | assert (He3 : exec (Defs.bind (Defs.bind W1 f2) f3) s5
+                              = Some (tt, s8));
+              [ | assert (Hg4 : goodmb Dr Dw
+                            (Defs.bind (Defs.bind (Defs.bind W1 f2) f3) f4) s5 ∅
+                          = true);
+                [ | assert (He4 : exec (Defs.bind (Defs.bind (Defs.bind W1 f2) f3) f4)
+                                    s5 = Some (tt, s9));
+                  [ | gm_peel Hg4 He4 ] ] ] ] ] ]
+    end.
+    { gm_peel_w mstatus HWms. cbn match. gm_last_w stval HWstval. }
+    { rewrite (exec_bind_Some _ _ _ _ _ (exec_write_reg mstatus ms_c s5)).
+      apply exec_write_reg. }
+    { gm_peel Hg2 He2. gm_last_w sepc HWsepc. }
+    { rewrite (exec_bind_Some _ _ _ _ _ He2). apply exec_write_reg. }
+    { gm_peel Hg3 He3. gm_last_w cur_privilege HWcp. }
+    { rewrite (exec_bind_Some _ _ _ _ _ He3). apply exec_write_reg. }
+    cbn [handle_trap_extension].
+    gm_peel (goodmb_track_trap_S Dr Dw (trapCause_is_interrupt c)
+               (trapCause_bits_forwards c) s9 HRms HRsc HRstval HRsepc)
+            (exec_track_trap_S (trapCause_is_interrupt c)
+               (trapCause_bits_forwards c) s9).
+    assert (Hrc : exec (Defs.read_reg scause : M _) s9 = Some (c2, s9)).
+    { rewrite (exec_read_reg scause s9).
+      unfold s9, s8, s7, s6, s5, s4; rewrite ?sregs_set_reg.
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      unfold s3; rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
+    gm_peel (Gr scause s9 HRsc) Hrc. cbn beta.
+    unfold prepare_trap_vector.
+    assert (Hrt : exec (Defs.read_reg stvec : M _) s9 = Some (stvec_v, s9)).
+    { rewrite (exec_read_reg stvec s9).
+      unfold s9, s8, s7, s6, s5, s4, s3, s2, s1e, s1; rewrite ?sregs_set_reg.
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      rewrite Hstvec. reflexivity. }
+    gm_peel (Gr stvec s9 HRstvec) Hrt. cbn beta.
+    unfold tvec_addr. rewrite Htvd. cbn match.
+    apply goodmb_returnm.
+      }
+    iApply (swp_mono with "[] [Hany Hrw Hro]").
+    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df _ s1e s9
+                  (stvec_base stvec_v) rs2 ∅
+                  Hdisj HDr HDw Hag2e (map_empty_subseteq _) HgREST HTH
+                  with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
+    iSplitR; [ done |]. iExists rs3. iFrame "Hrw Hro Hany". done.
+    (* the node-shape side condition [swp_write_reg_same] shelved: the
+       [decide (r' = r)] does not reduce on its own, so collapse its proof
+       by [proof_irrel] -- the [hregread_resume_red] recipe. *)
+    Unshelve.
+    unfold hregwrite_val_at, Defs.write_reg. cbn.
+    destruct (decide _) as [Heq | Hne]; [ | congruence ].
+    assert (Heq = eq_refl) as -> by apply proof_irrel. reflexivity.
   Qed.
 
   (* --- instances: the three model entry points that reach the tower --- *)
