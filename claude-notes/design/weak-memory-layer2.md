@@ -775,3 +775,94 @@ re-derived from the promise run exactly as `robust_main_bundle` does.
   start with the two `vcap` lemmas (`Certify.v:144/166`), then the
   restriction simulation `sim_wpcfg` with its four invariants, then
   `certified_exec_complete`'s backward induction.
+
+
+## 12. ANSWER to §10.2's first half — WHAT THE ISA SAYS ABOUT A/D SPECULATION
+
+Source: `riscv-isa-manual`, `src/priv/supervisor.adoc`, the non-`Svade`
+scheme (the scheme this build is in — `menvcfg.ADUE = 1`, see
+[`execution-model.md`](execution-model.md)).  The normative sentences that
+bind Layer 2, and what each one settles:
+
+- *"The PTE update must be atomic with respect to other accesses to the PTE,
+  and must atomically perform all page-table walk checks for that leaf PTE as
+  part of, and before, conditionally updating the PTE value."* — the Sail
+  fork's atomic recheck (shape 4 of
+  [`weak-memory-walk-bridge.md`](weak-memory-walk-bridge.md)) is exactly this,
+  so the walker's A/D write is an RMW in the machine, by right.
+- *"Updates of the A bit may be performed as a result of speculation, even if
+  the associated memory access ultimately is not performed architecturally."*
+  ⇒ **§8's option (a) is NOT an ISA fact for the A bit.**  Making the walker's
+  A-bit RMW append-at-fulfil is a MODEL RESTRICTION (an assumption in the
+  no-icache / dropped-fence-I/O-bits class), never a theorem.  Note the
+  strength of the licence: the update may exist with *no* architectural access
+  behind it at all.
+- *"However, updates to the D bit, resulting from an explicit store, must be
+  exact (i.e., non-speculative), and observed in program order by the local
+  hart."* ⇒ **option (a) IS an ISA theorem for the D bit.**  If the machine
+  ever splits the two, the D-bit RMW is non-promisable by right and needs no
+  assumption.
+- *"The PTE update must appear in the global memory order before the memory
+  access that caused the PTE update and before any subsequent explicit memory
+  access to that virtual page by the local hart."* — a usable gmo-position
+  fact, but note its direction: it orders the update EARLIER.  **Nothing in the
+  ISA orders a walker A-write after anything.**
+- *"The ordering on loads and stores provided by FENCE instructions and the
+  acquire/release bits on atomic instructions also orders the PTE updates
+  associated with those loads and stores as observed by remote harts"*, with
+  the note *"The PTE updates due to memory accesses ordered-after a FENCE are
+  not themselves ordered by the FENCE."* ⇒ a fence orders the update of an
+  access BEFORE it and does NOT order the update of an access AFTER it.  So
+  §8's obstacle shape (a walker RMW floating above the fence that precedes the
+  access it serves) is precisely what the ISA permits: **the obstacle is real,
+  not an artifact of our promise machine.**
+- *"Implementations are of course still permitted to perform both A and D bit
+  updates only in an exact manner"*, together with *"the address-translation
+  algorithm may be executed speculatively at any time, for any virtual
+  address, as long as `satp` is active"* ⇒ **option (b)'s pf twin is a legal
+  implementation, AND it may perform an otherwise-unmotivated walk at its own
+  pf position.**  That second clause is load-bearing for the exhibit: an
+  *exact*-A/D twin cannot reproduce an A bit the weak run set speculatively
+  for an access that never happened architecturally, and robustness's
+  conclusion is memory EQUALITY at every address — the twin needs the licence
+  to do the same unmotivated walk, not just the exact ones.
+
+Two standing facts about xv6 that make option (b) tractable:
+
+- **xv6 never reads or writes A/D** (`grep 'PTE_A\|PTE_D' xv6-riscv/kernel/*.[ch]`
+  is empty).  The hardware walker is the ONLY agent that touches those bits,
+  and it only ever SETS them.  So the bits are monotone, the RMW fires at most
+  once per leaf per boot, and no software read observes them.
+- **Do not "resolve" the obstacle by presetting the kernel table's A/D bits.**
+  `kvmmake`/`mappages` write `PTE_R|PTE_W`/`PTE_R|PTE_X` and nothing else, so a
+  faithful run DOES fire the walker RMW on the table shared by all harts; the
+  A/D-preset instance is a WP-tier instance choice
+  ([`tlb-translation.md`](tlb-translation.md)), not a property of the image.
+
+⇒ **The decision §10.2 asks for is now a clean either/or.**  (a) survives only
+as an explicit model assumption, and only for the A bit; (b) is the route the
+ISA leaves fully open, at the price of generalizing the EXHIBIT (Layer 1's
+replay, `WeakRobustProv`/`Ord`/`Sim`/`Cone`) so the pf run may differ from the
+weak run in walker events — because for the behaviors at issue
+`gdep2_acyclic` is FALSE, so no amount of Layer-2 case analysis reaches them.
+
+**BEFORE EITHER OPTION: NOTHING IN THE PIPELINE CAN NAME WALKER TRAFFIC.**
+Both (a) and (b) need to distinguish the walker's A/D RMW from a software
+AMO — (a) to make it non-promisable, (b) to replay it up to idempotence
+(replaying an arbitrary RMW that way is unsound: a software CAS feeds `rd`).
+The label alphabet does not: `LRmw aq rl base tvs data asrc vsrc` carries no
+marker, the generated model emits no `TranslationStart`/`TranslationEnd`
+(upstream `sail-riscv` has no such concurrency-interface event at all), and
+D-8 in [`../../iris/WeakEvLang.v`](../../iris/WeakEvLang.v) records the
+consequence for reads — a PTE read and a data load are the same node.  What
+IS available, in increasing cost:
+- a WRITTEN-VALUE discriminator: the walker's RMW writes an A/D VARIANT of
+  the word it read (`PtAdBits.pte_set_ad`, with `pte_set_ad_absorb` already
+  proving variant-of-variant collapses) and has no architectural `rd`.  This
+  is label-and-value-level, needs no model change, and is the first thing to
+  test before pricing anything else;
+- a `pcls`-style STATE classification (the class function already takes `P`,
+  so "the address is a PTE reachable from `satp`" is expressible);
+- a MODEL fork adding walker markers to `vmem.sail` (the `-D SYMBOLIC`
+  announce nodes are the precedent, but those existed upstream and these do
+  not) — plus the machine parameter and a full tower re-land.

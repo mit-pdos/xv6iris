@@ -1,5 +1,28 @@
 # SESSION HANDOFF — 2026-08-18 (branch `weak-memory`)
 
+**LATEST (2026-08-18, later session): §10.2 IS NOW HALF-ANSWERED — from the
+privileged spec's own words (`design/weak-memory-layer2.md` §12).  The ISA
+PERMITS speculative A-bit updates ("even if the associated memory access
+ultimately is not performed architecturally"), so §8's option (a) —
+non-promisable walker RMW — is a MODEL ASSUMPTION for the A bit and an ISA
+THEOREM only for the D bit; a FENCE does NOT order the PTE update of an access
+ordered after it, so the §8 obstacle is REAL and not an artifact of our promise
+machine; and option (b)'s pf twin is a legal implementation AND licensed to
+perform the same otherwise-unmotivated walk (needed, because robustness
+concludes memory EQUALITY and an exact-A/D twin cannot reproduce a
+speculatively-set A bit).  xv6 never mentions `PTE_A`/`PTE_D`, so those bits
+are monotone hints no software reads — but do NOT dodge the obstacle by
+presetting the kernel table's A/D (`kvmmake` writes neither).  **THE DECISION
+STILL OWED: (a) model assumption + non-promisable walker A RMW, or (b)
+generalize the EXHIBIT (Layer 1's replay) for walker events.**  Recommended
+sequencing: TAKE THAT DECISION BEFORE D8 — under (b), `gdep2_acyclic` is FALSE
+for some real xv6 behaviors, so Layer 2's target theorem does not reach them
+and D8/E1/L2′ would sit on a theorem that still needs generalizing; under (a)
+D8 starts at once with no change of plan.  Nothing in flight; notes-only
+change.  (HEAD was re-verified by a full rebuild in this worktree — the `.vo`
+tier here predated L2-M1/M2.)**
+
+
 **LATEST (2026-08-18, HEAD pushed): everything green; nothing in flight.  The
 user is deliberating on the CERTIFICATION ROUTE for Layer 2
 (`design/weak-memory-layer2.md` §8/§10 — NO side conditions: early reads
