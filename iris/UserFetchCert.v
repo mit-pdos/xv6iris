@@ -32,7 +32,7 @@ Require Import WpDecodeBridge HartGoodb HartMemRun HartMemAsm PtBytes.
 Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte.
 Require Import CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
 Require Import UptTree UserPtTree UserBits UserMem UserFetch.
-Require Import PtWalkCert.
+Require Import UserBytes PtWalkCert.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -419,3 +419,103 @@ Section FetchOk4Cert.
   Qed.
 
 End FetchOk4Cert.
+
+(* ===================================================================== *)
+(* 3. THE [u_mem_wf] PROJECTIONS THE WALK ASKS FOR.                       *)
+(*                                                                        *)
+(* [PtWalkCert.goodmb_ptree_translateAddr] and its exec twin want, per     *)
+(* slot, a [pt_slot_mem] and a [bytes_owned].  Both are projections of     *)
+(* [UserBytes.u_mem_wf] once the slot is known to be ONE OF THE TREE'S --  *)
+(* which is what [ptree_maps] says, and what this section turns into the   *)
+(* [pt_maps 2 t] membership [u_mem_wf_read] / [u_mem_wf_owned] consume.    *)
+(* ===================================================================== *)
+
+Lemma mword9_uint_range (x : mword 9) : (0 <= uint x < 512)%Z.
+Proof.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [| exact (proj1 Hr)].
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 9)) with 512%Z in Hr.
+  exact Hr.
+Qed.
+
+Lemma mword9_uint_id (x : mword 9) : (mword_of_int (uint x) : mword 9) = x.
+Proof.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N,
+         SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z2N.id; [| exact (proj1 Hr)].
+  apply Z_to_bv_bv_unsigned.
+Qed.
+
+(* a node's OWN slot, as a byte map of that node's page *)
+Lemma pt_page_maps_slot (t : ptree) (i : mword 9) :
+  word_bytes (u_pte_addr (pt_base t) i) (pt_ents t i) ∈ pt_page_maps t.
+Proof.
+  pose proof (pt_page_map_mem t (uint i) (mword9_uint_range i)) as Hm.
+  rewrite mword9_uint_id in Hm. exact Hm.
+Qed.
+
+(* the three slots a successful walk of [vpn] reads, as members of the
+   whole tree's byte-map list *)
+Lemma ptree_maps_slot2 (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 ->
+  word_bytes (u_pte_addr (pt_base t) (vpn_idx 2 vpn)) p2 ∈ pt_maps 2 t.
+Proof.
+  intros (c1 & c0 & _ & _ & He2 & _). rewrite <- He2.
+  apply pt_maps_page. apply pt_page_maps_slot.
+Qed.
+
+Lemma ptree_maps_slot1 (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 ->
+  word_bytes (pt_addr1 p2 vpn) p1 ∈ pt_maps 2 t.
+Proof.
+  intros (c1 & c0 & Hk1 & Hk0 & He2 & He1 & He0 & Hb1 & Hb0 & _).
+  unfold pt_addr1. rewrite Hb1. rewrite <- He1.
+  apply (pt_maps_kid 1 t c1 (uint (vpn_idx 2 vpn)));
+    [ apply mword9_uint_range
+    | rewrite mword9_uint_id; exact Hk1
+    | apply pt_maps_page; apply pt_page_maps_slot ].
+Qed.
+
+Lemma ptree_maps_slot0 (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 ->
+  word_bytes (pt_addr0 p1 vpn) p0 ∈ pt_maps 2 t.
+Proof.
+  intros (c1 & c0 & Hk1 & Hk0 & He2 & He1 & He0 & Hb1 & Hb0 & _).
+  unfold pt_addr0. rewrite Hb0. rewrite <- He0.
+  apply (pt_maps_kid 1 t c1 (uint (vpn_idx 2 vpn)));
+    [ apply mword9_uint_range | rewrite mword9_uint_id; exact Hk1 |].
+  apply (pt_maps_kid 0 c1 c0 (uint (vpn_idx 1 vpn)));
+    [ apply mword9_uint_range | rewrite mword9_uint_id; exact Hk0 |].
+  rewrite pt_maps_O. apply pt_page_maps_slot.
+Qed.
+
+(* ...and a member of that list, at a slot ADDRESS (so its alignment is
+   the slot geometry's), is a [pt_slot_mem] of the reference state *)
+Lemma u_slot_mem_at (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (b : mword 44) (i : mword 9) (q : mword 64) :
+  u_mem_wf P t mm ->
+  word_bytes (u_pte_addr b i) q ∈ pt_maps 2 t ->
+  pt_slot_mem (MState rs mm dev0_state) (u_pte_addr b i) q.
+Proof.
+  intros Hwf Hin.
+  pose proof (u_mem_wf_sub P t mm _ q Hwf Hin) as Hsub.
+  assert (Hlk : forall j : nat, (N.of_nat j < 8)%N ->
+            mm !! pa_add (u_pte_addr b i) j = Some (nth_byte q j)).
+  { intros j Hj. apply (lookup_weaken (word_bytes (u_pte_addr b i) q) mm);
+      [ apply word_bytes_lookup; lia | exact Hsub ]. }
+  assert (Hram : forall j : nat, (N.of_nat j < 8)%N ->
+            addr_is_ram (pa_add (u_pte_addr b i) j)).
+  { intros j Hj. destruct Hwf as (md & _ & _ & _ & _ & Hr & _).
+    apply Hr. apply elem_of_dom. exists (nth_byte q j). exact (Hlk j Hj). }
+  split_and!.
+  - exact Hlk.
+  - rewrite <- (pa_add_0 (u_pte_addr b i)). apply Hram. lia.
+  - apply Hram. lia.
+  - exact (pte_addr_at_aligned8 b i).
+Qed.
+
+Lemma u_slot_owned (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) (q : mword 64) :
+  u_mem_wf P t mm -> word_bytes a q ∈ pt_maps 2 t -> bytes_owned mm a 8 = true.
+Proof. intros Hwf Hin. exact (u_mem_wf_owned P t mm a q Hwf Hin). Qed.
