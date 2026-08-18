@@ -16,23 +16,28 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
 
 ## Items
 
-- **W1 — walker-naming spike** (investigation, no tree changes): evaluate the
-  written-value discriminator for the walker's A/D RMW (§12's first
-  mechanism): definition in the tree's vocabulary, false-positive analysis
-  (software AMOs), where the non-promisability gate would live in
-  `iris/WeakPromise.v`, cost estimate.  Fallback if NO-GO: the `pcls`-style
-  state classification.  **Status: IN FLIGHT (2026-08-18).**
-- **W2 — the machine change** (blocked on W1): walker A/D RMW append-at-fulfil
-  (non-promisable) in the full machine, per §13; containment argument
-  (restricted ⊆ unrestricted is trivial; the fidelity boundary is §13's
-  bullet); re-land whatever the gate touches.
-- **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: the
-  certification step relation (agent i's `wpstep` arms minus `WPPromise`,
-  unioned with `PFStore`/`PFRmw`), `wp_certify`, and the ports of PARM
-  `Certify.v:128/144/166` (`cert_step_vcap`, `cert_step_vcap_promise`,
-  `rtc_cert_step_vcap_promise`) — EXT ⊒ `w_vcap` is the proof content, D-2
-  already supplies it.  New leaf file `iris/WeakCertify.v`.
-  **Status: IN FLIGHT (2026-08-18).**
+- **W1 — walker-naming spike**: **DONE (2026-08-18) — GO** on the
+  written-value discriminator, with conjunct (ii) REPLACED (see Findings).
+- **W2 — realizing §13** (blocked on: the fused-RMW change the user has
+  announced, and the user's confirmation of the premise shape): the
+  discriminator `wlb_ad` (stdpp-only, beside `WeakMem`) + the ~30-line
+  `PtAdBits.v` bridge (`update_PTE_Bits w acc = Some w' → ad_variant w w'`;
+  the two hard bit-facts are proved in the spike's scratch file) + §13 stated
+  as the traced-bundle premise `no_early_ad` threaded through
+  `robust_main_l2` — NOT as a `WPPromise`-side machine change (see Findings
+  for why that is architecturally blocked).  Also owed here: the one-line
+  staleness fix to `WeakInterp.v`'s access-kind table (A/D path is
+  `Read_RISCV_reserved`/`Write_RISCV_conditional` post-fork, not
+  `Write_plain`).
+- **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
+  (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
+  wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
+  duplicated), `prom_free`/`wp_certify`, `cert_step_vcap`,
+  `cert_step_vcap_promise`, `rtc_cert_step_vcap_promise`, the contrapositive
+  `rtc_cert_step_prom_free_vcap`, and `cert_step_rtc_wpstep` (a certifying
+  run IS a full-machine run — `cfg_wf` replaces the bridge's `no_promises`
+  premise via `prom_wf`'s length bound).  All closed under the global
+  context.
 - **D8-2 — the restriction simulation** (`sim_wpcfg`, PARM `CertifySim.v`'s
   arch-generic line): views equal below the boundary; every source message
   above the boundary is agent i's; the forward bank two-armed; `excl_ok`
