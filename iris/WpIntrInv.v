@@ -57,6 +57,24 @@
    [Psi rs2] back beside [rs2] itself, so the landing pc is an equation
    rather than an existential.
 
+   THE CLOCK-BORROWING READING IS THE PRIMITIVE.  [wp_exec_step_intr_clock]
+   lends the leaf the three clock cells (mcycle / mtime / mip) and takes them
+   back; [wp_exec_step_intr] is that with the cells passed straight through.
+   They live in the cycle's own footprint because the TICK writes them, but
+   the tick runs at the cycle BOUNDARY, so within the instruction they are
+   stable and lending them costs the engine nothing -- and [csrr time],
+   [csrr sip] and [csrw stimecmp] (whose new mip comes out of device state)
+   cannot be written without them.  The cycle rule's continuation constrains
+   the landing file only OFF [tk_clock3], so nothing downstream sees it.
+   The leaf-facing callback is ONE definition ([intr_cb_clock] / [intr_cb]),
+   not three spelled copies: it appears in the engine's premise, in the
+   rider's trap arm, and in the resource the S-mode run rule threads to
+   whichever arm the machine picks.
+
+   §5 adds [strans_regime_swp], the swp-layer instance of the S-mode tier's
+   COMBINED translation slot -- see its own header for why each arm's satp
+   MODE has to sit in the residue and not only in the side condition.
+
    The per-trap frame is the CONCRETE [intr_frame]: [stack_own] of depth AT
    LEAST [kv_frame_slots] below the interrupted sp -- the kernel must
    maintain that much free stack at every interrupts-enabled instruction.
