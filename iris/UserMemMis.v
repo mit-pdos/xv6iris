@@ -693,6 +693,691 @@ Qed.
 Lemma ws_seq_all_true (N : nat) : ws_seq (fun _ => true) N = true.
 Proof. induction N as [|N IH]; [reflexivity | cbn [ws_seq]; rewrite IH; reflexivity]. Qed.
 
+(* ===================================================================== *)
+(* THE [untilMT] CHAIN'S CERTIFICATE.                                      *)
+(* ===================================================================== *)
+
+Lemma gm_untilMT'_last (Dr Dw : register -> bool) {R Vars} (limit : Z)
+   (vars vars' : Vars)
+   (cond : Vars -> Defs.monadR R exception bool)
+   (body : Vars -> Defs.monadR R exception Vars)
+   s s' mm (acc : Acc (Zwf 0) limit) :
+  (limit >= 0)%Z ->
+  goodmb Dr Dw (body vars) s mm = true ->
+  execR (body vars) s = Some (inr vars', s') ->
+  goodmb Dr Dw (cond vars') s' mm = true ->
+  execR (cond vars') s' = Some (inr true, s') ->
+  goodmb Dr Dw (Defs.untilMT' limit vars cond body acc) s mm = true.
+Proof.
+  intros Hlim Hbg Hb Hcg Hc. destruct acc as [acc_fn]. cbn [Defs.untilMT'].
+  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [| lia].
+  erewrite (gm_bindR Dr Dw _ _ s s' mm vars' Hbg Hb).
+  erewrite (gm_bindR Dr Dw _ _ s' s' mm true Hcg Hc).
+  cbn match. apply goodmb_returnm.
+Qed.
+
+Lemma gm_untilMT'_step (Dr Dw : register -> bool) {R Vars} (limit : Z)
+   (vars vars' : Vars)
+   (cond : Vars -> Defs.monadR R exception bool)
+   (body : Vars -> Defs.monadR R exception Vars)
+   s s' mm (acc : Acc (Zwf 0) limit) :
+  (limit >= 0)%Z ->
+  goodmb Dr Dw (body vars) s mm = true ->
+  execR (body vars) s = Some (inr vars', s') ->
+  goodmb Dr Dw (cond vars') s' mm = true ->
+  execR (cond vars') s' = Some (inr false, s') ->
+  exists acc' : Acc (Zwf 0) (limit - 1),
+    goodmb Dr Dw (Defs.untilMT' limit vars cond body acc) s mm
+    = goodmb Dr Dw (Defs.untilMT' (limit - 1) vars' cond body acc') s' mm.
+Proof.
+  intros Hlim Hbg Hb Hcg Hc. destruct acc as [acc_fn]. cbn [Defs.untilMT'].
+  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [| lia].
+  erewrite (gm_bindR Dr Dw _ _ s s' mm vars' Hbg Hb).
+  erewrite (gm_bindR Dr Dw _ _ s' s' mm false Hcg Hc).
+  cbn match. eexists. reflexivity.
+Qed.
+
+Lemma gm_untilMT'_chain (Dr Dw : register -> bool) {R Vars}
+   (cond : Vars -> Defs.monadR R exception bool)
+   (body : Vars -> Defs.monadR R exception Vars) mm :
+   forall (N : nat) (v : nat -> Vars) (st : nat -> mstate) (limit0 : Z)
+          (acc : Acc (Zwf 0) limit0),
+   (1 <= N)%nat ->
+   (limit0 >= Z.of_nat N - 1)%Z ->
+   (forall k, (k < N)%nat -> goodmb Dr Dw (body (v k)) (st k) mm = true) ->
+   (forall k, (k < N)%nat -> execR (body (v k)) (st k)
+                             = Some (inr (v (S k)), st (S k))) ->
+   (forall k, (k < N)%nat -> goodmb Dr Dw (cond (v (S k))) (st (S k)) mm = true) ->
+   (forall k, (S k < N)%nat -> execR (cond (v (S k))) (st (S k))
+                               = Some (inr false, st (S k))) ->
+   execR (cond (v N)) (st N) = Some (inr true, st N) ->
+   goodmb Dr Dw (Defs.untilMT' limit0 (v 0%nat) cond body acc) (st 0%nat) mm = true.
+Proof.
+  intros N. induction N as [|N' IH]; [ lia | ].
+  intros v st limit0 acc HN Hlim Hbodyg Hbody Hcondg Hcondf Hcondt.
+  destruct (Nat.eq_dec N' 0) as [->|Hn0].
+  - apply (gm_untilMT'_last Dr Dw limit0 (v 0%nat) (v 1%nat) cond body
+             (st 0%nat) (st 1%nat) mm acc).
+    + lia.
+    + apply (Hbodyg 0%nat). lia.
+    + apply (Hbody 0%nat). lia.
+    + apply (Hcondg 0%nat). lia.
+    + apply Hcondt.
+  - edestruct (gm_untilMT'_step Dr Dw limit0 (v 0%nat) (v 1%nat) cond body
+                 (st 0%nat) (st 1%nat) mm acc) as [acc' Hstep].
+    + lia.
+    + apply (Hbodyg 0%nat). lia.
+    + apply (Hbody 0%nat). lia.
+    + apply (Hcondg 0%nat). lia.
+    + apply (Hcondf 0%nat). lia.
+    + rewrite Hstep.
+      apply (IH (fun k => v (S k)) (fun k => st (S k)) (limit0 - 1) acc').
+      * lia.
+      * lia.
+      * intros k Hk. apply (Hbodyg (S k)). lia.
+      * intros k Hk. apply (Hbody (S k)). lia.
+      * intros k Hk. apply (Hcondg (S k)). lia.
+      * intros k Hk. apply (Hcondf (S k)). lia.
+      * apply Hcondt.
+Qed.
+
+(* [returnR tt >> B] is [B] by conversion, but Sail's [>>] binds TIGHTER than
+   [>>=], so the collapsed node sits one bind IN and no [execR_bind0_Some]
+   rewrite finds it.  [change] does, at either level and on either side. *)
+Ltac gm_ret_bind0 :=
+  first
+    [ match goal with |- execR (Defs.bind (Defs.bind0 _ ?B) ?kk) ?ss = ?RR =>
+        change (execR (Defs.bind B kk) ss = RR) end
+    | match goal with |- execR (Defs.bind0 _ ?B) ?ss = ?RR =>
+        change (execR B ss = RR) end
+    | match goal with
+      | |- goodmb ?dr ?dw (Defs.bind (Defs.bind0 _ ?B) ?kk) ?ss ?m = ?RR =>
+          change (goodmb dr dw (Defs.bind B kk) ss m = RR) end
+    | match goal with |- goodmb ?dr ?dw (Defs.bind0 _ ?B) ?ss ?m = ?RR =>
+        change (goodmb dr dw B ss m = RR) end ].
+
+Section GmCheckedMemReadSplit.
+  Context (Dr Dw : register -> bool).
+  Context (acc : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
+          (priv : Privilege).
+  Context (pa : mword 64) (width bytes : Z) (N : nat)
+          (aq rl res meta : bool) (rk : read_kind).
+  Context (val : nat -> mword (8 * bytes)) (s : mstate) (mm : PtBytes.pamap).
+  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes).
+
+  Notation n := (Z.of_nat N).
+  Notation cpa k := (Physaddr (add_vec_int pa (Z.of_nat k * bytes))).
+
+  Hypothesis Hpmp : forall k, (k < N)%nat ->
+    exec (pmpCheck (cpa k) bytes acc priv) s = Some (None, s).
+  Hypothesis Hpmpg : forall k, (k < N)%nat ->
+    goodmb Dr Dw (pmpCheck (cpa k) bytes acc priv) s mm = true.
+  Hypothesis Hmmio : forall k, (k < N)%nat ->
+    exec (within_mmio_readable (cpa k) bytes) s = Some (false, s).
+  Hypothesis Hmmiog : forall k, (k < N)%nat ->
+    goodmb Dr Dw (within_mmio_readable (cpa k) bytes) s mm = true.
+  Hypothesis Hram : forall k, (k < N)%nat ->
+    exec (read_ram rk (cpa k) bytes meta) s = Some ((val k, tt), s).
+  Hypothesis Hramg : forall k, (k < N)%nat ->
+    goodmb Dr Dw (read_ram rk (cpa k) bytes meta) s mm = true.
+
+  Lemma goodmb_checked_mem_read_split (plan : Phys_Mem_Access_Info) :
+    goodmb Dr Dw (check_pma_with_pmp_priority acc pbmt priv (Physaddr pa) width res)
+      s mm = true ->
+    exec (check_pma_with_pmp_priority acc pbmt priv (Physaddr pa) width res) s
+      = Some (Ok plan, s) ->
+    goodmb Dr Dw (split_misaligned (Physaddr pa) width
+            (Phys_Mem_Access_Info_granule_size_exp plan)
+            (Phys_Mem_Access_Info_splittable plan)) s mm = true ->
+    exec (split_misaligned (Physaddr pa) width
+            (Phys_Mem_Access_Info_granule_size_exp plan)
+            (Phys_Mem_Access_Info_splittable plan)) s = Some ((n, bytes), s) ->
+    goodmb Dr Dw (read_kind_of_flags aq rl res) s mm = true ->
+    exec (read_kind_of_flags aq rl res) s = Some (rk, s) ->
+    goodmb Dr Dw (checked_mem_read acc pbmt priv (Physaddr pa) width aq rl res meta)
+      s mm = true.
+  Proof.
+    intros Hpacg Hpac Hsplitg Hsplit Hrkg Hrk.
+    unfold checked_mem_read. apply goodmb_cer.
+    gmm_lift Hpacg Hpac. cbn beta. cbn match.
+    erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    cbn match beta.
+    gmm_lift Hsplitg Hsplit. cbn beta zeta match.
+    rewrite misaligned_order_split. cbn zeta.
+    gmm_lift Hrkg Hrk. cbn beta.
+    match goal with
+    | |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+        assert (Hu : execR (Defs.untilMT vs m0 c bb) s
+                     = Some (inr (MemAccessGen.rsplit_var bytes N val N), s));
+        [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ]
+    end.
+    { rewrite <- (MemAccessGen.rsplit_var0 bytes N val HN).
+      unfold Defs.untilMT.
+      match goal with
+      | |- execR (Defs.untilMT' ?L _ ?c ?b _) _ = _ =>
+          set (LL := L); set (CC := c); set (BB := b)
+      end.
+      assert (HL : LL = n)
+        by (unfold LL; rewrite (MemAccessGen.rsplit_var0 bytes N val HN); reflexivity).
+      clearbody LL. rewrite HL.
+      apply (MemAccessGen.execR_untilMT'_chain CC BB N
+               (MemAccessGen.rsplit_var bytes N val) (fun _ => s) n).
+      - exact HN.
+      - lia.
+      - intros k Hk. unfold BB, MemAccessGen.rsplit_var.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hpmp k Hk)). cbn match.
+        gm_ret_bind0.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hmmio k Hk)). cbn match beta.
+        match goal with
+        | |- execR (Defs.bind ?m0 ?post) s = _ =>
+            assert (Hrr : execR m0 s = Some (inr (val k), s))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hram k Hk)). cbn match.
+          apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hrr). cbn beta.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match;
+          rewrite execR_returnR_fwd; do 3 f_equal; unfold MemAccessGen.rsplit_var.
+        + apply Z.eqb_eq in Eq.
+          replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+          replace (Nat.min (S k) (N - 1)) with k by lia. reflexivity.
+        + apply Z.eqb_neq in Eq.
+          replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+          replace (Nat.min (S k) (N - 1)) with (S k) by lia.
+          replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+      - intros k Hk. unfold CC, MemAccessGen.rsplit_var. cbn match.
+        replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        apply execR_returnR_fwd.
+      - unfold CC, MemAccessGen.rsplit_var. cbn match. rewrite Nat.eqb_refl.
+        apply execR_returnR_fwd. }
+    { rewrite <- (MemAccessGen.rsplit_var0 bytes N val HN).
+      unfold Defs.untilMT.
+      match goal with
+      | |- goodmb _ _ (Defs.untilMT' ?L _ ?c ?b _) _ _ = _ =>
+          set (LL := L); set (CC := c); set (BB := b)
+      end.
+      assert (HL : LL = n)
+        by (unfold LL; rewrite (MemAccessGen.rsplit_var0 bytes N val HN); reflexivity).
+      clearbody LL. rewrite HL.
+      apply (gm_untilMT'_chain Dr Dw CC BB mm N
+               (MemAccessGen.rsplit_var bytes N val) (fun _ => s) n).
+      - exact HN.
+      - lia.
+      - intros k Hk. unfold BB, MemAccessGen.rsplit_var.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        gmm_liftT ltac:(apply goodmb_assert_exp'_true)
+                  ltac:(apply exec_assert_exp'_true). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        gmm_lift (Hpmpg k Hk) (Hpmp k Hk). cbn match.
+        gm_ret_bind0.
+        gmm_lift (Hmmiog k Hk) (Hmmio k Hk). cbn match beta.
+        match goal with
+        | |- goodmb _ _ (Defs.bind ?m0 ?post) s _ = _ =>
+            assert (Hrrg : goodmb Dr Dw m0 s mm = true);
+            [ | assert (Hrr : execR m0 s = Some (inr (val k), s)) ]
+        end.
+        { gmm_lift (Hramg k Hk) (Hram k Hk). cbn match. apply goodmb_returnm. }
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hram k Hk)). cbn match.
+          apply execR_returnR_fwd. }
+        erewrite (gm_bindR Dr Dw _ _ s s mm (val k) Hrrg Hrr). cbn beta.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match; apply goodmb_returnm.
+      - intros k Hk. unfold BB, MemAccessGen.rsplit_var.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hpmp k Hk)). cbn match.
+        gm_ret_bind0.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hmmio k Hk)). cbn match beta.
+        match goal with
+        | |- execR (Defs.bind ?m0 ?post) s = _ =>
+            assert (Hrr : execR m0 s = Some (inr (val k), s))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hram k Hk)). cbn match.
+          apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hrr). cbn beta.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match;
+          rewrite execR_returnR_fwd; do 3 f_equal; unfold MemAccessGen.rsplit_var.
+        + apply Z.eqb_eq in Eq.
+          replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+          replace (Nat.min (S k) (N - 1)) with k by lia. reflexivity.
+        + apply Z.eqb_neq in Eq.
+          replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+          replace (Nat.min (S k) (N - 1)) with (S k) by lia.
+          replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+      - intros k Hk. unfold CC, MemAccessGen.rsplit_var. cbn match.
+        apply goodmb_returnm.
+      - intros k Hk. unfold CC, MemAccessGen.rsplit_var. cbn match.
+        replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        apply execR_returnR_fwd.
+      - unfold CC, MemAccessGen.rsplit_var. cbn match. rewrite Nat.eqb_refl.
+        apply execR_returnR_fwd. }
+    erewrite (gm_bindR Dr Dw _ _ s s mm (MemAccessGen.rsplit_var bytes N val N) Hug Hu).
+    cbn beta zeta. unfold MemAccessGen.rsplit_var. cbn match.
+    apply goodmb_returnm.
+  Qed.
+
+End GmCheckedMemReadSplit.
+
+Section GmCheckedMemWriteSplit.
+  Context (Dr Dw : register -> bool).
+  Context (acc : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
+          (priv : Privilege).
+  Context (pa : mword 64) (width bytes : Z) (N : nat)
+          (aq rl con : bool) (meta : unit) (wk : write_kind).
+  Context (dat : mword (8 * width)) (sk : nat -> bool) (sw : nat -> mstate).
+  Context (mm : PtBytes.pamap).
+  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes).
+
+  Notation n := (Z.of_nat N).
+  Notation cpa k := (Physaddr (add_vec_int pa (Z.of_nat k * bytes))).
+
+  Hypothesis Hpmp : forall k, (k < N)%nat ->
+    exec (pmpCheck (cpa k) bytes acc priv) (sw k) = Some (None, sw k).
+  Hypothesis Hpmpg : forall k, (k < N)%nat ->
+    goodmb Dr Dw (pmpCheck (cpa k) bytes acc priv) (sw k) mm = true.
+  Hypothesis Hmmio : forall k, (k < N)%nat ->
+    exec (within_mmio_writable (cpa k) bytes) (sw k) = Some (false, sw k).
+  Hypothesis Hmmiog : forall k, (k < N)%nat ->
+    goodmb Dr Dw (within_mmio_writable (cpa k) bytes) (sw k) mm = true.
+  Hypothesis Hwram : forall k, (k < N)%nat ->
+    exec (write_ram wk (cpa k) bytes (MemAccessGen.wvc width bytes dat k) meta) (sw k)
+      = Some (sk k, sw (S k)).
+  Hypothesis Hwramg : forall k, (k < N)%nat ->
+    goodmb Dr Dw (write_ram wk (cpa k) bytes (MemAccessGen.wvc width bytes dat k) meta)
+      (sw k) mm = true.
+
+  Lemma goodmb_checked_mem_write_split (plan : Phys_Mem_Access_Info) :
+    goodmb Dr Dw (check_pma_with_pmp_priority acc pbmt priv (Physaddr pa) width con)
+      (sw 0%nat) mm = true ->
+    exec (check_pma_with_pmp_priority acc pbmt priv (Physaddr pa) width con) (sw 0%nat)
+      = Some (Ok plan, sw 0%nat) ->
+    goodmb Dr Dw (split_misaligned (Physaddr pa) width
+            (Phys_Mem_Access_Info_granule_size_exp plan)
+            (Phys_Mem_Access_Info_splittable plan)) (sw 0%nat) mm = true ->
+    exec (split_misaligned (Physaddr pa) width
+            (Phys_Mem_Access_Info_granule_size_exp plan)
+            (Phys_Mem_Access_Info_splittable plan)) (sw 0%nat)
+      = Some ((n, bytes), sw 0%nat) ->
+    goodmb Dr Dw (write_kind_of_flags aq rl con) (sw 0%nat) mm = true ->
+    exec (write_kind_of_flags aq rl con) (sw 0%nat) = Some (wk, sw 0%nat) ->
+    goodmb Dr Dw (checked_mem_write (Physaddr pa) width dat acc pbmt priv meta aq rl con)
+      (sw 0%nat) mm = true.
+  Proof.
+    intros Hpacg Hpac Hsplitg Hsplit Hwkfg Hwkf.
+    unfold checked_mem_write. apply goodmb_cer.
+    gmm_lift Hpacg Hpac. cbn beta. cbn match.
+    erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    cbn match beta.
+    gmm_lift Hsplitg Hsplit. cbn beta zeta match.
+    rewrite misaligned_order_split. cbn zeta.
+    gmm_lift Hwkfg Hwkf. cbn beta.
+    match goal with
+    | |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+        assert (Hu : execR (Defs.untilMT vs m0 c bb) (sw 0%nat)
+                     = Some (inr (MemAccessGen.wsplit_var N sk N), sw N));
+        [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) (sw 0%nat) mm = true) ]
+    end.
+    { rewrite <- (MemAccessGen.wsplit_var0 N sk HN).
+      unfold Defs.untilMT.
+      match goal with
+      | |- execR (Defs.untilMT' ?L _ ?c ?b _) _ = _ =>
+          set (LL := L); set (CC := c); set (BB := b)
+      end.
+      assert (HL : LL = n)
+        by (unfold LL; rewrite (MemAccessGen.wsplit_var0 N sk HN); reflexivity).
+      clearbody LL. rewrite HL.
+      apply (MemAccessGen.execR_untilMT'_chain CC BB N
+               (MemAccessGen.wsplit_var N sk) sw n).
+      - exact HN.
+      - lia.
+      - intros k Hk. unfold BB, MemAccessGen.wsplit_var.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ (sw k))). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hpmp k Hk)). cbn match.
+        gm_ret_bind0.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hmmio k Hk)). cbn match beta zeta.
+        match goal with
+        | |- execR (Defs.bind ?m0 ?post) (sw k) = _ =>
+            assert (Hrr : execR m0 (sw k)
+                          = Some (inr (andb (MemAccessGen.ws_seq sk k) (sk k)), sw (S k)))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hwram k Hk)). cbn beta.
+          apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hrr). cbn beta.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match;
+          rewrite execR_returnR_fwd; do 3 f_equal; unfold MemAccessGen.wsplit_var.
+        + apply Z.eqb_eq in Eq.
+          replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+          replace (Nat.min (S k) (N - 1)) with k by lia. reflexivity.
+        + apply Z.eqb_neq in Eq.
+          replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+          replace (Nat.min (S k) (N - 1)) with (S k) by lia.
+          replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+      - intros k Hk. unfold CC, MemAccessGen.wsplit_var. cbn match.
+        replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        apply execR_returnR_fwd.
+      - unfold CC, MemAccessGen.wsplit_var. cbn match. rewrite Nat.eqb_refl.
+        apply execR_returnR_fwd. }
+    { rewrite <- (MemAccessGen.wsplit_var0 N sk HN).
+      unfold Defs.untilMT.
+      match goal with
+      | |- goodmb _ _ (Defs.untilMT' ?L _ ?c ?b _) _ _ = _ =>
+          set (LL := L); set (CC := c); set (BB := b)
+      end.
+      assert (HL : LL = n)
+        by (unfold LL; rewrite (MemAccessGen.wsplit_var0 N sk HN); reflexivity).
+      clearbody LL. rewrite HL.
+      apply (gm_untilMT'_chain Dr Dw CC BB mm N (MemAccessGen.wsplit_var N sk) sw n).
+      - exact HN.
+      - lia.
+      - intros k Hk. unfold BB, MemAccessGen.wsplit_var.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        gmm_liftT ltac:(apply goodmb_assert_exp'_true)
+                  ltac:(apply exec_assert_exp'_true). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        gmm_lift (Hpmpg k Hk) (Hpmp k Hk). cbn match.
+        gm_ret_bind0.
+        gmm_lift (Hmmiog k Hk) (Hmmio k Hk). cbn match beta zeta.
+        match goal with
+        | |- goodmb _ _ (Defs.bind ?m0 ?post) (sw k) _ = _ =>
+            assert (Hrrg : goodmb Dr Dw m0 (sw k) mm = true);
+            [ | assert (Hrr : execR m0 (sw k)
+                        = Some (inr (andb (MemAccessGen.ws_seq sk k) (sk k)), sw (S k))) ]
+        end.
+        { gmm_lift (Hwramg k Hk) (Hwram k Hk). cbn beta. apply goodmb_returnm. }
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hwram k Hk)). cbn beta.
+          apply execR_returnR_fwd. }
+        erewrite (gm_bindR Dr Dw _ _ (sw k) (sw (S k)) mm _ Hrrg Hrr). cbn beta.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match; apply goodmb_returnm.
+      - intros k Hk. unfold BB, MemAccessGen.wsplit_var.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ (sw k))). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hpmp k Hk)). cbn match.
+        gm_ret_bind0.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hmmio k Hk)). cbn match beta zeta.
+        match goal with
+        | |- execR (Defs.bind ?m0 ?post) (sw k) = _ =>
+            assert (Hrr : execR m0 (sw k)
+                          = Some (inr (andb (MemAccessGen.ws_seq sk k) (sk k)), sw (S k)))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hwram k Hk)). cbn beta.
+          apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hrr). cbn beta.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match;
+          rewrite execR_returnR_fwd; do 3 f_equal; unfold MemAccessGen.wsplit_var.
+        + apply Z.eqb_eq in Eq.
+          replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+          replace (Nat.min (S k) (N - 1)) with k by lia. reflexivity.
+        + apply Z.eqb_neq in Eq.
+          replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+          replace (Nat.min (S k) (N - 1)) with (S k) by lia.
+          replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+      - intros k Hk. unfold CC, MemAccessGen.wsplit_var. cbn match.
+        apply goodmb_returnm.
+      - intros k Hk. unfold CC, MemAccessGen.wsplit_var. cbn match.
+        replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        apply execR_returnR_fwd.
+      - unfold CC, MemAccessGen.wsplit_var. cbn match. rewrite Nat.eqb_refl.
+        apply execR_returnR_fwd. }
+    erewrite (gm_bindR Dr Dw _ _ (sw 0%nat) (sw N) mm
+                (MemAccessGen.wsplit_var N sk N) Hug Hu).
+    cbn beta zeta. unfold MemAccessGen.wsplit_var. cbn match.
+    apply goodmb_returnm.
+  Qed.
+
+End GmCheckedMemWriteSplit.
+
+Section GmMemWriteEaSplit.
+  Context (Dr Dw : register -> bool).
+  Context (acc : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
+          (ep : Privilege).
+  Context (pa : mword 64) (width bytes : Z) (N : nat) (wk : write_kind) (s : mstate).
+  Context (mm : PtBytes.pamap).
+  Context (HN : (1 <= N)%nat).
+
+  Notation n := (Z.of_nat N).
+  Notation cpa k := (Physaddr (add_vec_int pa (Z.of_nat k * bytes))).
+
+  Hypothesis Hpmp : forall k, (k < N)%nat ->
+    exec (pmpCheck (cpa k) bytes acc ep) s = Some (None, s).
+  Hypothesis Hpmpg : forall k, (k < N)%nat ->
+    goodmb Dr Dw (pmpCheck (cpa k) bytes acc ep) s mm = true.
+
+  Lemma goodmb_mem_write_ea_split (plan : Phys_Mem_Access_Info) :
+    Dr mstatus = true -> Dr cur_privilege = true ->
+    goodmb Dr Dw (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+            (register_lookup cur_privilege s.(sregs))) s mm = true ->
+    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+            (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+    goodmb Dr Dw (check_pma_with_pmp_priority acc pbmt ep (Physaddr pa) width false)
+      s mm = true ->
+    exec (check_pma_with_pmp_priority acc pbmt ep (Physaddr pa) width false) s
+      = Some (Ok plan, s) ->
+    goodmb Dr Dw (split_misaligned (Physaddr pa) width
+            (Phys_Mem_Access_Info_granule_size_exp plan)
+            (Phys_Mem_Access_Info_splittable plan)) s mm = true ->
+    exec (split_misaligned (Physaddr pa) width
+            (Phys_Mem_Access_Info_granule_size_exp plan)
+            (Phys_Mem_Access_Info_splittable plan)) s = Some ((n, bytes), s) ->
+    goodmb Dr Dw (write_kind_of_flags false false false) s mm = true ->
+    exec (write_kind_of_flags false false false) s = Some (wk, s) ->
+    goodmb Dr Dw (mem_write_ea (Physaddr pa) width acc pbmt false false false) s mm
+      = true.
+  Proof.
+    intros HDm HDc Heffg Heff Hpacg Hpac Hsplitg Hsplit Hwkfg Hwkf.
+    assert (Hmst : goodmb Dr Dw (Defs.read_reg mstatus : M _) s mm = true)
+      by (rewrite goodmb_read_reg; exact HDm).
+    assert (Hcpr : goodmb Dr Dw (Defs.read_reg cur_privilege : M _) s mm = true)
+      by (rewrite goodmb_read_reg; exact HDc).
+    unfold mem_write_ea. apply goodmb_cer.
+    gmm_lift Hmst (exec_read_reg mstatus s). cbn beta.
+    gmm_lift Hcpr (exec_read_reg cur_privilege s). cbn beta.
+    gmm_lift Heffg Heff. cbn beta.
+    gmm_lift Hpacg Hpac. cbn beta. cbn match.
+    erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    cbn match beta.
+    gmm_lift Hsplitg Hsplit. cbn beta zeta match.
+    rewrite misaligned_order_split. cbn zeta.
+    gmm_lift Hwkfg Hwkf. cbn beta.
+    match goal with
+    | |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+        assert (Hu : execR (Defs.untilMT vs m0 c bb) s
+                     = Some (inr (MemAccessGen.eavar N N), s));
+        [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ]
+    end.
+    { rewrite <- (MemAccessGen.eavar0 N HN).
+      unfold Defs.untilMT.
+      match goal with
+      | |- execR (Defs.untilMT' ?L _ ?c ?b _) _ = _ =>
+          set (LL := L); set (CC := c); set (BB := b)
+      end.
+      assert (HL : LL = n)
+        by (unfold LL; rewrite (MemAccessGen.eavar0 N HN); reflexivity).
+      clearbody LL. rewrite HL.
+      apply (MemAccessGen.execR_untilMT'_chain CC BB N (MemAccessGen.eavar N)
+               (fun _ => s) n).
+      - exact HN.
+      - lia.
+      - intros k Hk. unfold BB, MemAccessGen.eavar.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hpmp k Hk)). cbn match.
+        gm_ret_bind0.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match zeta;
+          rewrite execR_returnR_fwd; do 3 f_equal; unfold MemAccessGen.eavar.
+        + apply Z.eqb_eq in Eq.
+          replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+          replace (Nat.min (S k) (N - 1)) with k by lia. reflexivity.
+        + apply Z.eqb_neq in Eq.
+          replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+          replace (Nat.min (S k) (N - 1)) with (S k) by lia.
+          replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+      - intros k Hk. unfold CC, MemAccessGen.eavar. cbn match.
+        replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        apply execR_returnR_fwd.
+      - unfold CC, MemAccessGen.eavar. cbn match. rewrite Nat.eqb_refl.
+        apply execR_returnR_fwd. }
+    { rewrite <- (MemAccessGen.eavar0 N HN).
+      unfold Defs.untilMT.
+      match goal with
+      | |- goodmb _ _ (Defs.untilMT' ?L _ ?c ?b _) _ _ = _ =>
+          set (LL := L); set (CC := c); set (BB := b)
+      end.
+      assert (HL : LL = n)
+        by (unfold LL; rewrite (MemAccessGen.eavar0 N HN); reflexivity).
+      clearbody LL. rewrite HL.
+      apply (gm_untilMT'_chain Dr Dw CC BB mm N (MemAccessGen.eavar N) (fun _ => s) n).
+      - exact HN.
+      - lia.
+      - intros k Hk. unfold BB, MemAccessGen.eavar.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        gmm_liftT ltac:(apply goodmb_assert_exp'_true)
+                  ltac:(apply exec_assert_exp'_true). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        gmm_lift (Hpmpg k Hk) (Hpmp k Hk). cbn match.
+        gm_ret_bind0.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match zeta;
+          apply goodmb_returnm.
+      - intros k Hk. unfold BB, MemAccessGen.eavar.
+        replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        replace (Nat.min k (N - 1)) with k by lia.
+        cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+        change (bits_of_physaddr (Physaddr pa)) with pa.
+        rewrite (execR_liftR_seq _ _ _ _ _ (Hpmp k Hk)). cbn match.
+        gm_ret_bind0.
+        destruct (Z.eqb (Z.of_nat k) (n - 1)) eqn:Eq; cbn match zeta;
+          rewrite execR_returnR_fwd; do 3 f_equal; unfold MemAccessGen.eavar.
+        + apply Z.eqb_eq in Eq.
+          replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+          replace (Nat.min (S k) (N - 1)) with k by lia. reflexivity.
+        + apply Z.eqb_neq in Eq.
+          replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+          replace (Nat.min (S k) (N - 1)) with (S k) by lia.
+          replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+      - intros k Hk. unfold CC, MemAccessGen.eavar. cbn match.
+        apply goodmb_returnm.
+      - intros k Hk. unfold CC, MemAccessGen.eavar. cbn match.
+        replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        apply execR_returnR_fwd.
+      - unfold CC, MemAccessGen.eavar. cbn match. rewrite Nat.eqb_refl.
+        apply execR_returnR_fwd. }
+    erewrite (gm_bindR Dr Dw _ _ s s mm (MemAccessGen.eavar N N) Hug Hu).
+    cbn beta zeta. unfold MemAccessGen.eavar. cbn match.
+    apply goodmb_returnm.
+  Qed.
+
+End GmMemWriteEaSplit.
+
+Lemma goodmb_mem_write_value_of_checked_plain (Dr Dw : register -> bool)
+    (acc : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
+    (pa : mword 64) (width : Z) (dat : mword (8 * width)) (b : bool)
+    (ep : Privilege) s s' mm :
+  Dr mstatus = true -> Dr cur_privilege = true ->
+  goodmb Dr Dw (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s mm = true ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  goodmb Dr Dw (checked_mem_write (Physaddr pa) width dat acc pbmt ep default_meta
+                  false false false) s mm = true ->
+  exec (checked_mem_write (Physaddr pa) width dat acc pbmt ep default_meta
+          false false false) s = Some (Ok b, s') ->
+  goodmb Dr Dw (mem_write_value (Physaddr pa) width dat acc pbmt false false false)
+    s mm = true.
+Proof.
+  intros HDm HDc Heffg Heff Hchkg Hchk.
+  assert (Hmst : goodmb Dr Dw (Defs.read_reg mstatus : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HDm).
+  assert (Hcpr : goodmb Dr Dw (Defs.read_reg cur_privilege : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HDc).
+  unfold mem_write_value, mem_write_value_meta.
+  gmm_peel Hmst (exec_read_reg mstatus s).
+  gmm_peel Hcpr (exec_read_reg cur_privilege s).
+  gmm_peel Heffg Heff.
+  unfold mem_write_value_priv_meta.
+  gmm_peel Hchkg Hchk. cbn match.
+  unfold mem_write_callback. apply goodmb_returnm.
+Qed.
+
+Lemma bytes_owned_of_spec (mm : PtBytes.pamap) (pa : Arch.pa) (n : N) :
+  (forall j : nat, (N.of_nat j < n)%N -> is_Some (mm !! RiscvModelBytes.pa_add pa j)) ->
+  bytes_owned mm pa n = true.
+Proof.
+  intros H. unfold bytes_owned. apply List.forallb_forall. intros j Hin.
+  apply List.in_seq in Hin. apply bool_decide_eq_true_2. apply H. lia.
+Qed.
+
+Lemma bytes_owned_chunk (mm : PtBytes.pamap) (pa : mword 64) (W bytes : Z) (N k : nat) :
+  0 < bytes -> Z.of_nat N * bytes = W -> (k < N)%nat ->
+  bytes_owned mm pa (Z.to_N W) = true ->
+  bytes_owned mm (add_vec_int pa (Z.of_nat k * bytes)) (Z.to_N bytes) = true.
+Proof.
+  intros Hb Hw Hk Hown.
+  assert (HbN : Z.to_nat W = (N * Z.to_nat bytes)%nat).
+  { rewrite <- Hw. rewrite Z2Nat.inj_mul; [| lia | lia]. rewrite Nat2Z.id. reflexivity. }
+  apply bytes_owned_of_spec. intros j Hj.
+  rewrite (pa_add_chunk pa k bytes ltac:(lia)). rewrite pa_add_bump2.
+  apply (bytes_owned_spec mm pa (Z.to_N W) Hown).
+  assert (Hjn : (j < Z.to_nat bytes)%nat) by lia.
+  assert (Hlt : (k * Z.to_nat bytes + j < Z.to_nat W)%nat) by (rewrite HbN; nia).
+  lia.
+Qed.
+
+Lemma exec_bind_assert_false {X} (msg : string) (f : false = true -> M X) s :
+  exec (Defs.bind (Defs.assert_exp' false msg) f) s = None.
+Proof. reflexivity. Qed.
+
+Lemma goodmb_assert_seq_of_exec (Dr Dw : register -> bool) {X}
+    (b : bool) (msg : string) (f : b = true -> M X) s mm r s' :
+  exec (Defs.bind (Defs.assert_exp' b msg) f) s = Some (r, s') ->
+  (forall e : b = true, goodmb Dr Dw (f e) s mm = true) ->
+  goodmb Dr Dw (Defs.bind (Defs.assert_exp' b msg) f) s mm = true.
+Proof.
+  intros He Hf. destruct b.
+  - erewrite gm_bind;
+      [ | apply goodmb_assert_exp'_true | apply exec_assert_exp'_true ].
+    apply Hf.
+  - rewrite exec_bind_assert_false in He. discriminate He.
+Qed.
+
+Lemma goodmb_split_misaligned_of_exec (Dr Dw : register -> bool)
+    (paddr : physaddr) (width awe : Z) (sp : Splittability) s mm r s' :
+  exec (split_misaligned paddr width awe sp) s = Some (r, s') ->
+  goodmb Dr Dw (split_misaligned paddr width awe sp) s mm = true.
+Proof.
+  destruct paddr as [addr]. intros He.
+  unfold split_misaligned in He |- *. cbn zeta in He |- *.
+  destruct (orb (generic_eq sp CannotSplit)
+              (orb (Z.eqb (Z.rem (uint addr) width) 0)
+                 (allowed_misaligned (subrange_vec_dec addr (Z.sub xlen 1) 0)
+                    width awe))) eqn:E.
+  - apply goodmb_returnm.
+  - unfold sys_misaligned_byte_by_byte in He |- *. cbn match in He |- *.
+    unfold split_access in He |- *. cbn zeta in He |- *.
+    eapply goodmb_assert_seq_of_exec; [ exact He | intros; apply goodmb_returnm ].
+Qed.
+
 Section MisPhys.
   Context (pa : mword 64) (W : Z) (s : mstate).
   Context (HWpos : 0 < W) (HWle : W <= 8).
@@ -793,6 +1478,49 @@ Section MisPhys.
     reflexivity.
   Qed.
 
+  Local Lemma chunk_range (bytes : Z) (N k : nat) :
+    0 < bytes -> bytes <= 8 -> uint (to_bits 64 bytes) = bytes ->
+    Z.of_nat N * bytes = W -> (k < N)%nat ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+      (uint (add_vec_int pa (Z.of_nat k * bytes))) (uint (to_bits 64 bytes)) = PMP_Match.
+  Proof.
+    intros Hb Hb8 Hbu Hw Hk.
+    assert (Hlast : (Z.to_nat bytes - 1 < Z.to_nat bytes)%nat) by lia.
+    assert (Hr0 : addr_is_ram (add_vec_int pa (Z.of_nat k * bytes))).
+    { rewrite <- (pa_add_0 (add_vec_int pa (Z.of_nat k * bytes))).
+      exact (chunk_ram bytes N k 0%nat Hb Hw Hk ltac:(lia)). }
+    assert (HrL : addr_is_ram (pa_add (add_vec_int pa (Z.of_nat k * bytes))
+                                 (Z.to_nat bytes - 1)))
+      by exact (chunk_ram bytes N k (Z.to_nat bytes - 1)%nat Hb Hw Hk Hlast).
+    exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hb Hb8 Hbu
+             ltac:(lia) Hr0 HrL Hcovp).
+  Qed.
+
+  Local Lemma chunk_clint (bytes : Z) (N k : nat) :
+    0 < bytes -> Z.of_nat N * bytes = W -> (k < N)%nat -> forall (t : mstate),
+    exec (within_clint (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes) t
+      = Some (false, t).
+  Proof.
+    intros Hb Hw Hk t.
+    assert (Hr0 : addr_is_ram (add_vec_int pa (Z.of_nat k * bytes))).
+    { rewrite <- (pa_add_0 (add_vec_int pa (Z.of_nat k * bytes))).
+      exact (chunk_ram bytes N k 0%nat Hb Hw Hk ltac:(lia)). }
+    exact (within_clint_false _ bytes t (addr_is_ram_not_in_clint _ Hr0) Hb).
+  Qed.
+
+  Local Lemma chunk_sig (bytes : Z) (N k : nat) :
+    0 < bytes -> Z.of_nat N * bytes = W -> (k < N)%nat -> forall (t : mstate),
+    exec (within_sig (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes) t
+      = Some (false, t).
+  Proof.
+    intros Hb Hw Hk t.
+    assert (Hr0 : addr_is_ram (add_vec_int pa (Z.of_nat k * bytes))).
+    { rewrite <- (pa_add_0 (add_vec_int pa (Z.of_nat k * bytes))).
+      exact (chunk_ram bytes N k 0%nat Hb Hw Hk ltac:(lia)). }
+    exact (within_sig_false _ bytes t (addr_is_ram_not_in_sig _ Hr0) Hb).
+  Qed.
+
 
   (* ---- the misaligned in-page READ, at the full width ---- *)
   Lemma exec_mem_read_mis_U :
@@ -862,6 +1590,127 @@ Section MisPhys.
     exact (exec_mem_read_of_checked_plain (Load Data) PBMT_PMA pa W _ User s Heff Hchk).
   Qed.
 
+  Lemma goodmb_mem_read_mis_U (Dr Dw : register -> bool) mm :
+    Dr mstatus = true -> Dr cur_privilege = true ->
+    Dr pmpcfg_n = true -> Dr pmpaddr_n = true ->
+    Dr pma_regions = true -> Dr htif_tohost_base = true ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+    register_lookup cur_privilege s.(sregs) = User ->
+    eq_vec (_get_Pmpcfg_ent_R
+              (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+    (forall j : nat, (j < Z.to_nat W)%nat -> is_Some (s.(mem) !! pa_add pa j)) ->
+    bytes_owned mm pa (Z.to_N W) = true ->
+    goodmb Dr Dw (mem_read (Load Data) PBMT_PMA (Physaddr pa) W false false false)
+      s mm = true.
+  Proof.
+    intros HDm HDcp HDc HDa HDp HDh Hmprv Hcp HRp Hpres Hown.
+    pose proof HWpos as Hpos. pose proof HWle as Hle.
+    assert (Hr0 : addr_is_ram pa).
+    { rewrite <- (pa_add_0 pa). apply Hwin. lia. }
+    assert (HrL : addr_is_ram (pa_add pa (Z.to_nat W - 1))) by (apply Hwin; lia).
+    destruct (pma_all_ram Hall pa W
+                (pma_access_ram_at pa W (Z.to_nat W - 1)%nat ltac:(lia) Hr0 HrL
+                   (pma_width_le W 8 Hpos Hle eq_refl)))
+      as (region & Hpmam & _ & Hrd & _ & _ & _ & _ & Hmisx & _).
+    destruct (exec_pmaCheck_ram_load_plan W pa PBMT_PMA region s Hpmam Hrd Hmisx)
+      as (plan & Hpma).
+    pose proof (goodmb_pmaCheck_ram_load_plan Dr Dw W pa PBMT_PMA region s mm
+                  HDp Hpmam Hrd Hmisx) as Hpmag.
+    assert (Hcpp : exec (check_pma_with_pmp_priority (Load Data) PBMT_PMA User
+                           (Physaddr pa) W false) s = Some (Ok plan, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
+    pose proof (goodmb_check_pma_with_pmp_priority Dr Dw (Load Data) PBMT_PMA User
+                  (Physaddr pa) W false plan s mm Hpmag Hpma) as Hcppg.
+    destruct (split_misaligned_phys_derive W pa
+                (Phys_Mem_Access_Info_granule_size_exp plan)
+                (Phys_Mem_Access_Info_splittable plan) s HWpos HWle)
+      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbuint & Hsplit).
+    pose proof (goodmb_split_misaligned_of_exec Dr Dw (Physaddr pa) W
+                  (Phys_Mem_Access_Info_granule_size_exp plan)
+                  (Phys_Mem_Access_Info_splittable plan) s mm _ _ Hsplit) as Hsplitg.
+    assert (Hb8 : bytes <= 8) by lia.
+    assert (Hrange : forall k, (k < N)%nat ->
+              pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+                (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+                (uint (add_vec_int pa (Z.of_nat k * bytes))) (uint (to_bits 64 bytes))
+              = PMP_Match)
+      by (intros k Hk; exact (chunk_range bytes N k Hbpos Hb8 Hbuint Hwidth Hk)).
+    assert (Hpmp : forall k, (k < N)%nat ->
+              exec (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
+                      (Load Data) User) s = Some (None, s))
+      by (intros k Hk;
+          exact (exec_pmpCheck_user_grant_load _ bytes s HA Hord (Hrange k Hk) HRp)).
+    assert (Hpmpg : forall k, (k < N)%nat ->
+              goodmb Dr Dw (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes)))
+                              bytes (Load Data) User) s mm = true)
+      by (intros k Hk;
+          exact (goodmb_pmpCheck_user_grant_load Dr Dw _ bytes s mm HDc HDa HA Hord
+                   (Hrange k Hk) HRp)).
+    assert (Hmmio : forall k, (k < N)%nat ->
+              exec (within_mmio_readable
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes) s
+              = Some (false, s)).
+    { intros k Hk. unfold within_mmio_readable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ (chunk_clint bytes N k Hbpos Hwidth Hk s)).
+      cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ (chunk_sig bytes N k Hbpos Hwidth Hk s)).
+      cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ (within_htif_false _ bytes s Hhtif)).
+      cbn match. reflexivity. }
+    assert (Hmmiog : forall k, (k < N)%nat ->
+              goodmb Dr Dw (within_mmio_readable
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes) s mm = true)
+      by (intros k Hk;
+          exact (goodmb_within_mmio_readable Dr Dw _ bytes s mm HDh Hhtif
+                   (chunk_clint bytes N k Hbpos Hwidth Hk s)
+                   (chunk_sig bytes N k Hbpos Hwidth Hk s))).
+    assert (Hdevk : forall k, (k < N)%nat ->
+              dev_addr (add_vec_int pa (Z.of_nat k * bytes)) = false).
+    { intros k Hk. apply addr_is_ram_not_dev.
+      rewrite <- (pa_add_0 (add_vec_int pa (Z.of_nat k * bytes))).
+      exact (chunk_ram bytes N k 0%nat Hbpos Hwidth Hk ltac:(lia)). }
+    assert (Hramc : forall k, (k < N)%nat ->
+              exec (read_ram Read_plain
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes false) s
+              = Some ((ram_chunk Read_plain (add_vec_int pa (Z.of_nat k * bytes))
+                         bytes false s, tt), s)).
+    { intros k Hk. apply exec_read_ram_chunk.
+      apply exec_read_ram_plain_gen.
+      - exact (Hdevk k Hk).
+      - apply read_bytes_is_Some. intros j Hj.
+        rewrite (pa_add_chunk pa k bytes ltac:(lia)). rewrite pa_add_bump2.
+        apply Hpres. exact (chunk_off bytes N k j Hbpos Hwidth Hk ltac:(lia)). }
+    assert (Hramcg : forall k, (k < N)%nat ->
+              goodmb Dr Dw (read_ram Read_plain
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes false)
+                s mm = true).
+    { intros k Hk.
+      exact (goodmb_read_ram_of_exec Dr Dw Read_plain bytes
+               (add_vec_int pa (Z.of_nat k * bytes)) false _ s s mm eq_refl
+               (Hdevk k Hk)
+               (bytes_owned_chunk mm pa W bytes N k Hbpos Hwidth Hk Hown)
+               (Hramc k Hk)). }
+    assert (Hrkf : exec (read_kind_of_flags false false false) s
+                   = Some (rv64d_types.Read_plain, s))
+      by (unfold read_kind_of_flags; apply exec_returnM).
+    assert (Hrkg : goodmb Dr Dw (read_kind_of_flags false false false) s mm = true)
+      by (unfold read_kind_of_flags; apply goodmb_returnm).
+    pose proof (exec_checked_mem_read_split (Load Data) PBMT_PMA User pa W bytes N
+                  false false false false Read_plain
+                  (fun k => ram_chunk Read_plain (add_vec_int pa (Z.of_nat k * bytes))
+                              bytes false s) s HN Hpmp Hmmio Hramc plan Hcpp Hsplit
+                  Hrkf) as Hchk.
+    pose proof (goodmb_checked_mem_read_split Dr Dw (Load Data) PBMT_PMA User pa W
+                  bytes N false false false false Read_plain
+                  (fun k => ram_chunk Read_plain (add_vec_int pa (Z.of_nat k * bytes))
+                              bytes false s) s mm HN
+                  Hpmp Hpmpg Hmmio Hmmiog Hramc Hramcg plan
+                  Hcppg Hcpp Hsplitg Hsplit Hrkg Hrkf) as Hchkg.
+    exact (goodmb_mem_read_data_U Dr Dw W PBMT_PMA pa _ s mm
+             HDm HDcp Hmprv Hcp Hchkg Hchk).
+  Qed.
+
   (* ---- the misaligned in-page effective-address announcement ---- *)
   Lemma exec_mem_write_ea_mis_U :
     eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
@@ -904,6 +1753,78 @@ Section MisPhys.
     exact (exec_mem_write_ea_split (Store Data) PBMT_PMA User pa W bytes N
              rv64d_types.Write_plain s HN Hpmp plan Heff Hcpp Hsplit
              ltac:(unfold write_kind_of_flags; cbn match; apply exec_returnM)).
+  Qed.
+
+  Lemma goodmb_mem_write_ea_mis_U (Dr Dw : register -> bool) mm :
+    Dr mstatus = true -> Dr cur_privilege = true ->
+    Dr pmpcfg_n = true -> Dr pmpaddr_n = true -> Dr pma_regions = true ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+    register_lookup cur_privilege s.(sregs) = User ->
+    eq_vec (_get_Pmpcfg_ent_W
+              (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+    goodmb Dr Dw (mem_write_ea (Physaddr pa) W (Store Data) PBMT_PMA false false false)
+      s mm = true.
+  Proof.
+    intros HDm HDcp HDc HDa HDp Hmprv Hcp HWp.
+    pose proof HWpos as Hpos. pose proof HWle as Hle.
+    assert (Hr0 : addr_is_ram pa).
+    { rewrite <- (pa_add_0 pa). apply Hwin. lia. }
+    assert (HrL : addr_is_ram (pa_add pa (Z.to_nat W - 1))) by (apply Hwin; lia).
+    destruct (pma_all_ram Hall pa W
+                (pma_access_ram_at pa W (Z.to_nat W - 1)%nat ltac:(lia) Hr0 HrL
+                   (pma_width_le W 8 Hpos Hle eq_refl)))
+      as (region & Hpmam & _ & _ & Hwr & _ & _ & _ & Hmisx & _).
+    destruct (exec_pmaCheck_ram_store_plan W pa PBMT_PMA region s Hpmam Hwr Hmisx)
+      as (plan & Hpma).
+    pose proof (goodmb_pmaCheck_ram_store_plan Dr Dw W pa PBMT_PMA region s mm
+                  HDp Hpmam Hwr Hmisx) as Hpmag.
+    assert (Hcpp : exec (check_pma_with_pmp_priority (Store Data) PBMT_PMA User
+                           (Physaddr pa) W false) s = Some (Ok plan, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
+    pose proof (goodmb_check_pma_with_pmp_priority Dr Dw (Store Data) PBMT_PMA User
+                  (Physaddr pa) W false plan s mm Hpmag Hpma) as Hcppg.
+    destruct (split_misaligned_phys_derive W pa
+                (Phys_Mem_Access_Info_granule_size_exp plan)
+                (Phys_Mem_Access_Info_splittable plan) s HWpos HWle)
+      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbuint & Hsplit).
+    pose proof (goodmb_split_misaligned_of_exec Dr Dw (Physaddr pa) W
+                  (Phys_Mem_Access_Info_granule_size_exp plan)
+                  (Phys_Mem_Access_Info_splittable plan) s mm _ _ Hsplit) as Hsplitg.
+    assert (Hb8 : bytes <= 8) by lia.
+    assert (Hrange : forall k, (k < N)%nat ->
+              pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+                (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+                (uint (add_vec_int pa (Z.of_nat k * bytes))) (uint (to_bits 64 bytes))
+              = PMP_Match)
+      by (intros k Hk; exact (chunk_range bytes N k Hbpos Hb8 Hbuint Hwidth Hk)).
+    assert (Hpmp : forall k, (k < N)%nat ->
+              exec (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
+                      (Store Data) User) s = Some (None, s))
+      by (intros k Hk;
+          exact (exec_pmpCheck_user_grant_store _ bytes s HA Hord (Hrange k Hk) HWp)).
+    assert (Hpmpg : forall k, (k < N)%nat ->
+              goodmb Dr Dw (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes)))
+                              bytes (Store Data) User) s mm = true)
+      by (intros k Hk;
+          exact (goodmb_pmpCheck_user_grant_store Dr Dw _ bytes s mm HDc HDa HA Hord
+                   (Hrange k Hk) HWp)).
+    assert (Heff : exec (effectivePrivilege (Store Data)
+                           (register_lookup mstatus s.(sregs))
+                           (register_lookup cur_privilege s.(sregs))) s = Some (User, s)).
+    { rewrite <- Hcp. apply exec_effectivePrivilege_mprv0. exact Hmprv. }
+    assert (Heffg : goodmb Dr Dw (effectivePrivilege (Store Data)
+                           (register_lookup mstatus s.(sregs))
+                           (register_lookup cur_privilege s.(sregs))) s mm = true)
+      by (apply goodmb_effectivePrivilege_mprv0; exact Hmprv).
+    assert (Hwkf : exec (write_kind_of_flags false false false) s
+                   = Some (rv64d_types.Write_plain, s))
+      by (unfold write_kind_of_flags; cbn match; apply exec_returnM).
+    assert (Hwkg : goodmb Dr Dw (write_kind_of_flags false false false) s mm = true)
+      by (unfold write_kind_of_flags; cbn match; apply goodmb_returnm).
+    exact (goodmb_mem_write_ea_split Dr Dw (Store Data) PBMT_PMA User pa W bytes N
+             rv64d_types.Write_plain s mm HN Hpmp Hpmpg plan
+             HDm HDcp Heffg Heff Hcppg Hcpp Hsplitg Hsplit Hwkg Hwkf).
   Qed.
 
 
@@ -1053,6 +1974,153 @@ Section MisPhys.
     rewrite (ws_seq_all_true N) in Hchk.
     exact (exec_mem_write_value_of_checked_plain (Store Data) PBMT_PMA pa W dat true
              User s _ Heff Hchk).
+  Qed.
+
+  Lemma goodmb_mem_write_value_mis_U (Dr Dw : register -> bool)
+      (dat : mword (8 * W)) mm :
+    Dr mstatus = true -> Dr cur_privilege = true ->
+    Dr pmpcfg_n = true -> Dr pmpaddr_n = true ->
+    Dr pma_regions = true -> Dr htif_tohost_base = true ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+    register_lookup cur_privilege s.(sregs) = User ->
+    eq_vec (_get_Pmpcfg_ent_W
+              (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+    bytes_owned mm pa (Z.to_N W) = true ->
+    goodmb Dr Dw (mem_write_value (Physaddr pa) W dat (Store Data) PBMT_PMA
+                    false false false) s mm = true.
+  Proof.
+    intros HDm HDcp HDc HDa HDp HDh Hmprv Hcp HWp Hown.
+    pose proof HWpos as Hpos. pose proof HWle as Hle.
+    assert (Hr0 : addr_is_ram pa).
+    { rewrite <- (pa_add_0 pa). apply Hwin. lia. }
+    assert (HrL : addr_is_ram (pa_add pa (Z.to_nat W - 1))) by (apply Hwin; lia).
+    destruct (pma_all_ram Hall pa W
+                (pma_access_ram_at pa W (Z.to_nat W - 1)%nat ltac:(lia) Hr0 HrL
+                   (pma_width_le W 8 Hpos Hle eq_refl)))
+      as (region & Hpmam & _ & _ & Hwr & _ & _ & _ & Hmisx & _).
+    destruct (exec_pmaCheck_ram_store_plan W pa PBMT_PMA region s Hpmam Hwr Hmisx)
+      as (plan & Hpma).
+    pose proof (goodmb_pmaCheck_ram_store_plan Dr Dw W pa PBMT_PMA region s mm
+                  HDp Hpmam Hwr Hmisx) as Hpmag.
+    assert (Hcpp : exec (check_pma_with_pmp_priority (Store Data) PBMT_PMA User
+                           (Physaddr pa) W false) s = Some (Ok plan, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
+    pose proof (goodmb_check_pma_with_pmp_priority Dr Dw (Store Data) PBMT_PMA User
+                  (Physaddr pa) W false plan s mm Hpmag Hpma) as Hcppg.
+    destruct (split_misaligned_phys_derive W pa
+                (Phys_Mem_Access_Info_granule_size_exp plan)
+                (Phys_Mem_Access_Info_splittable plan) s HWpos HWle)
+      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbuint & Hsplit).
+    pose proof (goodmb_split_misaligned_of_exec Dr Dw (Physaddr pa) W
+                  (Phys_Mem_Access_Info_granule_size_exp plan)
+                  (Phys_Mem_Access_Info_splittable plan) s mm _ _ Hsplit) as Hsplitg.
+    assert (Hb8 : bytes <= 8) by lia.
+    assert (Hdevk : forall k, (k < N)%nat ->
+              dev_addr (add_vec_int pa (Z.of_nat k * bytes)) = false).
+    { intros k Hk. apply addr_is_ram_not_dev.
+      rewrite <- (pa_add_0 (add_vec_int pa (Z.of_nat k * bytes))).
+      exact (chunk_ram bytes N k 0%nat Hbpos Hwidth Hk ltac:(lia)). }
+    assert (Hregs : forall k, (k <= N)%nat ->
+              (wchain bytes dat k).(sregs) = s.(sregs))
+      by (intros k Hk;
+          exact (proj1 (wchain_regs bytes N dat Hbpos Hwidth k Hk))).
+    assert (Hrange : forall k, (k < N)%nat ->
+              pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+                (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+                (uint (add_vec_int pa (Z.of_nat k * bytes))) (uint (to_bits 64 bytes))
+              = PMP_Match)
+      by (intros k Hk; exact (chunk_range bytes N k Hbpos Hb8 Hbuint Hwidth Hk)).
+    assert (Hpmp : forall k, (k < N)%nat ->
+              exec (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
+                      (Store Data) User) (wchain bytes dat k)
+              = Some (None, wchain bytes dat k)).
+    { intros k Hk.
+      apply (exec_pmpCheck_user_grant_store _ bytes _).
+      - rewrite (Hregs k ltac:(lia)). exact HA.
+      - rewrite (Hregs k ltac:(lia)). exact Hord.
+      - rewrite (Hregs k ltac:(lia)). exact (Hrange k Hk).
+      - rewrite (Hregs k ltac:(lia)). exact HWp. }
+    assert (Hpmpg : forall k, (k < N)%nat ->
+              goodmb Dr Dw (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes)))
+                      bytes (Store Data) User) (wchain bytes dat k) mm = true).
+    { intros k Hk.
+      apply (goodmb_pmpCheck_user_grant_store Dr Dw _ bytes _ mm HDc HDa).
+      - rewrite (Hregs k ltac:(lia)). exact HA.
+      - rewrite (Hregs k ltac:(lia)). exact Hord.
+      - rewrite (Hregs k ltac:(lia)). exact (Hrange k Hk).
+      - rewrite (Hregs k ltac:(lia)). exact HWp. }
+    assert (Hh : forall k, (k <= N)%nat ->
+              register_lookup htif_tohost_base (wchain bytes dat k).(sregs) = None)
+      by (intros k Hk; rewrite (Hregs k Hk); exact Hhtif).
+    assert (Hmmio : forall k, (k < N)%nat ->
+              exec (within_mmio_writable
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes)
+                (wchain bytes dat k) = Some (false, wchain bytes dat k)).
+    { intros k Hk. unfold within_mmio_writable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _
+                 (chunk_clint bytes N k Hbpos Hwidth Hk (wchain bytes dat k))).
+      cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _
+                 (chunk_sig bytes N k Hbpos Hwidth Hk (wchain bytes dat k))).
+      cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _
+                 (within_htif_false _ bytes (wchain bytes dat k)
+                    (Hh k ltac:(lia)))).
+      cbn match. reflexivity. }
+    assert (Hmmiog : forall k, (k < N)%nat ->
+              goodmb Dr Dw (within_mmio_writable
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes)
+                (wchain bytes dat k) mm = true)
+      by (intros k Hk;
+          exact (goodmb_within_mmio_writable Dr Dw _ bytes (wchain bytes dat k) mm
+                   HDh (Hh k ltac:(lia))
+                   (chunk_clint bytes N k Hbpos Hwidth Hk (wchain bytes dat k))
+                   (chunk_sig bytes N k Hbpos Hwidth Hk (wchain bytes dat k)))).
+    assert (Hwram : forall k, (k < N)%nat ->
+              exec (write_ram rv64d_types.Write_plain
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
+                      (MemAccessGen.wvc W bytes dat k) tt) (wchain bytes dat k)
+              = Some (true, wchain bytes dat (S k))).
+    { intros k Hk.
+      destruct (exec_write_ram_plain_gen bytes (add_vec_int pa (Z.of_nat k * bytes))
+                  (MemAccessGen.wvc W bytes dat k) (wchain bytes dat k)
+                  (Hdevk k Hk)) as (nn & v & Hwr2).
+      cbn [wchain]. rewrite Hwr2. reflexivity. }
+    assert (Hwramg : forall k, (k < N)%nat ->
+              goodmb Dr Dw (write_ram rv64d_types.Write_plain
+                      (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
+                      (MemAccessGen.wvc W bytes dat k) tt) (wchain bytes dat k) mm
+              = true)
+      by (intros k Hk;
+          exact (goodmb_write_ram Dr Dw rv64d_types.Write_plain bytes
+                   (add_vec_int pa (Z.of_nat k * bytes))
+                   (MemAccessGen.wvc W bytes dat k) (wchain bytes dat k) mm
+                   eq_refl (Hdevk k Hk)
+                   (bytes_owned_chunk mm pa W bytes N k Hbpos Hwidth Hk Hown))).
+    assert (Heff : exec (effectivePrivilege (Store Data)
+                           (register_lookup mstatus s.(sregs))
+                           (register_lookup cur_privilege s.(sregs))) s = Some (User, s)).
+    { rewrite <- Hcp. apply exec_effectivePrivilege_mprv0. exact Hmprv. }
+    assert (Heffg : goodmb Dr Dw (effectivePrivilege (Store Data)
+                           (register_lookup mstatus s.(sregs))
+                           (register_lookup cur_privilege s.(sregs))) s mm = true)
+      by (apply goodmb_effectivePrivilege_mprv0; exact Hmprv).
+    assert (Hwkf : exec (write_kind_of_flags false false false) s
+                   = Some (rv64d_types.Write_plain, s))
+      by (unfold write_kind_of_flags; cbn match; apply exec_returnM).
+    assert (Hwkg : goodmb Dr Dw (write_kind_of_flags false false false) s mm = true)
+      by (unfold write_kind_of_flags; cbn match; apply goodmb_returnm).
+    pose proof (exec_checked_mem_write_split (Store Data) PBMT_PMA User pa W bytes N
+                  false false false tt rv64d_types.Write_plain dat (fun _ => true)
+                  (wchain bytes dat) HN Hpmp Hmmio Hwram plan Hcpp Hsplit Hwkf) as Hchk.
+    pose proof (goodmb_checked_mem_write_split Dr Dw (Store Data) PBMT_PMA User pa W
+                  bytes N false false false tt rv64d_types.Write_plain dat
+                  (fun _ => true) (wchain bytes dat) mm HN
+                  Hpmp Hpmpg Hmmio Hmmiog Hwram Hwramg plan
+                  Hcppg Hcpp Hsplitg Hsplit Hwkg Hwkf) as Hchkg.
+    exact (goodmb_mem_write_value_of_checked_plain Dr Dw (Store Data) PBMT_PMA pa W
+             dat _ User s _ mm HDm HDcp Heffg Heff Hchkg Hchk).
   Qed.
 
 End MisPhys.
