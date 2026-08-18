@@ -26,15 +26,42 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
   consumer exists) and the one-line staleness fix to `WeakInterp.v`'s
   access-kind table (A/D path is `Read_RISCV_reserved`/
   `Write_RISCV_conditional` post-fork, not `Write_plain`).
-- **W1′ — the premise-free walker analysis** (investigation): does
-  walker-write non-promisability even SUFFICE for `gdep2_acyclic` (the §8
-  cycle's variant with the ORDINARY store `f` promised early and the walk
-  READ late may survive it); if not — or since a machine gate is blocked
-  anyway (no label at `WPPromise`; append-at-fulfil breaks front-loading) —
-  which theorem route closes walker-entry segments: the certification
-  analysis (L2′ treating the walker edges like any early read) or the
-  walker-idempotent exhibit (§12 option (b)), and what each costs.
+- **W1′ — the premise-free walker analysis: DONE (2026-08-18).**  Verdict
+  in layer2 §13's addendum: non-promisability necessary but NOT sufficient
+  (variant B is a real, certifiable machine run — machine-checked probes
+  `fulfil_ok_survives_walk_read`/`fulfil_vext_walk_read` in the
+  walker-analysis scratchpad); the certification route closes NO walker
+  shape; the recommended repair is W-TV (below).  Probe file worth
+  harvesting when W2 lands.
+- **W2a — the §13 gate, front-loading-safe form**: walker-shaped
+  `LExStore` (named AT FULFIL from the reservation + the log's values —
+  the spike's `ad_variant` discriminator, split-adapted) fulfils with
+  release-strength `vpre` (join `w_vrOld ⊔ w_vwOld`).  Yields the TOP
+  fact (its timestamp exceeds everything the agent read/fulfilled before)
+  ⇒ closes every walker-write-EXIT segment; every store stays promisable;
+  `wp_behavior_factor` untouched.  Land the TOP fact as a named Layer-1
+  lemma.  Sequencing: with/after the split's S2 (it is a premise on the
+  new `LExStore` arm).
+- **W2b — W-TV, the missing translation ordering** (closes the
+  walker-read-ENTRY shapes, variant B): bank the instruction's prior read
+  timestamps `w_ldv`-style and join them into every memory-access node's
+  `vaddr` (hence `w_vcap` via the existing `ctrl_post`), dying at
+  `LInstr`.  No discriminator.  BLOCKED ON: W3's audit verdict, then the
+  user's go (it is a model-of-record ordering addition).  If adopted,
+  bundle into the split's S1 (`wstate`/`lstate` opened once).
+- **W3 — the W-TV containment audit** (paper, gates W2b): does the
+  permanent `vcap` raise keep machine ⊇ hardware under RVWMO + the
+  privileged spec's translation-ordering text (and the Sail-following
+  stance)?  Same audit class D-2 already owes.  Includes: the
+  cross-instruction leakage check (`LInstr` reset), AMO-internal ordering,
+  abandoned/faulting translations, LB litmus preservation, and whether
+  `vaddr ⊔= w_ldv` at access nodes is the right implementation.
   **Status: IN FLIGHT (2026-08-18).**
+- **Fallback if W3 fails**: §12 option (b), the walker-idempotent exhibit —
+  priced by W1′ as LARGER than the RMW split (walker READ discriminator =
+  `pcls` state classification or a model fork; non-event-preserving replay
+  re-bases `U_Qinv`/`head_prestate_pf_real`'s `pc_log = pf_log` framing; a
+  new `walk_absorbing` Layer-1 parameter).
 - **S-track — the RMW split** (design:
   [`../design/weak-memory-rmw-split.md`](../design/weak-memory-rmw-split.md),
   user-confirmed; gates D8-2's final shape and the L2 vocabulary):

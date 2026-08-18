@@ -902,12 +902,54 @@ generalized, walker-idempotent exhibit of §12's option (b)).  Two recorded
 obstacles to (i): a `WPPromise`-side gate is impossible (the arm carries no
 label — the discriminator's read value does not exist at promise time), and
 an append-at-fulfil arm breaks `wp_behavior_factor`'s frozen-log phase.
-OPEN (investigation in flight): whether (i) even SUFFICES — the §8 cycle has
-a variant where the early promise is the ORDINARY store `f` (promisable in
-any promise machine) and the unordered thing is the walk READ, so the cycle
-may survive walker-write non-promisability; if so (ii), or a Layer-2 case
-that closes walker-entry segments by the certification analysis, is forced
-regardless.
+ANSWERED (2026-08-18, machine-checked probes — the W1′ investigation):
+**walker-write non-promisability is NECESSARY but NOT SUFFICIENT.**  The
+verdicts that bind the plan:
+
+- A translation-walk read contributes NOTHING to any plain store's fulfil
+  EXT — not the access it translates, not any later store
+  (`fulfil_ok_survives_walk_read`, `fulfil_vext_walk_read`: a walk read is
+  `wak_plain`, moves only `coh[pte]`/`w_vrOld`/`w_ldv`, and a plain store's
+  EXT reads none of them; `w_ldv` dies at `LInstr`; D-8 makes `asrc`
+  syntactic).  So the §8 cycle's VARIANT B — ordinary store `f` promised
+  early, walk read late, walker write append-at-fulfil at the top — is a
+  real machine run, certifiable, and its behavior is robust only with
+  DIFFERENT walker events in the twin.  `gdep2_acyclic` stays false for it.
+- What §13's gate DOES close, premise-free: every segment EXITING at a
+  walker write (the TOP fact — an append-at-fulfil timestamp exceeds every
+  timestamp its agent read or fulfilled po-before).  What stays open:
+  **walk read as segment ENTRY**, exiting at any fulfil not fence-separated
+  from it.  C2–C5 are structurally unavailable there (the walker is never
+  `aq`; syntactic deps cannot see translation; A/D bytes are outside every
+  lock protocol; a PTE word is never owned-unpublished), and the
+  same-instruction instance is provably unclosable by the per-edge
+  interface.
+- **The certification route closes NO walker shape** (there is no promise
+  to certify at the entry; the entry's ancestry runs through the cycle —
+  `bad_min_not_on_cyc`'s obstruction; φ has nothing to say about
+  published-shared PTE bytes).  D8/L2′ remain the route for the OTHER
+  residues; do not aim them at the walker.
+- THE ROUTE FOUND — **W-TV, a missing-ordering repair**: every accepted VM
+  concurrency model orders a translated access after its own
+  translation-table reads (tob / intra-instruction order); our machine
+  simply lacks that edge, which is what makes variant B producible.  Give
+  the access's `vaddr` the banked view of the instruction's prior reads
+  (`w_ldv`-style, dying at `LInstr`), so `ctrl_post` pushes it into
+  `w_vcap` and every later fulfil of the hart exceeds the walk read.  No
+  walker discriminator needed at all.  GATING ITEM: the containment audit
+  (the permanent `vcap` raise is the addr;po-shaped over-approximation D-2
+  already carries — audit it against RVWMO + the privileged spec's
+  translation-ordering text before any code).  Fallback if the audit
+  fails: §12 option (b), the walker-idempotent exhibit — priced as larger
+  than the RMW split, and it would re-base L2-M2's `pc_log = pf_log`
+  replay framing.
+- §13's gate itself is realized WITHOUT breaking front-loading: not a
+  missing promise arm but a FULFIL-SIDE EXT strengthening — a
+  walker-shaped `LExStore` (named at fulfil time from the reservation +
+  the log's values) fulfils with release-strength `vpre` (`w_vrOld ⊔
+  w_vwOld` joined), which yields the TOP fact's consequence while every
+  store stays promisable and `wp_behavior_factor` stands.  This matches
+  the Sail-fidelity reading: the update happens at its program position.
 
 **The RMW split (the user, 2026-08-18): CONFIRMED.**  Layer 1 and the event
 language mirror the reservation design of `main-cycle-port.md` §3a (shape
