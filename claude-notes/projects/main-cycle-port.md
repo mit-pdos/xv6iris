@@ -1703,6 +1703,28 @@ identical is necessary, not sufficient.  Known exposure: 6 files DESTRUCTURE
 each needs the one-line fix `ProofSpin` needed, because `pc_is` now carries
 `minstret_res ∗ clock_res`.
 
+## CHECKPOINT 2026-08-18 (evening) -- where the fan-out stands
+
+Landed, admit-free: reservation semantics+logic; M-mode leaves; S-mode
+translation per node (SRegime fold, KptGoodb certificates,
+`spt_tr_obl_of_regime`); `HartSMem` (mode-generic data engines, AMO with
+existential word); `WpIntrInv.wp_exec_step_intr` + `WpSmodeIntr` funnels
+(b'/ms' generalization in progress; two isolated holes:
+`swp_run_hart_active_instr_S`, `wp_instr_s_sconf_off_clock`, both wired next);
+`SmodeCorePt` wrappers on the `sr_inv R` surface (rider `Rl npc`; the
+tlb-existential post is the pending one-line fix); S-mode leaf sweep A
+(WpSconfAlu/Btype/Ctl, 86 leaves) done, B (WpSconfCsr 6/16, HartSCsr;
+SIE-moving ones wait on b'/ms'; timer via a node seam) in progress, D
+(WpSmodePt*: WpSmodePtEngine SRET engine, WpSmodePtFetch producer face,
+memory half waits on `sr_swp_mode` + the tlb-existential post) in progress,
+C (WpSconfMem/Lock, PLIC, virtio, UART, kvminithart, WFI) NOT started --
+relaunch when D lands WpSmodePtLeaves and drop WpSconfMem's Require of it.
+User tier: P0-P6 done, P3's `u_fetch_pure` assembly in progress (needs
+`goodb_pte_is_invalid` at an abstract word), P4b (classify arms) waits on
+P7's UserTotalU, P7 on UserTotalU/UserStepFull/UserActiveClass §3-5.
+Not started: downstream compile tail (`pc_is` destructuring sites),
+WpUmodeStep tier, GCP full build, push (dozens of local commits).
+
 ## Left, in order
 
 1. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
