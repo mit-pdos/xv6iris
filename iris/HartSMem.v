@@ -2473,3 +2473,151 @@ Section sdevnodes.
   Qed.
 
 End sdevnodes.
+
+(* ====================================================================== *)
+(* 11. THE ENGINES, INSTANTIATED.                                          *)
+(*                                                                        *)
+(* These are what a leaf applies.  Each is the generic engine at one width  *)
+(* and one address class; the statement is the generic one with [Acls],     *)
+(* [Pma], [Mobl]/[Wobl] and the width filled in, so it is read off          *)
+(* [swp_execute_LOAD_S] / [swp_execute_STORE_S] above.                      *)
+(* ====================================================================== *)
+Lemma vmw1 : vmem_width 1. Proof. by left. Qed.
+Lemma vmw2 : vmem_width 2. Proof. right; by left. Qed.
+Lemma vmw4 : vmem_width 4. Proof. right; right; by left. Qed.
+Lemma vmw8 : vmem_width 8. Proof. right; right; by right. Qed.
+
+Lemma dvd1 : (1 | 4096)%Z. Proof. exists 4096. lia. Qed.
+Lemma dvd2 : (2 | 4096)%Z. Proof. exists 2048. lia. Qed.
+Lemma dvd4 : (4 | 4096)%Z. Proof. exists 1024. lia. Qed.
+Lemma dvd8 : (8 | 4096)%Z. Proof. exists 512. lia. Qed.
+
+Lemma uintw1 : uint (to_bits 64 1) = 1. Proof. vm_compute; reflexivity. Qed.
+Lemma uintw2 : uint (to_bits 64 2) = 2. Proof. vm_compute; reflexivity. Qed.
+Lemma uintw4 : uint (to_bits 64 4) = 4. Proof. vm_compute; reflexivity. Qed.
+Lemma uintw8 : uint (to_bits 64 8) = 8. Proof. vm_compute; reflexivity. Qed.
+
+Section instances.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the RAM obligations: the state is handed back UNCHANGED at a read and
+     with exactly the written bytes at a write *)
+  Definition Mobl_ram (width : Z) (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * width)) (R : iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜mem_bytes_at σ pa width bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R))%I.
+
+  Definition Wobl_ram (width : Z) (pa : SailStdpp.Values.mword 64)
+      (v : SailStdpp.Values.mword (8 * width)) (R : iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R))%I.
+
+  (* the DEVICE obligations: the DEVICE state advances, and the value read is
+     the one the device answered *)
+  Definition Mobl_dev1 (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_read σ.(mdev) pa 1 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R))%I.
+
+  Definition Mobl_dev4 (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_read σ.(mdev) pa 4 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R))%I.
+
+  Definition Wobl_dev1 (pa : SailStdpp.Values.mword 64)
+      (v : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_write σ.(mdev) pa 1 v = Some d'⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R))%I.
+
+  Definition Wobl_dev4 (pa : SailStdpp.Values.mword 64)
+      (v : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_write σ.(mdev) pa 4 v = Some d'⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R))%I.
+
+  Local Lemma dev_cls_dev (width : Z) (pa : SailStdpp.Values.mword 64) :
+    dev_cls width pa -> dev_addr pa = true.
+  Proof. by intros (H & _ & _). Qed.
+
+  (* ---- the four RAM LOAD engines ---- *)
+  Definition swp_execute_LOAD_ram_S1 :=
+    swp_execute_LOAD_S 1 vmw1 addr_is_ram pma_allows_ram
+      (ram_pma_load 1 vmw1 dvd1) (ram_mmio_r 1 vmw1)
+      (ram_pmprange 1 vmw1 dvd1 uintw1) (Mobl_ram 1)
+      (fun pa bytes R H => swp_read_ram_node1 pa bytes R
+                             (addr_is_ram_not_dev pa H)).
+  Definition swp_execute_LOAD_ram_S2 :=
+    swp_execute_LOAD_S 2 vmw2 addr_is_ram pma_allows_ram
+      (ram_pma_load 2 vmw2 dvd2) (ram_mmio_r 2 vmw2)
+      (ram_pmprange 2 vmw2 dvd2 uintw2) (Mobl_ram 2)
+      (fun pa bytes R H => swp_read_ram_node2 pa bytes R
+                             (addr_is_ram_not_dev pa H)).
+  Definition swp_execute_LOAD_ram_S4 :=
+    swp_execute_LOAD_S 4 vmw4 addr_is_ram pma_allows_ram
+      (ram_pma_load 4 vmw4 dvd4) (ram_mmio_r 4 vmw4)
+      (ram_pmprange 4 vmw4 dvd4 uintw4) (Mobl_ram 4)
+      (fun pa bytes R H => swp_read_ram_node4 pa bytes R
+                             (addr_is_ram_not_dev pa H)).
+  Definition swp_execute_LOAD_ram_S8 :=
+    swp_execute_LOAD_S 8 vmw8 addr_is_ram pma_allows_ram
+      (ram_pma_load 8 vmw8 dvd8) (ram_mmio_r 8 vmw8)
+      (ram_pmprange 8 vmw8 dvd8 uintw8) (Mobl_ram 8)
+      (fun pa bytes R H => swp_read_ram_node8 pa bytes R
+                             (addr_is_ram_not_dev pa H)).
+
+  (* ---- the four RAM STORE engines ---- *)
+  Definition swp_execute_STORE_ram_S1 :=
+    swp_execute_STORE_S 1 vmw1 addr_is_ram pma_allows_ram
+      (ram_pma_store 1 vmw1 dvd1) (ram_mmio_w 1 vmw1)
+      (ram_pmprange 1 vmw1 dvd1 uintw1) (Wobl_ram 1)
+      (fun pa v R rr H => swp_write_ram_node1 pa v R rr
+                            (addr_is_ram_not_dev pa H)).
+  Definition swp_execute_STORE_ram_S2 :=
+    swp_execute_STORE_S 2 vmw2 addr_is_ram pma_allows_ram
+      (ram_pma_store 2 vmw2 dvd2) (ram_mmio_w 2 vmw2)
+      (ram_pmprange 2 vmw2 dvd2 uintw2) (Wobl_ram 2)
+      (fun pa v R rr H => swp_write_ram_node2 pa v R rr
+                            (addr_is_ram_not_dev pa H)).
+  Definition swp_execute_STORE_ram_S4 :=
+    swp_execute_STORE_S 4 vmw4 addr_is_ram pma_allows_ram
+      (ram_pma_store 4 vmw4 dvd4) (ram_mmio_w 4 vmw4)
+      (ram_pmprange 4 vmw4 dvd4 uintw4) (Wobl_ram 4)
+      (fun pa v R rr H => swp_write_ram_node4 pa v R rr
+                            (addr_is_ram_not_dev pa H)).
+  Definition swp_execute_STORE_ram_S8 :=
+    swp_execute_STORE_S 8 vmw8 addr_is_ram pma_allows_ram
+      (ram_pma_store 8 vmw8 dvd8) (ram_mmio_w 8 vmw8)
+      (ram_pmprange 8 vmw8 dvd8 uintw8) (Wobl_ram 8)
+      (fun pa v R rr H => swp_write_ram_node8 pa v R rr
+                            (addr_is_ram_not_dev pa H)).
+
+  (* ---- the MMIO engines (widths 1 and 4) ---- *)
+  Definition swp_execute_LOAD_dev_S1 :=
+    swp_execute_LOAD_S 1 vmw1 (dev_cls 1) pma_allows_io
+      (dev_pma_load 1) (dev_mmio_r 1 vmw1) (dev_pmprange 1 vmw1 uintw1)
+      Mobl_dev1
+      (fun pa bytes R H => swp_dev_read_node1 pa bytes R (dev_cls_dev 1 pa H)).
+  Definition swp_execute_LOAD_dev_S4 :=
+    swp_execute_LOAD_S 4 vmw4 (dev_cls 4) pma_allows_io
+      (dev_pma_load 4) (dev_mmio_r 4 vmw4) (dev_pmprange 4 vmw4 uintw4)
+      Mobl_dev4
+      (fun pa bytes R H => swp_dev_read_node4 pa bytes R (dev_cls_dev 4 pa H)).
+  Definition swp_execute_STORE_dev_S1 :=
+    swp_execute_STORE_S 1 vmw1 (dev_cls 1) pma_allows_io
+      (dev_pma_store 1) (dev_mmio_w 1 vmw1) (dev_pmprange 1 vmw1 uintw1)
+      Wobl_dev1
+      (fun pa v R rr H => swp_dev_write_node1 pa v R rr (dev_cls_dev 1 pa H)).
+  Definition swp_execute_STORE_dev_S4 :=
+    swp_execute_STORE_S 4 vmw4 (dev_cls 4) pma_allows_io
+      (dev_pma_store 4) (dev_mmio_w 4 vmw4) (dev_pmprange 4 vmw4 uintw4)
+      Wobl_dev4
+      (fun pa v R rr H => swp_dev_write_node4 pa v R rr (dev_cls_dev 4 pa H)).
+
+End instances.
