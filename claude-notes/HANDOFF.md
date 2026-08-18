@@ -1,4 +1,23 @@
-# SESSION HANDOFF — 2026-08-17 (branch `weak-memory`)
+# SESSION HANDOFF — 2026-08-18 (branch `weak-memory`)
+
+**LATEST (2026-08-18, HEAD pushed): everything green; nothing in flight.  The
+user is deliberating on the CERTIFICATION ROUTE for Layer 2
+(`design/weak-memory-layer2.md` §8/§10 — NO side conditions: early reads
+become pf reads via the promise author's certifying run, φ refutes early
+reads of owned-unpublished messages, sync bytes by machine facts + the
+exported lock-word value protocol) and will say when to start D8.  DO NOT
+start D8/E1/L2′ without that go.  Landed since the previous handoff:
+`-D SYMBOLIC` model; D2/D3 dependency tracking (D-7 forward bank fixed);
+A0/A0′/A0″ premise repairs (`main_premises` = `edges_split_cyc ∧ bad_wf ∧
+ee_ok ∧ dev_wit_ok ∧ bytes_ok`, `robust_main_acyc`, `robust_main_l2`);
+L2-M1/M2 (`WeakRobustL2.v`, `WeakRobustL2b.v`: SCC skeleton, `U_Qinv`,
+`head_prestate_pf_real`, `sf_edges ≡ edges_split_cyc`); M4-1 first slice
+(`WeakEvFunnel/Wire/ExecEff/Disk`).  Open technical questions before D8:
+(1) whether PARM's `interference_certify` transfers to our machine without
+the `RES = ts` view (a read-only investigation report may be in the
+scratchpad `interference-certify-report.md`); (2) speculative A-bit
+updates vs the acyclicity route (§10).**
+
 
 **LATEST (end of day): the Sail model is now generated with `-D SYMBOLIC`
 (`d978b255`): `riscv_step` emits `InstrAnnounce`/`BranchAnnounce` nodes; 12
