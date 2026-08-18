@@ -1222,6 +1222,61 @@ Proof.
   intros Hg He. exact (goodmb_cer_bind_empty Dr Dw m (fun _ => n) s s' tt Hg He).
 Qed.
 
+(* AND THE SAME PEEL ONE LEVEL IN.  [and_boolM] / [or_boolM] are LEFT-NESTED
+   ([or_boolM l r] IS [bind l ...]), so a region that throws inside such a
+   guard reads as [bind (bind m g) f] with the throw in [g] -- and no
+   single-level bind equation peels [m] out of it, because [goodmb] cannot
+   certify the throwing middle.  This rule peels the innermost head, which
+   is the one that returns normally, and leaves the wrapper and the rest of
+   the nest in place.  ([execute_SSAMOSWAP]'s Zicfiss guard is the instance;
+   spell [Defs.bind0] out with [unfold] first where the nest sits under one.) *)
+Lemma goodmb_cer_bind_nest (Dr Dw : register -> bool) {X Y Z : Type}
+    (m : Defs.monadR X exception Y) (g : Y -> Defs.monadR X exception Z)
+    (f : Z -> Defs.monadR X exception X)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) (y : Y) :
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr y, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Defs.bind (Defs.bind m g) f)) s mm
+  = goodmb Dr Dw (Defs.catch_early_return (Defs.bind (g y) f)) s' (mm_after m s mm).
+Proof.
+  revert s mm. induction m as [y0 | T oc k IH]; intros s mm Hg He.
+  - cbn [execR] in He.
+    assert (Hx : y = y0) by congruence. assert (Hs : s' = s) by congruence.
+    subst y s'. reflexivity.
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb execR mm_after Defs.bind Interface.iMon_bind
+           Defs.catch_early_return Defs.try_catch] in Hg, He |- *;
+      try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+      rewrite Hfp. cbn [negb andb] in Hg2 |- *.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma goodmb_cer_bind_nest_empty (Dr Dw : register -> bool) {X Y Z : Type}
+    (m : Defs.monadR X exception Y) (g : Y -> Defs.monadR X exception Z)
+    (f : Z -> Defs.monadR X exception X) (s s' : mstate) (y : Y) :
+  goodmb Dr Dw m s ∅ = true ->
+  execR m s = Some (inr y, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Defs.bind (Defs.bind m g) f)) s ∅
+  = goodmb Dr Dw (Defs.catch_early_return (Defs.bind (g y) f)) s' ∅.
+Proof.
+  intros Hg He. rewrite (goodmb_cer_bind_nest Dr Dw m g f s s' ∅ y Hg He).
+  by rewrite (mm_after_empty Dr Dw m s Hg).
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* THE CERTIFICATE AT [∅] IS A CERTIFICATE AT ANY MAP.  Only [dom mm] is    *)
 (* ever consulted, and the [bytes_owned] tests are MONOTONE in it, so a     *)
