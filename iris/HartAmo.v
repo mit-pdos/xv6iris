@@ -406,18 +406,24 @@ Section amo.
     hread_req_at n m = Some req ->
     dev_addr (Interface.ReadReq.pa req) = false ->
     ak_excl (Interface.ReadReq.access_kind req) = true ->
-    (* the window, certified FOR EVERY read value: [k] footprinted silent
-       steps from the resumed read land on the conditional write [wreq w] *)
-    (forall w : bv (8 * n),
-       hwrite_req_at nw
-         (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)) ->
-    (forall w, dev_addr (Interface.WriteReq.pa (wreq w)) = false) ->
-    (forall w, ak_excl (Interface.WriteReq.access_kind (wreq w)) = true) ->
     gen_cert -∗
     hreg_frame rs D -∗
+    (* THE WINDOW IS CERTIFIED AT THE ACTUAL READ VALUE, not for every
+       possible one.  Stating it as [forall w] up front is too strong to be
+       dischargeable by the one caller this rule exists for: the A/D
+       write-back runs [check_leaf_pte] on the RE-READ word, and a word that
+       fails its checks EARLY-RETURNS, so for such a [w] the walk never
+       reaches the conditional write and [hwrite_req_at] is [None].  The exec
+       side has the same shape for the same reason -- [PtTreeAdue.
+       exec_translate_TLB_hit_pt_upd] takes the re-read word as a BINDER and
+       pins it with its check premises. *)
     (∀ mm : gmap Arch.pa (bv 8), gen_heap_interp mm ={⊤,∅}=∗
        ∃ w : bv (8 * n),
          ⌜read_bytes mm (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ⌜hwrite_req_at nw
+            (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)⌝ ∗
+         ⌜dev_addr (Interface.WriteReq.pa (wreq w)) = false⌝ ∗
+         ⌜ak_excl (Interface.WriteReq.access_kind (wreq w)) = true⌝ ∗
          ▷ (|={∅,⊤}=> gen_heap_interp
                 (write_bytes mm (Interface.WriteReq.pa (wreq w)) nw
                    (Interface.WriteReq.value (wreq w))) ∗
@@ -449,19 +455,19 @@ Section amo.
          file; the caller's continuation supplies the written byte heap;
          [dev_interp] is framed.
        - re-assemble mstate_interp (MState (machine landing).1 written devM). *)
-    intros Hrd Hdva Hex Hwin Hwdev Hwex.
+    intros Hrd Hdva Hex.
     destruct (hread_req_at_inv n m req Hrd) as (K & -> & Hres).
     iIntros "#Hcert Hrf Hcb".
     iApply (wp_hart_step with "Hcert").
     iIntros (σ) "Hσ". destruct σ as [rsM memM devM].
     iDestruct "Hσ" as "(Hri & Hmem & Hdv)".
     iDestruct (hreg_frame_agree rs D rsM with "Hri Hrf") as %Hag.
-    iMod ("Hcb" $! memM with "Hmem") as (w) "(%Hrb & Hk)".
+    iMod ("Hcb" $! memM with "Hmem") as (w) "(%Hrb & %HwinW1 & %Hwdev1 & %Hwex1 & Hk)".
     (* normalise the caller-side landing to hrun_silent form *)
     assert (Hhsil : hsil k D (rs, K (inl (w, None)))
                     = hrun_silent k D rs (K (inl (w, None)))) by reflexivity.
     iEval (rewrite (Hres w) Hhsil) in "Hk".
-    pose proof (Hwin w) as HwinW.
+    pose proof HwinW1 as HwinW.
     rewrite (Hres w) Hhsil in HwinW.
     destruct (hrun_silent_agree k D rs rsM (K (inl (w, None))) Hag)
       as [Hmeq _].
@@ -471,7 +477,7 @@ Section amo.
     pose proof (hrun_silent_silent_run k D rsM (K (inl (w, None)))) as HsilM.
     pose proof (hwin_wr_node nw (wreq w)
                   (hrun_silent k D rsM (K (inl (w, None)))).2 memM
-                  HwinM (Hwdev w) (Hwex w)) as HwrM.
+                  HwinM Hwdev1 Hwex1) as HwrM.
     iModIntro.
     iExists (hwrite_resume (hrun_silent k D rsM (K (inl (w, None)))).2),
       (MState (hrun_silent k D rsM (K (inl (w, None)))).1
@@ -525,20 +531,22 @@ Section amo.
     hread_req_at n m = Some req ->
     dev_addr (Interface.ReadReq.pa req) = false ->
     ak_excl (Interface.ReadReq.access_kind req) = true ->
-    (forall w : bv (8 * n),
-       hwrite_req_at nw
-         (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)) ->
-    (forall w, dev_addr (Interface.WriteReq.pa (wreq w)) = false) ->
-    (forall w, ak_excl (Interface.WriteReq.access_kind (wreq w)) = true) ->
-    (* the window passes through no [Ret] and no early return -- the
-       condition [hsil_mctx] needs, and the one the A/D write-back meets *)
-    (forall (w : bv (8 * n)) (j : nat), (j < k)%nat ->
-       hsil_opaque ((hsil j D (rs, hread_resume (bv_unsigned w) m)).2) = false) ->
     gen_cert -∗
     hreg_frame rs D -∗
+    (* every per-value fact rides INSIDE the fupd, at the ACTUAL read value:
+       the window, the write's two classifiers, and the [hsil_opaque]
+       condition the context transport needs.  See [wp_hart_amo]'s note for
+       why none of them can be a [forall w] premise. *)
     (∀ mm : gmap Arch.pa (bv 8), gen_heap_interp mm ={⊤,∅}=∗
        ∃ w : bv (8 * n),
          ⌜read_bytes mm (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ⌜hwrite_req_at nw
+            (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)⌝ ∗
+         ⌜dev_addr (Interface.WriteReq.pa (wreq w)) = false⌝ ∗
+         ⌜ak_excl (Interface.WriteReq.access_kind (wreq w)) = true⌝ ∗
+         ⌜forall j : nat, (j < k)%nat ->
+            hsil_opaque
+              ((hsil j D (rs, hread_resume (bv_unsigned w) m)).2) = false⌝ ∗
          ▷ (|={∅,⊤}=> gen_heap_interp
                 (write_bytes mm (Interface.WriteReq.pa (wreq w)) nw
                    (Interface.WriteReq.value (wreq w))) ∗
@@ -548,32 +556,29 @@ Section amo.
                       (hsil k D (rs, hread_resume (bv_unsigned w) m)).2) Φ))) -∗
     swp m Φ.
   Proof.
-    intros Hproj Hdev Hexcl Hwin Hwdev Hwexcl Hop.
+    intros Hproj Hdev Hexcl.
     iIntros "#Hcert Hrf H".
     rewrite /swp. iIntros (C) "%HC Hcont".
-    (* the window, transported through the context once and for all *)
-    assert (Hstep : forall w : bv (8 * n),
-              hsil k D (rs, hread_resume (bv_unsigned w) (C m))
-              = ((hsil k D (rs, hread_resume (bv_unsigned w) m)).1,
-                 C (hsil k D (rs, hread_resume (bv_unsigned w) m)).2)).
-    { intros w.
-      rewrite (hread_resume_mctx C n m req (bv_unsigned w) HC Hproj).
-      exact (hsil_mctx C D k rs (hread_resume (bv_unsigned w) m) HC (Hop w)). }
-    assert (Hwin' : forall w : bv (8 * n),
-              hwrite_req_at nw
-                (hsil k D (rs, hread_resume (bv_unsigned w) (C m))).2
-              = Some (wreq w)).
-    { intros w. rewrite (Hstep w). cbn [snd].
-      exact (hwrite_req_at_mctx C nw _ (wreq w) HC (Hwin w)). }
     iApply (wp_hart_amo D k n req (C m) rs nw wreq
               (hread_req_at_mctx C n m req HC Hproj) Hdev Hexcl
-              Hwin' Hwdev Hwexcl with "Hcert Hrf [H Hcont]").
-    iIntros (mm) "Hmm". iMod ("H" $! mm with "Hmm") as (w) "[%Hrb Hk]".
-    iModIntro. iExists w. iSplitR; [done|]. iNext.
-    iMod "Hk" as "[Hmm Hcl]". iModIntro. iFrame "Hmm".
-    rewrite (Hstep w). cbn [fst snd].
+              with "Hcert Hrf [H Hcont]").
+    iIntros (mm) "Hmm".
+    iMod ("H" $! mm with "Hmm") as (w) "(%Hrb & %Hwin & %Hwdev & %Hwex & %Hop & Hk)".
+    (* the window, transported through the context at THIS [w] *)
+    assert (Hstep : hsil k D (rs, hread_resume (bv_unsigned w) (C m))
+                    = ((hsil k D (rs, hread_resume (bv_unsigned w) m)).1,
+                       C (hsil k D (rs, hread_resume (bv_unsigned w) m)).2)).
+    { rewrite (hread_resume_mctx C n m req (bv_unsigned w) HC Hproj).
+      exact (hsil_mctx C D k rs (hread_resume (bv_unsigned w) m) HC Hop). }
+    iModIntro. iExists w. iSplitR; [done|].
+    iSplitR.
+    { iPureIntro. rewrite Hstep. cbn [snd].
+      exact (hwrite_req_at_mctx C nw _ (wreq w) HC Hwin). }
+    iSplitR; [done|]. iSplitR; [done|].
+    iNext. iMod "Hk" as "[Hmm Hcl]". iModIntro. iFrame "Hmm".
+    rewrite Hstep. cbn [fst snd].
     iIntros "Hrf'".
-    rewrite (hwrite_resume_mctx C nw _ (wreq w) HC (Hwin w)).
+    rewrite (hwrite_resume_mctx C nw _ (wreq w) HC Hwin).
     iApply (swp_use _ Φ C HC with "[Hcl Hrf'] Hcont").
     by iApply "Hcl".
   Qed.
