@@ -891,6 +891,7 @@ WeakRobustDisc.v
 WeakRobustL2.v
 WeakRobustL2b.v
 WeakRobustBlocks.v
+WeakCertify.v
 WeakRobustCone.v
 WeakSailCone.v
 WeakAxiomatic.v
