@@ -3101,10 +3101,10 @@ Section SmodeCorePt.
       (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
       (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
-      (mstatus1 mie1 mdv1 menvcfg1 satp1 : mword 64)
+      (mie1 menvcfg1 satp1 : mword 64)
       (pcfg1 : type_of_register pmpcfg_n)
       (paddr1 : type_of_register pmpaddr_n)
-      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3132,9 +3132,25 @@ Section SmodeCorePt.
     instr pc is_rvc i -∗
     spt_fetch_tr (s_Df_mix dq) Res pc mstatus0 satp0 mie_v mdv0 menvcfg0
       pcfg paddr -∗
-    (* THE LEAF'S OBLIGATION.  The PMP grant travels INTO it: a data leaf
-       runs [HartSMem]'s PMP checks and [SRegime.sr_swp_side_ok], and
-       neither fact is recoverable inside the obligation otherwise. *)
+    (* THE LEAF'S OBLIGATION.  Three things travel into it that a
+       register-only leaf does not need and no MEMORY leaf can do without:
+
+         - the PMP grant, because [HartSMem]'s checks and
+           [SRegime.sr_swp_side_ok] both take it and neither is
+           recoverable inside the obligation (the residue is the regime's,
+           and Bare's is [True]);
+         - the three CLOCK cells ([MinstretInv.clock_res], mcycle / mtime
+           / mip -- already in [s_Drw]), without which [csrr time],
+           [csrr sip] and [csrw stimecmp] cannot be written at all.  They
+           are handed over at EXISTENTIAL values, because the wrapper's own
+           come out of [spt_frames_intro]'s existentials, and they come
+           back the same way -- the tick runs at the cycle BOUNDARY, so
+           nothing inside the instruction has to name them;
+         - and the leaf CHOOSES the post mstatus and mideleg.  That is
+           forced: [csrsi]/[csrci sstatus] and [sret] MOVE SIE, so a caller
+           on the SIE = 0 arm cannot name the mstatus the instruction
+           leaves behind.  They ride in ONE existential with the landing
+           pc, because the rider is keyed on all three. *)
     (∀ tv' : type_of_register tlb,
        ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
        cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -3144,33 +3160,34 @@ Section SmodeCorePt.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ Res tv' -∗
+       clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
-                   mstatus ↦ᵣ{ dq } mstatus1 ∗
                    mie ↦ᵣ{ dq } mie1 ∗
-                   mideleg ↦ᵣ{ dq } mdv1 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗
                    pmpaddr_n ↦ᵣ paddr1 ∗
                    (∃ tv2 : type_of_register tlb, tlb ↦ᵣ tv2 ∗ Res tv2) ∗
-                   (∃ npc : mword 64,
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
                    resv_any cpu_id)) -∗
-    ▷ (∀ (npc : mword 64) (tv1 : type_of_register tlb),
+    ▷ (∀ (npc ms1 mdv1 : mword 64) (tv1 : type_of_register tlb),
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
          cur_privilege ↦ᵣ{ dq } Supervisor -∗
-         mstatus ↦ᵣ{ dq } mstatus1 -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
          mie ↦ᵣ{ dq } mie1 -∗
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          satp ↦ᵣ satp1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pmpaddr_n ↦ᵣ paddr1 -∗
          tlb ↦ᵣ tv1 -∗ Res tv1 -∗
-         pc_is npc -∗ Rl npc -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3189,33 +3206,38 @@ Section SmodeCorePt.
                   micfg misa0 mseccfg0 senv0 pmar0 elp0) as "#Htr0".
     iApply (spt_cycle (s_Df_mix dq) pc
               (fun rs2 => (Res (register_lookup tlb rs2) ∗ resv_any cpu_id
-                           ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2))%I)
-              (fun rs2 => exists (npc : mword 64) (tv : type_of_register tlb),
-                 rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+                           ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
+                                (register_lookup mstatus rs2)
+                                (register_lookup mideleg rs2))%I)
+              (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
+                            (tv : type_of_register tlb),
+                 rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
               ms bmi cy ti ip mstatus0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
               satp0 mie_v mdv0 menvcfg0 pcfg paddr tlbv
-              ltac:(intros rs2 (npc & tv & ->); apply s_rs_hart)
-              ltac:(intros rs2 (npc & tv & ->); apply s_rs_mi)
+              ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
+                    apply s_rs_hart)
+              ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
+                    apply s_rs_mi)
               with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr] [Hcont]").
     2:{ (* ---- the continuation ---- *)
         iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl)".
-        destruct HQ as (npc & tv & ->).
+        destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->).
         iEval (rewrite s_rs_tlb) in "HRes".
-        iEval (rewrite s_rs_nPC) in "HRl".
+        iEval (rewrite s_rs_nPC s_rs_mst s_rs_mdl) in "HRl".
         pose proof (s_tick_agree pc npc ms
-                      (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1
+                      (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
                       pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
                       satp1 mie1 mdv1 menvcfg1 tv mi rs3 Hag) as Hag'.
         iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
         iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hag' with "Hro") as "Hro".
         iDestruct (spt_frames_elim dq npc mi
                      (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
-                     misa0 mseccfg0 senv0 pmar0 elp0 mstatus1 satp1 mie1 mdv1
+                     misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
                      menvcfg1 pcfg1 paddr1 tv with "Hfrag Hrw Hro")
           as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
                Hpaddr & Htlbc & Hpc)".
-        iApply ("Hcont" $! npc tv with "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp
-                  Hpcfg Hpaddr Htlbc HRes Hpc HRl"). }
+        iApply ("Hcont" $! npc ms1 mdv1 tv with "Hhs Hpriv Hmst Hmie Hmdl Hmenv
+                  Hsatp Hpcfg Hpaddr Htlbc HRes Hpc HRl"). }
     (* ---- the body ---- *)
     iIntros "Hfrag Hrw Hro".
     iApply (swp_mono with "[] [-]");
@@ -3223,12 +3245,14 @@ Section SmodeCorePt.
                    (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
                    pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
                    mie_v mdv0 menvcfg0 Res tlbv is_rvc i
-                   (fun rs2 => exists (npc : mword 64)
+                   (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
                                  (tv : type_of_register tlb),
-                      rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+                      rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
                    (fun rs2 => (Res (register_lookup tlb rs2)
                                 ∗ resv_any cpu_id
-                                ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2))%I)
+                                ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
+                                     (register_lookup mstatus rs2)
+                                     (register_lookup mideleg rs2))%I)
                    emp%I (fun _ _ => False%I)
                    Hmisaval Hmenvval Helpnp (pma_all_ram Hpmaall)
                    HA Hord HX Hcov
@@ -3263,21 +3287,26 @@ Section SmodeCorePt.
              & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg & #Hmisa & #Hsec & #Hpma
              & #Hhtif & #Help & #Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
       iSpecialize ("Hex" $! tv' with "[%]"); [ exact Hpmp | ].
-      iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hhs] [-]");
+      iAssert clock_res with "[Hcy Hti Hip]" as "Hclk".
+      { iExists cy, ti, ip. iFrame "Hcy Hti Hip". }
+      iApply (swp_mono with "[Hms Hmi Hhs] [-]");
         [| iApply ("Hex" with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
-                     Hpaddr Htlbc HRes' HPC HnPC Hany") ].
-      iIntros (e) "(-> & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
-                    Hpaddr & Htlbr & Hpcs & Hany)".
+                     Hpaddr Htlbc HRes' Hclk HPC HnPC Hany") ].
+      iIntros (e) "(-> & Hpriv & Hmie & Hmenv & Hsatp & Hpcfg &
+                    Hpaddr & Htlbr & Hclk & Hcfg & Hany)".
       (* the leaf may have FILLED THE TLB (a data access walks too), so the
          cell and the regime residue come back at the leaf's own landing
-         value, not at the one the fetch handed it *)
+         value, not at the one the fetch handed it; the clock cells and the
+         post mstatus / mideleg come back the same way *)
       iDestruct "Htlbr" as (tv2) "(Htlbc & HRes')".
-      iDestruct "Hpcs" as (npc) "(HPC & HnPC & HRl)".
+      iDestruct "Hclk" as (cy1 ti1 ip1) "(Hcy & Hti & Hip)".
+      iDestruct "Hcfg" as (ms1 mdv1 npc) "(Hmst & Hmdl & HPC & HnPC & HRl)".
       iSplitR; [done|].
-      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv2).
-      iSplitR; [iPureIntro; by exists npc, tv2 |].
+      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv2).
+      iSplitR;
+        [ iPureIntro; by exists npc, ms1, mdv1, cy1, ti1, ip1, tv2 |].
       iDestruct (spt_frames_close dq pc npc ms
-                   (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1
+                   (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
                    pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1
                    mie1 mdv1 menvcfg1 tv2
                    with "[HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs
@@ -3286,7 +3315,8 @@ Section SmodeCorePt.
       { iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg
                 Hpaddr Hsatp Hmie Hmdl Hmenv".
         by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv". }
-      rewrite s_rs_tlb s_rs_nPC. iFrame "Hrw Hro HRes' Hany HRl".
+      rewrite s_rs_tlb s_rs_nPC s_rs_mst s_rs_mdl.
+      iFrame "Hrw Hro HRes' Hany HRl".
   Qed.
 
   (* ==================================================================== *)
@@ -3330,6 +3360,7 @@ Section SmodeCorePt.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ Res tv' -∗
+       clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
@@ -3343,6 +3374,7 @@ Section SmodeCorePt.
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
                    pmpaddr_n ↦ᵣ paddr ∗
                    (∃ tv2 : type_of_register tlb, tlb ↦ᵣ tv2 ∗ Res tv2) ∗
+                   clock_res ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3364,19 +3396,39 @@ Section SmodeCorePt.
     iDestruct "Hmiebundle" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
     iDestruct "Hmenvbundle" as (menvcfg0)
       "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
+    (* the BUNDLE cannot take the config-existential post: [smode_config]
+       requires SIE = 0 of the mstatus it re-bundles, and a leaf that MOVED
+       SIE is exactly what the existential is for.  So this wrapper keeps a
+       FIXED post config and carries the two equations through the rider,
+       which is what lets the raw-cell wrapper stay existential underneath. *)
     iApply (wp_instr_s_config_regime Res pc is_rvc i mstatus0 mie_v mdv0
-              menvcfg0 satp0 pcfg paddr tlbv mstatus0 mie_v mdv0 menvcfg0
-              satp0 pcfg paddr Rl (dq := dq)
+              menvcfg0 satp0 pcfg paddr tlbv mie_v menvcfg0
+              satp0 pcfg paddr
+              (fun npc ms1 mdv1 =>
+                 (⌜ ms1 = mstatus0 ⌝ ∗ ⌜ mdv1 = mdv0 ⌝ ∗ Rl npc)%I) (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmp
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
                     Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [Htr] [Hex]
                     [Hcont Hsie]").
     - iApply ("Htr" $! mstatus0 mie_v mdv0 menvcfg0 with "[%] [%] [%] [%]");
         [ exact HSIE | exact HSXL | exact Hmm | exact Hmenvval ].
-    - iApply ("Hex" $! mstatus0 mie_v mdv0 menvcfg0).
-    - iNext. iIntros (npc tv1)
+    - iIntros (tv') "_ Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr
+                     Htlbc HRes Hclk HPC HnPC Hany".
+      iApply (swp_mono with "[] [-]");
+        [| iApply ("Hex" $! mstatus0 mie_v mdv0 menvcfg0 tv' with "[%] Hpriv
+             Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc HRes Hclk
+             HPC HnPC Hany") ].
+      2:{ exact Hpmp. }
+      iIntros (e) "(-> & Hpriv & Hmstatus & Hmiec & Hmdlc & Hmenvc & Hsatp &
+                    Hpcfg & Hpaddr & Htlbr & Hclk & Hpcs & Hany)".
+      iDestruct "Hpcs" as (npc) "(HPC & HnPC & HRl)".
+      iFrame "Hpriv Hmiec Hmenvc Hsatp Hpcfg Hpaddr Htlbr Hclk Hany".
+      iSplitR; [done|].
+      iExists mstatus0, mdv0, npc. iFrame "Hmstatus Hmdlc HPC HnPC".
+      iSplitR; [done|]. iSplitR; [done|]. iExact "HRl".
+    - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Hpc (-> & -> & HRl)".
       iApply ("Hcont" $! npc tv1 with
                 "[Hhs Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] Hsatp Hpcfg
                  Hpaddr Htlbc HRes Hpc HRl").
@@ -3439,7 +3491,7 @@ Section SmodeCorePt.
   Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3471,33 +3523,34 @@ Section SmodeCorePt.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ spt_res_pt root_ppn tv' -∗
+       clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
-                   mstatus ↦ᵣ{ dq } mstatus0 ∗
                    mie ↦ᵣ{ dq } mie_v ∗
-                   mideleg ↦ᵣ{ dq } mdv0 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg0 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
                    pmpaddr_n ↦ᵣ paddr ∗
                    (∃ tv2 : type_of_register tlb,
                       tlb ↦ᵣ tv2 ∗ spt_res_pt root_ppn tv2) ∗
-                   (∃ npc : mword 64,
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
                    resv_any cpu_id)) -∗
-    ▷ (∀ npc : mword 64,
+    ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
          cur_privilege ↦ᵣ{ dq } Supervisor -∗
-         mstatus ↦ᵣ{ dq } mstatus0 -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
          mie ↦ᵣ{ dq } mie_v -∗
-         mideleg ↦ᵣ{ dq } mdv0 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg0 -∗
          tlb_res_pt root_ppn -∗
-         pc_is npc -∗ Rl npc -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3510,7 +3563,7 @@ Section SmodeCorePt.
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iApply (wp_instr_s_config_regime (spt_res_pt root_ppn) pc is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
-              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr Rl (dq := dq)
+              mie_v menvcfg0 satp0 pcfg paddr Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
               ltac:(unfold pmp_ent0_ok; split_and!; assumption)
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
@@ -3519,12 +3572,12 @@ Section SmodeCorePt.
     - rewrite /spt_res_pt. iFrame "Hsnap Hkpt".
     - iApply ("Htr" $! satp0 pcfg paddr).
     - iApply ("Hex" $! satp0 pcfg paddr).
-    - iNext. iIntros (npc tv1)
+    - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
          HRes Hpc HRl".
       iDestruct "HRes" as "[Hsnap _]".
       iDestruct "Hsnap" as (t0) "[%Hok #Hlb]".
-      iApply ("Hcont" $! npc with
+      iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
                  [Hsatp Htlbc Hpcfg Hpaddr] Hpc HRl").
       iApply (tlb_res_pt_intro root_ppn satp0 tv1 t0 Hmode Hasid Hppn Hok
@@ -3552,8 +3605,8 @@ Section SmodeCorePt.
   Lemma wp_instr_s_config_sr (R : s_regime)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (mstatus1 mie1 mdv1 menvcfg1 : mword 64)
-      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
+      (mie1 menvcfg1 : mword 64)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3590,33 +3643,34 @@ Section SmodeCorePt.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ sr_swp_res_at R satp0 tv' -∗
+       clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
-                   mstatus ↦ᵣ{ dq } mstatus1 ∗
                    mie ↦ᵣ{ dq } mie1 ∗
-                   mideleg ↦ᵣ{ dq } mdv1 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
                    pmpaddr_n ↦ᵣ paddr ∗
                    (∃ tv2 : type_of_register tlb,
                       tlb ↦ᵣ tv2 ∗ sr_swp_res_at R satp0 tv2) ∗
-                   (∃ npc : mword 64,
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
                    resv_any cpu_id)) -∗
-    ▷ (∀ npc : mword 64,
+    ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
          cur_privilege ↦ᵣ{ dq } Supervisor -∗
-         mstatus ↦ᵣ{ dq } mstatus1 -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
          mie ↦ᵣ{ dq } mie1 -∗
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          sr_inv R -∗
-         pc_is npc -∗ Rl npc -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3627,7 +3681,7 @@ Section SmodeCorePt.
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
     iApply (wp_instr_s_config_regime (sr_swp_res_at R satp0) pc is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
-              mstatus1 mie1 mdv1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
+              mie1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
                     Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [Htr] [Hex] [Hcont]").
@@ -3636,10 +3690,10 @@ Section SmodeCorePt.
     - iIntros (tv') "_".
       iApply ("Hex" $! satp0 pcfg paddr tv' with "[%] [%]");
         [ exact Hsatpok | exact Hpmpok ].
-    - iNext. iIntros (npc tv1)
+    - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
          HRes Hpc HRl".
-      iApply ("Hcont" $! npc with
+      iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
                  [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
       iApply (sr_swp_close R satp0 tv1 pcfg paddr Hsatpok Hpmpok
@@ -3677,6 +3731,7 @@ Section SmodeCorePt.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ sr_swp_res_at R satp0 tv' -∗
+       clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
@@ -3691,6 +3746,7 @@ Section SmodeCorePt.
                    pmpaddr_n ↦ᵣ paddr ∗
                    (∃ tv2 : type_of_register tlb,
                       tlb ↦ᵣ tv2 ∗ sr_swp_res_at R satp0 tv2) ∗
+                   clock_res ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3709,7 +3765,9 @@ Section SmodeCorePt.
     iDestruct "Hmenvbundle" as (menvcfg0)
       "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
     iApply (wp_instr_s_config_sr R pc is_rvc i mstatus0 mie_v mdv0 menvcfg0
-              mstatus0 mie_v mdv0 menvcfg0 Rl (dq := dq)
+              mie_v menvcfg0
+              (fun npc ms1 mdv1 =>
+                 (⌜ ms1 = mstatus0 ⌝ ∗ ⌜ mdv1 = mdv0 ⌝ ∗ Rl npc)%I) (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
                     Hinstr [Htr] [Hex] [Hcont Hsie]").
@@ -3718,10 +3776,25 @@ Section SmodeCorePt.
                 with "[%] [%] [%] [%] [%] [%]");
         [ exact HSIE | exact HSXL | exact Hmm | exact Hmenvval
         | exact Hsok | exact Hpok ].
-    - iIntros (satp0 pcfg paddr tv').
-      iApply ("Hex" $! mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tv').
-    - iNext. iIntros (npc)
-        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc HRl".
+    - (* the BUNDLE keeps a FIXED post config ([smode_config] requires
+         SIE = 0 of what it re-bundles); the two equations ride the rider *)
+      iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok Hpriv Hmstatus Hmiec Hmdlc
+               Hmenvc Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC Hany".
+      iApply (swp_mono with "[] [-]");
+        [| iApply ("Hex" $! mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tv'
+             with "[%] [%] Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg
+                   Hpaddr Htlbc HRes Hclk HPC HnPC Hany") ].
+      2:{ exact Hsok. }
+      2:{ exact Hpok. }
+      iIntros (e) "(-> & Hpriv & Hmstatus & Hmiec & Hmdlc & Hmenvc & Hsatp &
+                    Hpcfg & Hpaddr & Htlbr & Hclk & Hpcs & Hany)".
+      iDestruct "Hpcs" as (npc) "(HPC & HnPC & HRl)".
+      iFrame "Hpriv Hmiec Hmenvc Hsatp Hpcfg Hpaddr Htlbr Hclk Hany".
+      iSplitR; [done|].
+      iExists mstatus0, mdv0, npc. iFrame "Hmstatus Hmdlc HPC HnPC".
+      iSplitR; [done|]. iSplitR; [done|]. iExact "HRl".
+    - iNext. iIntros (npc ms1 mdv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc (-> & -> & HRl)".
       iApply ("Hcont" $! npc with
                 "[Hhs Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] Hinv Hpc HRl").
       iApply (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
