@@ -261,9 +261,12 @@ Record gstate := GState {
   gmem  : gmap Arch.pa (bv 8);
   gdev  : dev_state;
   (* the power/crash layer (claude-notes/design/crash.md): the current
-     GENERATION and the POWER bit.  INERT until the power thread lands:
-     every arm below PRESERVES both fields and none reads them, so the
-     semantics is still generation- and power-blind. *)
+     GENERATION and the POWER bit.  LIVE: every hart and device arm below is
+     gated on [thread_live g gen] ([gpow] set and [ggen] equal to the
+     thread's own generation), with a pure self-loop on the COMPLEMENT, and
+     the power thread's own arms clear [gpow] while bumping [ggen].  The
+     gating partitions, so the relation stays total without a stutter arm --
+     and [ggen > gen] is the one stable death certificate. *)
   ggen : nat;
   gpow : bool;
 }.
@@ -420,10 +423,10 @@ Class CpuId := cpu_id : CPU.
    [wp_next] contracts quantify their continuations over the RESUMING
    CpuId, and that quantifier must range over harts of the SAME
    generation -- a parked proc's payload is era resources and dies with
-   its generation.  Until the power thread lands, the semantics is
-   GENERATION-BLIND: no [prim_step] arm reads or constrains the index
-   (every arm preserves it), so a WP is provable at any fixed ambient
-   generation and the tree is exactly as strong as before. *)
+   its generation.  The semantics READS this index: a thread's real arms
+   are gated on [thread_live], so a WP at a fixed ambient generation is
+   provable only while that generation is current -- a dead one can take
+   only the corpse self-loop. *)
 Class GenId := gen_id : nat.
 
 (* ---------------------------------------------------------------------- *)
