@@ -945,3 +945,21 @@ Proof.
   - unfold is_aligned_vaddr. apply Z.eqb_eq. cbn [bits_of_virtaddr].
     rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Ha4 | lia | lia ].
 Qed.
+
+(* The ELIMINATOR.  Using [uM_only_in] means showing a key is outside every
+   window, and doing that by hand is an [elem_of_cons] / [destruct] / [lia]
+   chase at each site -- the largest single piece of boilerplate the sh
+   proofs carry.  Stated with the window quantified so a caller discharges
+   one goal per window and never touches the list structure. *)
+Lemma uM_only_in_out (M M' : gmap Z (bv 8)) (ws : list (Z * Z)) (k : Z) :
+  uM_only_in M M' ws ->
+  (forall w : Z * Z, w ∈ ws -> ~ (fst w <= k < fst w + snd w)) ->
+  M' !! k = M !! k.
+Proof.
+  intros [_ E] Hout. apply E. intros (w & Hw & Hin). exact (Hout w Hw Hin).
+Qed.
+
+(* ... and its introduction twin: a key inside a NAMED window is in the list *)
+Lemma uM_in_windows_here (ws : list (Z * Z)) (a n k : Z) :
+  (a, n) ∈ ws -> a <= k < a + n -> uM_in_windows ws k.
+Proof. intros Hw Hk. exists (a, n). split; [ exact Hw | exact Hk ]. Qed.

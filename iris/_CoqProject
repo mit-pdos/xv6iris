@@ -201,6 +201,9 @@ UmodeFrame.v
 UmodeStub.v
 UProofShLib.v
 UProofShMem.v
+UProofShHeap.v
+UProofShLex.v
+UProofShIo.v
 UCodeInit.v
 UmodeInitIo.v
 USpecInit.v

@@ -107,6 +107,13 @@ Definition sh_frame_ok (hbase hlen : Z) (sp0 : mword 64) (n : Z) : Prop :=
    scope nor the pair. *)
 Definition sh_win (a n : Z) : Z * Z := (a, n).
 
+(* [sh_win] is a definition, not a notation, so a window's components hide
+   behind it: [simpl] leaves [fst (sh_win a n)] and the following [lia] fails
+   with "Cannot find witness", naming neither.  Unfold it with
+   [cbv [sh_win]] before destructuring a window, or use this. *)
+Lemma sh_win_fst (a n : Z) : fst (sh_win a n) = a.   Proof. reflexivity. Qed.
+Lemma sh_win_snd (a n : Z) : snd (sh_win a n) = n.   Proof. reflexivity. Qed.
+
 Section USpecSh.
   Context `{!riscvGS Σ} `{!uioG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -434,8 +441,12 @@ Section USpecSh.
       (Hfreep : uM_bytes M SH_FREEP 8 (mword_of_int SH_BASE : mword 64))
       (Hbaseptr : uM_bytes M SH_BASE 8 (mword_of_int SH_BASE : mword 64))
       (Hbasesz : uM_bytes M (SH_BASE + 8) 8 (mword_of_int 0 : mword 64))
-      (* bp->s.size = nu *)
-      (Hbpsz : uM_bytes M (bp + 8) 8 (mword_of_int nu : mword 64))
+      (* bp->s.size = nu, at FOUR bytes: [Header.s.size] is a C [uint],
+         written by [sw] and read by [sw]'s matching [lw].  The other four
+         bytes of the union slot are padding that no instruction writes and
+         [uM_grown] does not constrain, so an 8-byte claim here is
+         unprovable at the one call site. *)
+      (Hbpsz : uM_bytes M (bp + 8) 4 (mword_of_int nu : mword 32))
       (Hheapw : uv_wr pt M bp (16 * nu))
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
       (Hfr : sh_frame_ok hbase hlen sp0 16)
@@ -447,7 +458,7 @@ Section USpecSh.
        (* base.s.ptr = bp, bp->s.ptr = &base, freep = &base *)
        ⌜uM_bytes M' SH_BASE 8 (mword_of_int bp : mword 64)⌝ -∗
        ⌜uM_bytes M' bp 8 (mword_of_int SH_BASE : mword 64)⌝ -∗
-       ⌜uM_bytes M' (bp + 8) 8 (mword_of_int nu : mword 64)⌝ -∗
+       ⌜uM_bytes M' (bp + 8) 4 (mword_of_int nu : mword 32)⌝ -∗
        ⌜uM_bytes M' SH_FREEP 8 (mword_of_int SH_BASE : mword 64)⌝ -∗
        ⌜uM_only_in M M' [sh_win (uint sp0 - 16) (16); sh_win (SH_FREEP) (8); sh_win (SH_BASE) (16); sh_win (bp) (16)]⌝ -∗
        UVG m' M' -∗
@@ -464,7 +475,10 @@ Section USpecSh.
       (Hst : uv_stack pt M sp0 (64 + 16 + 16))    (* own + free + sbrk *)
       (Hn : m !!! Regidx a0_idx = (mword_of_int nbytes : mword 64))
       (Hnr : 0 < nbytes /\ 16 * sh_nunits nbytes <= 65536)
-      (Hfreep0 : uM_bytes M SH_FREEP 8 (mword_of_int 0 : mword 64))
+      (* the whole .bss is zeroed by [exec] -- this subsumes freep = 0 and
+         is what makes [base.s.size]'s upper four bytes zero, which no
+         instruction writes *)
+      (Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88)
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
       (Hfr : sh_frame_ok hbase hlen sp0 96)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
@@ -500,8 +514,9 @@ Section USpecSh.
       (Htext : sh_text_sub M)
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 (32 + 64 + 16 + 16))
-      (Hfreep0 : uM_bytes M SH_FREEP 8 (mword_of_int 0 : mword 64))
+      (Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88)
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
+      (Hfr : sh_frame_ok hbase hlen sp0 128)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     ubrk gbrk hbase -∗
@@ -514,6 +529,11 @@ Section USpecSh.
        ⌜uM_bytes M' cmd 4 (mword_of_int 1 : mword 32)⌝ -∗
        ⌜sh_zeroed M' cmd 4 SH_EXECCMD_SZ⌝ -∗
        ⌜uv_wr pt M' cmd SH_EXECCMD_SZ⌝ -∗
+       (* WITHOUT this [parseexec] cannot re-establish anything at all about
+          the image it handed in *)
+       ⌜uM_only_in M M' [sh_win hbase 65536; sh_win SH_FREEP 8;
+                         sh_win SH_BASE 16; sh_win cmd SH_EXECCMD_SZ;
+                         sh_win (uint sp0 - 128) 128]⌝ -∗
        ubrk gbrk (hbase + 65536) -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗

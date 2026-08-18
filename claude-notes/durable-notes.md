@@ -162,6 +162,32 @@ state it as `gset_disjUR (mword 64) (EqDecision0 := @…Decidable_eq_mword 64)
 unpinned functor field takes stdpp's instances and then fails to unify at
 every use site, with an error naming neither.
 
+## `vm_compute` ON A GOAL CONTAINING A SECTION VARIABLE DOES NOT FAIL — IT HANGS
+
+`apply bv_eq; vm_compute; reflexivity` is the tier's idiom for a CLOSED
+bitvector identity. Point it at a goal mentioning a section variable
+(`moi hbase = add_vec (moi hbase) (sign_extend' …)`) and it does not report
+anything: it runs for 12+ minutes with no output, and `coqc -time`'s last
+streamed line is the sentence BEFORE it, so the log blames the wrong
+sentence. **Rule: `vm_compute` only closed immediates.** Pull the immediate
+out as its own `Hc : sign_extend' 64 … = mword_of_int k` (closed, so
+`vm_compute` is instant), then `rewrite Hc moi_add; f_equal; lia`.
+
+Three smaller ones from the same effort:
+
+- **`exact (f … _ _ H ltac:(lia) …)` fails with "Cannot find witness"** — the
+  inline `ltac:` is elaborated BEFORE the conclusion is unified with the
+  goal, so `lia` sees a goal full of evars. Use
+  `refine (f … _ _ H _ _ _); lia`. (Same family as the other inline-`ltac:`
+  traps above; this is the one that bites in `exact`.)
+- **`change C with <lit> in *` does not reach hypotheses a callee's contract
+  delivers LATER**, and the failure surfaces as a `lia` "Cannot find witness"
+  comparing `C` to the literal. Re-`change` on each hypothesis as it arrives.
+- **A Coq comment containing `(void *)` closes early**: `(* … free((void
+  *)(hp+1)) … *)` ends at the `*)` inside the cast, and the syntax error is
+  reported ~60 characters later with an unrelated `[ltac_use_default]`
+  message. Quoting C in a comment needs the `*` broken up.
+
 ## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
 
 **"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal
@@ -187,6 +213,35 @@ Two smaller ones from the same proof:
   an earlier `_` is still an evar at splice time.** Spell out the argument the
   side condition mentions. (Same root cause as the `Qp.div_2` and
   `co_license` traps: a hole whose expected type is still an evar.)
+
+## INCONSISTENT PREMISES ARE THE WORST DEFECT, AND NOTHING IN THE BUILD SEES THEM
+
+A hedged conjunct makes a postcondition say nothing. **Contradictory
+PREMISES make the whole contract say nothing** — it is vacuously true, its
+proof goes through, its callers apply it, and every check in this tree stays
+green. `Print Assumptions` does not see it. There is no compile error to
+find.
+
+The instance: adding `Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88` to
+`wp_sh_free_first_body`, which already carried
+`Hfreep : uM_bytes M SH_FREEP 8 (mword_of_int SH_BASE)`. `SH_DATA_PG + 0x10`
+IS `SH_FREEP`, so one premise says that byte is 0 and the other says it is
+0x88. It was caught only because a proof agent noticed the two addresses
+coincide and wrote the four-line refutation.
+
+Two rules follow:
+
+- **Adding a premise to a contract is not a safe operation.** When a premise
+  is added because some OTHER function needed it, check it against every
+  premise already there — especially any that names an address, since a
+  contract's addresses are usually literals that no type discipline relates.
+  Here the premise belonged to `malloc`'s contract (where `freep` really is
+  0, before `malloc` writes it) and was over-applied to `free`'s (where
+  `malloc` has already set `freep = &base`, which is the entire point of the
+  scan).
+- **When two premises mention overlapping ADDRESS RANGES, prove they are
+  jointly satisfiable, or delete one.** A four-line `Lemma … -> … -> False`
+  attempt is cheap and is the only thing that finds this.
 
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 

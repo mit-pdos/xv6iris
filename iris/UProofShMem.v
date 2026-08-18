@@ -11,27 +11,28 @@
    hart ([forall CID]), which is why every lemma here takes [CIDp] as an
    EXPLICIT leading binder rather than a section variable.
 
-   Both contracts are discharged AS THEY STAND in USpecSh.v, each with ONE
-   extra hypothesis in front -- so the remaining drift is visible in the
-   statement rather than hidden in a restated body:
+   Both contracts are now discharged EXACTLY AS THEY STAND in USpecSh.v --
+   no restated body, no extra hypothesis.  Everything the earlier passes
+   reported (memset's unprovable [uM_written] postcondition, the missing
+   [sh_frame_ok] and [8192 <= dst], free's [nu < 2 ^ 31], its vacuous
+   [uM_only ... \/ True], and [Hbpsz]/[bp->s.size] being a FOUR-byte C
+   [uint]) is fixed there.
 
-   - [wp_sh_memset] additionally assumes [8192 <= dst].  Nothing in
-     [wp_sh_memset_body] stops the destination from overlapping the program
-     TEXT (sh's text keys run to 8192, [UCodeSh.sh_bytes_key_lt]), and a
-     buffer that did would invalidate the loop's own [ui_sh_a70/a74/a76]
-     facts at the first [sb].  [Hwr]'s store-permitting leaves do not rule
-     it out: [sh_text_layout] claims fetch+load for the text pages and says
-     nothing about store, so an RWX text page is formally consistent with
-     both premises.  Every real call site (buf.0 in .bss, the malloc'd
-     execcmd node) satisfies it; it belongs beside [Habove].
-   - [wp_sh_free_first] additionally assumes [nu < 2 ^ 31].  free reads
-     [bp->s.size] with a SIGNED 4-byte [lw] at 0x1136, so the value in a1 is
-     [sext32] of the low half of [nu]; the contract's own premises bound
-     [nu] only by [hlen / 16], i.e. by [2 ^ 34].
-
-   Everything else the first pass found -- the unprovable [uM_written]
-   postcondition on memset, the missing [sh_frame_ok], the vacuous
-   [uM_only ... \/ True] on free -- is already fixed in USpecSh.v. *)
+   ONE DEFECT REMAINS, and it is the bad kind: [wp_sh_free_first_body]'s
+   premises are INCONSISTENT, so the contract is vacuously true.
+   [Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88] claims every byte of
+   [0x2010 .. 0x2097] is NUL, and [SH_DATA_PG + 0x10] IS [SH_FREEP] -- but
+   [Hfreep] says the eight bytes there spell [SH_BASE] = 0x2088, whose low
+   byte is 0x88.  They clash at the very first byte.  (That is also what the
+   code does: [malloc] sets [freep = &base] BEFORE calling [morecore], so at
+   free's one call site [freep] is emphatically not zero.)  [Hbss] is not
+   needed for anything here either -- [base.s.size]'s upper half is already
+   pinned by [Hbasesz], which claims all EIGHT bytes at [SH_BASE + 8] are
+   zero -- so the fix is to drop [Hbss], or at most to narrow it to a range
+   that excludes the cells [malloc] has already written.  The contradiction
+   is one line: [Hbss 0] gives [M !! 0x2010 = Some ubyte0] and [Hfreep 0%nat]
+   gives [M !! 0x2010 = Some (nth_byte (mword_of_int SH_BASE) 0)], whose
+   [bv_unsigned] is 136. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -1219,14 +1220,15 @@ Section UProofShMem.
       assert (Hc : (sign_extend' 64 (mword_of_int 4088 : mword 12) : mword 64)
                    = mword_of_int (-8)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite Hc moi_add. f_equal; lia. }
-    assert (Hbpsz2 : uM_bytes M2 (bp + 8) 8 (mword_of_int nu : mword 64))
+    (* [bp->s.size] is a C [uint]: FOUR bytes, exactly what the [lw] reads *)
+    assert (Hbpsz2 : uM_bytes M2 (bp + 8) 4 (mword_of_int nu : mword 32))
       by (intros j Hj; rewrite (HeqM2 (bp + 8 + Z.of_nat j) ltac:(lia));
           exact (Hbpsz j Hj)).
     destruct (uv_slot4_facts (bp + 8) (mword_of_int (bp + 8)) ltac:(lia) ltac:(lia)
                 ltac:(lia) eq_refl) as (Hu3 & Hcn3 & Hpg3 & Hal3).
     assert (Hbw3 : uM_bytes M2 (uint (mword_of_int (bp + 8) : mword 64)) 4
                      (mword_of_int nu : mword 32))
-      by (rewrite Hu3; exact (uM_bytes_4_of_8 M2 (bp + 8) nu Hbpsz2)).
+      by (rewrite Hu3; exact Hbpsz2).
     destruct (heap_leaf (bp + 8) Hlay ltac:(lia)) as (wh1 & Hwh1 & Hwhl1 & Hwhs1).
     iApply (wp_uv_lw C pt Psh M2 m5 (mword_of_int 0x1136)
               (mword_of_int 4088 : mword 12) a0_idx a1_idx
@@ -1753,7 +1755,7 @@ Section UProofShMem.
     { intros j Hj. rewrite (Hne5 (bp + Z.of_nat j) ltac:(lia)).
       rewrite (Hne4 (bp + Z.of_nat j) ltac:(lia)).
       exact (uM_store8_bytes M2 bp (mword_of_int 8328 : mword 64) j Hj). }
-    assert (Rsz : uM_bytes M5 (bp + 8) 8 (mword_of_int nu : mword 64)).
+    assert (Rsz : uM_bytes M5 (bp + 8) 4 (mword_of_int nu : mword 32)).
     { intros j Hj. rewrite (Hne5 (bp + 8 + Z.of_nat j) ltac:(lia)).
       rewrite (Hne4 (bp + 8 + Z.of_nat j) ltac:(lia)).
       rewrite (Hne3 (bp + 8 + Z.of_nat j) ltac:(lia)).
