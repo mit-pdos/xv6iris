@@ -429,6 +429,64 @@ Proof.
   reflexivity.
 Qed.
 
+
+(* ...and the RESERVED 8-byte read, which is what the page walk's A/D
+   write-back issues for its exclusive re-read of the leaf.
+   [read_kind_of_flags false false true] is [Read_RISCV_reserved], which the
+   model maps to an AV_exclusive access kind -- the whole difference from the
+   plain request. *)
+Definition mread_req8_res (pa : SailStdpp.Values.mword 64)
+    : Interface.ReadReq.t 8 :=
+  {| Interface.ReadReq.pa := pa;
+     Interface.ReadReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_explicit
+         {| SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety
+              := SailStdpp.ConcurrencyInterfaceTypes.AV_exclusive;
+            SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_strength
+              := SailStdpp.ConcurrencyInterfaceTypes.AS_normal |};
+     Interface.ReadReq.va := None;
+     Interface.ReadReq.translation := tt;
+     Interface.ReadReq.tag := false |}.
+
+Lemma hread_req_at_read_ram8_res (pa : SailStdpp.Values.mword 64) :
+  hread_req_at 8 (read_ram Read_RISCV_reserved (Physaddr pa) 8 false)
+  = Some (mread_req8_res pa).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_req_at].
+  destruct (decide (8%N = 8%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hread_resume_read_ram8_res (pa : SailStdpp.Values.mword 64) (w : bv 64) :
+  hread_resume (bv_unsigned w) (read_ram Read_RISCV_reserved (Physaddr pa) 8 false)
+  = Interface.Ret (w, default_meta).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_resume].
+  rewrite Z_to_bv_bv_unsigned TypeCasts.cast_N_refl.
+  reflexivity.
+Qed.
+
 (* WIDTH-GENERIC, and the RAM-access fact arrives as a PREMISE rather than
    being derived here from [addr_is_ram] + 4-alignment.  That is what keeps
    the chain width-agnostic: the alignment arithmetic is width-specific, so

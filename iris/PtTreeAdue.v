@@ -399,7 +399,8 @@ Local Ltac scmr_read :=
   end.
 
 Lemma hfrun_check_pma_pte (D Drw : gset register) (rs : regstate)
-    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (n : Z) :
+    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (n : Z)
+    (con : bool) :
   (pma_regions : register) ∈ D ->
   register_lookup pma_regions rs = pmar0 ->
   pma_allows_ram pmar0 ->
@@ -407,7 +408,7 @@ Lemma hfrun_check_pma_pte (D Drw : gset register) (rs : regstate)
   is_aligned_paddr (Physaddr pa) n = true ->
   hfrun 6 D Drw rs
     (check_pma_with_pmp_priority (Load PageTableEntry) PBMT_PMA Supervisor
-       (Physaddr pa) n false)
+       (Physaddr pa) n con)
   = Some (Values.Ok
             {| Phys_Mem_Access_Info_splittable := CannotSplit;
                Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
@@ -623,7 +624,7 @@ Section pteread.
                  Supervisor (Physaddr pa) 8 false) _ _ C HC
               with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_check_pma_pte (Drw ∪ Dro) Drw rs pa pmar0 8
+                (hfrun_check_pma_pte (Drw ∪ Dro) Drw rs pa pmar0 8 false
                    HD Hpma Hpallow Hacc Hpa) with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite mbind_ret. cbn beta iota zeta.
@@ -677,6 +678,20 @@ Section pteread.
   (* [read_pte] on top of the node: [mem_read_priv] at [Load PageTableEntry]
      is [checked_mem_read] plus the callback and the meta drop, both pure.
      [SmodePte.exec_read_pte_S] reduces the same two steps on the exec side. *)
+  (* NO STANDALONE EXCLUSIVE PTE RE-READ, and that is the model's design
+     rather than a gap.  [RiscvLang]'s MemRead arm GUARDS the plain RAM read
+     with [ak_excl = false] and hands every exclusive read to the FUSED
+     arm -- the read, the silent steps between, and the paired conditional
+     write are ONE step, because on this machine an LR/SC pair is one step.
+     ([RiscvLang.wr_node]'s comment states the other half: a STANDALONE
+     conditional write is unguarded on purpose and takes the ordinary store
+     arm, which is why [swp_checked_mem_write_pte8_con] above is sound.)
+
+     So the A/D write-back cannot be assembled from a read node and a write
+     node.  It goes through [HartAmo.wp_hart_amo], which is already proved
+     and already has exactly this shape: an exclusive read, [k] footprinted
+     silent steps, and the conditional write it lands on. *)
+
   Lemma swp_read_pte_S (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pa : SailStdpp.Values.mword 64) (w : bv 64) :
     gen_cert -∗
