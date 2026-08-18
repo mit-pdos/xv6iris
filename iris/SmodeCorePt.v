@@ -22,13 +22,13 @@
      - the regime's non-cell RESIDUE as a family
        [Res : type_of_register tlb -> iProp Σ] ([SRegime.sr_swp_res] at
        the tlb value the cell carries -- [tlb_snap_ok tv ∗ kpt_inv] at
-       [kpt_share_regime_swp], [True] at [bare_regime_swp]);
+       [kpt_share_regime], [True] at [bare_regime]);
      - the regime's FETCH TRANSLATION as a persistent obligation
        ([spt_fetch_tr], which is [SRegime.sr_swp_translate] at
        [InstructionFetch tt] instantiated at the wrapper's tower).
 
-   THE WRAPPER IS NOT PARAMETERISED BY [(R : s_regime) (RS :
-   s_regime_swp R)], and the reason is structural: [sr_swp_res] is a
+   THE RAW-CELL WRAPPER IS NOT PARAMETERISED BY [R : s_regime] at all,
+   and the reason is structural: [sr_swp_res] is a
    function of the FILE and [sr_swp_side] mentions the file and a
    reference [mstate], while the wrapper's file is a tower whose
    components come out of [pc_is] and [hw_config] EXISTENTIALLY.  No
@@ -2503,9 +2503,9 @@ Section SmodeCorePt.
   (* =================================================================== *)
   (* PART H -- THE THREE WRAPPERS.                                        *)
   (*                                                                     *)
-  (* WHAT THEY ARE PARAMETERISED BY, and why it is not [(R : s_regime)    *)
-  (* (RS : s_regime_swp R)] (the choice this conversion had to make, and  *)
-  (* the reason, recorded so it is not re-litigated):                     *)
+  (* WHAT THEY ARE PARAMETERISED BY, and why the RAW-CELL one is not      *)
+  (* parameterised by [R : s_regime] (the choice this conversion had to    *)
+  (* make, and the reason, recorded so it is not re-litigated):            *)
   (*                                                                     *)
   (*   [SRegime.sr_swp_res] is a function of the FILE, and                *)
   (*   [sr_swp_side] mentions the file and a reference [mstate] as well.  *)
@@ -2517,7 +2517,7 @@ Section SmodeCorePt.
   (*     - [Res : type_of_register tlb -> iProp Σ], the residue as a      *)
   (*       function of the one component of the file it actually depends  *)
   (*       on (it is [KptShare.tlb_snap_ok tv ∗ kpt_inv] at               *)
-  (*       [kpt_share_regime_swp], [True] at [bare_regime_swp]), and      *)
+  (*       [kpt_share_regime], [True] at [bare_regime]), and          *)
   (*     - the regime's FETCH TRANSLATION as a persistent obligation      *)
   (*       ([spt_tr_obl], which is [sr_swp_translate] at                  *)
   (*       [InstructionFetch tt] instantiated at the tower).              *)
@@ -2902,7 +2902,7 @@ Section SmodeCorePt.
   Local Ltac tlbpeel := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
   Lemma spt_tr_obl_of_regime
-      (R : s_regime) (RS : s_regime_swp R)
+      (R : s_regime)
       (Df : register -> dfrac) (Db : register -> bool)
       (pc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (pcfg : type_of_register pmpcfg_n)
@@ -2913,23 +2913,18 @@ Section SmodeCorePt.
     misa0 = MISA_C ->
     menv0 = MENVCFG_S ->
     _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
     (forall r : register, Db r = true -> r ∈ s_Drw ∪ s_Dro) ->
     (forall r : register, D_leafchk r = true -> r ∈ s_Drw ∪ s_Dro) ->
-    (forall (va : mword 64) (ppn : mword 44),
-       ktier_pin cur_ktier ppn va -> sr_adm R va ppn) ->
-    (forall (va : mword 64) (ppn : mword 44) (tv : type_of_register tlb),
-       (uint va < 274877906944)%Z -> ktier_pin cur_ktier ppn va ->
-       sr_swp_side R RS (InstructionFetch tt) va ppn KP_rx Db s_Drw s_Dro
-         (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
-            senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
-         (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
-            mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
-            ∅ dev0_state)) ->
+    Db mstatus = true -> Db satp = true ->
+    sr_swp_satp_ok R satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pma_allows_ram pmar0 ->
     gen_cert -∗
     spt_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
-      senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 (sr_swp_res_at R RS satp0).
+      senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 (sr_swp_res_at R satp0).
   Proof.
-    intros Hmisa Hmenv HSXL HDb HDlc Hadm Hside.
+    intros Hmisa Hmenv HSXL HMPRV HDb HDlc HDm HDs Hsok Hpmp Hpma.
     iIntros "#Hcert". rewrite /spt_tr_obl. iModIntro.
     iIntros (va ppn tv rr) "%Hlt %Hpin #Hat Hfrag HRes Hrw Hro".
     (* the reference state's three pure pins, read off the tower *)
@@ -2949,16 +2944,35 @@ Section SmodeCorePt.
               = 'b"10").
     { rewrite s_rs_mst. exact HSXL. }
     (* the residue at the PRE-file *)
-    iAssert (sr_swp_res R RS
+    iAssert (sr_swp_res R
                (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
       with "[HRes]" as "HRes'".
-    { rewrite -(sr_swp_res_agree R RS
+    { rewrite -(sr_swp_res_agree R
                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)).
       rewrite s_rs_satp s_rs_tlb. iExact "HRes". }
+    (* the regime's own side condition, out of the pure config facts *)
+    assert (Hside : sr_swp_side R (InstructionFetch tt) va ppn KP_rx Db
+                      s_Drw s_Dro
+                      (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+                 misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                      (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+                 misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                         ∅ dev0_state)).
+    { apply (sr_swp_side_ok R (InstructionFetch tt) va ppn KP_rx Db
+               s_Drw s_Dro).
+      - left. reflexivity.
+      - rewrite s_rs_satp. exact Hsok.
+      - rewrite s_rs_pcfg s_rs_paddr. exact Hpmp.
+      - rewrite s_rs_pma. exact Hpma.
+      - rewrite s_rs_mst. exact HMPRV.
+      - exact HDm.
+      - exact HDs.
+      - cbn [sregs]. rewrite s_rs_mst. exact HSXL.
+      - reflexivity. }
     iApply (swp_mono with "[] [-]").
-    2:{ iApply (sr_swp_translate R RS (InstructionFetch tt) s_Drw s_Dro Df
+    2:{ iApply (sr_swp_translate R (InstructionFetch tt) s_Drw s_Dro Df
                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
                   (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
@@ -2976,14 +2990,14 @@ Section SmodeCorePt.
                   (exec_is_shadow_stack_fetch _)
                   (goodb_is_shadow_stack_fetch Db _)
                   (lo_canonical va Hlt) eq_refl
-                  (Hadm va ppn Hpin) (Hside va ppn tv Hlt Hpin)
+                  (sr_adm_of_pin R va ppn Hpin) Hside
                   with "Hat Hcert Hfrag HRes' Hrw Hro"). }
     iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
     iSplitR; [done |].
     destruct Hshape as [-> | (tvx & ->)].
     - (* the TLB hit: the file did not move *)
       iExists tv. iFrame "Hany Hrw Hro".
-      iEval (rewrite -(sr_swp_res_agree R RS
+      iEval (rewrite -(sr_swp_res_agree R
                 (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                    mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
              s_rs_satp s_rs_tlb) in "HRes".
@@ -3037,7 +3051,7 @@ Section SmodeCorePt.
       iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
       iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
       iExists tvx. iFrame "Hany Hrw Hro".
-      iEval (rewrite -(sr_swp_res_agree R RS
+      iEval (rewrite -(sr_swp_res_agree R
                 (register_set tlb tvx
                    (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                       mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)))
@@ -3523,7 +3537,7 @@ Section SmodeCorePt.
   (* the very facts [sr_swp_open] produced -- which is why the regime is   *)
   (* re-formed without the caller ever naming a satp value.                *)
   (* ==================================================================== *)
-  Lemma wp_instr_s_config_sr (R : s_regime) (RS : s_regime_swp R)
+  Lemma wp_instr_s_config_sr (R : s_regime)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (mstatus1 mie1 mdv1 menvcfg1 : mword 64)
@@ -3549,8 +3563,8 @@ Section SmodeCorePt.
        turns out to hold *)
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
        (paddr : type_of_register pmpaddr_n),
-       ⌜ sr_swp_satp_ok R RS satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
-       spt_fetch_tr (s_Df_mix dq) (sr_swp_res_at R RS satp0) pc mstatus0
+       ⌜ sr_swp_satp_ok R satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       spt_fetch_tr (s_Df_mix dq) (sr_swp_res_at R satp0) pc mstatus0
          satp0 mie_v mdv0 menvcfg0 pcfg paddr) -∗
     (* THE LEAF'S OBLIGATION, at the bundle's cells and the walk's landing
        tlb value *)
@@ -3562,7 +3576,7 @@ Section SmodeCorePt.
        mideleg ↦ᵣ{ dq } mdv0 -∗
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-       tlb ↦ᵣ tv' -∗ sr_swp_res_at R RS satp0 tv' -∗
+       tlb ↦ᵣ tv' -∗ sr_swp_res_at R satp0 tv' -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
@@ -3575,7 +3589,7 @@ Section SmodeCorePt.
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
                    pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
-                   sr_swp_res_at R RS satp0 tv' ∗
+                   sr_swp_res_at R satp0 tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3595,10 +3609,10 @@ Section SmodeCorePt.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval.
     iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
              Hinstr Htr Hex Hcont".
-    iDestruct (sr_swp_open R RS with "Hinv") as (satp0 tlbv pcfg paddr)
+    iDestruct (sr_swp_open R with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
     destruct Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iApply (wp_instr_s_config_regime (sr_swp_res_at R RS satp0) pc is_rvc i
+    iApply (wp_instr_s_config_regime (sr_swp_res_at R satp0) pc is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mstatus1 mie1 mdv1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
@@ -3614,7 +3628,7 @@ Section SmodeCorePt.
       iApply ("Hcont" $! npc with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
                  [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
-      iApply (sr_swp_close R RS satp0 tv1 pcfg paddr Hsatpok
+      iApply (sr_swp_close R satp0 tv1 pcfg paddr Hsatpok
                 ltac:(unfold pmp_ent0_ok; split_and!; assumption)
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
@@ -3622,7 +3636,7 @@ Section SmodeCorePt.
   (* the bundle twin, on [SmodeCore.smode_config] *)
   (* NOTE: the leaf's obligation is ∀ over the config values because
      [smode_config] quantifies them, exactly as [wp_instr_s_regime] does. *)
-  Lemma wp_instr_s_sr (R : s_regime) (RS : s_regime_swp R) (γ : gname)
+  Lemma wp_instr_s_sr (R : s_regime) (γ : gname)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
     smode_config γ dq -∗
@@ -3636,8 +3650,8 @@ Section SmodeCorePt.
        ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ -∗
        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
        ⌜ menvcfg0 = MENVCFG_S ⌝ -∗
-       ⌜ sr_swp_satp_ok R RS satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
-       spt_fetch_tr (s_Df_mix dq) (sr_swp_res_at R RS satp0) pc mstatus0
+       ⌜ sr_swp_satp_ok R satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       spt_fetch_tr (s_Df_mix dq) (sr_swp_res_at R satp0) pc mstatus0
          satp0 mie_v mdv0 menvcfg0 pcfg paddr) -∗
     (∀ (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
        (pcfg : type_of_register pmpcfg_n)
@@ -3648,7 +3662,7 @@ Section SmodeCorePt.
        mideleg ↦ᵣ{ dq } mdv0 -∗
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-       tlb ↦ᵣ tv' -∗ sr_swp_res_at R RS satp0 tv' -∗
+       tlb ↦ᵣ tv' -∗ sr_swp_res_at R satp0 tv' -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
@@ -3661,7 +3675,7 @@ Section SmodeCorePt.
                    menvcfg ↦ᵣ{ dq } menvcfg0 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
                    pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
-                   sr_swp_res_at R RS satp0 tv' ∗
+                   sr_swp_res_at R satp0 tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3679,7 +3693,7 @@ Section SmodeCorePt.
     iDestruct "Hmiebundle" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
     iDestruct "Hmenvbundle" as (menvcfg0)
       "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
-    iApply (wp_instr_s_config_sr R RS pc is_rvc i mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_instr_s_config_sr R pc is_rvc i mstatus0 mie_v mdv0 menvcfg0
               mstatus0 mie_v mdv0 menvcfg0 Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
