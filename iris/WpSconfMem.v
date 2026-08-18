@@ -113,13 +113,32 @@ Section WpSconfMem.
      rides beside it.  Every caller has it: an owner of the window reads it
      off the points-to ([wordw_claim_of]), and an invariant-backed caller
      off one peek-open of its (persistent) accessor. *)
-  Definition wordw_claim `{KTR : !CurKtier} (width : Z) (a : Arch.pa) : iProp Σ :=
-    (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
-     ∃ ppn : mword 44,
+  (* THE BYTE'S CLAIM: [mem_pointsto] minus the physical ownership -- the
+     mapping, canonicality, RAM-ness and the tier pin.  THE ONE LEMMA every
+     translation side-condition is derived from ([mem_pointsto_claim]); the
+     word form below is this at byte 0 plus the word's alignment. *)
+  Definition mem_claim `{KTR : !CurKtier} (a : Arch.pa) : iProp Σ :=
+    (∃ ppn : mword 44,
        kmap_at (svpn_of a) ppn KP_rw ∗
        ⌜(uint a < 274877906944)%Z⌝ ∗
        ⌜addr_is_ram (pa_of ppn a)⌝ ∗
        ⌜ktier_pin cur_ktier ppn a⌝)%I.
+
+  Global Instance mem_claim_persistent `{KTR : !CurKtier} a :
+    Persistent (mem_claim a).
+  Proof. apply _. Qed.
+
+  Lemma mem_pointsto_claim `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac) (b : bv 8) :
+    a ↦ₘ{dq} b -∗ mem_claim a.
+  Proof.
+    iIntros "Hb".
+    iDestruct (mem_pointsto_acc with "Hb")
+      as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & _ & _)".
+    iExists ppn. iFrame "Hk". done.
+  Qed.
+
+  Definition wordw_claim `{KTR : !CurKtier} (width : Z) (a : Arch.pa) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗ mem_claim a)%I.
 
   Global Instance wordw_claim_persistent `{KTR : !CurKtier} width a :
     Persistent (wordw_claim width a).
@@ -134,9 +153,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 _]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0")
-      as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & _ & _)".
-    iSplitR; [done|]. iExists ppn. iFrame "Hk". done.
+    iSplitR; [done|]. iApply (mem_pointsto_claim with "Hb0").
   Qed.
 
   Local Lemma write_bytes_1 (mm : _) (pa : Arch.pa) (v : bv 8) :
