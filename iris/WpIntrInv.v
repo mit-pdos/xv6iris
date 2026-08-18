@@ -1222,6 +1222,36 @@ Section IntrEngine.
     split_and!; try reflexivity; vm_compute; reflexivity.
   Qed.
 
+
+  (* ------------------------------------------------------------------ *)
+  (* THE PINNED-mstatus BUNDLE, WITH cur_privilege STILL IN HAND.          *)
+  (*                                                                      *)
+  (* [IntrDefs.sconf_at ms] is the accessor a leaf wants -- the mstatus     *)
+  (* triple at a NAMED value plus a closer -- but the closer swallows       *)
+  (* [cur_privilege], and the cycle's own frame has to hold that cell       *)
+  (* across the tick ([i_Dro]; the prelude reads it).  So the engine takes  *)
+  (* the leaf's bundle back in the form [sconf_priv_open] already produces: *)
+  (* the same three pieces with the privilege cell OUT.  It is strictly     *)
+  (* stronger than [sconf_at ms] and a leaf produces it in one step.        *)
+  (* ------------------------------------------------------------------ *)
+  Definition sconf_at_priv (ms : mword 64) : iProp Σ :=
+    (sconf_priv_closer ∗ cur_privilege ↦ᵣ Supervisor ∗ sconf_msown ms)%I.
+
+  Lemma sconf_at_priv_open : sconf -∗ ∃ ms : mword 64, sconf_at_priv ms.
+  Proof.
+    iIntros "H". iDestruct (sconf_priv_open with "H") as (ms) "(Hcl & Hp & Ho)".
+    iExists ms. rewrite /sconf_at_priv. iFrame "Hcl Hp Ho".
+  Qed.
+
+  (* ...and back, once the privilege cell has come out of the frame *)
+  Lemma sconf_at_of_priv (ms : mword 64) :
+    sconf_priv_closer -∗ cur_privilege ↦ᵣ Supervisor -∗ sconf_msown ms -∗
+    sconf_at ms.
+  Proof.
+    iIntros "Hcl Hpriv Hown". rewrite /sconf_at. iFrame "Hown".
+    iIntros (ms') "Hown'". iApply ("Hcl" with "Hpriv Hown'").
+  Qed.
+
   Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) : Prop :=
     pmpAddrMatchType_encdec_backwards
@@ -1320,7 +1350,8 @@ Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
    written without them. *)
 Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
-    (i : instruction) (R : mword 64 -> regfile -> nat -> iProp Σ)
+    (i : instruction) (b' : bool)
+    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     `{CID : CpuId} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
@@ -1331,21 +1362,22 @@ Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     clock_res -∗
     swp (execute i)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-         ∃ (npc : mword 64) (m' : regfile) (av' : nat),
+         ∃ (npc ms' : mword 64) (m' : regfile) (av' : nat),
            (R_bitvector_64 PC) ↦ᵣ pc0 ∗
            (R_bitvector_64 nextPC) ↦ᵣ npc ∗
            resv_any cpu_id ∗ clock_res ∗
-           sconf ∗ sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
-           R npc m' av'))
-   ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
-        sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗ R npc m' av' -∗
+           sconf_at_priv ms' ∗ sie_cap kt m' av' b' p ∗
+           gpr_file (tp_pin m') ∗ R npc ms' m' av'))
+   ∗ (∀ (npc ms' : mword 64) (m' : regfile) (av' : nat),
+        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R npc ms' m' av' -∗
         WP (Loop : expr riscv_lang)))%I.
 
 (* ...and the CLOCK-FREE reading, for the leaves that never touch a clock
    cell: the same callback with the three cells passed straight through. *)
 Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
-    (i : instruction) (R : mword 64 -> regfile -> nat -> iProp Σ)
+    (i : instruction) (b' : bool)
+    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     `{CID : CpuId} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
@@ -1355,14 +1387,14 @@ Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     resv_any cpu_id -∗
     swp (execute i)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-         ∃ (npc : mword 64) (m' : regfile) (av' : nat),
+         ∃ (npc ms' : mword 64) (m' : regfile) (av' : nat),
            (R_bitvector_64 PC) ↦ᵣ pc0 ∗
            (R_bitvector_64 nextPC) ↦ᵣ npc ∗
            resv_any cpu_id ∗
-           sconf ∗ sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
-           R npc m' av'))
-   ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
-        sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗ R npc m' av' -∗
+           sconf_at_priv ms' ∗ sie_cap kt m' av' b' p ∗
+           gpr_file (tp_pin m') ∗ R npc ms' m' av'))
+   ∗ (∀ (npc ms' : mword 64) (m' : regfile) (av' : nat),
+        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R npc ms' m' av' -∗
         WP (Loop : expr riscv_lang)))%I.
 
 (* the CYCLE'S RIDER, keyed on the file the body landed on ([rs2]): its
@@ -1371,17 +1403,18 @@ Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
    not tie down. *)
 Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
-    (i : instruction) (R : mword 64 -> regfile -> nat -> iProp Σ)
+    (i : instruction) (b' : bool)
+    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
   ((* --- RETIRE: the leaf kept the bundles, at its own map --- *)
-                (∃ (m' : regfile) (av' : nat),
-                   sconf_priv_closer ∗ (∃ ms : mword 64, sconf_msown ms) ∗
-                   sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
+                (∃ (ms' : mword 64) (m' : regfile) (av' : nat),
+                   sconf_priv_closer ∗ sconf_msown ms' ∗
+                   sie_cap kt m' av' b' p ∗ gpr_file (tp_pin m') ∗
                    resv_any cpu_id ∗
-                   R (register_lookup (R_bitvector_64 nextPC) rs2) m' av' ∗
-                   (∀ (npc0 : mword 64) (m0 : regfile) (av0 : nat),
-                      sie_cap_gpr kt m0 av0 true p -∗ pc_is npc0 -∗
-                      R npc0 m0 av0 -∗ WP (Loop : expr riscv_lang)))
+                   R (register_lookup (R_bitvector_64 nextPC) rs2) ms' m' av' ∗
+                   (∀ (npc0 ms0 : mword 64) (m0 : regfile) (av0 : nat),
+                      sie_cap_gpr_at kt ms0 m0 av0 b' p -∗ pc_is npc0 -∗
+                      R npc0 ms0 m0 av0 -∗ WP (Loop : expr riscv_lang)))
                 ∨
                 (* --- TRAP: the entry package, minus what the frame holds --- *)
                 (∃ (sc mstT mdvT : mword 64),
@@ -1400,18 +1433,18 @@ Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
                      (register_lookup (R_bitvector_64 nextPC) rs2) ∗
                    gpr_file (tp_pin m) ∗ resv_any cpu_id ∗
                    wp_next true p (fun CID =>
-                     intr_cb_clock kt m av p pc0 is_rvc i R (CID := CID))))%I.
+                     intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))))%I.
 
 Lemma wp_exec_step_intr_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
-    (is_rvc : bool) (i : instruction)
-    (R : mword 64 -> regfile -> nat -> iProp Σ) :
+    (is_rvc : bool) (i : instruction) (b' : bool)
+    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
   ret_pc pc0 = pc0 ->
   sie_cap_gpr kt m av true p -∗
   pc_is pc0 -∗
   instr pc0 is_rvc i -∗
   ▷ wp_next true p (fun CID =>
-      intr_cb_clock kt m av p pc0 is_rvc i R (CID := CID)) -∗
+      intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID)) -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros Hpc0.
@@ -1468,7 +1501,7 @@ Proof.
                rsx = wrap_post rs2 mi)
             (fun rsx => ∃ (rs2 : regstate) (mi : mword 64),
                ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2 /\
-                rsx = wrap_post rs2 mi⌝ ∗ intr_psi kt m av p pc0 is_rvc i R rs2)%I
+                rsx = wrap_post rs2 mi⌝ ∗ intr_psi kt m av p pc0 is_rvc i b' R rs2)%I
             i_disj i_w_cy i_w_ti i_w_ip
             with "Hcert Hresv [-] []").
   { (* ==================== THE CYCLE'S BODY ==================== *)
@@ -1478,7 +1511,7 @@ Proof.
                   (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
          (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbv)
                   (intr_Q (minstret_inc_flag mc micfg Supervisor))
-                  (intr_psi kt m av p pc0 is_rvc i R)
+                  (intr_psi kt m av p pc0 is_rvc i b' R)
                   i_disj i_in_priv i_in_hart i_in_mc i_in_micfg i_w_mi
                   i_in_mi i_w_ms i_in_ms i_w_PC i_in_PC i_in_nPC
                   ltac:(by srs)
@@ -1520,7 +1553,7 @@ Proof.
          mdv0 MENVCFG_S tlbv) root_ppn pc0 is_rvc i
                       ip mdv0 mst0
                       (wp_next true p (fun CID =>
-                         intr_cb_clock kt m av p pc0 is_rvc i R (CID := CID))
+                         intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))
                        ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
                        ∗ sret_tie mst0
                        ∗ stack_own (KTR := kt) (m !!! Regidx csp_rs1)
@@ -1537,13 +1570,13 @@ Proof.
                       (∃ rs2 : regstate,
                         ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2⌝ ∗
                         hreg_frame rs2 i_Drw ∗ hreg_frame_ro i_Df rs2 i_Dro ∗
-                        intr_psi kt m av p pc0 is_rvc i R rs2)%I
+                        intr_psi kt m av p pc0 is_rvc i b' R rs2)%I
                       (fun ii pr => ∃ rs2 : regstate,
                         ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2⌝ ∗
                         swp (handle_interrupt ii pr)
                           (fun _ => hreg_frame rs2 i_Drw ∗
                                     hreg_frame_ro i_Df rs2 i_Dro ∗
-                                    intr_psi kt m av p pc0 is_rvc i R rs2))%I
+                                    intr_psi kt m av p pc0 is_rvc i b' R rs2))%I
                       ltac:(by srs) ltac:(by srs)
                       ltac:(srs; exact Hmisaval)
                       ltac:(srs; exact Hsecval)
@@ -1700,11 +1733,10 @@ Proof.
             iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
             2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv' Hclk"). }
             iIntros (e) "(-> & Hres)".
-            iDestruct "Hres" as (npc m' av')
+            iDestruct "Hres" as (npc ms' m' av')
               "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
             iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
-            iDestruct (sconf_priv_open with "Hsc'") as (msT)
-              "(Hcl & Hpriv' & Hmsown)".
+            iDestruct "Hsc'" as "(Hcl & Hpriv' & Hmsown)".
             iSplitR; [done|].
             iExists (s_rs pc0 npc msr (minstret_inc_flag mc micfg Supervisor)
                    cy' ti' ip'
@@ -1716,9 +1748,8 @@ Proof.
             { rewrite i_rw_split. srs. iFrame. }
             iSplitL "HnPC Hhs Hpriv'".
             { rewrite i_ro_split. srs. iFrame "HnPC Hhs Hpriv' Hmc Hmicfg". }
-            iLeft. iExists m', av'.
-            iFrame "Hcl Hcap' Hfile' Hresv2 Hcont".
-            iSplitL "Hmsown"; [ by iExists msT |].
+            iLeft. iExists ms', m', av'.
+            iFrame "Hcl Hmsown Hcap' Hfile' Hresv2 Hcont".
             srs. iExact "HRv". }
         iIntros (st) "[Hi | Hr]".
         - iDestruct "Hi" as (ii pr) "(-> & Hq)".
@@ -1771,15 +1802,14 @@ Proof.
       by iFrame. }
     iDestruct "Hpsi" as "[HRet | HTrap]".
     - (* ---- the instruction retired: hand the caller its own bundles ---- *)
-      iDestruct "HRet" as (m' av')
+      iDestruct "HRet" as (ms' m' av')
         "(Hcl & Hmsown & Hcap' & Hfile' & Hresv' & HRv & Hcont)".
-      iDestruct "Hmsown" as (msT) "Hmsown".
       iApply ("Hmkpc" with "[Hhs3 Hpriv3 Hcl Hmsown Hcap' Hfile' HRv Hcont]
                             Hresv'").
       iIntros "Hpc'".
       iApply ("Hcont" with "[Hhs3 Hpriv3 Hcl Hmsown Hcap' Hfile'] Hpc' HRv").
-      rewrite /sie_cap_gpr. iFrame "Hhs3 Hcap' Hfile'".
-      iApply ("Hcl" with "Hpriv3 Hmsown").
+      rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hcap' Hfile'".
+      iApply (sconf_at_of_priv ms' with "Hcl Hpriv3 Hmsown").
     - (* ---- a trap was taken: run the handler and re-enter the loop ---- *)
       iDestruct "HTrap" as (sc mstT mdvT)
         "(%HscT & %HmsfT & %HmmT & HmsT & HhalfT & HtieT & HmieT &
@@ -1814,17 +1844,17 @@ Qed.
 (* ===================================================================== *)
 Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
-    (is_rvc : bool) (i : instruction)
-    (R : mword 64 -> regfile -> nat -> iProp Σ) :
+    (is_rvc : bool) (i : instruction) (b' : bool)
+    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
   ret_pc pc0 = pc0 ->
   sie_cap_gpr kt m av true p -∗
   pc_is pc0 -∗
   instr pc0 is_rvc i -∗
-  ▷ wp_next true p (fun CID => intr_cb kt m av p pc0 is_rvc i R (CID := CID)) -∗
+  ▷ wp_next true p (fun CID => intr_cb kt m av p pc0 is_rvc i b' R (CID := CID)) -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros Hpc0. iIntros "Hcg Hpc Hinstr Hbody".
-  iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i R Hpc0
+  iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i b' R Hpc0
             with "Hcg Hpc Hinstr [Hbody]").
   iNext. iIntros (CID Hs).
   iDestruct (wp_next_at true p _ CID Hs with "Hbody") as "Hb".
@@ -1836,9 +1866,9 @@ Proof.
   iApply (swp_mono (CID := CID) with "[Hclk] [-]");
     [| iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv") ].
   iIntros (e) "(-> & Hres)".
-  iDestruct "Hres" as (npc m' av')
+  iDestruct "Hres" as (npc ms' m' av')
     "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
-  iSplitR; [done|]. iExists npc, m', av'. iFrame.
+  iSplitR; [done|]. iExists npc, ms', m', av'. iFrame.
 Qed.
 
 (* ===================================================================== *)

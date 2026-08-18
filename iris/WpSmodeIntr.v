@@ -108,28 +108,28 @@ Section WpSmodeIntr.
      the engine nothing -- and [csrr time] / [csrr sip] / [csrw stimecmp]
      cannot be written without them. *)
   Lemma wp_instr_s_intr_clock (m : regfile) (n : nat)
-      (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) :
+      (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     ret_pc pc = pc ->
     sie_cap_gpr kt m n true p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
     ▷ wp_next true p (fun (CID : CpuId) =>
-        intr_cb_clock kt m n p pc is_rvc i R (CID := CID)) -∗
+        intr_cb_clock kt m n p pc is_rvc i b' R (CID := CID)) -∗
     WP (Loop : expr riscv_lang).
-  Proof. exact (wp_exec_step_intr_clock pc m n p is_rvc i R). Qed.
+  Proof. exact (wp_exec_step_intr_clock pc m n p is_rvc i b' R). Qed.
 
   Lemma wp_instr_s_intr (m : regfile) (n : nat)
-      (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) :
+      (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     ret_pc pc = pc ->
     sie_cap_gpr kt m n true p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
     ▷ wp_next true p (fun (CID : CpuId) =>
-        intr_cb kt m n p pc is_rvc i R (CID := CID)) -∗
+        intr_cb kt m n p pc is_rvc i b' R (CID := CID)) -∗
     WP (Loop : expr riscv_lang).
-  Proof. exact (wp_exec_step_intr pc m n p is_rvc i R). Qed.
+  Proof. exact (wp_exec_step_intr pc m n p is_rvc i b' R). Qed.
 
   (* =================================================================== *)
   (* §2 THE SIE-AGNOSTIC FUNNEL over [sconf] + [sie_cap]: the capability's *)
@@ -144,9 +144,10 @@ Section WpSmodeIntr.
   (* on it).  Everything else here is proved, so when that lands the       *)
   (* instantiation is the ONLY edit.                                      *)
   (* =================================================================== *)
-  Definition sconf_step_obl_clock (m : regfile) (n : nat) (b : bool)
+  Definition sconf_step_obl_clock (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) (CID : CpuId) : iProp Σ :=
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+      (CID : CpuId) : iProp Σ :=
     ((sconf -∗
       sie_cap kt m n b p -∗
       gpr_file (tp_pin m) -∗
@@ -156,19 +157,20 @@ Section WpSmodeIntr.
       clock_res -∗
       swp (execute i)
         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-           ∃ (npc : mword 64) (m' : regfile) (n' : nat),
+           ∃ (npc ms' : mword 64) (m' : regfile) (n' : nat),
              (R_bitvector_64 PC) ↦ᵣ pc ∗
              (R_bitvector_64 nextPC) ↦ᵣ npc ∗
              resv_any cpu_id ∗ clock_res ∗
-             sconf ∗ sie_cap kt m' n' b p ∗ gpr_file (tp_pin m') ∗
-             R npc m' n'))
-     ∗ (∀ (npc : mword 64) (m' : regfile) (n' : nat),
-          sie_cap_gpr kt m' n' b p -∗ pc_is npc -∗ R npc m' n' -∗
+             sconf_at_priv ms' ∗ sie_cap kt m' n' b' p ∗
+             gpr_file (tp_pin m') ∗ R npc ms' m' n'))
+     ∗ (∀ (npc ms' : mword 64) (m' : regfile) (n' : nat),
+          sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R npc ms' m' n' -∗
           WP (Loop : expr riscv_lang)))%I.
 
-  Definition sconf_step_obl (m : regfile) (n : nat) (b : bool)
+  Definition sconf_step_obl (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) (CID : CpuId) : iProp Σ :=
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+      (CID : CpuId) : iProp Σ :=
     ((sconf -∗
       sie_cap kt m n b p -∗
       gpr_file (tp_pin m) -∗
@@ -177,38 +179,38 @@ Section WpSmodeIntr.
       resv_any cpu_id -∗
       swp (execute i)
         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-           ∃ (npc : mword 64) (m' : regfile) (n' : nat),
+           ∃ (npc ms' : mword 64) (m' : regfile) (n' : nat),
              (R_bitvector_64 PC) ↦ᵣ pc ∗
              (R_bitvector_64 nextPC) ↦ᵣ npc ∗
              resv_any cpu_id ∗
-             sconf ∗ sie_cap kt m' n' b p ∗ gpr_file (tp_pin m') ∗
-             R npc m' n'))
-     ∗ (∀ (npc : mword 64) (m' : regfile) (n' : nat),
-          sie_cap_gpr kt m' n' b p -∗ pc_is npc -∗ R npc m' n' -∗
+             sconf_at_priv ms' ∗ sie_cap kt m' n' b' p ∗
+             gpr_file (tp_pin m') ∗ R npc ms' m' n'))
+     ∗ (∀ (npc ms' : mword 64) (m' : regfile) (n' : nat),
+          sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R npc ms' m' n' -∗
           WP (Loop : expr riscv_lang)))%I.
 
   (* THE SIE=0 ARM.  STATED, NOT PROVED -- see the note above; it is
      [SmodeCorePt.wp_instr_s_config_regime strans_regime] once that file's
      regime-open/close fields land, with SIE=0 read off the ghost. *)
   Lemma wp_instr_s_sconf_off_clock (m : regfile) (n : nat)
-      (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) :
+      (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     sie_cap_gpr kt m n false p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
-    ▷ wp_next false p (sconf_step_obl_clock m n false pc is_rvc i R) -∗
+    ▷ wp_next false p (sconf_step_obl_clock m n false b' pc is_rvc i R) -∗
     WP (Loop : expr riscv_lang).
   Proof.
   Admitted.
 
   Lemma wp_instr_s_sconf_clock
-      (m : regfile) (n : nat) (b : bool)
+      (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
-    ▷ wp_next b p (sconf_step_obl_clock m n b pc is_rvc i R) -∗
+    ▷ wp_next b p (sconf_step_obl_clock m n b b' pc is_rvc i R) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr H".
@@ -223,28 +225,28 @@ Section WpSmodeIntr.
         iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
       assert (Hpc0 : ret_pc pc = pc)
         by (unfold ret_pc; exact (update_bit0_zero_of_aligned2 pc Hal2)).
-      iApply (wp_instr_s_intr_clock m n pc is_rvc i R Hpc0
+      iApply (wp_instr_s_intr_clock m n pc is_rvc i b' R Hpc0
                 with "Hcg Hpc Hinstr").
       iExact "H".
     - (* ---- b = false: the dispatch-None engine, SIE=0 from the ghost ---- *)
-      iApply (wp_instr_s_sconf_off_clock m n pc is_rvc i R
+      iApply (wp_instr_s_sconf_off_clock m n pc is_rvc i b' R
                 with "Hcg Hpc Hinstr").
       iExact "H".
   Qed.
 
   (* ...and the CLOCK-FREE reading, which is what the 68 call sites use. *)
   Lemma wp_instr_s_sconf
-      (m : regfile) (n : nat) (b : bool)
+      (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
-    ▷ wp_next b p (sconf_step_obl m n b pc is_rvc i R) -∗
+    ▷ wp_next b p (sconf_step_obl m n b b' pc is_rvc i R) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr H".
-    iApply (wp_instr_s_sconf_clock m n b pc is_rvc i R
+    iApply (wp_instr_s_sconf_clock m n b b' pc is_rvc i R
               with "Hcg Hpc Hinstr [H]").
     (* the rename has to come AFTER the sibling application; see §3 *)
     rename CID into CID0.
@@ -258,9 +260,9 @@ Section WpSmodeIntr.
     iApply (swp_mono (CID := CID) with "[Hclk] [-]");
       [| iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv") ].
     iIntros (e) "(-> & Hres)".
-    iDestruct "Hres" as (npc m' n')
+    iDestruct "Hres" as (npc ms' m' n')
       "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
-    iSplitR; [done|]. iExists npc, m', n'. iFrame.
+    iSplitR; [done|]. iExists npc, ms', m', n'. iFrame.
   Qed.
 
   (* =================================================================== *)
@@ -332,8 +334,8 @@ Section WpSmodeIntr.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iApply (wp_instr_s_sconf m n b pc true base
-              (fun npc m' n' => ⌜npc = add_vec_int pc 2⌝ ∗
+    iApply (wp_instr_s_sconf m n b b pc true base
+              (fun npc ms' m' n' => ⌜npc = add_vec_int pc 2⌝ ∗
                                 ⌜m' = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
                                 ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hex Hcont]").
@@ -355,10 +357,12 @@ Section WpSmodeIntr.
         [| iExact "Hexx" ].
       iIntros (e) "(-> & Hfile)".
       iSplitR; [done|].
-      iExists (add_vec_int pc 2),
+      iAssert (sconf (CID := CID)) with "[Hsc]" as "Hsc2".
+      { rewrite /sconf. iFrame "Hhw Hminv Hsc". }
+      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc2") as (ms') "Hscp".
+      iExists (add_vec_int pc 2), ms',
               (<[Regidx rd := regval_into_reg wval]> m), n.
-      iFrame "HPC HnPC Hresv".
-      iSplitL "Hsc". { iFrame "Hhw Hminv Hsc". }
+      iFrame "HPC HnPC Hresv Hscp".
       iSplitL "Hcap".
       { iApply (sie_cap_retarget m
                   (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap"). }
@@ -367,7 +371,8 @@ Section WpSmodeIntr.
           in "Hfile". iExact "Hfile". }
       done.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
-      iIntros (npc m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
@@ -409,8 +414,8 @@ Section WpSmodeIntr.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iApply (wp_instr_s_sconf m n b pc false base
-              (fun npc m' n' => ⌜npc = add_vec_int pc 4⌝ ∗
+    iApply (wp_instr_s_sconf m n b b pc false base
+              (fun npc ms' m' n' => ⌜npc = add_vec_int pc 4⌝ ∗
                                 ⌜m' = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
                                 ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hex Hcont]").
@@ -432,10 +437,12 @@ Section WpSmodeIntr.
         [| iExact "Hexx" ].
       iIntros (e) "(-> & Hfile)".
       iSplitR; [done|].
-      iExists (add_vec_int pc 4),
+      iAssert (sconf (CID := CID)) with "[Hsc]" as "Hsc2".
+      { rewrite /sconf. iFrame "Hhw Hminv Hsc". }
+      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc2") as (ms') "Hscp".
+      iExists (add_vec_int pc 4), ms',
               (<[Regidx rd := regval_into_reg wval]> m), n.
-      iFrame "HPC HnPC Hresv".
-      iSplitL "Hsc". { iFrame "Hhw Hminv Hsc". }
+      iFrame "HPC HnPC Hresv Hscp".
       iSplitL "Hcap".
       { iApply (sie_cap_retarget m
                   (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap"). }
@@ -444,7 +451,8 @@ Section WpSmodeIntr.
           in "Hfile". iExact "Hfile". }
       done.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
-      iIntros (npc m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
