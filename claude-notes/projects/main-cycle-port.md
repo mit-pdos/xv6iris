@@ -882,8 +882,14 @@ takes them back — the S-mode twin of `WpInstrMip.wp_instr_mip`.
 `SmodeCorePt.wp_instr_s_config_regime` (16 sites) / `wp_instr_s_regime` (2)
 / `wp_instr_s_config_tlbinv_pt`: same idea on raw cells (cur_privilege,
 mstatus, mie, mideleg, menvcfg cells in, `swp (execute i)` returning them,
-plus `sr_swp_res R` (the regime's residue) instead of `sr_inv R`, and
-`resv_frag cpu_id None` in / `resv_any cpu_id` out).  Fetch translation is
+`resv_frag cpu_id None` in / `resv_any cpu_id` out).  **`sr_inv R` STAYS THE
+SURFACE** (in, and back to the continuation): the regime-generic leaves
+(`wp_ld_s_r`, `wp_beq_fall_s_config_r`, `wp_sret_gpr_r`, …) carry `sr_inv R`
+in statements consumed by ProofSwtch/VcGenS/WpSconfSret/WpSmodePtAlu/
+WpSmodePtMemWrap.  The LEAF obligation gets the OPENED form -- the
+satp/tlb/pmpcfg_n/pmpaddr_n cells + a tlb-keyed residue + the pure facts --
+via new `s_regime_swp` fields `sr_swp_open` / `sr_swp_close` (proved for
+both instances), and returns it at the landing tlb value.  Fetch translation is
 `SRegime.sr_swp_translate` at `InstructionFetch`; data translation inside a
 leaf is the same field at the data access.
 
