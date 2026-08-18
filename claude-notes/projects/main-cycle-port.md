@@ -2537,9 +2537,9 @@ it here.  What is left is the rest:
 
 Branch `hart-node-port`, LOCAL ONLY (still nothing pushed).  Working tree
 CLEAN at handoff.  Last whole-tree run: `./gcp-rocq/run-on-gcp make -k -j36
-proofs`, **9 red roots**, down from 14 at the start of the session.
+proofs`, **8 red roots**, down from 14 at the start of the session.
 
-### THE NINE RED ROOTS, CLASSIFIED
+### THE EIGHT RED ROOTS, CLASSIFIED
 
 Each line is a ROOT: every file that merely depends on one is skipped by
 `-k`, not broken.
@@ -2549,7 +2549,6 @@ Each line is a ROOT: every file that merely depends on one is skipped by
 | `ProofKvminithart` | `iIntro: cannot turn … sconf_step_obl …` | **S-mode leaf, NOT ported** — see below |
 | `ProofMain` | `iSpecialize: cannot instantiate (tlb ↦ᵣ tlbvec0 -∗ …)` | ruling 1 (tlb → `bare_inv`) |
 | `ProofMainSecondary` | same | ruling 1 |
-| `ProofVirtioDiskIntr` | `iInv: cannot open invariant (disk_inv γd)` | ruling 2 (a read-only used-element accessor) |
 | `ProofUser` | `arm_LOAD_u C pt` — pre-port arity | P7 §5 assembly + the last 2 arms |
 | `UserretPt` | `wp_instr_u_pt` not found | trampoline lane (b) |
 | `UservecExitPt` | `wp_instr_u_pt` not found | trampoline lane (a)+(b) |
@@ -2595,6 +2594,10 @@ Doing this lane turns THREE roots green and is the largest single win left.
 - Assorted port-shape corrections: `hw_config`'s trailing conjunct in three
   ipatterns, `user_trap_frame_open`'s `pc_is`, `minstret_inv`'s lost hart
   index.
+- **Ruling 2**: `VirtioProto.virtio_proto_used_peek`, the read-only
+  used-element accessor (`virtio_proto_reclaim_acc`'s closer is one-shot, so
+  it cannot serve a claim that must arrive BEFORE the update).
+  `ProofVirtioDiskIntr` is green.
 
 ### HOW TO RESUME (for a fresh session/agent)
 
@@ -2607,8 +2610,8 @@ Doing this lane turns THREE roots green and is the largest single win left.
    `run-on-gcp` runs WITHOUT the opam switch (`rocq: not found`) — prefix it
    with `opam exec --switch=/shared/xv6rocq --` if you want a single file.
 3. Pick a lane.  In descending order of roots-per-effort: the kvminithart
-   sfence leaf (3 roots), the VirtioProto read-only accessor (1), the
-   trampoline leaves (3, but they need `wp_instr_u_pt` first), the last two
+   sfence leaf (3 roots), the trampoline leaves (3, but they need
+   `wp_instr_u_pt` first), `WpUmodeStep` (1, not started), the last two
    memory arms + P7 §5 (1, and it is the biggest).
 4. Standing rules, unchanged: no caller-visible leaf/spec statement change
    without the user; every address claim from
