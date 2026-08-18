@@ -387,3 +387,64 @@ a po-later event of the same agent back to `c`).
   Track-A lemma does); `WeakRobustDisc.foreign_ts_unforwarded` discharges
   it for any cross-agent edge, which is the only case a cycle segment
   has.
+
+
+## 8. NO SIDE CONDITIONS — the certification route (2026-08-18, after the user's veto of SF-1/2/3)
+
+The user rejects any manual side condition; SF-1/2/3 must come from the WPs.
+The mechanism that makes this possible is CERTIFICATION, and the reason it
+was invisible so far is that our full machine has unconditional promises:
+
+- PARM proves `Machine.exec p m ↔ certified_exec p m`
+  (`lcertify/CertifyComplete.v: certified_exec_equivalent`; the completeness
+  direction is `interference_certify`, RISC-V's "certification survives
+  memory extension"), and `axiomatic_to_promising` builds `Machine.exec`.
+  So the CERTIFIED promising machine has exactly hardware's behaviors, and
+  we may reason as if every outstanding promise in a behavior is
+  certifiable at every point by a THREAD-LOCAL PROMISE-FREE run.
+- Consequence for Layer 2: at a segment head `h` (pf-real pre-state, §4)
+  reading a promise `m` of agent `i` EARLY, extend the pf-real prefix with
+  `i`'s certifying run (a pf run: it fulfils `m` at the pf top) and then
+  `h`'s read of `m` IS a pf read (`readable` at the top).  So EVERY read the
+  full machine performs, early or not, is a read of some pf run — and φ
+  and every WP-exported invariant apply to it.  In particular an early read
+  of an OWNED message that its author has not yet published is a φ
+  violation of a pf-reachable configuration — IMPOSSIBLE.  SF-1 (the
+  byte→lock map) is not needed at all: no per-byte logging, no ghost map.
+- Sync bytes: lock words (RMW aq entries, `holding()` covered by the RMW's
+  own read — machine facts), `started`/`first` (control-dependent branch +
+  fence — machine facts after D2/D3), the disk's used index (fence after the
+  read — trace fact).  Mutual exclusion in gmo, which `excl_ok` alone does
+  not give (§7), follows from the RECORDED VALUES: RMWs write 1, releases
+  write 0, an RMW reads its co-predecessor, and an agent's CS events exist
+  only after an RMW that READ 0 (the program branches on it) — a trace
+  theorem given the lock word's value protocol, which the tree's lock
+  invariant (`wlockN`) already establishes and adequacy can export.
+- What this costs (the new plan of record, replacing L2-M3/M4):
+  **D8 — certification in the full machine**: `WPPromise` becomes a
+  CERTIFIED promise (a thread-local `wp_pf`-style solo run fulfils all of
+  the agent's outstanding promises), plus OUR proof that the uncertified
+  behaviors are certified behaviors (a port of `CertifyComplete` +
+  `interference_certify`; the RISC-V-specific view arithmetic it uses —
+  the SC-result view `RES = ts` — is exactly D-2's missing component, so
+  D8 likely has to add the AMO's own write timestamp to the aq raise; to
+  audit against RVWMO ppo 5); **E1 — the extended exhibit**: replay
+  `U ++ certifying runs ++ the early read` as a pf run (the cone replay
+  plus solo runs); **L2′** — the case analysis with the extended pf runs:
+  φ refutes early reads of owned-unpublished messages; sync bytes by
+  machine facts + the exported lock-word protocol.
+- OBSTACLE found while checking the acyclicity route against xv6: the
+  hardware walker's A-bit CAS may be performed EARLY (speculatively) — a
+  full-machine RMW promise — and a walk of another hart may read it; with
+  a lock-mediated data flow back this forms a REAL `gdep2` cycle
+  (`c1 →rf→ j-walk →po→ f →rf→ k-read →po→ c1`) whose behavior IS robust
+  (the pf twin has j's walker set the A bit itself: same final program
+  states and memory, DIFFERENT events).  So `gdep2_acyclic` is SUFFICIENT
+  for robustness but can be FALSE for xv6 with speculative A/D updates,
+  and any acyclicity-based proof is inapplicable to those behaviors.  To
+  resolve: (a) check the privileged spec on speculative A/D setting; if the
+  ISA forbids early A/D updates, make the walker's CAS non-promisable
+  (append-at-fulfil) in the full machine — a machine change with a
+  containment argument; (b) otherwise generalize the exhibit to replay
+  walker A/D updates up to idempotence (the pf twin performs the CAS
+  itself).  Neither is a side condition; both are model/theorem work.
