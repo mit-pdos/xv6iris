@@ -1646,6 +1646,24 @@ Section IntrDefsBase.
                Hacc Hk Hpmp Hpma HMPRV HDm HDs HSXL Hag).
   Qed.
 
+  (* the slot's translation mode, AS DATA.  [strans_satp_ok] is a
+     disjunction and the arm is not decidable from a Prop, but it does not
+     have to be: the arm IS the satp mode bits, so the mode reads straight
+     off them and the two disjuncts each settle their own branch. *)
+  Definition strans_mode (satp0 : mword 64) : SATPMode :=
+    if eq_vec (_get_Satp64_Mode (Mk_Satp64 satp0)) ('b"0000" : mword 4)
+    then Bare else Sv39.
+
+  Lemma strans_swp_mode_ok (satp0 : mword 64) :
+    strans_satp_ok satp0 ->
+    satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0))
+    = Some (strans_mode satp0).
+  Proof.
+    rewrite /strans_mode. intros [Hb | (Hk & _ & _)].
+    - rewrite Hb. vm_compute. reflexivity.
+    - rewrite Hk. vm_compute. reflexivity.
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
             strans_absorb strans_transform strans_tmode
@@ -1653,7 +1671,8 @@ Section IntrDefsBase.
             strans_swp_res strans_swp_side strans_swp_translate
             strans_res_at strans_satp_ok strans_swp_res_agree
             strans_swp_open strans_swp_close
-            (fun _ _ H => H) strans_swp_side_ok.
+            (fun _ _ H => H) strans_swp_side_ok
+            strans_mode strans_swp_mode_ok.
 
   (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
      leaf/engine call sites use without unfolding the record. *)

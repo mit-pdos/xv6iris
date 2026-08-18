@@ -611,6 +611,22 @@ Section SRegimeDef.
       _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
       register_lookup satp dst.(sregs) = register_lookup satp rs ->
       sr_swp_side acc va ppn kp Db Drw Dro rs dst;
+    (* ---- THE ARM'S TRANSLATION MODE, AS DATA ---------------------------
+       [sr_swp_satp_ok] is a Prop, and the regime-generic MEMORY leaves
+       need the mode as a VALUE: [translationMode Supervisor] returns it,
+       and [transform_effective_address] dispatches on it.  Bare's arm is
+       [Bare] and the shared table's is [Sv39]; the combined slot's is a
+       FUNCTION of the satp mode bits, because the arm is exactly what
+       those bits say.  Stated at [satpMode_of_bits] rather than at
+       [translationMode] so it stays a pure fact about the satp VALUE --
+       the register read and its footprint certificate are the leaf's
+       ([SmodePte.exec_translationMode_S_sv39],
+       [KptGoodb.goodb_translationMode_S_sv39]). *)
+    sr_swp_mode : mword 64 -> SATPMode;
+    sr_swp_mode_ok : forall satp0 : mword 64,
+      sr_swp_satp_ok satp0 ->
+      satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0))
+      = Some (sr_swp_mode satp0);
   }.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
@@ -950,13 +966,19 @@ Section SRegimeDef.
     exact (bare_swp_side_intro acc va ppn kp Db Drw Dro rs dst Hacc Hsatp HMPRV).
   Qed.
 
+  Lemma bare_swp_mode_ok (satp0 : mword 64) :
+    bare_satp_ok satp0 ->
+    satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0)) = Some Bare.
+  Proof. intros Hmode. rewrite Hmode. vm_compute. reflexivity. Qed.
+
   Definition bare_regime : s_regime :=
     SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
             bare_tmode (False%I) _ bare_absorb_wit
             (fun _ => True%I) bare_swp_side bare_swp_translate
             (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
             bare_swp_open bare_swp_close
-            (fun _ _ H => H) bare_swp_side_ok.
+            (fun _ _ H => H) bare_swp_side_ok
+            (fun _ => Bare) bare_swp_mode_ok.
 
 End SRegimeDef.
 
@@ -1318,6 +1340,11 @@ Section SRegimeShared.
              Hsatp Hpmp Hpma HDm HDs HSXL Hag).
   Qed.
 
+  Lemma kpt_swp_mode_ok (root_ppn : mword 44) (satp0 : mword 64) :
+    kpt_satp_ok root_ppn satp0 ->
+    satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0)) = Some Sv39.
+  Proof. intros (Hmode & _ & _). rewrite Hmode. vm_compute. reflexivity. Qed.
+
   Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
     SRegime (tlb_res_pt root_ppn) (fun _ _ => True) (fun _ _ _ => I)
             (res_absorb root_ppn) (res_transform root_ppn) (res_tmode root_ppn)
@@ -1327,7 +1354,8 @@ Section SRegimeShared.
             (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
             (kpt_swp_res_agree root_ppn) (kpt_swp_open root_ppn)
             (kpt_swp_close root_ppn)
-            (fun _ _ _ => I) (kpt_swp_side_ok root_ppn).
+            (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
+            (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).
 
   Lemma kpt_share_regime_inv (root_ppn : mword 44) :
     sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.
