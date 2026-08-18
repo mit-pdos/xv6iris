@@ -700,3 +700,32 @@ and runs in CI on every checkin.
   `rewrite` then fails with "does not match any subterm" while the printed goal
   shows the very term, character-identical. State register facts CID-generically
   up front (`assert (∀ CID', rget (CID := CID') M2 r = v)`) and rewrite with that.
+
+## A HINT-DATABASE DISPATCH IS A DEPTH PROBLEM, NOT A BREADTH ONE (measured 2026-08-18, UserTotalU)
+
+`UserTotalU`'s two dispatch tables discharge ~98 per-family `goodmb`
+obligations through one tactic that ends in `eauto … with u_gm`, where
+`u_gm` holds the ~80 twins of P5's catalogue plus the gpr-index side
+conditions.  Breadth is cheap — a twin whose head instruction does not match
+fails its `apply` immediately — but DEPTH is not: at `eauto 6` each call
+site cost **~15 s** and the file took **half an hour**; at `eauto 3` it is a
+few seconds each.  The obligation is only ever "apply the family's twin,
+then its side conditions, then at most one step inside one", so 3 is the
+real bound and everything above it is backtracking through side conditions
+that were already going to fail.
+
+Two companion rules from the same measurement:
+
+* **Put the SYMBOLIC-INDEX side conditions at `Hint Extern 0`.**  A
+  `Hint Extern 2 (Du_w _ = true) => vm_compute; reflexivity` is right for a
+  named cell and a DISASTER at `Du_w (R_bitvector_64 (gpr_of_Z (uint i)))`,
+  where `bool_decide (r ∈ u_rw_list)` is stuck on a symbolic index and
+  `vm_compute` grinds.  Give the gpr shape its own cost-0 extern so the
+  computing one is never reached.
+* **A premise the database cannot possibly discharge is what actually
+  hangs.**  Before the gate certificates existed (§11 of the user-tier
+  plan), `goodmb_execute_JAL_total`'s
+  `goodmb … (currentlyEnabled Ext_Zca) s ∅ = true` premise had no producer,
+  and `eauto` did not fail on it — it searched for minutes. If a hint-driven
+  discharge is mysteriously slow, look first for an obligation nothing in
+  the database proves.
