@@ -1,3 +1,33 @@
+(* ===================================================================== *)
+(* THE PER-NODE PORT: WHERE THIS FILE STANDS (2026-08-18).                *)
+(*                                                                        *)
+(* [wp_csrr_time_s_sconf] is CONVERTED and verified, statement unchanged.  *)
+(* It needed one genuinely new shape, [swp_check_CSR_result_time_S] below: *)
+(* Supervisor's [time] check is the one CSR legality check in the tree     *)
+(* that mixes a PINNED read with an UNPINNED one -- mcounteren decides the *)
+(* answer and [TimerCap.sstc_enabled] pins it persistently, while          *)
+(* scounteren is read and only matters at User -- so it has no single      *)
+(* [goodb] certificate and no ∀-peel either.  At the [swp] layer the two   *)
+(* mix freely, which is what [HartSCsr.swp_doCSR_r_obl_p]'s check          *)
+(* OBLIGATION exists for.  The read value is existential (mtime is owned   *)
+(* by nobody and the tick moves it), which the Q-carrying wrapper returns  *)
+(* and the leaf's own ∀ absorbs.                                          *)
+(*                                                                        *)
+(* [wp_csrw_stimecmp_s_sconf] is NOT converted, and it is blocked on the   *)
+(* RESOURCE, not on the wrapper.  [TimerCap.timer_cap] holds the deadline  *)
+(* cell in an INVARIANT, and the model's [write_CSR 0x14D v] touches that  *)
+(* cell THREE times across a long stretch -- read old, write legalized,    *)
+(* [clint_dispatch], read back -- with the CLINT refresh's own nodes (and  *)
+(* its mip write) in between.  A one-node seam is therefore not enough:    *)
+(* [HartSCsr.swp_write_reg_acc] opens an invariant around a SINGLE         *)
+(* register-write node, and there is no such shape for a stretch, because  *)
+(* an Iris invariant cannot stay open across a machine step.  The fix is   *)
+(* at the resource: [stimecmp_free] has to be THREADED (an exclusive cell  *)
+(* in and out, as [wp_csrw_stvec_s_sconf] threads stvec) rather than       *)
+(* sealed in [timerN] -- which changes [timer_cap] and hence both leaves'  *)
+(* statements, so it is a decision for the timer's owner and not a proof   *)
+(* detail.  The leaf keeps its pre-port proof; nothing here is [Admitted]. *)
+(* ===================================================================== *)
 (* WpSconfTimer.v -- the two Sstc timer leaves over [sconf]+[sie_cap]:
 
      wp_csrr_time_s_sconf rd        (csrr rd, time     -- 0xC01)
@@ -37,7 +67,11 @@ Require Import WpGprCsrrCommon WpGprCsrrB.
 Require Import WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
 Require Import HartTp WpNext.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs WpIntrInv WpSmodeIntr.
+(* the privilege-generic CSR swp engines and the frame kit at Supervisor *)
+Require Import HartSCsr HartSwp HartMFrame HartLift HartSpan HartSpanChar
+        HartMCycle HartRegNode HartGoodb WpDecodeBridge WpMmodeJump
+        WpMmodeCsrSwp WpGprCsrwA.
 Require Import TimerCap.
 Local Open Scope Z_scope.
 Import Defs.
@@ -200,6 +234,139 @@ Qed.
 (* ===================================================================== *)
 (* 3. The two leaves.                                                     *)
 (* ===================================================================== *)
+(* ===================================================================== *)
+(* THE SUPERVISOR time CHECK, AT THE NODE LAYER.                          *)
+(*                                                                        *)
+(* This is the one CSR legality check in the tree that mixes a PINNED read *)
+(* with an UNPINNED one: at Supervisor [counter_enabled] reads mcounteren  *)
+(* -- whose TM bit decides the answer, and which [TimerCap.sstc_enabled]   *)
+(* pins persistently -- and then reads scounteren, which nobody owns and   *)
+(* whose value only matters at User.  So it has no single [goodb]          *)
+(* certificate ([hval_of_goodb] wants every read register owned) and no    *)
+(* ∀-peel either (that cannot pin the one that matters).  At the [swp]     *)
+(* layer the two mix freely, which is what [HartSCsr.swp_doCSR_r_obl_p]'s  *)
+(* check OBLIGATION exists for.                                           *)
+(* ===================================================================== *)
+Section TimeCheck.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Local Lemma hval_cE_Zicntr (D Drw : gset register) (rs : regstate) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    hval D Drw rs (currentlyEnabled Ext_Zicntr) true rs.
+  Proof.
+    intros HD1 HD2 HD3 Hp Hs Hm.
+    apply (hval_of_goodb D_m D Drw _ dstateS rs true
+             (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm)).
+    - vm_compute. reflexivity.
+    - apply exec_currentlyEnabled_Zicntr.
+  Qed.
+
+  Lemma swp_check_CSR_result_time_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (mcen : mword 32) :
+    Drw ## Dro ->
+    (R_bitvector_32 mcounteren : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mseccfg : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_32 mcounteren) rs = mcen ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    eq_vec (_get_Counteren_TM mcen) ('b"1") = true ->
+    gen_cert -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (check_CSR_result csr_time Supervisor CSRRead)
+      (fun w => ⌜w = CSR_Check_OK tt⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmc HDpriv HDsec HDmisa Lmc Lpriv Lsec Lmisa HTM.
+    iIntros "#Hcert Hrw Hro".
+    unfold check_CSR_result.
+    iApply (swp_bind_use _ _
+              (fun w : bool => ⌜w = true⌝ ∗
+                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+              _ with "[Hrw Hro] [-]").
+    { unfold check_CSR, Defs.and_boolM.
+      (* 1. the privilege gate: pure at this csr *)
+      assert (H1 : check_CSR_priv csr_time Supervisor = returnM true)
+        by (vm_compute; reflexivity).
+      rewrite H1.
+      iApply (swp_bind_use _ _
+                (fun w : bool => ⌜w = true⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply swp_ret. by iFrame. }
+      iIntros (x1) "(-> & Hrw & Hro)". cbn match.
+      (* 2. the access-type gate: pure *)
+      replace (check_CSR_access csr_time CSRRead) with true
+        by (vm_compute; reflexivity).
+      iApply (swp_bind_use _ _
+                (fun w : bool => ⌜w = true⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply swp_ret. by iFrame. }
+      iIntros (x2) "(-> & Hrw & Hro)". cbn match.
+      (* 3. accessibility: Zicntr (goodb) AND the counter-enable bit *)
+      assert (Hred : is_CSR_accessible csr_time Supervisor CSRRead
+                     = Defs.and_boolM (currentlyEnabled Ext_Zicntr)
+                         (counter_enabled 1 Supervisor)) by csr_dispatch_eq.
+      rewrite Hred.
+      iApply (swp_bind_use _ _
+                (fun w : bool => ⌜w = true⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { unfold Defs.and_boolM.
+        iApply (swp_bind_use _ _
+                  (fun w : bool => ⌜w = true⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_span Drw Dro Df rs rs _ true Hdisj
+                    (hval_cE_Zicntr (Drw ∪ Dro) Drw rs HDpriv HDsec HDmisa
+                       Lpriv Lsec Lmisa) with "Hcert Hrw Hro"). }
+        iIntros (y1) "(-> & Hrw & Hro)". cbn match.
+        (* the counter-enable read: mcounteren PINNED, scounteren UNPINNED *)
+        unfold counter_enabled.
+        iApply (swp_bind_use _ _
+                  (fun mc : mword 32 => ⌜mc = mcen⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_mono with "[] [-]");
+            [| iApply (swp_read_reg_pinned Drw Dro Df rs
+                         (R_bitvector_32 mcounteren) Hdisj HDmc
+                         with "Hcert Hrw Hro") ].
+          iIntros (mc) "(-> & Hrw & Hro)". rewrite Lmc. by iFrame. }
+        iIntros (mc) "(-> & Hrw & Hro)".
+        iApply (swp_bind_use _ _
+                  (fun _ : mword 32 =>
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_read_reg_any (R_bitvector_32 scounteren) with "Hcert").
+          iIntros (v). iFrame. }
+        iIntros (sc) "[Hrw Hro]".
+        unfold feature_enabled_for_priv_bool.
+        iApply (swp_bind_use _ _
+                  (fun f => ⌜f = FEATURE_ENABLED⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { unfold feature_enabled_for_priv. cbn match.
+          rewrite <- counteren_TM_access in HTM. rewrite HTM.
+          iApply swp_ret. by iFrame. }
+        iIntros (f) "(-> & Hrw & Hro)". iApply swp_ret. by iFrame. }
+      iIntros (x3) "(-> & Hrw & Hro)". cbn match.
+      (* 4. the stateen gate: pure *)
+      assert (H4 : stateen_allows_CSR_access csr_time Supervisor CSRRead
+                   = returnM true) by (vm_compute; reflexivity).
+      rewrite H4. iApply swp_ret. by iFrame. }
+    iIntros (w) "(-> & Hrw & Hro)". cbn match.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+End TimeCheck.
+
 Section WpSconfTimer.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -231,57 +398,110 @@ Section WpSconfTimer.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iDestruct "Htcap" as "[Hen _]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf m n false pc false
+    assert (Hfresh : cw_fresh (R_bitvector_32 mcounteren))
+      by (split_and!; vm_compute; reflexivity).
+    (* THE READ VALUE IS NOT THE LEAF'S TO NAME: mtime lives in the clock
+       invariant and the tick moves it, so it comes back EXISTENTIALLY out of
+       the Q-carrying wrapper and the caller's own ∀ is instantiated at it. *)
+    iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csr_time, zreg, Regidx rd, CSRRS))
-              with "Hcg Hpc Hinstr").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
-       obligation is discharged by [wp_next]'s OWN introduction rule at the
-       ambient hart -- the same [wp_next_off_intro] every b = false leaf
-       already uses for its own conclusion.  Nothing is renamed and nothing
-       is substituted: the body below is the pre-move proof VERBATIM. *)
-    iApply wp_next_off_intro.
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hrest)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hmcen") as %Lmcen.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmcen_spc : register_lookup mcounteren s_pc.(sregs) = mcen)
-      by (unfold s_pc; tmig; exact Lmcen).
-    set (tv := time_rdval s_pc).
-    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg tv) with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg tv)
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg tv)).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
+              (fun npc ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜n' = n⌝ ∗
+                 ⌜∃ tv : mword 64,
+                    m' = <[Regidx rd := regval_into_reg tv]> m⌝)%I
+              with "Hcg Hpc Hinstr [Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - (* ---- the instruction ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      iDestruct (pr_frames_in Supervisor (DfracOwn 1) DfracDiscarded
+                   (R_bitvector_32 mcounteren) mcen Hfresh
+                   with "Hmcen Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       change (execute (CSRReg (csr_time, zreg, Regidx rd, CSRRS)))
         with (execute_CSRReg csr_time zreg (Regidx rd) CSRRS).
-      apply (exec_execute_csrr_time_gpr_S rd s_pc Hrd Lpriv_spc).
-      rewrite Lmcen_spc. exact HTM. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg tv)).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg tv]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    tp_refold Hrdtp "Hfile".
-    iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg tv]> m) n false Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hrest] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! tv cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+      iApply (swp_mono with
+                "[Hcap Hms Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
+                 [Hrw Hro Hfile]");
+        [| iApply (swp_execute_CSRReg_r_obl_p ∅
+                     (cr_Dro (R_bitvector_32 mcounteren))
+                     (cr_Df (DfracOwn 1) DfracDiscarded
+                        (R_bitvector_32 mcounteren))
+                     (pw_rs Supervisor (R_bitvector_32 mcounteren) mcen)
+                     (tp_pin m) csr_time Supervisor rd (fun _ => emp)%I
+                     (cr_disj _) (cr_in_priv _)
+                     (pw_rs_priv Supervisor (R_bitvector_32 mcounteren) mcen
+                        Hfresh)
+                     Hrd ltac:(by vm_compute)
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     ltac:(intro; by vm_compute)
+                     with "Hcert Hfile Hrw Hro [Hcert] [Hcert]") ].
+      + iIntros (e) "(-> & Hx)".
+        iDestruct "Hx" as (tv) "(_ & Hf & Hrw & Hro)".
+        iDestruct (pr_frames_out Supervisor (DfracOwn 1) DfracDiscarded
+                     (R_bitvector_32 mcounteren) mcen Hfresh with "Hro")
+          as "(_ & Hpriv & _ & _)".
+        assert (Hsp : m !!! Regidx csp_rs1
+                      = <[Regidx rd := regval_into_reg tv]> m !!! Regidx csp_rs1)
+          by (symmetry; apply upd_ne; congruence).
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4), ms0,
+                (<[Regidx rd := regval_into_reg tv]> m), n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        { rewrite /sconf_at_priv. iExists mdv0.
+          iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          iPureIntro. split; [exact Hmsf | exact Hmm]. }
+        iSplitL "Hcap".
+        { iApply (sie_cap_retarget m (<[Regidx rd := regval_into_reg tv]> m)
+                    n false Hsp with "Hcap"). }
+        iSplitL "Hf".
+        { iEval (rewrite (tp_pin_upd m rd (regval_into_reg tv) Hrdtp)) in "Hf".
+          iExact "Hf". }
+        iSplitR; [done|]. iSplitR; [done|].
+        iPureIntro. exists tv. reflexivity.
+      + (* the legality check: mcounteren pinned, scounteren ∀-peeled *)
+        iIntros "Hrw Hro".
+        iApply (swp_check_CSR_result_time_S ∅
+                  (cr_Dro (R_bitvector_32 mcounteren))
+                  (cr_Df (DfracOwn 1) DfracDiscarded
+                     (R_bitvector_32 mcounteren))
+                  (pw_rs Supervisor (R_bitvector_32 mcounteren) mcen) mcen
+                  (cr_disj _) (cr_in_r _) (cr_in_priv _) (cr_in_sec _)
+                  (cr_in_misa _)
+                  (pw_rs_r Supervisor (R_bitvector_32 mcounteren) mcen)
+                  (pw_rs_priv Supervisor (R_bitvector_32 mcounteren) mcen Hfresh)
+                  (pw_rs_sec Supervisor (R_bitvector_32 mcounteren) mcen Hfresh)
+                  (pw_rs_misa Supervisor (R_bitvector_32 mcounteren) mcen Hfresh)
+                  HTM with "Hcert Hrw Hro").
+      + (* the mtime read: UNOWNED, so the value is whatever the machine has *)
+        iIntros "Hrw Hro". rewrite read_CSR_time_red.
+        iApply (swp_bind_use _ _
+                  (fun _ : mword 64 =>
+                     hreg_frame (pw_rs Supervisor (R_bitvector_32 mcounteren)
+                                   mcen) ∅ ∗
+                     hreg_frame_ro (cr_Df (DfracOwn 1) DfracDiscarded
+                                      (R_bitvector_32 mcounteren))
+                       (pw_rs Supervisor (R_bitvector_32 mcounteren) mcen)
+                       (cr_Dro (R_bitvector_32 mcounteren)))%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_read_reg_any (R_bitvector_64 mtime) with "Hcert").
+          iIntros (v). iFrame. }
+        iIntros (tv) "[Hrw Hro]". iApply swp_ret. by iFrame.
+    - (* ---- the continuation ---- *)
+      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & %Hex)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      destruct Hex as (tv & ->).
+      iApply ("Hcont" $! tv cpu_id with "[%] Hcg' Hpc'"). done.
   Qed.
 
   (* ---- csrw stimecmp,rs1.  The deadline cell is NOT threaded: it lives in
