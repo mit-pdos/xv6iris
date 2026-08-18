@@ -1783,3 +1783,58 @@ fault flavour) and `in_one_page_dec` (intra-page vs straddle) before it
 can use any composer — which is why `mem_read_total` was called TOTAL and
 why the pure arms will not be much shorter than the case tree, only than
 the Iris plumbing around it.
+
+### `UserFaultCert.v` — the fault side, and four things it settled
+
+`u_translate_fault_pure` (access-type-generic) and `u_fetch_fault_pure`
+(the `F_Error` producer §14.3 item 2 asked for).  Both close at
+`plat_term_write` alone.
+
+* **THE FAULT WALK MOVES NOTHING, and that was checked rather than
+  assumed.**  The post state is `u_state rs mm` on the nose and there is
+  no `u_mem_step` conjunct: the non-canonical fault fires before the TLB
+  is consulted, `translate_TLB_miss` returns the walk's error BEFORE
+  `add_to_TLB`, and a denied HIT fails `check_PTE_permission` before
+  `update_and_write_pte` is reached.
+* **`u_translate_fault_pure` needs two pins that `u_exec_pins` does not
+  carry** — `register_lookup cur_privilege rs = User` and
+  `_get_Mstatus_SXL … = 'b"10"`.  The lemma is FALSE without them
+  (`exec_translateAddr_pt_front_err` demands both); `u_fetch_pure` only
+  avoids the question because `post_fetch_cfg` happens to carry them.  By
+  §14.1's own rule ("a missing ambient pin goes in `u_exec_pins`, not into
+  an arm's premise list") they belong in `u_exec_pins` — a
+  `UserClassifyAsm` edit for P7.
+* **`goodb Db (is_shadow_stack_access acc) s = true` IS FALSE IN
+  GENERAL**, so no certificate on the translate path can be stated
+  generically in `acc` without ruling the bad-payload access types out:
+  their arms are `internal_error`, i.e. THROWS, not `Ret`s.  What rules
+  them out is the caller's own `exec (is_shadow_stack_access acc) s =
+  Some (false, s)` premise — which in fact upgrades to the TERM equation
+  `is_shadow_stack_access acc = returnm false`, and every needed `goodb`
+  falls out of that.  Same shape as the reservation term axioms: when a
+  certificate cannot see a value, lift the fact to the term.
+* **The unmapped arm works only because the tree spec is
+  `ptree_blocks0`.**  `PtWalkCert`'s fault-walk lemmas demand
+  `forall Db s0, goodb Db (pte_is_invalid …) s0 = true` AT THE STOPPING
+  WORD, and for a merely model-invalid word that is unobtainable
+  (`goodb_pte_is_invalid` needs `Db misa` and `Db menvcfg`).
+  `upt_tree_spec` hands out `ptree_blocks0`, whose stop word is the
+  LITERAL ZERO, and V=0 short-circuits the first `or_boolM` so the test
+  reads nothing.  Had the spec used the weaker `ptree_blocks`, that
+  premise shape would have made the whole unmapped arm unprovable.
+
+`UserFaultCert` §0 restates ten `UserFetchCert` helpers under a `ufa_`
+prefix; delete them at the fold-back.
+
+### AN ADDITIVE LEMMA CAN BREAK A GREEN FILE BY SHADOWING
+
+`UserBytes`' new 4-argument `u_walk_pa_window` had the same name as
+`UserMem`'s 3-argument one, and `UserFetchCert` imports `UserBytes`
+AFTER `UserMem` — so ITS OWN call, unchanged, resolved to the new lemma
+and failed with *"the term `w` has type `mword 64` while it is expected
+to have type `Z`"*, an error that names neither file and reads like a
+type confusion in the caller.  Nothing about the addition failed; a file
+that was green went red.  **Rename the newcomer** (here to
+`u_walk_pa_window_wf`) rather than qualifying at the use site: the
+shadowing is a landmine for every later file that imports both.  Grep
+the name before adding a lemma to a widely-imported file.
