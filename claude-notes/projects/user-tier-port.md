@@ -994,7 +994,36 @@ FUNCTION (`u_gpr_val g` on x1..x31, the pinned CSR values elsewhere), not a
 (gpr_of_Z (uint i)))` at a symbolic `i` only through a 32-way split of
 `register_beq`, once per tower level.
 
-## 10. THE ONE THING §3.6 GOT WRONG: `elp` IS `↦ᵣ□`, SO THE TRAP TOWER CANNOT BE ONE `swp_hmrun_of_exec` (found 2026-08-18, P7)
+## 10. THE ONE THING §3.6 GOT WRONG: `elp` IS `↦ᵣ□`, SO THE TRAP TOWER CANNOT BE ONE `swp_hmrun_of_exec` (found AND FIXED 2026-08-18, P7)
+
+**FIXED: `UserTrap.swp_trap_handler_u`** is the tower with the `reset_elp`
+node split out and taken by `HartRegNode.swp_write_reg_same`; it closes at
+the five platform axioms.  Two things the implementation settled, both
+reusable:
+
+* **The decomposition needs NO term to be named** — that is the payoff of
+  `swp` quantifying over a CONTEXT.  `swp_bind` / `swp_bind0` peel the
+  model's own binds and leave the residual IN THE GOAL, so the three pieces
+  before the cut come out by three peels and everything AFTER the cut is
+  certified by the UNCHANGED tail of `goodmb_trap_handler_U`, reached with a
+  `match goal with |- envs_entails _ (swp ?R _) => assert (goodmb … R …)` and
+  copied VERBATIM.  **Put the swp lemma INSIDE `UTrapReduce`**: `s1` … `s9`
+  are already `Let`-bound there, so the copied tail needs no renaming, and
+  the residual's `exec` fact is the whole-tower one peeled by the same two
+  `exec_bind*_Some` rewrites.
+* Two measured details: after `swp_write_reg_same` the goal is
+  `swp (Ret tt) _`, so it needs `swp_ret` before the residual is visible;
+  and the rule's `hregwrite_val_at` side condition is **SHELVED, not a
+  goal** — `Unshelve` it and collapse the `decide`'s proof with
+  `proof_irrel`, exactly as `hregread_resume_red` does.
+
+STILL TO DO (mechanical, ~100 lines, same pattern): the three entry-point
+wrappers `swp_handle_interrupt_u`, `swp_handle_exception_u` and
+`swp_exec_trap_u` (`bind (exception_handler …) set_next_pc`), each a
+`swp_bind_use` chain of read-only prefixes around `swp_trap_handler_u` plus
+one `nextPC` write.
+
+### The finding, as recorded when it was made
 
 **[V] measured, and it blocks `wp_user_step_active`.**  §3.6 says the U trap
 tower is one `swp_hmrun_of_exec … (mm := ∅)`, and §3.1's `u_Drw` list — which
