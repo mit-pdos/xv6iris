@@ -1013,7 +1013,15 @@ Section IcacheLink.
      lelem bwl' bwdu' bwdt' bg' bc' br' bp').
   Proof.
     rewrite /lelem. intros Hwl Hwdu Hwdt Hg Hc Hr Hp.
-    apply prod_local_update'; [| exact Hp].
+    apply (prod_local_update'
+      (A := prodUR
+        (prodUR
+          (prodUR
+            (prodUR natUR (prodUR natUR natUR))
+            natUR)
+          (optionUR (exclR unitO)))
+        natUR)
+      (B := optionUR (dfrac_agreeR (leibnizO Z)))); [| exact Hp].
     apply prod_local_update'; [| exact Hr].
     apply prod_local_update'; [| exact Hc].
     apply prod_local_update'; [| exact Hg].
