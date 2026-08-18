@@ -2555,7 +2555,60 @@ Each line is a ROOT: every file that merely depends on one is skipped by
 | `UserretEntryPt` | `wp_instr_ktramp_pt_share` not found | trampoline lane (a) |
 | `WpUmodeStep` | `minstret_inv_body` not found | "Not started" (verified U-mode tier) |
 
-### WHAT `ProofKvminithart` REALLY NEEDS, AND IT IS NOT RULING 1
+### THE KVMINITHART LANE: THE SFENCE HALF IS BUILT (session 2), THE SATP HALF IS NOT
+
+`WpSconfSfence.v` is the converted `sfence.vma` leaf, in three pieces:
+
+* `UserretDefs.flush_TLB_all_cert` / `execute_SFENCE_VMA_S_cert` — the
+  existing exec proofs GENERALISED IN PLACE to carry the `goodmb`
+  certificate, with `exec_flush_TLB_all` / `exec_execute_SFENCE_VMA_S` kept
+  as corollaries at a trivial footprint so no caller moved.  They had to be
+  one lemma: **`goodmb` recurses on the continuation applied to what the
+  STATE holds, so every case of the certificate's walk needs that case's
+  `exec` fact.**  Two traps the certificate side has and the exec side does
+  not: the early `rewrite exec_bind_Some` touches only the `exec` conjunct
+  (so the goodmb branch still carries the outer `read_reg tlb` bind), and
+  `rewrite goodmb_read_reg` inside a `gm_bind` whose `m` is an evar matches
+  nothing (name the per-read certificates up front).
+* `swp_execute_SFENCE_VMA_S` — **not a node walk.**  `flush_TLB` is a
+  64-iteration loop over a symbolic TLB, so the leaf goes through
+  `HartMemRun.swp_hmrun_of_exec` at `mm := ∅` (that file's header calls it
+  *the register-writing analogue of `hval_of_goodb`*), with
+  `HartStepFull`'s reference-state idiom: `MState rs ∅ dev0_state`,
+  `reg_agree_refl`, `∅ ⊆ mem`, `bytes_own ∅` persistent.
+* `wp_sfence_vma_bare_s_sconf` / `wp_sfence_vma_kpt_s_sconf` — **ruling 1 as
+  a leaf statement.**  The `tlb` cell lives in `sie_cap`'s translation slot
+  and the slot may NOT be dissolved around the call (the stretch between
+  kvminithart's first sfence and its `csrw satp` keeps calling other leaves,
+  each taking `sie_cap_gpr` whole), so the borrow-and-reseal happens INSIDE
+  the step, one variant per arm of `strans_inv`, each pinned by the caller's
+  own receipt.  The KPT one needs no tree argument and opens no invariant:
+  a flushed cell is coherent with ANY tree (`tlb_ok_pt_empty`).
+
+**WHAT IS LEFT IN THE LANE**, in order:
+
+1. **The `csrw satp` leaf at Supervisor — THE SWITCH.**  ProofKvminithart's
+   +0x1c block is raw for the same reason the sfences were.  Unlike them it
+   should be a NODE WALK, not an `swp_hmrun_of_exec`: `HartSCsr.
+   swp_execute_CSRReg_w_p` is already CSR-generic and `wp_csrw_stvec_s_sconf`
+   (WpSconfCsr.v) is the template — what it needs at `csr_satp` is
+   `hval_check_CSR_result_S` fed by `UserretDefs.exec_check_CSR_result_csrw_satp_S`
+   (exists) and an `swp_write_CSR_satp_S` (does not).  On top of that the
+   leaf must MOVE THE SLOT from the Bare arm to the KPT arm, which is the
+   semantically interesting part and has no analogue among the converted
+   leaves.
+2. **`SpecKvminithart.wp_kvminithart_sconf_body`**: drop `tlb ↦ᵣ tlbvec0`
+   (it is unsatisfiable beside the capability, which already owns the cell
+   inside `bare_inv` — that is the bug ruling 1 names) and require the Bare
+   arm instead.
+3. **ProofKvminithart**: the three raw blocks become three leaf
+   applications.
+4. **ProofMain / ProofMainSecondary**: `SpecMain.main_hart_raw` is already
+   `strans_pending ∗ trap_csrs_raw`, so `iDestruct "Hhart" as "(Hsbit &
+   Htlb & Htcsr)"` over-destructs into `trap_csrs_raw`; and `mn_grp_kvm`
+   drops its own `tlb ↦ᵣ tlbvec0` premise with the spec.
+
+### WHY `ProofKvminithart` WAS RED, AND WHY IT IS NOT RULING 1 ALONE
 
 The file's first error is one missing `b'` argument to
 `wp_instr_s_sconf` (fixed, three sites).  Behind it is the real one: the
