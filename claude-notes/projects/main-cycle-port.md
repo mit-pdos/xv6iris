@@ -1594,10 +1594,24 @@ subject of the first finding.
    the window's claim -- its `ppn`, canonicality, RAM-ness and tier pin --
    and the atomic update is opened at the memory NODE, several nodes later.
    A LINEAR atomic update cannot be peeked at and put back, so the claim
-   cannot be recovered from it; and it is not derivable from anything else,
-   because the address is the caller's.  The claim is PERSISTENT and says
-   nothing about the VALUE, so it rides beside the update as
-   `WpSconfMem.wordw_claim`.  Every caller already has it: an owner of the
+   cannot be recovered from it -- and the reason is the MASK ORDER, not
+   convenience: the update is `|={⊤ ∖ ↑minstretN, Em}=>` with `Em` a
+   PARAMETER, and a mask-changing fupd leaves you at `Em` with no way back
+   except its own closer, so a leaf that opens it early to read the claim
+   cannot return to `⊤` to run the walk.  (At the non-atomic instances,
+   where `Em = ⊤ ∖ ↑minstretN`, there is no mask change and the claim IS
+   free -- which is exactly why the `_gen` wrappers need no premise.)
+   Nor is the claim derivable from the kernel table: `kmap_at` is a
+   PERSISTED `ghost_map_elem` and `KptShare.kpt_body` holds only
+   `kmap_auth M`, and `ghost_map_auth` does not record which entries were
+   persisted, so `kmap_auth M ∗ ⌜M !! vpn = Some e⌝ ⊢ ◇ kmap_at vpn e.1 e.2`
+   is not provable.  The claim is PERSISTENT and says nothing about the
+   VALUE, so it rides beside the update as `WpSconfMem.wordw_claim` --
+   **USER-APPROVED as a justified change** (the caller passes some
+   additional facts before the AU): the four the walk needs before it may
+   run are the MAPPING, the ALIGNMENT, the CANONICALITY and the RAM-ness,
+   and all four come off the very points-to the update already promises,
+   by `wordw_claim_of`.  Every caller already has it: an owner of the
    window reads it off its own points-to (`wordw_claim_of` -- and
    `iDestruct … as "#H"` at a Persistent conclusion does NOT consume the
    points-to, which is what makes this free), and an invariant-backed caller
