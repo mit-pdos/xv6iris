@@ -1539,6 +1539,39 @@ Section WpUmodeLeaf.
              (fun s => exec_execute_SHIFTIOP_SRLI_gpr rd rd shamt s) Hwval).
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* li rd,imm -- the BASE pseudo-instruction, [addi rd,x0,imm].  Like     *)
+  (* [wp_uv_cli] it reads x0 as a SOURCE, so the value premise cannot be   *)
+  (* stated over [m] alone; x0's value is taken off [gpr_file] here.       *)
+  (* (init's vprintf has two: [li s5,37] and [li s8,100].)                 *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_li (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rd : mword 5) (wval : mword 64) :
+    uinstr pt M pc false
+      (ITYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rd, ADDI)) ->
+    uint rd <> 0 ->
+    wval = add_vec zero_reg (sign_extend' 64 imm) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M
+         (<[Regidx rd := regval_into_reg wval]> m) -∗
+       pc_is (CID := CID0) (add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hrd Hwv.
+    iIntros "Hcg Hpc Hcont".
+    iDestruct "Hcg" as "(Hcap & Hlin & Hgpr)".
+    iDestruct (gpr_file_x0 m (mword_of_int 0 : mword 5)
+                 ltac:(vm_compute; reflexivity) with "Hgpr") as "[%Hz Hgpr]".
+    iAssert (uv_cap_gpr C pt Ψ M m) with "[Hcap Hlin Hgpr]" as "Hcg".
+    { rewrite /uv_cap_gpr. iFrame "Hcap Hlin Hgpr". }
+    iApply (wp_uv_addi Ψ M m pc imm (mword_of_int 0 : mword 5) rd wval
+              Hui Hrd ltac:(rewrite Hz; exact Hwv)
+              with "Hcg Hpc Hcont").
+  Qed.
+
 End WpUmodeLeaf.
 
 (* ---------------------------------------------------------------------- *)
