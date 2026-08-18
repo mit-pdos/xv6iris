@@ -49,14 +49,38 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
   `LInstr`.  No discriminator.  BLOCKED ON: W3's audit verdict, then the
   user's go (it is a model-of-record ordering addition).  If adopted,
   bundle into the split's S1 (`wstate`/`lstate` opened once).
-- **W3 — the W-TV containment audit** (paper, gates W2b): does the
-  permanent `vcap` raise keep machine ⊇ hardware under RVWMO + the
-  privileged spec's translation-ordering text (and the Sail-following
-  stance)?  Same audit class D-2 already owes.  Includes: the
-  cross-instruction leakage check (`LInstr` reset), AMO-internal ordering,
-  abandoned/faulting translations, LB litmus preservation, and whether
-  `vaddr ⊔= w_ldv` at access nodes is the right implementation.
-  **Status: IN FLIGHT (2026-08-18).**
+- **W3 — the W-TV containment audit: DONE (2026-08-18), verdict (B) —
+  ADOPT as a documented model-of-record boundary, awaiting the user's go.**
+  Nothing in {(i),(ii),(iii)} contradicts the ISA: (i) is ASSERTED by the
+  privileged spec ("those implicit accesses are ordered before their
+  associated explicit accesses", `supervisor.adoc:1303-1304`); (ii) is not
+  RISC-V-normative (RVWMO leaves walks unformalized) but is the ratified
+  Arm VMSA `dob` clause (`[Imp & TTD & R]; tr-ib; [Exp & M]; po;
+  [Exp & W | HU]`, Arm ARM B2.3.7) and RVWMO ppo rule 13's own rationale
+  ("a store generally cannot be performed until it is known that preceding
+  instructions will not cause an exception due to failed address
+  resolution"); (iii) is deviation D-2, already landed.  Loads are
+  deliberately NOT ordered (matches both Arm models).  The narrow variant
+  is REFUTED concretely (`narrow_gap` probe: a two-instruction variant B
+  survives it).  28 machine-checked probes in the wtv-audit scratchpad;
+  the proposed boundary sentence is in the audit report, to be copied into
+  layer2 §13 on adoption.
+  **W2b's five conditions (from the audit — carry, don't rediscover):**
+  (1) reset the translation bank at the instruction BOUNDARY, before the
+  fetch (`pnode_step`'s `Ret` arm emits the reset, not `LSilent`) — with
+  only the `LInstr` reset, the fetch's load consumes the previous
+  instruction's data-read views and LB DIES; (2) a dedicated `w_tbank`
+  joined with `fwd_view` only — NOT `w_ldv`, whose `vpre` component drags
+  `w_vrNew` into every fulfil's EXT (probe `wtv_ldv_leaks_vrNew`);
+  (3) add `LInstr` steps to `WeakPromiseLitmus.lbstep` and `WeakLitmus`'s
+  toy language or their reachability theorems go false; (4) read the bank
+  at each node's PRE-state (keeps the AMO's read half out of `w_vcap`);
+  (5) the Layer-2 consumer already exists — `WeakRobustL2.fcov_of_vcap`
+  turns a `vcapat` into `fcov`; only the `vcapat` producer at the access
+  node is owed.  Also record with the boundary: the fetch's own
+  translation reads gain the same edge, and misaligned/page-crossing
+  component accesses become ordered (both RVWMO-unformalized; both
+  vacuous for this image).
 - **Fallback if W3 fails**: §12 option (b), the walker-idempotent exhibit —
   priced by W1′ as LARGER than the RMW split (walker READ discriminator =
   `pcls` state classification or a model fork; non-event-preserving replay
