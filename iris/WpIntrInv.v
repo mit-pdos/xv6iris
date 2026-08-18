@@ -1769,3 +1769,162 @@ Proof.
       iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hwn") as "Hwn".
       iApply ("IH" $! c' with "Hcg Hpc [Hwn]"). iNext. iExact "Hwn". }
 Qed.
+
+(* ===================================================================== *)
+(* §5 THE COMBINED S-MODE REGIME AT THE [swp] LAYER.                      *)
+(*                                                                       *)
+(* [IntrDefs.strans_regime] is the hart's translation slot as a DISJUNCTION *)
+(* -- Bare before kvminithart, the shared kernel table after -- and its    *)
+(* exec-side fields dispatch on the ghost bit.  This is the same           *)
+(* dispatch one layer up, onto [SRegime.bare_regime_swp] /                 *)
+(* [kpt_share_regime_swp].                                                *)
+(*                                                                       *)
+(* WHAT MOVES FROM THE SIDE CONDITION INTO THE RESIDUE, and it is the     *)
+(* whole design of the instance: each arm's satp MODE.  The side condition *)
+(* is a Prop the CALLER picks and the residue is the ghost's own arm, so   *)
+(* without the mode in the residue the two cross cases (caller says Bare,  *)
+(* slot is KPT, and back) are live and unprovable -- the Bare translate    *)
+(* would have to hand back a KPT residue at a file it does not know did    *)
+(* not fill the TLB.  With the mode in BOTH, 'b"0000" vs 'b"1000" refutes  *)
+(* the crossings outright and only the two matching cases remain.         *)
+(* ===================================================================== *)
+Section StransSwp.
+  Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the KPT arm's root is a FUNCTION of satp, so the instance needs no
+     existential for it -- which is what lets the residue and the side
+     condition name the same one. *)
+  Definition strans_root (rs : regstate) : mword 44 :=
+    autocast (T := mword)
+      (satp_to_ppn (autocast (T := mword) (register_lookup satp rs) : mword 64)).
+
+  Definition strans_swp_res (rs : regstate) : iProp Σ :=
+    ((strans_pending ∗ (∃ v : mword 64, stvec ↦ᵣ v) ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
+        = ('b"0000" : mword 4) ⌝)
+     ∨ (strans_kpt ∗
+        ⌜ _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
+          = ('b"1000" : mword 4) ⌝ ∗
+        kpt_swp_res (strans_root rs) rs))%I.
+
+  Definition strans_swp_side (acc : MemoryAccessType mem_payload)
+      (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+      (Drw Dro : gset register) (rs : regstate) (dst : mstate) : Prop :=
+    bare_swp_side acc va ppn kp Db Drw Dro rs dst
+    \/ kpt_swp_side (strans_root rs) acc va ppn kp Db Drw Dro rs dst.
+
+  (* satp survives a translation: the walk's only write is the TLB fill. *)
+  Lemma strans_satp_landing (rs rsf : regstate) :
+    (rsf = rs \/ exists tv, rsf = register_set tlb tv rs) ->
+    register_lookup satp rsf = register_lookup satp rs.
+  Proof.
+    intros [-> | (tv & ->)]; [reflexivity |].
+    rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ].
+  Qed.
+
+  Lemma strans_root_landing (rs rsf : regstate) :
+    (rsf = rs \/ exists tv, rsf = register_set tlb tv rs) ->
+    strans_root rsf = strans_root rs.
+  Proof.
+    intros H. rewrite /strans_root (strans_satp_landing rs rsf H). reflexivity.
+  Qed.
+
+  Lemma strans_swp_translate :
+    forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (tlb : register) ∈ Drw ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      sr_adm strans_regime va ppn ->
+      strans_swp_side acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        strans_swp_res rs -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      strans_swp_res rsf ∗ resv_any cpu_id).
+  Proof.
+    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
+      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
+      Hadm Hside.
+    iIntros "#Hat #Hcert Hfrag Hres Hrw Hro".
+    iDestruct "Hres" as "[(Hpend & Hstv & %Hmb) | (Hkpt & %Hmk & Hres)]".
+    - (* ---- the slot is BARE ---- *)
+      destruct Hside as [Hbs | Hks].
+      2:{ destruct Hks as (Hmode & _). rewrite Hmb in Hmode.
+          exfalso. vm_compute in Hmode. discriminate. }
+      iApply (swp_mono with "[Hpend Hstv] [-]");
+        [| iApply (bare_swp_translate acc Drw Dro Df rs dst Db va pa ppn kp rr
+                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg
+                     HDaddr HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa
+                     Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat Hadm Hbs
+                     with "Hat Hcert Hfrag [//] Hrw Hro") ].
+      iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & _ & Hany)".
+      iSplitR; [done |]. iExists rsf. iFrame "Hrw Hro Hany".
+      iSplitR; [iPureIntro; exact Hshape |].
+      iLeft. iFrame "Hpend Hstv". iPureIntro.
+      rewrite (strans_satp_landing rs rsf Hshape). exact Hmb.
+    - (* ---- the slot is the SHARED KERNEL TABLE ---- *)
+      destruct Hside as [Hbs | Hks].
+      { destruct Hbs as (Hmode & _). rewrite Hmk in Hmode.
+        exfalso. vm_compute in Hmode. discriminate. }
+      iApply (swp_mono with "[Hkpt] [-]");
+        [| iApply (kpt_swp_translate (strans_root rs) acc Drw Dro Df rs dst Db
+                     va pa ppn kp rr
+                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg
+                     HDaddr HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa
+                     Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat I Hks
+                     with "Hat Hcert Hfrag Hres Hrw Hro") ].
+      iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & Hres & Hany)".
+      iSplitR; [done |]. iExists rsf. iFrame "Hrw Hro Hany".
+      iSplitR; [iPureIntro; exact Hshape |].
+      iRight. iFrame "Hkpt".
+      rewrite (strans_root_landing rs rsf Hshape). iFrame "Hres".
+      iPureIntro. rewrite (strans_satp_landing rs rsf Hshape). exact Hmk.
+  Qed.
+
+  Definition strans_regime_swp : s_regime_swp strans_regime :=
+    SRegimeSwp strans_regime strans_swp_res strans_swp_side
+      strans_swp_translate.
+
+End StransSwp.
