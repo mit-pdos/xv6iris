@@ -41,7 +41,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -79,8 +80,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* nameiparent's own frame is 16 bytes (2 slots) over namex's 102. *)
-Definition K_nameiparent : nat := 104%nat.
-
+Notation K_nameiparent := (114%nat) (only parsing).
 Definition wp_nameiparent_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
@@ -138,10 +138,10 @@ Definition wp_nameiparent_sconf_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
@@ -160,8 +160,8 @@ Definition wp_nameiparent_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
@@ -174,7 +174,7 @@ Definition wp_nameiparent_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -184,8 +184,8 @@ Definition wp_nameiparent_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -265,10 +265,10 @@ Definition wp_nameiparent_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
@@ -287,8 +287,8 @@ Definition wp_nameiparent_gen_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
@@ -301,7 +301,7 @@ Definition wp_nameiparent_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -311,8 +311,8 @@ Definition wp_nameiparent_gen_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ nf i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots bn 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)

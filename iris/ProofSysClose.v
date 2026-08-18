@@ -54,7 +54,7 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecMyproc SpecArgfd SpecIput SpecFileclose.
+Require Import SpecMyproc SpecArgfd SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecSysClose.
 Require Import CodeSysClose.
@@ -136,12 +136,12 @@ Section ProofSysClose.
   Lemma sc_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
-    sie_cap_gpr m k b pp -∗
+    sie_cap_gpr KT1 m k b pp -∗
     ⌜(8 <= uint (m !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res b + k)%nat with "Hstk").
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)
@@ -166,17 +166,17 @@ Section ProofSysClose.
     Mt !!! Regidx (mword_of_int 15 : mword 5) = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> (mword_of_int 8 : mword 5) -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 4)%nat b pp -∗
+    sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_close + 0x3a) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
-        sie_cap_gpr mf av b pp -∗
+        sie_cap_gpr KT1 mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -333,14 +333,14 @@ Section ProofSysClose.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow.
-    unfold sys_close_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
     set (s00 := m !!! Regidx (mword_of_int 8 : mword 5)).
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpanic Hpriv Hpenv
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpe Hpriv Hpenv
               Hfenv Hcont".
     (* [b] AND [eb] ARE DERIVABLY EQUAL HERE, and the derivation is available
        because fileclose's FS bundle carries [⌜n = 0⌝]: sys_close has no
@@ -545,7 +545,7 @@ Section ProofSysClose.
     iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p 0%nat v
               pid V (word_hi w3) w4 b lks
               ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [Hs3hi] Hs4").
     { (* sys_close DOES want the descriptor index, so its [pfd] is a real
          stack address -- [ofd_out]'s non-null case *)
@@ -851,9 +851,9 @@ Section ProofSysClose.
       iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
-                ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
+                ltac:(lia) Hn HDa0
                 Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href Hfcenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hfcenv").
       all: try lkbelow.
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".
       iDestruct ("Hfcback" with "Hout") as "[Hpenv Hfenv]".

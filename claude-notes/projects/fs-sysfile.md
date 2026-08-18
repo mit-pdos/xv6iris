@@ -10779,3 +10779,102 @@ free-slot home in `fslot`'s free arm (`FileInvDefs.v`:849) stands; and
 (B)'s two imports still close no cycle.  **The cone figures did not move at
 all**: 352 / 63 / 12, plus `SpecFilestat.vo` at 5.
 
+
+### THE FUSED V4 + V5′-R INCREMENT LANDS: **(D2) HAS ITS SUPPLIER
+### (`IregDirBit.dir_links_subdir_nlink2`), the T_DIR arm's `b = false`
+### IS REFUTED IN THE WALK, and the seal now waits on (D1) ALONE**
+
+The campaign's V4 (T1′ + the flip + `dlc_lower`) and V5′'s region half
+(the `(wdu, wdt)` split + the fractional parent register + the tagged
+movers) landed as ONE InodeRegion-cone pass — the full record, layer by
+layer, is `fs-fragments-campaign.md`'s fused-increment entry; the V5′
+design of record (the transcribed D1 probe) is the entry above it.
+What this walk's ledger needs to know:
+
+* **`su_w5_dir`'s (D2) premise `2 <= bv_unsigned (di_nlink dnd)` is now
+  SUPPLIED**: the seal derives it by one application of
+  `IregDirBit.dir_links_subdir_nlink2` at the +0x8a seam's T_DIR arm
+  (holdings: dp's `dir_links` + `ireg_inv` + ip's `dinode_at` and its
+  T_DIR test + the found-record facts `kk ∉ {0,1}`, live, non-self —
+  all in the seam's hands), then feeds the premise.  The premise's
+  banner in `ProofSysUnlink.v` says so at the point of use.
+* **`su_w5_dir`'s zeroing now REFUTES `b = false`** through
+  `IregDirBit.ireg_link_not_dir` ((T1′)'s reader) — the exact mirror of
+  the file arm's `ireg_dirbit_ty` step — and pays
+  `dir_links_unlink`'s NEW equality wand (`nlink' + 1 = nlink`, off the
+  landed `su_decr` chain) on the `b = true` arm alone.  `su_w5_file`
+  pays the same wand at `+ 0 =` off `Hnl'v`.  Both calls gained the
+  `kk <> 0` premise, off the already-derived `Hkk0`.
+* **(D1) is the seal's ONLY remaining stop.**  Its carrier is V5′; the
+  region half is BANKED (the register, both fragments, `iparent_agree`,
+  both tagged movers, `ireg_link_root_min2`); the payload half
+  (ticket index-split, the tie, create's tagged mint, the `dotdot_out`
+  extension) and the walk composition are the successor increment's.
+  Do not attempt the `Module … <: SYSUNLINK` seal before it lands.
+* Coverage is UNMOVED; `LinkSysUnlink.v` still supplies `SYSUNLINK`
+  with the Axiom.
+
+**The fused increment's gate figures are in the campaign ledger's entry
+(mirror lane `/home/ubuntu/v4lane`, 334-file closure, EXIT=0, lemma_diff
+CLEAN, coverage 186/190 sysfile 15/16 unmoved, the four seals at the
+standing sets, seven new lemmas Closed).  The mirror lane is left in
+place for the successor increment (P: payload half; W: walk + seal).**
+
+### V5′ INCREMENTS P + W: **(D1) IS DERIVED IN THE WALK, `su_w5_dir`
+### TAKES NO DESIGN-FACT PREMISE, AND THE COMPOSITION IS WRITTEN**
+
+The payload half of the parent register landed (the full layer-by-layer
+record is `fs-fragments-campaign.md`'s "V5′ INCREMENT P" entry).  What
+this walk's ledger needs to know:
+
+* **`su_w5_dir` HAS NO (D1)/(D2) PREMISES.**  Both are derived inside it:
+  (D2) by one `IregDirBit.dir_links_subdir_nlink2` before the zeroing;
+  (D1) in three steps after it — the zeroing's released ticket is the
+  TAGGED `ilinkdp ip dp` (index ≥ 2 is a name record, and the tag is
+  dp's inum off the payload's own `self`), `ireg_link_root_min2_dp`
+  against FINDING 3's `nlink ip = 1` refutes `ip = root` and opens
+  `DirLinks.dir_links_dotdot_out`'s tie leg, and `IcacheRef.iparent_agree`
+  collapses the two readings of the register.  No region is opened twice
+  and no tree fragment is touched; the lock is what makes it an episode
+  (ip's reference and sleeplock are held continuously from `ilock` to the
+  spend).
+* **The `ip->nlink--` flush is the TAGGED spend**: it takes
+  `ilinkdp ip dp ∗ iparent ip dp` (the full register) and RESETS `p` to
+  `None`, so the register is clean before the inum can be reclaimed.
+  The `".."`-ticket at index 1 is still the UNTAGGED d-unit, so
+  `wp_iupdate_unlink(dp)` keeps its `dlc_fl b` shape unchanged.
+* **`su_w5_file`'s `b = true` refutation moved to
+  `IregDirBit.ireg_dirbit_ty_dp`**: the record it zeroes is at index ≥ 2
+  too, so what it meets is an `ilinkdp`, not an `ilinkd`.  (T1) is stated
+  at `wdu + wdt` and does not care which.
+* **A GAP THE SEAL FOUND IN W1, and it is real.**  `su_w1`'s +0x30 seam
+  did not export `⌜Ms !!! Ra0 = dpv⌝`.  `su_regs` pins the five
+  CALLEE-SAVED registers and `a0` is not one of them, so the
+  `c.mv s1,a0` at +0x2c leaves the fact true and unexported — while W2's
+  first act, `ilock(dp)`, reads `a0`.  The seam gained the conjunct and
+  the site closes it with `eq_trans HN4a0 (proj1 Hnp)`.  **Read this as
+  the general rule for block decomposition: a seam must export every
+  CALLER-SAVED register the next block reads, because the register
+  bundle by construction says nothing about them.**
+
+**S7-unlink IS DONE.**  `SysUnlinkProof` is ascribed `: SYSUNLINK`,
+`ProofSysUnlink.wp_sys_unlink_sconf` composes
+W1 ∘ W2 ∘ W3 ∘ {W5-FILE, W5-DIR}, and `LinkSysUnlink.v` instantiates it
+against the twelve callees -- retiring the tree's LAST stub `Axiom`.
+`Print Assumptions SysUnlink.wp_sys_unlink_sconf` is **the standing six
+and nothing else**; coverage is **187/190, sysfile.c 16/16 COMPLETE**.
+The seal itself is a composition, not a proof: every block is a landed
+lemma and every seam is the next block's premise list verbatim, with the
+caller's exit handed BACK at each stage.  Two things it had to get right
+and a reader should not re-derive: `trap_csrs_ext eb` /
+`cpu_claim_ext eb` are DROPPED at entry (both are `emp` at the contract's
+own `eb = true`, and the exit continuation the walk carries is the
+caller's own, which still demands them); and the `MEMSET` the walk takes
+is `LinkMemsetArray.MemsetArray`, the WHOLE-FUNCTION spec, not
+`LinkMemset.Memset` (the `MEMSET_PARTS` block layer) -- LinkBalloc.v and
+LinkIalloc.v carry the same note.
+
+**VERDICT #2 IS COMPLETE**: the `dir_dots_ix` / `dir_links_dotdot_out`
+extraction's CONSTRUCTOR fired at the W5 increment and its INDEX IDENTITY
+now reaches the walk, through the parent register rather than the tree.
+Verdicts #1 and #3 were already confirmed.

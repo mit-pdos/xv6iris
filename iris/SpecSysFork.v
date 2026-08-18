@@ -63,7 +63,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import PanicStub.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -86,8 +85,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* kfork's budget plus this function's own two slots. *)
-Definition K_sys_fork : nat := (K_kfork + 2)%nat.
-
+Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
@@ -103,10 +101,9 @@ Definition wp_sys_fork_sconf_body
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (* straight through to kfork, whose cone floors at wait_lock (8) *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -121,7 +118,7 @@ Definition wp_sys_fork_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       (* the caller's block comes back verbatim: kfork only reads it *)

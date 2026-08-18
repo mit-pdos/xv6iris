@@ -64,12 +64,10 @@ Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import KptShare KptExecMap KvmMap.
-Require Import PanicStub.
 Require Import StartedInv.
 Require Import SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv.
-Require Import PanicStub.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
 Require Import DiskPtsto WpUart.
@@ -90,8 +88,7 @@ Require Import ProcAvail.
    cone (38 slots below a 2-slot frame): the secondary hart also ends in
    [jal scheduler], whose loop-head enable must fund [kv_frame_slots] out of
    what it is given, i.e. [2 + kv_frame_slots + 20 = 100]. *)
-Definition K_main_secondary : nat := 100%nat.
-
+Notation K_main_secondary := (112%nat) (only parsing).
 Section SpecMainSecondary.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
@@ -148,7 +145,7 @@ Section SpecMainSecondary.
        it is scheduler() at the far end that first enables them.  So the hart
        provably cannot move under this contract, and (as on the boot arm) it
        needs no [wp_next] wrapper: it diverges, there is no continuation. *)
-    sie_cap_gpr m K false p0 -∗
+    sie_cap_gpr KT0 m K false p0 -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
@@ -157,8 +154,7 @@ Section SpecMainSecondary.
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
-       acquire wants [panic_wp_any], and one hart's copy does not yield it. *)
-    panic_wp_any -∗
+       acquire wants them hart-generically. *)
     (* the handover channel, at the CONCRETE deposit *)
     started_inv (main_deposit γd γv) -∗
     (* this hart's own translation and trap resources *)

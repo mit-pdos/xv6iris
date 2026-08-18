@@ -36,7 +36,7 @@
    rather than as a functor argument.  See SpecBalloc.v's "READ THIS BEFORE
    TRUSTING THE STANDING SIX": carrying it as a hypothesis keeps
    [Print Assumptions] at the standing six, but the six are then modulo a
-   THREADED printk obligation, exactly as [SpecPanic.panic_wp_any] is.
+   THREADED printk obligation, exactly as [SpecPanic]'s credentials are.
 
    ---- THE CLAIM TAKES NO REGION RESOURCE AND PAYS NONE BACK (§16) -------
 
@@ -121,7 +121,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import FdSlots.
@@ -151,8 +150,7 @@ Local Open Scope Z_scope.
    with ra/s0/s1/s2/s3/s4/s5/s6 pushed at 56/48/40/32/24/16/8/0.  Its
    deepest callee is now printk on the out-of-inodes path (48, printk_stack);
    bread wants 40, brelse 26, log_write 18, iget 16 and memset 2. *)
-Definition K_ialloc : nat := 56%nat.
-
+Notation K_ialloc := (66%nat) (only parsing).
 (* THE RECORD THE CLAIM WRITES.  [memset(dip, 0, 64)] at +0x90 followed by
    [sh s6,0(s3)] at +0x94 -- the type halfword and nothing else.  Stated as
    a named constructor rather than inline so that [create]'s own contract,
@@ -216,7 +214,7 @@ Definition wp_ialloc_sconf_body
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
@@ -230,10 +228,9 @@ Definition wp_ialloc_sconf_body
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
@@ -276,7 +273,7 @@ Definition wp_ialloc_sconf_body
   ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -360,7 +357,7 @@ Definition wp_ialloc_gen_body
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
@@ -374,10 +371,9 @@ Definition wp_ialloc_gen_body
      arm) -- "itable" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
@@ -424,7 +420,7 @@ Definition wp_ialloc_gen_body
   ∀ (mf : regfile) (alloc : bool) (kslot : nat) (q : Qp) (inum : mword 32)
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗

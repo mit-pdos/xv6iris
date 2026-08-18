@@ -132,26 +132,26 @@ Section ProofPMS.
     pt_nodes tf = (pt_nodes t + g)%nat ->
     kvm_pas_ok pas ->
     (g <= kstacks_missing t)%nat ->
-    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
+    sie_cap_gpr KT0 Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x80)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx (mword_of_int 18)) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx (mword_of_int 19)) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx (mword_of_int 20)) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
-    pa_stk sp0 10 ↦₈ (mm !!! Regidx (mword_of_int 24)) -∗
+    pa_stk sp0 1 ↦₈[KT0] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[KT0] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[KT0] (mm !!! Regidx (mword_of_int 9)) -∗
+    pa_stk sp0 4 ↦₈[KT0] (mm !!! Regidx (mword_of_int 18)) -∗
+    pa_stk sp0 5 ↦₈[KT0] (mm !!! Regidx (mword_of_int 19)) -∗
+    pa_stk sp0 6 ↦₈[KT0] (mm !!! Regidx (mword_of_int 20)) -∗
+    pa_stk sp0 7 ↦₈[KT0] (mm !!! Regidx (mword_of_int 21)) -∗
+    pa_stk sp0 8 ↦₈[KT0] (mm !!! Regidx (mword_of_int 22)) -∗
+    pa_stk sp0 9 ↦₈[KT0] (mm !!! Regidx (mword_of_int 23)) -∗
+    pa_stk sp0 10 ↦₈[KT0] (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on (64 + g)) -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
+      sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
       kalloc_env γa (avail_sub on (64 + g')) -∗
@@ -332,8 +332,8 @@ Section ProofPMS.
     assert (Hpop : E10 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E10 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
     { rewrite Hwv HspE10. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 10) with "[Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT0) sp0 10) with "[Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT0)). cbn [seq].
       iSplitL "Hc72". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc72". }
       iSplitL "Hc64". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc64". }
       iSplitL "Hc56". { iExists (mm !!! Regidx (mword_of_int 9)). iExact "Hc56". }
@@ -457,26 +457,26 @@ Section ProofPMS.
     (* the loop's own kalloc call (+0x52) touches "kmem" (13); nothing else
        in its cone touches a lock (kvmmap's own Spec exposes no premise). *)
     locks_below lks "kmem" ->
-    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
+    sie_cap_gpr KT0 Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x52)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx (mword_of_int 18)) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx (mword_of_int 19)) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx (mword_of_int 20)) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
-    pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
-    pa_stk sp0 10 ↦₈ (mm !!! Regidx (mword_of_int 24)) -∗
+    pa_stk sp0 1 ↦₈[KT0] (mm !!! Regidx (mword_of_int 1)) -∗
+    pa_stk sp0 2 ↦₈[KT0] (mm !!! Regidx (mword_of_int 8)) -∗
+    pa_stk sp0 3 ↦₈[KT0] (mm !!! Regidx (mword_of_int 9)) -∗
+    pa_stk sp0 4 ↦₈[KT0] (mm !!! Regidx (mword_of_int 18)) -∗
+    pa_stk sp0 5 ↦₈[KT0] (mm !!! Regidx (mword_of_int 19)) -∗
+    pa_stk sp0 6 ↦₈[KT0] (mm !!! Regidx (mword_of_int 20)) -∗
+    pa_stk sp0 7 ↦₈[KT0] (mm !!! Regidx (mword_of_int 21)) -∗
+    pa_stk sp0 8 ↦₈[KT0] (mm !!! Regidx (mword_of_int 22)) -∗
+    pa_stk sp0 9 ↦₈[KT0] (mm !!! Regidx (mword_of_int 23)) -∗
+    pa_stk sp0 10 ↦₈[KT0] (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env γa (avail_sub (Some nb) (i + gk)) -∗
     ([∗ list] j ∈ seq 0 i,
        page_own (zero_extend' 64 (concat_vec (pas j) (zeros' 12 : mword 12)))) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
+      sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
       kalloc_env γa (avail_sub (Some nb) (64 + g')) -∗
@@ -523,7 +523,7 @@ Section ProofPMS.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) 4)]> Mk).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) (sign_extend' 64 (mword_of_int 2093890 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Hsp. }
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) 4)
@@ -533,7 +533,7 @@ Section ProofPMS.
        it to kalloc's own [cpu_own] premise. *)
     assert (HcntC0 : b = false \/ p = zero_reg -> (CIDl1 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CID CIDl1 lvl eb p b HcntC0 with "Hcnt") as "Hcnt".
-    iApply (K.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
+    iApply (K.wp_kalloc_sconf KT0 γa γk (mword_of_int (KernelSyms.kmem + 24))
               J (avail_sub (Some nb) (i + gk)) lvl eb p (K - 10)%nat b lks
               ltac:(lia)
               ltac:(reflexivity)
@@ -558,7 +558,7 @@ Section ProofPMS.
     (* rebuild kalloc_env at avail_sub (i+gk+1) *)
     iAssert (kalloc_env γa (avail_sub (Some nb) (i + gk + 1)))
       with "[Havail2]" as "Henv".
-    { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
+    { iExists γk. iFrame "Hlock Havail2". }
     (* a0 = page, page_valid, nonzero *)
     set (page := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     assert (Hpanz : page <> mword_of_int 0).
@@ -1082,7 +1082,7 @@ Section ProofPMS.
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm) with W1.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (v72) "Hc72". iDestruct "S2" as (v64) "Hc64".
     iDestruct "S3" as (v56) "Hc56". iDestruct "S4" as (v48) "Hc48".

@@ -158,7 +158,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -223,8 +224,7 @@ Definition USERSTACK : nat := 1%nat.
    one 168 -> 174.  None of it is a soundness question, it is all just "the
    callee needs six more slots than it did" (SpecReadi.v's header has the
    arithmetic). *)
-Definition K_kexec : nat := 174%nat.
-
+Notation K_kexec := (184%nat) (only parsing).
 (* ===================================================================== *)
 (*  The argument-stack model.                                             *)
 (* ===================================================================== *)
@@ -345,7 +345,15 @@ Definition fs_fabric
     (g : log_names) (gfs : fs_names) (gi : gname) (cn : ic_names) (gtl : gname)
     (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
     : iProp Σ :=
-  (bio_ctx bn (fs_view gfs gd dev cov) ∗
+  (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
+     now also asks for by name: the .rodata image the panic literals come
+     out of, and the console credentials [panic] hands to printk.  Both are
+     persistent and both are supplied once at boot, so putting them in the
+     fabric rather than in each block lemma's premise list is what keeps the
+     kexec cone's dozen internal lemmas unchanged. *)
+  (kernel_data ∗
+   panic_env ∗
+   bio_ctx bn (fs_view gfs gd dev cov) ∗
    log_ctx g bn gfs cov logstart dev ∗
    fs_crash_seam cov logstart ∗
    gen_cert ∗
@@ -483,10 +491,9 @@ Definition wp_kexec_sconf_body
      [b = true]; it is kept because it is what the callee contracts quote. *)
   b = true ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
@@ -509,8 +516,8 @@ Definition wp_kexec_sconf_body
      source to a fraction is the "right" shape and has no consumer; recorded in
      projects/kexec.md, not done.
        The pointer vector stays at [dqa] because kexec only loads from it. *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
   bslots bn 3 -∗
@@ -521,7 +528,7 @@ Definition wp_kexec_sconf_body
       ⌜callee_saved m mf⌝ -∗
       ⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
                 entry spv szv' na alen⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -530,8 +537,8 @@ Definition wp_kexec_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
          [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
       bslots bn 3 -∗

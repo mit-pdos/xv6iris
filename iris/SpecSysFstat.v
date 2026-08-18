@@ -115,7 +115,8 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -146,8 +147,7 @@ Local Open Scope Z_scope.
    wants [filestat_stack] = 62, which dominates argfd's 24 and argaddr's 18.
    Written as an expression so that a change to filestat's budget cannot
    silently leave this one behind. *)
-Definition sys_fstat_stack : nat := (4 + filestat_stack)%nat.
-
+Notation sys_fstat_stack := ((4 + filestat_stack)%nat) (only parsing).
 (* WHAT SYS_FSTAT RETURNS, as a function of what the caller already knows.
    The disjunction is indexed by [arg_fd], not by [r]: filestat's own -1
    (copyout faulted) is not distinguishable from argfd's by the value. *)
@@ -218,12 +218,12 @@ Definition wp_sys_fstat_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol): filestat's ilock
      sleeps, so this syscall parks. *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* a syscall runs at push_off level 0 *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
-  panic_wp_any -∗
+  panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
@@ -238,7 +238,7 @@ Definition wp_sys_fstat_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_fstat_ret V v r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗

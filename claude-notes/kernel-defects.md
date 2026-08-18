@@ -232,3 +232,83 @@ SOURCE".
   `off, n < 2^31`, which the callers' `uint` arguments guarantee.
 - **`initlog`'s "too big logheader" panic** is compile-time dead and absent from
   the image entirely.
+
+## Benign-but-load-bearing (2026-08-16): the no-crash orphan, and why ireclaim is not just crash recovery
+
+Not a defect — a design consequence worth having on the record (user-derived,
+from iput's tail).  Between `releasesleep(&ip->lock)` (fs.c:357) and the
+re-`acquire`/`ref--` (:359-362), the freeing thread F holds a counted
+reference to an entry whose inode it has already freed on disk.  `iget`
+adopts any entry with `ref > 0` at the same `(dev, inum)` (:258), so a
+concurrent `ialloc`+`iget` for the recycled inum bumps ref 1→2 and the slot
+now serves TWO incarnations at once — safe (all ref moves under
+`itable.lock`; `valid = 0` forces the newcomer's `ilock` to reload its own
+claim), but the incarnation boundary exists only in the trace, never in
+machine state.  This is the model's BORN-BEFORE-THE-ENTRY wall and
+§17.6.1's mid-free referrer, read directly off the C.
+
+The corner: F is preemptible in that gap (no spinlock held).  If the new
+incarnation lives a WHOLE LIFE meanwhile (create → unlink → last close),
+its final `iput` sees `ref == 2` — F's ghost — and SKIPS the free (:343);
+F then decrements to 0.  Result: `type != 0, nlink == 0`, zero refs, zero
+dirents — a fully-formed on-disk orphan with NO crash anywhere.  Bounded
+in THIS kernel because `ireclaim`'s scan (:381) matches exactly that shape
+at next boot; stock xv6 (no ireclaim) leaks it until fsck.  Consequences:
+(1) ireclaim is load-bearing for steady-state semantics, not only crash
+recovery — do not model it as crash-only; (2) any future strong invariant
+of the form "nlink == 0 ∧ ref == 0 ⇒ type == 0 on disk" is FALSE of the
+running kernel between F's ref-- and the next boot; state orphan-set
+membership instead.
+
+### The fix (candidate), and what it does and does NOT buy (probe, 2026-08-16)
+
+CANDIDATE FIX for the no-crash orphan above: restructure iput to release
+the in-core reference BEFORE freeing the disk inode --
+
+    acquire(&itable.lock);
+    int last = (ip->ref == 1 && ip->valid && ip->nlink == 0);
+    uint dev = ip->dev, inum = ip->inum;   // CAPTURE BEFORE ref-- (mandatory)
+    ip->ref--;
+    release(&itable.lock);
+    if (last)
+      ifree(dev, inum);                    // bread(IBLOCK(inum)); itrunc-from-disk; type=0; iupdate
+
+Verified sound (report-only probe) with TWO mandatory conditions:
+(1) dev,inum captured before ref-- -- once ref hits 0 the slot may be
+    recycled by a concurrent iget for a DIFFERENT inum, so ifree must
+    touch only those two scalars, never ip.  (The naive `ifree(ip->dev,
+    inum)` reads ip too late -- a real bug in the sketch.)
+(2) ifree's itrunc reads the ON-DISK addrs (fresh bread), not in-core.
+    Sound because a quiescent nlink==0 sole-ref inode has no writei in
+    flight, so iupdate already flushed current addrs -- but this is a
+    SEMANTIC argument, not the syntactic identity in-core itrunc enjoys.
+    Note the unlink-while-open (POSIX) case: writes continue after
+    nlink==0, but the final iput is the sole holder with none in flight.
+The [ref--, ifree] gap leaves type!=0,nlink==0,ref==0: unreachable by
+any iget (type!=0 blocks ialloc, nlink==0 blocks dirlookup), so
+preemption is harmless; a crash there is an ordinary crash-orphan that
+ireclaim recovers.  Same begin_op/end_op, same MAXOPBLOCKS budget.
+
+WHAT IT BUYS: fixes this leak; makes "allocatable(inum) => no in-core
+iref" TRUE and preservable (today false of the running kernel); demarks
+incarnation boundaries in machine state.  Kills the create_fresh_ty
+residue's CASE 1 (the pre-existing / stale-reference leg, fs-icache
+§17.6.1).
+
+WHAT IT DOES NOT BUY: it does NOT retire create_fresh_ty.  The axiom's
+load-bearing attacker is CASE 2 -- a FRESH iget of the claimed inum
+inside ialloc's own brelse->iget window -- which lives inside ialloc,
+not iput.  The claim slot c and refcount r are decoupled ledger
+components (IcacheRef.v:290-296,731-734); an outstanding iclaim carries
+r=0 by definition, so a free reasoning through r never meets a c.  The
+reorder relocates the wall from Case 1 to Case 2; only K-F2 (currency
+into ialloc's window) or weakening SpecCreate reach Case 2.  After
+C'-lite + boot-shelter + this reorder, the SOLE surviving model-
+admissible attacker on the claim box is the fresh iget at the SpanL /
+currency-gap site = exactly K-F2's territory.  GO as a kernel fix;
+NO-GO as an axiom retirement.  Proof cost if taken: ProofIput cone
+re-walk (the free fires post-ref--, REF-1 derivations move before it),
+a new type=0 => iref-empty coupling in InodeRegion/IcacheRef, SpecItrunc
+re-spec to disk-addr form; SpecIalloc/SpecIget/SpecCreate DO NOT move
+(which is exactly why the axiom is untouched).  Pin bump + re-dump
+(post-sys_link addresses relayout).

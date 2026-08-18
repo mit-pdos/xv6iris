@@ -35,7 +35,7 @@
    ([sie_cap_intro_bare]), converts entry's PHYSICAL stack region to the
    VA tier the capability owns, and builds [cpu_own] out of the cpus[0]
    struct cells.  The MEMORY-IMAGE half of main's precondition
-   (kernel_text / kernel_data / panic_wp / started_inv / the locks / the
+   (kernel_text / kernel_data / started_inv / the locks / the
    globals / the device tokens / the pages) is NOT this file's business.
 
    THE INPUTS THAT ARE NOT ENTRY'S POST.  Three groups, all of which the
@@ -47,7 +47,7 @@
        ([mmode_config_persist] below is the one-liner that keeps a copy
        on the caller's side);
      - both halves of the Bare arm bit
-       [strans_bit strans_bit_bare], the three pieces of this hart's SIE
+       [strans_pending], the three pieces of this hart's SIE
        ghost at [sie_gname], the [tlb] cell and the three trap
        CSRs: minted by [RiscvAdequacy.riscv_system_adequacy].  The two
        GLOBAL boot tokens adequacy also mints -- [KptGhost.kpt_unset] and
@@ -152,6 +152,12 @@ Qed.
 Section BootStack.
   Context `{!riscvGS Σ}.
 
+  (* PINNED AT KT0, AND FORCED.  This bridge turns a PHYSICAL stack region
+     into a virtual one, which is exactly the boot identity map's own step:
+     a KT1 [stack_own] carries no identity pin, so there is nothing to build
+     it out of.  Boot is Bare until kvminithart, so the pin costs nothing --
+     and it is one of the two places in the tree where a concrete tier is a
+     FACT rather than a parameter (the other is [sie_cap_intro_bare]). *)
   Lemma phys_word_to_word (a : mword 64) (dq : dfrac) (w : bv 64) :
     (forall j : nat, (j < 8)%nat -> addr_is_kdata (pa_add a j)) ->
     kmap_static_claims -∗ a ↦ₚ₈{dq} w -∗ a ↦₈{dq} w.
@@ -173,7 +179,7 @@ Section BootStack.
   Lemma stack_own_phys_to_stack (sp : mword 64) (n : nat) :
     (forall k : nat, (0 < k)%nat -> (k <= n)%nat ->
        forall j : nat, (j < 8)%nat -> addr_is_kdata (pa_add (pa_stk sp k) j)) ->
-    kmap_static_claims -∗ stack_own_phys sp n -∗ stack_own sp n.
+    kmap_static_claims -∗ stack_own_phys sp n -∗ stack_own (KTR := KT0) sp n.
   Proof.
     iIntros (Hkd) "#Hcl H".
     rewrite /stack_own_phys /stack_own.
@@ -230,7 +236,7 @@ Definition boot_stack_slots (K : nat) : nat := (2 + (kv_frame_slots + K))%nat.
    [kv_frame_slots] did (32 -> 78, to cover the whole trap path and not just
    kernelvec's own frame), and again from 132 when [K_main] did (52 -> 100, so
    that the scheduler's loop-head enable can fund its own reserve). *)
-Lemma boot_stack_slots_main : boot_stack_slots K_main = 180%nat.
+Lemma boot_stack_slots_main : boot_stack_slots K_main = 214%nat.
 Proof. reflexivity. Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -247,6 +253,8 @@ Section BootBridge.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* NO [KT0] BINDER: the boot capability is at KT0 by construction
+     ([sie_cap_intro_bare]); see the note in [Section BootStack] above. *)
   (* [mmode_config]'s two persistent conjuncts, kept while the bundle is
      handed to [wp_entry_boot] (which consumes it and never gives it back).
      This is how the corollary sources the bridge's [hw_config] /
@@ -352,8 +360,8 @@ Section BootBridge.
     menvcfg ↦ᵣ menvcfgf -∗
     stack_own_phys sp0 n -∗
     (* --- the adequacy-minted inputs --- *)
-    strans_bit strans_bit_bare -∗
-    strans_bit strans_bit_bare -∗
+    strans_pending -∗
+    strans_pending -∗
     (* this hart's SIE ghost, in the three pieces the choreography splits it
        into (IntrDefs.v §2), all at '0' -- interrupts are off at boot.  The
        NAME is canonical ([sie_gname]), so there is nothing to allocate and
@@ -394,7 +402,7 @@ Section BootBridge.
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
-      sie_cap_gpr mf (kv_frame_slots + K) false p0 ∗
+      sie_cap_gpr KT0 mf (kv_frame_slots + K) false p0 ∗
       cpu_ctx_free ∗
       cpu_own 0 false p0 false ∅ ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
@@ -417,7 +425,7 @@ Section BootBridge.
                ltac:(unfold boot_stack_slots in Hn; lia)).
     iDestruct "Hstk" as "[Hstk _]".
     assert (Hst2 : (8 * Z.of_nat 2 <= uint sp0)%Z).
-    { unfold boot_stack_slots, kv_frame_slots, text_end in Hlo. lia. }
+    { unfold boot_stack_slots, text_end in Hlo. lia. }
     pose proof (uint_pa_stk sp0 2 Hst2) as Hu2.
     iDestruct (stack_own_phys_to_stack (pa_stk sp0 2) (kv_frame_slots + K)
                  (stack_kdata_range (pa_stk sp0 2) (kv_frame_slots + K)
@@ -433,7 +441,7 @@ Section BootBridge.
                 with "Hpcf Hpad"). }
     (* --- the capability, at the final register file --- *)
     iDestruct "Hstv" as (stv0) "Hstv".
-    iAssert (stack_own (Mf !!! Regidx csp_rs1) (kv_frame_slots + K))
+    iAssert (stack_own (KTR := KT0) (Mf !!! Regidx csp_rs1) (kv_frame_slots + K))
       with "[Hstk]" as "Hstk".
     { rewrite Hsp mb_frame_pa_stk. iExact "Hstk". }
     (* [sie_cap_intro_bare]'s stack premise is PLAIN [avail], so it is

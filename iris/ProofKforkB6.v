@@ -72,7 +72,6 @@ Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import PanicStub.
 Require Import SpecMyproc.
 Require Import SpecAllocproc.
 Require Import SpecUvmcopy.
@@ -247,11 +246,10 @@ Section KforkPrologue.
        already held, but rank above "proc" follows by [locks_below_mono]
        and its own contract does not yet expose the premise. *)
     locks_below lks "proc" ->
-    sie_cap_gpr m K b pme -∗
+    sie_cap_gpr KT1 m K b pme -∗
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -279,7 +277,7 @@ Section KforkPrologue.
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
-        sie_cap_gpr Mt (K - 8)%nat b pme -∗
+        sie_cap_gpr KT1 Mt (K - 8)%nat b pme -∗
         (* [cpu_own] is handed on, not dropped.  Both of allocproc_post's
            not-found arms return it at the CALLER's level and index, and
            [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
@@ -331,7 +329,7 @@ Section KforkPrologue.
            carries the trap reserve of the arm the caller will eventually
            return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
            index, propagated. *)
-        sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+        sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
         (* slot 6 PINNED: s4 was spilled at +0x1a and the uvmcopy-failure
@@ -348,7 +346,11 @@ Section KforkPrologue.
         FdSlots.fd_slots FDSPARE -∗
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
-        IntrDefs.arm_pay lvl eb pme -∗
+        (* the child's kernel stack, exactly as allocproc handed it out: this
+           exit frees the slot, so the page goes straight back into
+           freeproc's block ([SpecFreeproc.fp_rest]). *)
+        ProcDefs.kstack_free npa -∗
+        IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         R -∗
@@ -387,7 +389,7 @@ Section KforkPrologue.
            carries the trap reserve of the arm the caller will eventually
            return at ([trap_res b]) -- exactly [SpecAllocproc]'s found-arm
            index, propagated. *)
-        sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+        sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
         (* all three lazy slots PINNED here: by +0x4a s2, s3 and s4 have all
@@ -423,7 +425,7 @@ Section KforkPrologue.
                 other copy.  The two are [mword_of_int KernelSyms.forkret]
                 either way, hence convertible, and [iApply] bridges them. *)
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
-        IntrDefs.arm_pay lvl eb pme -∗
+        IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -435,8 +437,8 @@ Section KforkPrologue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
-    unfold K_kfork in HK.
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
+    
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
              #Hitinv Henv #Hpav Hpv HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     iPoseProof (kfk_000 with "Htext") as "Hi000".
@@ -478,7 +480,7 @@ Section KforkPrologue.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0
               (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> m) with M0'.
     assert (HM0sp : M0' !!! Regidx csp_rs1 = pa_stk sp0 8) by (rewrite /M0' upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -656,7 +658,7 @@ Section KforkPrologue.
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on None b lks
               ltac:(lia) ltac:(lia) Hbelow
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Henv Hpav").
+              with "Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpav").
     all: try lkbelow.
     iIntros (CID11 Hs11 mf6) "%HcsB Hpc Hpost".
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
@@ -715,7 +717,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
@@ -772,7 +774,7 @@ Section KforkPrologue.
       (* +0x01e ld a2,72(s5) -- a2 := p->sz *)
       assert (Hszaddr_p : add_vec (N1 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 72 : mword 12))
                           = p_sz pme) by (rewrite HN1s5; reflexivity).
-      iApply (wp_ld_s_sconf (mword_of_int (KF + 0x1e)) Ra2 Rs5 (mword_of_int 72 : mword 12)
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x1e)) Ra2 Rs5 (mword_of_int 72 : mword 12)
                 N1 (trap_res b + K1)%nat (pv_sz Vp) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi01e [HPsz]").
@@ -802,7 +804,7 @@ Section KforkPrologue.
       (* +0x022 c.ld a1,80(a0) -- a1 := np->pagetable *)
       assert (Hpgaddr_c : add_vec (N2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable npa) by (rewrite HN2a0; reflexivity).
-      iApply (wp_cld_s_sconf (mword_of_int (KF + 0x22)) Ra1 Ra0 (mword_of_int 80 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x22)) Ra1 Ra0 (mword_of_int 80 : mword 12)
                 N2 (trap_res b + K1)%nat (page_base (ud_root (pv_upt Vc))) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi022 [HCpg]").
@@ -831,7 +833,7 @@ Section KforkPrologue.
       (* +0x024 ld a0,80(s5) -- a0 := p->pagetable *)
       assert (Hpgaddr_p : add_vec (N3 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable pme) by (rewrite HN3s5; reflexivity).
-      iApply (wp_ld_s_sconf (mword_of_int (KF + 0x24)) Ra0 Rs5 (mword_of_int 80 : mword 12)
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x24)) Ra0 Rs5 (mword_of_int 80 : mword 12)
                 N3 (trap_res b + K1)%nat (page_base (ud_root (pv_upt Vp))) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi024 [HPpg]").
@@ -901,7 +903,7 @@ Section KforkPrologue.
       assert (Hpinid5 : tp_pin N5p = tp_pin N5) by (rewrite /N5p; apply (tp_pin_id (tp_pin N5) (rget_tp N5))).
       assert (Hn5psp : N5p !!! Regidx csp_rs1 = N5 !!! Regidx csp_rs1)
         by (rewrite /N5p; exact (tp_pin_sp N5)).
-      assert (Hgpreq5 : sie_cap_gpr N5 (trap_res b + K1)%nat false pme = sie_cap_gpr N5p (trap_res b + K1)%nat false pme)
+      assert (Hgpreq5 : sie_cap_gpr KT1 N5 (trap_res b + K1)%nat false pme = sie_cap_gpr KT1 N5p (trap_res b + K1)%nat false pme)
         by (unfold sie_cap_gpr, sie_cap; rewrite Hn5psp Hpinid5; reflexivity).
       iEval (rewrite Hgpreq5) in "Hcg".
       assert (HN5pne : forall r : mword 5, r <> Rtp -> N5p !!! Regidx r = N5 !!! Regidx r).
@@ -1032,6 +1034,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "[Hctx]").
         { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
           iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"]. }
+        iSpecialize ("Hcont7c" with "Hkstk").
         iSpecialize ("Hcont7c" with "Harmpay").
         iSpecialize ("Hcont7c" with "Hcpu").
         iSpecialize ("Hcont7c" with "Henv'").
@@ -1074,7 +1077,7 @@ Section KforkPrologue.
         (* +0x034 ld a5,72(s5) -- a5 := p->sz (again) *)
         assert (Hszaddr_p2 : add_vec (mf9 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 72 : mword 12))
                             = p_sz pme) by (rewrite HDs5; reflexivity).
-        iApply (wp_ld_s_sconf (mword_of_int (KF + 0x34)) Ra5 Rs5 (mword_of_int 72 : mword 12)
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x34)) Ra5 Rs5 (mword_of_int 72 : mword 12)
                   mf9 (trap_res b + K1)%nat (pv_sz Vp) false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi034 [HPsz]").
@@ -1094,7 +1097,7 @@ Section KforkPrologue.
         (* +0x038 sd a5,72(s4) -- np->sz := a5 *)
         assert (Hszaddr_c : add_vec (N6 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 72 : mword 12))
                             = p_sz npa) by (rewrite HN6s4; reflexivity).
-        iApply (wp_sd_s_sconf (mword_of_int (KF + 0x38)) Ra5 Rs4 (mword_of_int 72 : mword 12)
+        iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x38)) Ra5 Rs4 (mword_of_int 72 : mword 12)
                   N6 (trap_res b + K1)%nat (pv_sz Vc) false
                   with "Hcg Hpc Hi038 [HCsz]").
         { iEval (rewrite Hszaddr_c). iExact "HCsz". }
@@ -1106,7 +1109,7 @@ Section KforkPrologue.
         (* +0x03c ld a3,88(s5) -- a3 := p->trapframe *)
         assert (Htfaddr_p : add_vec (N6 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 88 : mword 12))
                             = p_trapframe pme) by (rewrite HN6s5; reflexivity).
-        iApply (wp_ld_s_sconf (mword_of_int (KF + 0x3c)) Ra3 Rs5 (mword_of_int 88 : mword 12)
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x3c)) Ra3 Rs5 (mword_of_int 88 : mword 12)
                   N6 (trap_res b + K1)%nat (page_base (ud_tfp (pv_upt Vp))) false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi03c [HPtf]").
@@ -1146,7 +1149,7 @@ Section KforkPrologue.
         (* +0x042 ld a4,88(s4) -- a4 := np->trapframe (the DEST cursor) *)
         assert (Htfaddr_c : add_vec (N8 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
                             = p_trapframe npa) by (rewrite HN8s4; reflexivity).
-        iApply (wp_ld_s_sconf (mword_of_int (KF + 0x42)) Ra4 Rs4 (mword_of_int 88 : mword 12)
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x42)) Ra4 Rs4 (mword_of_int 88 : mword 12)
                   N8 (trap_res b + K1)%nat (page_base (ud_tfp (pv_upt Vc))) false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi042 [HCtf]").

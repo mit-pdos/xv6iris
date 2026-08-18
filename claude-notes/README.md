@@ -144,16 +144,23 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`cwd-ref.md`](projects/cwd-ref.md)** — filling the `ProcInv.cwd_ref` hole:
   the target shape (no null arm), the measured layering fix, why the itable
   gname must be canonical, and the ordering behind kfork.
+- **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
+  NON-IDENTITY kernel va (the gate on the process kernel stack): the four
+  dead ends, and THE SETTLED DESIGN — a ktier-indexed `↦ₘ[kt]` datum, a
+  persistent per-hart `kpt_on` witness carried by a ktier-indexed `sie_cap`,
+  tier-preserving `KtierLe`-inferred leaf rules, ambient `CurKtier` notation,
+  and lock payloads at explicit tiers.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`proc_pt`): the footprint derived
   from `um`, the physical-tier decision, the `page_own ⇄ udata_own` bridges.
   The CONSTRUCTION side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
 - **[`kexec.md`](projects/kexec.md)** — `kexec()`, the largest function in the
-  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN
-  and linked, with `sys_exec` the only thing left. Read it for how a
-  four-phase function's seams compose (every seam hands the caller's exit
-  BACK), and for **the copyout story**, the most transferable thing this
-  project produced.
+  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN,
+  linked, and reaching `syscall()` through `sys_exec` at dispatch index 7.
+  Read it for how a four-phase function's seams compose (every seam hands the
+  caller's exit BACK), for **the copyout story**, the most transferable thing
+  this project produced, and — before wiring any other `ProofSyscall.v` GAP
+  entry — for why the fs fabric was a NAMING problem, not a missing resource.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
   chain. Remaining: the whole-system adequacy composition, and (§G2) retiring
@@ -163,9 +170,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
   proof's file split, and the whole-trap-loop Löb theorem
   (`SpecUserretClosed`), which is now built.
-- **[`panic.md`](projects/panic.md)** — `panic()`, proven: the contract the two
-  printk calls force, the Löb self-jump, and the one thing left — splicing it
-  into the 169 files that still thread `PanicStub.v`'s placeholder credential.
 - **[`console.md`](projects/console.md)** — console.c, 5/5 functions proven
   and linked: the `cons` module's own state in `ConsoleInv.v` and why its
   resource is deliberately unconstrained, consoleintr's block decomposition,
@@ -179,6 +183,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
+- **[`user-echo.md`](projects/user-echo.md)** — the Umode tier's SECOND
+  program, `echo`: the first with loops, memory reads, an argv area and a
+  syscall with a real precondition. Read it for the pieces that grew to carry
+  it — the stack as a splittable BUDGET, `uM_only` as the image
+  postcondition of a call, the `mword_of_int` calculus, and the one generic
+  branch leaf that replaces an op cross-product.
 
 ## `completed/` — finished projects, archived for reference
 
@@ -189,6 +199,11 @@ true when it was written and may not be now. When a project is fully finished �
 no remaining work and no cleanup — move its file here rather than deleting it,
 and lift any broadly-applicable lesson up into the design or durable notes
 first.
+
+`panic.md` is the one to open before proving any arm that ends in a `jal
+panic` — `forkret`'s `if (first)` is the only such arm left. It carries the arm
+recipe, its six traps, and the rule for deriving a `.rodata` message address
+instead of copying one.
 
 Two are worth reading even if you never touch their subject, because they are
 about failure modes that COMPILE: `explicit-cpuid.md` with its porting guide

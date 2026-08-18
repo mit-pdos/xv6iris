@@ -103,18 +103,18 @@ Section ProofUvmcreate.
        r <> csp_rs1 -> r <> mword_of_int 8 -> r <> mword_of_int 9 ->
        Mt !!! Regidx r = mm !!! Regidx r) ->
     mm !!! Regidx csp_rs1 = sp0 ->
-    sie_cap_gpr Mt (K - 4)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 4)%nat b p -∗
     cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmcreate + 0x1a)) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[KT1] (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] v4 -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) rv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr : regfile,
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is (ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ⌜ callee_saved mm mr ⌝ -∗
@@ -195,8 +195,8 @@ Section ProofUvmcreate.
     assert (Hpop : E3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3sp. reflexivity. }
-    iAssert (stack_own sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       iSplitL "Hc3". { iExists (mm !!! Regidx (mword_of_int 9)). iExact "Hc3". }
@@ -325,7 +325,7 @@ Section ProofUvmcreate.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     iDestruct "S3" as (v3) "Hc3". iDestruct "S4" as (v4) "Hc4".
@@ -390,7 +390,7 @@ Section ProofUvmcreate.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095434 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
@@ -407,7 +407,7 @@ Section ProofUvmcreate.
        line, no case split on [b] -- exactly the ProofKvmmap.v pattern. ---- *)
     iDestruct (cpu_own_transport CID CID6 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
+    iApply (AK.wp_kalloc_sconf KT1 γa γk (mword_of_int (KernelSyms.kmem + 24))
               J on lvl eb p (K - 4)%nat b
               _ Hc14
               ltac:(reflexivity)
@@ -485,7 +485,7 @@ Section ProofUvmcreate.
       { rewrite /uvmcreate_post. iLeft.
         iSplit; [iPureIntro; rewrite Hnull; symmetry; exact Hnz|].
         iSplit; [iPureIntro; exact Hz|].
-        iExists γk. iFrame "Hlock Havail2 Hpanic". }
+        iExists γk. iFrame "Hlock Havail2". }
       (* [uvc_htail]'s OWN [wp_next b K] obligation (the [-]-framed slot
          above) is at ITS ambient hart (CID9 here), which is NOT [Hcont]'s
          hart -- [Hcont]'s [wp_next] is fixed at the OUTER entry hart
@@ -498,7 +498,7 @@ Section ProofUvmcreate.
     }
     iAssert (kalloc_env γa (avail_sub on 1))
       with "[Havail2]" as "Henv".
-    { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2 Hpanic". }
+    { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2". }
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x10)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               M1 (K - 4)%nat b
               ltac:(vm_compute; reflexivity)
@@ -543,7 +543,7 @@ Section ProofUvmcreate.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
-    iApply (MS.wp_memset_sconf M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    iApply (MS.wp_memset_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }

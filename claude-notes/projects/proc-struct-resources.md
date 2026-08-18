@@ -1147,10 +1147,21 @@ the evidence for every offset. This file is only the worklist.
 
       **THE ONE ASSUMPTION** is `SpecForkretPark.FORKRET_PARK`, argued at
       length in that file's header: parking a fresh process at RUNNABLE
-      needs a `▷ proc_ctx`, which is a Löb argument about `forkret`, and
-      nothing in the tree produces a fresh one.  Proving
-      `forkret`/`usertrapret`/`userret` (projects/uservec.md) retires it and
-      changes nothing else.
+      needs a `▷ proc_ctx`.
+
+      **THE SAME PARK IS A THEOREM in its PAID form** --
+      `SpecForkretParkPaid.v` / `ProofForkretPark.v` over forkret's own
+      contract (projects/uservec.md has the correspondence table and the
+      inventory).  What kfork cannot supply is that form's extra
+      precondition `forkret_park_pkg`, and **the residual gap is now exactly
+      ONE resource**: the child's free kernel stack is available (K3a) and
+      the closer's `bslots bn 3` / `initproc` share both have sound sources,
+      but `fileclose_bm` is a UNIQUE EXCLUSIVE resource -- the FS block
+      bitmap -- which no second process can hold.  So retiring the Axiom is
+      not a change to kfork's contract so much as a change to
+      `UsertrapRes.ut_own_nopt`'s: see
+      [`sp-migration.md`](sp-migration.md) §"K4 findings" for the accounting
+      and the FS-layer fix.
 
       Proven and reusable:
       * `ProofKforkParts.kfk_epi` -- the epilogue at +0xfc
@@ -1464,6 +1475,108 @@ the evidence for every offset. This file is only the worklist.
       observable from inside its diverging body), so the only thing sys_exit
       needs from argint is that argument 0 EXISTS in the trapframe — the
       loaded value itself is never named in the postcondition.
+
+## Retiring the `ForkretPark` axiom: the four obstacles, measured
+
+The park itself is no longer one of them — `SpecForkretParkPaid.v` /
+`ProofForkretPark.v` prove it over forkret's own contract
+([`uservec.md`](uservec.md) has the correspondence table). What is left is
+kfork's side, and it is these four, checked against the tree rather than
+guessed. **Obstacle 2 is now SOLVED (sp-migration K3a) and obstacle 3 is the
+one that stops the retirement**: one of its three pieces, `fileclose_bm`, is
+a singleton the kernel has exactly one of.
+
+**1. Most of `forkret_park_pkg` kfork already holds.** At the
+`FP.forkret_park` call site in `ProofKforkB5.v`: `kernel_text`,
+`procs_inv γs`, `pslot_used_at` (allocproc mints it) and
+`pa = proc_addr j ∧ j < NPROC`. `wire_inv` and the trampoline `kmap_at`
+appear nowhere in the syscall cone but are persistent and do exist
+(`BootChain.v` allocates `wire_inv`) — one more persistent premise threaded
+from boot. The two page-table facts (`ud_data pt = ud_pas pt`,
+`proc_pt_wf pt`) should fall out of uvmcopy's post via `ud_norm_id` /
+`ud_norm_pas`.
+
+**2. The child's KERNEL STACK is SOLVED.** sp-migration's K3a landed the
+whole lifecycle: `proc_dormant` owns `kstack_free` on both arms, boot's
+`KstackOwn.kstack_bank` reaches the slots at `SpecProcinit.procs_inv_alloc`,
+allocproc's post hands the slot's page out sealed beside `is_kstack`, and
+the exit path donates it back. The park's carve is one
+`ProcDefs.kstack_free_at`, at `av = KSTACK_AV = K_usertrap = 342`. The one
+piece of plumbing left is that `ProofKforkB6.kfk_prologue` drops the child's
+`kstack_free` on its uvmcopy-SUCCESS continuation (`Hcont4a`) while keeping
+it on the failure one; see [`sp-migration.md`](sp-migration.md) §"K4
+findings". The section below is the design that landed, kept for the
+`ProcDefs` vocabulary it explains.
+
+**3. The closer's environment is mostly free — AND THE ONE PIECE THAT IS NOT
+IS UNPAYABLE BY ANYBODY.** `ProofSyscall.syscall_env` is **entirely
+persistent** — its own header says so ("Every conjunct is Persistent … so the
+whole bundle is held with `#`") — and so is all of `UsertrapRes.ut_caps`, so
+a second process's copy of both costs nothing. Of `ut_env_nopt` only three
+pieces are real, and they do not have the same answer:
+
+- `bslots bn 3` — BOOT-MINTABLE PER SLOT. `bslots` is additive and
+  `NPROC * 3 = 192 ≤ BSLOTS = 1024`, so it takes the `fd_slots FDSPARE`
+  route exactly (deposit at `procs_inv_alloc`, hand out at allocproc).
+  Not parent-donatable: the parent must hand its own three back.
+- `initproc ↦₈{dqi}` — FREE, by discarding it at boot (every consumer
+  already takes a parametric `dfrac` and only reads); the parent's dfrac
+  can also be halved, since `un_dqi` is a `ut_names` field.
+- `fileclose_bm fn us` — **NO SOURCE AT ALL.** Its `bitmap_res` conjunct is
+  `fsblock γfs bmapstart` (a fixed HALF-fraction `ghost_map` element at one
+  key) plus a FULL-fraction `blk_own` per free block, so two copies are
+  refutable outright (`FsBlocks.blk_own_excl`); there is exactly one block
+  bitmap in the kernel, boot cannot mint 64, and the parent cannot spare its
+  own because `wp_syscall_sconf_body`'s continuation demands it back. The
+  measurement, the mechanical refutation and the FS-layer fix (the bitmap
+  belongs behind the log lock, not in a per-process residue) are in
+  [`sp-migration.md`](sp-migration.md) §"K4 findings". **Until that lands,
+  the trap loop's residue is satisfiable for exactly ONE process and no
+  paid park can be fed** — which is a defect about `usertrap_res`, not
+  about fork.
+
+**4. THE LAYERING WALL, and it decides the shape of everything else.**
+`usertrap_res_bare` is `ut_res_bare SY.syscall_env`, defined ABOVE the
+syscall table: `UsertrapRes.v` requires `SpecSyscall.v` (the module TYPE),
+`ProofSyscall.v` requires `SpecSysFork` → `SpecKfork`, and `SpecKfork.v`
+mentions neither. So the concrete residue exists only once `SY` is
+instantiated at `ProofSyscall`'s module — which is built over `Kfork`. A
+kfork contract naming `usertrap_res_bare` is therefore a MODULE-LEVEL CYCLE,
+and no file-level reshuffle fixes it. The escape is the one
+`wp_forkret_body` already uses: keep `URes` an ABSTRACT PARAMETER of the
+statement, threaded `SpecKfork` → `SpecSysFork` → `SpecSyscall`'s table
+entry, and instantiated only at `LinkUsertrap`. Note the same wall blocks
+the tempting shortcut of parking the whole package in the proc slot:
+`SchedCtx` / `ProcInv` sit below `UsertrapRes` too, so a slot could only
+store it at a parameterized residue.
+
+## The kernel stack: LANDED, and where the design lives now
+
+The whole lifecycle is in the tree (sp-migration K1-K3a; that file's "K3a
+findings" is the authority and this section is only the index into it):
+`KstackOwn.kstack_bank` is minted in `main` out of kvminit's pages and
+kvminithart's claims, `SpecProcinit.procs_inv_alloc` deposits one carve per
+slot at pass 3 (the first point `p->kstack` is persisted, hence the first
+point `kstack_free` is expressible), `ProcDefs.proc_dormant` owns
+`kstack_free` on BOTH arms, allocproc hands the slot's page out sealed,
+freeproc passes it ZOMBIE -> UNUSED, and the dying thread donates its whole
+page back through the `kstack_closer` chain that is born at usertrap's entry
+and dies at kexit's park. `KSTACK_AV` is 342 and must equal
+`UsertrapRes.K_usertrap`; the swtch protocol change that makes the page
+conserve exactly (a ZOMBIE swtch leaves NO record, guarded by
+`ProcGeom.needs_ctx st`) is landed across `SwtchCtx`/`SpecSwtch`/`SchedCtx`/
+`SpecSched`/`ProofScheduler`/yield/sleep/kexit.
+
+**THE RULE THAT EFFORT PAID FOR, and it is general: before parking a
+resource in an invariant that boot must fill, check that boot CAN fill it.**
+The first attempt put `kstack_free` into `proc_dormant` while `stack_own` was
+still `mem_pointsto`-based, i.e. carrying the identity conjunct
+`pa_of ppn va = va` a KSTACK va cannot satisfy. It COMPILED, threaded
+cleanly through procinit / allocproc / freeproc / kfork, and landed at
+`SpecMain` as a boot premise that made `wp_main_boot_sconf` VACUOUSLY TRUE —
+a proven top-level theorem quietly saying nothing, with nothing going red.
+An unpayable HYPOTHESIS is honest; an unpayable premise on a theorem boot
+must discharge is not.
 
 ## The unlinked chain: `fileclose` is the only blocker
 

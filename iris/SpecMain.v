@@ -129,7 +129,6 @@ Require Import HartTp.
 Require Import KptGhost KptShare KptExecMap KvmMap.
 Require Import KMap.
 Require Import TimerCap.
-Require Import PanicStub.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
 Require Import ConsoleInv.
@@ -182,8 +181,7 @@ Require Import ProcAvail.
    init cone needs.  The boot bridge hands out [kv_frame_slots + K_main]
    ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
    4096-byte per-hart stack, so nothing upstream has to change. *)
-Definition K_main : nat := 100%nat.
-
+Notation K_main := (122%nat) (only parsing).
 Section SpecMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
@@ -323,7 +321,7 @@ Section SpecMain.
   (* ------------------------------------------------------------------- *)
   Definition main_hart_raw
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) : iProp Σ :=
-    (strans_bit strans_bit_bare ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs_raw)%I.
+    (strans_pending ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs_raw)%I.
 
   (* ------------------------------------------------------------------- *)
   (* main(), entered on the BOOT hart.                                    *)
@@ -359,7 +357,7 @@ Section SpecMain.
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->
-    sie_cap_gpr m K false p0 -∗
+    sie_cap_gpr KT0 m K false p0 -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
@@ -369,11 +367,10 @@ Section SpecMain.
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     (* HART-GENERIC, and it has to be: main's boot arm calls kinit (-> freerange
        -> kfree -> acquire) and userinit, and builds [kalloc_env], all three of
-       which now take [panic_wp_any].  [panic_wp_any] is strictly stronger and
-       is NOT derivable from the ambient [panic_wp], so main has nowhere else
+       which took the hart-GENERIC panic credential.  It was strictly stronger
+       and NOT derivable from the ambient one, so main had nowhere else
        to get it.  The ambient form is recovered where needed with
-       [panic_wp_any_at cpu_id]. *)
-    panic_wp_any -∗
+       a per-hart projection. *)
     (* the handover channel, and the RECIPE for the deposit it will carry:
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)

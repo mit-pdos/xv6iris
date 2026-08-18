@@ -210,7 +210,7 @@ Section ProofPlicinithart.
        [b = false]-only with no [wp_next] wrapper, matching plicinithart's
        own now-[b = false] contract, so the call's continuation is entered
        directly. ---- *)
-    iApply (Cpuid.wp_call_cpuid_sconf_cs (mword_of_int (KernelSyms.plicinithart + 0x08))
+    iApply (Cpuid.wp_call_cpuid_sconf_cs KT1 (mword_of_int (KernelSyms.plicinithart + 0x08))
               (mword_of_int 2081526 : mword 21) m2 (n - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

@@ -12,8 +12,9 @@
    see SpecSysExec.v's header on why the kalloc'd pages therefore do not
    appear in the contract at all.
 
-   panic is not a module argument: the contract takes [panic_wp_any] and
-   relays it to kalloc, kfree and kexec, never consuming it locally. *)
+   panic is not a module argument: the contract takes [kernel_data] and
+   [panic_env] and relays them to kalloc, kfree and kexec, whose own arms
+   are theirs. *)
 Require Import LinkArgaddr LinkArgstr LinkMemsetArray LinkFetchaddr LinkKalloc
         LinkFetchstr LinkKexec LinkKfree
         ProofSysExec.

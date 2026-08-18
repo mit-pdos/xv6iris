@@ -88,7 +88,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -111,8 +112,7 @@ Local Open Scope Z_scope.
 (* iupdate's own frame is 32 bytes (4 slots) -- [c.addi sp,sp,-32] at +0x00,
    ra/s0/s1/s2 pushed.  Its deepest callee is bread (40); brelse wants 26,
    log_write 18 and memmove 2. *)
-Definition K_iupdate : nat := 44%nat.
-
+Notation K_iupdate := (62%nat) (only parsing).
 (* [sb_inodestart] -- the [sb + 24] cell iupdate reads at +0x18 -- now
    lives in InodeInv.v, where ilock's contract can also name it. *)
 
@@ -187,7 +187,7 @@ Definition wp_iupdate_sconf_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  iupdate itself never
      acquires or releases anything -- it just calls bread, whose OWN acquire
@@ -199,10 +199,10 @@ Definition wp_iupdate_sconf_body
      straight through to bread and back, unused, all the way to its own
      exit.  See claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
@@ -243,9 +243,9 @@ Definition wp_iupdate_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -353,17 +353,17 @@ Definition wp_iupdate_gen_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_iupdate_sconf_body] above -- required so that a caller reaching
      iupdate through the SET form (writei's own loop, deriving its counted
      [wp_writei_sconf] from [wp_writei_gen]) can reach this contract at
      [eb = false] too.  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
@@ -403,9 +403,9 @@ Definition wp_iupdate_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -523,10 +523,10 @@ Definition wp_iupdate_cred_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS, so the caller
@@ -568,7 +568,7 @@ Definition wp_iupdate_cred_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -673,12 +673,12 @@ Definition wp_iupdate_credgen_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -706,9 +706,9 @@ Definition wp_iupdate_credgen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -810,7 +810,7 @@ Definition wp_iupdate_link_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -828,13 +828,21 @@ Definition wp_iupdate_link_body
   (* THE ADDED PREMISE (see the banner): (L3) plus the increment below make
      a type-0 flush contradictory, so the region cannot take one here. *)
   bv_unsigned (di_type dn) <> 0 ->
-  (* THE FLAVOUR'S OWN PREMISE (see the banner): (T1) at the flushed record.
-     Vacuous at [fl = None], where every landed caller stands; at [Some tt]
-     it is what makes [InodeRegion.ireg_write_link_d]'s mint legal.  Stated
-     at [InodeRegion.ireg_dir_ty] rather than [DirView.T_DIR_z] so this file
-     acquires no import ([IregDirBit.ireg_dir_ty_T_DIR_z] is the bridge, one
+  (* THE FLAVOUR'S OWN PREMISES (see the banner; the index is widened to
+     [option (option Z)] by V5' -- [None] plain, [Some None] untagged-d,
+     [Some (Some pv)] tagged).  (T1) at the flushed record for EITHER d
+     flavour; (T1')'s mirror at the plain one (V4): a plain mint's record
+     is NOT a directory -- a walk-level fact at every plain-minting site;
+     and the tagged mint's legality (V5'): the pre-record is the fresh
+     child's, its count zero.  Stated at [InodeRegion.ireg_dir_ty] rather
+     than [DirView.T_DIR_z] so this file acquires no import
+     ([IregDirBit.ireg_dir_ty_T_DIR_z] is the bridge, one
      [reflexivity]). *)
-  (fl = Some tt -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty) ->
+  (forall od : option Z,
+     fl = Some od -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty) ->
+  (fl = None -> bv_unsigned (di_type dn) <> InodeRegion.ireg_dir_ty) ->
+  (forall pv : Z,
+     fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
   (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
      the count by exactly one, and that one unit is what pays for the
      [ilink] the post hands out (§20.6's mkdir/sys_link rows).
@@ -865,10 +873,10 @@ Definition wp_iupdate_link_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -888,7 +896,7 @@ Definition wp_iupdate_link_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -983,7 +991,7 @@ Definition wp_iupdate_unlink_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -1027,10 +1035,10 @@ Definition wp_iupdate_unlink_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -1058,7 +1066,7 @@ Definition wp_iupdate_unlink_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -1190,7 +1198,7 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
@@ -1215,7 +1223,7 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),

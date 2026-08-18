@@ -158,7 +158,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -197,8 +196,7 @@ Local Open Scope Z_scope.
    ([c.addi16sp sp,-304] at +0x00).  Its deepest callee is namei (106);
    nameiparent wants 104, dirlink 100, iunlockput 64, argstr 60, iput 60,
    end_op 58, ilock 44, iupdate 44, begin_op 26, iunlock 26. *)
-Definition K_sys_link : nat := 144%nat.
-
+Notation K_sys_link := (154%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  Three, and the third one is nameiparent's:
    see the header's reference ledger. *)
 Definition sys_link_slots : nat := 3%nat.
@@ -261,7 +259,7 @@ Definition wp_sys_link_sconf_body
      ZERO-extended halfword argument. *)
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- dirlink's out-of-blocks arm calls printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := KT1) γpr gu gd ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* namei's own premise, inherited: the walker runs with the base enabled *)
@@ -270,7 +268,7 @@ Definition wp_sys_link_sconf_body
      trapframe page [proc_priv] carries *)
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
      DERIVES [lks = ∅] and every order goal the eleven callees raise is
@@ -278,10 +276,9 @@ Definition wp_sys_link_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -321,9 +318,9 @@ Definition wp_sys_link_sconf_body
          in.  [uptd_ext] is argstr's own report, composed across the pair by
          [ProcPtOwn.uptd_ext_trans]. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

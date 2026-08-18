@@ -112,7 +112,8 @@ Require Import CalleeSaved.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
@@ -131,19 +132,19 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
-Require Import SpecIput.
+Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
 (* fileclose's own frame is 8 slots ([addi sp,sp,-64]: ra, s0..s5 saved), and
-   its deepest callee is iput ([SpecIput.K_iput] = 60, itself sized by bread
-   under itrunc).  The others are smaller: end_op 58, begin_op 26, pipeclose
-   22, acquire/release 10.  A CONSTANT, not a per-arm bound: the stack a
+   its deepest callee is end_op ([SpecEndOp.K_end_op] = 76, sized by
+   write_head / install_trans under bread).  iput (72, itself sized by bread
+   under itrunc) is just below it; begin_op 26, pipeclose 22,
+   acquire/release 10.  end_op OVERTOOK iput when the panic budget landed.  A CONSTANT, not a per-arm bound: the stack a
    function may need is a property of the function (durable-notes.md). *)
-Definition fileclose_stack : nat := (8 + K_iput)%nat.
-
+Notation fileclose_stack := ((8 + K_end_op)%nat) (only parsing).
 (* ---------------------------------------------------------------------- *)
 (* The ghost names and geometry the last-reference arm's callees are        *)
 (* indexed by, in one bundle.                                              *)
@@ -628,7 +629,7 @@ Definition wp_fileclose_sconf_body
   (* a0 is the file being closed *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where
      fileclose's own acquire mints what the FS arm's interior sleeps need;
@@ -637,11 +638,11 @@ Definition wp_fileclose_sconf_body
      [fileclose_fs_env] -- see that bundle's banner for why the FS arm is
      the wrong home for it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
-  panic_wp_any -∗
+  panic_env -∗
   file_ref γf k q Cf -∗
   fileclose_env fn on us n eb p Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  The FD_INODE / FD_DEVICE
@@ -656,9 +657,9 @@ Definition wp_fileclose_sconf_body
      continuation hart-generically.) *)
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

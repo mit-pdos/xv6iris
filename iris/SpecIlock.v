@@ -110,7 +110,7 @@
    (allocatedness is directory-structure knowledge -- namei/ialloc, future
    work), and the pool legitimately holds free inodes ([ipool_shape]'s
    type-0 shape, §13.3).  So on the free-inode arm ilock DIVERGES through
-   [SpecPanic.panic_wp_any] and this postcondition speaks only for
+   [SpecPanic]'s own contract and this postcondition speaks only for
    successful loads.  That is sound in a partial-correctness WP and it is
    the honest statement; every other panic in this tree is refuted, and the
    proof file says at which instruction this one is taken.
@@ -163,7 +163,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -192,8 +193,7 @@ Local Open Scope Z_scope.
    ra/s0/s1 pushed there and s2 pushed on the uncached arm only.  Its
    deepest callee is bread (40); acquiresleep wants 26, brelse 26,
    memmove 2. *)
-Definition K_ilock : nat := 44%nat.
-
+Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
@@ -238,7 +238,7 @@ Definition wp_ilock_sconf_body
      of the two, so one premise at its rank covers the whole cone via
      [locks_below_mono]. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread
      both sleep, and a parking thread hands [trap_csrs] / [cpu_claim] across
@@ -247,10 +247,10 @@ Definition wp_ilock_sconf_body
      and the caller brings nothing -- which is why this used to be an
      [eb = true] premise instead.  At [eb = false] the caller brings the
      pair, holding it because the TRAP handed it over. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
@@ -296,9 +296,9 @@ Definition wp_ilock_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

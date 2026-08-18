@@ -7,10 +7,10 @@
    "interface stated, no Link instantiates it" to PROVEN in
    [tools/proof_coverage.py].
 
-   The two callees are acquire and release.  panic is NOT a module here: the
-   "iget: no inodes" arm is LIVE (SpecIget.v's header), and it diverges
-   through the [panic_wp_any] resource the contract already takes, so no
-   further instantiation is needed for it. *)
-Require Import LinkAcquire LinkRelease ProofIget.
+   The callees are acquire, release and panic.  The "iget: no inodes" arm is
+   LIVE (SpecIget.v's header) and is discharged against [Panic] -- note it
+   fires while iget HOLDS itable.lock, which is what the contract's
+   [n + 3 < 2^31] and the rank table's "itable" < "pr" edge pay for. *)
+Require Import LinkAcquire LinkRelease LinkPanic ProofIget.
 
-Module Iget := IgetProof Acquire Release.
+Module Iget := IgetProof Acquire Release Panic.

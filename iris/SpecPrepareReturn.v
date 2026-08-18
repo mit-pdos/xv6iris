@@ -122,8 +122,7 @@ Import Defs.
 
 (* prepare_return's own 16-byte frame is 2 slots; below it myproc's 10.  The
    four trapframe stores and the five CSR writes are all leaf-level. *)
-Definition K_prepare_return : nat := 12%nat.
-
+Notation K_prepare_return := (12%nat) (only parsing).
 (* THE WORD [csrw stvec] WRITES.  The C computes
    [TRAMPOLINE + (uservec - trampoline)] and uservec IS the first byte of
    trampoline.S, so the difference is 0 and the vector is TRAMPOLINE itself
@@ -162,11 +161,11 @@ Definition wp_prepare_return_sconf_body
   (* ENTERED AT PUSH_OFF LEVEL 0, AT EITHER SIE INDEX -- see the header.
      [cpu_own]'s base-enable is [b] because at level 0 the two agree
      ([CpuOwn.cpu_own_eb_agree]); writing anything else would be vacuous. *)
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own 0%nat b p b lks -∗
   (* the trap CSRs, from the caller at [b = false] and [emp] at [b = true],
      where the function's own [intr_off] produces them ([trap_csrs_ext]). *)
-  trap_csrs_ext b -∗
+  trap_csrs_ext KT1 b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the process: [p] is what myproc() returns, i.e. [cpus[cid].proc] *)
   is_kstack p ks -∗
@@ -185,7 +184,7 @@ Definition wp_prepare_return_sconf_body
       (* INTERRUPTS ARE OFF, and the reserve the enabled arm was holding is
          now usable stack -- the standard csrci index move.  At [b = false]
          there was no arm and no reserve, and [trap_res false + av = av]. *)
-      sie_cap_gpr mf (trap_res b + av)%nat false p -∗
+      sie_cap_gpr KT1 mf (trap_res b + av)%nat false p -∗
       (* THE PER-CPU BUNDLE, REASSEMBLED AT THE DISABLED INDEX.  [cpu_own] at
          [b = true] is the pure fact plus the caller's frame [C] -- the cells
          and the counting token live inside [sie_arm true], and the [csrci]
@@ -222,7 +221,7 @@ Definition wp_prepare_return_sconf_body
          the sret. *)
       ghost_var sie_gname (1/4) vb -∗
       (* the KPT receipt, likewise out of [trap_csrs] and not folded back *)
-      strans_bit strans_bit_kpt -∗
+      kpt_on cpu_id -∗
       (* the process block, with the four kernel words re-armed *)
       proc_priv γf p pid
         (upd_tf V (prepare_return_tf (pv_tf V) ksat

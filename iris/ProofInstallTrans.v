@@ -93,7 +93,8 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeInstallTrans.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import SpecBread SpecBwrite SpecBunpin SpecBrelse SpecMemmove.
 Require Import SpecInstallTrans.
 From Kernel Require KernelSyms.
@@ -457,15 +458,15 @@ Proof. rewrite /log_slot_bno. lia. Qed.
 
 (* the stack budget: the ten-slot frame, then each callee's own depth *)
 Lemma it_Kbread (K : nat) : (K_install_trans <= K)%nat -> (K_bread <= K - 10)%nat.
-Proof. rewrite /K_install_trans /K_bread. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kbwrite (K : nat) : (K_install_trans <= K)%nat -> (K_bwrite <= K - 10)%nat.
-Proof. rewrite /K_install_trans /K_bwrite. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kbrelse (K : nat) : (K_install_trans <= K)%nat -> (K_brelse <= K - 10)%nat.
-Proof. rewrite /K_install_trans /K_brelse. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kbunpin (K : nat) : (K_install_trans <= K)%nat -> (14 <= K - 10)%nat.
-Proof. rewrite /K_install_trans. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kmm (K : nat) : (K_install_trans <= K)%nat -> (2 <= K - 10)%nat.
-Proof. rewrite /K_install_trans. lia. Qed.
+Proof. lia. Qed.
 
 (* the dirty authority's step *)
 Lemma it_dirty_flip_step (D : gmap Z bool) (W : list (mword 32)) (t : nat) (w : mword 32) :
@@ -577,9 +578,9 @@ Section InstallTransDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -614,16 +615,16 @@ Section InstallTransDefs.
 
   (* the ten saved slots (ra, s0..s8): every one is written *)
   Definition it_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ (m !!! Regidx Rs8 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] (m !!! Regidx Rs8 : mword 64))%I.
 
   (* what the caller still owns when the loop is done / at the epilogue *)
   Definition it_out (bn : bio_names) (γfs : fs_names) (logstart : Z)
@@ -781,12 +782,12 @@ Section InstallTransBlocks.
     M !!! Regidx Rs9 = (m !!! Regidx Rs9 : mword 64) ->
     M !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64) ->
     M !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64) ->
-    sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.install_trans + 0xb2) : mword 64) -∗
     it_frame m -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     it_out bn γfs logstart n W Lw L D -∗
@@ -1014,9 +1015,9 @@ Section InstallTransBlocks.
                    = pa_stk (add_vec (P10 !!! Regidx csp_rs1 : mword 64)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
     { rewrite Hwv HP10sp Hsp. exact (it_push m). }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 10)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 10)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iEval (rewrite -Hb1); iExists _; iExact "Hf1"|].
       iSplitL "Hf2"; [iEval (rewrite -Hb2 -HP1sp); iExists _; iExact "Hf2"|].
       iSplitL "Hf3"; [iEval (rewrite -Hb3 -HP2sp); iExists _; iExact "Hf3"|].
@@ -1032,7 +1033,7 @@ Section InstallTransBlocks.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.install_trans + 0xc6)) (mword_of_int 5 : mword 6)
               P10 (K - 10)%nat 10 eb Hpop with "Hcg Hpc Hic6 Hstk").
     iIntros (CID11 Hs11') "Hcg Hpc".
-    assert (Hnk : ((K - 10) + 10)%nat = K) by (unfold K_install_trans in HK; lia).
+    assert (Hnk : ((K - 10) + 10)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     set (P11 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (P10 !!! Regidx csp_rs1 : mword 64)
@@ -1219,13 +1220,13 @@ Section InstallTransBlocks.
        against "bcache"(4) only.  Threaded on this recursive helper's own
        binder list -- every recursive call re-proves it unchanged. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64) -∗
-    panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_frozen logstart dev -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1258,7 +1259,7 @@ Section InstallTransBlocks.
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Hregs Hbelow.
     { exfalso. exact (it_fuel_absurd t n Ht Hfuel). }
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlfz Hppid #Hprocs".
     iIntros "#Hdev #Hgeo #Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hrest Hslots".
     iIntros "#Hperm HR Hcont".
     pose proof Hregs as (HMsp & HMs3 & HMs4 & HMs5 & HMs6 & HMs7 & HMs9 & HMs10 & HMs11).
@@ -1338,7 +1339,7 @@ Section InstallTransBlocks.
                       = l_start).
     { rgne. rewrite HMs4. exact it_addr_start. }
     iEval (rewrite -Hastart) in "Hstc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
               M (K - 10)%nat (mword_of_int logstart : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi70 Hstc").
@@ -1404,7 +1405,7 @@ Section InstallTransBlocks.
                     = l_dev).
     { rgne. rewrite HA3s4. exact it_addr_dev. }
     iEval (rewrite -Hadev) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A3 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a Hdevc").
@@ -1453,7 +1454,7 @@ Section InstallTransBlocks.
               ltac:(reflexivity) ltac:(rewrite Hubnol; exact Hslotcov) ltac:(reflexivity)
               Hj Hgl HA5a0 HA5a1
               Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu1").
     all: try lkbelow.
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
@@ -1489,7 +1490,7 @@ Section InstallTransBlocks.
                     = lh_block t).
     { rgne. rewrite HA6s5. exact (it_cursor_at t). }
     iEval (rewrite -Hacur) in "Hblk".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
               A6 (K - 10)%nat w eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi84 Hblk").
@@ -1512,7 +1513,7 @@ Section InstallTransBlocks.
                      = l_dev).
     { rgne. rewrite HA7s4. exact it_addr_dev. }
     iEval (rewrite -Hadev2) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A7 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi88 Hdevc").
@@ -1565,7 +1566,7 @@ Section InstallTransBlocks.
               ltac:(reflexivity) ltac:(exact Hwcov) ltac:(reflexivity)
               Hj Hgl HA9a0 HA9a1
               Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu2").
     all: try lkbelow.
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
@@ -1707,7 +1708,7 @@ Section InstallTransBlocks.
     iDestruct (it_data_fwd (b_data (bpa k2)) (Lw t) 1024%nat Hlen2 with "Hdata2") as "Hdata2".
     iEval (rewrite -HB5a1) in "Hdata1".
     iEval (rewrite -HB5a0) in "Hdata2".
-    iApply (Mm.wp_memmove_sconf B5 (K - 10)%nat 1024%nat
+    iApply (Mm.wp_memmove_sconf KT1 KT0 KT0 B5 (K - 10)%nat 1024%nat
               (fun i => (Lw t) !!! i) (fun i => (Lw t) !!! i) eb (proc_addr j)
               (it_Kmm K HK)
               ltac:(vm_compute; reflexivity) HB5a2
@@ -1782,7 +1783,7 @@ Section InstallTransBlocks.
               (Lw t) bsd2 eb R lks
               (it_Kbwrite K HK)
               ltac:(exact (it_lt_lit _ Hwrange)) ltac:(reflexivity) Hj Hgl Hk2 HB7a0
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hhold [HR]").
     all: try lkbelow.
     (* THIS ENTRY'S CRASH PERMIT, out of the generator, at the home block the
@@ -1948,7 +1949,7 @@ Section InstallTransBlocks.
               B11 (K - 10)%nat eb (proc_addr j) (Lw t) bsd1 d1 eb lks
               (it_Kbrelse K HK) Hk1 HB11a0
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk1").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk1").
     all: try lkbelow.
     iIntros (CIDb5 Hsb5 mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu4".
     assert (Hpc5a : ret_pc (B11 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x5a)).
@@ -2006,7 +2007,7 @@ Section InstallTransBlocks.
               B13 (K - 10)%nat eb (proc_addr j) (Lw t) (Lw t) false eb lks
               (it_Kbrelse K HK) Hk2 HB13a0
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk2").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk2").
     all: try lkbelow.
     iIntros (CIDb6 Hsb6 mf7) "%Hcs7 Hcg Hcnt Hpc Hppid Hu5".
     assert (Hpc60 : ret_pc (B13 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x60)).
@@ -2089,7 +2090,7 @@ Section InstallTransBlocks.
                     = lh_n_pa).
     { rgne. rewrite HB15s4. exact it_addr_lhn. }
     iEval (rewrite -Halhn) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
               B15 (K - 10)%nat (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64 Hncell").
@@ -2162,7 +2163,7 @@ Section InstallTransBlocks.
                    Lw L D pidv dq m K eb eb R lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa30 (S t) B16 (it_more t n Ht Hmore) (it_fuel_step t n fuel Hfuel)
                 HB16regs Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio [] Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio [] Hppid Hprocs
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hrest
                       Hslots Hperm HR Hcont").
       rewrite /log_frozen. iFrame "Hdevc Hstc".
@@ -2197,7 +2198,7 @@ Section ProofInstallTrans.
     cbv beta delta [wp_install_trans_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hj Hgl Hstage Ha0 Hshape Hnd Hwok HLw Hbelow.
     destruct Hshape as [HnW Hn30].
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlfz Hppid #Hprocs".
     iIntros "#Hdev #Hgeo #Hdlock Hncell Hblks HauthL HauthD Hents Hslots #Hperm HR Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst b.
     iAssert (it_cont (CID0 := CID)  j bn γfs logstart n W Lw L D pidv dq m K eb eb R lks)
@@ -2222,7 +2223,7 @@ Section ProofInstallTrans.
                   = lh_n_pa).
     { rgne. rewrite /R1 upd_eq. exact it_reloc_lhn. }
     iEval (rewrite -Hna) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
               (mword_of_int 2282 : mword 12) R1 K
               (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2334,7 +2335,7 @@ Section ProofInstallTrans.
         apply bv_eq; vm_compute; reflexivity. }
       iApply (wp_caddi16sp_push_s_sconf (mword_of_int (KernelSyms.install_trans + 0x0c))
                 (mword_of_int 59 : mword 6) R2 K 10 eb
-                ltac:(unfold K_install_trans in HK; lia) Hpush
+                ltac:(lia) Hpush
                 with "Hcg Hpc Hi0c").
       iIntros (CID4 Hs4) "Hcg Hframe Hpc".
       set (Q1 := <[Regidx csp_rs1 := regval_into_reg
@@ -2348,7 +2349,7 @@ Section ProofInstallTrans.
       assert (HQ1sp : Q1 !!! Regidx csp_rs1 = it_spr m).
       { rewrite /Q1 upd_eq /it_spr HR2sp. reflexivity. }
       iEval (rewrite HR2sp) in "Hframe".
-      iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+      iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
       iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
       iDestruct "S1" as (v1) "Hf1".   iDestruct "S2" as (v2) "Hf2".
       iDestruct "S3" as (v3) "Hf3".   iDestruct "S4" as (v4) "Hf4".
@@ -2768,7 +2769,7 @@ Section ProofInstallTrans.
                 n W Lw L D pidv dq m K eb R lks
                 HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw
                 CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hents
                       Hslots Hperm HR Hcont").
   Qed.

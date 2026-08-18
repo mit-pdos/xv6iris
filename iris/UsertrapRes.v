@@ -69,7 +69,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import UserPtTree.
-Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
 Require Import SpecDevintr.
@@ -102,8 +101,7 @@ Import Defs.
    [intr_on] pays for them out of its.  Only the syscall arm needs it, but a
    function has one budget.  The other four arms never re-enable, so they
    fit in [4 + K_syscall] and nothing there notices. *)
-Definition K_usertrap : nat := (4 + kv_frame_slots + K_syscall)%nat.
-
+Notation K_usertrap := ((4 + kv_frame_slots + K_syscall)%nat) (only parsing).
 Section UsertrapRes.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -120,7 +118,7 @@ Section UsertrapRes.
      own premise.  [trap_res false = 0], so no reserve is owed: the disabled
      index is not holding an enabled arm's window. *)
   Definition ut_stack (ksp : mword 64) (av : nat) : iProp Σ :=
-    stack_own ksp (trap_res false + av)%nat.
+    stack_own (KTR := KT1) ksp (trap_res false + av)%nat.
 
   (* [sconf] MINUS the mstatus cell AND the privilege cell is
      [IntrDefs.sconf_priv_closer], which lives beside [sconf_at] because it
@@ -146,8 +144,8 @@ Section UsertrapRes.
         SHARED tier ([KptShare.tlb_res_pt] inside), which is the whole point
         of SpecUsertrap.v's restatement *)
      strans_inv ∗
-     sie_arm false pj ∗
-     strans_bit strans_bit_kpt ∗
+     sie_arm KT1 false pj ∗
+     kpt_on cpu_id ∗
      (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
         [user_cfg]'s cells too (uservec/userret/user-mode hold them the
         whole time usertrap ISN'T running), so [ut_trap] cannot claim them
@@ -165,27 +163,27 @@ Section UsertrapRes.
   (* THE PARKED FORM: [ut_trap] WITHOUT THE TRANSLATION SLOT.             *)
   (*                                                                      *)
   (* [ut_trap] owns [satp] -- its [strans_inv] is pinned to the KPT arm by *)
-  (* the [strans_bit strans_bit_kpt] beside it, and that arm IS            *)
+  (* the [kpt_on cpu_id] beside it, and that arm IS                        *)
   (* [tlb_res_pt], whose [satp ↦ᵣ] is full.  That is correct for the state *)
   (* usertrap RUNS in, and WRONG for anything parked across user           *)
   (* execution: while the user runs, [UptTree.utlb_inv_pt] owns [satp] (at *)
   (* the USER root), so a residue also holding [strans_inv] makes the pair *)
-  (* contradictory -- [strans_inv ∗ strans_bit strans_bit_kpt ∗            *)
+  (* contradictory -- [strans_inv ∗ kpt_on cpu_id ∗                        *)
   (* utlb_inv_pt _ _ _ ⊢ False] is provable, which silently turns any      *)
   (* consumer holding both into a vacuous lemma.                          *)
   (*                                                                      *)
-  (* So the parked form drops [strans_inv] and keeps BOTH [strans_bit]     *)
-  (* halves loose (the slot's own and the client's -- [strans_bit] is a    *)
-  (* [ghost_var] at [1/2], so the two together are full ownership of the   *)
-  (* bit, which is exactly "nobody is using the translation slot right     *)
-  (* now").  uservec's exit switch produces the [tlb_res_pt] that          *)
+  (* So the parked form drops [strans_inv] and keeps the one-shot's own    *)
+  (* [strans_kpt] auth loose beside the client's persistent [kpt_on]: the  *)
+  (* auth is at fraction 1, so holding it IS "nobody is using the          *)
+  (* translation slot right now" (a second copy is unsatisfiable).         *)
+  (* uservec's exit switch produces the [tlb_res_pt] that                  *)
   (* completes it ([ut_trap_tlb_close]); userret's entry switch takes it   *)
   (* back out ([ut_trap_tlb_open]).                                       *)
   Definition ut_trap_parked (pj : mword 64) (ksp : mword 64) (av : nat)
       (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
-     sie_arm false pj ∗
-     strans_bit strans_bit_kpt ∗ strans_bit strans_bit_kpt ∗
+     sie_arm KT1 false pj ∗
+     strans_kpt ∗ kpt_on cpu_id ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj false lks ∗
      cpu_claim pj)%I.
@@ -194,9 +192,8 @@ Section UsertrapRes.
       (lks : gset string) (kroot : mword 44) :
     ut_trap_parked pj ksp av lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm) Hkres".
+    iIntros "(Hstk & Harm & Hb1 & #Hb2 & Hgh & Hcpu & Hclm) Hkres".
     rewrite /ut_trap. iFrame "Hstk Harm Hb2 Hgh Hcpu Hclm".
-    rewrite /strans_bit_kpt.
     iApply (strans_inv_intro kroot with "Hb1 Hkres").
   Qed.
 
@@ -205,14 +202,13 @@ Section UsertrapRes.
     ut_trap pj ksp av lks -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Hstr & Harm & Hbit & Hgh & Hcpu & Hclm)".
-    (* the bit BESIDE the slot pins the slot's arm: at Bare the two would
-       disagree, so only the KPT arm survives. *)
+    iIntros "(Hstk & Hstr & Harm & #Hbit & Hgh & Hcpu & Hclm)".
+    (* the receipt BESIDE the slot pins the slot's arm: at Bare the shot's
+       lower bound and the pending half conflict, so only KPT survives. *)
     iDestruct "Hstr" as "[(Hb0 & _ & _) | (Hb1 & Hkpt)]".
-    { iDestruct (strans_bit_agree with "Hb0 Hbit") as %He.
-      rewrite /strans_bit_kpt in He. discriminate He. }
+    { iDestruct (kpt_on_pending_False with "Hbit Hb0") as %[]. }
     iDestruct "Hkpt" as (kroot) "Hkres".
-    iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked /strans_bit_kpt.
+    iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked.
     iFrame "Hstk Harm Hb1 Hbit Hgh Hcpu Hclm".
   Qed.
 
@@ -262,11 +258,11 @@ Section UsertrapRes.
     menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
     ut_trap pj ksp av lks -∗
-      sie_cap_gpr m av false pj ∗
+      sie_cap_gpr KT1 m av false pj ∗
       cpu_own 0%nat false pj false lks ∗
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
-      strans_bit strans_bit_kpt ∗
+      kpt_on cpu_id ∗
       sret_bits ('b"0" : mword 1) ('b"1" : mword 1).
   Proof.
     intros Hmsf Hsie Hspp Hspie Hsp Htp Hmiev Hmask Hmenvv.
@@ -274,7 +270,12 @@ Section UsertrapRes.
     apply mword1_zero_of_ne_one in Hsie.
     apply mword1_zero_of_ne_one in Hspp.
     iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Ht".
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hgh & Hcpu & Hclm)".
+    (* THE RECEIPT IS PERSISTENT, and taking it intuitionistically is what
+       lets this assembly supply the capability's tier witness for real
+       ([strans_ktier_wit_intro] below) instead of re-conjuring a KT0 one:
+       [ut_trap] carries [kpt_on cpu_id] at every tier, so the bundle it
+       builds attests the access right whatever the hart's regime is. *)
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & #Hkpt & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
     (* A named [iFrame] here still makes the tactic hunt these five atoms
        through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
@@ -287,7 +288,7 @@ Section UsertrapRes.
        The first branch is left open (empty in the bracket) so the rest of
        this proof, which is entirely about the [sie_cap_gpr] side, is
        unchanged. *)
-    iSplitR "Hcpu Hclm Hq Hkpt Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
+    iSplitR "Hcpu Hclm Hq Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
     rewrite /sie_cap_gpr. iFrame "Hhs".
     iSplitL "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
@@ -300,6 +301,7 @@ Section UsertrapRes.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
     iFrame "Hstk Hstr Harm".
+    iSplitR; [ iApply (strans_ktier_wit_intro with "Hkpt") |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
 
@@ -370,9 +372,9 @@ Section UsertrapRes.
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    strans_bit strans_bit_kpt -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    trap_csrs.
+    kpt_on cpu_id -∗
+    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs KT1.
   Proof.
     iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
@@ -507,7 +509,7 @@ Section UsertrapRes.
      because their propositions are [emp] at [true], which this one is not.
 
      So the bundle carries the [∀ h] form, exactly as [SpecPanic.
-     panic_wp_any] carries panic's contract for the same reason (a function
+     panic_env] carries panic's credentials for the same reason (a function
      that PARKS does not return on the hart it entered on).  It is
      persistent, hence free to hand to devintr at whatever hart the call
      happens on ([devintr_caps_any_at]), and it is satisfiable: of
@@ -552,7 +554,6 @@ Section UsertrapRes.
      twenty-five-way destructure and rebuild. *)
   Definition ut_caps (N : ut_names) : iProp Σ :=
     (procs_inv (un_s N) ∗
-     panic_wp_any ∗
      kernel_data ∗
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
@@ -581,8 +582,8 @@ Section UsertrapRes.
   Lemma ut_caps_kalloc (N : ut_names) :
     ut_caps N -∗ kalloc_env (un_kl N) None.
   Proof.
-    iIntros "(_ & #Hp & _ & _ & _ & _ & _ & _ & #Hkm & _ & _ & _ & _ & _ & _ & _ & #Hav & _)".
-    iExists (un_ka N). iFrame "Hkm Hav Hp".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & #Hkm & _ & _ & _ & _ & _ & _ & _ & #Hav & _)".
+    iExists (un_ka N). iFrame "Hkm Hav".
   Qed.
 
   (* the EXCLUSIVE remainder: what a callee can consume and must give back --
@@ -1049,8 +1050,21 @@ Section UsertrapRes.
      the epilogue's [c.ldsp ra,24(sp)] is what makes the [ret] land on the
      boundary's [ret_pc (m !!! ra)]. *)
   Definition ut_frame (sp0 : mword 64) (vra vs0 vs1 vs2 : mword 64) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ vra ∗ pa_stk sp0 2 ↦₈ vs0 ∗
-     pa_stk sp0 3 ↦₈ vs1 ∗ pa_stk sp0 4 ↦₈ vs2)%I.
+    (pa_stk sp0 1 ↦₈[KT1] vra ∗ pa_stk sp0 2 ↦₈[KT1] vs0 ∗
+     pa_stk sp0 3 ↦₈[KT1] vs1 ∗ pa_stk sp0 4 ↦₈[KT1] vs2)%I.
+
+  (* ...and the same four cells as FREE STACK, which is what they are on a
+     path that never returns: usertrap's frame is dead the moment the walk
+     reaches [kexit], and it is part of the page the dying thread donates
+     ([ProcDefs.kstack_closer_frame]). *)
+  Lemma ut_frame_stack (sp0 vra vs0 vs1 vs2 : mword 64) :
+    ut_frame sp0 vra vs0 vs1 vs2 ⊢ stack_own (KTR := KT1) sp0 4.
+  Proof.
+    rewrite /ut_frame /stack_own.
+    iIntros "(H1 & H2 & H3 & H4)".
+    iExists [vra; vs0; vs1; vs2]. iSplitR; [done|].
+    simpl. iFrame "H1 H2 H3 H4".
+  Qed.
 
   (* CALLEE-SAVED MINUS THE FOUR THE FRAME HOLDS.  [CalleeSaved.callee_saved
      m0 m] is FALSE at every point inside usertrap -- s1 holds [p] and s2
@@ -1150,12 +1164,12 @@ Section UsertrapRes.
      stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
-     strans_bit strans_bit_kpt)%I.
+     kpt_on cpu_id)%I.
 
   Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    trap_csrs.
+    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs KT1.
   Proof.
     iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".
     iApply (ut_trap_csrs_fold ep sc st with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hih").
@@ -1171,7 +1185,7 @@ Section UsertrapRes.
   Definition ut_hold (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) b lks ∗
-     trap_csrs_ext b ∗
+     trap_csrs_ext KT1 b ∗
      cpu_claim_ext b (un_pj N) ∗
      ut_env Rsys N V)%I.
 
@@ -1184,7 +1198,7 @@ Section UsertrapRes.
     (K_usertrap <= av)%nat -> (trap_res b + nx)%nat = (av - 4)%nat ->
     (K_syscall <= nx)%nat.
   Proof.
-    unfold K_usertrap, trap_res, kv_frame_slots. destruct b; lia.
+    unfold trap_res. destruct b; lia.
   Qed.
 
   (* ...and the STRONGER bound the [csrsi] at +0x9e needs, which is available
@@ -1196,7 +1210,7 @@ Section UsertrapRes.
   Lemma ut_nx_bound_off (av nx : nat) :
     (K_usertrap <= av)%nat -> (trap_res false + nx)%nat = (av - 4)%nat ->
     (kv_frame_slots + K_syscall <= nx)%nat.
-  Proof. unfold K_usertrap, trap_res, kv_frame_slots. lia. Qed.
+  Proof. unfold trap_res. lia. Qed.
 
   (* WHAT THE FLIP AT +0x9e TAKES OUT OF THE PER-CPU BUNDLE.  The enabling
      leaf wants the counting token and the cells SEPARATELY (at the enabled
@@ -1300,14 +1314,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res SY.syscall_env.
+    ut_res (SY.syscall_env).
 
   Definition usertrap_res_parked
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_parked SY.syscall_env.
+    ut_res_parked (SY.syscall_env).
 
   Lemma usertrap_res_tlb_close
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1315,7 +1329,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
-  Proof. exact (ut_res_tlb_close SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_tlb_close (SY.syscall_env) pt ksp kroot). Qed.
 
   Lemma usertrap_res_tlb_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1324,14 +1338,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res pt ksp -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_tlb_open (SY.syscall_env) pt ksp). Qed.
 
   Definition usertrap_res_bare
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_bare SY.syscall_env.
+    ut_res_bare (SY.syscall_env).
 
   Lemma usertrap_res_pt_close
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1339,7 +1353,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_pt_close SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_pt_close (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_pt_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1347,7 +1361,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
-  Proof. exact (ut_res_pt_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_pt_open (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_bare_norm
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1355,7 +1369,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
-  Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_bare_norm (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_tf_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1366,7 +1380,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
     usertrap_res_bare pt ksp -∗
     ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_bare_tf_open (SY.syscall_env) pt ksp kroot). Qed.
 
   Lemma usertrap_res_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1375,7 +1389,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗
     hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_bare_csrs_open (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1388,6 +1402,6 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
         (∀ ws' : list (mword 64),
            tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp kroot). Qed.
 
 End UtResFits.

@@ -249,6 +249,30 @@ Section CreateParts.
     exfalso. lia.
   Qed.
 
+  (* ...and the same two windows WEAKENED to KT1, which is the tier
+     [SpecDirlink]'s name-buffer premise is stated at (its other caller,
+     sys_link, passes a frame local).  The [.]/[..] strings are .rodata, so
+     the KT0 window is the real fact and this is [mem_ktier_mono]. *)
+  Lemma cr_dot_window_kt1 (a : mword 64) :
+    a = mword_of_int cr_dot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ[KT1]□ cr_dot_f j).
+  Proof.
+    intros ->. iIntros "Hkd".
+    iDestruct (cr_dot_window _ eq_refl with "Hkd") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iApply (mem_ktier_mono _ KT1 with "H").
+  Qed.
+
+  Lemma cr_dotdot_window_kt1 (a : mword 64) :
+    a = mword_of_int cr_dotdot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ[KT1]□ cr_dotdot_f j).
+  Proof.
+    intros ->. iIntros "Hkd".
+    iDestruct (cr_dotdot_window _ eq_refl with "Hkd") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iApply (mem_ktier_mono _ KT1 with "H").
+  Qed.
+
 End CreateParts.
 
 (* ===================================================================== *)
@@ -308,7 +332,7 @@ Proof.
 Qed.
 
 (* THE WORD THE THREE ALU LEAVES LEAVE IN a5, at their own output shapes:
-   [wp_lhu_s_sconf] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
+   [wp_lhu_s_sconf (kt := KT1) (ktd := KT0)] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
    [sign_extend' 64 (subrange_vec_dec (add_vec _ (sign_extend' 64
    (sign_extend' 12 imm))) 31 0)], and [wp_cslli_s_sconf] /
    [wp_csrli_s_sconf] give [shift_bits_left] / [shift_bits_right] at
@@ -570,8 +594,7 @@ Lemma cr_kb (K : nat) : (K_create <= K)%nat ->
   /\ (K_ialloc <= K - 10)%nat /\ (K_iupdate <= K - 10)%nat
   /\ (K_dirlink <= K - 10)%nat /\ ((K - 10) + 10)%nat = K.
 Proof.
-  unfold K_create, K_nameiparent, K_ilock, K_dirlookup, K_iunlockput,
-         K_ialloc, K_iupdate, K_dirlink. lia.
+  lia.
 Qed.
 
 (* ===================================================================== *)
@@ -635,7 +658,7 @@ Qed.
    that pushed dirlookup 84 -> 90 (SpecCreate.v's note on [K_create] has the
    whole ladder); 9da28f5's [dp->nlink == 0] guard did NOT move it, because
    the frame is still 80 bytes. *)
-Lemma cr_K_value : K_create = 114%nat.
+Lemma cr_K_value : K_create = 124%nat.
 Proof. reflexivity. Qed.
 
 Lemma cr_slots_value : create_slots = 3%nat.

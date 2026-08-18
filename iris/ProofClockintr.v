@@ -94,14 +94,14 @@ Section ProofClockintr.
   (* ================================================================== *)
   Local Lemma ci_outb_false (M : regfile) (av n : nat) (eb : bool)
       (p : mword 64) (lks : gset string) :
-    sie_cap_gpr M av false p -∗ cpu_own n eb p false lks -∗
+    sie_cap_gpr KT1 M av false p -∗ cpu_own n eb p false lks -∗
     ⌜ (match n with O => eb | S _ => false end) = false ⌝.
   Proof.
     iIntros "Hcg Hcnt".
     iDestruct "Hcnt" as "[_ Hic]".
     destruct n as [|n'].
     - iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-      iDestruct "Hsie" as "(_ & _ & Hbit)".
+      iDestruct "Hsie" as "(_ & _ & Hbit & _)".
       destruct eb.
       + iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
         exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
@@ -119,16 +119,16 @@ Section ProofClockintr.
       (M : regfile) (sp0 ra0 s00 : mword 64) (k : nat) (p : mword 64) :
     M !!! Regidx csp_rs1 = pa_stk sp0 2 ->
     timer_cap -∗
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr KT1 M k false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.clockintr + 0x0e) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     ( ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
           Mf !!! Regidx s0_idx = s00 /\
           (forall r : mword 5, is_cs_idx r = true ->
              r <> csp_rs1 -> r <> s0_idx -> Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mf (k + 2) false p -∗
+        sie_cap_gpr KT1 Mf (k + 2) false p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -396,7 +396,7 @@ Section ProofClockintr.
        tp is [cid_word_of cpu_id] by construction ([rget_tp]). *)
     (* ===================== +0x08: cpuid() ===================== *)
     iPoseProof (cii_08 with "Htext") as "Hi08".
-    iApply (Cpuid.wp_call_cpuid_sconf_cs (mword_of_int (KernelSyms.clockintr + 0x08))
+    iApply (Cpuid.wp_call_cpuid_sconf_cs KT1 (mword_of_int (KernelSyms.clockintr + 0x08))
               (mword_of_int 2094036 : mword 21) A1 (av - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -426,7 +426,7 @@ Section ProofClockintr.
     (* ===================== the cpuid() == 0 case split ===================== *)
     destruct (tick_hart) as [|] eqn:Hth.
     - (* ---------------- THIS HART KEEPS TIME: the tick block ------------- *)
-      iDestruct "Htk" as "[%Hno | (#Hlk & #Hpi & #Hpanic)]".
+      iDestruct "Htk" as "[%Hno | (#Hlk & #Hpi)]".
       { rewrite Hth in Hno. discriminate. }
       iPoseProof "Hpi" as "Hpi2".
       iDestruct "Hpi2" as "[%Hlen _]".
@@ -499,7 +499,7 @@ Section ProofClockintr.
         rewrite /B1 upd_ne; [| vm_compute; discriminate].
         rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Hmosp. }
       (* ===================== acquire(&tickslock) ===================== *)
-      iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res B2
+      iApply (Acquire.wp_acquire_sconf KT1 γl "time"%string ticks_res B2
                 n eb p (av - 2)%nat false lks
                 ltac:(lia)
                 ltac:(lia)
@@ -548,7 +548,7 @@ Section ProofClockintr.
         by (rgne; rewrite HD1a4; apply addv_sext0).
       (* ---- +0x3c: c.lw a5,0(a4) -- read ticks, under the lock ---- *)
       iPoseProof (cii_3c with "Htext") as "Hi3c".
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.clockintr + 0x3c)) a5_idx a4_idx
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.clockintr + 0x3c)) a5_idx a4_idx
                 (mword_of_int 0 : mword 12) D1 (av - 2)%nat t false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3c [Hticks]").
@@ -586,7 +586,7 @@ Section ProofClockintr.
                         = a_ticks)
         by (rgne; rewrite HD3a4; apply addv_sext0).
       iPoseProof (cii_40 with "Htext") as "Hi40".
-      iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.clockintr + 0x40)) a5_idx a4_idx
+      iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.clockintr + 0x40)) a5_idx a4_idx
                 (mword_of_int 0 : mword 12) D3 (av - 2)%nat t false
                 with "Hcg Hpc Hi40 [Hticks]").
       { iEval (rewrite Haddrt3). iExact "Hticks". }
@@ -646,7 +646,7 @@ Section ProofClockintr.
                 (locks_below_union_singleton lks "time" "proc"
                    ltac:(vm_compute; lia)
                    ltac:(lkbelow))
-                with "Hcg Hcnt Htext Hpc Hpanic Hpi").
+                with "Hcg Hcnt Htext Hpc Hpi").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
@@ -720,7 +720,7 @@ Section ProofClockintr.
                       = (trap_res (match n with O => eb | S _ => false end)
                          + (av - 2))%nat) by (rewrite Hout; reflexivity).
       iEval (rewrite Hridx) in "Hcg".
-      iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res E2
+      iApply (Release.wp_release_sconf KT1 γl a_tickslock "time"%string ticks_res E2
                 n eb p (av - 2)%nat
                 ({["time"]} ∪ lks)
                 ltac:(rewrite HE2a0; apply addv_sext0)
@@ -801,7 +801,7 @@ Section ProofClockintr.
         split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
         apply Hthr; vm_compute; first [reflexivity | discriminate]. }
       { iExact "Hpc". }
-      iRight. iFrame "Hlk Hpi Hpanic".
+      iRight. iFrame "Hlk Hpi".
     - (* ---------------- ANOTHER HART: straight to the timer tail -------- *)
       assert (Hnzero : eq_vec (rget mo a0_idx) (zero_reg : mword 64) = false)
         by (rgne; rewrite Hmoa0; exact Hth).

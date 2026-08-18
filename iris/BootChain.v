@@ -57,7 +57,7 @@ Require Import BootConfig BootBridge PowerBoot.
 Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv DevModel.
-Require Import WpUart DiskPtsto PanicStub.
+Require Import WpUart DiskPtsto.
 Require Import WpLock KallocInv FdSlots.
 Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
@@ -111,13 +111,12 @@ Definition sp_of (n : nat) : Z := KernelSyms.stack0 + 4096 * (Z.of_nat n + 1).
    is exactly [uint sp0 - 8*512, uint sp0), which is what makes the ONE range
    serve both [wp_entry_boot]'s [4 <= n] and the bridge's
    [boot_stack_slots K_main = 180 <= n]. *)
-Definition boot_stack_depth : nat := 512%nat.
-
+Notation boot_stack_depth := (512%nat) (only parsing).
 Lemma boot_stack_depth_entry : (4 <= boot_stack_depth)%nat.
-Proof. unfold boot_stack_depth. lia. Qed.
+Proof. lia. Qed.
 
 Lemma boot_stack_depth_bridge : (boot_stack_slots K_main <= boot_stack_depth)%nat.
-Proof. rewrite boot_stack_slots_main. unfold boot_stack_depth. lia. Qed.
+Proof. rewrite boot_stack_slots_main. lia. Qed.
 
 (* [_entry]'s computed sp, at this image's [stack0] and a concrete hart id.
    This is what [SpecEntry.wp_entry_boot]'s defining premise for [sp0] wants,
@@ -219,7 +218,7 @@ Qed.
    against [K_main] alone.  Nothing is retuned: [kv_frame_slots] only ever
    makes the available budget LARGER. *)
 Lemma K_main_secondary_le : (K_main_secondary <= kv_frame_slots + K_main)%nat.
-Proof. unfold K_main_secondary, K_main, kv_frame_slots. lia. Qed.
+Proof. lia. Qed.
 
 (* the boot arm's, likewise: it used to be [le_n K_main] at the call site. *)
 Lemma K_main_boot_le : (K_main <= kv_frame_slots + K_main)%nat.
@@ -404,8 +403,8 @@ Section BootRun.
      mb_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
      stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
      (* --- the bridge's adequacy-minted and .bss inputs --- *)
-     strans_bit strans_bit_bare ∗
-     strans_bit strans_bit_bare ∗
+     strans_pending ∗
+     strans_pending ∗
      ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
@@ -449,7 +448,7 @@ Section BootRun.
        it at [K_main] would be a silent 78-slot leak that leaves main unable
        to fund a trap. *)
     (∀ mf : regfile,
-       sie_cap_gpr mf (kv_frame_slots + K_main)%nat false zero_reg -∗
+       sie_cap_gpr KT0 mf (kv_frame_slots + K_main)%nat false zero_reg -∗
        cpu_ctx_free -∗
        cpu_own 0 false zero_reg false ∅ -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
@@ -555,7 +554,7 @@ End BootRun.
 (* boot supply and is where the shared allocation lands.                     *)
 (*                                                                        *)
 (* The three inputs beside the per-hart bundle are all PERSISTENT and all    *)
-(* SHARED: the image ([kernel_text] / [kernel_data]), [panic_wp_any], and    *)
+(* SHARED: the image ([kernel_text] / [kernel_data]) and                     *)
 (* the handover channel [started_inv (main_deposit γd γv Φ)] -- which the    *)
 (* client allocates ONCE, at that concrete payload, and hands to all eight   *)
 (* harts (main-boot's outstanding [P] choice, settled).                      *)
@@ -574,13 +573,12 @@ Section BootSecondary.
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
-    panic_wp_any -∗
     started_inv (main_deposit γd γv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
+    iIntros "#Htext #Hdata Hres #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
@@ -588,7 +586,7 @@ Section BootSecondary.
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
               K_main_secondary_le eq_refl
-              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Htimc Hraw").
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Htimc Hraw").
   Qed.
 
 End BootSecondary.
@@ -636,7 +634,6 @@ Section BootPrimary.
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
-    panic_wp_any -∗
     started_inv (main_deposit γd γv) -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
@@ -655,7 +652,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hpark Hpst
+    iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
@@ -666,7 +663,7 @@ Section BootPrimary.
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
-              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
                     Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
                     Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s

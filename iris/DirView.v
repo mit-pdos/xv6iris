@@ -1788,3 +1788,169 @@ Proof. unfold dlc_bound. lia. Qed.
    this one has no [add_vec] in scope (and importing SailStdpp's operators
    here would put ssreflect's [rewrite] in scope, which every proof above
    is written against the absence of). *)
+
+(* ======================================================================= *)
+(*  THE LOWER-BOUND COUNTERPART (V4 -- S7-unlink (D2)'s carrier)           *)
+(*  design: claude-notes/projects/fs-fragments-campaign.md, V4             *)
+(* ======================================================================= *)
+
+(* [dlc_bound] bounds the home's count ABOVE by one plus the d-flavoured
+   record count; this is the MIRROR, and at the same [F] the two pin
+   [nlink = 1 + count] at every live directory -- which forces [F] to be
+   exactly the subdirectory marker.  GUARDED BY [nlink <> 0]: an ORPHANED
+   directory still holds its two dots but counts zero, so an unguarded
+   bound would read [1 <= 0] exactly where [ip->nlink--] parks; the guard
+   is vacuous precisely there ([dlc_lower_nl0]). *)
+Definition dlc_lower (F : nat -> bool) (dn : dinode)
+    (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_nlink dn) <> 0 ->
+  1 + Z.of_nat (dlc_count F data (dir_nrec (bv_unsigned (di_size dn))))
+  <= bv_unsigned (di_nlink dn).
+
+(* the all-plain stock: no record is counted, and a nonzero bitvector is
+   at least one -- true of ANY record, which is what keeps boot's image
+   obligation empty (unlike [dlc_bound]'s, this is not even an image
+   fact) *)
+Lemma dlc_lower_false (dn : dinode) (data : nat -> list (bv 8)) :
+  dlc_lower (fun _ => false) dn data.
+Proof.
+  intro Hnz.
+  assert (Hc : dlc_count (fun _ => false) data
+                 (dir_nrec (bv_unsigned (di_size dn))) = 0%nat).
+  { unfold dlc_count. apply dcnt_false.
+    intros k _. exact (dlc_ctb_flav (fun _ => false) data k eq_refl). }
+  rewrite Hc.
+  pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+Qed.
+
+(* the orphan / claim-box parks: the guard is vacuous at a zero count *)
+Lemma dlc_lower_nl0 (F : nat -> bool) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) = 0 -> dlc_lower F dn data.
+Proof. intros Hz Hnz. exfalso. exact (Hnz Hz). Qed.
+
+(* the general ride: the home did not move and the count did not RISE.
+   (The mirror of [dlc_bound_le], whose count may not FALL.) *)
+Lemma dlc_lower_eq (F G : nat -> bool) (dn dn' : dinode)
+    (data data' : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn') = bv_unsigned (di_nlink dn) ->
+  (dlc_count G data' (dir_nrec (bv_unsigned (di_size dn')))
+   <= dlc_count F data (dir_nrec (bv_unsigned (di_size dn))))%nat ->
+  dlc_lower F dn data -> dlc_lower G dn' data'.
+Proof.
+  intros Hnl Hcnt Hl. unfold dlc_lower in Hl |- *. rewrite Hnl.
+  intro Hnz. pose proof (Hl Hnz). lia.
+Qed.
+
+(* ...and the one create's fused deposit + [++] takes: BOTH sides rise by
+   exactly one.  The EXACT increment on the left is forced -- an [<=]
+   would let the sixteen-bit wrap (65535 -> 0) under the clause -- and
+   the caller has it from the flush's own nonzero read-back
+   ([IregLinkNz.ireg_link_nz]): a [++] that lands nonzero did not wrap. *)
+Lemma dlc_lower_bump (F G : nat -> bool) (dn dn' : dinode)
+    (data data' : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) <> 0 ->
+  bv_unsigned (di_nlink dn') = bv_unsigned (di_nlink dn) + 1 ->
+  (dlc_count G data' (dir_nrec (bv_unsigned (di_size dn')))
+   <= S (dlc_count F data (dir_nrec (bv_unsigned (di_size dn)))))%nat ->
+  dlc_lower F dn data -> dlc_lower G dn' data'.
+Proof.
+  intros Hnz Hnl Hcnt Hl. unfold dlc_lower in Hl |- *. rewrite Hnl.
+  intros _. pose proof (Hl Hnz). lia.
+Qed.
+
+(* ---- the count comparisons the lower bound's writers need ------------- *)
+
+(* a write whose slot is UNCOUNTED on the new side cannot raise the
+   count: [dcnt_slot_ge]'s exact mirror, stated over the one-slot window
+   disjunction every dirlink caller already computes ([Hcalt]) *)
+Lemma dcnt_slot_le (p q : nat -> bool) (n n' k0 : nat) :
+  (n' = n \/ (n' = S n /\ k0 = n)) ->
+  (forall k : nat, (k < n')%nat -> k <> k0 -> q k = p k) ->
+  q k0 = false ->
+  (dcnt q n' <= dcnt p n)%nat.
+Proof.
+  intros Hn H Hq. destruct Hn as [-> | [-> ->]].
+  - pose proof (dcnt_diff1 q p n k0
+      ltac:(intros k Hk Hk0; symmetry; exact (H k Hk Hk0))) as Hd.
+    rewrite Hq in Hd. lia.
+  - rewrite (dcnt_S q n). rewrite Hq.
+    rewrite (dcnt_ext p q n ltac:(intros k Hk; apply H; lia)). lia.
+Qed.
+
+(* ...and the flip-on form: one slot turns on, so the count rises by AT
+   MOST one (the [>=] half is [dlc_count_set_ge]) *)
+Lemma dcnt_set_le (p q : nat -> bool) (n n' k0 : nat) :
+  (n' = n \/ (n' = S n /\ k0 = n)) ->
+  (forall k : nat, (k < n')%nat -> k <> k0 -> q k = p k) ->
+  (dcnt q n' <= S (dcnt p n))%nat.
+Proof.
+  intros Hn H. destruct Hn as [-> | [-> ->]].
+  - pose proof (dcnt_diff1 q p n k0
+      ltac:(intros k Hk Hk0; symmetry; exact (H k Hk Hk0))) as Hd.
+    destruct (q k0); lia.
+  - rewrite (dcnt_S q n).
+    rewrite (dcnt_ext p q n ltac:(intros k Hk; apply H; lia)).
+    destruct (q n); lia.
+Qed.
+
+Lemma dlc_count_ctb_le (F G : nat -> bool)
+    (data data' : nat -> list (bv 8)) (n n' k0 : nat) :
+  (n' = n \/ (n' = S n /\ k0 = n)) ->
+  (forall k : nat, k <> k0 -> dir_inum data' k = dir_inum data k) ->
+  (forall k : nat, k <> k0 -> G k = F k) ->
+  dlc_ctb G data' k0 = false ->
+  (dlc_count G data' n' <= dlc_count F data n)%nat.
+Proof.
+  intros Hn Hin HF Hc. unfold dlc_count.
+  apply (dcnt_slot_le (dlc_ctb F data) (dlc_ctb G data') n n' k0 Hn);
+    [| exact Hc].
+  intros k Hk Hk0.
+  exact (dlc_ctb_agree F G data data' k (Hin k Hk0) (HF k Hk0)).
+Qed.
+
+Lemma dlc_count_set_le (F G : nat -> bool)
+    (data data' : nat -> list (bv 8)) (n n' k0 : nat) :
+  (n' = n \/ (n' = S n /\ k0 = n)) ->
+  (forall k : nat, k <> k0 -> dir_inum data' k = dir_inum data k) ->
+  (forall k : nat, k <> k0 -> G k = F k) ->
+  (dlc_count G data' n' <= S (dlc_count F data n))%nat.
+Proof.
+  intros Hn Hin HF. unfold dlc_count.
+  apply (dcnt_set_le (dlc_ctb F data) (dlc_ctb G data') n n' k0 Hn).
+  intros k Hk Hk0.
+  exact (dlc_ctb_agree F G data data' k (Hin k Hk0) (HF k Hk0)).
+Qed.
+
+(* the zeroing at a COUNTED slot: the count falls by exactly the one
+   unit the T_DIR arm's [dp->nlink--] pays ([dcnt_set], right to left) *)
+Lemma dlc_count_kill_counted (F : nat -> bool)
+    (data data' : nat -> list (bv 8)) (n k0 : nat) :
+  (k0 < n)%nat ->
+  (forall k : nat, k <> k0 -> dir_inum data' k = dir_inum data k) ->
+  dlc_ctb F data k0 = true ->
+  dir_liveb data' k0 = false ->
+  (S (dlc_count F data' n) <= dlc_count F data n)%nat.
+Proof.
+  intros Hk0 Hin Hct Hdead. unfold dlc_count.
+  rewrite (dcnt_set (dlc_ctb F data') (dlc_ctb F data) n k0 Hk0
+             ltac:(intros k Hk Hk0';
+                   exact (dlc_ctb_agree F F data' data k
+                            (eq_sym (Hin k Hk0')) eq_refl))
+             (dlc_ctb_dead F data' k0 Hdead) Hct).
+  lia.
+Qed.
+
+(* the ONE d-flavoured record a walk can NAME makes the count positive --
+   the read half of (D2)'s derivation
+   ([IregDirBit.dir_links_subdir_nlink2]) *)
+Lemma dlc_count_pos (F : nat -> bool) (data : nat -> list (bv 8))
+    (n k : nat) :
+  (2 <= k)%nat -> (k < n)%nat -> dir_live data k -> F k = true ->
+  (1 <= dlc_count F data n)%nat.
+Proof.
+  intros Hk2 Hkn Hlv HF. unfold dlc_count.
+  pose proof (dcnt_mono (dlc_ctb F data) (S k) n Hkn) as Hm.
+  rewrite (dcnt_S (dlc_ctb F data) k) in Hm.
+  rewrite (dlc_ctb_true F data k Hk2 Hlv HF) in Hm. lia.
+Qed.

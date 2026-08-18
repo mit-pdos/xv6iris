@@ -15,7 +15,7 @@
    THE CONTRACT IS EXACTLY THE UNION OF ITS TWO CALLEES', with nothing of
    its own: argint's trapframe resources (a read fraction of [p->trapframe]
    plus the whole [tf_page], and the pure fact naming which word argument 0
-   is), and kkill's [procs_inv] + [panic_wp] + the [length γs = NPROC] the
+   is), and kkill's [procs_inv] + the [length γs = NPROC] the
    scan's bound needs.  The destination cell is carved out of sys_kill's own
    frame, so it does not appear here.
 
@@ -47,7 +47,6 @@ Require Import ProcDefs.
 Require Import FileInvDefs.
 Require Import PageGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -72,7 +71,7 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   locks_below lks "proc" ->
   (* what argint's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
@@ -80,13 +79,12 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   tf_page tfp ws -∗
   (* kkill's *)
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (rv : mword 64),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = rv /\
         (rv = (zero_reg : mword 64) \/ rv = mword_of_int (-1)) ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗

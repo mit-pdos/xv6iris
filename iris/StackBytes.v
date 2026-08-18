@@ -77,6 +77,13 @@ Proof. intro Hj. apply nth_byte_assemble_len; cbn [length]; lia. Qed.
 Section StackBytes.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  (* THE FRAME'S TIER.  A byte run in this file is always STACK scratch, so
+     it rides the same tier as the frame it was carved out of -- the
+     capability's [kt], not the ambient KT0 default.  The binder is the
+     ambient class ([Ktier.CurKtier]), exactly as [StackOwn.stack_own]'s is,
+     so a use whose tier is determined by a hypothesis needs no annotation
+     and one written into a STATEMENT says [(KTR := kt)]. *)
+  Context `{KTR : !CurKtier}.
 
   (* [n] bytes at [base], individually owned, contents unspecified. *)
   Definition bytes_own (dq : dfrac) (base : Arch.pa) (n : nat) : iProp Σ :=

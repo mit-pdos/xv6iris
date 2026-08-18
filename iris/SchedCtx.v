@@ -190,11 +190,20 @@ Section SchedCtx.
      dispatch the next one with, and the persistent version simply never had
      to.  ([h] still determines the ghost name, so the payload needs no
      ghost-name argument.) *)
+  (* THE SEVENTH SLOT is [SwtchCtx]'s [back]: did the resumer leave a
+     resumable record, or only its raw context cells?  [SwtchCtx] does not
+     know why the answer is what it is; THIS is where it is decided, and the
+     answer is [ProcGeom.needs_ctx st] -- THE PROC LOCK'S OWN PREDICATE.
+     [proc_slots] says a slot owns a [▷ proc_ctx] exactly when [needs_ctx st],
+     so pinning the crossing to the same predicate makes it deliver precisely
+     what the invariant it feeds asks for, with no second, weaker spelling
+     (a "not ZOMBIE" test) to keep in step with it.  The dispatch direction
+     is [true] unconditionally: the scheduler always comes back. *)
   Definition p_sched : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-                       mword 64 -d> mword 64 -d> iPropO Σ :=
-    fun h A' c cret tpv p =>
+                       mword 64 -d> mword 64 -d> bool -d> iPropO Σ :=
+    fun h A' c cret tpv p back =>
     (⌜tpv = cid_word_of h⌝ ∗
-     trap_csrs (CID := h) ∗
+     trap_csrs KT1 (CID := h) ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states.  [A'] -- the
@@ -203,7 +212,7 @@ Section SchedCtx.
        (⌜c = a_cpu_ctx (cid_word_of h)⌝ ∗ ⌜A' = None⌝ ∗
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
           ⌜cret = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
-           γs !! j = Some γl /\ park_ok st = true⌝ ∗
+           γs !! j = Some γl /\ park_ok st = true /\ back = needs_ctx st⌝ ∗
           proc_held h j γl st ch ∗ hart_full j h ∗ park_pay (proc_addr j) st)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p.  [A']
@@ -213,7 +222,7 @@ Section SchedCtx.
        (∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h) /\
-           A' = Some h⌝ ∗
+           A' = Some h /\ back = true⌝ ∗
           proc_held h j γl RUNNING ch ∗ hart_full j h)))%I.
 
   (* the scheduler-chain valid context, PINNED at hart [h]
@@ -242,12 +251,12 @@ Section SchedCtx.
   Lemma p_sched_to_cpu (i : CPU) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> park_ok st = true ->
-    trap_csrs (CID := i) -∗
+    trap_csrs KT1 (CID := i) -∗
     proc_held i j γl st ch -∗
     hart_full j i -∗
     park_pay (proc_addr j) st -∗
     p_sched i None (a_cpu_ctx (cid_word_of i))
-      (p_context (proc_addr j)) (cid_word_of i) (proc_addr j).
+      (p_context (proc_addr j)) (cid_word_of i) (proc_addr j) (needs_ctx st).
   Proof.
     iIntros (Hj Hgl Hst) "Htc Hheld Htag Hpay".
     iSplit; [done|]. iFrame "Htc". iLeft. iSplit; [done|]. iSplit; [done|].
@@ -261,11 +270,11 @@ Section SchedCtx.
      hart's ghost. *)
   Lemma p_sched_to_proc (i : CPU) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
-    trap_csrs (CID := i) -∗
+    trap_csrs KT1 (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
     hart_full j i -∗
     p_sched i (Some i) (p_context (proc_addr j))
-      (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
+      (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j) true.
   Proof.
     iIntros (Hj Hgl) "Htc Hheld Htag".
     iSplit; [done|]. iFrame "Htc". iRight.
@@ -276,12 +285,12 @@ Section SchedCtx.
      the proc's own lock is held with state RUNNING, and the scheduler's
      record comes back pinned at that hart. *)
   Lemma p_sched_at_proc (i : CPU) (A' : ctx_adm) (j : nat)
-      (cret tpv p : mword 64) :
+      (cret tpv p : mword 64) (back : bool) :
     (j < NPROC)%nat ->
-    p_sched i A' (p_context (proc_addr j)) cret tpv p -∗
+    p_sched i A' (p_context (proc_addr j)) cret tpv p back -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
-    ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗
-    trap_csrs (CID := i) ∗
+    ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗ ⌜back = true⌝ ∗
+    trap_csrs KT1 (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch ∗ hart_full j i.
   Proof.
@@ -290,9 +299,9 @@ Section SchedCtx.
     { exfalso.
       exact (a_cpu_ctx_ne_p_context (cid_word_of i) j (tp_ok_cid_of i) Hj (eq_sym Hc)). }
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts Hpay]".
-    destruct Hfacts as (Hc & Hp & Hj' & Hgl & Hcret & HA).
+    destruct Hfacts as (Hc & Hp & Hj' & Hgl & Hcret & HA & Hback).
     assert (j' = j) as -> by (apply (p_context_proc_addr_inj j' j Hj' Hj); congruence).
-    iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
+    iSplit; [done|]. iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
     iFrame "Htc".
     iExists γl, ch. iFrame. done.
   Qed.
@@ -305,20 +314,25 @@ Section SchedCtx.
      payload delivers with the lock its release is about to give back.  The
      parking proc's own record comes back at the index the payload pins,
      which is what the scheduler re-deposits into that proc's lock. *)
+  (* THE FLAG IS READ BACK HERE, and it is the parked state's own
+     [needs_ctx]: the scheduler learns "there is a record to re-deposit"
+     from exactly the predicate the slot it is about to release demands one
+     at.  So no case analysis crosses the seam -- the two are the same
+     boolean, not two facts to be kept consistent. *)
   Lemma p_sched_at_cpu (i : CPU) (A' : ctx_adm) (j : nat)
-      (cret tpv : mword 64) :
+      (cret tpv : mword 64) (back : bool) :
     (j < NPROC)%nat ->
-    p_sched i A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) -∗
+    p_sched i A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) back -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
-    ⌜A' = None⌝ ∗ trap_csrs (CID := i) ∗
+    ⌜A' = None⌝ ∗ trap_csrs KT1 (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
-      ⌜γs !! j = Some γl /\ park_ok st = true⌝ ∗
+      ⌜γs !! j = Some γl /\ park_ok st = true /\ back = needs_ctx st⌝ ∗
       proc_held i j γl st ch ∗ hart_full j i ∗ park_pay (proc_addr j) st.
   Proof.
     iIntros (Hj) "(%Htp & Htc & Hpay)". iSplit; [done|].
     iDestruct "Hpay" as "[(_ & %HA & Hpay) | Hpay]".
     { iDestruct "Hpay" as (j' γl st ch) "[%Hfacts Hpay]".
-      destruct Hfacts as (Hcret & Hp & Hj' & Hgl & Hst).
+      destruct Hfacts as (Hcret & Hp & Hj' & Hgl & Hst & Hback).
       assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
       iSplit; [done|]. iSplit; [done|]. iFrame "Htc".
       iExists γl, st, ch. iFrame. done. }
@@ -327,6 +341,12 @@ Section SchedCtx.
     exfalso. exact (a_cpu_ctx_ne_p_context (cid_word_of i) j' (tp_ok_cid_of i) Hj' Hc).
   Qed.
 
+  (* the ZOMBIE park's reading of the same flag, as a rewrite: [needs_ctx] is
+     false there, so the crossing carries [own_ctx] and not a record. *)
+
+
+  Lemma needs_ctx_ZOMBIE_false : needs_ctx ZOMBIE = false.
+  Proof. vm_compute. reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)
   (* The per-proc lock invariant.                                        *)
@@ -571,27 +591,34 @@ Section SchedCtx.
      crossing's [park_pay] carried, and that is [proc_slots] at the state the
      parking thread stored.  Stated once, so the scheduler never cases on the
      state -- the case analysis lives here. *)
+  (* THE CONTEXT SLOT ARRIVES IN THE SHAPE THE CROSSING DELIVERED, and that
+     is the same [needs_ctx st] guard the slot itself uses
+     ([SchedCtx.p_sched]'s [back], [SwtchCtx.valid_context_pre]'s [if]).  A
+     resumable park hands over a record; a ZOMBIE park hands over the raw
+     cells, because its swtch is not coming back and there is no
+     continuation to park.  Nothing is forgotten here any more -- the old
+     [proc_ctx_own_ctx] step, which threw a record's parked stack away, is
+     gone from this path, and with it the hole it used to leave in the
+     dying thread's kernel stack. *)
   Lemma proc_slots_park_gen (E : coPset) (pa : mword 64) (st : mword 32) :
     park_ok st = true ->
-    ▷ proc_ctx pa -∗ hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st
+    (if needs_ctx st then ▷ proc_ctx pa else own_ctx (p_context pa)) -∗
+    hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st
     ={E}=∗ proc_slots pa st.
   Proof.
     intros Hst. iIntros "Hctx Hpark #Hused Hpay".
     pose proof (is_unused_of_park_ok st Hst) as Hu.
     apply park_ok_cases in Hst as [Hn | Hz].
-    - iModIntro. rewrite /proc_slots Hn Hu.
+    - rewrite Hn. iModIntro. rewrite /proc_slots Hn Hu.
       rewrite (inv_dormant_of_needs_ctx st Hn) (not_running_of_needs_ctx st Hn).
       rewrite (is_running_of_needs_ctx st Hn).
       iFrame "Hctx Hpark". by iFrame "Hused".
-    - subst st. rewrite /park_pay inv_dormant_ZOMBIE.
-      iMod (proc_ctx_own_ctx E pa with "Hctx") as "Hown".
+    - subst st. rewrite /park_pay inv_dormant_ZOMBIE needs_ctx_ZOMBIE_false.
       iModIntro. rewrite /proc_slots not_running_ZOMBIE inv_dormant_ZOMBIE
-                        is_unused_ZOMBIE.
-      rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
-      rewrite is_running_ZOMBIE.
+                        is_unused_ZOMBIE needs_ctx_ZOMBIE_false is_running_ZOMBIE.
       iSplitR; [done|]. iSplitR; [done|].
       iSplitR "Hpark Hused"; [| iFrame "Hpark Hused"].
-      iEval (rewrite proc_dormant_split). iFrame "Hpay Hown".
+      iEval (rewrite proc_dormant_split). iFrame "Hpay Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)

@@ -49,6 +49,9 @@ Section ProofMemset.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb kt}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
      whole-function proof already has.  Written name-free (durable-notes: an
@@ -104,7 +107,7 @@ Section ProofMemset.
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5)
       `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13)
       (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
-    : wp_memset_loop_sconf_body N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
+    : wp_memset_loop_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
@@ -143,7 +146,7 @@ Section ProofMemset.
     assert (Hm1' : forall H : CpuId, rget (CID := H) m ra1 = cval).
     { intro H. rewrite (rget_ne (CID := H) m ra1 Hra1tp). exact Hm1. }
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s_sconf pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := ktb) pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
               with "Hcg Hpc Hi0 [Hb0]").
     { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
     iIntros (CID1 Hs1) "Hcg Hpc Hb0".
@@ -229,7 +232,7 @@ Section ProofMemset.
 
   Lemma wp_memset_suffix_sconf
       (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_suffix_sconf_body M n ra0e s00e b pcur.
+    : wp_memset_suffix_sconf_body kt M n ra0e s00e b pcur.
   Proof.
     cbv beta delta [wp_memset_suffix_sconf_body].
     intros spd sp0up ret_tgt.
@@ -239,7 +242,7 @@ Section ProofMemset.
         (add_vec (M5 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> M5).
     iIntros "Hcg Hi28 Hi2a Hi2c Hi2e Hpc Hp8 Hp0 Hcont".
     (* ---- 0x28: c.ldsp ra,8(sp) ---- *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.memset + 0x1e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_cldsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x1e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               M n ra0e b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 Hp8").
@@ -251,7 +254,7 @@ Section ProofMemset.
     (* ---- 0x2a: c.ldsp s0,0(sp) ---- *)
     assert (Hsp4 : M4 !!! Regidx csp_rs1 = spd)
       by (rewrite /M4 upd_ne; [reflexivity | vm_compute; discriminate]).
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.memset + 0x20)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_cldsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x20)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               M4 n s00e b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hp0]").
@@ -285,7 +288,7 @@ Section ProofMemset.
               n 2 b Hpop
               with "Hcg Hpc Hi2c [Hp8 Hp0]").
     { iEval (rewrite Hwv).
-      iApply (stack_own_2_intro with "[Hp8] [Hp0]").
+      iApply (stack_own_2_intro (KTR := kt) with "[Hp8] [Hp0]").
       - iEval (rewrite Hb1u). iExact "Hp8".
       - iEval (rewrite Hb2u -Hsp4). iExact "Hp0". }
     iIntros (CID3 Hs3) "Hcg Hpc".
@@ -322,7 +325,7 @@ Section ProofMemset.
   (* =================================================================== *)
   Lemma wp_memset_head_sconf
       (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8) (b : bool) (pcur : mword 64)
-    : wp_memset_head_sconf_body m0 n imm_entry nzimm_s0 b pcur.
+    : wp_memset_head_sconf_body kt m0 n imm_entry nzimm_s0 b pcur.
   Proof.
     cbv beta delta [wp_memset_head_sconf_body].
     intros ra_idx s0_idx pcE sp0 sp' pa_ra pa_s0 ra0 s00 m1 m2 Hn2 Hsp'.
@@ -344,13 +347,13 @@ Section ProofMemset.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.memset + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr8 b
+    iApply (wp_csdsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr8 b
               with "Hcg Hpc Hi02 Hbra").
     iIntros (CID2 Hs2) "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.memset + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.memset + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.memset + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs0 b
+    iApply (wp_csdsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs0 b
               with "Hcg Hpc Hi04 Hbs0").
     iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.memset + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.memset + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
@@ -381,7 +384,7 @@ Section ProofMemset.
   (* =================================================================== *)
   Lemma wp_memset_skip_sconf
       (M : regfile) (n : nat) (imm8_beqz : mword 8) (b : bool) (pcur : mword 64)
-    : wp_memset_skip_sconf_body M n imm8_beqz b pcur.
+    : wp_memset_skip_sconf_body kt M n imm8_beqz b pcur.
   Proof.
     cbv beta delta [wp_memset_skip_sconf_body].
     intros a2_idx pcE Hz Htgt.
@@ -409,7 +412,7 @@ Section ProofMemset.
   Lemma wp_memset_setup_sconf
       (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8)
       (wval_add : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_setup_sconf_body M n shamt_l shamt_r imm8_beqz wval_add b pcur.
+    : wp_memset_setup_sconf_body kt M n shamt_l shamt_r imm8_beqz wval_add b pcur.
   Proof.
     cbv beta delta [wp_memset_setup_sconf_body].
     intros a0_idx a2_idx a4_idx a5_idx pcE m3 m4 m5 m6 Hn0 Hvalue_add.

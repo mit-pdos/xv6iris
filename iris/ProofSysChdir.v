@@ -96,7 +96,7 @@ Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
+Require Import KernelDataInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -109,11 +109,9 @@ Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecMyproc.
@@ -126,6 +124,7 @@ Require Import SpecIput.
 Require Import SpecIunlockput.
 Require Import SpecDirlink.
 Require Import SpecNamex.
+Require Import SpecPanic.
 Require Import SpecNamei.
 Require Import CodeSysChdir.
 Require Import SpecSysChdir.
@@ -230,8 +229,7 @@ Lemma sc_kb (K : nat) : (K_sys_chdir <= K)%nat ->
   (K_iput <= K - 20)%nat /\ (K_iunlockput <= K - 20)%nat /\
   (10 <= K - 20)%nat /\ (20 <= K)%nat /\ ((K - 20) + 20 = K)%nat.
 Proof.
-  unfold K_sys_chdir, K_namei, argstr_stack, K_begin_op, K_end_op,
-         K_ilock, K_iunlock, K_iput, K_iunlockput.
+  
   intro H. split_and!; lia.
 Qed.
 
@@ -346,21 +344,21 @@ Section ProofSysChdirFrame.
   (* ---- THE FRAME CARVE: the low SIXTEEN slots ARE [char path[128]] ---- *)
 
   Lemma sc_frame_carve (sp0 : mword 64) :
-    stack_own sp0 20 -∗
+    stack_own (KTR := KT1) sp0 20 -∗
     ⌜forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true⌝ ∗
-    (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 3) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 4) ↦₈ w) ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 20) 128.
+    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 3) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 4) ↦₈[KT1] w) ∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 20) 128.
   Proof.
-    iIntros "H". rewrite stack_own_slots. cbn [seq].
+    iIntros "H". rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                        H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                        H20 & _)".
     change 128%nat with (8 * 16)%nat.
-    iDestruct (slotsn_bytes_own sp0 20 16 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := KT1) sp0 20 16 ltac:(lia)
                  with "[H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
                         H19 H20]") as "[%Hal Hb]".
     { cbn [seq].
@@ -379,18 +377,18 @@ Section ProofSysChdirFrame.
   Lemma sc_frame_join (sp0 : mword 64) (w1 w2 w3 w4 : mword 64) :
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true) ->
-    (pa_stk sp0 1) ↦₈ w1 -∗ (pa_stk sp0 2) ↦₈ w2 -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗ (pa_stk sp0 4) ↦₈ w4 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 20) 128 -∗
-    stack_own sp0 20.
+    (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
+    (pa_stk sp0 3) ↦₈[KT1] w3 -∗ (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 20) 128 -∗
+    stack_own (KTR := KT1) sp0 20.
   Proof.
     intro Hal. iIntros "H1 H2 H3 H4 Hb".
     change 128%nat with (8 * 16)%nat.
-    iDestruct (bytes_own_slotsn sp0 20 16 ltac:(lia) Hal with "Hb") as "Hs".
+    iDestruct (bytes_own_slotsn (KTR := KT1) sp0 20 16 ltac:(lia) Hal with "Hb") as "Hs".
     cbn [seq].
     iDestruct "Hs" as "(K20 & K19 & K18 & K17 & K16 & K15 & K14 & K13 & K12 &
                         K11 & K10 & K9 & K8 & K7 & K6 & K5 & _)".
-    rewrite stack_own_slots. cbn [seq].
+    rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iSplitL "H1"; [iExists w1; iExact "H1" |].
     iSplitL "H2"; [iExists w2; iExact "H2" |].
     iSplitL "H3"; [iExists w3; iExact "H3" |].
@@ -409,22 +407,22 @@ Section ProofSysChdirFrame.
   (* the buffer, named as bytes and back: namei / argstr both speak the
      [seq]-indexed byte window, not [bytes_own] *)
   Lemma sc_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
   Lemma sc_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): namei reads the NUL-terminated prefix, the rest
      rides through untouched *)
   Lemma sc_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j)
+    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
     ∗ ([∗ list] j ∈ seq 0 (127 - k)%nat,
-         pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat).
+         pa_add (pa_add a (S k)) j ↦ₘ[KT1] f (S k + j)%nat).
   Proof.
     intro Hk.
     replace 128%nat with (S k + (127 - k))%nat by lia.
@@ -433,10 +431,10 @@ Section ProofSysChdirFrame.
 
   Lemma sc_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
-       pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 128.
+       pa_add (pa_add a (S k)) j ↦ₘ[KT1] f (S k + j)%nat) -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
     iDestruct (sc_name_bytes a (S k) f with "H1") as "B1".
@@ -486,13 +484,13 @@ Section ProofSysChdirEpilogue.
     (M !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64) ->
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true) ->
-    sie_cap_gpr M (K - 20) b pj -∗
+    sie_cap_gpr KT1 M (K - 20) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (SC + 0x5c)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ bf jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] w3 -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ[KT1] bf jj) -∗
     (* THE INDEX IS [b], NOT [true], and it has to be: the epilogue is five
        PLAIN instructions, so every crossing it makes is a [b]-link and the
        [b]-form chain is what it can hand back.  Stated at [true] the caller
@@ -504,7 +502,7 @@ Section ProofSysChdirEpilogue.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra0 : mword 64)⌝ -∗
-        sie_cap_gpr mf K b pj -∗
+        sie_cap_gpr KT1 mf K b pj -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -714,12 +712,12 @@ Section ProofSysChdirM1Tail.
     (M !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64) ->
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true) ->
-    sie_cap_gpr M (K - 20) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 20) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
-    kernel_text -∗ pc_is (mword_of_int (SC + 0x68)) -∗
-    panic_wp_any -∗
+    kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SC + 0x68)) -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
@@ -730,18 +728,18 @@ Section ProofSysChdirM1Tail.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ w3 -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ bf jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] w3 -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ[KT1] bf jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -749,7 +747,7 @@ Section ProofSysChdirM1Tail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKeo HK20 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (schdi_68 with "Htext") as "Hi68".
@@ -786,7 +784,7 @@ Section ProofSysChdirM1Tail.
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 20)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(lkbelow)
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc6c : ret_pc (M1 !!! Regidx Rra : mword 64)
@@ -936,7 +934,7 @@ Section ProofSysChdirBody.
     destruct (sc_kb K HK) as (Kna & Kar & Kbo & Keo & Kil & Kiu & Kip & Kiup
                               & K10 & K20 & Kpop).
     set (sp0 := m !!! Regidx csp_rs1).
-    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpanic #Hbio #Hlog Hseam
+    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg Hsbb Hsbi Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -1170,7 +1168,7 @@ Section ProofSysChdirBody.
     iApply (BeginOp.wp_begin_op_sconf (CID := CID9) gs j gl bn g gfs cov logstart
               dev pid (DfracOwn (1/4)) M5 (K - 20)%nat eb b lks
               ltac:(lia) Hj Hgl (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hlog Hpidq Hprocs").
+              with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID10 Hq10 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
@@ -1441,7 +1439,7 @@ Section ProofSysChdirBody.
                 ltac:(lia) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr
                 (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl Heb
-                with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hkenv Hitab Hitinv
+                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir HopS").
       { iEval (rewrite HN1a0). iExact "Hbufk". }
@@ -1559,7 +1557,7 @@ Section ProofSysChdirBody.
                   P0 (K - 20)%nat eb b lks
                   ltac:(lia) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP0a0
                   (Hlb "bcache"%string)
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hesck
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                         Hireg Hslkk Hshr Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
@@ -1590,7 +1588,7 @@ Section ProofSysChdirBody.
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
         (* ============ +0x38 lh a4,68(s1) -- ip->type ============ *)
-        iApply (wp_lh_s_sconf (CID := CID24) (mword_of_int (SC + 0x38)) Ra4 Rs1
+        iApply (wp_lh_s_sconf (CID := CID24) (kt := KT1) (ktd := KT0) (mword_of_int (SC + 0x38)) Ra4 Rs1
                   (mword_of_int 68 : mword 12) mil (K - 20)%nat
                   (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi38 [Hity]").
@@ -1729,7 +1727,7 @@ Section ProofSysChdirBody.
                     cov logstart kk (qq/2)%Qp gsh dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
-                    with "Hcg Hown Htext Hpc Hpanic Hitinv Hesck Hslkk Hslkd
+                    with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
                           Hslpid Hpidq Hprocs Hdep Hidev Hiinum Hivalid Hload
                           Hshot").
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpidq Hshr".
@@ -1755,7 +1753,7 @@ Section ProofSysChdirBody.
           (* the reference, re-formed: this is the one the [sd] installs *)
           iDestruct (inode_ref_gather with "Hkeep Hshr") as "Hrefnew".
           (* ============ +0x48 ld a0,336(s2) -- a0 := p->cwd ============ *)
-          iApply (wp_ld_s_sconf (CID := CID30) (mword_of_int (SC + 0x48)) Ra0 Rs2
+          iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (CID := CID30) (mword_of_int (SC + 0x48)) Ra0 Rs2
                     (mword_of_int 336 : mword 12) miu (K - 20)%nat (pv_cwd V) b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi48 [Hcwd]").
           { iEval (rgne; rewrite Hius2 p_cwd_sext). iExact "Hcwd". }
@@ -1826,7 +1824,7 @@ Section ProofSysChdirBody.
                     ltac:(lia) Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hescc Hireg Hslkc Hrefc Hsbb Hsbi Hbmres Hpidq Hprocs
                           Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
@@ -1885,7 +1883,7 @@ Section ProofSysChdirBody.
                     bn g gfs cov logstart dev n2 pid (DfracOwn (1/4))
                     P7 (K - 20)%nat eb b lks
                     ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk Hop").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -1909,7 +1907,7 @@ Section ProofSysChdirBody.
           { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcseo c Hc).
             exact (HP7thr c Hc N2' N8 N9 N18). }
           (* ============ +0x54 sd s1,336(s2) -- p->cwd = ip ============ *)
-          iApply (wp_sd_s_sconf (CID := CID35) (mword_of_int (SC + 0x54)) Rs1 Rs2
+          iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (CID := CID35) (mword_of_int (SC + 0x54)) Rs1 Rs2
                     (mword_of_int 336 : mword 12) meo (K - 20)%nat (pv_cwd V) b
                     with "Hcg Hpc Hi54 [Hcwd]").
           { iEval (rgne; rewrite Heos2 p_cwd_sext). iExact "Hcwd". }
@@ -2079,7 +2077,7 @@ Section ProofSysChdirBody.
                     Q1 (K - 20)%nat eb b lks
                     ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpidq
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
@@ -2124,7 +2122,7 @@ Section ProofSysChdirBody.
                     bn g gfs cov logstart dev n2 pid (DfracOwn (1/4))
                     Q2 (K - 20)%nat eb b lks
                     ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk Hop").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -2275,7 +2273,7 @@ Section ProofSysChdirBody.
                   m N3 sp0 K eb b lks (m !!! Regidx Rs1 : mword 64) bf1
                   ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4 Hbuf
                         [Hpback Hcwd Hcwdref Hbsl Hsbb Hsbi Hbmres Hir Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
@@ -2322,7 +2320,7 @@ Section ProofSysChdirBody.
                 m mas sp0 K eb b lks u3 bf
                 ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hass1 Hal
-                with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf
                       [Hpback Hbsl Hsbb Hsbi Hbmres Hir Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }

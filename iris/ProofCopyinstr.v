@@ -197,6 +197,7 @@ Module CopyinstrProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) : COPYINSTR.
 Section ProofCopyinstr.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {ktb : ktier}.
 
   Notation Rx0 := (mword_of_int 0 : mword 5).
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -260,7 +261,7 @@ Section ProofCopyinstr.
      no such invariant, so re-point at its own [tp_pin] image, for which the
      fact holds BY CONSTRUCTION (ProofCopyin.sie_cap_gpr_tp_pin). *)
   Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
-    sie_cap_gpr m n b pcur -∗ sie_cap_gpr (tp_pin m) n b pcur.
+    sie_cap_gpr KT1 m n b pcur -∗ sie_cap_gpr KT1 (tp_pin m) n b pcur.
   Proof.
     rewrite /sie_cap_gpr /sie_cap (tp_pin_sp m).
     assert (Htp2 : tp_pin (tp_pin m) = tp_pin m) by (apply tp_pin_id; exact (rget_tp m)).
@@ -298,25 +299,25 @@ Section ProofCopyinstr.
     Mt !!! Regidx Ra0 = res ->
     Mt !!! Regidx Rs10 = m !!! Regidx Rs10 ->
     Mt !!! Regidx Rs11 = m !!! Regidx Rs11 ->
-    sie_cap_gpr Mt (av - 12)%nat b pcur -∗
+    sie_cap_gpr KT1 Mt (av - 12)%nat b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) s70 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) s80 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) s90 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) gap -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) s70 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) s80 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) s90 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) gap -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = res⌝ -∗
-        sie_cap_gpr mf av b pcur -∗
+        sie_cap_gpr KT1 mf av b pcur -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -510,9 +511,9 @@ Section ProofCopyinstr.
                    = pa_stk (add_vec (T11 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6)))) 12)
       by (rewrite Hwv; exact HT11sp).
-    iAssert (stack_own sp0 12) with
+    iAssert (stack_own (KTR := KT1) sp0 12) with
       "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -589,14 +590,14 @@ Section ProofCopyinstr.
       /\ resv = (mword_of_int 0 : mword 64)
     \/ xor_vec a5v (sign_extend' 64 (mword_of_int 1 : mword 12)) = (mword_of_int 1 : mword 64)
       /\ resv = (mword_of_int (-1) : mword 64) ->
-    sie_cap_gpr M Kv b pcur -∗
+    sie_cap_gpr KT1 M Kv b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x46) : mword 64) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ Mo : regfile,
         ⌜Mo !!! Regidx Ra0 = resv⌝ -∗
         ⌜forall r : mword 5, r <> Ra0 -> r <> Ra5 -> Mo !!! Regidx r = M !!! Regidx r⌝ -∗
-        sie_cap_gpr Mo Kv b pcur -∗
+        sie_cap_gpr KT1 Mo Kv b pcur -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -672,11 +673,11 @@ Section ProofCopyinstr.
     M !!! Regidx Rs1 = sub_vec srcp (pa_add dst done) ->
     (forall r : mword 5, r <> Ra1 -> r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
         M !!! Regidx r = M0 !!! Regidx r) ->
-    sie_cap_gpr M Kv b pcur -∗
+    sie_cap_gpr KT1 M Kv b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0xa6) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
-    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
     (* THE TWO EXITS, as an Iris [∧] and not two separate wands: they are
        ALTERNATIVES, and both need the same resources (the rest of the
        borrowed page, its returning wand, and the function's own exit
@@ -691,10 +692,10 @@ Section ProofCopyinstr.
           ⌜Mn !!! Regidx Ra5 = pa_add (pa_add dst done) i'⌝ -∗
           ⌜forall r : mword 5, r <> Ra1 -> r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
               Mn !!! Regidx r = M0 !!! Regidx r⌝ -∗
-          sie_cap_gpr Mn Kv b pcur -∗
+          sie_cap_gpr KT1 Mn Kv b pcur -∗
           pc_is (mword_of_int (KernelSyms.copyinstr + 0x40) : mword 64) -∗
           ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
-          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
           WP (Loop : expr riscv_lang))
         ∧
         ( ∀ (Mc : regfile) (g : nat -> bv 8),
@@ -703,10 +704,10 @@ Section ProofCopyinstr.
           ⌜Mc !!! Regidx Ra5 = pa_add (pa_add dst done) n⌝ -∗
           ⌜forall r : mword 5, r <> Ra1 -> r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
               Mc !!! Regidx r = M0 !!! Regidx r⌝ -∗
-          sie_cap_gpr Mc Kv b pcur -∗
+          sie_cap_gpr KT1 Mc Kv b pcur -∗
           pc_is (mword_of_int (KernelSyms.copyinstr + 0x68) : mword 64) -∗
           ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
-          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+          ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
           WP (Loop : expr riscv_lang)) )) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -752,7 +753,7 @@ Section ProofCopyinstr.
     assert (HI2a4 : I2 !!! Regidx Ra4 = pa_add srcp i) by lkp.
     (* ---- +0x8e: lbu a4,0(a4) ---- *)
     iDestruct (bb_byte_acc srcp n i fsrc (DfracOwn 1) Hin with "Hsrc") as "[Hsb Hsback]".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xac)) Ra3 Ra4
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.copyinstr + 0xac)) Ra3 Ra4
               (mword_of_int 0 : mword 12) I2 Kv (fsrc i : mword 8) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hiac [Hsb]").
@@ -807,7 +808,7 @@ Section ProofCopyinstr.
         by apply pa_add_assoc.
       iDestruct (bb_byte_acc dst maxn (done + i) f (DfracOwn 1) Hdi with "Hdst")
         as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
+      iApply (wp_sb_s_sconf (kt := KT1) (ktd := ktb) (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
                 (mword_of_int 0 : mword 12) I3 Kv (f (done + i)%nat) b
                 with "Hcg Hpc Hib2 [Hdb]").
       { iEval (rgne; rewrite HI3a5 addv_sext0 Hcur). iExact "Hdb". }
@@ -930,13 +931,13 @@ Section ProofCopyinstr.
     m !!! Regidx Rs10 = v10 ->
     m !!! Regidx Rs11 = v11 ->
     locks_below lks "kmem" ->
-    sie_cap_gpr m (K - 12)%nat b pcur -∗
+    sie_cap_gpr KT1 m (K - 12)%nat b pcur -∗
     cpu_own lvl eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) -∗
     proc_pt Pc -∗
     kalloc_env γa None -∗
-    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (g : nat -> bv 8),
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
@@ -945,11 +946,11 @@ Section ProofCopyinstr.
       ⌜mj !!! Regidx Ra0 = res⌝ -∗
       ⌜copyinstr_ret maxn g res⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
-      sie_cap_gpr mj (K - 12)%nat b pcur -∗
+      sie_cap_gpr KT1 mj (K - 12)%nat b pcur -∗
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
-      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -960,7 +961,7 @@ Section ProofCopyinstr.
         Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
@@ -975,11 +976,11 @@ Section ProofCopyinstr.
       ⌜mj !!! Regidx Ra0 = res⌝ -∗
       ⌜copyinstr_ret maxn g res⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
-      sie_cap_gpr mj (K - 12)%nat b pcur -∗
+      sie_cap_gpr KT1 mj (K - 12)%nat b pcur -∗
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
-      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
+      ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
       WP (Loop : expr riscv_lang)))%I).
     iPoseProof (csi_7c with "Htext") as "Hi7c".
     iPoseProof (csi_80 with "Htext") as "Hi80".
@@ -1113,12 +1114,12 @@ Section ProofCopyinstr.
         ⌜mc !!! Regidx Rs9 = (mword_of_int 1 : mword 64)⌝ -∗
         ⌜mc !!! Regidx Rs10 = v10⌝ -∗
         ⌜mc !!! Regidx Rs11 = v11⌝ -∗
-        sie_cap_gpr mc (K - 12)%nat b pcur -∗
+        sie_cap_gpr KT1 mc (K - 12)%nat b pcur -∗
         cpu_own lvl eb pcur b lks -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
         page_own pa0 -∗
         (page_own pa0 -∗ proc_pt Pd) -∗
-        ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
+        ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
         EXIT -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
     { iIntros (CIDc mc pa0 Pd) "%Hanchorc %Hextd %Hza0 %Hzsp %Hz1 %Hz2 %Hz3
@@ -1148,7 +1149,7 @@ Section ProofCopyinstr.
           ⌜mb !!! Regidx Rs9 = (mword_of_int 1 : mword 64)⌝ -∗
           ⌜mb !!! Regidx Rs10 = v10⌝ -∗
           ⌜mb !!! Regidx Rs11 = v11⌝ -∗
-          sie_cap_gpr (CID:=CIDb) mb (K - 12)%nat b pcur -∗
+          sie_cap_gpr KT1 (CID:=CIDb) mb (K - 12)%nat b pcur -∗
           pc_is (CID:=CIDb) (mword_of_int (KernelSyms.copyinstr + 0x96) : mword 64) -∗
           WP (Loop : expr riscv_lang))%I
         with "[Hdst Hpg Hback Hcnt HEXIT]" as "BODY".
@@ -1282,7 +1283,7 @@ Section ProofCopyinstr.
                        with "Hcg") as "[%Hz0 Hcg]".
           iDestruct (bb_byte_acc dst maxn (done + i') g (DfracOwn 1) Hdi with "Hdst")
             as "[Hdb Hdback]".
-          iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
+          iApply (wp_sb_s_sconf (kt := KT1) (ktd := ktb) (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
                     (mword_of_int 0 : mword 12) Mn (K - 12)%nat (g (done + i')%nat) b
                     with "Hcg Hpc Hi40 [Hdb]").
           { iEval (rgne; rewrite Hna5 addv_sext0 Hcur). iExact "Hdb". }
@@ -1540,7 +1541,7 @@ Section ProofCopyinstr.
             iDestruct (cpu_own_transport CIDc CIDd6 lvl eb pcur b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
             iAssert (kalloc_env γa None) as "Henv".
-            { iExists γk. iFrame "Hlock Havail Hpanic". }
+            { iExists γk. iFrame "Hlock Havail". }
             iApply (IH (done + n)%nat (rem - n)%nat CIDd6 Pd D5 g
                       Hf1 Hf2 Hf3 Hnulg (uptd_ext_sz_trans szv P Pc Pd Hext Hextd)
                       HD5sp HD5s1 HD5s3 HD5s4 HD5s5 HD5s6
@@ -1708,7 +1709,7 @@ Section ProofCopyinstr.
                       = add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x36) : mword 64) 4)
         by (rewrite /F5 upd_eq; reflexivity).
       iAssert (kalloc_env γa None) as "Henv".
-      { iExists γk. iFrame "Hlock Havail Hpanic". }
+      { iExists γk. iFrame "Hlock Havail". }
       iDestruct (cpu_own_transport CID0 CIDu6 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (sie_cap_gpr_tp_pin (CIDx := CIDu6) F5 (K - 12)%nat b pcur with "Hcg") as "Hcg".
@@ -1896,7 +1897,7 @@ Section ProofCopyinstr.
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p b lks.
+    : wp_copyinstr_sconf_body ktb γa mm P szv maxn dst_olds K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_copyinstr_sconf_body].
     intros pcE dst ret_tgt HK Hroot Hsza1 Hmaxr Hmax64 Hszb Hlvl Hlkbelow.
@@ -2039,7 +2040,7 @@ Section ProofCopyinstr.
       iEval (rewrite Hq04) in "Hpc".
       assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 12)
         by (rewrite /M1 upd_eq; apply cs_push).
-      iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+      iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
       iDestruct "Hframe" as
         "(K1 & K2 & K3 & K4 & K5 & K6 & K7 & K8 & K9 & K10 & K11 & K12 & _)".
       iDestruct "K1" as (u1) "Hb1".   iDestruct "K2" as (u2) "Hb2".

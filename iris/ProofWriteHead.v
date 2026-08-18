@@ -86,7 +86,6 @@ Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeWriteHead.
-Require Import PanicStub.
 Require Import SpecBread SpecBwrite SpecBrelse.
 Require Import FsCrash.
 Require Import SpecWriteHead.
@@ -474,9 +473,9 @@ Section WriteHeadDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -492,10 +491,10 @@ Section WriteHeadDefs.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
   Definition wh_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   (* what every block knows about its arrival map *)
   Definition wh_regs (m M : regfile) : Prop :=
@@ -552,13 +551,12 @@ Section WriteHeadBlocks.
     (* wh_tail's own acquire (via brelse's unlink/splice) is at "bcache"
        (rank 4); nothing below it is touched here. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x46) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv γs -∗
@@ -582,7 +580,7 @@ Section WriteHeadBlocks.
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1 Hbelow.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: write_head never push_off's, so its
@@ -661,7 +659,7 @@ Section WriteHeadBlocks.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbw : (K_bwrite <= K - 4)%nat)
-      by (unfold K_bwrite, K_write_head in *; lia).
+      by (lia).
     (* the header image's [n] field, needed HERE (the permit is deposited at
        the bwrite, not at the return) *)
     assert (Hhn_early : hdr_n (f <$> seq 0 1024) = Z.of_nat n).
@@ -675,7 +673,7 @@ Section WriteHeadBlocks.
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat eb
               (f <$> seq 0 1024) bsd0 b Q
               _ HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm]").
     all: try lkbelow.
     (* THE CALLER'S OWN PERMIT, at the header image this function assembled
@@ -779,12 +777,12 @@ Section WriteHeadBlocks.
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
-      by (unfold K_brelse, K_write_head in *; lia).
+      by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat eb (proc_addr j)
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
               _ HKbl Hk HT4a0 Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID6 Hs6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hslot".
     assert (Hpc52 : ret_pc (T4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x52)).
@@ -908,9 +906,9 @@ Section WriteHeadBlocks.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].
@@ -924,7 +922,7 @@ Section WriteHeadBlocks.
     set (P5 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> P4).
-    assert (Hnk : ((K - 4) + 4)%nat = K) by (unfold K_write_head in HK; lia).
+    assert (Hnk : ((K - 4) + 4)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     assert (Hpp5c : add_vec_int (mword_of_int (KernelSyms.write_head + 0x5a) : mword 64) 2
                     = mword_of_int (KernelSyms.write_head + 0x5c))
@@ -1064,13 +1062,12 @@ Section WriteHeadBlocks.
     M !!! Regidx Ra4 = lh_block i ->
     M !!! Regidx Ra5 = pa_add (bnode kk) (4 * i)%nat ->
     M !!! Regidx Ra2 = pa_add (bnode kk) (4 * n)%nat ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x3a) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv γs -∗
@@ -1099,7 +1096,7 @@ Section WriteHeadBlocks.
       iIntros (i M f Hi Hfuel Hf4 Henc Hregs HMs1 HMa4 HMa5 HMa2);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
@@ -1118,7 +1115,7 @@ Section WriteHeadBlocks.
                    = lh_block i).
     { rgne. rewrite HMa4 wh_s0. apply wh_blk_at. }
     iEval (rewrite -Hsrc) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
               (mword_of_int 0 : mword 12) M (K - 4)%nat w b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a Hcell").
@@ -1282,7 +1279,7 @@ Section WriteHeadBlocks.
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
                 HS3regs HS3s1 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* more entries: branch back to +0x3a *)
@@ -1315,7 +1312,7 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
-      iApply ("IH" with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
+      iApply ("IH" with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
                          Hextra HLauth Hfsb Hncell HW Hperm Hcont").
   Qed.
 
@@ -1346,8 +1343,8 @@ Section ProofWriteHead.
     intros pcE pj ret_tgt HK Hgeom Hj Hgl Hbatch Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct Hbatch as [HnW HnB].
-    unfold K_write_head in HK.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs
+    
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hfroz Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -1399,7 +1396,7 @@ Section ProofWriteHead.
                     = add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -1518,7 +1515,7 @@ Section ProofWriteHead.
                      = l_start).
     { rgne. rewrite HR4s2 wh_s24. apply wh_l_start. }
     iEval (rewrite -Hstart) in "Hstc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
               (mword_of_int 24 : mword 12) R4 (K - 4)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1540,7 +1537,7 @@ Section ProofWriteHead.
                     = l_dev).
     { rgne. rewrite HR5s2 wh_s36. apply wh_l_dev. }
     iEval (rewrite -Hdvad) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
               (mword_of_int 36 : mword 12) R5 (K - 4)%nat dev b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hdevc").
@@ -1609,12 +1606,12 @@ Section ProofWriteHead.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat eb b lks
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot").
     all: try lkbelow.
     iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1678,7 +1675,7 @@ Section ProofWriteHead.
                    = lh_n_pa).
     { rgne. rewrite HB1s2 wh_s44. apply wh_l_lhn. }
     iEval (rewrite -Hlhn) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
               (mword_of_int 44 : mword 12) B1 (K - 4)%nat
               (mword_of_int (Z.of_nat n) : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1778,7 +1775,7 @@ Section ProofWriteHead.
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB2regs HB2s1 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* ---- n > 0: set the cursors up and enter the loop ---- *)
@@ -1944,7 +1941,7 @@ Section ProofWriteHead.
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
   Qed.

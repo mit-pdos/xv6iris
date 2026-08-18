@@ -109,19 +109,19 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      (sleep is only ever reached from a thread that has already released its
      condition lock). *)
   locks_below lks "proc"%string ->
-  sie_cap_gpr m av eb pj -∗
+  sie_cap_gpr KT1 m av eb pj -∗
   cpu_own 0 eb pj eb lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av eb pj -∗
+      sie_cap_gpr KT1 mf av eb pj -∗
       cpu_own 0 eb pj eb lks -∗
       pc_is ret_tgt -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

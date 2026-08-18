@@ -318,7 +318,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -374,8 +373,7 @@ Local Open Scope Z_scope.
    (104), SpecDirlink.v (100), SpecDirlookup.v (90), SpecIunlockput.v (64),
    SpecIalloc.v (56), SpecIlock.v (44), SpecIupdate.v (44).
    [ProofCreateParts.cr_K_value] carries the same number. *)
-Definition K_create : nat := 114%nat.
-
+Notation K_create := (124%nat) (only parsing).
 (* THE LEDGER UNITS create must have in hand.  nameiparent takes two and
    returns one on success; dirlookup's iget takes the second on the found
    arm; ialloc takes one on the allocate half; dirlink is NET ZERO but
@@ -566,7 +564,7 @@ Definition wp_create_sconf_body
   16 * Z.of_nat nib <= 2 ^ 16 ->
   bv_unsigned ty <> 0 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- THE TWO LEDGERS (see the header) ---- *)
   (create_units <= u)%nat ->
   (create_slots <= ns)%nat ->
@@ -581,10 +579,9 @@ Definition wp_create_sconf_body
   m !!! Regidx (mword_of_int 13 : mword 5) = (sign_extend' 64 minor : mword 64) ->
   (* PARKING PREMISE (hart-generic scheduler protocol) *)
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the two persistent credentials ialloc's printk arm needs, and the
      rodata image the "." / ".." literals live in *)
   kernel_data -∗
@@ -614,7 +611,7 @@ Definition wp_create_sconf_body
   proc_priv γf pj pidv V -∗
   (* ---- the caller's NUL-terminated path buffer (a kernel buffer: every
      caller ran argstr into its own frame) ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -633,7 +630,7 @@ Definition wp_create_sconf_body
     (dn : dinode) (bm : blkmap)
     (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
@@ -646,7 +643,7 @@ Definition wp_create_sconf_body
          iunlockput of a link-count-zero inode). *)
       bitmap_res γfs bmapstart cov logstart size used' -∗
       proc_priv γf pj pidv V -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       (* at most [create_slots] of the ledger gone, and none gained --
          AND, on the SUCCESS arms, one is still OUT.  The interval alone

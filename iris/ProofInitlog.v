@@ -294,8 +294,8 @@ Section ProofInitlog.
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1 Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
-    unfold K_initlog in HK.
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio #Hseam #Hcert Hmirf
+    
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hcert Hmirf
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
@@ -374,7 +374,7 @@ Section ProofInitlog.
         (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (vra0) "Hc1". iDestruct "S2" as (vs00) "Hc2".
     iDestruct "S3" as (vs10) "Hc3". iDestruct "S4" as (vs20) "Hc4".
@@ -623,7 +623,7 @@ Section ProofInitlog.
       rewrite /R7 upd_ne; [| vm_compute; discriminate].
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [exact HR4s3 | vm_compute; discriminate]. }
-    iApply (Initlock.wp_initlock_sconf RA vlock vname vcpu "log"%string
+    iApply (Initlock.wp_initlock_sconf KT1 RA vlock vname vcpu "log"%string
               (K - 6)%nat b pj ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HRAa1). iExact "Hstr". }
@@ -681,7 +681,7 @@ Section ProofInitlog.
                     = pa_add sb 20%nat).
     { rgne. rewrite Hmils3 il_s20. reflexivity. }
     iEval (rewrite -Hsbad) in "Hsbf".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.initlog + 0x28)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x28)) Ra1 Rs3
               (mword_of_int 20 : mword 12) mil (K - 6)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -811,13 +811,13 @@ Section ProofInitlog.
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 6)%nat) by (lia).
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true b
               _ HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -869,7 +869,7 @@ Section ProofInitlog.
     { rgne. rewrite HmBa0 il_s88. apply il_hdr_addr. }
     iEval (rewrite (il_hdrw_zero bs_hdr Hhdr0)) in "Hword".
     iEval (rewrite -Hhaddr) in "Hword".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
               (mword_of_int 88 : mword 12) mB (K - 6)%nat
               (mword_of_int 0 : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -969,12 +969,12 @@ Section ProofInitlog.
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID26) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 6)%nat) by (lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
               (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj
               bs_hdr bsd0 d0 b _ HKbl HA HB2a0
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
     iIntros (CID27 Hs27 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hs1u".
     assert (Hpc62 : ret_pc (B2 !!! Regidx Rra : mword 64)
@@ -1054,7 +1054,7 @@ Section ProofInitlog.
     iDestruct (wp_next_shift (b := true) (CIDa := CID26) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKit : (K_install_trans <= K - 6)%nat)
-      by (unfold K_install_trans; lia).
+      by (lia).
     (* the empty batch's pure shape, as NAMED facts: a tactic in an argument
        position whose expected type is still an evar diverges
        (claude-notes/durable-notes.md) *)
@@ -1085,7 +1085,7 @@ Section ProofInitlog.
               _ HKit Hgeomok Hj Hgl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
                     Hnil2 Hs2 [] []").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1189,7 +1189,7 @@ Section ProofInitlog.
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID33) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKwh : (K_write_head <= K - 6)%nat) by (unfold K_write_head; lia).
+    assert (HKwh : (K_write_head <= K - 6)%nat) by (lia).
     iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
@@ -1197,7 +1197,7 @@ Section ProofInitlog.
               D2 (K - 6)%nat true b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ HKwh Hgeomok Hj Hgl Hshape0
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf]").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1322,8 +1322,8 @@ Section ProofInitlog.
                    = pa_stk (add_vec (P5 !!! Regidx csp_rs1 : mword 64)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HP5sp. exact Hspr6. }
-    iAssert (stack_own sp0 6) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1"; [iExists _; iExact "Hc1"|].
       iSplitL "Hc2"; [iExists _; iExact "Hc2"|].
       iSplitL "Hc3"; [iExists _; iExact "Hc3"|].

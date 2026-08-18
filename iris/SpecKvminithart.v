@@ -34,7 +34,7 @@
    and [KptShare.kpt_inv_snapshot] supplies the snapshot ghost.
 
    Boot-free, straight-line, no callees -> unconditional success, no
-   panic_wp.  Follows SpecKvminit.v's file conventions.
+   panic credential.  Follows SpecKvminit.v's file conventions.
 
    INTERRUPTS OFF, AND THAT IS LOAD-BEARING (not a convenience).  Every
    resource this contract carries from entry to exit -- [tlb ↦ᵣ], the
@@ -78,8 +78,8 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
   (2 <= K)%nat ->
-  sie_cap_gpr mm K false p -∗
-  strans_bit strans_bit_bare -∗
+  sie_cap_gpr KT0 mm K false p -∗
+  strans_pending -∗
   kernel_text -∗
   pc_is pcE -∗
   tlb ↦ᵣ tlbvec0 -∗
@@ -90,10 +90,10 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   (* the shared table, likewise persistent *)
   kpt_inv root -∗
   ( ∀ (mr : regfile),
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

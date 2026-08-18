@@ -64,6 +64,8 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
+Require Import WpMmodeLeafBase.
+Require Import StackOwn.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
@@ -75,7 +77,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKexit.      (* [K_kexit] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
@@ -86,8 +88,7 @@ Import Defs.
 
 (* 4 slots for sys_exit's own frame, and below it kexit's 74 -- argint's 18
    (4 + 18 = 22) is smaller and subsumed. *)
-Definition K_sys_exit : nat := (4 + K_kexit)%nat.
-
+Notation K_sys_exit := ((4 + K_kexit)%nat) (only parsing).
 Definition wp_sys_exit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
@@ -128,7 +129,18 @@ Definition wp_sys_exit_sconf_body
      is "ftable" (1), via the fileclose loop -- so this is exactly kexit's
      own premise, unconsumed. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
+  (* THE DYING THREAD'S STACK CLOSER, in transit.  sys_exit is one layer of
+     the diverging chain [usertrap -> syscall -> sys_exit -> kexit]: it takes
+     the closer anchored at ITS entry sp, wraps its own (dead) 4-slot frame
+     around it, and hands the result to kexit, whose ZOMBIE park is where the
+     page finally reaches the slot ([ProcDefs.kstack_closer],
+     [ProcDefs.kstack_closer_frame]).  UNPAID HERE and honestly so: nothing
+     applies this contract yet -- syscall's dispatch does not reach sys_exit
+     (ProofSyscall.v's header lists what blocks it) -- and the payer, when it
+     comes, is usertrap's entry, where sp IS the page top
+     ([ProcDefs.kstack_closer_top]). *)
+  kstack_closer pj (m !!! Regidx csp_rs1) (trap_res b + av)%nat -∗
   (* entered with no lock held *)
   cpu_own 0%nat eb pj b lks -∗
   (* [kernel_data] is argint/argraw's own premise (the jump table it reads
@@ -136,7 +148,7 @@ Definition wp_sys_exit_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗
-  panic_wp_any -∗
+  panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

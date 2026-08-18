@@ -136,9 +136,9 @@ Section ProofBwrite.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
-    unfold K_bwrite in HK.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanicany #Hbio Hppid Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio Hppid Hprocs
               Hdev Hgeom Hdlock Hlocked Hperm Hcont".
     (* [b] and [eb] are DERIVABLY EQUAL: bwrite enters and stays at noff 0
        (it has no acquire of its own), so [CpuOwn.cpu_own_eb_agree] gives
@@ -181,7 +181,7 @@ Section ProofBwrite.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -331,7 +331,7 @@ Section ProofBwrite.
                  with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ HKhsl Hbelow
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanicany Hppid").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hpid". }
@@ -420,7 +420,7 @@ Section ProofBwrite.
               addr_is_kdata (pa_add (b_data (D3 !!! Regidx Ra0)) kk)).
     { intros kk Hkk. rewrite HD3a0. exact (bnode_data_kdata k kk Hk Hkk). }
     assert (HKrw : (K_virtio_disk_rw <= K - 4)%nat)
-      by (unfold K_virtio_disk_rw; lia).
+      by (lia).
     iDestruct (cpu_own_transport CID9 CID13 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* [Hextc]/[Hextm] were never handed to holdingsleep (not in its
@@ -450,7 +450,7 @@ Section ProofBwrite.
               (K - 4)%nat eb bno (mword_of_int 0 : mword 32) bs bsd b
               Q
               _ HKrw Hbno Hkdata Hj Hgl
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanicany Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm").
     all: try lkbelow.
     { iEval (rewrite HD3a0). iExact "Hbuf". }
     iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ".
@@ -558,8 +558,8 @@ Section ProofBwrite.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP3sp. unfold pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].

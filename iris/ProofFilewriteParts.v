@@ -78,7 +78,14 @@ Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import WpUart.
+Require Import DiskPtsto.
+Require Import WpLock.
+Require Import SpecPanic.
+Require Import CpuOwn.
+Require Import LockRank.
 Require Import IcacheRef.
 Require Import CodeFilewrite.
 Require Import ProofFilereadParts.
@@ -87,6 +94,53 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 Notation FW := KernelSyms.filewrite (only parsing).
+
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  filewrite's one live arm is [panic("filewrite")]  *)
+(*  at +0x11e -- the ELSE of the type dispatch; the literal sits at       *)
+(*  0x800075a8 in .rodata, nine characters and a NUL.  Hoisted as NAMED   *)
+(*  pure lemmas rather than inline [ltac:] -- see optimization.md, and    *)
+(*  the panic recipe's third trap ([lia]/[lkbelow] against an evar).      *)
+(* ===================================================================== *)
+Definition fw_msg_a : Z := 0x800075a8.
+Definition fw_msg : string := "filewrite".
+
+Lemma fw_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+(* "log" (rank 1) is below "pr" (16).  A CLOSED lemma over the plain gset,
+   not an inline [ltac:(lkbelow)]. *)
+Lemma fw_panic_below (lks : gset string) :
+  locks_below lks "log" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
+
+Lemma fw_msg_nz : eq_vec (mword_of_int fw_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fw_msg_nonul : PrintkFmt.nonul fw_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fw_msg_bytes :
+  forall j b, cstring_bytes fw_msg !! j = Some b ->
+    KernelData.kernel_data !! (fw_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 10 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section FilewriteMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma fw_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int fw_msg_a : mword 64) ↦ₛ□ fw_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string fw_msg_a fw_msg _ eq_refl
+              ltac:(unfold text_end, fw_msg_a; lia) fw_msg_bytes with "Hd").
+  Qed.
+End FilewriteMsg.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE 96-BYTE FRAME                                                      *)
@@ -411,7 +465,7 @@ Section ProofFilewriteParts.
       (m : regfile) (K : nat) (sp0 : mword 64) (p : mword 64) (b : bool) :
     (12 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 ->
-    sie_cap_gpr m K b p -∗
+    sie_cap_gpr KT1 m K b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x08) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -420,20 +474,20 @@ Section ProofFilewriteParts.
           /\ Mr !!! Regidx Rs0 = sp0
           /\ (forall r : mword 5, r <> csp_rs1 -> r <> Rs0 ->
                 Mr !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr (K - 12)%nat b p -∗
+        sie_cap_gpr KT1 Mr (K - 12)%nat b p -∗
         pc_is (mword_of_int (FW + 0x16) : mword 64) -∗
-        word_pointsto (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-        word_pointsto (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-        word_pointsto (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
-        word_pointsto (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
-        word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-        word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-        word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-        word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -463,7 +517,7 @@ Section ProofFilewriteParts.
     assert (HR1thr : forall r : mword 5, r <> csp_rs1 ->
                        R1 !!! Regidx r = m !!! Regidx r).
     { intros r Nsp. rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 &
                             S11 & S12 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -584,25 +638,25 @@ Section ProofFilewriteParts.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs2 -> r <> Rs5 -> r <> Rs6 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 12)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 12)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0xfc) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -704,9 +758,9 @@ Section ProofFilewriteParts.
                    = pa_stk (add_vec (T5 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6)))) 12)
       by (rewrite Hwv; exact HT5sp).
-    iAssert (stack_own sp0 12)
+    iAssert (stack_own (KTR := KT1) sp0 12)
       with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -807,7 +861,7 @@ Section ProofFilewriteParts.
     add_vec_int (mword_of_int zc : mword 64) 2 = mword_of_int zd ->
     add_vec_int (mword_of_int zd : mword 64) 2 = mword_of_int ze ->
     add_vec_int (mword_of_int ze : mword 64) 2 = mword_of_int zf ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")),
@@ -824,11 +878,11 @@ Section ProofFilewriteParts.
     instr (mword_of_int ze : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs9, false, 8)) -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) v7 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) v8 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) v9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) v7 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) v8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) v9 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 12
@@ -838,13 +892,13 @@ Section ProofFilewriteParts.
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 r <> Rs1 -> r <> Rs3 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int zf : mword 64) -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-        word_pointsto (pa_stk sp0 9) (DfracOwn 1) v7 -∗
-        word_pointsto (pa_stk sp0 10) (DfracOwn 1) v8 -∗
-        word_pointsto (pa_stk sp0 11) (DfracOwn 1) v9 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) v7 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) v8 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) v9 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -957,7 +1011,7 @@ Section ProofFilewriteParts.
     add_vec_int (mword_of_int za : mword 64) 2 = mword_of_int zb ->
     add_vec (mword_of_int zb : mword 64) (sign_extend' 64 jimm)
       = mword_of_int (FW + 0xfc) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra0, ADDI)) -∗
@@ -967,7 +1021,7 @@ Section ProofFilewriteParts.
         ⌜ Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0xfc) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1006,7 +1060,7 @@ Section ProofFilewriteParts.
     add_vec_int (mword_of_int zb : mword 64) 2 = mword_of_int zc ->
     add_vec (mword_of_int zc : mword 64) (sign_extend' 64 jimm)
       = mword_of_int (FW + 0xfc) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra0, ADDI)) -∗
@@ -1014,16 +1068,16 @@ Section ProofFilewriteParts.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")),
              sp, Regidx Rs4, false, 8)) -∗
     instr (mword_of_int zc : mword 64) true (JAL (jimm, zreg)) -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
           /\ Mr !!! Regidx Rs4 = v4
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> Rs4 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0xfc) : mword 64) -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1078,7 +1132,7 @@ Section ProofFilewriteParts.
       (p : mword 64) (b : bool) :
     (0 <= mj < 16)%Z ->
     Mt !!! Regidx Ra5 = (mword_of_int mj : mword 64) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x6c) : mword 64) -∗
     word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
@@ -1087,7 +1141,7 @@ Section ProofFilewriteParts.
         ⌜ Mr !!! Regidx Ra5 = slot
           /\ (forall r : mword 5, r <> Ra4 -> r <> Ra5 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0x7a) : mword 64) -∗
         word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1167,7 +1221,7 @@ Section ProofFilewriteParts.
         [| apply bv_eq; vm_compute; reflexivity].
       by rewrite fr_addv64_moi. }
     iEval (rewrite -Hpsl) in "Hslot".
-    iApply (wp_cld_s_sconf (mword_of_int (FW + 0x78)) Ra5 Ra5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x78)) Ra5 Ra5
               (mword_of_int 8 : mword 12) D4 K slot b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi78 Hslot").
@@ -1190,32 +1244,54 @@ Section ProofFilewriteParts.
   (* =================================================================== *)
   (*  +0x10a .. +0x11e -- THE ELSE ARM.  panic("filewrite").              *)
   (*                                                                      *)
-  (*  A COMPLETE arm, not a fragment: [SpecPanic.panic_wp_any] closes it,  *)
-  (*  and panic never returns, so there is nothing after the [jal].  gcc   *)
-  (*  emitted the six shrink-wrapped spills here too (the arm is laid out  *)
-  (*  after the returns), which is why the block consumes six frame slots  *)
-  (*  and gives nothing back.  Decode note 3: this is the ELSE arm -- the  *)
-  (*  type is none of FD_PIPE / FD_DEVICE / FD_INODE -- and NOT a          *)
-  (*  short-write panic.                                                   *)
+  (*  A COMPLETE arm, not a fragment: panic never returns, so there is     *)
+  (*  nothing after the [jal].  gcc emitted the six shrink-wrapped spills  *)
+  (*  here too (the arm is laid out after the returns), which is why the   *)
+  (*  block consumes six frame slots and gives nothing back.  Decode note  *)
+  (*  3: this is the ELSE arm -- the type is none of FD_PIPE / FD_DEVICE / *)
+  (*  FD_INODE -- and NOT a short-write panic.                             *)
+  (*                                                                       *)
+  (*  panic() IS AN ORDINARY CALL.  This file is a plain [Section], not a  *)
+  (*  functor, so the contract arrives as a [Hypothesis] on the nested     *)
+  (*  section below and only THIS lemma gains an argument; ProofFilewrite  *)
+  (*  supplies it from its own [(PN : PANIC)].                             *)
   (* =================================================================== *)
-  Lemma fw_panic `{GEN : GenId} `{CID0 : CpuId}
+  Section FwPanicArm.
+    Context `{!lockG Σ, !uartGhostG Σ, !diskGhostG Σ}.
+    Context `{GEN : GenId}.
+
+    (* CID is EXPLICIT here, unlike [PANIC]'s own [`{CID : CpuId}]: a
+       maximally-inserted implicit is instantiated the moment the constant
+       is named, so [PN.wp_panic_sconf] passed as an argument would arrive
+       already pinned at one hart.  The call site eta-expands. *)
+    Hypothesis wp_panic_sconf :
+      forall (CID : CpuId) (m : regfile) (K : nat)
+        (n : nat) (eb : bool) (b : bool) (p : mword 64)
+        (dm : pk_arg_desc) (lks : gset string),
+        wp_panic_sconf_body KT1 (CID := CID) m K n eb b p dm lks.
+
+  Lemma fw_panic `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
-      (u3 u5 u6 u9 u10 u11 : mword 64) (p : mword 64) (b : bool) :
+      (u3 u5 u6 u9 u10 u11 : mword 64) (p : mword 64) (eb b : bool)
+      (lks : gset string) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 12 ->
-    sie_cap_gpr Mt K b p -∗
-    kernel_text -∗
+    (panic_stack <= K)%nat ->
+    locks_below lks "log" ->
+    sie_cap_gpr KT1 Mt K b p -∗
+    cpu_own 0%nat eb p b lks -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (FW + 0x10a) : mword 64) -∗
-    panic_wp_any -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) u3 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) u5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) u6 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) u9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) u10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) u11 -∗
+    panic_env -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) u3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) u5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) u6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) u9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) u10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) u11 -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hmtsp.
-    iIntros "Hcg #Htext Hpc #Hpanic Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+    intros Hmtsp HK Hbelow.
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
     iPoseProof (fwri_10a with "Htext") as "Hi10a".
     iPoseProof (fwri_10c with "Htext") as "Hi10c".
     iPoseProof (fwri_10e with "Htext") as "Hi10e".
@@ -1325,9 +1401,31 @@ Section ProofFilewriteParts.
               = mword_of_int KernelSyms.panic)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpanic) in "Hpc".
-    iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpanic0".
-    iApply ("Hpanic0" with "Htext Hpc Hcg").
+    (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+       a0 holds &"filewrite"; [kernel_data] mints the literal and
+       [panic_env] is the console bundle printk needs.  [cpu_own] has to
+       arrive AT THE PANIC HART (CID9), not at the one the block was
+       entered on. *)
+    iPoseProof (fw_msg_str with "Hkd") as "#Hstr".
+    iDestruct (cpu_own_transport CID0 CID9 0%nat eb p b
+                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE: [wp_jal_s_sconf]
+       hands back [sie_cap_gpr (<[rd := pc+4]> m)], so passing [P2] makes
+       the unifier grind on [P2 =?= <[Rra := _]> P2] and never return. *)
+    pose (P3 := <[Regidx Rra := regval_into_reg
+                   (add_vec_int (mword_of_int (FW + 0x11e) : mword 64) 4)]> P2).
+    assert (Ha0msg : P3 !!! Regidx Ra0 = (mword_of_int fw_msg_a : mword 64))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_panic_sconf CID9 P3 K
+              0%nat eb b p (PkAStr DfracDiscarded fw_msg) lks
+              HK eq_refl fw_panic_noff (fw_panic_below lks Hbelow)
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+    { rewrite /pk_desc_res Ha0msg.
+      iSplit; [iPureIntro; exact fw_msg_nonul|].
+      iSplit; [iPureIntro; exact fw_msg_nz|]. iExact "Hstr". }
   Qed.
+
+  End FwPanicArm.
 
   (* =================================================================== *)
   (*  +0xf4 .. the epilogue -- THE FD_INODE ARM'S WHOLE TAIL.             *)
@@ -1371,27 +1469,27 @@ Section ProofFilewriteParts.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs2 -> r <> Rs4 -> r <> Rs5 -> r <> Rs6 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 12)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 12)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0xf4) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mf : regfile) (rv : mword 64),
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv
           /\ (rv = (mword_of_int (-1) : mword 64)
               \/ (iz = nz /\ rv = (mword_of_int nz : mword 64)))⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

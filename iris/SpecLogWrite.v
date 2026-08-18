@@ -18,7 +18,7 @@
    log_write does NOT sleep -- it takes only the "log" SPINLOCK and calls
    bpin (which takes the bcache spinlock) -- so it threads no running-process
    bundle: [cpu_own n eb p C b] at the caller's own nesting level, exactly
-   like SpecBpin.v.  It does need [panic_wp_any]: both of its own panic arms
+   like SpecBpin.v.  Both of its own panic arms
    are DEAD (see below), but acquire's own holding-check arm wants a panic
    contract regardless.
 
@@ -74,7 +74,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto.
@@ -86,8 +85,7 @@ Local Open Scope Z_scope.
 (* log_write's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
    deepest callee is bpin, which wants 14 (its own 4 plus acquire/release's
    10).  acquire/release directly want only 10. *)
-Definition K_log_write : nat := 18%nat.
-
+Notation K_log_write := (18%nat) (only parsing).
 Definition wp_log_write_gen_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -131,10 +129,9 @@ Definition wp_log_write_gen_body
      which every landed caller is at (a caller of log_write holds sleeplocks,
      not spinlocks). *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -155,7 +152,7 @@ Definition wp_log_write_gen_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -223,10 +220,9 @@ Definition wp_log_write_au_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -283,7 +279,7 @@ Definition wp_log_write_au_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -385,10 +381,9 @@ Definition wp_log_write_gene_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -406,7 +401,7 @@ Definition wp_log_write_gene_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -453,10 +448,9 @@ Definition wp_log_write_sconf_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -471,7 +465,7 @@ Definition wp_log_write_sconf_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

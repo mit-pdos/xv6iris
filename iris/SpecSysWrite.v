@@ -87,7 +87,7 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -119,8 +119,7 @@ Local Open Scope Z_scope.
 (* sys_write's own frame is 6 slots ([c.addi16sp sp,sp,-48]); below it
    filewrite wants [filewrite_stack] = 82, which dominates argfd's 24 and
    argint's / argaddr's 18. *)
-Definition sys_write_stack : nat := (6 + filewrite_stack)%nat.
-
+Notation sys_write_stack := ((6 + filewrite_stack)%nat) (only parsing).
 (* WHAT SYS_WRITE RETURNS.  Indexed by [arg_fd], not by [r]: filewrite's own
    -1 (not writable / a short write / a bad device major) is not
    distinguishable from argfd's by the value. *)
@@ -213,13 +212,15 @@ Definition wp_sys_write_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol): every filewrite arm
      sleeps, so this syscall parks. *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* a syscall runs at push_off level 0 *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filewrite's default arm is [panic("filewrite")], and its callees panic
      too; this is theirs *)
-  panic_wp_any -∗
+  (* ...and that arm calls panic as an ORDINARY call: [kernel_data] above
+     mints the literal, and this is the console bundle printk needs. *)
+  panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
@@ -234,7 +235,7 @@ Definition wp_sys_write_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_write_ret V v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗

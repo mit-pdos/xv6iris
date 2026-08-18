@@ -28,8 +28,8 @@
    wants one: the only reader is killed(), which any hart may call on any
    proc.  See claude-notes/design/proc-struct.md, discipline 1.
 
-   [panic_wp] is threaded because acquire takes it (its "acquire" panic on a
-   doubly-held lock). *)
+   The panic credentials are threaded because acquire takes them (its
+   "acquire" panic on a doubly-held lock). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -77,14 +77,14 @@ Definition wp_setkilled_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      setkilled is BALANCED -- both the entry and the exit [cpu_own] carry the
      same [lks] -- because the C releases p->lock on its only return path. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

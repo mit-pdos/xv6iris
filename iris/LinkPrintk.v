@@ -15,7 +15,7 @@
      - there is NO panic credential to supply any more: acquire's
        [if(holding(lk)) panic] arm is refuted (SpecAcquire.v), so nothing in
        the printk cone asks for one and this file no longer reaches
-       [LinkPanicStub] at all.
+       a panic credential at all.
      - the postcondition WEAKENS (drops the trace claim and the return-value
        fact), which is a plain [wp_next] reindex -- no new hart-transport
        needed since both sides share the caller's ambient [CID]. *)
@@ -39,19 +39,19 @@ Module Printk := PrintkProof Consputc Printint Acquire Release.
 Module PrintkGen : PRINTK_GEN.
   Lemma wp_printk_gen_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr : gname) (γd : uart_names) (γv : disk_names)
+      {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool)
       (lks : gset string) :
-    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj dqf f descs b lks.
+    wp_printk_gen_sconf_body kt γpr γd γv m0 K eb pj dqf f descs b lks.
   Proof.
     rewrite /wp_printk_gen_sconf_body /=.
     intros HK Hlen Hnonul Hkinds Hdlen Hbelow.
     iIntros "Hcap Htext Hkdata Hpc Hcpu Hpenv Hfmt Hdescs Hcont".
     iDestruct "Hpenv" as "(#Hprlk & #Hdoff & #Hdev & [%γl #Htxl] & #Hsub0)".
-    iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb
+    iApply (Printk.wp_printk_sconf kt γpr γl γd γv m0 K [] 0%nat eb
               (dqf := dqf) f descs b pj lks
-              ltac:(rewrite /printk_stack; lia)
+              ltac:(lia)
               Hlen Hnonul Hkinds Hdlen ltac:(lia)
               with "Hcap Hcpu Htext Hkdata Hpc Hfmt Hdescs Hprlk Hdev Htxl Hsub0").
     all: try lkbelow.

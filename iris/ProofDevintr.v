@@ -130,18 +130,18 @@ Section ProofDevintr.
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     M !!! Regidx a0_idx = retv ->
     di_thr m0 M ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr KT1 M k false p -∗
     cpu_own lvl eb p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x22) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ v3 -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[KT1] ra0 -∗
+    pa_stk sp0 2 ↦₈[KT1] s00 -∗
+    pa_stk sp0 3 ↦₈[KT1] v3 -∗
+    pa_stk sp0 4 ↦₈[KT1] v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = retv ⌝ -∗
-        sie_cap_gpr mf (k + 4) false p -∗
+        sie_cap_gpr KT1 mf (k + 4) false p -∗
         cpu_own lvl eb p false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
@@ -267,19 +267,19 @@ Section ProofDevintr.
         r <> csp_rs1 -> r <> (mword_of_int 8 : mword 5) ->
         r <> (mword_of_int 9 : mword 5) -> M !!! Regidx r = m0 !!! Regidx r ) ->
     devintr_ret sc = (mword_of_int 1 : mword 64) ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr KT1 M k false p -∗
     cpu_own lvl eb p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
     dev_inv γu γv -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ s10 -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[KT1] ra0 -∗
+    pa_stk sp0 2 ↦₈[KT1] s00 -∗
+    pa_stk sp0 3 ↦₈[KT1] s10 -∗
+    pa_stk sp0 4 ↦₈[KT1] v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = devintr_ret sc ⌝ -∗
-        sie_cap_gpr mf (k + 4) false p -∗
+        sie_cap_gpr KT1 mf (k + 4) false p -∗
         cpu_own lvl eb p false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
@@ -410,7 +410,7 @@ Section ProofDevintr.
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
     set (s10 := (m !!! Regidx s1_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hsc #Hcaps".
-    iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv & #Hpanic)".
+    iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv)".
     iIntros "Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -419,7 +419,7 @@ Section ProofDevintr.
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (dii_00 with "Htext") as "Hi00".
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 false
-              ltac:(unfold devintr_stack in Hav; lia) Hpush
+              ltac:(lia) Hpush
               with "Hcg Hpc Hi00").
     iApply wp_next_off_intro. iIntros "Hcg Hframe Hpc".
     set (A0 := <[Regidx csp_rs1 := regval_into_reg
@@ -626,7 +626,7 @@ Section ProofDevintr.
         by (rewrite /B0 upd_eq; reflexivity).
       (* ===================== plic_claim() ===================== *)
       iApply (PlicClaim.wp_plic_claim_sconf γu γv B0 (av - 4)%nat p
-                (di_tp_bound B0) ltac:(unfold devintr_stack in Hav; lia)
+                (di_tp_bound B0) ltac:(lia)
                 with "Hcg Htext Hpc Hdev").
       iIntros (MK) "Hcg Hpc %HcsK".
       destruct HcsK as (HcsK & HraK & Hok).
@@ -836,7 +836,7 @@ Section ProofDevintr.
                   eq_refl eq_refl eq_refl HB6sp HB6a0 HB6thr
                   with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
-        replace (av - 4 + 4)%nat with av by (unfold devintr_stack in Hav; lia).
+        replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
       + (* ---------------- irq = uart_irq_id = 10 ---------------- *)
         assert (Hirq10 : irq = (mword_of_int 10 : mword 64)).
@@ -872,8 +872,8 @@ Section ProofDevintr.
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
           by (rewrite /U0 upd_eq; reflexivity).
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p false
-                  _ Hlen ltac:(lia) ltac:(unfold devintr_stack, uartintr_stack in *; lia)
-                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hpanic Hccaps").
+                  _ Hlen ltac:(lia) ltac:(lia)
+                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
         destruct HcsU as [HcsU HdomU].
@@ -904,11 +904,11 @@ Section ProofDevintr.
         { intros r Hr Ncsp N8 N9.
           rewrite (callee_saved_lookup HcsB3MU r Hr). exact (HB3thr r Hr Ncsp N8 N9). }
         iApply (di_plic_tail γu γv m MU sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p dq sc w4 lks
-                  ltac:(unfold devintr_stack in Hav; lia) eq_refl eq_refl eq_refl eq_refl
+                  ltac:(lia) eq_refl eq_refl eq_refl eq_refl
                   HMUsp HMUs1 HMUthr Hret1
                   with "Hcg Hcnt Htext Hpc Hsc Hdev Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
-        replace (av - 4 + 4)%nat with av by (unfold devintr_stack in Hav; lia).
+        replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
       + (* ---------------- irq = virtio_irq_id = 1 ---------------- *)
         assert (Hirq1 : irq = (mword_of_int 1 : mword 64)).
@@ -981,10 +981,10 @@ Section ProofDevintr.
           by (rewrite /V1 upd_eq; reflexivity).
         iApply (VirtioDiskIntr.wp_virtio_disk_intr_sconf γs γu γv γdk pd pav pu
                   V1 (av - 4)%nat lvl eb p false lks
-                  ltac:(unfold devintr_stack, K_virtio_disk_intr in *; lia)
+                  ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hpanic Hpinv Hdev Hgeom Hdlk").
+                  with "Hcg Hcnt Htext Hpc Hpinv Hdev Hgeom Hdlk").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MV) "%HcsV Hcg Hcnt Htext2 Hpc".
         destruct HcsV as [HcsV HdomV].
@@ -1015,11 +1015,11 @@ Section ProofDevintr.
         { intros r Hr Ncsp N8 N9.
           rewrite (callee_saved_lookup HcsV0MV r Hr). exact (HV0thr r Hr Ncsp N8 N9). }
         iApply (di_plic_tail γu γv m MV sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p dq sc w4 lks
-                  ltac:(unfold devintr_stack in Hav; lia) eq_refl eq_refl eq_refl eq_refl
+                  ltac:(lia) eq_refl eq_refl eq_refl eq_refl
                   HMVsp HMVs1 HMVthr Hret1
                   with "Hcg Hcnt Htext Hpc Hsc Hdev Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
-        replace (av - 4 + 4)%nat with av by (unfold devintr_stack in Hav; lia).
+        replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
     - (* ------------------- scause /= 0x...9 ------------------------------ *)
       assert (Hcmp : eq_vec (rget A5 a4_idx) (rget A5 a5_idx) = false)
@@ -1143,7 +1143,7 @@ Section ProofDevintr.
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x6e) : mword 64) 4)
           by (rewrite /K0 upd_eq; reflexivity).
         iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p (av - 4)%nat lks
-                  ltac:(lia) ltac:(unfold devintr_stack in Hav; lia) ltac:(lkbelow)
+                  ltac:(lia) ltac:(lia) ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Htcap Htk").
         all: try lkbelow.
         iIntros (MC) "%HcsC Hcg Hcnt Hpc Htk2".
@@ -1190,7 +1190,7 @@ Section ProofDevintr.
                   eq_refl eq_refl eq_refl HK1sp HK1a0 HK1thr
                   with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
-        replace (av - 4 + 4)%nat with av by (unfold devintr_stack in Hav; lia).
+        replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
       + (* ------------- neither: return 0 ------------- *)
         assert (Hcmp5 : eq_vec (rget T3 a4_idx) (rget T3 a5_idx) = false)
@@ -1210,7 +1210,7 @@ Section ProofDevintr.
                   eq_refl eq_refl eq_refl HT3sp HT3a0 HT3thr
                   with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
-        replace (av - 4 + 4)%nat with av by (unfold devintr_stack in Hav; lia).
+        replace (av - 4 + 4)%nat with av by (lia).
         iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hsc Hpc"). exact Hf.
   Qed.
 

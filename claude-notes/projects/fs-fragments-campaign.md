@@ -13,15 +13,16 @@ diverged from the design's sketches, and what is left.
 | **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | **LANDED** |
 | **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | **LANDED** |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
-| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause AND the isdirempty plank are landed** — see below) | NOT STARTED |
+| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput — **AND `SpecIput` (under-counted here): ireclaim's iput must carry the boot token through to `ireg_free_au`, so `SpecIput` is `option unit`-indexed exactly as `SpecAllocproc` indexes `procs_avail op`; see the boot-shelter plank below** | §20.17.5's residue + C′ (**the root clause, the isdirempty plank AND the boot-shelter plank are landed** — see below) | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
 | **V1** | the COUNT-FACT CARRIER: `w` widened to `(wl, wd)`, `ilinkd`, (T1), the flavour-indexed movers and `wp_iupdate_link`/`_unlink` | IcacheRef, InodeRegion, IregLinkNz, `IregDirBit.v` (new), IcacheBoot, SpecIupdate, ProofIupdate + 3 callers | full cone | **LANDED** |
 | **V2** | the `DirLinks`/`DirView` COUNT CLAUSE + the d-flavoured mint ESTABLISHED at create's mkdir arm | DirView, DirLinks, InodeRegion, IregLinkNz, FsRep, IcacheBoot, ProofIlock, ProofCreate, ProofSysLinkTails, ProofSysUnlinkParts | full cone | **LANDED** |
 | **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | **LANDED with W5-DIR (increment 9), at two premises D1/D2** |
 | **S2-0** | the NAME-UNIQUENESS payload clause `dir_uniq`, and the payload → tree constructor it unlocks | FsTree, FsLookup, IcacheEscrow, IcacheBoot + 18 walk/spec files | full cone | **LANDED** |
-| **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | DESIGNED, NOT STARTED — see below |
+| **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | **LANDED, fused with V5′'s increment R** — see the fused-increment entry below |
+| **F3** | the SYSCALL BOUNDARY: `fs_geom`/`fs_world`/`fs_res` + the mkdir and chdir wrappers | `FsSyscalls.v`, `LinkFsSyscalls.v` (new leaves) | F2 | **LANDED — the CALLING-CONVENTION half only; THE TREE-DELTA HALF IS STOPPED (S1–S3), and lifting the stop needs an R3 ruling** |
 | **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | SUPERSEDED by **V5′** — the sketch is unsound (Correction 1) and unprovable (Correction 2) as written; see the V5′ entry |
-| **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | DESIGNED (probe report transcribed below); increment R IN FLIGHT fused with V4 |
+| **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | **ALL THREE INCREMENTS LANDED** (R fused with V4; P and W below) -- (D1) falls, `su_w5_dir` takes no design-fact premise, and the seal flips sysfile.c to 16/16 |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
 landed contract and no landed proof moved.
@@ -629,6 +630,45 @@ flight, so the same lane was re-pointed at the merged commit and rebuilt:
 working tree clean. The two change sets are disjoint by inspection:
 `ProofSyscall.v` / `SpecSysUptime.v` / `ProofSysUptime.v` mention
 `ic_loaded` / `ipool_alloc` / `ic_payload` **zero** times.
+
+## THE BOOT-SHELTER PLANK — LANDED (design: fs-fragments.md §7.12)
+
+Plank 3 of §7.9's licence-completion program.  §7.1.7's boot-order shelter is
+now a theorem: while the exclusive pre-userspace token `ireg_boot` is held, no
+in-region slot is claimed, so `ireclaim`'s `iget` cannot be racing a claim
+box.  **Zero new assumptions** — the sealed syscalls' `Print Assumptions` and
+the adequacy print are unchanged; `create_fresh_ty` does NOT fall (this closes
+ireclaim, not the general free — the axiom's residue is Case 2, ialloc-side).
+
+- **The algebra was already landed.**  One new ambient field `icfg_boot :
+  gname` on `MkIcfg`, and the two regimes reuse `IcacheRef.ityR`:
+  `ireg_boot := ity_pending icfg_boot` (exclusive), `ireg_open := ∃ ty,
+  ity_shot icfg_boot ty` (persistent, timeless).  `icfg_alloc` mints
+  `ireg_boot` by KEEPING the pool's boot-generation one-shot it previously
+  dropped — no new `own_alloc`.  The refutation is the landed
+  `ity_pending_shot_excl` (→ `ireg_boot_open_excl`).
+- **The clause.**  `InodeRegion.ireg_slot` gains `(⌜c = None⌝ ∨ ireg_open)`
+  beside `link_auth` — DISJUNCTIVE (keeps `ireg_slot` timeless; both arms are
+  timeless AND persistent).  Threaded through `ireg_slot_intro` (one new
+  premise) at all ~21 intro sites and ~13 destructurings as `#Hdisj`: every
+  region mover carries it unchanged (none moves `c`), boot sites supply the
+  left arm for free.  No new camera, class, gname, or functor argument; the
+  124 `iregG` files see no binder change (the gname rides on `icfg`).
+- **The theorem.**  `IregLinkNz.ireg_boot_no_claim` — an ACCESSOR over
+  `ireg_inv` (the §7.1.4 shape): `ireg_inv -∗ ireg_boot -∗ iclaim z ={E}=∗
+  False`, via `link_claim_agree` + the clause + `ireg_boot_open_excl`.
+- **Threaded on two contracts only.**  `SpecFsinit`/`SpecIreclaim` each gain
+  one `ireg_boot` premise, returned in the post (`ProofFsinit` frames it across
+  bread/memmove/initlog/ireclaim; `ProofIreclaim` across the scan's block
+  lemmas — `irc_cont`/`irc_loop`/`irc_epilogue`/`irc_step`/`irc_orphan`/
+  `irc_release`).  `SpecForkret` does NOT move and the six fs contracts do NOT
+  move (`iclaim` is inert; the `ireg_open` premise on `ireg_claim_au` is a
+  written constraint on (M1)/F1.5c, not owed here).
+- **Two IOUs, recorded not fixed.**  (1) The seal `ireg_boot ==∗ ireg_open`
+  fires after fsinit returns and before `kexec` — OWED to `forkret`'s first
+  branch (UNPROVEN upstream, GR-37), beside `SpecForkret`'s `first_addr` IOU;
+  `ireg_open` being reachable post-boot is owed with it.  (2) F1.5d's row
+  under-counts `SpecIput` (see the corrected row above).
 
 ## `iunlock` STOPS ERASING THE GENERATION — the carrier PASS 2 needed
 
@@ -1852,3 +1892,791 @@ opaquely.  The cost concentrates where `dir_links` is opened.
 complete, park-audited, graveyard-clean carrier; with V4 (whose region
 half co-lands), `su_w5_dir` loses both premises and the seal flips
 sysfile.c to 16/16.
+
+## THE FUSED V4 + V5′-INCREMENT-R PASS — **EXECUTED.  (T1′), `dlc_lower`,
+## the flip, the (wdu, wdt)/register widening and the two tagged movers,
+## one InodeRegion-cone iteration; (D2) HAS ITS SUPPLIER**
+
+Ruled fused because the two designs edit THE SAME movers (the campaign's
+own "V5 reuses V4's flavour work", taken literally).  What landed, layer
+by layer:
+
+* **`IcacheRef.v`** — `lelem` is `wl (wdu, wdt) g c r p` with
+  `p : optionUR (dfrac_agreeR (leibnizO Z))` (`lreg`/`lreg_half` are the
+  full/half registers).  `ilinkd` re-reads as the UNTAGGED d-unit;
+  **`ilinkdp z pv`** (wdt-unit + half register) and **`iparent z pv`**
+  (half register only) are new; **`iparent_agree`** is the no-region-open
+  agreement.  `ilink_fl`'s index widened `option unit -> option (option
+  Z)` with the TAGGED arm the PAIR `ilinkdp ∗ iparent` -- one payout
+  slot, so every contract keeps one shape.  New movers
+  `link_mint_linkdp` (alloc at fraction one, split into the two halves)
+  and `link_spend_linkdp` (both halves in, register reset -- the
+  `delete_option_local_update` at `Exclusive (to_frac_agree 1 _)`).
+* **`InodeRegion.v`** — the slot's pure block is FIVE clauses: (L1) and
+  the root clause at `wl + wdu + wdt`, (T1) at `wdu + wdt`, **(T1′)
+  `ireg_dir_wl0 d wl`** (`di_type = T_DIR -> wl = 0`), and
+  **`ireg_par_ok wdt p`** (`wdt <= 1` ∧ `p = None <-> wdt = 0` ∧ the
+  full-fraction shape).  `ireg_write_link_fl`/`_unlink_fl` widened to
+  the three-arm index; the tagged mint's `p = None` derives INSIDE the
+  mover from its own `nlink dn = 0` premise ((L1) collapses the counts,
+  the iff frees the register -- nothing remembered across a free).  New
+  wrappers **`ireg_write_link_p`** / **`ireg_write_unlink_p`**;
+  `ireg_write_link` (plain) gains V4's premise
+  `bv_unsigned (di_type dn') <> ireg_dir_ty`.
+* **`IregDirBit.v`** — **`ireg_link_not_dir`** ((T1′)'s reader, the
+  mirror of `ireg_dirbit_ty`) and **`dir_links_subdir_nlink2`** — (D2)'s
+  three-step consumption bridge packaged as ONE mask-preserving lemma:
+  borrow the found record's ticket, refute the plain flavour against the
+  child's T_DIR through (T1′), read `2 <= nlink` off `dlc_lower` at the
+  counted record.  `su_w5_dir`'s (D2) premise is exactly its conclusion;
+  the premise's banner in `ProofSysUnlink.v` now points HERE.  (D1)
+  stays V5′'s -- the seal remains stopped on it alone.
+* **`IregLinkNz.v`** — `ireg_link_nz_fl` (the nonzero read-back at any
+  flavour; create's flipped mint uses it) and `ireg_link_root_min2`
+  (V5′ consumption step 2's root exclusion, banked ahead).
+  `dir_links_nlink_drop` NARROWED to non-directories -- `dlc_lower`
+  makes the old "count may fall with bytes fixed" false at a live
+  directory, and its one landed caller (sys_link's `bad:` tail) is at a
+  refuted-T_DIR file where both sides are `emp`.
+* **`DirView.v`** — **`dlc_lower`** (guarded: `nlink <> 0 -> 1 + count
+  <= nlink`) + movers (`_false`, `_nl0`, `_eq`, `_bump`) + the count
+  comparisons (`dcnt_slot_le`/`dcnt_set_le`/`dlc_count_ctb_le`/
+  `dlc_count_set_le`/`dlc_count_kill_counted`/`dlc_count_pos`).
+* **`DirLinks.v`** — `dir_links` carries `⌜dlc_lower F dn data⌝` beside
+  the bound (separate conjunct).  Every park re-audited per the V4
+  table; the two INTERFACE moves the audit priced:
+  `dir_links_dirlink_d`'s nlink premise is the EXACT `+1` (the wrap
+  would otherwise slip under the lower clause; `dlc_bv_add1_nz_eq` +
+  the flush's own nonzero read-back derive it), and
+  **`dir_links_unlink`'s wand premise is the EQUALITY**
+  `nlink' + (if b then 1 else 0) = nlink` **plus `k0 <> 0`** (at
+  `b = true` the count falls only if the killed slot is counted).  New
+  **`dir_links_dirlink_dot`** — the d-flavoured COUNT-NEUTRAL deposit at
+  a dot slot (create's `".."` after the flip; V5′'s tie-establishment
+  fuses into this same lemma next).  `dir_links_live`/`_of_ilink` carry
+  the lower clause through the round trip.
+* **`IcacheBoot.v`** — arity only (`link_auth z 0 0 0 0 None 0 None`);
+  (T1′) and `ireg_par_ok` are zero/vacuous at the all-plain stock -- as
+  priced, NOT EVEN AN IMAGE FACT.
+* **`SpecIupdate.v` / `ProofIupdate.v`** — the flavour index widened;
+  `wp_iupdate_link` takes the three flavour premises ((T1) ∀-od, (T1′)
+  at None, the tagged zero); `wp_iupdate_unlink` unchanged beyond the
+  index.  Landed `None` callers unchanged to the character (R6 again).
+* **`ProofCreate.v`** — **THE FLIP**: the `dp->nlink++` flush at +0x140
+  passes `Some None`; the `".."` deposit consumes the resulting
+  `ilinkd dp` through `dir_links_dirlink_dot`; the FUSED name-record
+  deposit (`dir_links_dirlink_d`) is DEFERRED three instructions to
+  after the flush, where `ireg_link_nz_fl`'s read-back turns the
+  machine `++` into the exact `+1`.  `cr_flav` widened (`Some None` at
+  T_DIR; the tagged form is the successor's) with `cr_flav_nty`/
+  `cr_flav_ntag` discharging the new premises.
+* **`ProofSysUnlink.v`** — both W5 halves supply the equality wand and
+  `kk <> 0`; **the T_DIR arm now REFUTES `b = false`** through
+  `ireg_link_not_dir` (the exact mirror of the file arm's
+  `ireg_dirbit_ty` step), so the `dp->nlink--` prices the zeroing
+  exactly.  `su_w5_dir` still takes (D1)/(D2) as premises; (D2)'s
+  banner re-pointed to its supplier.
+
+**WHAT THE SUCCESSOR (increment P + W) INHERITS**, per the V5′ entry
+above: the ticket index-split in `dir_link_at_f` (k=1 untagged, k≥2
+tagged at `self`), the tie inside `dir_links`' T_DIR branch (guard =
+`nlink <> 0 ∧ 2 <= nrec ∧ self <> ROOTINO_z`, spelled through
+`ireg_root_ROOTINO`), `dir_links_dirlink_dot` extended to ESTABLISH the
+tie, `dotdot_out` extended to hand it out, create's tagged mint
+(`cr_flav ty = Some (Some dp_inum)`, `ireg_write_link_p` at +0xc4 --
+both movers and `cr_flav_ntag`'s retirement), the fail-arm tagged
+spends, boot's one image fact ("every live image directory is root"),
+and then `su_w5_dir` deriving BOTH premises internally + the seal.
+The grey conversion's constraint stands: **no `wdt -> g` lemma is ever
+written** (the tagged unit is spent one instruction before the orphan
+park).
+
+### The fused increment's gate
+
+Lane `/home/ubuntu/v4lane` ON THE EC2 MIRROR (local compiles are ruled
+out; the lane is a `cp -a` of the mirror's checkout at `cff29d43` with
+the 14-file edited set scp'd in and **block-md5-verified** before the
+build).  Rebuild closure of the edited set: **334 files** (measured from
+`.CoqMakefile.d`), matching the design's ~350 price.  Final pass:
+`make -f CoqMakefile -j24 -k` **EXIT=0**; `make -n` emits **0** compile
+lines; the `.v`-vs-`.vo` staleness sweep over the `_CoqProject` rows
+reports **0**; `tools/lemma_diff.py --ref HEAD` over the 14 files:
+**CLEAN** (nothing dropped, nothing admitted, no new assumption).
+`proof_coverage.py --check` exits 0; coverage **186/190 (98 %),
+sysfile.c 15/16 — UNMOVED** (the seal still awaits (D1)).
+`Print Assumptions`: `Create.wp_create_sconf` = the standing set +
+`create_fresh_ty`; `SysLink.wp_sys_link_sconf`, `Iput.wp_iput_sconf`,
+`Iupdate.wp_iupdate_link`, `Iupdate.wp_iupdate_unlink` = the standing
+set only; and the seven new headline lemmas
+(`dir_links_subdir_nlink2`, `ireg_link_not_dir`, `iparent_agree`,
+`ireg_write_link_p`, `ireg_write_unlink_p`, `dir_links_dirlink_dot`,
+`ireg_link_root_min2`) are **Closed under the global context**.
+
+**THE TWO NEW TRAPS THIS INCREMENT PAID FOR** are in durable-notes'
+proofmode section: the `iMod`-with-explicit-op-term divergence (state
+the ghost step as a goal and `iApply`; combine `own`s with `own_op` +
+eq-rewrites, never `iCombine`), and the ~8 s/`apply`
+`prod_local_update'` cost at a 7-component element (a composed
+local-update helper is OWED as an optimization).  A third, smaller one:
+`destruct (F kk) eqn:` substitutes into HYPOTHESES but not into a
+wand's not-yet-unfolded premise, so a re-park after a flavour destruct
+needs `rewrite EFkk` on the goal side only.
+
+## V5′ INCREMENT P — **EXECUTED.  The ticket index-split, the tie, the
+## tagged mint and its two halves, and the dot deposit that ESTABLISHES
+## the tie.  (D1)'s payload half is landed**
+
+What the payload layer now says, layer by layer:
+
+* **`DirLinks.v`** — the per-record ticket is `dlc_tick self k b z`:
+  plain at `b = false`, the UNTAGGED `ilinkd` at the two dot slots
+  (`k < 2`), and the TAGGED `ilinkdp z self` at a NAME record
+  (`2 <= k`) — **the tag is literally the payload's own `self`
+  parameter**, which is the whole trick: one payload states a two-inode
+  relation without ever naming the second inode.  Four movers
+  (`dlc_tick_dot_out`/`_in`, `dlc_tick_name_out`/`_in`) are stated as
+  WANDS rather than equations, because a `rewrite` of the equation
+  inside the proofmode does not always match the `∃`/`∗`-elaborated
+  term (the trap below).  The tie is `dir_par_tie self dn data` — a
+  separate conjunct of `dir_links`' T_DIR branch, guarded on
+  `nlink ≠ 0 ∧ 2 ≤ nrec ∧ self ≠ dl_root`, with
+  `_nl0`/`_small`/`_root`/`_cong`/`_open`/`_close` as its six movers.
+  `dl_root` is restated locally at `1` for `InodeRegion.ireg_root`'s own
+  layering reason; the bridges are `IregLinkNz.dl_root_ireg_root` and
+  `dl_root_ROOTINO`.
+* **The park table, as executed.**  `dir_links_dirlink` gained
+  **`k0 <> 1`** (a plain deposit into record 1 would have to
+  re-establish a tie it has no register half for) and
+  `dir_slot_dots_ge2` is the packaged discharge every caller uses;
+  `_nop` needed nothing; `dir_links_dirlink_d` takes the TAGGED unit and
+  rides the tie; `dir_links_dirlink_dot` is pinned to `k0 = 1`, takes
+  BOTH halves of the mint, and is the ONE site in the tree that
+  ESTABLISHES the tie; `dir_links_unlink` releases
+  `if b then ilinkdp _ self else ilink _` and rides the tie through a
+  count case-split; `dir_links_orphan` / `_size_zero` are guard-false;
+  `dir_links_of_plain` carries boot's one image fact
+  (`nlink ≠ 0 -> 2 ≤ nrec -> self = dl_root`), vacuous at its one caller.
+* **`dir_links_dotdot_out` IS AN ACCESSOR IN TWO LEGS, and the ORDER IS
+  FORCED.**  Stating the tie and the ticket under one premise list is
+  CIRCULAR: the ticket needs `dir_inum data 1 ≠ self`, which a caller
+  cannot know until it knows WHO record 1 names — which is (D1), which
+  is what the tie supplies.  So the tie comes out unconditionally and the
+  ticket sits behind `⌜dir_inum data 1 <> self⌝ -∗ …`.
+* **`ProofCreate.v`** — `cr_flav ty dpv` is the TAGGED index
+  (`Some (Some dpv)` at `T_DIR`), `cr_flav_ntag` is RETIRED and
+  `cr_flav_tag` replaces it; the +0xc4 mint's third premise
+  (`p = None`'s source) is now the fresh child's own `nlink = 0` rather
+  than a vacuity; the payout is SPLIT at ARM C-OK-DIR — `ilinkdp` into
+  dp's name record, `iparent` into the child's tie — and the fail arms'
+  `wp_iupdate_unlink` spends the pair back, resetting the register.
+* **`IregDirBit.v` / `IregLinkNz.v`** — `ireg_dirbit_ty_dp` and
+  `ireg_link_root_min2_dp`, structural copies of their `ilink_fl`
+  twins with `link_wdt_ge` in place of `link_wd_ge`/`link_wsum_ge`.
+  They are needed because a payload's NAME record now hands the walk an
+  `ilinkdp`, which is not an `ilink_fl` — the other half is the child's.
+
+## V5′ INCREMENT W — **(D1) AND (D2) ARE DERIVED INSIDE `su_w5_dir`, AND
+## BOTH PREMISES ARE GONE**
+
+* **(D2)** — one `IregDirBit.dir_links_subdir_nlink2` before the
+  zeroing, off holdings the +0x8a seam already has.
+* **(D1) — three steps, no region open twice and no tree fragment.**
+  (1) the zeroing releases `ilinkdp ip dp`, the tag read off dp's own
+  `self`; (2) `ireg_link_root_min2_dp` against FINDING 3's
+  `nlink ip = 1` refutes `ip = root`, which opens
+  `dir_links_dotdot_out`'s tie leg and yields
+  `iparent ip pv ∗ ⌜dir_inum dati 1 = pv⌝`; (3) `iparent_agree`
+  collapses `pv` and `dp`.  The `".."`-ticket's index then rewrites to
+  dp and feeds `wp_iupdate_unlink(dp)`, and the TAGGED spend at
+  `ip->nlink--` takes both halves and RESETS the register before the
+  inum can be reclaimed.
+* **A GAP THE SEAL FOUND, and it is real**: `su_w1`'s seam did not
+  export `⌜Ms !!! Ra0 = dpv⌝`.  `su_regs` pins the five CALLEE-SAVED
+  registers and `a0` is not one of them, so the `c.mv s1,a0` at +0x2c
+  leaves the fact true and unexported — and W2's `ilock(dp)` reads `a0`.
+  One conjunct added to the seam, one `eq_trans` at the site.
+
+**THE TRAP THIS INCREMENT PAID FOR**: **an equation between `iProp`s
+does not always `rewrite` inside the proofmode.**
+`dlc_tick self k b z = (if b then ilinkdp z self else ilink z)` failed
+with *"Found no subterm matching"* against a goal that PRINTS as exactly
+that RHS — it was under an `iExists`-instantiated `∃`/`∗` skeleton.  The
+fix is not a stronger rewrite: state the mover as a WAND and `iApply`
+it.  Every `dlc_tick` mover in `DirLinks.v` is written that way, and the
+equations are kept only as the reading.
+
+### The P + W increment's gate
+
+Lane `/home/ubuntu/v4lane` ON THE EC2 MIRROR, re-synced around the three
+upstream commits that landed mid-increment (F3's `FsSyscalls.v` /
+`LinkFsSyscalls.v` / `_CoqProject` rows, and the equivalence package's
+`IregBox.v` / `SpecCreateFreshTy.v` / `SystemAdequacy.v`), block-md5
+verified before the build.  `make -f CoqMakefile -j24 -k` **EXIT=0**;
+`make -n` emits **0** compile lines; the `.v`-vs-`.vo` staleness sweep
+over every `_CoqProject` row reports **0**.
+`tools/lemma_diff.py --ref HEAD` over the ten files: exactly **three**
+retirements, all intended -- `Module SysUnlinkAx` and
+`Axiom wp_sys_unlink_sconf` (the tree's LAST stub axiom, retired by the
+seal) and `Lemma cr_flav_ntag` (create's mint is tagged now).
+`proof_coverage.py --check` exits 0; coverage **187/190 (98 %),
+sysfile.c 16/16 -- COMPLETE**.
+
+`Print Assumptions SysUnlink.wp_sys_unlink_sconf` is **THE STANDING SIX
+AND NOTHING ELSE** -- `valid_reservation`, `plat_term_write`,
+`match_reservation`, `load_reservation`,
+`functional_extensionality_dep`, `cancel_reservation`.  No
+`create_fresh_ty` (sys_unlink allocates no inode), no module parameter,
+no admit.
+
+## F3 — **THE SYSCALL BOUNDARY.  The packaging half LANDS; the TREE-DELTA
+## half is STOPPED on three obstructions, and the third one is R3 itself**
+
+F3's charter (fs-friendly.md §4) is the friendly triple
+`⟨t. fs_rep-fragment⟩ sys_mkdir(path) ⟨t'. post ∗ ⌜t' = tree_insert t p …⌝⟩`,
+lifted caller-side out of the landed seals the way F2 was lifted out of
+`SpecDirlookup`. **The lift does not exist, and the reason is structural.**
+What landed instead is the boundary's CALLING CONVENTION — item (c) of the
+same charter, and the half that is derivable.
+
+### The three stops, each verified against the landed text
+
+**(S1) NO SYSCALL SEAL CARRIES A TREE DELTA, AND NONE CAN BE GIVEN ONE
+CALLER-SIDE.** `SpecSysMkdir.v:280-304` is the entire postcondition: a
+register file, `proc_priv`, the four superblock cells, `bslots`,
+`bitmap_res` at an unordered `used'`, the iref interval, and
+`sys_mkdir_ret` (0 or −1). Nothing inode-shaped, byte-shaped or
+tree-shaped. `ProofSysMkdir.v:60` says it in the seal's own words: *"Nothing
+inode-shaped survives the call, which is why this function's own post
+mentions none of it."* And the delta cannot be recovered one contract down
+either: **create's post names only the CHILD** (`create_locked` at
+`k`/`inum`/`dn`/`bm`, `SpecCreate.v:668-692`) and says nothing whatever
+about the PARENT, which it has already `iunlockput`'d — while the tree
+delta of a mkdir IS an edge at the parent. F2's lift worked because
+`SpecDirlookup`'s post spoke about the SAME `data` the caller's fragment
+named; at the syscall boundary there is no shared name to speak through.
+Checked across the family: every `SpecSys*.v` post in sysfile.c is
+register/process/ledger-shaped. `sys_open` is the one with a structural
+payout, and it is at the FD layer (`SpecSysOpen.v:240-256`: the returned fd
+is the least free descriptor and `pv_ofile` gains a slot), not the tree.
+
+**(S2) THERE IS NO AMBIENT TREE RESOURCE AT THE SYSCALL BOUNDARY.**
+`FsRep.fnode` needs `InodeRegion.dinode_at`, which is exclusive and lives
+inside `IcacheEscrow.ic_loaded` / `ipool_alloc` — **the escrow owns every
+node fragment in the system**, and a thread can hold one only while it holds
+that inode's sleeplock (§1.4). A syscall-level client holds no lock, so the
+only `fs_rep t` it can supply is at the EMPTY tree. This is §1.4 restated
+one altitude up, and it has a sharp consequence for F2's own `dl_au`: that
+device is satisfiable today only by a client that is itself inside a walk.
+**The HOCAP thread does not rescue it.** Threading an atomic update from
+the syscall down to the record write (the `wp_log_write_au` shape, which is
+where the linearization point genuinely is — the parent's record write
+inside the `begin_op..end_op` window) still requires the client to own the
+ambient tree it surrenders at the firing instant, and it does not.
+
+**(S3) EVEN THE PURE-RESOURCE TRIPLE IS NOT COMPOSABLE FOR mkdir.** The
+iref ledger returns as an INTERVAL (`SpecSysMkdir.v:300`,
+`ns - create_slots ≤ ns' ≤ ns`), inherited from create's own interval
+(`SpecCreate.v:659-661`). A client cannot re-establish its precondition
+`create_slots ≤ ns` from that, so **the friendly mkdir triple cannot be
+called twice.** Physically the figure is exact (create's failure arms
+return every slot; the success arm's one is returned by the caller's
+`iunlockput`), so this is contract imprecision, not a leak. `sys_chdir` has
+no such problem — `iref_slots 2` in and out on all four arms
+(`SpecSysChdir.v:259, :283`), `used' ⊆ used` (:280) — which is why the chdir
+wrapper is composable and the mkdir one is not. **The first real
+distinction the friendly layer draws between two syscalls is a LEDGER fact,
+not a tree fact.** NOTHING WAS AMENDED: the tightening, if ever wanted, is
+create's post, not sys_mkdir's.
+
+### WHAT IT WOULD TAKE — the price of the tree half, named exactly
+
+The only carrier that survives S2 is a **per-node LOCKSTEP GHOST**: a
+`ghost_map Z fsnode` whose AUTHORITY half rides in the same payload as
+`dinode_at` — so every mover that changes the bytes changes it under the
+same lock — and whose FRAGMENT half is CLIENT-HELD. That fragment is F4's
+path-points-to; with it, `fs_rep` becomes holdable by a thread that holds no
+lock, the syscall AU has something to surrender, and S1 becomes a matter of
+threading one AU parameter down the write path.
+
+**This is a whole-tree authority in the sense R3 forbids**, and the
+coordinator, not this increment, rules on it. Two observations for that
+ruling, both in the proposal's favour and neither decisive:
+
+* §20.9(c)'s death certificate is against an authority *a mover can read
+  only by opening, with nothing letting the caller supply a fact about it*.
+  A lockstep ghost parked in the payload is read by the mover **that already
+  holds the payload** — the writer holds the parent's `ic_loaded` — so that
+  certificate does not obviously transfer.
+* §20.9(e)'s certificate is a PRICE, not an impossibility: a new gname enters
+  `ireg_inv` and `ipool_shape`, i.e. `ic_escrow`'s arity, i.e. every fs
+  contract. That is the V1/V2/V5′ sweep shape, at the payload level, one more
+  time.
+
+Against it: the AU parameter has to be threaded through **every intermediate
+contract on the write path** (sys_mkdir → create → dirlink → writei →
+log_write), and the hardness data's expensive mistake is exactly a contract
+renegotiated after its consumers exist. **If the tree half is ever wanted,
+`sys_unlink`'s IN-FLIGHT seal is the cheapest place in the tree to design it
+in** — it is the one syscall contract that does not yet have consumers.
+
+### What landed — `iris/FsSyscalls.v` + `iris/LinkFsSyscalls.v` (new leaves)
+
+Two files, no landed file touched (the two `_CoqProject` rows are the only
+edit outside them). ONE file for both syscalls because the three bundles are
+shared; the Link file is separate because that is the house discipline — the
+tree layer never enters a Link cone, so `FsSyscalls.v` compiles against the
+definitional layer alone and `LinkFsSyscalls.v` is the one place the
+packaging meets the proofs (and the only place `Print Assumptions` has a
+closed term).
+
+* **`fs_geom`** — the 19 pure geometry/ties premises as ONE record. The
+  UNION of the two seals', deliberately: geometry is a fact about mkfs's
+  image and boot, established once and handed to every syscall; chdir
+  ignores five fields. The `icfg` instance is left implicit so it resolves
+  from the ambient `fileG`, which is `SpecCreate.v:433-444`'s two-instance
+  trap avoided.
+* **`fs_world`** — the 19 ambient resources as ONE assertion, **and
+  `fs_world_persistent` is the increment's real theorem about hiding**: the
+  seals consume all nineteen and return none, and that is sound precisely
+  because not one is spent. A client pays for the file system's world once,
+  at boot, and every syscall is free of it forever after.
+* **`fs_res`** — the 7 consumables that actually cross: `bslots`, the four
+  superblock cells, `bitmap_res`, the iref ledger. Everything F3 must
+  ACCOUNT for is here, and S3 is a statement about this bundle's `ns`.
+* **`wp_sys_mkdir_friendly` / `wp_sys_chdir_friendly`** — functors over
+  `SYSMKDIR` / `SYSCHDIR`, F2's `FsLookupTree` pattern. 26 pure premises
+  become 6 (mkdir) and 5 (chdir); 31 resources become 6 — the two bundles,
+  the process block, and the three machine ones (`sie_cap_gpr`, `cpu_own`,
+  `pc_is`) that cannot be bundled away. `eb` disappears as a parameter,
+  fixed at the `true` both seals force, and with it `trap_csrs_ext` /
+  `cpu_claim_ext` vanish from the pre AND the post (`emp` at `true`,
+  `IntrDefs.v:1068, :1737`). **That is F2's bar — fewer premises than the
+  seal, zero axioms added — met in the one dimension where it can be met.**
+
+**What stays irreducible, and is not a defect**: the register file (`m`,
+`mf`, `callee_saved`), the stack budget `K`, the program counter. This is a
+WP over machine code; a friendly layer can bundle the file system's world
+but not the machine's own state.
+
+### chdir was staged as "the NO-DELTA case"; both halves of that are wrong
+
+* Its `iput(p->cwd)` can be the last reference to an unlinked inode and then
+  truncates and FREES it — `used' ⊆ used` is the visible half
+  (`SpecSysChdir.v:279`). The node store CAN lose a node across a chdir.
+  What is untouched is the REACHABLE tree, and saying so needs the ambient
+  tree S2 says does not exist.
+* The interesting half — "the new cwd is what `path` resolves to" — is
+  **unstatable, and R8 is why**: `SpecNamex.v:113-124` rules there is no
+  path → inode functional statement. The seal says what it can: the process
+  returns at `upd_cwd V ipv` for an EXISTENTIAL `ipv`
+  (`SpecSysChdir.v:161-166`). **That existential is not slack — it is R8 at
+  the syscall boundary.**
+
+### For the remaining syscall wrappers
+
+* **`sys_open`** is the next one worth writing and the best-placed: its post
+  is already friendly in the FD dimension (`SpecSysOpen.v:240-256`), it takes
+  the same three bundles plus `fd_slot` and the ftable pair, and its tree
+  half stops at S1 exactly as mkdir's does. **Name collision to expect:**
+  `FdSlots`' `fnode k` (a file-table node) versus `FsRep.fnode γi γfs i n`.
+  Nothing imports both today; the first wrapper that wants FD *and* tree
+  content will, and one of the two needs qualifying.
+* **`sys_link` / `sys_unlink`** inherit S1 and S3 unchanged (unlink's seal is
+  in flight at V3/V5′). Unlink is where R2's uniqueness invariant was made
+  load-bearing for a friendly delta that, per S1/S2, cannot yet be stated —
+  the invariant is not wasted (it is what makes the delta TRUE), but its
+  consumer is still missing.
+* Any wrapper for a syscall that does **not** close its ledgers gets S3's
+  treatment: state the interval, and say in the header that the triple is
+  single-shot. Composability is the friendly layer's real acceptance test,
+  and today only chdir passes it.
+
+### Gate
+
+`FsSyscalls.vo` and `LinkFsSyscalls.vo` both green on the mirror at
+`37918d9b`, and `proof_coverage.py --check` exits 0 with coverage UNMOVED
+(186/190, 98 %; the increment is additive and flips no seal).
+
+The fused V4 + V5′-R commit (`412c58ed`) landed in the same window and
+rebuilds the `InodeRegion` cone under these leaves, so the mirror was
+brought to it and rebuilt (331 files, `-j24`): **`FsSyscalls.v` recompiles
+GREEN at `412c58ed`** — it carries the wrappers' whole proof, against the
+abstract `SYSMKDIR` / `SYSCHDIR` module types, so this is the substantive
+half of the re-verification. The only error in the whole 331-file rebuild
+is `LinkCreate.vo`'s *"LinkCreateFreshTy makes inconsistent assumptions
+over SpecCreateFreshTy"*, and it is **not this increment's**: a sibling
+lane was editing `iris/SpecCreateFreshTy.v` uncommitted in the shared
+mirror checkout mid-build (source mtime 12:54, `LinkCreateFreshTy.vo`
+12:48). `LinkFsSyscalls.vo` sits behind it in the same cone.
+
+OWED, and both are one command once the shared checkout is quiet:
+`LinkFsSyscalls.vo` at `412c58ed` (a two-line functor application — it can
+only fail if `SysMkdir`/`SysChdir` stop satisfying their own module types,
+which is `LinkSysMkdir`'s business, not this file's), and the per-lemma
+`Print Assumptions` attribution. The one PA run that completed (at
+`37918d9b`, exit 0) shows the expected inhabitants and no others — the five
+Sail platform axioms, `functional_extensionality_dep`, and
+`SpecCreateFreshTy.create_fresh_ty` — but its capture was truncated, so
+**which** of the four queries each line belongs to is not yet on the
+record. Nothing in the two leaves can add an assumption: they contain no
+`Axiom`, no `Parameter`, no `admit`.
+
+**MIRROR HAZARD, recorded because it cost this increment its gate**: two
+lanes were running `make` against `/shared/xv6iris` on the mirror at the
+same time, one of them with uncommitted edits to a file the other's cone
+requires. A lane that is going to edit shared sources needs a lane tree
+(`/shared/xv6iris-*`), and a lane that is going to GATE needs to check
+`git status --porcelain` on the mirror checkout before it starts, not only
+before it commits.
+
+---
+
+## THE EQUIVALENCE PACKAGE — **`create_fresh_ty` IS REDUCED TO ONE
+## SENTENCE OVER A THREE-INSTRUCTION WINDOW, AND THE THREE FLANKS THAT
+## BOUND IT ARE MACHINE-CHECKED.  `iris/IregBox.v` (new leaf)**
+
+### What the package is
+
+The axiom is not retirable (§7's ruling, upgraded to a LAW wall by
+§7.10.6's station exhaustion).  What it *is* is reducible, and the
+reduction was owed as prose in four probes' reports.  It is now a file:
+
+> `create_fresh_ty` ⟺ **no foreign `ireg_free_au` at the claimed inum
+> between `ialloc`'s `brelse` and `ialloc`'s `iget`.**
+
+Left to right: the only way create's `ilock` reads a type other than
+`ty` is for the claimed record to be REWRITTEN, and the only mover that
+writes a type-0 record over a claim box is `ireg_free_au` — a foreign
+`ireg_withdraw` alone changes no byte, so a stranger who merely fills
+reads `ty` too.  Right to left: a free in that interval is §17.6.1's
+machine-legal trace and it makes the conclusion false.
+
+### The seven lemmas, all `Closed under the global context`
+
+`iris/IregBox.v` — a LEAF (zero dependents), for `IregLinkNz.v`'s and
+`IregDirBit.v`'s reason; fold all three back into `InodeRegion.v` /
+`FsBlocks.v` at a milestone.
+
+| lemma | content |
+|---|---|
+| `ireg_box_fresh` | `ireg_in d ∧ type ≠ 0 → fresh_shape d` (pure; the IN arm's two sub-cases are disjoint) |
+| `ireg_box_w0` | …and (L1) at `nlink = 0` collapses the ternary sum: **no live record of any flavour names a box** |
+| `ireg_box_excl` | T1 over the slot, as a **DICHOTOMY**: a nonzero-type slot is either CHECKED OUT (region holds the marker) or a BOX, and at a box `fresh_shape` ∧ no `ilink_fl` ∧ no client `dinode_at` |
+| `ireg_claim_box_freeze` | the mover-by-mover refutation from the box's fragment alone: `type ≠ 0` kills the CLAIM's premise, no `dinode_at` kills the four record-movers, `ireg_withdraw` alone survives |
+| `ireg_box_no_payload` | §16.4's exhaustiveness **without the itable**: no `ipool_alloc` and no `ic_loaded` names a boxed inum, so every `ilock` there must take the fill arm |
+| `fsL_block_exclusive` | §7.2.4 phase 1, generalised from `q : Qp` to an arbitrary `dfrac` |
+| `iref_two_not_ref1` | §7.2.4 phase 3: two reference fragments at one slot ⟹ count ≥ 2, so a slot at REF-1 carries only one — no foreign `iput` free while create's reference lives |
+
+### Three findings worth keeping
+
+1. **`ireg_box_excl` CANNOT be stated under an IN-arm hypothesis.**
+   IN-ness is the region's own existential and the one witness that
+   picks it — the marker — is in the pool at a claim box, behind the
+   itable spinlock `ialloc` does not hold (§7.4.3).  A pure `ireg_in d`
+   premise does *not* select the arm (the OUT arm is compatible with it).
+   The dichotomy is the only faithful form, and it is also the useful
+   one: a caller holding `dinode_at` at the inum lands in the LEFT
+   disjunct by its own fragment, which is exactly what `ireg_free_au`
+   does today.
+2. **THE "VALID BIT" IS NOT THE MODEL'S CARRIER, AND THE MODEL'S IS
+   STRONGER.**  At the C level "every free passes through a fill" is
+   `iput`'s `ip->valid` test plus "`valid` is written 1 only in `ilock`".
+   The model needs no bit: `ireg_free_au` takes ONE caller-side resource,
+   `dinode_at γi inum dn`, and at a box that fragment is in the region
+   (`ireg_claim_box_freeze` + `ireg_box_no_payload` between them refute
+   every other custodian).  So it is a **custody theorem about the
+   fragment**, not a control-flow claim about a word — and the fragment
+   is strictly stronger, because the bit is per-ENTRY and dies at
+   eviction while the fragment is per-INUM and is conserved (§7.7).
+   Recorded as a delta, not as a weakening.
+3. **THE WINDOW IS THREE INSTRUCTIONS, NOT FOUR, AND THE TWO COUNTS HAVE
+   BEEN CONFUSED.**  `brelse` returns to `ialloc`+0xa4 and the `jal iget`
+   is at +0xaa, so the gap is `+0xa4 addiw a1,s2,0`, `+0xa8 c.mv a0,s5`,
+   `+0xaa jal ra,iget`, plus `iget`'s prologue to the reference mint.
+   The FOUR instructions in `SpecCreateFreshTy.v`'s header are a
+   different measurement — create's own span, +0xa4..+0xb0.  Both are now
+   spelled out there.  Neither is a bound on TIME: the claimant can be
+   preempted inside the gap arbitrarily long.
+
+### The header
+
+`SpecCreateFreshTy.v`'s header (comment-only edit) now carries: the
+equivalence and the three flanks with lemma names; the ten-formulation
+reduction history as §(E) — C′, adequacy coupling, entry-keyed payload
+certificate, the escort, span-stability, harmlessness, record-backed
+greys, the reference/occupancy certificate, ownership transfer, the
+protocol ghost — each with its wall; and §(F), the three open routes.
+It also CORRECTS §20.17.7's "those are the two doors" to **one**
+(§7.4.6 killed the withdraw door independently, at `ireg_claim_au`'s
+re-mint).
+
+### The three open routes, as recorded in §(F)
+
+- **(F1) K-F2** — move `ialloc`'s `brelse` after its `iget`.  Designed,
+  priced, rejected by policy (R13(iii)).  The unique change that deletes
+  the window, because it is the unique change that puts a revocable
+  resource — flank (i)'s buffer half — into the gap.  With it flanks (i)
+  and (ii) meet and there is no residue.
+- **(F2) CLOSED-WORLD ADEQUACY** — not a resource route; discharge the
+  sentence at the adequacy theorem as a property of the closed program.
+  §7.2.2's certificate is against the RESOURCE form only.  Unaudited;
+  its cost is abandoning thread-modularity for one fact.
+- **(F3) PROPHECY / LATE LINEARIZATION** — **NOT PREVIOUSLY RECORDED**,
+  and the only mechanism §7.10.6's station exhaustion does not literally
+  name: a prophecy pins a FUTURE OBSERVATION, not an EPISODE, so the
+  four carrier assignments do not obviously cover it.  Expected outcome
+  is that clause (i) covers it anyway (prophecy resolution is itself a
+  frame-preserving update), i.e. an ∃-typed payout.  **If an eleventh
+  probe is opened, this is the only one worth opening.**
+
+### Gate
+
+MIRROR (`ec2-18-206-159-30`), never local; scp + block-md5 verified on
+both sides before each build.  `IregBox.v` is a leaf, so a single-file
+`coqc` IS its whole cone: prerequisites verified non-stale first
+(`make -n IcacheEscrow.vo IcacheInv.vo InodeRegion.vo FsBlocks.vo
+LogInv.vo IrefSlots.vo IcacheRef.vo InodeInv.vo DinodeEnc.vo` emits **0**
+compile lines, and the `.vo` mtimes are per-file, not a sync artefact),
+then `IregBox.vo` deleted and rebuilt from scratch — **EXIT=0**.
+`Print Assumptions` on all **seven** new lemmas: **Closed under the
+global context**.  `SpecCreateFreshTy.v` recompiles (comment-only) and
+`LinkCreateFreshTy.v` — the Module Type instantiation, the one consumer
+that would catch a statement move — rebuilds green, so no statement
+moved.  `tools/lemma_diff.py`: **CLEAN**.  Committed by explicit path;
+the live `DirLinks.v` lane's edit was present in the tree throughout and
+was not touched.
+
+### Owed
+
+- Fold `IregBox.v` + `IregLinkNz.v` + `IregDirBit.v` back into
+  `InodeRegion.v` (and `fsL_block_exclusive` into `FsBlocks.v`) at the
+  next `InodeRegion`-cone milestone.
+- Nothing in `IregBox.v` has a consumer yet.  `ireg_box_no_payload` is
+  the load-bearing one if K-F2 ever lands: it turns "`ialloc`'s `iget`
+  finds either the pool's marker or an unloaded entry's marker, and
+  never a loaded record" from a paragraph into a theorem.
+
+---
+
+## PROBE 8 — **PROPHECY-ASSISTED LATE LINEARIZATION: DEAD at a SIXTH
+## named wall, THE ADVERSARY RESOLVES CONSISTENTLY.  The last recorded
+## unaudited route is closed; report-only, nothing built**
+
+Transcribed into `claude-notes/design/fs-fragments.md` §7.11 (with §7.0
+gaining the sixth-wall note and §5.3/§7.4.6 reconciled to the new door
+map); one sentence added to `SpecCreateFreshTy.v`'s header §(D).
+
+- **VERDICT.**  DEAD as a retirement of `create_fresh_ty` — but one wall
+  further out than all eight predecessors.  The language extension is
+  *not* the obstacle: `mobs := Empty_set` today, and adding deterministic
+  step observations is a sound, conservative, ~8-file-deep change with
+  **zero contract movement above the lifting layer**.  The
+  prophesied-MINE branch (region-resident `proph_z` in `ireg_slot`, H1's
+  phase carrying `sp₀`, γe on the **proc** bundle) genuinely delivers
+  `di_type dn = ty`, past **all five named walls** — the currency gap
+  included — and past all three of §7.9's missing pieces.
+- **WALL (new, sixth): THE ADVERSARY RESOLVES CONSISTENTLY.**  Prophecy
+  resolution refutes *mis-ordered observations relative to a hypothesized
+  future*; it cannot refute a *foreign resolver*.  The prophesied-FOREIGN
+  branch grants the adversary the first move, and every future in which
+  it acts is realized by resolutions each consistent at its own step, so
+  the branch survives every resolution create can reach except in the
+  no-interference sub-world — and "no interference" is §19.6's
+  allocatedness / §7.2.7's honest residue.  **The debt is conserved
+  through the logic extension too.**  Certificate verbatim at §7.11.5;
+  all five escape rungs (pocketing, richer prophecies, resolution
+  counters, trace snapshots, plain logical atomicity) audited and dead.
+- **SCOPE FINDING on §7.10.6.**  Station exhaustion is **LAW over
+  ghost-only Iris** and nothing more: its carrier enumeration {bytes,
+  arm, client token, nowhere} misses a fifth carrier — **the trace** —
+  which lives in `state_interp`, outside the frame quantification, so
+  clause (i) does not reach it.  Branch A is the constructive witness.
+  §7.10 is scoped, not weakened.
+- **THE ONE-BIT FACTORIZATION.**  Under the design, `create_fresh_ty` is
+  *exactly equivalent* to one trace-level sentence — **"the first fill of
+  a just-claimed inum is the claimant's"** — statable in the operational
+  semantics' own vocabulary, no Iris, no ghost state, consumed at one
+  point.  That is a real redraw of the modular boundary (the WP tree goes
+  axiom-clean), but it is a **FACTORIZATION, NOT A RETIREMENT**: the
+  trace lemma is provable only by a whole-machine interleaving argument
+  ((F2)), or assumed — one axiom traded for another plus the extension.
+  **Not worth building for this axiom alone; REPRICE if a second
+  commit-early/resolve-late window ever appears** (the machinery
+  amortizes, the axiom does not).
+- **ROUTE MAP CLOSED (§7.11.7).**  **K-F2 = the unique CODE door**
+  (rejected by policy); **the licence-completion program** (C′ +
+  box-exclusion + boot-shelter + guard-fed grey deletion, §7.9) **= the
+  unique MODULAR-GHOST door**, with its three named missing pieces; **the
+  trace lemma = the unique LANGUAGE-LEVEL door**, non-modular by nature.
+  **Prophecy is a BRIDGE between the last two, not a fourth door.**  A
+  ninth probe on either mechanism is a re-run, and §(D)'s new sentence in
+  `SpecCreateFreshTy.v` says so.  Stale count corrected along the way:
+  §20.17.7's "those are the two doors" was already down to **one**
+  (§7.4.6); §5.3's restatement of it now points at the three-door map.
+
+### Gate
+
+MIRROR (`ec2-18-206-159-30`), never local.  `SpecCreateFreshTy.v` is a
+comment-only edit; scp + md5 verified both sides, then `SpecCreateFreshTy.vo`
+and `LinkCreateFreshTy.vo` (the Module Type instantiation — the one
+consumer that would catch a statement move) rebuilt: **EXIT=0**, so no
+statement moved.  Committed by explicit path; the live `DirLinks.v` /
+`ProofCreate.v` / `IregDirBit.v` lanes' edits were present in the tree
+throughout and were not touched.
+
+---
+
+## THE iget LICENCE INCREMENT (C′-lite) — **§20.17.5's PARAGRAPH IS NOW A
+## TYPE.  `iris/IgetLic.v` (new leaf); every `iget` in the tree presents a
+## licence, and the user's invariant is a theorem of each one**
+
+Design of record: `design/fs-fragments.md` §7.1 (R13(i)) as amended by
+**R14** (C′ un-parked, licence (d) foreclosed, the `SpanL` transitional
+constructor); supplier table §7.5.6.  Worklist: `projects/iget-licence.md`.
+
+### What landed
+
+`SpecIget` gains ONE binder `l : ilic` and ONE premise
+`IgetLic.iname γi γfs inum l`, returned in the postcondition **unspent and
+at the SAME `l`**.  `ProofIget` frames it across the whole function inside
+the shared tail's closure and drops it on the diverging
+`panic("iget: no inodes")` arm.  `SpecDirlookup` borrows the directory's
+ticket list and the home's own record to produce one at the matched index;
+`SpecDirlink` relays that borrow to its inner lookup.  All eight delivery
+sites in the tree now name their licence in their own `iApply` line:
+
+| site | licence | what earns it |
+|---|---|---|
+| `ProofNamexRoot`'s `+0x4c` iget | `RootL` | the landed ROOT CLAUSE, its first consumer |
+| `ProofNamex`'s `+0x4c` iget | `RootL` | same |
+| `ProofDirlookup`'s iget, non-self record | `LinkedL fl` | the payload's own ticket at the matched index |
+| `ProofDirlookup`'s iget, SELF record (`"."`) | `HeldL dr` | the home's `dinode_at`; xv6 files no ticket for `"."` |
+| `ProofIreclaim`'s `+0x44` iget | `BufL bno ds` | the block half still in hand (brelse is at `+0x4c`) |
+| `ProofIalloc`'s `+0xaa` iget | `SpanL` | **nothing** — R14's one permitted site |
+
+**THE TWO AUDIT GREPS, captured (`iris/`, at the landed tree):**
+
+```
+$ grep -n "GreyL" iris/Proof*.v
+                                   (no output; exit 1)
+$ grep -n "SpanL" iris/Proof*.v
+iris/ProofIalloc.v:1661:    (*  R14: THE SPAN LICENCE -- THE ONE PERMITTED [SpanL] SITE IN THE TREE   *)
+iris/ProofIalloc.v:1670:        So this iget presents [SpanL], whose [iname] is [⌜True⌝]: a licence
+iris/ProofIalloc.v:1674:        [grep -n "SpanL" iris/Proof*.v] must name THIS site and no other.
+iris/ProofIalloc.v:1677:    iAssert (iname γi γfs inum SpanL) as "Hlic";
+iris/ProofIalloc.v:1680:              SpanL
+```
+
+So §20.17.5's box is a proposition a build checks: **zero sites instantiate
+the grey licence, and exactly one site — `ProofIalloc`'s iget — presents no
+evidence at all.**  The axiom's delivery-side perimeter is a grep line.
+
+### Where the user's invariant is earned
+
+`ProofNamex`'s `dirlookup(ip,name,0)`, at the `fs.c:693` guard
+`if(ip->nlink == 0) return 0` the walk fell through two instructions
+earlier.  That guard is the only thing in xv6 stopping a `chdir`'d process
+from walking `".."` out of an orphaned directory into a claim box (§7.5.4's
+TRACE G), and turning it into `SpecDirlookup`'s premise is what makes *"the
+kernel never invokes iget on inode numbers in directories in a disconnected
+subtree"* a **theorem of every licensed iget** rather than a paragraph.
+Note the order the trace turns on: `ilock` happens BEFORE the guard, so the
+licence is *held* there and merely never *delivered* — which is why the
+enumeration lives at `SpecIget` and not on the payload.
+
+### Four findings
+
+- **THREE CONSTRUCTORS HAVE TO CARRY DATA, and "the same `l`" is what
+  forces it.**  §7.1.1 wrote (a)/(c)/(e) with the content behind a `∃`
+  (`∃ d, dinode_at …`, `∃ ds, fsblock …`).  A post returning the licence
+  "at the same `l`" then returns a DIFFERENT resource — the caller lends
+  `dinode_at γi inum dn` and gets back `∃ d, dinode_at γi inum d`, which no
+  walk can put back into its payload.  **A borrow is only a borrow if the
+  index pins the content.**  `HeldL (d : dinode)`, `BufL (bno : Z) (ds :
+  list dinode)`, `LinkedL (fl : option (option Z))`.  Still seven
+  constructors, still closed, both greps unaffected.
+- **LICENCE (a) IS THE PAYMENT UNIT AT ANY FLAVOUR, not `ilink`.**  §7.1.1
+  predates V5′'s flavour split: a record's ticket is
+  `DirLinks.dlc_tick self k (F k) z`, i.e. `ilink` / `ilinkd` / `ilinkdp z
+  self` — three fragments in three ledger components with no weakening
+  between them.  Spelling (a) as the plain `ilink` would have made it
+  **unsuppliable at the commonest iget in the kernel**, namex's walk into a
+  subdirectory.  `IgetLic.ipaid` indexes it; (L1) bounds the SUM, so any one
+  unit is the allocatedness witness (`link_paid_ge`, three lines).
+- **THE (a)/(c) BOUNDARY IS THE KERNEL'S OWN.**  A lookup of `"."` matches
+  the home's SELF record, and xv6 deliberately files no ticket for it ("No
+  ip->nlink++ for '.': avoid cyclic ref count"), so `dir_link_at`'s guard is
+  false there and (a) has nothing to lend.  The case split in
+  `ProofDirlookup`'s found arm is not a proof artefact — it is §20.4's
+  (a)-vs-(c) line, drawn where the source draws it.
+- **THE READING THAT MAY NOT TAKE A CALLER'S RECORD.**  `dinode_at` is a
+  full-fraction ghost_map element, so the accessor-family shape for (c) —
+  `ireg_inv -∗ dinode_at γi inum dn -∗ iname … HeldL ={E}=∗ ⌜…⌝` — has an
+  UNSATISFIABLE premise set and says nothing about anything.  That is
+  §4.1's twice-instantiate failure one tier up, and it would have compiled.
+  `iname_held_alloc` is the unpack instead, and the header says why.
+
+### Row 14 — **the one row that did not fit, reported rather than absorbed**
+
+`FsLookup.v` (F2's atomic triple) was to re-supply the wrapper over the new
+`SpecDirlookup` shape, with instructions to STOP AND REPORT if its
+CLIENT-facing premise set had to grow beyond §7.5.6's disjunction.  **It
+did.**  The exact list, for the coordinator to rule on, is in the file's own
+header and is: (i) the disjunction — sanctioned; (ii) `⌜dir_orphan_clean dn
+data⌝` — `FsTree.node_rep`'s NDir case fixes the type, name uniqueness and
+`ents = dir_view …` and says NOTHING about `di_nlink`, so no tree-level fact
+implies it; (iii) `⌜0 <= dpi < 2 ^ 32⌝` — the `Z`-key/word-key round trip
+(`FsRep.inum_of_unsigned`), which IS `FsTree.fs_inums_ok` at one node;
+(iv) **`FsRep.fedges dpi dn data`** — a RESOURCE, the substantive one.
+§1.3 makes edges a primitive client-held fragment beside the node, so a
+client does hold it, but `fdir` does not contain it — **folding the edges
+into `fdir` would restore the property outright, and that is the shape
+question owed.**  What survives: F2 still has strictly fewer premises than
+the bytes (the bytes gained three pure + two resources, F2 three pure + one,
+and `dinode_at` is still hidden inside `fdir`).  The row was executed rather
+than left red because the increment's gate is a green cone; the finding is
+recorded in `FsLookup.v`'s header, here, and in the worklist.
+
+### What this does NOT do (R14(iii), restated so it is not oversold)
+
+The free-side wall is untouched.  §7.1.6's death certificate stands
+verbatim — the licence is BORROWED at the iget and RETURNED before the call
+ends, so `iput` holds none and §20.7's "the reference that outlives its
+licence" is exactly where it was.  `create_fresh_ty` stands; the gate does
+not open.  This retires §20.17.5's PARAGRAPH, not §20.7's WALL.
+
+### Byte-stability, verified
+
+`SpecNamex`, `SpecCreate`, `SpecSysLink`, `SpecSysUnlink`, `SpecIalloc`,
+`SpecIlock`, `SpecIput`, `SpecIupdate`, `InodeRegion.v`, `IcacheRef.v`,
+`IcacheEscrow.v`, `IcacheBoot.v`, `DirLinks.v` are all **byte-identical**:
+the licence is borrowed within one call, so no syscall-level contract sees
+it.  The borrow accessor `IgetLic.dir_links_borrow` — `dir_links_dotdot_out`'s
+shape at an arbitrary index — lives in the new leaf precisely so `DirLinks.v`
+need not move.
+
+### APPENDIX — `SpecCreateFreshTy.v` §(F3)
+
+Rewritten from *"Nobody has run it.  If an eleventh probe is opened, THIS is
+the only one worth opening"* to probe 8's outcome: **RUN, AND DEAD** at the
+sixth wall, THE ADVERSARY RESOLVES CONSISTENTLY (§7.11).  Both halves of the
+recorded guess were wrong and that is why running it paid — the language
+extension is NOT the obstacle, and branch A genuinely delivers past all five
+named walls including the currency gap; it dies in the prophesied-FOREIGN
+branch.  Comment-only; `LinkCreateFreshTy.vo` rebuilt green in the cone,
+which is the statement-drift catch.
+
+### Gate
+
+MIRROR ONLY (`ec2-18-206-159-30`, lane `/home/ubuntu/gr36lane`, verified
+clean and at this tree before use); never local.  Full cone
+`make -f CoqMakefile -j24 -k` → **MAKEEXIT=0**, `make -n` → **0 compile
+lines**, staleness sweep (the "older than a `.vo` it DEPENDS on, to a
+fixpoint" form) → **0 stale, 0 missing**, 1164 `.vo` (1163 + `IgetLic.vo`).
+`tools/proof_coverage.py --check` → exit 0, **187/190**, `sysfile.c` 16/16.
+`tools/lemma_diff.py` → CLEAN across all 16 files.  `Print Assumptions` on
+`Iget.wp_iget_sconf`, `SysUnlink.wp_sys_unlink_sconf`,
+`Create.wp_create_sconf` and `SysLink.wp_sys_link_sconf` captured verbatim:
+**the increment adds ZERO assumptions** — sys_unlink and sys_link keep THE
+STANDING SIX, create's cone keeps those plus `create_fresh_ty` and nothing
+new, and iget's own instantiation is clean.

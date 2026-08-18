@@ -24,7 +24,7 @@
    recursion is structurally bounded by the description, and [ptree_own]
    is indexed by exactly the same [lvl].  Sv39 tables enter at [lvl = 2].
 
-   THE PANIC ARM IS DEAD, not discharged by [panic_wp].  [pt_free_ok lvl t]
+   THE PANIC ARM IS DEAD, not discharged by a panic credential.  [pt_free_ok lvl t]
    (PtFree.v §1) says every slot is either the literal zero word or a valid
    pointer to a node the description owns, so the [andi a4,a5,14 / bnez]
    test at +0x32 never fires.  That is the honest precondition: freewalk
@@ -90,7 +90,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      -- including the recursive descent, whose own instance of this same
      contract carries the identical bound. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -98,7 +98,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗

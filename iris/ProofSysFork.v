@@ -95,7 +95,7 @@ Section ProofSysFork.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
-    unfold K_sys_fork in Hav.
+    
     set (imm_entry := (mword_of_int 48 : mword 6)).
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
     set (nzimm_s0 := (mword_of_int 4 : mword 8)).
@@ -105,7 +105,7 @@ Section ProofSysFork.
     set (sp' := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))).
     set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv Henv #Hpav Hpriv Hcont".
     iPoseProof (sf_00 with "Htext") as "Hi00".
     iPoseProof (sf_02 with "Htext") as "Hi02".
@@ -179,7 +179,7 @@ Section ProofSysFork.
     iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart nib
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
+              with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpav Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henv & %Hrv)".

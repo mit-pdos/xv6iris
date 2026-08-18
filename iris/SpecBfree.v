@@ -35,8 +35,8 @@
    ([BitmapInv.free_pool_own_used]).  The bit is therefore set,
    [bp->data[bi/8] & m] is nonzero ([BitmapEnc.bm_bit_test]), and the
    branch at +0x3a is not taken.  Refuting this panic is the main thing the
-   invariant has to buy; the contract still takes [panic_wp_any] because
-   bread's own interior panic arm wants one.
+   invariant has to buy; the contract still takes the panic credentials
+   because bread's own interior panic arm wants them.
 
    ONE BITMAP BLOCK.  [FSSIZE = 2000 < BPB = 8192], so [size <= BPB] is a
    premise and [BBLOCK b sb = sb.bmapstart] outright
@@ -74,7 +74,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -95,8 +96,7 @@ Local Open Scope Z_scope.
 (* bfree's own frame is 32 bytes (4 slots) -- [c.addi16sp sp,-32] at +0x00,
    ra/s0/s1/s2 pushed.  Its deepest callee is bread (40); brelse wants 26
    and log_write 18. *)
-Definition K_bfree : nat := 44%nat.
-
+Notation K_bfree := (62%nat) (only parsing).
 Definition wp_bfree_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
@@ -145,7 +145,7 @@ Definition wp_bfree_gen_body
   (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
      touches ranks lower.  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
      release of its own -- it is a pure PASS-THROUGH to bread, which is
@@ -156,10 +156,10 @@ Definition wp_bfree_gen_body
      unchanged to bread and back.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* sb.bmapstart, read once at +0x12 *)
@@ -214,9 +214,9 @@ Definition wp_bfree_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -277,7 +277,7 @@ Definition wp_bfree_sconf_body
   (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
      touches ranks lower.  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
      release of its own -- it is a pure PASS-THROUGH to bread, which is
@@ -288,10 +288,10 @@ Definition wp_bfree_sconf_body
      unchanged to bread and back.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* sb.bmapstart, read once at +0x12 *)
@@ -327,9 +327,9 @@ Definition wp_bfree_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

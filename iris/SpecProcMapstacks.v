@@ -35,7 +35,7 @@ From Kernel Require KernelSyms.
    non-boot caller.  The budget exceeds 64 (the leaf pages) plus
    [kstacks_missing t] (the naive-sum UPPER BOUND on the tables the 64 walks
    graft -- see KvmMap; the proof telescopes it), so every kalloc-null /
-   kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
+   kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
@@ -54,14 +54,14 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
      cone touches "kmem" (13) via the per-iteration kalloc call, and nothing
      lower (kvmmap's own Spec exposes no locks_below premise). *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT0 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗

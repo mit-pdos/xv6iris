@@ -87,8 +87,7 @@ Local Open Scope Z_scope.
 
 (* growproc's own frame is 4 slots; uvmalloc wants 42 below it (mappages 32,
    kalloc 14, uvmdealloc 26) and myproc 10, so 42 covers every call. *)
-Definition growproc_stack : nat := 46%nat.
-
+Notation growproc_stack := (46%nat) (only parsing).
 (* ===================================================================== *)
 (*  WHAT growproc DID, as a function of [n] and the return value.         *)
 (* ===================================================================== *)
@@ -135,7 +134,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   let n := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (growproc_stack <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: uvmalloc's kalloc runs with interrupts un-pushed *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -146,7 +145,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜callee_saved m mf⌝ -∗
       ⌜growproc_ok (pv_sz V) n (pv_upt V) P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗

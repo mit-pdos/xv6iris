@@ -29,11 +29,20 @@
 
    which is exactly what the second and every later caller of forkret
    observes, and refutes the branch outright ([c.beqz] at +0x24 is taken).
+
    Discarded rather than owned deliberately: [first] is written once and
    then read by every process forever, so the permanent form is the one a
    caller can actually keep, and a fractional or owned cell would have to
    be threaded through the trap loop.  The arm this hides is the boot
    client's; NOTHING about forkret's steady-state behaviour depends on it.
+
+   THE PREMISE IS A PARAMETER OF THE STATEMENT ([wp_forkret_gen_body]), and
+   the file exports two readings of it: [wp_forkret_body], which is what
+   this proof gives, and [wp_forkret_nf_body], which drops it entirely.  The
+   second is what a caller that PARKS a fresh process needs -- see
+   [SpecForkretPark.v] -- because such a caller holds no claim on the boot
+   client's one-shot; it is assumed in [LinkForkretNF.v] and discharged by
+   the same [if (first)] proof this contract is waiting on.
 
    ==== forkret DOES NOT RETURN ==========================================
 
@@ -110,6 +119,7 @@ Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv.
 Require Import BioDefs.
 Require Import IrefSlots InodeRegion ProcAvail.
 Require Import SpecPrepareReturn.
+Require Import SpecKexec.
 Require Import SpecUsertrap.
 Require Import UsertrapRes.
 From Kernel Require KernelSyms.
@@ -123,8 +133,7 @@ Definition first_addr : mword 64 := mword_of_int KernelSyms.first_1.
    prepare_return's 12 (myproc's and release's 10 are subsumed).  Written as
    an expression so a change to prepare_return's budget cannot silently
    leave this one behind. *)
-Definition K_forkret : nat := (6 + K_prepare_return)%nat.
-
+Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -144,11 +153,19 @@ Section SpecForkret.
 
 End SpecForkret.
 
-Definition wp_forkret_body
+(* THE CONTRACT, PARAMETRIC IN THE [first] PREMISE.  The two readings below
+   are this one at [Pfirst := first_addr ↦₄{DfracDiscarded} 0] (what
+   [ProofForkret.v] proves) and at [Pfirst := emp] (what the [first] arm's
+   proof would give, and what [LinkForkretNF.v] assumes so that the park
+   argument can be written against a hypothesis that does not smuggle the
+   boot client's premise into every fresh process).  ONE statement rather
+   than two so the axiom cannot drift from the theorem. *)
+Definition wp_forkret_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
+    (Pfirst : iProp Σ)
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -187,12 +204,12 @@ Definition wp_forkret_body
   wire_inv -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   pc_is pcE -∗
-  (* THE EXPERIMENTAL PREMISE -- see the header *)
-  first_addr ↦₄{DfracDiscarded} (mword_of_int 0 : mword 32) -∗
+  (* THE [first] PREMISE -- see the header, and the two readings above *)
+  Pfirst -∗
   (* ---- the running kernel thread, as swtch left it ---- *)
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   cpu_own 1%nat eb p false {[s]} -∗
-  trap_csrs -∗
+  trap_csrs KT1 -∗
   cpu_claim p -∗
   (* ---- p->lock, still held from scheduler() ---- *)
   is_lock γl p s Rlk -∗
@@ -207,6 +224,65 @@ Definition wp_forkret_body
      forkret_yield (CID := h) γf p ksp pid av V' -∗
      URes h pt ksp) -∗
   WP (Loop : expr riscv_lang).
+
+(* THE PROVEN READING: [first] is already 0.  [ProofForkret.v]. *)
+Definition wp_forkret_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (pt : uptd) (j : nat)
+    (γl γf : gname) (s : string) (Rlk : iProp Σ)
+    (pid : mword 32) (V : pprivate)
+    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
+  wp_forkret_gen_body
+    (first_addr ↦₄{DfracDiscarded} (mword_of_int 0 : mword 32))
+    URes pt j γl γf s Rlk pid V ks m av av2 eb.
+
+(* THE READING WITH NO [first] PREMISE AT ALL.  A caller that PARKS a fresh
+   process cannot pay the discarded points-to: it is a fact about the boot
+   client's one-shot, and a process created by kfork or userinit inherits no
+   claim on it.  So the park argument ([ProofForkretPark.v]) is written
+   against this reading, which is assumed in [LinkForkretNF.v] and will be
+   discharged by the same proof the [if (first)] arm needs. *)
+Definition wp_forkret_nf_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (pt : uptd) (j : nat)
+    (γl γf : gname) (s : string) (Rlk : iProp Σ)
+    (pid : mword 32) (V : pprivate)
+    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
+  wp_forkret_gen_body emp
+    URes pt j γl γf s Rlk pid V ks m av av2 eb.
+
+(* the no-[first] reading IS stronger, mechanically: the only difference is
+   a premise the weaker one may simply drop.  Stated so that nothing has to
+   take on faith that [LinkForkretNF.v]'s Axiom subsumes [ProofForkret.v]'s
+   theorem rather than merely resembling it. *)
+Lemma wp_forkret_body_of_nf
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (pt : uptd) (j : nat)
+    (γl γf : gname) (s : string) (Rlk : iProp Σ)
+    (pid : mword 32) (V : pprivate)
+    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
+  wp_forkret_nf_body URes pt j γl γf s Rlk pid V ks m av av2 eb ->
+  wp_forkret_body URes pt j γl γf s Rlk pid V ks m av av2 eb.
+Proof.
+  rewrite /wp_forkret_body /wp_forkret_nf_body /wp_forkret_gen_body.
+  intros Hnf Hj Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw.
+  iIntros "#Htext #Hwire #Hmap Hpc _ Hcg Hcpu Htc Hclm #Hlk Hlocked HR #Hks Hpv Hyield".
+  iApply (Hnf Hj Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw
+            with "Htext Hwire Hmap Hpc [] Hcg Hcpu Htc Hclm Hlk Hlocked HR Hks Hpv Hyield").
+  done.
+Qed.
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
    tail runs [SpecUserretClosed]'s theorem, which is stated at
@@ -225,3 +301,25 @@ Module Type FORKRET.
       wp_forkret_body (fun h : CpuId => usertrap_res_bare (CID := h))
         pt j γl γf s Rlk pid V ks m av av2 eb.
 End FORKRET.
+
+(* ... and the same interface at the no-[first] reading.  [ProofForkretPark.v]
+   is a functor over THIS one: a parked process is resumed by a scheduler
+   that knows nothing about the boot client's one-shot, so the park argument
+   has no [first] points-to to hand forkret and the [FORKRET] interface is
+   the wrong hypothesis to write it against.  Assumed in [LinkForkretNF.v]
+   (and only there); [wp_forkret_body_of_nf] above records that assuming it
+   is a strengthening of the proven contract, not a different one. *)
+Module Type FORKRET_NF.
+  Include SpecUsertrap.USERTRAP_RES.
+  Parameter wp_forkret_nf :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (pt : uptd) (j : nat)
+      (γl γf : gname) (s : string) (Rlk : iProp Σ)
+      (pid : mword 32) (V : pprivate)
+      (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
+      wp_forkret_nf_body (fun h : CpuId => usertrap_res_bare (CID := h))
+        pt j γl γf s Rlk pid V ks m av av2 eb.
+End FORKRET_NF.

@@ -89,7 +89,6 @@ Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import ConsoleInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -103,8 +102,7 @@ Local Open Scope Z_scope.
    (50), on top of sleep (22) and acquire/release (10); the constant is
    piperead's, which is the honest bound for "a blocking read into user
    memory". *)
-Definition consoleread_stack : nat := 62%nat.
-
+Notation consoleread_stack := (70%nat) (only parsing).
 Definition wp_consoleread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -137,7 +135,7 @@ Definition wp_consoleread_sconf_body
      (myproc, killed, sleep_prepare, sleep, either_copyout) surface a lock
      of their own through this contract. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -148,7 +146,6 @@ Definition wp_consoleread_sconf_body
   proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -157,7 +154,7 @@ Definition wp_consoleread_sconf_body
          between "failed" and "all of it". *)
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗

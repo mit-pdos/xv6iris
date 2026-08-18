@@ -39,7 +39,7 @@
       pushed at +0x2a only when the loop runs; the [npages == 0] branch at
       +0x26 jumps to +0x78, PAST the [ld s1] at +0x76.  So the epilogue
       lemma [uu_epilogue] covers +0x78..+0x88 and takes slot 3 as an
-      [∃ w, pa_stk sp0 3 ↦₈ w] argument (the vmfault join recipe).
+      [∃ w, pa_stk sp0 3 ↦₈[KT1] w] argument (the vmfault join recipe).
 
    3. THE +0x4a JOIN.  Three arms reach the loop tail -- walk found no leaf,
       the leaf word is invalid, and the freed-and-cleared arm -- and all three
@@ -210,20 +210,20 @@ Section ProofUvmunmap.
     mm !!! Regidx csp_rs1 = sp0 ->
     mj !!! Regidx csp_rs1 = spr ->
     uu_thr1 mm mj ->
-    sie_cap_gpr mj (K - 8) b p -∗
+    sie_cap_gpr KT1 mj (K - 8) b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x78) : mword 64) -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx Rs0) -∗
-    (∃ w : mword 64, pa_stk sp0 3 ↦₈ w) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx Rs2) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
-    pa_stk sp0 6 ↦₈ (mm !!! Regidx Rs4) -∗
-    pa_stk sp0 7 ↦₈ (mm !!! Regidx Rs5) -∗
-    pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
+    pa_stk sp0 1 ↦₈[KT1] (mm !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[KT1] (mm !!! Regidx Rs0) -∗
+    (∃ w : mword 64, pa_stk sp0 3 ↦₈[KT1] w) -∗
+    pa_stk sp0 4 ↦₈[KT1] (mm !!! Regidx Rs2) -∗
+    pa_stk sp0 5 ↦₈[KT1] (mm !!! Regidx Rs3) -∗
+    pa_stk sp0 6 ↦₈[KT1] (mm !!! Regidx Rs4) -∗
+    pa_stk sp0 7 ↦₈[KT1] (mm !!! Regidx Rs5) -∗
+    pa_stk sp0 8 ↦₈[KT1] (mm !!! Regidx Rs6) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -353,8 +353,8 @@ Section ProofUvmunmap.
                    = pa_stk (add_vec (E7 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8).
     { rewrite Hwv HE7sp. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 8) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 8) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
       iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
       iSplitL "Hk3"; [iExists _; iExact "Hk3" |].
@@ -440,7 +440,7 @@ Section ProofUvmunmap.
        /\ uptg_view (uu_fx df fx (svpn_of va) (S done))
                     (uu_um df um (svpn_of va) (S done)) m'
        /\ pt_base t' = uroot ⌝ -∗
-     sie_cap_gpr mt (K - 8) b p -∗
+     sie_cap_gpr KT1 mt (K - 8) b p -∗
      cpu_own ilvl eb p b lks -∗
      pc_is (mword_of_int (KernelSyms.uvmunmap + 0x4a) : mword 64) -∗
      ptree_own 2 (DfracOwn 1) t' -∗
@@ -461,7 +461,7 @@ Section ProofUvmunmap.
        /\ uu_s5 df ms
        /\ ms !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
        /\ uu_thr mm ms ⌝ -∗
-     sie_cap_gpr ms (K - 8) b p -∗
+     sie_cap_gpr KT1 ms (K - 8) b p -∗
      cpu_own ilvl eb p b lks -∗
      pc_is (mword_of_int (KernelSyms.uvmunmap + 0x46) : mword 64) -∗
      ptree_own 2 (DfracOwn 1) t -∗
@@ -505,7 +505,7 @@ Section ProofUvmunmap.
     (* the loop's kfree only runs when [do_free != 0] ([destruct df] below);
        at [df = false] the run never touches a lock at all. *)
     (if df then locks_below lks "kmem" else True) ->
-    sie_cap_gpr m (K - 8) b p -∗
+    sie_cap_gpr KT1 m (K - 8) b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x50) : mword 64) -∗
@@ -516,7 +516,7 @@ Section ProofUvmunmap.
       ∀ mj : regfile,
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜uu_thr mm mj⌝ -∗
-      sie_cap_gpr mj (K - 8) b p -∗
+      sie_cap_gpr KT1 mj (K - 8) b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.uvmunmap + 0x76) : mword 64) -∗
       uptg (uu_fx df fx (svpn_of va) npages)
@@ -532,7 +532,7 @@ Section ProofUvmunmap.
              Hsp Hs2 Hs3 Hs4 Hs5 Hs6 Hthr Hbelow;
       [ destruct (Nat.nle_succ_0 0 Hrem) |].
     iIntros "Hcg Hcnt #Htext Hpc Hptree Hown Henv Hcont".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
@@ -663,7 +663,7 @@ Section ProofUvmunmap.
                      = mword_of_int (KernelSyms.uvmunmap + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp50) in "Hpc".
       iAssert (kalloc_env γa None) as "Henv2".
-      { iExists γk. iFrame "Hlock Havail Hpanic". }
+      { iExists γk. iFrame "Hlock Havail". }
       iDestruct (cpu_own_transport CIDt CIDw ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDw) ltac:(wp_next_chain)
@@ -739,7 +739,7 @@ Section ProofUvmunmap.
       change (2 ^ 38)%Z with 274877906944%Z. exact Hc38. }
     assert (Hret5a : ret_pc (L4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmunmap + 0x5a)).
     { rewrite /L4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf L4 t m_ad (K - 8)%nat (DfracOwn 1) b p
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 L4 t m_ad (K - 8)%nat (DfracOwn 1) b p
               ltac:(lia) HL4a0 HL4a2 Hwkva Hrep
               with "Hcg Htext Hpc Hptree").
     iIntros (CIDx Hsx mw) "Hcg Hpc Hptree %Hwcs %Hpay".
@@ -850,7 +850,7 @@ Section ProofUvmunmap.
         (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x5e)) Ra5 Ra0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.uvmunmap + 0x5e)) Ra5 Ra0
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               B1 (K - 8) w0 b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -974,7 +974,7 @@ Section ProofUvmunmap.
         replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
           with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         apply kv_addv_zero. }
-      iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x46)) Rs1
+      iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.uvmunmap + 0x46)) Rs1
                 (mword_of_int 0 : mword 12) ms (K - 8) w0 b
                 with "Hcg Hpc Hi46s [Hcell]").
       { iEval (rewrite Hzoff; rgne; rewrite Hss1 Ha0v). iExact "Hcell". }
@@ -1135,7 +1135,7 @@ Section ProofUvmunmap.
     { rewrite /B6 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (cpu_own_transport CID0 CIDz9 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf KT1 γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) B6 None ilvl eb p (K - 8)%nat b lks
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl Hbelow
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
@@ -1220,7 +1220,7 @@ Section ProofUvmunmap.
     (* threaded straight to [uu_loop]: kfree's "kmem" bound applies only
        when [do_free != 0]. *)
     (if df then locks_below lks "kmem" else True) ->
-    sie_cap_gpr mm K b p -∗
+    sie_cap_gpr KT1 mm K b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is pcE -∗
@@ -1228,7 +1228,7 @@ Section ProofUvmunmap.
     kalloc_env γa None -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
@@ -1281,7 +1281,7 @@ Section ProofUvmunmap.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> mm) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hk1".   iDestruct "S2" as (u2) "Hk2".
     iDestruct "S3" as (u3) "Hk3".   iDestruct "S4" as (u4) "Hk4".

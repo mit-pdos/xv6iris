@@ -57,17 +57,15 @@ Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash.
 Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
-Require Import SchedCtx PanicStub.
+Require Import SchedCtx.
 Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts.
 From Kernel Require KernelInstrs.
@@ -129,16 +127,23 @@ Section ProofUsertrapTail.
     locks_below lks "log" ->
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
+    (* THE DYING THREAD'S STACK CLOSER, straight through.  This dead end adds
+       no frame of its own -- it is a [jal] and nothing else -- so kexit's
+       premise is this one verbatim.  Its three call sites build it from
+       [ut_caps]' [is_kstack] and usertrap's own frame; see
+       [ProcDefs.kstack_closer_top]. *)
+    kstack_closer (un_pj N) (m !!! Regidx csp_rs1) (trap_res b + nx)%nat -∗
     ut_hold Rsys N V b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
-    iDestruct "Hcaps" as "(#Hpi & #Hpa & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
+    iIntros "#Htext Hpc Hcg Hcl (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    iDestruct "Hcaps" as "(#Hpi & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
                            & #Hgeom & #Hav & #Hic)".
     iDestruct "Hown" as "(Hbs & Hbm & Hip & Hfd & Hir & Hpv & _)".
+    iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
     iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
               (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
               (un_bn N) (un_lg N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N)
@@ -147,7 +152,7 @@ Section ProofUsertrapTail.
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
               None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
-              with "Hcg Hcpu Hcsrs Hclm Htext Hpc Hpi Hpa Hw Hft Hkm Hav
+              with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
     all: try lkbelow.
   Qed.
@@ -198,7 +203,7 @@ Section UtRet2.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xb2)) -∗
     (* ---- exactly what prepare_return handed back ---- *)
-    sie_cap_gpr mf (trap_res b + nx)%nat false (un_pj N) -∗
+    sie_cap_gpr KT1 mf (trap_res b + nx)%nat false (un_pj N) -∗
     cpu_own 0%nat false (un_pj N) false lks -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ mepc_val uepc -∗
@@ -207,7 +212,7 @@ Section UtRet2.
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     stvec ↦ᵣ uservec_tvec -∗
     ghost_var sie_gname (1/4) vb -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     ut_env Rsys N V -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -220,7 +225,7 @@ Section UtRet2.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
-    unfold K_usertrap, kv_frame_slots, K_syscall, K_sys_exit, K_kexit in Hav'.
+    
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
              Hkptr [#Hcaps Hown] Hframe Hcont".
@@ -236,7 +241,7 @@ Section UtRet2.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_priv_open with "Hsc") as (msf) "(Hcl & Hpriv & Hmsown)".
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsf)".
-    iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Hwit)".
     iDestruct (sie_arm_half_agree false (un_pj N) msf with "Hhalf Harm") as %Hsie0.
     iDestruct (ghost_var_agree with "Hhalf Hq4") as %Hvb.
     rewrite Hsie0 in Hvb. rewrite -Hvb.
@@ -255,13 +260,13 @@ Section UtRet2.
       rewrite /sconf_msown /sret_tie Hsie0 Hspp Hspie.
       iSplitL "Hms"; [iExact "Hms"|]. iSplitL "Hhalf"; [iExact "Hhalf"|].
       iSplitL "Htie"; [iExact "Htie"|]. iPureIntro. exact Hmsf. }
-    iAssert (sie_cap_gpr mf (trap_res b + nx)%nat false (un_pj N))
+    iAssert (sie_cap_gpr KT1 mf (trap_res b + nx)%nat false (un_pj N))
       with "[Hhs Hsc Hstk Hstr Harm Hfile]" as "Hcg".
     { rewrite /sie_cap_gpr /sie_cap.
       iSplitL "Hhs"; [iExact "Hhs"|]. iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitR "Hfile"; [| iExact "Hfile"].
       iSplitL "Hstk"; [iExact "Hstk"|]. iSplitL "Hstr"; [iExact "Hstr"|].
-      iExact "Harm". }
+      iSplitL "Harm"; [iExact "Harm"|]. iExact "Hwit". }
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     (* [ut_caps] is NOT destructured here: +0xb2..+0xc6 calls nothing, so no
        member of it is needed, and destructuring an intuitionistic hypothesis
@@ -289,7 +294,7 @@ Section UtRet2.
                       = p_pagetable (un_pj N))
       by (rgne; rewrite Hmfs1; reflexivity).
     iEval (rewrite -Haddrpg) in "Hpgt".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xb2)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xb2)) Ra0 Rs1
               (mword_of_int 80 : mword 12) mf (trap_res b + nx)%nat
               (page_base (ud_root (pv_upt V))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -488,8 +493,8 @@ Section UtRet2.
     iEval (rewrite Hp2) in "Hbs0".
     iEval (rewrite Hp3) in "Hbs1".
     iEval (rewrite Hp4) in "Hbs2".
-    iAssert (stack_own ksp 4) with "[Hbra Hbs0 Hbs1 Hbs2]" as "Hfr".
-    { iApply (stack_own_4_intro ksp with "Hbra Hbs0 Hbs1 Hbs2"). }
+    iAssert (stack_own (KTR := KT1) ksp 4) with "[Hbra Hbs0 Hbs1 Hbs2]" as "Hfr".
+    { iApply (stack_own_4_intro (KTR := KT1) ksp with "Hbra Hbs0 Hbs1 Hbs2"). }
     iEval (rewrite -Hwv) in "Hfr".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (UT + 0xc4))
               (mword_of_int 2 : mword 6) S8 (trap_res b + nx)%nat 4 false Hpop
@@ -610,7 +615,7 @@ Section UtRet2.
          too, are NOT in [ut_trap]: they go to the boundary raw (above). *)
       iSplitL "Hcap Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
       + rewrite /ut_trap /ut_stack /ut_ghosts.
-        iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+        iDestruct "Hcap" as "(Hstk & Hstr & Harm & _)".
         iSplitL "Hstk". { rewrite /S9 upd_eq. iExact "Hstk". }
         iSplitL "Hstr". { iExact "Hstr". }
         iSplitL "Harm". { iExact "Harm". }
@@ -653,7 +658,7 @@ Section UtRet.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
     ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -664,7 +669,7 @@ Section UtRet.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iPoseProof (uti_0ae with "Htext") as "Hiae".
@@ -673,7 +678,7 @@ Section UtRet.
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
     destruct Hepcx as [uepc Hepc].
     iAssert (is_kstack (un_pj N) (un_ks N)) with "[]" as "#Hkst".
-    { iDestruct "Hcaps" as "(_ & _ & _ & #H & _)". iExact "H". }
+    { iDestruct "Hcaps" as "(_ & _ & #H & _)". iExact "H". }
     (* ---- +0xae: jal prepare_return ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0xae)) Rra
               (mword_of_int 2096658 : mword 21) m nx b
@@ -701,7 +706,7 @@ Section UtRet.
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) V
-              M1 nx (un_pj N) uepc b lks ltac:(unfold K_prepare_return; lia) Hepc
+              M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn Hcg Hcpu Hclmpay Hsepc Hscause Hstval
@@ -777,7 +782,7 @@ Section UtA6.
     locks_below lks "log" ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
     ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -788,7 +793,7 @@ Section UtA6.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iPoseProof (uti_0a6 with "Htext") as "Hia6".
@@ -796,8 +801,6 @@ Section UtA6.
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     (* ---- +0xa6: c.mv a0,s1 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (UT + 0xa6)) Ra0 Rs1 m nx b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -944,11 +947,32 @@ Section UtA6.
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
       iDestruct (cpu_claim_ext_transport CID3 CID7 b (un_pj N)
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
+      (* ---- THE DYING THREAD'S STACK CLOSER, BUILT HERE.  usertrap was
+         entered with sp AT THE PAGE TOP ([Hksp]), which is the one point in
+         a trap round where the closer is free ([ProcDefs.kstack_closer_top]:
+         nothing is owed above the top).  Wrapping usertrap's own frame
+         around it re-anchors it at the sp the walk is running on -- and that
+         frame is dead, because kexit does not return. ---- *)
+      assert (HKsp : (<[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
+                       !!! Regidx csp_rs1 = pa_stk ksp 4).
+      { rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite /K2 upd_ne; [| vm_compute; discriminate].
+        rewrite /K1 upd_ne; [exact Hmfsp | vm_compute; discriminate]. }
+      iAssert (is_kstack (un_pj N) (un_ks N)) as "#Hkstk".
+      { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+      iDestruct (ut_frame_stack with "Hframe") as "Hfr".
+      iDestruct (kstack_closer_top (un_pj N) (un_ks N) av
+                   ltac:(unfold KSTACK_AV; lia) with "Hkstk") as "Hkcl".
+      iEval (rewrite Hksp) in "Hkcl".
+      iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
+                   with "Hkcl Hfr") as "Hkcl4".
+      iEval (rewrite -Hnx -HKsp) in "Hkcl4".
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx b lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
-                with "Htext Hpc Hcg [-]").
+                nx b lks Hwf' ltac:(lia) ltac:(lkbelow)
+                with "Htext Hpc Hcg Hkcl4 [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -1015,7 +1039,7 @@ Section UtFa.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
     ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -1026,7 +1050,7 @@ Section UtFa.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iPoseProof (uti_0fc with "Htext") as "Hifc".
@@ -1037,8 +1061,6 @@ Section UtFa.
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     (* ---- +0xfc: c.li a5,2 ---- *)
     iApply (wp_cli_s_sconf (mword_of_int (UT + 0xfc)) Ra5 (mword_of_int 2 : mword 6)
               (add_vec zero_reg (sign_extend' 64

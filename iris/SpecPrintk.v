@@ -32,7 +32,7 @@
        (c)), and [UartTxInv.is_txlock γl γd], which every byte below needs.
        With them comes the ordinary spinlock-caller accounting: [cpu_own]
        threaded net-zero (printk leaves the interrupt level as it found it),
-       [panic_wp_any] for acquire's "already holding" arm, and a transient
+       and a transient
        bound on [noff] -- [+2] here, not [+1], because printk holds pr.lock
        while the cone below takes tx_lock.
 
@@ -94,6 +94,7 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
 Require Export PrintkArgs.
+Require Import SpecPanic.
 From Kernel Require KernelSyms.
 
 
@@ -104,10 +105,9 @@ From Kernel Require KernelSyms.
 
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
    printint's 24. *)
-Definition printk_stack : nat := 48%nat.
-
+Notation printk_stack := (48%nat) (only parsing).
 Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
+    (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (dqf : dfrac)
     (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string) :=
@@ -134,7 +134,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
      acquire (rank 15 > 14) follows from this by
      [LockRank.locks_below_union_singleton]. *)
   locks_below lks "pr" ->
-  sie_cap_gpr m0 K b p -∗
+  sie_cap_gpr kt m0 K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   fmt ↦ₛ{ dqf } f -∗
@@ -150,7 +150,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
   uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
-    sie_cap_gpr mf K b p -∗
+    sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0
@@ -164,11 +164,11 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
 Module Type PRINTK.
   Parameter wp_printk_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
+      (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string),
-      wp_printk_sconf_body γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
+      wp_printk_sconf_body kt γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
 End PRINTK.
 
 (* ========================================================================
@@ -228,11 +228,25 @@ Section PrintkGen.
   Global Instance printk_env_persistent γpr γd γv : Persistent (printk_env γpr γd γv).
   Proof. apply _. Qed.
 
+  (* printk_env IS panic_env plus an existential [γl] and the trivial trace
+     witness: pr.lock's resource is [emp] on both sides ([pr_res] is [emp])
+     and the address is the same [KernelSyms.pr] under two names.  So any site
+     already carrying the general printk credential can call panic without
+     gaining a premise -- which is what makes the first conversions free. *)
+  Lemma printk_env_panic γpr γd γv :
+    printk_env γpr γd γv -∗ SpecPanic.panic_env.
+  Proof.
+    iIntros "(#Hlk & _ & #Hdev & Htx & _)".
+    iDestruct "Htx" as (γl) "#Htx".
+    iApply (SpecPanic.panic_env_of γpr γl γd γv with "[] Hdev Htx").
+    rewrite /pr_res /pr_lock /PrintkArgs.pk_pr_lock. iExact "Hlk".
+  Qed.
+
 End PrintkGen.
 
 Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γpr : gname) (γd : uart_names) (γv : disk_names)
+    (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -254,7 +268,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* acquire's order premise, at the LOWEST rank this function (or a callee)
      acquires: "pr" (rank 14), see [wp_printk_sconf_body]. *)
   locks_below lks "pr" ->
-  sie_cap_gpr m0 K b pj -∗
+  sie_cap_gpr kt m0 K b pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the interrupt level is left exactly as found: acquire/release pair *)
   cpu_own 0%nat eb pj b lks -∗
@@ -264,7 +278,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ mf : regfile,
-    sie_cap_gpr mf K b pj -∗
+    sie_cap_gpr kt mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     cpu_own 0%nat eb pj b lks -∗
@@ -275,22 +289,22 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
 
 (* printk's general contract as a PROP, so a caller can carry it as a
    HYPOTHESIS rather than instantiate a functor -- the [Prop] twin of
-   [SpecPanic.panic_wp_any], and the same idiom [ProofBmap.balloc_contract]
+   [SpecPanic]'s own credentials, and the same idiom [ProofBmap.balloc_contract]
    uses.  [LinkPrintk.printk_gen_contract_holds] proves it unconditionally, so
    a holder pays nothing beyond the standing platform/stdlib axioms. *)
 Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
-    (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
+    {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
   forall (CIDp : CpuId)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-    wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
+    wp_printk_gen_sconf_body kt (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
+      (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-      wp_printk_gen_sconf_body γpr γd γv m0 K eb pj dqf f descs b lks.
+      wp_printk_gen_sconf_body kt γpr γd γv m0 K eb pj dqf f descs b lks.
 End PRINTK_GEN.

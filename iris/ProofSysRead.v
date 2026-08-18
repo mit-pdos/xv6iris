@@ -147,12 +147,12 @@ Section ProofSysRead.
   Lemma sr_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (bb : bool) (pp : mword 64) :
     (0 < kk)%nat ->
-    sie_cap_gpr mm kk bb pp -∗
+    sie_cap_gpr KT1 mm kk bb pp -∗
     ⌜(8 <= uint (mm !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res bb + kk)%nat with "Hstk").
-    destruct bb; unfold trap_res, kv_frame_slots; lia.
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res bb + kk)%nat with "Hstk").
+    destruct bb; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)
@@ -173,19 +173,19 @@ Section ProofSysRead.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b pp -∗
+    sie_cap_gpr KT1 Mt (av - 6)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_read + 0x40) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b pp -∗
+        sie_cap_gpr KT1 mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -244,8 +244,8 @@ Section ProofSysRead.
       by (rewrite Hwv; exact HT2sp).
     (* NO [stack_own_6_elim]/[_intro] exists: ProofSysPipe's slot recipe is
        what rebundles a frame of any width. *)
-    iAssert (stack_own sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -327,7 +327,7 @@ Section ProofSysRead.
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hn0 Hnmax Heb.
     (* every budget, or [lia] cannot see past [fileread_stack] -- it is an
        expression, not a literal, on purpose (SpecSysRead.v). *)
-    unfold sys_read_stack, fileread_stack, K_readi in Hav.
+    
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
@@ -342,7 +342,7 @@ Section ProofSysRead.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): fileread
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -384,7 +384,7 @@ Section ProofSysRead.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M1 upd_eq; apply stk_push_48).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(P1 & P2 & P3 & P4 & P5 & P6 & _)".
     iDestruct "P1" as (u1) "Hs1". iDestruct "P2" as (u2) "Hs2".
     iDestruct "P3" as (w3) "Hs3". iDestruct "P4" as (w4) "Hs4".
@@ -510,7 +510,7 @@ Section ProofSysRead.
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
-              ltac:(unfold argaddr_stack; lia) Hpv
+              ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
     iIntros (CID8 Hs8 A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs5".
     iEval (rewrite HM5a1) in "Hs5".
@@ -689,7 +689,7 @@ Section ProofSysRead.
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
     { iApply (ofd_out_null _ _ HN4a1). }
     iIntros (CID17 Hs17 A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
@@ -923,9 +923,9 @@ Section ProofSysRead.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
-                _ ltac:(unfold fileread_stack, K_readi; lia) Hkk Hj Hgs Hlens
+                _ ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 Hn0 Hnmax Heb
-                with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".

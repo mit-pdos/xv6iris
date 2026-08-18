@@ -79,7 +79,6 @@ Require Import FileInvDefs.
 Require Import PipeInvDefs.
 Require Import KallocInv.
 Require Import ProcPtOwn.
-Require Import PanicStub.
 Require Import ProcInv.
 Require Import WpUart DiskPtsto FsBlocks LogInv.
 Require Import BioDefs.
@@ -87,7 +86,6 @@ Require Import ConsoleInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
                                 carve's slot selects out of the family. *)
@@ -96,7 +94,9 @@ Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
    name is meant here except through the two contracts. *)
 Require Import DinodeEnc.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
 Require Import SpecPiperead SpecIlock SpecReadi SpecIunlock SpecConsoleread.
 Require Import SpecFileread.
 Require Import CodeFileread ProofFilereadParts.
@@ -126,17 +126,17 @@ Qed.
    [lia] that discharges them cannot run at the call site, where the context
    holds a register file (durable-notes, "an [mword] merely in CONTEXT"). *)
 Lemma fr_K6 (K : nat) : (6 + K_readi <= K)%nat -> (6 <= K)%nat.
-Proof. unfold K_readi. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_pipe (K : nat) : (6 + K_readi <= K)%nat -> (piperead_stack <= K - 6)%nat.
-Proof. unfold K_readi, piperead_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_cons (K : nat) : (6 + K_readi <= K)%nat -> (consoleread_stack <= K - 6)%nat.
-Proof. unfold K_readi, consoleread_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_ilock (K : nat) : (6 + K_readi <= K)%nat -> (K_ilock <= K - 6)%nat.
-Proof. unfold K_readi, K_ilock. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_readi (K : nat) : (6 + K_readi <= K)%nat -> (K_readi <= K - 6)%nat.
 Proof. lia. Qed.
 Lemma fr_av_iunlock (K : nat) : (6 + K_readi <= K)%nat -> (K_iunlock <= K - 6)%nat.
-Proof. unfold K_readi, K_iunlock. lia. Qed.
+Proof. lia. Qed.
 
 (* a [short] field's unsigned value is below 2^16 -- the range the major's
    zero extension and the [devsw] index arithmetic both need. *)
@@ -235,8 +235,63 @@ Qed.
 Lemma fr_upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. destruct V; reflexivity. Qed.
 
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  fileread's one live arm is [panic("fileread")] at  *)
+(*  +0xa6 -- the default of the type dispatch; the literal sits at         *)
+(*  0x80007598 in .rodata, eight characters and a NUL.  Hoisted as NAMED   *)
+(*  pure lemmas rather than inline [ltac:] -- see optimization.md, and the *)
+(*  panic recipe's third trap ([lia]/[lkbelow] against an evar).           *)
+(* ===================================================================== *)
+Definition fr_msg_a : Z := 0x80007598.
+Definition fr_msg : string := "fileread".
+
+Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
+
+Lemma fr_panic_K (K : nat) : (fileread_stack <= K)%nat -> (panic_stack <= K - 6)%nat.
+Proof. lia. Qed.
+
+Lemma fr_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+(* "bcache" (rank 2) is below "pr" (16).  A CLOSED lemma over the plain
+   gset, not an inline [ltac:(lkbelow)]: that backtracks across four rules
+   and each arm ends in [vm_compute; lia], the documented search-forever
+   case once a bitvector is in the context. *)
+Lemma fr_panic_below (lks : gset string) :
+  locks_below lks "bcache" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "bcache" "pr" H). vm_compute; lia. Qed.
+
+Lemma fr_msg_nz : eq_vec (mword_of_int fr_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fr_msg_nonul : PrintkFmt.nonul fr_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fr_msg_bytes :
+  forall j b, cstring_bytes fr_msg !! j = Some b ->
+    KernelData.kernel_data !! (fr_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 9 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section FilereadMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma fr_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int fr_msg_a : mword 64) ↦ₛ□ fr_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string fr_msg_a fr_msg _ eq_refl
+              ltac:(unfold text_end, fr_msg_a; lia) fr_msg_bytes with "Hd").
+  Qed.
+End FilereadMsg.
+
 Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
-                     (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD) : FILEREAD.
+                     (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD)
+                     (PN : PANIC) : FILEREAD.
 
 Section ProofFileread.
   (* NO [!icacheG Σ]: [fileG] bundles it, and binding both gives two
@@ -346,9 +401,9 @@ Section ProofFileread.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb Hbelow.
-    unfold fileread_stack in HK.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -383,7 +438,7 @@ Section ProofFileread.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
     assert (HsprS : spr = pa_stk sp0 6) by exact Hpush.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -456,7 +511,7 @@ Section ProofFileread.
                    = a_freadable k).
     { rewrite (rget_ne R2 Ra0 ltac:(vm_compute; discriminate)) HR2a0. reflexivity. }
     iEval (rewrite -Hprd) in "Hcrd".
-    iApply (wp_lbu_s_sconf (mword_of_int (FR + 0x0a)) Ra5 Ra0
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x0a)) Ra5 Ra0
               (mword_of_int 8 : mword 12) R2 (K - 6)%nat (fc_readable Cf : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a Hcrd").
@@ -704,7 +759,7 @@ Section ProofFileread.
       { rewrite (rget_ne B3 Ra0 ltac:(vm_compute; discriminate)) HB3a0.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hpty) in "Hcty".
-      iApply (wp_clw_s_sconf (mword_of_int (FR + 0x1a)) Ra5 Ra0
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x1a)) Ra5 Ra0
                 (mword_of_int 0 : mword 12) B3 (K - 6)%nat (fc_type Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a Hcty").
@@ -787,7 +842,7 @@ Section ProofFileread.
                       = a_fpipe k).
         { rewrite (rget_ne B5 Ra0 ltac:(vm_compute; discriminate)) HB5a0. reflexivity. }
         iEval (rewrite -Hpp) in "Hcpp".
-        iApply (wp_cld_s_sconf (mword_of_int (FR + 0x64)) Ra0 Ra0
+        iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x64)) Ra0 Ra0
                   (mword_of_int 16 : mword 12) B5 (K - 6)%nat (fc_pipe Cf) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi64 Hcpp").
@@ -833,7 +888,7 @@ Section ProofFileread.
         iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb pidv V n b
                   _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
-                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
+                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
         all: try lkbelow.
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
         iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
@@ -1010,7 +1065,7 @@ Section ProofFileread.
                          = a_fmajor k).
           { rewrite (rget_ne B6 Ra0 ltac:(vm_compute; discriminate)) HB6a0. reflexivity. }
           iEval (rewrite -Hpmj) in "Hcmaj".
-          iApply (wp_lh_s_sconf (mword_of_int (FR + 0x72)) Ra5 Ra0
+          iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x72)) Ra5 Ra0
                     (mword_of_int 36 : mword 12) B6 (K - 6)%nat (fc_major Cf : mword 16) b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hi72 Hcmaj").
@@ -1210,7 +1265,7 @@ Section ProofFileread.
              { rewrite (rget_ne D8 Ra5 ltac:(vm_compute; discriminate)) HD8a5.
                apply addv_sext0. }
              iEval (rewrite -Hpsl) in "Hslot".
-             iApply (wp_cld_s_sconf (mword_of_int (FR + 0x8e)) Ra5 Ra5
+             iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x8e)) Ra5 Ra5
                        (mword_of_int 0 : mword 12) D8 (K - 6)%nat (frn_rp fn (dev_major Cf)) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi8e Hslot").
@@ -1393,7 +1448,7 @@ Section ProofFileread.
                           (fr_av_cons K HK) Heb
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
-                                Hprocs Hpanic").
+                                Hprocs").
                 all: try lkbelow.
                 iIntros (CIDcr Hscr mf r P') "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
                                               Hpriv".
@@ -1685,7 +1740,7 @@ Section ProofFileread.
                             = a_fip k).
              { rewrite (rget_ne B7 Ra0 ltac:(vm_compute; discriminate)) HB7a0. reflexivity. }
              iEval (rewrite -Hpip) in "Hcip".
-             iApply (wp_cld_s_sconf (mword_of_int (FR + 0x2e)) Ra0 Ra0
+             iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x2e)) Ra0 Ra0
                        (mword_of_int 24 : mword 12) B7 (K - 6)%nat (fc_ip Cf) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi2e Hcip").
@@ -1752,7 +1807,7 @@ Section ProofFileread.
                        I2 (K - 6)%nat eb b
                        _ (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
-                       with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
              all: try lkbelow.
@@ -1835,7 +1890,7 @@ Section ProofFileread.
                              = a_foff k).
              { rewrite (rget_ne J1 Rs1 ltac:(vm_compute; discriminate)) HJ1s1. reflexivity. }
              iEval (rewrite -Hpoff) in "Hoff".
-             iApply (wp_clw_s_sconf (mword_of_int (FR + 0x36)) Ra3 Rs1
+             iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x36)) Ra3 Rs1
                        (mword_of_int 32 : mword 12) J1 (K - 6)%nat v b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi36 Hoff").
@@ -1874,7 +1929,7 @@ Section ProofFileread.
                              = a_fip k).
              { rewrite (rget_ne J4 Rs1 ltac:(vm_compute; discriminate)) HJ4s1. reflexivity. }
              iEval (rewrite -Hpip2) in "Hcip".
-             iApply (wp_cld_s_sconf (mword_of_int (FR + 0x3c)) Ra0 Rs1
+             iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x3c)) Ra0 Rs1
                        (mword_of_int 24 : mword 12) J4 (K - 6)%nat (fc_ip Cf) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi3c Hcip").
@@ -1976,7 +2031,7 @@ Section ProofFileread.
                by (rewrite HJ6a4; apply rd_arg32_small; lia).
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iApply (Readi.wp_readi_sconf γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Readi.wp_readi_sconf KT0 γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
                        (frn_cov fn) (frn_logstart fn) icfg_dev (fc_ip Cf)
@@ -1988,7 +2043,7 @@ Section ProofFileread.
                        _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
                        HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4' Hbelow
-                       with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").
              all: try lkbelow.
@@ -2108,7 +2163,7 @@ Section ProofFileread.
                 { rewrite (rget_ne M1 Rs1 ltac:(vm_compute; discriminate)) HM1s1.
                   reflexivity. }
                 iEval (rewrite -Hpip3) in "Hcip".
-                iApply (wp_cld_s_sconf (mword_of_int (FR + 0x4e)) Ra0 Rs1
+                iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x4e)) Ra0 Rs1
                           (mword_of_int 24 : mword 12) M1 (K - 6)%nat (fc_ip Cf) b
                           ltac:(vm_compute; discriminate) ltac:(rdok)
                           with "Hcg Hpc Hi4e Hcip").
@@ -2162,7 +2217,7 @@ Section ProofFileread.
                           lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
-                          with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
+                          with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
                 all: try lkbelow.
@@ -2272,7 +2327,7 @@ Section ProofFileread.
                 { rewrite (rget_ne M1 Rs1 ltac:(vm_compute; discriminate)) HM1s1.
                   reflexivity. }
                 iEval (rewrite -Hpoff2) in "Hoff".
-                iApply (wp_clw_s_sconf (mword_of_int (FR + 0x48)) Ra5 Rs1
+                iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x48)) Ra5 Rs1
                           (mword_of_int 32 : mword 12) M1 (K - 6)%nat v b
                           ltac:(vm_compute; discriminate) ltac:(rdok)
                           with "Hcg Hpc Hi48 Hoff").
@@ -2387,7 +2442,7 @@ Section ProofFileread.
                 { rewrite (rget_ne M4 Rs1 ltac:(vm_compute; discriminate)) HM4s1.
                   reflexivity. }
                 iEval (rewrite -Hpip3) in "Hcip".
-                iApply (wp_cld_s_sconf (mword_of_int (FR + 0x4e)) Ra0 Rs1
+                iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x4e)) Ra0 Rs1
                           (mword_of_int 24 : mword 12) M4 (K - 6)%nat (fc_ip Cf) b
                           ltac:(vm_compute; discriminate) ltac:(rdok)
                           with "Hcg Hpc Hi4e Hcip").
@@ -2441,7 +2496,7 @@ Section ProofFileread.
                           lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
-                          with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
+                          with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
                 all: try lkbelow.
@@ -2520,7 +2575,7 @@ Section ProofFileread.
                 { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
                   iFrame "Hsb Hbslot". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
-                [SpecPanic.panic_wp_any] closes the arm; panic never
+                [SpecPanic] discharges the arm; panic never
                 returns, so there is nothing after the [jal]. *)
              iPoseProof (fri_9e with "Htext") as "Hi9e".
              iPoseProof (fri_a2 with "Htext") as "Hia2".
@@ -2569,8 +2624,30 @@ Section ProofFileread.
                        = mword_of_int KernelSyms.panic)
                by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Htgtpanic) in "Hpc".
-             iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpanic0".
-             iApply ("Hpanic0" with "Htext Hpc Hcg").
+             (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+                a0 holds &"fileread"; [kernel_data] mints the literal and
+                [panic_env] is the console bundle printk needs.  [cpu_own]
+                has to arrive AT THE PANIC HART (CID22), not at the one the
+                arm was entered on. *)
+             iPoseProof (fr_msg_str with "Hkd") as "#Hstr".
+             iDestruct (cpu_own_transport CID CID22 0%nat eb pj b
+                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+             (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE.
+                [wp_jal_s_sconf] hands back [sie_cap_gpr (<[rd := pc+4]> m)],
+                so passing [P2] makes the unifier grind on
+                [P2 =?= <[Rra := _]> P2] and [iSpecialize] never returns. *)
+             pose (P3 := <[Regidx Rra := regval_into_reg
+                            (add_vec_int (mword_of_int (FR + 0xa6) : mword 64) 4)]> P2).
+             assert (Ha0msg : P3 !!! Regidx Ra0 = (mword_of_int fr_msg_a : mword 64))
+               by pcw.
+             iApply (PN.wp_panic_sconf KT1 (CID := CID22) P3 (K - 6)%nat
+                       0%nat eb b pj (PkAStr DfracDiscarded fr_msg) lks
+                       (fr_panic_K K HK) eq_refl fr_panic_noff
+                       (fr_panic_below lks Hbelow)
+                       with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+             { rewrite /pk_desc_res Ha0msg.
+               iSplit; [iPureIntro; exact fr_msg_nonul|].
+               iSplit; [iPureIntro; exact fr_msg_nz|]. iExact "Hstr". }
   Qed.
 
 End ProofFileread.

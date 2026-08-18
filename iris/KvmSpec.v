@@ -22,7 +22,7 @@
           [sr_inv R] threading is gone.  The per-function spec STATEMENTS live
           in the Spec<F>.v files (SpecWalk / SpecMappages / SpecKvmmap /
           SpecProcMapstacks / SpecKvmmake / SpecKvminit); this file keeps only
-          the shared vocabulary ([kalloc_env], [panic_wp], [K_kvmmake]).
+          the shared vocabulary ([kalloc_env], [K_kvmmake]).
 
    2. THE MAP VIEW.  A table under construction is described by a finite
       map [m : gmap (mword 27) (mword 64)] (vpn -> leaf word), through
@@ -61,7 +61,7 @@
 
    5. PANIC.  kvmmap/kvmmake sit above panic() on their failure paths.
       panic never returns (prints, then spins) -- a safety-only WP for it
-      holds with ANY postcondition.  The specs thread a [panic_wp]
+      holds with ANY postcondition.  The specs used to thread a panic credential
       hypothesis of that shape rather than an axiom, so the day panic is
       proven (uartputc + a Löb spin loop) the callers close without
       restatement.  With the failure
@@ -86,7 +86,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import SmodeCore KallocInv WpLock.
-Require Export PanicStub.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -99,8 +98,10 @@ Import Defs.
 (*    the Bare∨KPT regime disjunction -- no [s_regime] parameter and no    *)
 (*    [sr_inv R] threading at the whole-function altitude).  What remains   *)
 (*    here is the vocabulary every one of those Spec files shares:          *)
-(*    [kalloc_env] (kalloc's ambient resources) and [panic_wp].            *)
+(*    [kalloc_env] (kalloc's ambient resources).                          *)
 (* ===================================================================== *)
+
+Notation K_kvmmake := (166%nat) (only parsing).
 
 Section KvmSpecs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
@@ -121,14 +122,7 @@ Section KvmSpecs.
     (∃ γk : gname * gname,
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
-      kalloc_avail γk on ∗
-      (* HART-GENERIC, deliberately: [kalloc_env] is a caller-supplied bundle
-         threaded across [b]-generic calls, and [panic_wp] reads the ambient
-         hart (through [pc_is] / [sie_cap_gpr] / [Loop]).  Carrying the
-         ambient form would strand the whole bundle at the entry hart the
-         moment an interrupts-enabled instruction is stepped.  Every other
-         conjunct here is already hart-free. *)
-      panic_wp_any)%I.
+      kalloc_avail γk on)%I.
 
   (* The panic contract now lives in SpecPanic.v (Require Export above), so
      the spinlock layer and the kvm chain share one statement. *)
@@ -151,9 +145,9 @@ Section KvmSpecs.
   Lemma kalloc_env_seal_Some (γ : gname) (n : nat) :
     kalloc_env γ (Some n) ==∗ kalloc_env γ None.
   Proof.
-    iIntros "(%γk & #Hlk & Hav & #Hp)".
+    iIntros "(%γk & #Hlk & Hav)".
     iMod (kalloc_avail_seal with "Hav") as "Hav".
-    iModIntro. iExists γk. iFrame "Hlk Hav Hp".
+    iModIntro. iExists γk. iFrame "Hlk Hav".
   Qed.
 
   (* the form a bundle-GENERIC proof needs: the caller's [on] is a variable,
@@ -191,6 +185,5 @@ Section KvmSpecs.
      3 L1 group tables + 98 L0 tables -- see the node accounting in
      claude-notes/completed/kvm-spec.md,
      pinned to [pt_nodes = 102] in the proof) + 64 kstack leaf pages. *)
-  Definition K_kvmmake : nat := 166.
 
 End KvmSpecs.

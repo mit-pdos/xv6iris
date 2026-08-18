@@ -128,8 +128,7 @@ Local Open Scope Z_scope.
 
 (* idup's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
    below that -- filedup's [K] budget exactly, and for the same frame. *)
-Definition K_idup : nat := 14%nat.
-
+Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
@@ -151,7 +150,7 @@ Definition wp_idup_sconf_body
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
@@ -162,7 +161,7 @@ Definition wp_idup_sconf_body
   inode_shr k s dev inum -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr

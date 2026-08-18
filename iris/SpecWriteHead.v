@@ -63,7 +63,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -81,8 +82,7 @@ Import Defs.
 
 (* write_head's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
    deepest callee is bread (40).  bwrite/brelse want less. *)
-Definition K_write_head : nat := 44%nat.
-
+Notation K_write_head := (62%nat) (only parsing).
 Definition wp_write_head_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
@@ -113,12 +113,12 @@ Definition wp_write_head_sconf_body
      recycle acquires) and brelse (its unlink/splice acquire); nothing in
      its cone touches a lower rank, so one premise covers both callees. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* NOT [log_ctx]: this helper holds no lock -- see LogInv.log_frozen *)
   log_frozen logstart dev -∗
@@ -162,9 +162,9 @@ Definition wp_write_head_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bs' : list (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

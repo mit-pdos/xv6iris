@@ -49,7 +49,7 @@
      truncates;
    - the budget interval [(n - iput_units) <= n' <= n], spend-at-most,
      because iput never holds log.lock;
-   - [panic_wp_any], which BOTH callees carry -- iunlock's three panic tests
+   - the panic credentials, which BOTH callees carry -- iunlock's three panic tests
      are dead but SpecIunlock still takes the resource, and iput's
      "sched locks" arm diverges through it (design §13.12, Route B).
 
@@ -72,7 +72,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -104,8 +105,7 @@ Local Open Scope Z_scope.
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
    its deepest callee is iput (60).  iunlock wants 26. *)
-Definition K_iunlockput : nat := 64%nat.
-
+Notation K_iunlockput := (76%nat) (only parsing).
 Definition wp_iunlockput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
@@ -155,17 +155,17 @@ Definition wp_iunlockput_sconf_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
      caller holds it because the TRAP gave it to it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
@@ -207,9 +207,9 @@ Definition wp_iunlockput_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -285,17 +285,17 @@ Definition wp_iunlockput_gen_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
      caller holds it because the TRAP gave it to it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
@@ -344,9 +344,9 @@ Definition wp_iunlockput_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

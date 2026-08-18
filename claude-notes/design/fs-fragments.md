@@ -176,6 +176,39 @@ R12. **Do not build on the current grey provenance** — today the only
      dimension (dl/crz credit) stays outside the algebra; only F3's
      syscall boundary can hide it.
 
+R14 (2026-08-16, C′ UN-PARKED — the licence increment executes).  The
+     user directed the delivery half built now ("Follow your
+     recommendation.  I am hoping that by keeping improving we will
+     get rid of the axiom"), prompted by their own formulation of the
+     invariant — "the kernel will never invoke iget on inode numbers
+     in directories in a disconnected subtree" — whose statable form
+     IS the SpecIget licence (§7.5.6 point 2 of TRACE G: the
+     enumeration lives at delivery).  Three amendments to R13:
+     (i) R13(iii)'s parking clause ("C′ EXECUTES ONLY AFTER K-F2
+     lands") is VOID: K-F2 is rejected, so the clause as written parks
+     C′ forever, which was not its intent.  C′-lite — the delivery
+     half, licence (d) FORECLOSED per §7.9 step 3 — executes now.
+     The worklist is `claude-notes/projects/iget-licence.md`.
+     (ii) The one design delta the foreclosure forces: `ProofIalloc`'s
+     own `iget` presents a new TRANSITIONAL constructor `SpanL`, with
+     `iname … SpanL := ⌜True⌝`, documented in `IgetLic.v` as the
+     create_fresh_ty span licence — permitted at EXACTLY ONE site
+     (`ProofIalloc`'s iget), so the axiom's delivery-side perimeter
+     becomes a grep line.  `SpanL` deletes when F1.5c mints `iclaim`
+     or the axiom retires.  `ClaimL := iclaim` stays per R11 (honesty
+     marker, unminted); `GreyL := igrey` stays with the audit
+     obligation *zero sites instantiate it* (G1's token deletion
+     remains available and is deferred to a milestone fold-back — it
+     touches `IcacheRef`/`InodeRegion`, which this increment must not).
+     (iii) Honesty, restated so the increment is not oversold: this
+     retires §20.17.5's PARAGRAPH (the enumeration becomes contract),
+     not §20.7's WALL (the free-side residue, §7.1.6's death
+     certificate, stands; the axiom stands).  The gate does not open
+     when this lands — what changes is that the invariant the user
+     stated becomes a theorem of every licensed iget, and the axiom's
+     remaining justification shrinks to the three §7.9 pieces plus one
+     greppable SpanL site.
+
 ---
 
 What follows is the verification report, preserved verbatim (2026-08-14,
@@ -771,9 +804,20 @@ InodeRegion.v, SpecIalloc.v), which is why the (L5) sweep is bounded.
 
 **Recommendation: F1a, F1b, F1.5b are unconditional, additive, and
 reopen nothing.  Do not start F1.5c until F1.5d's gate has a door.**
-The two doors are unchanged from §20.17.7 (fs-icache.md:5517-5522):
-the kernel fix (`ialloc`'s `brelse` after its `iget`), or a refutation
-at the free.
+**§20.17.7's count is stale and is corrected here.**  It read: two doors
+(fs-icache.md:5562-5567) — the kernel fix (`ialloc`'s `brelse` after its
+`iget`), or a refutation of §20.17.6(B) at the withdraw.  §7.4.6 closed
+the second one independently, at `ireg_claim_au`'s re-mint rather than at
+the withdraw's premise, so **that pair is one door, not two**
+(`SpecCreateFreshTy.v`'s header carries the same correction).  The
+current map is §7.11.7's, and it has **three doors of three different
+kinds**: **K-F2**, the unique *code* door (the kernel fix, rejected by
+policy); **the licence-completion program** (C′ + box-exclusion +
+boot-shelter + guard-fed grey deletion, §7.9), the unique *modular-ghost*
+door, with its three named missing pieces; and **the trace lemma**
+(§7.11.6's one bit), the unique *language-level* door, non-modular by
+nature.  Prophecy is a bridge between the last two, not a fourth door
+(§7.11).  For this gate specifically the live door is the middle one.
 
 ### 5.4 A correction to fs-friendly's F2 row
 
@@ -911,6 +955,18 @@ resource may not forbid a machine-reachable step), §20.9(b) (a
 persistent per-inum allocatedness witness is dead on free-and-reclaim),
 §16.5 (the packaging gap: `ci` lives in the itable spinlock's resource
 and no fupd can open it).
+
+**A SIXTH wall was named later, and it stands in a different space, so
+the five above are left as they are: THE ADVERSARY RESOLVES
+CONSISTENTLY (§7.11, probe 8) — prophecy resolution refutes mis-ordered
+observations, never a foreign resolver, because every future in which
+the adversary acts is realized by resolutions each consistent at its own
+step.**  It is not a wall of ghost-only Iris (the space the five index
+and §7.10.6 exhausts); it is the wall of Iris *extended with trace
+observations*, and it is the reason the extension does not pay either.
+The five above are still the walls a ghost-side route dies at, and
+§7.11's branch A dodges all five — which is exactly why the sixth was
+needed to kill it.
 
 ---
 
@@ -1266,9 +1322,10 @@ At the free's fupd iput holds *both* halves (its own buffer's, plus the
 region's through the AU).  At `ireg_withdraw` the same is already true
 and already used (`ghost_map_elem_agree with "Hhalf Hfsb"`).  So **at
 either of those two fupds, no other thread is inside a bread/brelse
-window on that dinode block.**  ~5 lines, provable today, no contract
-moves.  This is the honest formal content of "the buffer serialises the
-region" — the licence composes because it is a *fraction*, not a handle.
+window on that dinode block.**  This is the honest formal content of
+"the buffer serialises the region" — the licence composes because it is
+a *fraction*, not a handle.  **LANDED as `IregBox.fsL_block_exclusive`**,
+generalised from the sketch's `q : Qp` to an arbitrary `dfrac`.
 
 **Phase 3 (post-iget): REFUTED, but at +0x50 only.**  REF-1 +
 `ci`-injectivity.  Genuine absence; genuinely stronger than §20.15
@@ -1706,7 +1763,12 @@ theorem rather than a paragraph.
 The withdraw wall was previously stated as *a premise cannot be supplied
 at the call site*.  This probe shows the payout direction (no premise at
 all) fails independently, at `ireg_claim_au`'s re-mint.  So §20.17.7's
-"those are the two doors" is corrected to **one**.
+"those are the two doors" is corrected to **one**.  (That correction
+stands.  §7.11.7 then re-draws the map as **three** doors — but of three
+different *kinds*, and only one of them, K-F2, is the code door
+§20.17.7 was counting; the other two, the licence-completion program and
+the trace lemma, are the modular-ghost and language-level doors, neither
+of which is "a refutation at the withdraw".)
 
 ---
 
@@ -2494,8 +2556,17 @@ The probes read `c105ad60` / `3e8d4c3e`.  Verified at HEAD `e50a6508`:
   `ProofSysUnlinkParts` is a new `igrey` consumer — **the grey
   conversion is becoming live**, which is R12's condition for building
   on grey provenance.
-- **T1 / `ireg_box_excl` is still UNWRITTEN** — no `ireg_box_excl`,
-  `ireg_claim_box_freeze` or `ireg_box_no_payload` exists in `iris/`.
+- **T1 IS LANDED.** `iris/IregBox.v` (a leaf, zero dependents, folded back
+  into `InodeRegion.v`/`FsBlocks.v` at a milestone) carries
+  `ireg_box_fresh`, `ireg_box_w0`, `ireg_box_excl`,
+  `ireg_claim_box_freeze` and `ireg_box_no_payload`, plus the two flanks
+  `fsL_block_exclusive` (§7.2.4 phase 1) and `iref_two_not_ref1` (§7.2.4
+  phase 3, REF-1 as a refutation).  All seven are `Closed under the global
+  context`.  `ireg_box_excl` is stated as a **dichotomy** rather than under
+  an IN-arm hypothesis, because IN-ness is not nameable from outside the
+  region (§7.4.3): at a nonzero-type slot either the region holds the
+  MARKER (the record is checked out) or the slot is a box, and then
+  `fresh_shape`, no `ilink_fl` of any flavour, and no client `dinode_at`.
 - **C′ is still unlanded**: no `IgetLic.v`, no `ilic`, and `SpecIget`'s
   only resource premise is still `iref_slot`.
 
@@ -2822,5 +2893,392 @@ this route and life.**
 - **Nothing new to build.**  H1's machinery (~100–150 lines,
   `InodeRegion.v` only, zero contract moves) is **buildable and
   worthless** — its entire payout is already landed as `filled` +
-  `fresh_shape` + ∃ty′.  The one still-unwritten lemma worth landing
-  remains §7.6.9's `ireg_box_excl` (confirmed still absent at HEAD).
+  `fresh_shape` + ∃ty′.  §7.6.9's `ireg_box_excl` was the one lemma still
+  worth landing and it is now landed in `iris/IregBox.v` (§7.8).
+
+---
+
+### 7.11 THE PROPHECY-ASSISTED LATE LINEARIZATION PROBE (probe 8) — THE ADVERSARY RESOLVES CONSISTENTLY, a SIXTH named wall
+
+Read against `50cbb136` (the equivalence package landed, `IregBox.v` in
+the tree).  This is §(F3) of `SpecCreateFreshTy.v`'s header and lead (3)
+of the REVISIT list — **the last recorded unaudited route**, and the
+concrete form of the user's modular-provability intuition: let `ialloc`'s
+claim *prophesy* the fill its own `ilock` will perform, commit early and
+linearize late, resolving at the fill.  Report-only: nothing was touched,
+no build was run.
+
+> **VERDICT.  DEAD as a retirement of `create_fresh_ty`, at a NEW named
+> wall — THE ADVERSARY RESOLVES CONSISTENTLY — which is the old debt
+> (§19.6's allocatedness, §7.2.7's honest residue) reappearing in the
+> FALSE branch of the prophecy's case-split.  But the corpse is the most
+> valuable one yet: the scope reading of §7.10 is CONFIRMED (station
+> exhaustion does not cover observation-coupled movers), branch A dodges
+> all five named walls AND all three of §7.9's missing pieces, and the
+> entire irreducible content of the axiom compresses to ONE BIT — the
+> prophesied value.  The modular intuition has a home, and the home is a
+> FACTORIZATION, not a dissolution.**
+
+#### 7.11.1 The language has no prophecies — and that is not what kills it
+
+`RiscvLang.v:852` is `Definition mobs := Empty_set.`: the observation
+type is not merely unused, it is **uninhabited**, and every one of the
+five `prim_step` arms fixes `κ = []` syntactically besides.
+`RiscvPtsto.v`'s `irisGS` instance discards the observation list, the
+step index and the thread count (`state_interp g _ _ _ := power_interp
+g`); `RiscvAdequacy.v`'s `riscv_system_adequacy` already destructs and
+passes `κs` — **the adequacy plumbing for observations is present and
+vacuous.**  The logic side needs nothing: the pinned coq-iris 4.4.0 ships
+`base_logic/lib/proph_map.v`, and the project's own `weakestpre` threads
+`state_interp σ ns (κ ++ κs) nt` through every step.  The gap is exactly
+and only the language instance.
+
+**Priced honestly, and the price is not the obstacle.**  `mobs :=
+step_event` (hart, the Sail step's memory events, plus `sp` as episode
+identity — the outcome structure in `run (riscv_step tick)` already
+reifies the accesses), each arm emitting `κ = [ev]` *deterministically*,
+so the trace set is in bijection with the old one — a conservative
+extension whose gate is a bisimulation lemma, with trivial erasure.
+Blast radius, measured: `RiscvLang.v`, `RiscvExec.v`, `RiscvPtsto.v`,
+`RiscvAdequacy.v`, `CrashProto.v`, `ColdBoot.v`, `PowerBoot.v`,
+`MinstretInv.v` re-proved; the WP-unfolding surface is only `RiscvExec.v`
+(`wp_exec_step` and ~4 siblings, which already bind `κ κs` abstractly),
+`CrashProto.v`, `RiscvAdequacy.v`; one new trace-prophecy library (~400
+lines — iris's `proph_map` is (P,V)-shaped and would be replaced by a
+bespoke filter-over-events form); full-tree rebuild (~1100 `.vo`).
+**Zero contract above the lifting layer moves textually.**  Deep but
+narrow: maximal blast radius *by depth*, small *by breadth*.  "The
+language is not sacred" survives the audit.
+
+#### 7.11.2 The design, and branch A works
+
+**Anchors.**  The branch decision must sit at the claim's own physical
+step — `ialloc`'s `log_write` store at +0x9a, where `ireg_claim_au` is
+already plugged into `SpecLogWrite.wp_log_write_au`'s fupd premise
+(`ProofIalloc.v:55-58, 1413ff`); one instruction later leaks the crack
+and the whole residue drains through it.  That forces `SpecLogWrite`'s AU
+premise to become **step-coupled**, a real contract-shape change touring
+`log_write`'s consumers.  Resolution sits at the **fill** (the
+withdraw-bearing instruction in `ilock`), not at the `iget`: the danger
+window is claim→fill.  The resolved value is the resolving step's `sp`
+(kernel-stack identity) — hart id is wrong, because `ialloc` sleeps in
+`bread` and the episode migrates harts, while create's proc bundle pins
+the kstack.
+
+**Speculative ghost state.**  The prophecy assertion is
+**region-resident** — `proph_z z vs` lives inside `ireg_slot`, which is
+the one move that dodges H3's hand-off death (§7.10.5: the foreign filler
+"does not hold and `SpecIlock`'s 11 callers cannot supply" a client
+fragment; a slot-resident fragment is fetched by the withdraw from the
+region it already opens).  On top of H1's phase, `PhClaimed ty sp₀ γe`
+with
+
+> (P2) `p = PhClaimed ty sp₀ γe → inreg ∧ fresh_shape d ∧ di_type d = ty
+> ∧ head-z-fill(vs) is a step with sp = sp₀`
+
+and the claim's fupd case-splits on `head-z-fill(vs) ∈ sp₀`:
+
+- **branch A (prophesied-mine):** install `PhClaimed ty sp₀ γe`, γe fresh
+  (frame-preserving allocation), create keeps the γe-half welded into its
+  **proc** bundle — which, unlike H3's hart bundle, tours every syscall
+  proof today, so §7.6.3's affinity poison does not arise.
+- **branch B (prophesied-foreign):** install `PhDoomed sp₀`; `ialloc`'s
+  post becomes the disjunction, the kernel does not retry, and branch B
+  must die later or the design is worthless.  (It does not.  §7.11.3.)
+
+No custody moves — the fragment stays in-region, so §7.7's conservation
+law is untouched: the speculation is **clause-shaped, not
+custody-shaped**.
+
+**The mover interaction works, and this is the probe's first headline.**
+A *foreign* fill at a branch-A slot: `ProofIlock`'s fill step emits
+`ev_f` (foreign `sp_f`), opens the region (it already does — the
+withdraw), takes `proph_z z vs` from the slot, and the state-interp tie
+forces `vs = ev_f :: vs'`.  (P2) says head(vs) is by `sp₀`; `sp_f ≠ sp₀`:
+**False, derived at the foreign filler's own step** — the standard
+heap_lang pattern transplanted, and §19.7 is respected because no
+machine-reachable step is forbidden (the mover stays universally
+provable, one arm discharged by contradiction, exactly like
+`ireg_claim_au`'s landed `exact (Ht2 Ht0)`).  The cost: the fill is
+proven above the `wp_next` abstraction, which hides `state_interp`, so it
+needs a trace-exposing lifting variant — that plus the step-coupled
+`log_write` AU are the two contract-shape changes.
+
+In branch A every phase-changing mover between claim and fill is
+refuted — foreign withdraw (observation mismatch), free (`PhClaimed →
+inreg` + `dinode_at_excl`, H1's two landed lines), re-claim (type ≠ 0,
+purely), writes (`dinode_at_excl`, T1's freeze).  So the phase at
+create's fill is exactly `PhClaimed ty sp₀ γe`, create's own resolution
+pins `sp' = sp₀`, the γe-half agreement pins `ty`: **`di_type dn = ty` is
+delivered.**  Against every certificate:
+
+| wall | branch A's disposition |
+|---|---|
+| CLAIM'S HORIZON (§7.6) | dodged at the mint, like H1 — the claim verifies no absence; it conditions |
+| CONSERVATION LAW (§7.7) | untouched — no custody moves |
+| CURRENCY GAP (§7.2.4) | **dodged** — the window is covered by trace-correlation, which is not a client-held revocable; nothing needs revoking because branch A *says* nothing intervenes |
+| BORN BEFORE THE ENTRY (§7.4) | dodged — phase + clause are region-side, per-inum, entry-free |
+| TRACE G (§7.5) | irrelevant — no reachability claim is used anywhere in branch A |
+| R5/§20.16.3 at the withdraw | dodged by residency: the resolution obligation is payable region-internally |
+| §19.5(f) trichotomy, affinity (§7.6.3) | dodged — γe rides the proc bundle; the head-clause self-clears at the first fill; nothing droppable is load-bearing |
+| §16.5 packaging | untouched — identity comes from the observation, not from `ci` |
+| episode blindness (§7.10.2) | **evaded** — the interference sequence I is no longer composed of firable updates: its second element (foreign withdraw) is refuted at its own step |
+
+#### 7.11.3 THE SCOPE FINDING — what §7.10's exhaustion does and does not cover
+
+> **§7.10.6's LAW clause (i) — "a frame-preserving update is valid
+> against all frames, so no client resource can obstruct it" — is true
+> and is NOT violated here, because the pin is not carried by a resource
+> any frame could collide with: it is carried by the correlation between
+> authority-side ghost state and the trace, which lives in `state_interp`,
+> OUTSIDE the frame quantification.  Station exhaustion enumerated the
+> carriers of a pin as {bytes, arm, client token, nowhere}; THE TRACE is a
+> fifth carrier that the theorem's premise (mover-chosen frame-preserving
+> ghost updates) genuinely does not cover.  The exhaustion is exhaustive
+> over GHOST-ONLY Iris; it was never a theorem about
+> Iris-with-observations.  Branch A is the constructive witness that the
+> uncovered case is real.**
+
+So §7.10 is not weakened — it is **scoped**: LAW over ghost-only Iris,
+silent about observation-coupled movers.  What follows is that the
+extension does not escape the debt either.
+
+#### 7.11.4 THE DEATH — branch B, worked with full rigor
+
+Branch B's hypothesis is that the first future z-fill in `vs₀` is
+foreign.  In every real trace of the pinned binary that is **false** (the
+`f60ff58` guards — GR-2d's "the guards kill CONSUMERS, not the wall" —
+plus the instruction order make §7.2.7's residue true: *the first fill of
+a just-claimed inum is the claimant's*).  So branch B is
+**vacuous-per-trace**.  Per-trace vacuity does not discharge the
+obligation:
+
+1. Create's proof in branch B walks to its own fill and resolves
+   `vs_now = ev_mine :: vs'`.
+2. If nothing intervened, `vs_now = vs₀`, head is mine, contradicting
+   head-foreign.  **False — this sub-branch dies correctly, at create's
+   own resolution, exactly as hoped.**
+3. But "nothing intervened" is itself a case-split.  In branch-B worlds
+   the slot says `PhDoomed` with head-foreign, and a foreign withdraw
+   firing there resolves `vs₀ = ev_f :: vs'` with `sp_f` foreign —
+   **consistent with the branch's own clause.**  It proceeds
+   legitimately: strips the head, fills, and the episode resets (free,
+   re-claim at ty₂) become fireable again.  Create's fill then resolves
+   the *second* element, no contradiction, and the withdrawn record is
+   `ialloc_fresh ty₂`.  The post is unprovable there.
+4. So branch B's residue is precisely "no foreign z-fill occurred between
+   my claim and my fill."  **The same proposition.  §19.6's
+   allocatedness.  The debt is conserved — relocated from the mint's fupd
+   (where seven probes met it) to the false branch of the mint's
+   case-split.**
+
+**The general principle, which is the certificate's content:** prophecy
+resolution refutes *mis-ordered observations relative to a hypothesized
+future*; it cannot refute a *foreign resolver*, because every future in
+which the adversary acts is realized by resolutions each individually
+consistent at their own step — the adversary strips its own observations,
+consistently, by construction.  Branch A survives because its hypothesis
+makes the adversary's very first move inconsistent; branch B, whose
+hypothesis *grants* the adversary the first move, can never catch it in
+an inconsistency afterwards.
+
+**Every escape rung, audited:**
+
+- **Pocket the assertion in branch B** (only create can resolve): then a
+  foreign fill step, which semantically emits a z-event, cannot restore
+  `state_interp` — its WP becomes unprovable, i.e. the pocketed assertion
+  *forbids* a machine step, and proving the generic `ProofIlock` now
+  requires that step's unreachability.  §19.7's wall relocated to
+  interp-restoration.  Dead.
+- **Richer prophecies** (the full z-event list; the entire future): every
+  formulation re-splits at the payout on "did anything intervene," and
+  the intervening sub-world strips consistently.  Same residue, verbatim.
+- **Resolution counters / fill-history in the slot** (claim-time `c₀` vs
+  fill-time `c₁`): `c₁ = c₀` refutes branch B beautifully; `c₁ > c₀` is
+  the residue again — pinning `c₁ = c₀` across the window *is* the
+  window-absence.
+- **Trace-snapshot form** (`state_interp` carries the remaining step
+  list; the claim takes the eternally-true pure fact "at step n₀ the
+  future was τ₀"): nothing in any separation-logic context contradicts
+  pure data about a future step, so refuting "τ₀ contains a foreign
+  z-fill before mine" becomes a raw reachability theorem over all
+  interleavings of the whole binary.  That is (F2)/lead (2)
+  (closed-world adequacy), not prophecy, and it is the *definition* of
+  non-modular.
+- **Lead (3) as recorded** (logical atomicity spanning claim..iget, no
+  prophecy): at the fill the atomic triple's late commit needs exactly
+  the knowledge that the record is still `ty` — without a prophecy it is
+  the ∃ty′ weakening (§19.9.2, landed); with one it is this probe.  **It
+  needs no separate audit; it dies here.**
+
+#### 7.11.5 THE CERTIFICATE — THE ADVERSARY RESOLVES CONSISTENTLY
+
+> **DEATH CERTIFICATE (prophecy-assisted late linearization; probe 8, the
+> last recorded unaudited route).**  Prophecy observations do not exist in
+> the language (`mobs := Empty_set`, κ = [] in every arm, state_interp
+> discards κs); adding them is a sound, conservative, ~8-file-deep
+> extension of the WP-adequacy chain and is not the obstacle.  With them,
+> a region-resident per-inum prophecy plus H1's phase carries the episode
+> pin on THE TRACE — a fifth carrier, genuinely outside §7.10.6's
+> exhaustion — and the prophesied-MINE branch delivers `di_type dn = ty`
+> past all five named walls, the currency gap included.  The route dies in
+> the prophesied-FOREIGN branch: **THE ADVERSARY RESOLVES CONSISTENTLY.**
+> Resolution refutes mis-ordered observations, never foreign resolvers;
+> every model-consistent future in which the excluded interference occurs
+> is realized by resolutions each consistent at its own step, so the
+> foreign branch survives every resolution the claimant can reach except
+> in the no-interference sub-world — and "no interference" is §19.6's
+> allocatedness, §7.2.7's honest residue, the debt the seven probes could
+> not source, conserved to the letter.  Prophecy lets a spec condition on
+> the actual future of this trace; it does not let a proof *exclude* a
+> future the model deems possible, and excluding that future was the
+> entire problem.  The vacuity of the foreign branch is a fact about the
+> binary's traces, not about the model's continuations, and Iris
+> discharges branches against the latter.
+
+#### 7.11.6 THE ONE-BIT FACTORIZATION — the honest home of the modular intuition
+
+Under the design, `create_fresh_ty` is *exactly equivalent* to the single
+trace-level statement
+
+> **"the first fill of a just-claimed inum is the claimant's"**
+
+— one bit per episode, statable in the operational semantics' own
+vocabulary (no Iris, no ghost state), consumed at precisely one point
+(killing branch B at the claim, purely).  The prophecy machinery would
+convert the current span-shaped, program-point-pinned axiom
+(`SpecCreateFreshTy.v`'s four instructions) into a **ghost-free lemma
+about Sail traces of the binary**: the WP tree becomes axiom-clean and
+the residue moves to the language level, where it names the actual kernel
+facts (the `brelse`-before-`iget` order plus the `f60ff58` guards)
+instead of impersonating a resource.
+
+**But it is a FACTORIZATION, not a retirement.**  The trace lemma is
+provable only by a whole-machine interleaving argument ((F2)/lead 2), or
+assumed — in which case one axiom has been traded for another *plus* the
+language extension.  Given that `create_fresh_ty` already exists, is
+consistent by construction, and costs nothing further, **the trade is not
+worth building for this axiom alone.  REPRICE IT if a second
+commit-early/resolve-late window ever appears** — the machinery
+amortizes; the axiom does not.
+
+#### 7.11.7 THE ROUTE MAP, CLOSED — three doors, and prophecy is a bridge
+
+| door | what it is | status |
+|---|---|---|
+| **K-F2** | the unique **CODE** door — move `ialloc`'s `brelse` after its `iget`, the unique change that puts a revocable resource (the buffer's `fs_L` half) into phase 2 of the window | designed, priced, rejected by policy (R13(iii)) |
+| **the licence-completion program** | the unique **MODULAR GHOST** door — C′ + box-exclusion + boot-shelter + guard-fed grey deletion (§7.9), with its three named missing pieces | open, and the missing pieces are named |
+| **the trace lemma** | the unique **LANGUAGE-LEVEL** door — §7.11.6's one bit, discharged over the operational semantics; non-modular by nature | unbuilt; (F2)'s cost |
+
+**Prophecy adds no fourth door.  It is a BRIDGE between the second and
+the third** — it relocates the sentence from the ghost layer to the trace
+layer and hands it over in its cheapest form (one bit), and that is the
+whole of its contribution.  §7.10's station exhaustion keeps its LAW
+status over ghost-only Iris; this probe fixes its scope and shows the
+uncovered case does not pay either.  **A ninth probe on either mechanism
+is a re-run** — the sentence in `SpecCreateFreshTy.v`'s header §(D) is
+there to say so.
+
+### 7.12 THE BOOT-SHELTER PLANK — §7.1.7's comment becomes a theorem (LANDED)
+
+Plank 3 of §7.9's licence-completion program (C′-lite / box-exclusion /
+**boot-shelter** / guard-fed grey deletion).  It upgrades §7.1.7's boot-order
+shelter from a comment to a machine-checked ghost consequence.  **It does NOT
+retire the axiom** — the axiom's residue is Case 2, a fresh `iget` in
+`ialloc`'s window (ialloc-side); this plank closes ireclaim ONLY.  It adds
+**zero assumptions** to any sealed syscall.
+
+#### The threat (§7.1.7 restated)
+
+`ireclaim` `iget`s exactly when `dip->type != 0 && dip->nlink == 0` — which is
+byte-identical to a mid-window claim box (`ialloc_fresh ty`).  Under (L5) the
+region invariant is *unpreservable* on ireclaim's trace (iget → ilock =
+withdraw at the box → iput = `ireg_free_au` whose `c = None` is FALSE there),
+excluded only by reachability: `fsinit` is called only from `forkret`'s first
+branch, before `kexec("/init")` and before any second process.  That is a
+boot-order fact — a STATE fact over modeled state, hence statable, unlike the
+axiom's future-trace residue.
+
+#### The statable form: reuse `IcacheRef`'s one-shot
+
+The algebra is already landed.  `ityR = csumR (exclR unitO) (agreeR …)`
+(`IcacheRef.v`) supplies the two regimes on ONE ambient gname `icfg_boot`
+(a new field on `MkIcfg`, ambient for `icfg_iref`'s reason — a threaded name
+would enter `ireg_inv`'s arity, i.e. every fs contract):
+
+- `ireg_boot := ity_pending icfg_boot` — **EXCLUSIVE**, the pre-userspace
+  token.  Minted by `icfg_alloc` (it reuses the pool's boot-generation
+  one-shot, previously allocated-and-dropped), carried on the boot thread.
+- `ireg_open := ∃ ty, ity_shot icfg_boot ty` — **PERSISTENT** and **timeless**,
+  the sealed regime.
+
+The refutation lemma is landed and is the whole engine:
+`ity_pending_shot_excl : ity_pending g -∗ ity_shot g ty -∗ False`
+(→ `IcacheRef.ireg_boot_open_excl`).
+
+**The clause.**  `InodeRegion.ireg_slot`'s ∃-block gains, beside `link_auth`,
+the DISJUNCTIVE `(⌜c = None⌝ ∨ ireg_open)` — a claimed slot (`c = Some`) must
+exhibit the sealed regime.  Disjunctive, not an implication, so `ireg_slot`
+stays timeless (both arms are timeless AND persistent); persistence makes it
+thread through the ~21 `ireg_slot_intro` sites and ~13 destructurings as a
+`#Hdisj` that every mover carries unchanged (no mover moves `c`), with the
+boot sites (`IcacheBoot`, all `c = None`) supplying the left arm for free.
+
+**The theorem** (`IregLinkNz.ireg_boot_no_claim`, in `ireg_link_nz`'s ACCESSOR
+shape per §7.1.4 — over `ireg_inv`, never free-standing over a free `dn`):
+
+> `ireg_inv … -∗ ireg_boot -∗ iclaim z ={E}=∗ False`
+>
+> *Proof.* `link_claim_agree` pins the slot's `c` to `Some`; the clause is
+> forced onto `ireg_open`; `ireg_boot_open_excl` refutes it. ∎
+
+While the boot token is held, NO in-region slot is claimed — §7.1.7's
+exclusion, as ghost, not prose.  `ireclaim` carries `ireg_boot` (a
+`SpecIreclaim` premise, returned unspent), so its `iget` cannot be racing a
+claim box.
+
+#### The moving set (and what does NOT move)
+
+`IcacheRef.v` (field + `icfg_alloc` + the two regimes),
+`InodeRegion.v` (the clause, `ireg_slot_intro`, the movers),
+`IcacheBoot.v` (left disjunct at each boot slot; `ireg_alloc` threads
+`ireg_boot` out beside `ireg_inv`), `IregLinkNz.v`/`IregDirBit.v`/`IregBox.v`/
+`IgetLic.v` (pattern-only), `SpecFsinit.v`+`ProofFsinit.v` and
+`SpecIreclaim.v`+`ProofIreclaim.v` (one premise, returned; framed across the
+scan / bread·memmove·initlog·ireclaim).  **`SpecForkret` does NOT move; the
+six fs contracts (`SpecIalloc`/`SpecCreate`/`SpecIlock`/`SpecIput`/
+`SpecIupdate`/`SpecIget`) do NOT move** — `ireg_claim_au` does not touch `c`
+today (the whole `iclaim` machinery is inert), so the clause is preserved by
+carrying `c` through unchanged, and the `ireg_open` premise on
+`ireg_claim_au` is a WRITTEN CONSTRAINT on (M1)/F1.5c, not an owed edit here.
+
+#### Two IOUs (recorded, not fixed)
+
+1. **The seal** `ireg_boot ==∗ ireg_open` (`ity_shoot`) fires once, after
+   `fsinit` returns and before `kexec("/init")`.  It is OWED to whoever proves
+   `forkret`'s first branch — UNPROVEN upstream (GR-37: their
+   `wp_forkret_nf_ax` and this seal both wait on it), beside `SpecForkret`'s
+   existing `first_addr` IOU.  `ireg_open` being reachable post-boot is thus
+   also owed with the seal — expected and correct for a plank.  (`procs_avail_seal`
+   owes an identical boot seal with zero call sites; pay them together.)
+2. **F1.5d under-counts `SpecIput`.**  The campaign-ledger F1.5d row lists
+   `SpecIget + 4 sites, SpecIupdate, ProofIput` but NOT `SpecIput` — yet
+   ireclaim's `iput` cannot discharge `c = None` from the licence enumeration
+   (§7.1.7's whole point), so under (M1) the token has to reach `ireg_free_au`
+   THROUGH `SpecIput`.  Recommended shape (the tree's own): index `SpecIput` by
+   `option unit` exactly as `SpecAllocproc` indexes `procs_avail op` — `Some tt`
+   = boot regime (exclusive `ireg_boot`), `None` = steady (persistent
+   `ireg_open`, free from `syscall_env`).  That is F1.5d's price, not this
+   plank's.
+
+#### What it buys, honestly
+
+It makes the ireclaim trace PRESERVABLE under a future (L5), and it is a
+prerequisite for (L5)'s free.  It touches none of the axiom's three missing
+pieces (converse of the freeze, affinity leak, currency gap): the token is
+gone before any user thread runs, so **`create_fresh_ty` does not fall** — the
+planks retire §20.17.5's *paragraph*, not §20.7's *wall*.  After C′-lite +
+box-exclusion + boot-shelter, §20.17.5's enumeration is discharged premises
+except the one named informal shelter: `ProofIalloc`'s own `iget` under the
+`SpanL` transitional licence, sheltered by `create_fresh_ty` itself and
+deleting exactly when the axiom does.

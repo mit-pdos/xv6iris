@@ -25,7 +25,7 @@
    [b ∈ used] outright, and [BitmapEnc.bm_bit_test] turns that into
    [bp->data[bi/8] & m = 2^(b mod 8) <> 0]: the [c.beqz] at +0x3a falls
    THROUGH, and the arm at +0x60 is never entered.  Nothing about the panic
-   is proved -- it is refuted.  [panic_wp_any] is still threaded because
+   is proved -- it is refuted.  The panic credentials are still threaded because
    bread's own interior panic arm wants one.
 
    ONE BITMAP BLOCK.  [size <= BPB] is a premise, so [BBLOCK b sb] collapses
@@ -78,7 +78,6 @@ Require Import FsBlocks LogInv.
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBfree.
-Require Import PanicStub.
 Require Import SpecBread SpecBrelse SpecLogWrite.
 Require Import SpecBfree.
 From Kernel Require KernelSyms.
@@ -466,11 +465,11 @@ Section WpBfreeSllw.
       (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
          (subrange_vec_dec
             (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr KT1 m n b p -∗
     pc_is pc -∗
     instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -518,10 +517,10 @@ Section BfreeDefs.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition bf_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new
      byte list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
@@ -565,13 +564,13 @@ Section BfreeDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 b (proc_addr j) b lks -∗
         (* bfree's own crossing established [eb = b] once at entry
            (cpu_own_eb_agree, n = 0); the whole function is a PURE
            PASS-THROUGH of the trap-CSR complement (it does no acquire of
            its own), so it stays [b] rather than a fresh [eb]. *)
-        trap_csrs_ext b -∗
+        trap_csrs_ext KT1 b -∗
         cpu_claim_ext b (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -620,13 +619,12 @@ Section BfreeTail.
     bmapstart ∈ cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     bitmap_ok cov logstart size (used ∖ {[ bi ]}) ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 b (proc_addr j) b lks -∗
-    trap_csrs_ext b -∗
+    trap_csrs_ext KT1 b -∗
     cpu_claim_ext b (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bfree + 0x4a) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -646,8 +644,8 @@ Section BfreeTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel.
-    pose proof HK as HK'. unfold K_bfree in HK'.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop Hfsb Hpool Hheld Hcont".
+    pose proof HK as HK'. 
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop Hfsb Hpool Hheld Hcont".
     iPoseProof (bfi_4a with "Htext") as "Hi4a".
     iPoseProof (bfi_4e with "Htext") as "Hi4e".
     iPoseProof (bfi_50 with "Htext") as "Hi50".
@@ -685,7 +683,7 @@ Section BfreeTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID1) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
+    assert (HKlw : (K_log_write <= K - 4)%nat) by (lia).
     iEval (rewrite -Hbno) in "Hfsb".
     (* the credit travels under the block's OWN name, and [Hbno] is the one
        fact tying bfree's [bmapstart] to the register the buffer carries *)
@@ -700,7 +698,7 @@ Section BfreeTail.
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hcredit Hop Hfsb Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hcredit Hop Hfsb Hheld").
     all: try lkbelow.
     (* the registry row log_write hands back is dropped here: bfree's caller
        threads the ENTRY, at its own epoch, and nothing below the bitmap
@@ -768,7 +766,7 @@ Section BfreeTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID1) (CIDb := CID4) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
     (* brelse does not thread the trap-CSR complement either: same
        stranding as log_write above. *)
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -779,7 +777,7 @@ Section BfreeTail.
                  [locks_below_mono] weakens it.  This is the composition the
                  bound exists for -- one premise covers the whole cone. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID5 Hq5 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc54 : ret_pc (T2 !!! Regidx Rra : mword 64)
@@ -921,9 +919,9 @@ Section BfreeTail.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -1043,7 +1041,7 @@ Section ProofBfreeMain.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
-    pose proof HK as HK'. unfold K_bfree in HK'.
+    pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hbmcov) as [Hbmpos Hbmlt].
     (* ---- the pure arithmetic of the block number: all of it comes from
@@ -1069,7 +1067,7 @@ Section ProofBfreeMain.
     { rewrite HbnoB. exact (proj2 Hbm31). }
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl #Hcredit Hop Hcont".
     (* bfree enters at level 0, so the live index IS the saved base -- one
        variable [b] carries both from here on (the porting guide's "derive
@@ -1115,7 +1113,7 @@ Section ProofBfreeMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : bf_sp m R1) by (rewrite /bf_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -1292,7 +1290,7 @@ Section ProofBfreeMain.
                      = sb_bmapstart).
     { rgne. rewrite HR5a1. rewrite /sb_bmapstart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
               (mword_of_int 2504 : mword 12) R5 (K - 4)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 Hsb").
@@ -1378,14 +1376,14 @@ Section ProofBfreeMain.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 4)%nat b b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1599,7 +1597,7 @@ Section ProofBfreeMain.
                      = pa_add (b_data (bpa kk)) d).
     { rgne. rewrite HB5a4. apply bf_data_off. }
     iEval (rewrite -Hbyadr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
               (mword_of_int 88 : mword 12) B5 (K - 4)%nat
               (bm_byte used q) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi32 Hbyte").
@@ -1833,7 +1831,7 @@ Section ProofBfreeMain.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
               dev used bi u cr Sb e0 kk bnoB bsd0 d0 pidv dq dqb m B11 K b lks
               Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hcredit Hop Hfsbm Hpool Hheld [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
                 with "Hcont"). }
@@ -1861,7 +1859,7 @@ Section ProofBfreeMain.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     (* the counted form opens its own birth epoch and presents the EMPTY
@@ -1875,7 +1873,7 @@ Section ProofBfreeMain.
               pidv dq dqb m K eb b lks
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].

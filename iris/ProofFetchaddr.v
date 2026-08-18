@@ -159,17 +159,17 @@ Section ProofFetchaddr.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 4)%nat b p -∗
+    sie_cap_gpr KT1 Mt (av - 4)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fetchaddr + 0x36) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr KT1 mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -356,7 +356,7 @@ Section ProofFetchaddr.
   Proof.
     cbv beta delta [wp_fetchaddr_sconf_body].
     intros pcE addr ip ret_tgt Hav.
-    unfold fetchaddr_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -578,7 +578,7 @@ Section ProofFetchaddr.
     assert (Hszaddr : add_vec (A !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
       by (rewrite HAa0; reflexivity).
     iEval (rewrite -Hszaddr) in "Hszc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.fetchaddr + 0x14)) Ra1 Ra0
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fetchaddr + 0x14)) Ra1 Ra0
               (mword_of_int 72 : mword 12) A (av - 4)%nat (pv_sz V) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 Hszc").
@@ -850,7 +850,7 @@ Section ProofFetchaddr.
                           = p_pagetable p)
           by (rewrite HA5a0; reflexivity).
         iEval (rewrite -Hptaddr) in "Hptc".
-        iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.fetchaddr + 0x28)) Ra0 Ra0
+        iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fetchaddr + 0x28)) Ra0 Ra0
                   (mword_of_int 80 : mword 12) A5 (av - 4)%nat (page_base (ud_root (pv_upt V))) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi28 Hptc").
@@ -919,7 +919,7 @@ Section ProofFetchaddr.
         iEval (rewrite -HA7a2) in "Hbuf".
         (* ---- copyin(p->pagetable, p->sz, ip, addr, 8) ---- *)
         iDestruct (cpu_own_transport CID10 CID19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iApply (Copyin.wp_copyin_sconf γa A7 (pv_upt V) (pv_sz V) 8%nat
+        iApply (Copyin.wp_copyin_sconf KT1 γa A7 (pv_upt V) (pv_sz V) 8%nat
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p b
                   _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").

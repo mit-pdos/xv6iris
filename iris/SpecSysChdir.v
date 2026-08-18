@@ -109,7 +109,7 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -147,8 +147,7 @@ Local Open Scope Z_scope.
    at +0x00), of which sixteen are the [path] buffer.  Its deepest callee is
    namei (106); iunlockput wants 64, argstr 60, iput 60, end_op 58, ilock
    44, begin_op 26, iunlock 26, myproc 10. *)
-Definition K_sys_chdir : nat := 126%nat.
-
+Notation K_sys_chdir := (136%nat) (only parsing).
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
@@ -215,7 +214,7 @@ Definition wp_sys_chdir_sconf_body
   (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
      carries *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here where sys_close has one: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
@@ -229,10 +228,10 @@ Definition wp_sys_chdir_sconf_body
      is threaded rather than framed because begin_op / ilock / iput /
      iunlockput / end_op each take it and each crosses at the literal
      [true].  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  panic_env -∗
   (* ---- the block layer ---- *)
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
@@ -268,9 +267,9 @@ Definition wp_sys_chdir_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

@@ -148,12 +148,12 @@ Section ProofSysFstat.
   Lemma sfs_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (b : bool) (pp : mword 64) :
     (0 < kk)%nat ->
-    sie_cap_gpr mm kk b pp -∗
+    sie_cap_gpr KT1 mm kk b pp -∗
     ⌜(8 <= uint (mm !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res b + kk)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res b + kk)%nat with "Hstk").
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -193,17 +193,17 @@ Section ProofSysFstat.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 4)%nat b pp -∗
+    sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_fstat + 0x32) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b pp -∗
+        sie_cap_gpr KT1 mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -336,7 +336,7 @@ Section ProofSysFstat.
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Heb.
     (* BOTH budgets, or [lia] cannot see past [filestat_stack] -- it is an
        expression, not a literal, on purpose (SpecSysFstat.v). *)
-    unfold sys_fstat_stack, filestat_stack in Hav.
+    
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
@@ -351,7 +351,7 @@ Section ProofSysFstat.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): filestat
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic Hpriv #Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -507,7 +507,7 @@ Section ProofSysFstat.
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 4)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w4 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
-              ltac:(unfold argaddr_stack; lia) Hpv
+              ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs4").
     iIntros (CID8 Hs8 A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs4".
     iEval (rewrite HM5a1) in "Hs4".
@@ -610,7 +610,7 @@ Section ProofSysFstat.
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 4)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
     { iApply (ofd_out_null _ _ HN4a1). }
     iIntros (CID13 Hs13 A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
@@ -806,8 +806,8 @@ Section ProofSysFstat.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S3 (av - 4)%nat eb b lks
-                ltac:(unfold filestat_stack; lia) Hkk Hj Hgs Hlens HS3a0' Heb
-                with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
+                ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID20 Hs20 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".

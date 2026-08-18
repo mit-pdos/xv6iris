@@ -52,7 +52,6 @@ Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecWakeup SpecConsoleintr.
@@ -139,10 +138,10 @@ Section UiCont.
 
   (* the frame the prologue spilled *)
   Definition ui_frame (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1) ∗
-     pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2))%I.
+    (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
+     pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
   Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
@@ -150,7 +149,7 @@ Section UiCont.
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-         sie_cap_gpr mf av b pme -∗
+         sie_cap_gpr KT1 mf av b pme -∗
          cpu_own lvl eb pme b lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -195,7 +194,7 @@ Section ProofUartintr.
     m0 !!! Regidx csp_rs1 = sp0 ->
     (uartintr_stack <= av)%nat ->
     kernel_text -∗
-    sie_cap_gpr M (av - 4) b pme -∗
+    sie_cap_gpr KT1 M (av - 4) b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
     ui_frame sp0 m0 -∗
@@ -265,8 +264,8 @@ Section ProofUartintr.
     assert (HE4sp : E4 !!! Regidx csp_rs1 = spd) by (rewrite /E4 upd_ne; [exact HE3sp | reg_neq]).
     iEval (rewrite P54) in "Hpc".
     (* +0x54 c.addi16sp sp,32 -- the frame pop *)
-    iAssert (stack_own sp0 4) with "[H1 H2 H3 H4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[H1 H2 H3 H4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "H1"; [by iExists _|]. iSplitL "H2"; [iExists _; iEval (rewrite -Hb2 -HE1sp); iExact "H2"|].
       iSplitL "H3"; [iExists _; iEval (rewrite -Hb3 -HE2sp); iExact "H3"|].
       iSplitL "H4"; [iExists _; iEval (rewrite -Hb4 -HE3sp); iExact "H4"|]. done. }
@@ -286,7 +285,7 @@ Section ProofUartintr.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.uartintr + 0x54)) (mword_of_int 2 : mword 6)
               E4 (av - 4)%nat 4%nat b Hpop with "Hcg Hpc Hi54 Hframe").
     iIntros (CID5 Hs5) "Hcg Hpc".
-    assert (Hav4 : ((av - 4) + 4)%nat = av) by (unfold uartintr_stack in Hav; lia).
+    assert (Hav4 : ((av - 4) + 4)%nat = av) by (lia).
     iEval (rewrite Hav4) in "Hcg".
     set (E5 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E4).
@@ -360,9 +359,9 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M (pa_stk sp0 4) ⌝ -∗
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗ panic_wp_any -∗
+      kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗
       console_caps γu -∗
-      sie_cap_gpr (CID := CIDe) M (av - 4) b pme -∗
+      sie_cap_gpr KT1 (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
@@ -370,7 +369,7 @@ Section ProofUartintr.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav Hbelow.
-    iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hpanic #Hccaps".
+    iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hccaps".
     iIntros "Hcg Hcnt Hpc Hfr Hcont".
     iPoseProof (uii2_2c with "Ht") as "#Hi2c".
     iPoseProof (uii2_30 with "Ht") as "#Hi30".
@@ -389,7 +388,7 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M1 (pa_stk sp0 4) ⌝ -∗
       ⌜ M1 !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M1 !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      sie_cap_gpr (CID := CIDk) M1 (av - 4) b pme -∗
+      sie_cap_gpr KT1 (CID := CIDk) M1 (av - 4) b pme -∗
       cpu_own (CID := CIDk) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
@@ -450,9 +449,9 @@ Section ProofUartintr.
           apply callee_saved_refl. }
         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
-                  ltac:(unfold consoleintr_stack, uartintr_stack in *; lia)
+                  ltac:(lia)
                   Hlen ltac:(lia) Hbelow
-                  with "Hcg Hcnt Ht Hpc Hpanic Hpinv Hdinv Hccaps").
+                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps").
         all: try lkbelow.
         iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc".
         iEval (rewrite HG1ra) in "Hpc".
@@ -493,8 +492,8 @@ Section ProofUartintr.
     (uartintr_stack <= av)%nat ->
     locks_below lks "cons" ->
     kernel_text -∗ dev_inv γu γv -∗
-    procs_inv γs -∗ panic_wp_any -∗ console_caps γu -∗
-    sie_cap_gpr M (av - 4)%nat b pme -∗
+    procs_inv γs -∗ console_caps γu -∗
+    sie_cap_gpr KT1 M (av - 4)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
     ui_frame sp0 m0 -∗
@@ -502,7 +501,7 @@ Section ProofUartintr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav Hbelow.
-    iIntros "#Ht #Hdinv #Hpinv #Hpanic #Hccaps Hcg Hcnt Hpc Hfr Hcont".
+    iIntros "#Ht #Hdinv #Hpinv #Hccaps Hcg Hcnt Hpc Hfr Hcont".
     iPoseProof (uii2_22 with "Ht") as "Hi22".
     iPoseProof (uii2_26 with "Ht") as "Hi26".
     iPoseProof (uii2_28 with "Ht") as "Hi28".
@@ -550,7 +549,7 @@ Section ProofUartintr.
     iDestruct (ui_ret_cont_shift CID0 CIDT3 m0 av lvl eb pme b lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iPoseProof (ui_rx γu γv γs m0 av lvl eb pme sp0 b lks Hsp0 Hlen Hlvl Hav Hbelow) as "Rx".
-    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont");
+    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont");
       [exact HS2regs | exact HS2s1 | exact HS2s2].
   Qed.
 
@@ -564,7 +563,7 @@ Section ProofUartintr.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
-    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hpanic #Hccaps Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hccaps Hcont".
     iAssert (ui_ret_cont m av lvl eb pme b lks) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -594,7 +593,7 @@ Section ProofUartintr.
                     = pa_stk (m !!! Regidx csp_rs1) 4%nat).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4%nat b
-              ltac:(unfold uartintr_stack in Hav; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     set (A0 := <[Regidx csp_rs1 := regval_into_reg
@@ -604,7 +603,7 @@ Section ProofUartintr.
     assert (HcspA0 : A0 !!! Regidx csp_rs1 = spd)
       by (rewrite /A0 upd_eq Hpush Hspm; reflexivity).
     iEval (rewrite P02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
     iDestruct "F3" as (v3) "H3". iDestruct "F4" as (v4) "H4".
@@ -742,7 +741,7 @@ Section ProofUartintr.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m B2 av lvl eb pme sp0 b lks
                 HB2regs Hspm Hlen Hlvl Hav Hbelow
-                with "Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont").
     - (* THRE: wake the writers, then join the rx setup *)
       assert (Jtx : add_vec (mword_of_int (KernelSyms.uartintr + 0x20) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
@@ -802,12 +801,12 @@ Section ProofUartintr.
         apply callee_saved_refl. }
       iDestruct (cpu_own_transport CID CIDW3 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (Wakeup.wp_wakeup_sconf T3 γs pme lvl (av - 4)%nat eb b lks
-                ltac:(unfold uartintr_stack in Hav; lia)
+                ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
                 ltac:(lia)
                 ltac:(lkbelow)
-                with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
+                with "Hcg Hcnt Ht Hpc Hpinv").
       all: try lkbelow.
       iIntros (CIDW4 HsW4 Mw) "[%Hcsw %Hdomw] Hcg Hcnt Ht2 Hpc".
       iEval (rewrite HT3ra P4a) in "Hpc".
@@ -827,7 +826,7 @@ Section ProofUartintr.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m Mw av lvl eb pme sp0 b lks
                 HregsW Hspm Hlen Hlvl Hav Hbelow
-                with "Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont").
   Qed.
 
 End ProofUartintr.

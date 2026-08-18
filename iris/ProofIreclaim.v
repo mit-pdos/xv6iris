@@ -106,13 +106,13 @@ Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import CodeIreclaim.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import SpecBread SpecBrelse SpecIget.
 Require Import SpecBeginOp SpecEndOp.
@@ -201,14 +201,14 @@ Section IreclaimDefs.
 
   (* ireclaim's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0 *)
   Definition irc_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64))%I.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md).  [used] here is the contract's
@@ -226,7 +226,7 @@ Section IreclaimDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -237,6 +237,7 @@ Section IreclaimDefs.
         iref_slot -∗
         ⌜used' ⊆ used⌝ -∗
         bitmap_res γfs bmapstart cov logstart size used' -∗
+        ireg_boot -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* ONE TURN OF THE LOOP, AT ITS BODY (+0x7c).  This is the wand the
@@ -259,7 +260,7 @@ Section IreclaimDefs.
        ⌜Mn !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)⌝ -∗
        ⌜Mn !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64)⌝ -∗
        ⌜Mn !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64)⌝ -∗
-       sie_cap_gpr Mn (K - 8)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mn (K - 8)%nat b (proc_addr j) -∗
        cpu_own 0 true (proc_addr j) b lks -∗
        pc_is (mword_of_int (KernelSyms.ireclaim + 0x7c) : mword 64) -∗
        irc_frame m -∗
@@ -270,6 +271,7 @@ Section IreclaimDefs.
        bslots bn 3 -∗
        iref_slot -∗
        bitmap_res γfs bmapstart cov logstart size usedn -∗
+       ireg_boot -∗
        irc_cont (CID0 := CIDn) γfs bn cov logstart bmapstart inodestart ninodes
                 size used pidv dq dqb dqs dqn j m K b lks -∗
        WP (Loop : expr riscv_lang))%I.
@@ -307,7 +309,7 @@ Section IreclaimEpilogue.
     used' ⊆ used ->
     irc_sp m M ->
     irc_thr8 m M ->
-    sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0xb2) : mword 64) -∗
@@ -319,13 +321,14 @@ Section IreclaimEpilogue.
     bslots bn 3 -∗
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size used' -∗
+    ireg_boot -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
              used pidv dq dqb dqs dqn j m K b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsub Hsp Hthr.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hcont".
+    pose proof HK as HK'. 
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hcont".
     iPoseProof (irci_b2 with "Htext") as "Hib2".
     iPoseProof (irci_b4 with "Htext") as "Hib4".
     iPoseProof (irci_b6 with "Htext") as "Hib6".
@@ -560,9 +563,9 @@ Section IreclaimEpilogue.
                    = pa_stk (add_vec (P8 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8).
     { rewrite Hwv HP8sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 8)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 8)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1"|].
       iSplitL "Hf2"; [iExists _; iExact "Hf2"|].
       iSplitL "Hf3"; [iExists _; iExact "Hf3"|].
@@ -651,7 +654,7 @@ Section IreclaimEpilogue.
     rewrite /irc_cont.
     iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P9 used' with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbb Hppid
-                                       Hsl Hiref [%] Hbm");
+                                       Hsl Hiref [%] Hbm Hboot");
       [exact Hcs | exact Hsub].
   Qed.
 
@@ -689,7 +692,7 @@ Section IreclaimStep.
     Ml !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64) ->
     Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
-    sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0x6e) : mword 64) -∗
@@ -701,6 +704,7 @@ Section IreclaimStep.
     bslots bn 3 -∗
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size usedn -∗
+    ireg_boot -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
              pidv dq dqb dqs dqn j m K b lks fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
@@ -708,14 +712,14 @@ Section IreclaimStep.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hsub Hfuel Hinum Hsp Hthr Hs1 Hs4 Hs5 Hs6.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum32].
     assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
       by (vm_compute; reflexivity).
     rewrite Hm32 in Hinum32.
     assert (Hinum31 : bv_unsigned inum < 2147483648)
       by (change (2^31)%Z with 2147483648%Z in Hn31; lia).
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot
               Hloop Hcont".
     iPoseProof (irci_6e with "Htext") as "Hi6e".
     iPoseProof (irci_70 with "Htext") as "Hi70".
@@ -771,7 +775,7 @@ Section IreclaimStep.
                       = sb_ninodes).
     { rgne. rewrite HS1s4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbnadr) in "Hsbn".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x70)) Ra4 Rs4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x70)) Ra4 Rs4
               (mword_of_int 12 : mword 12) S1 (K - 8)%nat
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi70 Hsbn").
@@ -853,7 +857,7 @@ Section IreclaimStep.
                 inodestart ninodes size used usedn pidv dq dqb dqs dqn
                 m S3 K b lks HK Hsub HS3sp HS3thr
                 with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl
-                      Hiref Hbm [Hcont]").
+                      Hiref Hbm Hboot [Hcont]").
       { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                   ltac:(wp_next_chain) with "Hcont"). }
     - (* ---- ANOTHER TURN: back to the body at +0x7c ---- *)
@@ -879,7 +883,7 @@ Section IreclaimStep.
       rewrite /irc_loop.
       iApply ("Hloop" $! S3 inum1 usedn CID4
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe
-                      Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm [Hcont]").
+                      Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot [Hcont]").
       { rewrite Hinum1u. lia. }
       { rewrite Hinum1u. lia. }
       { exact Hsub. }
@@ -922,7 +926,7 @@ Section IreclaimOrphan.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat) (used usedn : gset Z)
       (dev inum bno : mword 32) (kk : nat)
-      (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
+      (bs bsd0 : list (bv 8)) (ds : list dinode) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
@@ -936,13 +940,24 @@ Section IreclaimOrphan.
     cov_below cov size ->
     ninodes <= 16 * Z.of_nat nib ->
     ninodes < 2 ^ 31 ->
-    printk_gen_contract γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     (Z.to_nat (ninodes - bv_unsigned inum) <= S fuel)%nat ->
     0 < bv_unsigned inum < ninodes ->
     usedn ⊆ used ->
     (kk < NBUF)%nat ->
+    (* ---- LICENCE (e)'s PREMISES (increment C'-lite, fs-fragments.md §7.1).
+       This lemma runs from +0x38, i.e. AFTER the scan has bread the inode
+       block and decoded it, and it holds the handle until the brelse at
+       +0x4c -- which is two instructions PAST the iget at +0x44.  So what
+       the caller already knows about those bytes is exactly what founds the
+       iget's licence, at the cost of four pure premises here and four
+       [exact]s at the one call site. ---- *)
+    bs = diblk_bytes ds ->
+    diblk_wf ds ->
+    bv_unsigned (di_type (ds !!! DinodeEnc.islot inum)) <> 0 ->
+    uint bno = IBLOCK inum inodestart ->
     irc_sp m Ml ->
     irc_thr8 m Ml ->
     Ml !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64) ->
@@ -955,11 +970,10 @@ Section IreclaimOrphan.
        begin_op/end_op ("log", 3), ilock ("bcache", 4), iunlock
        ("sleep lock", 6) -- "itable" is the lowest. *)
     locks_below lks "log" ->
-    sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0x38) : mword 64) -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -982,6 +996,7 @@ Section IreclaimOrphan.
     bslots bn 2 -∗
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size usedn -∗
+    ireg_boot -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0 -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
              pidv dq dqb dqs dqn j m K b lks fuel -∗
@@ -990,15 +1005,17 @@ Section IreclaimOrphan.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
-           Hj Hgl Hfuel Hinum Hsub Hkk Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+           Hj Hgl Hfuel Hinum Hsub Hkk Hbseq Hdswf Htnz Hbnoeq
+           Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
+    pose proof HK as HK'. 
     pose proof irc_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
     destruct (Hblk inum Hnibin) as [Hibcov Hiblog].
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hlctx
               #Hseam #Hgen #Hireg #Hitb2 #Hitbl #Hesc #Hslks #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
-              Hbm Hlk Hloop Hcont".
+              Hbm Hboot Hlk Hloop Hcont".
+    iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iPoseProof (kernel_data_string irc_msg_addr irc_msg
                   (mword_of_int irc_msg_addr) eq_refl
                   ltac:(unfold text_end, irc_msg_addr; lia) irc_msg_bytes
@@ -1257,14 +1274,51 @@ Section IreclaimOrphan.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
+    (* ================================================================== *)
+    (*  THE LICENCE (increment C'-lite, fs-fragments.md §7.1), licence (e)  *)
+    (* ================================================================== *)
+    (*  ireclaim's iget is at +0x44 and its brelse is at +0x4c, so THE
+        BUFFER IS STILL IN HAND: [DinodeSlot.ds_held_L] takes the block's
+        client half out of the handle and hands back a wand to return it.
+        That half, at bytes which decode to a record with a nonzero type,
+        IS licence (e) -- and it is STRONGER than §20.4's [bio_locked]
+        sketch: the [fs_L] element sits at half-plus-half, so while this
+        walk holds one half no [ireg_write_au] / [ireg_claim_au] /
+        [ireg_free_au] at ANY inum of this block can fire (§7.1.3, §16.2's
+        serialiser as a resource fact rather than a paragraph).
+
+        BOOT-ONLY: sheltered by the pre-userspace one-shot [ireg_boot]
+        (plank 3, iget-licence follow-on; see fs-fragments.md §7.1.7).  The
+        record ireclaim igets here is CLAIM-SHAPED -- type nonzero, nlink
+        zero -- and §7.1.7's finding is that the licence alone does not
+        exclude that; what excludes it is that ireclaim is reachable only
+        from fsinit, i.e. before [kexec("/init")] and before any second
+        process exists.  That is a boot-order fact, [ireg_boot] is the
+        shelter's DESIGNATED CARRIER for it, and the model does not state
+        it here. *)
+    iEval (rewrite /bio_locked) in "Hlk".
+    iDestruct (ds_held_L with "Hlk") as "[HpL Hlkback]".
+    iAssert (iname γi γfs inum (BufL (uint bno) ds)) with "[HpL]" as "Hlic".
+    { rewrite /iname /fsblock -Hbseq. iFrame "HpL". iPureIntro.
+      split; [exact Hdswf | exact Htnz]. }
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
+              (BufL (uint bno) ds)
               O6 0%nat true (proc_addr j) (K - 8)%nat b lks
-              ltac:(unfold K_iget; lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
+              ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanenv Hiref Hlic").
     all: try lkbelow.
-    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href".
+    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href Hlic".
+    (* ...and the half goes straight back into the handle, unspent.  The
+       unfolding is done IN the hypothesis: [fs_L]'s ghost_map notation is
+       not in scope in this file, and writing the target proposition out
+       would import it for one line. *)
+    iEval (rewrite /iname /fsblock -Hbseq) in "Hlic".
+    iDestruct "Hlic" as "(HpL & _ & _)".
+    iDestruct ("Hlkback" with "HpL") as "Hlk".
+    iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0)
+      with "[Hlk]" as "Hlk"; [rewrite /bio_locked; iExact "Hlk" |].
     destruct Higfacts as (Hcsig & Hkslot & HmIa0).
     assert (Hpc48 : ret_pc (O6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x48))
@@ -1392,11 +1446,11 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq O9 (K - 8)%nat true (proc_addr j)
-              bs bsd0 d0 b lks ltac:(unfold K_brelse; lia) Hkk HO9a0
+              bs bsd0 d0 b lks ltac:(lia) Hkk HO9a0
               (* brelse's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID12 Hq12 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc50 : ret_pc (O9 !!! Regidx Rra : mword 64)
@@ -1477,11 +1531,11 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
               OA (K - 8)%nat true b lks
-              ltac:(unfold K_begin_op; lia) Hj Hgl
+              ltac:(lia) Hj Hgl
               (* begin_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlctx Hppid Hprocs").
+              with "Hcg Hcnt [] [] Htext Hpc Hlctx Hppid Hprocs").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
@@ -1588,12 +1642,12 @@ Section IreclaimOrphan.
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh dev inum
               pidv dq dqs OC (K - 8)%nat true b lks
-              ltac:(unfold K_ilock; lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
+              ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
               (* ilock's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hescrow Hireg Hslk
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
                     Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1697,11 +1751,11 @@ Section IreclaimOrphan.
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
               (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat true
               (proc_addr j) b lks
-              ltac:(unfold K_iunlock; lia) Hkslot HOEa0
+              ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hescrow Hslk Hslkd Hslpid
+              with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd Hslpid
                     Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot").
     all: try lkbelow.
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
@@ -1801,11 +1855,11 @@ Section IreclaimOrphan.
     iApply (IP.wp_iput_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev usedn
               kslot q inum MAXOPBLOCKS pidv dq dqb dqs OG (K - 8)%nat true b lks
-              ltac:(unfold K_iput; lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              ltac:(lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hitb2 Hitbl Hescrow
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
     all: try lkbelow.
@@ -1873,11 +1927,11 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
               dev n' pidv dq OH (K - 8)%nat true b lks
-              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
+              ltac:(lia) Hgeom Hj Hgl
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hseam Hgen Hppid
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1916,7 +1970,7 @@ Section IreclaimOrphan.
               Hfuel Hinum HmEsp HmEthr
               HmEs1 HmEs4 HmEs5 HmEs6
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
-                    Hbm [Hloop] [Hcont]").
+                    Hbm Hboot [Hloop] [Hcont]").
     { iExact "Hloop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID25) (CIDb := CID26)
                 ltac:(wp_next_chain) with "Hcont"). }
@@ -1959,11 +2013,10 @@ Section IreclaimRelease.
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     (* irc_release's only lock-touching callee is brelse, at "bcache" (4). *)
     locks_below lks "log" ->
-    sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0xaa) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv γs -∗
     irc_frame m -∗
@@ -1974,6 +2027,7 @@ Section IreclaimRelease.
     bslots bn 2 -∗
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size usedn -∗
+    ireg_boot -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0 -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
              pidv dq dqb dqs dqn j m K b lks fuel -∗
@@ -1982,9 +2036,9 @@ Section IreclaimRelease.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hfuel Hinum Hsub Hkk Hsp Hthr Hs1 Hs2 Hs4 Hs5 Hs6 Hbelow.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hprocs Hframe Hppid Hsbn Hsbi
-              Hsbb Hsl Hiref Hbm Hlk Hloop Hcont".
+    pose proof HK as HK'. 
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hprocs Hframe Hppid Hsbn Hsbi
+              Hsbb Hsl Hiref Hbm Hboot Hlk Hloop Hcont".
     iPoseProof (irci_aa with "Htext") as "Hiaa".
     iPoseProof (irci_ac with "Htext") as "Hiac".
     iPoseProof (irci_b0 with "Htext") as "Hib0".
@@ -2050,9 +2104,9 @@ Section IreclaimRelease.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq V2 (K - 8)%nat true (proc_addr j)
-              bs bsd0 d0 b lks ltac:(unfold K_brelse; lia) Hkk HV2a0
+              bs bsd0 d0 b lks ltac:(lia) Hkk HV2a0
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID3 Hq3 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hppb0 : ret_pc (V2 !!! Regidx Rra : mword 64)
@@ -2099,7 +2153,7 @@ Section IreclaimRelease.
               m mR K b lks HK Hn31 Hsub Hfuel Hinum HmRsp HmRthr
               HmRs1 HmRs4 HmRs5 HmRs6
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
-                    Hbm [Hloop] [Hcont]").
+                    Hbm Hboot [Hloop] [Hcont]").
     { iExact "Hloop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID4)
                 ltac:(wp_next_chain) with "Hcont"). }
@@ -2142,14 +2196,13 @@ Section IreclaimScan.
     1 < ninodes ->
     ninodes <= 16 * Z.of_nat nib ->
     ninodes < 2 ^ 31 ->
-    printk_gen_contract γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     (* irc_scan reaches irc_step (no lock), irc_orphan ("itable", 2) and
        irc_release ("bcache", 4) every turn; "itable" is the lowest. *)
     locks_below lks "log" ->
     kernel_text -∗ kernel_data -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -2170,23 +2223,24 @@ Section IreclaimScan.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31
            Hpk Hj Hgl Hbelow.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
-    iIntros "#Htext #Hkdata #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hgen #Hireg
+    iIntros "#Htext #Hkdata #Hpenv #Hbio #Hlctx #Hseam #Hgen #Hireg
               #Hitb2 #Hitbl #Hesc #Hslks #Hprocs #Hdevi #Hdgeom #Hdlock".
+    iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iIntros (fuel).
     iInduction fuel as [|fuel] "IH".
     - (* ---- FUEL 0: unreachable, [inum < ninodes] leaves at least one turn ---- *)
       rewrite /irc_loop.
       iIntros (Ml inum usedn CIDn) "%Hfuel %Hinum %Hsub %Hsp %Hthr %Hs1 %Hs4
                                     %Hs5 %Hs6".
-      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hcont".
+      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hcont".
       exfalso. lia.
     - (* ---- FUEL S: one turn of the loop ---- *)
       rewrite /irc_loop.
       iIntros (Ml inum usedn CIDn) "%Hfuel %Hinum %Hsub %Hsp %Hthr %Hs1 %Hs4
                                     %Hs5 %Hs6".
-      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hcont".
+      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hcont".
       pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum32].
       assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
         by (vm_compute; reflexivity).
@@ -2292,7 +2346,7 @@ Section IreclaimScan.
                         = sb_inodestart).
       { rgne. rewrite HW2s4. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
       iEval (rewrite -Hsbiadr) in "Hsbi".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x84)) Ra5 Rs4
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x84)) Ra5 Rs4
                 (mword_of_int 24 : mword 12) W2 (K - 8)%nat
                 (mword_of_int inodestart : mword 32) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 Hsbi").
@@ -2428,12 +2482,12 @@ Section IreclaimScan.
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
                 W6 (K - 8)%nat true b lks
-                ltac:(unfold K_bread; lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
+                ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
                 HW6a0 HW6a1
                 (* bread's bound is "bcache"(4); irc_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
-                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -2676,7 +2730,7 @@ Section IreclaimScan.
                      = pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat).
       { rgne. rewrite HWBa5. apply iu_off0. }
       iEval (rewrite -Hlh0) in "Hd0".
-      iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x9e)) Ra4 Ra5
+      iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x9e)) Ra4 Ra5
                 (mword_of_int 0 : mword 12) WB (K - 8)%nat
                 (di_type (ds !!! DinodeEnc.islot inum) : mword 16) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9e Hd0").
@@ -2754,8 +2808,8 @@ Section IreclaimScan.
                   (* irc_release's bound is "bcache"(4); irc_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe Hppid
-                        Hsbn Hsbi Hsbb Hsl Hiref Hbm Hlk [] [Hcont]").
+                  with "Hcg Hcnt Htext Hpc Hbio Hprocs Hframe Hppid
+                        Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hlk [] [Hcont]").
         { iApply "IH". }
         { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID14)
                     ltac:(wp_next_chain) with "Hcont"). }
@@ -2777,7 +2831,7 @@ Section IreclaimScan.
                                    (64 * DinodeEnc.islot inum)%nat) 6).
         { rgne. rewrite HWCa5. apply iu_disp; [lia | lia | reflexivity]. }
         iEval (rewrite -Hlh6) in "Hd6".
-        iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xa4)) Ra5 Ra5
+        iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0xa4)) Ra5 Ra5
                   (mword_of_int 6 : mword 12) WC (K - 8)%nat
                   (di_nlink (ds !!! DinodeEnc.islot inum) : mword 16) b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia4 Hd6").
@@ -2843,16 +2897,21 @@ Section IreclaimScan.
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γpr cov logstart bmapstart inodestart ninodes size
-                    nib used usedn dev inum bno kk (diblk_bytes ds) bsd0 d0 fuel
+                    nib used usedn dev inum bno kk (diblk_bytes ds) bsd0 ds d0
+                    fuel
                     pidv dq dqb dqs dqn m WD K b lks
                     HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31
-                    Hpk Hj Hgl Hfuel Hinum Hsub Hkk HWDsp HWDthr
+                    Hpk Hj Hgl Hfuel Hinum Hsub Hkk
+                    (* LICENCE (e)'s four premises (§7.1): the block this
+                       walk bread, decoded, with the claim-shaped record the
+                       [c.beqz] at +0xa2 has just refuted a zero type for. *)
+                    eq_refl Hdswf Ht0 Hbno HWDsp HWDthr
                     HWDs1 HWDs2 HWDs3 HWDs4 HWDs5 HWDs6
                     Hbelow
-                    with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hlctx
+                    with "Hcg Hcnt Htext Hkdata Hpc Hpenv Hbio Hlctx
                           Hseam Hgen Hireg Hitb2 Hitbl Hesc Hslks Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
-                          Hbm Hlk [] [Hcont]").
+                          Hbm Hboot Hlk [] [Hcont]").
           { iApply "IH". }
           { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID16)
                       ltac:(wp_next_chain) with "Hcont"). }
@@ -2877,8 +2936,8 @@ Section IreclaimScan.
                     (* irc_release's bound is "bcache"(4); irc_scan's own is
                        "itable"(2), and [locks_below_mono] weakens it. *)
                     ltac:(lkbelow)
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hframe Hppid
-                          Hsbn Hsbi Hsbb Hsl Hiref Hbm Hlk [] [Hcont]").
+                    with "Hcg Hcnt Htext Hpc Hbio Hprocs Hframe Hppid
+                          Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hlk [] [Hcont]").
           { iApply "IH". }
           { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID16)
                       ltac:(wp_next_chain) with "Hcont"). }
@@ -2923,7 +2982,7 @@ Section IreclaimMain.
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb
            Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Heb Hbelow.
     subst eb.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     assert (Hnsext : (sign_extend' 64 (mword_of_int ninodes : mword 32) : mword 64)
                      = mword_of_int ninodes)
       by (apply sext32_64_small; change (2^31)%Z with 2147483648%Z; lia).
@@ -2936,8 +2995,8 @@ Section IreclaimMain.
                  ltac:(lia)
                  ltac:(change (2^31)%Z with 2147483648%Z in Hn31; lia)).
       apply not_true_is_false. intro Hc. apply Z.geb_le in Hc. lia. }
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hpenv #Hbio #Hlctx
-              #Hseam #Hgen Hsbn Hsbi Hsbb #Hireg #Hitb2 #Hitbl #Hesc #Hslks
+    iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
+              #Hseam #Hgen Hsbn Hsbi Hsbb #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks
               Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hiref Hcont".
     iAssert (irc_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size used pidv dq dqb dqs dqn j m K b lks)%I
@@ -2984,7 +3043,7 @@ Section IreclaimMain.
                     = sb_ninodes).
     { rgne. rewrite HR1a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x4)) Ra4 Ra4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x4)) Ra4 Ra4
               (mword_of_int 1194 : mword 12) R1 K
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04 Hsbn").
@@ -3096,7 +3155,7 @@ Section IreclaimMain.
     assert (HR4s6 : (R4 !!! Regidx Rs6 : mword 64) = (m !!! Regidx Rs6 : mword 64))
       by (rewrite /R4 upd_ne; [exact HR3s6 | nz]).
     iEval (rewrite HR3sp0) in "Hframe".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(T1 & T2 & T3 & T4 & T5 & T6 & T7 & T8 & _)".
     iDestruct "T1" as (v1) "Hf1".   iDestruct "T2" as (v2) "Hf2".
     iDestruct "T3" as (v3) "Hf3".   iDestruct "T4" as (v4) "Hf4".
@@ -3411,14 +3470,14 @@ Section IreclaimMain.
                   pidv dq dqb dqs dqn m K b lks
                   HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib
                   Hn31 Hpk Hj Hgl Hbelow
-                  with "Htext Hkdata Hpanic Hpenv Hbio Hlctx Hseam Hgen Hireg
+                  with "Htext Hkdata Hpenv Hbio Hlctx Hseam Hgen Hireg
                         Hitb2 Hitbl Hesc Hslks Hprocs Hdevi Hdgeom Hdlock")
       as "Hscan".
     iSpecialize ("Hscan" $! (Z.to_nat (ninodes - 1))).
     rewrite /irc_loop.
     iApply ("Hscan" $! RB (mword_of_int 1 : mword 32) used CID21
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe
-                    Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hcont").
+                    Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hcont").
     { rewrite Hunit1. lia. }
     { rewrite Hunit1. lia. }
     { reflexivity. }

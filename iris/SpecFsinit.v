@@ -87,8 +87,8 @@
    BEHAVIOUR -- this one really is a panic, so a contract that promises to
    RETURN has to refute it.  [sb_magic (sb_image ...) = FSMAGIC] is what
    does, and it is an image premise of exactly the same kind as the rest:
-   mkfs writes the magic.  [panic_wp_any] still rides, because the callees
-   have their own panic arms.
+   mkfs writes the magic.  The panic credentials still ride, because the
+   callees have their own panic arms.
 
    ---- ONE SLOT MORE THAN initlog GIVES BACK (a real composition fact) --
 
@@ -133,7 +133,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import FdSlots.
@@ -165,8 +164,7 @@ Local Open Scope Z_scope.
 (* fsinit's own frame is 32 bytes (4 slots) -- [c.addi sp,sp,-32] at +0x00,
    with ra/s0/s1/s2 pushed at 24/16/8/0.  Its deepest callee is ireclaim
    (68); initlog wants 56, bread 40, brelse 26, memmove 2. *)
-Definition K_fsinit : nat := 72%nat.
-
+Notation K_fsinit := (88%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE SUPERBLOCK: ITS EIGHT CELLS, ITS 32 BYTES, AND ITS MAGIC          *)
 (*                                                                        *)
@@ -303,7 +301,7 @@ Definition wp_fsinit_sconf_body
          pass are both dead.  Real recovery is stage 4. *)
   hdr_n bs_hdr = 0 ->
   (* ---- ireclaim's printk, as a hypothesis and not a functor ---- *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev *)
@@ -315,10 +313,9 @@ Definition wp_fsinit_sconf_body
      ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* initlog's crash seam, era certificate and era mirror variable *)
@@ -336,6 +333,13 @@ Definition wp_fsinit_sconf_body
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
   ireg_inv γi γfs inodestart nib -∗
+  (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12), from [icfg_alloc] through
+     the boot chain: fsinit frames it across bread/memmove/initlog and hands it
+     to ireclaim, which is the only reason it is safe there (§7.1.7).  Returned
+     in the post, so the boot caller can seal it to [ireg_open] after fsinit
+     returns and before [kexec("/init")] -- that seal is OWED to forkret's
+     first branch. *)
+  ireg_boot -∗
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
@@ -384,7 +388,7 @@ Definition wp_fsinit_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -415,6 +419,9 @@ Definition wp_fsinit_sconf_body
       (* the bitmap, with every orphan's blocks freed *)
       ⌜used' ⊆ used⌝ -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
+      (* the boot-shelter token, handed back for the seal (fs-fragments.md
+         §7.12) *)
+      ireg_boot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -43,7 +43,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -80,8 +81,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* namei's own frame is 32 bytes (4 slots) over namex's 102. *)
-Definition K_namei : nat := 106%nat.
-
+Notation K_namei := (116%nat) (only parsing).
 Definition wp_namei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
@@ -137,10 +137,10 @@ Definition wp_namei_sconf_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
@@ -159,7 +159,7 @@ Definition wp_namei_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
@@ -172,7 +172,7 @@ Definition wp_namei_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z)
     (ok : bool) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -182,7 +182,7 @@ Definition wp_namei_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -259,10 +259,10 @@ Definition wp_namei_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
@@ -281,7 +281,7 @@ Definition wp_namei_gen_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
@@ -294,7 +294,7 @@ Definition wp_namei_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
     (ok : bool) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -304,7 +304,7 @@ Definition wp_namei_gen_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)
@@ -396,11 +396,10 @@ End NAMEI.
 (* ===================================================================== *)
 
 (* namei's own frame is 32 bytes (4 slots) over the corner's 28. *)
-Definition K_namei_root : nat := 32%nat.
-
+Notation K_namei_root := (74%nat) (only parsing).
 Definition wp_namei_root_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
-      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
@@ -411,16 +410,18 @@ Definition wp_namei_root_body
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in    (* a0 = path *)
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_namei_root <= K)%nat ->
-  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* [+3], not [+1]: namex's iget acquires itable.lock and its LIVE panic
+     arm fires inside that critical section, where printk takes two more. *)
+  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   dev = icfg_dev ->
   nib = icfg_nib ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn gfs gi cov logstart -∗
@@ -431,7 +432,7 @@ Definition wp_namei_root_body
     ∀ (mr : regfile) (ipv : mword 64),
       ⌜ callee_saved m mr
         /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗
@@ -443,7 +444,7 @@ Definition wp_namei_root_body
 Module Type NAMEI_ROOT.
   Parameter wp_namei_root :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
-             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)

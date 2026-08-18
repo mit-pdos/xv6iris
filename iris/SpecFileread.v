@@ -57,7 +57,8 @@
                   owes nothing.
    * FD_INODE  -> ilock's, readi's and iunlock's: the icache seam, the block
                   cache and disk fabric, and the off-borrow invariant.
-   * anything else -> nothing; the arm is [panic], closed by [panic_wp_any].
+   * anything else -> nothing; the arm is [panic], discharged against
+     [SpecPanic] out of [kernel_data] + [panic_env] below.
 
    ==== THE FS ENVIRONMENT IS CONTENT-INDEPENDENT (fs-sysfile S4') =======
 
@@ -144,10 +145,11 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
+Require Import KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -193,8 +195,7 @@ Local Open Scope Z_scope.
    piperead and consoleread 62, ilock 44, iunlock 26.  A CONSTANT, not a
    per-arm bound: the stack a function may need is a property of the function
    (durable-notes.md). *)
-Definition fileread_stack : nat := (6 + K_readi)%nat.
-
+Notation fileread_stack := ((6 + K_readi)%nat) (only parsing).
 (* NDEV, as the bounds test reads it: [bltu a4,a3] with a4 = 9 against the
    ZERO-EXTENDED 16-bit major, so "in range" is exactly [major <= 9] and a
    negative [short] is caught by the zero extension rather than by a signed
@@ -515,7 +516,7 @@ Section SpecFileread.
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
-     reader nothing -- the arm is [panic], and [panic_wp_any] closes it. *)
+     reader nothing -- the arm is [panic], discharged against [SpecPanic]. *)
   Lemma fileread_env_none γf fn Cf :
     fc_type Cf = FD_NONE -> ⊢ fileread_env γf fn Cf.
   Proof.
@@ -693,11 +694,16 @@ Definition wp_fileread_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  (* WHAT THE DEFAULT ARM COSTS.  [f->type] outside {FD_PIPE, FD_DEVICE,
+     FD_INODE} reaches [panic("fileread")], and panic is an ordinary call:
+     the literal comes out of [kernel_data] and the console credentials
+     printk needs out of [panic_env].  Both are persistent and both are
+     already in every caller's hand, so neither costs the caller anything. *)
+  panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q Cf -∗
   (* ambient, because three of the four arms copy into user memory *)
@@ -720,7 +726,7 @@ Definition wp_fileread_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜fileread_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗

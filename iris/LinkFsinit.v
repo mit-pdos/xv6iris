@@ -23,8 +23,8 @@
      premise about the 32 bytes mkfs wrote into block 1.  That is the whole
      reason SpecFsinit.v states its geometry as claims about [sb_image].
 
-   The [panic_wp_any] resource the contract takes is threaded to all five
-   callees and never consumed locally.
+   The [kernel_data] / [panic_env] the contract takes are threaded to all
+   five callees, whose own panic arms are discharged against [Panic].
 
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  ireclaim's orphan
    arm calls printk on its general path (with a [%d]), and [PRINTK_GEN]'s only
@@ -33,10 +33,10 @@
    and SpecFsinit.v threads that same hypothesis down to it -- so the
    obligation is now TWO deep, and the boot client above fsinit (forkret /
    main) is where it finally has to be discharged, or accepted as
-   [SpecPanic.panic_wp_any] already is.  [Print Assumptions
+   [SpecPanic]'s own credentials already are.  [Print Assumptions
    Fsinit.wp_fsinit_sconf] therefore stays at the standing six -- the five
    platform axioms plus funext -- but the six are MODULO that threaded printk
-   obligation and modulo [panic_wp_any].  This is SpecBalloc.v's /
+   obligation.  This is SpecBalloc.v's /
    LinkIalloc.v's / LinkIreclaim.v's arrangement verbatim; a reader who takes
    the six for "depends on nothing else" is misreading it.
 

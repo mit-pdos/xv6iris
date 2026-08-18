@@ -61,7 +61,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
    there are four rather than three is that kernelvec now calls the REAL
    kerneltrap: its cone (devintr -> uartintr / virtio_disk_intr / clockintr)
    needs the device invariants, the two locks, the timer capability, the tick
-   keeper, [procs_inv] and [panic_wp_any] -- all of which [devintr_caps]
+   keeper and [procs_inv] -- all of which [devintr_caps]
    bundles and all of which are persistent, so the [□] handler contract can
    close over them.  Nothing else is needed: everything the HANDLER gets per
    trap rides inside [IntrDefs.ihs_entry_of].
@@ -81,7 +81,7 @@ Definition kernelvec_handler_spec_body
   minstret_inv -∗
   kernel_text -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
-  intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64).
+  intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64).
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :

@@ -133,7 +133,6 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import PanicStub.
 Require Import SpecFreeproc.
 Require Import SpecMyproc.
 Require Import SpecAllocproc.
@@ -171,11 +170,11 @@ Notation KF := KernelSyms.kfork (only parsing).
    a [bv_unsigned] is merely in the ambient proof context, not just the
    goal). ---- *)
 Lemma wpk_K_ge8 (K : nat) : (K_kfork <= K)%nat -> (8 <= K)%nat.
-Proof. unfold K_kfork. lia. Qed.
+Proof. lia. Qed.
 Lemma wpk_K_ge52 (K : nat) : (K_kfork <= K)%nat -> (52 <= K)%nat.
-Proof. unfold K_kfork. lia. Qed.
+Proof. lia. Qed.
 Lemma wpk_K_ge56 (K : nat) : (K_kfork <= K)%nat -> (56 <= K)%nat.
-Proof. unfold K_kfork. lia. Qed.
+Proof. lia. Qed.
 
 (* Re-anchoring a [wp_next] FORWARD, i.e. handing the caller's exit -- which
    is anchored at the function's entry hart -- to a block that resumed
@@ -255,9 +254,9 @@ Section KforkArms.
        [S lvl], arm [false]), so the index carries the reserve of the arm
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
-    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-    arm_pay lvl eb pme -∗
+    arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
     (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
@@ -268,6 +267,9 @@ Section KforkArms.
     FdSlots.fd_slots FDSPARE -∗
     IrefSlots.iref_slots (1 + IREFSPARE) -∗
     SwtchCtx.own_ctx (p_context npa) -∗
+    (* the child's kernel stack, as allocproc handed it out: this arm frees
+       the slot, so it goes straight back into freeproc's block. *)
+    ProcDefs.kstack_free npa -∗
     kalloc_env γa None -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
@@ -282,17 +284,17 @@ Section KforkArms.
       Hofnull Hcwdnull HMtthr Hbelow.
     subst npa.
     iIntros "#Hprocs Hcg Hcpu Hpay #Htext Hpc Hframe
-             Hpv HCpriv Hheld Hhart Hfd Hir Hctx Hkalloc Hcont".
+             Hpv HCpriv Hheld Hhart Hfd Hir Hctx Hkst Hkalloc Hcont".
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
-    iAssert (∃ w4', word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
+    iAssert (∃ w4', word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
     { iExists w4. iExact "Hb4". }
-    iAssert (∃ w5', word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
+    iAssert (∃ w5', word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
-                 with "HCpriv Hfd Hir Hctx") as "(Hfprest & Hfppt & Hfptf)".
+                 with "HCpriv Hfd Hir Hctx Hkst") as "(Hfprest & Hfppt & Hfptf)".
     iApply (B1.kfk_exit_uvmcopy γs γa γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
               m Mt K sp0 ra0 s00 s10 s50 pme eb b lvl lks
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
@@ -342,7 +344,7 @@ Section KforkArms.
     Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat b pme -∗
+    sie_cap_gpr KT1 Mt (K - 8)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
@@ -452,13 +454,12 @@ Section KforkArms.
        four follow from this one by [locks_below_mono]. *)
     locks_below lks "wait_lock" ->
     kernel_text -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
-    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     kfk_frame_at sp0 ra0 s00 s10 s50
@@ -477,7 +478,7 @@ Section KforkArms.
        ProcDefs.is_kstack npa ks ∗
        SwtchCtx.ctx_cells (p_context npa)
          (SpecAllocproc.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
-    IntrDefs.arm_pay lvl eb pme -∗
+    IntrDefs.arm_pay KT1 lvl eb pme -∗
     kalloc_env γa None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
@@ -497,7 +498,7 @@ Section KforkArms.
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull Hbelow.
     subst tfsrc tfdst.
-    iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
+    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
              Hitb Hitinv Hirs Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
@@ -571,7 +572,7 @@ Section KforkArms.
     iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false
                   (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({["proc"]} ∪ lks)
                   ltac:(lia) ltac:(lia) HofnullV2 ltac:(lkbelow)) as "Hb3app".
-    iSpecialize ("Hb3app" with "Htext Hft Hpanic").
+    iSpecialize ("Hb3app" with "Htext Hft").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                      Hheld Hhart Hfd Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
@@ -593,7 +594,7 @@ Section KforkArms.
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
-                with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
+                with "Hsc Hown Htext Hpcx Hitb Hitinv Hirs Hpvx Hpvcx").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
@@ -620,7 +621,7 @@ Section KforkArms.
       iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb b
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
-                with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
+                with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock
                       Hheld Hhart Hpvcx4 Hmk Hfd Hirsp Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
@@ -702,7 +703,7 @@ Section KforkMain.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv Henv #Hpav Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
@@ -720,7 +721,7 @@ Section KforkMain.
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
+              with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpav Hpv Hcont [] [] []").
     all: try lkbelow.
     - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
@@ -742,7 +743,7 @@ Section KforkMain.
     - (* ---- arm 2: uvmcopy failed, +0x7c ---- *)
       iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Vc).
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hctx Hpay Hcpu Hke HR".
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hctx Hkstk Hpay Hcpu Hke HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       iApply (kfork_arm2 (CID0 := CID2) γa γf γl2 γs cn m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
@@ -753,7 +754,7 @@ Section KforkMain.
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
                 Hofn Hcwdn HMtthr ltac:(lkbelow)
                 with "Hprocs Hcg Hcpu Hpay Ht Hpc Hframe Hpv HCp Hheld Hhart
-                      Hfd Hir Hctx Hke [HR]").
+                      Hfd Hir Hctx Hkstk Hke [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is
          durable-notes' diverging-ltac trap. *)
@@ -776,7 +777,7 @@ Section KforkMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
-                with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
+                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
                       Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hirs [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is

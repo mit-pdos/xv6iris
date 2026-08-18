@@ -135,7 +135,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -187,8 +187,7 @@ Local Open Scope Z_scope.
    has the accounting.  pipewrite (64), begin_op / end_op / ilock / iunlock
    are all below both.  A CONSTANT, not a per-arm bound: the stack a
    function may need is a property of the function (durable-notes.md). *)
-Definition filewrite_stack : nat := (12 + K_writei)%nat.
-
+Notation filewrite_stack := ((12 + K_writei)%nat) (only parsing).
 (* &devsw[mj].write.  [struct devsw] is two function pointers with [read]
    FIRST, so the entry is 16 bytes and this field is at offset 8 -- which is
    what the [slli a5,a5,4] / [ld a5,8(a5)] pair at +0x6c / +0x78 computes.
@@ -446,7 +445,7 @@ Section SpecFilewrite.
                      (fwn_size fn)⌝ ∗
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
-     ⌜printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
+     ⌜printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
      bio_ctx (fwn_bio fn)
        (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
@@ -556,7 +555,7 @@ Section SpecFilewrite.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      writer nothing -- the arm is [panic] at +0x11e (decode note 3), and
-     [panic_wp_any] closes it. *)
+     [SpecPanic] discharges it. *)
   Lemma filewrite_env_none γf fn Cf :
     fc_type Cf = FD_NONE -> ⊢ filewrite_env γf fn Cf.
   Proof.
@@ -609,11 +608,17 @@ Definition wp_filewrite_sconf_body
      ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  (* WHAT THE ELSE ARM COSTS.  [f->type] outside {FD_PIPE, FD_DEVICE,
+     FD_INODE} reaches [panic("filewrite")], and panic is an ordinary call:
+     the literal comes out of [kernel_data] and the console credentials
+     printk needs out of [panic_env].  Both are persistent, and both reach
+     the arm -- note that [filewrite_fs_env]'s own copies do NOT: on exactly
+     this path [filewrite_env] reduces to [emp]. *)
+  panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q Cf -∗
   (* ambient, because three of the four arms copy FROM user memory *)
@@ -634,7 +639,7 @@ Definition wp_filewrite_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗

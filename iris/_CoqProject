@@ -46,6 +46,7 @@ RegFile.v
 HartTp.v
 WpNext.v
 PtreeType.v
+Ktier.v
 RiscvPtsto.v
 PermInv.v
 PageGeom.v
@@ -166,6 +167,7 @@ PtAdBits.v
 Pt4kWalk.v
 KptPt.v
 KMap.v
+TrampText.v
 PtTree.v
 KptGhost.v
 KstackArith.v
@@ -211,13 +213,27 @@ UmodeMem.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v
+UmodeArith.v
 UmodeSyscall.v
+UmodeIo.v
 WpUmodeStep.v
 WpUmodeLeaf.v
+WpUmodeBranch.v
 WpUmodeStore.v
+WpUmodeLoad.v
 USpecSync.v
 UCodeSync.v
 UProofSync.v
+UCodeEcho.v
+USpecEcho.v
+UCodeSh.v
+USpecSh.v
+USpecShParse.v
+UmodeFrame.v
+UProofShLib.v
+UProofShMem.v
+UProofEchoA.v
+UProofEcho.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
@@ -255,7 +271,6 @@ WpIntenaBits.v
 SpecPushOff.v
 ProofPushOff.v
 LinkPushOff.v
-PanicStub.v
 SpecHolding.v
 ProofHolding.v
 LinkHolding.v
@@ -536,6 +551,7 @@ SpecFileclose.v
 ProofFilecloseParts.v
 LinkFilealloc.v
 PageFields.v
+KstackOwn.v
 PipeInvDefs.v
 PipeInv.v
 CodePipealloc.v
@@ -903,7 +919,6 @@ CodeUserinit.v
 SpecUserinit.v
 LinkUserinit.v
 StartedInv.v
-LinkPanicStub.v
 CodeMain.v
 SpecMain.v
 ProofMain.v
@@ -962,8 +977,10 @@ InodeLock.v
 InodeRegion.v
 FsRep.v
 IregLinkNz.v
+IgetLic.v
 IregDirBit.v
 IcacheEscrow.v
+IregBox.v
 IcacheBoot.v
 CodeIget.v
 CodeDirlink.v
@@ -1160,6 +1177,8 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
+FsSyscalls.v
+LinkFsSyscalls.v
 SpecSysMknod.v
 ProofSysMknod.v
 LinkSysMknod.v
@@ -1195,4 +1214,8 @@ SpecForkret.v
 ProofForkretParts.v
 ProofForkret.v
 LinkForkret.v
+LinkForkretNF.v
+SpecForkretParkPaid.v
+ProofForkretPark.v
+LinkForkretParkPaid.v
 CodeSyscall.v

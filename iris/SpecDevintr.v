@@ -72,7 +72,6 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import DiskPtsto WpUart DiskInv.
 Require Import TimerCap.
 Require Import SpecClockintr.
@@ -140,7 +139,6 @@ Section DevintrCaps.
                       free);
        [procs_inv]    the proc array's locks -- wakeup, reached from three of
                       the handlers;
-       [panic_wp_any] the panic arms inside acquire/release/wakeup.
 
      ALL PERSISTENT, so the bundle is threaded and never consumed, and the
      postcondition does not mention it. *)
@@ -153,8 +151,7 @@ Section DevintrCaps.
       is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
       timer_cap ∗
       tick_keeper γtl γs ∗
-      procs_inv γs ∗
-      panic_wp_any )%I.
+      procs_inv γs )%I.
 
   Global Instance devintr_caps_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps γu γv γdk γtl γs pd pav pu).
@@ -165,8 +162,7 @@ End DevintrCaps.
 (* devintr's own frame is 4 slots; the deepest callee is uartintr at
    [SpecUartintr.uartintr_stack] = 36 (virtio_disk_intr wants 22, clockintr
    20, plic_complete 6, plic_claim 4). *)
-Definition devintr_stack : nat := 40%nat.
-
+Notation devintr_stack := (52%nat) (only parsing).
 Definition wp_devintr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -190,14 +186,14 @@ Definition wp_devintr_sconf_body
      Trivial at every real call site: devintr always runs at trap entry,
      where [lks = ∅]. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   cpu_own lvl eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
-      sie_cap_gpr mf av false p -∗
+      sie_cap_gpr KT1 mf av false p -∗
       cpu_own lvl eb p false lks -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is ret_tgt -∗

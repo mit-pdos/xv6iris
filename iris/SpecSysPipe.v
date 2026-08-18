@@ -109,6 +109,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
+Require Import SpecPanic.
 Require Import SpecFdalloc.
 Require Import WpUart.
 Require Import DiskPtsto.
@@ -128,8 +129,7 @@ Local Open Scope Z_scope.
    wants 74, fileclose 68, copyout 50, argaddr 18, fdalloc 14, myproc 10 --
    so pipealloc sets the bound, and what makes pipealloc the deepest is the
    fileclose on its own error path. *)
-Definition sys_pipe_stack : nat := 82%nat.
-
+Notation sys_pipe_stack := (98%nat) (only parsing).
 Section SpecSysPipe.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
@@ -183,7 +183,7 @@ Definition wp_sys_pipe_sconf_body
      three fileclose calls (inside [sp_close2]), whose own lowest rank is
      "ftable" (1).  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
@@ -196,13 +196,14 @@ Definition wp_sys_pipe_sconf_body
      to be threaded rather than framed -- a hart-indexed resource held across
      a [true] crossing could not be transported back.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   is_ftable γfl γf -∗
   (* the kmem lock, the sealed page count and panic's contract: pipealloc
      needs the allocator and copyout needs it again for vmfault, and every
-     acquire on the way needs [panic_wp] *)
+     acquire on the way has its own panic arm *)
   kalloc_env γa None -∗
   proc_priv γf p pid V -∗
   (* the syscall's own allowance -- two references may be live in locals
@@ -225,9 +226,9 @@ Definition wp_sys_pipe_sconf_body
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')

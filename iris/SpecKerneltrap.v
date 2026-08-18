@@ -168,7 +168,7 @@ End KERNELTRAP_RETURNS.
                                         recognises.
 
    THE POINT OF DOING IT THIS WAY IS THE AXIOM LEDGER.  Closing the third arm
-   with [panic_wp_any] instead would have been easy, but printk's general
+   with a panic instead would have been easy, but printk's general
    (non-panic) path is UNPROVEN, so a live edge to it would put
    [wp_printk_gen_sconf] in the cone -- proving kerneltrap would then trade
    one sanctioned assumed contract for another.  With [Hsc] the cone is
@@ -226,8 +226,7 @@ End KERNELTRAP_RETURNS.
 
 (* kerneltrap's own frame is 6 slots; the deepest callee is devintr at
    [SpecDevintr.devintr_stack] = 40 (myproc wants 10, yield 20). *)
-Definition kerneltrap_stack : nat := 46%nat.
-
+Notation kerneltrap_stack := (58%nat) (only parsing).
 (* THE CHECK THAT KEEPS [IntrDefs.kv_frame_slots] HONEST.  That constant is
    the stack a trap may consume below the interrupted sp, and it has to cover
    kernelvec's own 32-slot frame PLUS this whole cone.  It is written as a
@@ -236,7 +235,7 @@ Definition kerneltrap_stack : nat := 46%nat.
    kerneltrap's cone still compiles and only fails deep inside the handler
    proof, at a place that looks unrelated. *)
 Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
-Proof. unfold kerneltrap_stack, kv_frame_slots. lia. Qed.
+Proof. lia. Qed.
 
 Definition wp_kerneltrap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
@@ -259,7 +258,7 @@ Definition wp_kerneltrap_sconf_body
      tickslock (8) and virtio's (9), and a bound has to be stated at the
      minimum, since [locks_below_mono] raises but never lowers. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
      carries the fact past the four instructions before the check. *)
@@ -283,14 +282,14 @@ Definition wp_kerneltrap_sconf_body
      bought nothing across the one boundary (the park) that mattered.  The
      trap CSRs beside it are threaded piecewise at PINNED values here, which
      is why this is its own conjunct rather than folded into [trap_csrs]. *)
-  intr_res -∗
+  intr_res KT1 -∗
   (* THE KPT RECEIPT, [trap_csrs]' sixth member (IntrDefs §6b), threaded for
      EXACTLY [intr_res]'s reasons and by the same route.  kernelvec's sret
      re-enables interrupts, and the arm it rebuilds carries the receipt, so a
      returning trap can no more re-enable them without it than without the
      handler resource.  It crosses the yield park inside [trap_csrs] and comes
      back as the RESUMING hart's, which is why it is a post as well. *)
-  strans_bit strans_bit_kpt -∗
+  kpt_on cpu_id -∗
   cpu_own 0 false p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
@@ -310,11 +309,11 @@ Definition wp_kerneltrap_sconf_body
       ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗
       ⌜ _get_Mstatus_SPIE ms_f = ('b"1" : mword 1) ⌝ -∗
       ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
-      sie_cap_gpr_at ms_f mf av false p -∗
+      sie_cap_gpr_at KT1 ms_f mf av false p -∗
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       (* at the RESUMING hart -- see the premise *)
-      intr_res -∗
-      strans_bit strans_bit_kpt -∗
+      intr_res KT1 -∗
+      kpt_on cpu_id -∗
       cpu_own 0 false p false lks -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)

@@ -1,18 +1,37 @@
-(* SpecForkretPark.v -- a NEW assumed contract: turning a freshly-allocated
-   process's raw saved context (ra = forkret, sp = kstack + PGSIZE, twelve
-   don't-care callee-saved slots) into a member of the scheduler's swtch
-   chain, i.e. [SchedCtx.proc_ctx] -- so that [kfork] (and, eventually,
-   [userinit]) can release the process at RUNNABLE.
+(* SpecForkretPark.v -- turning a freshly-allocated process's raw saved
+   context (ra = forkret, sp = kstack + PGSIZE, twelve don't-care
+   callee-saved slots) into a member of the scheduler's swtch chain, i.e.
+   [SchedCtx.proc_ctx] -- so that [kfork] (and, eventually, [userinit]) can
+   release the process at RUNNABLE.
 
-   THIS IS NOT A DESIGN SHORTCUT; IT IS A REAL, PRE-EXISTING GAP THAT KFORK
-   IS THE FIRST FUNCTION TO NEED CLOSED.  [SchedCtx.proc_ctx pa] unfolds to
+   THERE ARE TWO FORMS OF THIS PARK, and the difference between them is the
+   only thing still missing:
+
+     [FORKRET_PARK] / [forkret_park_body] -- HERE, and ASSUMED
+       ([LinkForkretPark.v]).  What [ProofKfork.v] is a functor over; it
+       takes exactly what kfork has in hand.
+
+     [FORKRET_PARK_PAID] -- [SpecForkretParkPaid.v], PROVED
+       ([ProofForkretPark.v]) over forkret's own contract, at the cost of
+       one further precondition ([forkret_park_pkg]): the child's free
+       kernel stack and the closer that turns forkret's yield into the trap
+       loop's kernel-side bundle.  That file's comment block is the
+       inventory, and the reason the two cannot simply be joined.
+
+   So parking a fresh process is no longer an open question about forkret;
+   it is an open question about where a NEW process's half of the kernel
+   environment comes from, which is kfork's (and sys_fork's) to answer.
+
+   THE ASSUMED FORM IS NOT A DESIGN SHORTCUT; IT IS A REAL, PRE-EXISTING GAP
+   THAT KFORK IS THE FIRST FUNCTION TO NEED CLOSED.  [SchedCtx.proc_ctx pa]
+   unfolds to
    [SwtchCtx.valid_context p_sched None (p_context pa) pa], a Löb/guarded
    fixpoint whose obligation is literally "prove a WP for the code that runs
    when this context is resumed" -- i.e. proving that a scheduler which picks
    this process up, swtch's into it, and lands at [forkret] actually behaves
    (forkret -> usertrapret -> userret -> user execution, re-establishing the
-   very same obligation at ITS next park).  Nothing in this tree does that
-   proof today: [SpecAllocproc.v]'s own header says as much --
+   very same obligation at ITS next park).  [SpecAllocproc.v]'s own header
+   says whose job that is --
 
      "turning 'ra = forkret, sp = kstack + PGSIZE' into a member of the
       scheduler's swtch chain is a Löb argument about forkret, which
@@ -27,10 +46,10 @@
    Axiom just to avoid this one step would throw away everything real about
    the proof.  So this file isolates exactly the missing step, in the same
    [Module Type] + [Axiom]-in-the-Link shape [SpecIput.v] already uses,
-   which is what lets [ProofKfork.v] be a functor over it: the day someone
-   proves [forkret]/[usertrapret]/[userret] for real (claude-notes/projects/
-   uservec.md is the tracker for that cone), this file and its [Axiom] are
-   what get replaced, and nothing about [ProofKfork.v] itself changes.
+   which is what lets [ProofKfork.v] be a functor over it: when kfork can
+   pay [forkret_park_pkg], its [Axiom] is replaced by an application of
+   [ProofForkretPark.ForkretParkProof], and nothing about [ProofKfork.v]
+   itself changes beyond that one new premise.
 
    WHAT IT TAKES: precisely what [allocproc]'s own postcondition hands the
    caller for the context (raw [ctx_cells], [is_kstack]) plus everything the
@@ -68,7 +87,7 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γs : list gname)
+    (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
   (length rest = 12%nat) ->
@@ -87,7 +106,7 @@ Definition forkret_park_body
 Module Type FORKRET_PARK.
   Parameter forkret_park :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γs : list gname)
+      (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),
       forkret_park_body γs γf pa ks rest pid V.

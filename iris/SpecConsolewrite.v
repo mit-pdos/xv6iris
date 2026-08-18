@@ -89,7 +89,6 @@ Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -110,8 +109,7 @@ Local Open Scope Z_scope.
    and the reserve is not available to them.  Raising [SpecFilewrite]'s
    [filewrite_stack] from [12 + K_writei] to [12 + 72] is the whole cost of
    that, and it stops there: nothing above sys_write reads the constant. *)
-Definition consolewrite_stack : nat := 72%nat.
-
+Notation consolewrite_stack := (72%nat) (only parsing).
 Definition wp_consolewrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ}
@@ -141,7 +139,7 @@ Definition wp_consolewrite_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
      released inside uartwrite's own loop -- be the only lock held. *)
   cpu_own 0%nat eb pj b lks -∗
@@ -153,7 +151,6 @@ Definition wp_consolewrite_sconf_body
   dev_inv γu γv -∗
   is_txlock γl γu -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   (* THE CROSSING IS [true], NOT [b] -- consolewrite reaches a park, so the
      porting guide's rule applies: a parking function's [wp_next] index is
      [true] unconditionally.  With [eb = true] above and [cpu_own_eb_agree]
@@ -166,7 +163,7 @@ Definition wp_consolewrite_sconf_body
          between nothing and all of it. *)
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗

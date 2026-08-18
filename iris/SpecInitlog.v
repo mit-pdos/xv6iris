@@ -91,7 +91,7 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -110,8 +110,7 @@ Import Defs.
 (* initlog's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00); its
    deepest callee is install_trans (50).  write_head wants 44, bread 40,
    initlock 2. *)
-Definition K_initlog : nat := 56%nat.
-
+Notation K_initlog := (74%nat) (only parsing).
 (* the string literal initlog passes to initlock -- it sits in .rodata past
    etext with no ELF symbol of its own (the [auipc a1,0x4 ; addi a1,a1,-1658]
    pair at +0x1a/+0x1e), so it is spelled out here; the proof reads its bytes
@@ -160,10 +159,10 @@ Definition wp_initlog_sconf_body
      bwrite/bunpin, write_head's bread/bwrite/brelse) never dips below
      "bcache" (4); [initlock] itself carries no order premise. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* THE CRASH SEAM (phase C2b/D1 stage 3): the persistent identification of
      the machine layer's crash predicate with THIS file system's [P_fs].  It
@@ -233,7 +232,7 @@ Definition wp_initlog_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

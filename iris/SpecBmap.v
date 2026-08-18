@@ -64,7 +64,7 @@
    THE PANIC ARM IS DEAD.  bmap's [panic("bmap: out of range")] at +0xb2
    is reached only when bn - NDIRECT >= NINDIRECT, which the premise
    (bn < MAXFILE) rules out -- the same way both of log_write's panics are
-   dead.  [panic_wp_any] is still threaded, because the interior
+   dead.  The panic credentials are still threaded, because the interior
    acquire's own holding-check arm wants a panic contract regardless.
 
    THE s4 QUIRK.  gcc saves s4 only on the paths that reach bread
@@ -106,7 +106,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -131,8 +132,7 @@ Local Open Scope Z_scope.
    (s4 rides in the same frame, at slot 0, on the indirect paths).  Its
    deepest callee is balloc (58, itself dominated by printk's out-of-blocks
    path); bread wants 40 and log_write 18. *)
-Definition K_bmap : nat := 64%nat.
-
+Notation K_bmap := (74%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE ARMS, AS THE CALLER READS THEM OFF THE BLOCK MAP                  *)
 (*  (fs-icache.md section 18: "bmap: ONE credit (the bitmap), arm-wise    *)
@@ -293,7 +293,7 @@ Definition wp_bmap_sconf_body
   (* balloc's out-of-blocks arm calls the GENERAL printk path; its contract
      rides as a hypothesis, never a functor, so that neither balloc nor bmap
      inherits LinkPrintk's Axiom.  See SpecBalloc.v's header. *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* KILLS THE PANIC ARM *)
   (fbn < MAXFILE)%nat ->
   blkmap_wf cov logstart bm ->
@@ -305,7 +305,7 @@ Definition wp_bmap_sconf_body
   (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
      the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bmap holds no lock of its
      own -- every push_off/pop_off pair that can mint or spend an
@@ -318,13 +318,13 @@ Definition wp_bmap_sconf_body
      because the TRAP handed it over.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev, read (never written) on all four balloc/bread call paths --
@@ -401,9 +401,9 @@ Definition wp_bmap_sconf_body
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -472,7 +472,7 @@ Definition wp_bmap_gen_body
   (bmap_need cr (bmap_ind fbn) <= n)%nat ->
   log_geom_ok cov logstart ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* THE CREDIT'S PREMISE: claiming the bitmap block is already paid for
      means claiming this op has already logged it.  There is only one. *)
   (cr = true -> bmapstart ∈ Sb) ->
@@ -494,7 +494,7 @@ Definition wp_bmap_gen_body
   (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
      the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_bmap_sconf_body] above -- required so that a LOOPING caller (e.g.
@@ -503,12 +503,12 @@ Definition wp_bmap_gen_body
      counted/sconf form, which has no [cr]/[Sb] at all) can reach this
      contract at [eb = false] too.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -541,9 +541,9 @@ Definition wp_bmap_gen_body
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -714,15 +714,15 @@ Definition wp_bmap_noalloc_sconf_body
   (* the NO-ALLOC bmap never reaches log_write, so its floor is just the
      bread/brelse one -- requiring "log" of its callers would be over-strong. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- see the allocating
      contract above; the no-alloc arm still sleeps (bread), so it is a
      pure pass-through here too. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   i_dev ip ↦₄{dqd} dev -∗
   inode_map γfs ip bm -∗
@@ -750,9 +750,9 @@ Definition wp_bmap_noalloc_sconf_body
       (* the block the map already named, and nothing else happened *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
          = sign_extend' 64 (blkmap_get bm fbn : mword 32)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

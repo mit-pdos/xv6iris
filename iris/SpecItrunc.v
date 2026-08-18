@@ -92,7 +92,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -125,8 +126,7 @@ Local Open Scope Z_scope.
 (* itrunc's own frame is 48 bytes (6 slots) -- [addi sp,sp,-48] at +0x00,
    ra/s0/s1/s2/s3 pushed, and s4 conditionally at +0x50.  Its deepest
    callee is bfree (44); bread wants 40, brelse 26 and iupdate 44. *)
-Definition K_itrunc : nat := 50%nat.
-
+Notation K_itrunc := (68%nat) (only parsing).
 (* THE TRUNCATED RECORD: the same inode with its size zeroed and its addrs
    emptied.  [type], [major], [minor] and [nlink] are untouched -- itrunc
    frees blocks, it does not delete the inode; zeroing the type is iput's
@@ -394,7 +394,7 @@ Definition wp_itrunc_sconf_body
      indirect arm, and its closing iupdate ("log", 3) -- "log" is the
      lowest, so one premise there covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  itrunc itself never
      acquires or releases anything -- it is a pure PASS-THROUGH to its
@@ -407,10 +407,10 @@ Definition wp_itrunc_sconf_body
      through to each callee and back, unused, all the way to its own exit.
      See claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev and ip->inum: read, never written *)
@@ -460,9 +460,9 @@ Definition wp_itrunc_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -567,12 +567,12 @@ Definition wp_itrunc_gen_body
      indirect arm, and its closing iupdate ("log", 3) -- "log" is the
      lowest, so one premise there covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -611,9 +611,9 @@ Definition wp_itrunc_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

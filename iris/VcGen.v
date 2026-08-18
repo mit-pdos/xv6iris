@@ -529,6 +529,9 @@ Qed.
 Section VcGenIris.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  (* the heap cells are the block's own memory, so they ride the accessing
+     hart's tier exactly as its frame slots do (StackOwn.v's KTR discipline). *)
+  Context `{KTR : !CurKtier}.
 
   (* one fully-owned 8-byte points-to per heap cell *)
   Definition vheap_own (ρ : nat -> mword 64) (h : list (sval * sval)) : iProp Σ :=

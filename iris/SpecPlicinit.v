@@ -60,14 +60,14 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
   (2 <= n)%nat ->
-  sie_cap_gpr m0 n false p -∗
+  sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      both writes preserve [plic_ok], so nothing is owed back to the caller *)
   plic_inv -∗
   wp_next false p (fun (CID : CpuId) =>
     ∀ m' : regfile,
-    sie_cap_gpr m' n false p -∗
+    sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗

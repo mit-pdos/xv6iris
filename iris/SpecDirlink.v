@@ -65,7 +65,7 @@
    system invariant -- dirlink's OWN short-write arm is what breaks it (see
    the APPEND arm below: on [tot < 16] the new size is [16*k0 + tot]) -- so
    the short-readi turn is now a LIVE panic arm, discharged with
-   [SpecPanic.panic_wp_any], and no caller owes granularity.  A dirlink on a
+   [SpecPanic]'s own contract, and no caller owes granularity.  A dirlink on a
    directory a previous short write corrupted therefore PANICS rather than
    returning; that is what the C does, and it is the honest post-state.
 
@@ -174,7 +174,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -190,6 +189,7 @@ Require Import SpecPrintk.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -226,8 +226,7 @@ Local Open Scope Z_scope.
    arithmetic.  writei also grew (78, dominated by the same bmap chain, not
    the copyout one), but stays under dirlookup, so dirlookup alone still
    fixes this number: 10 + 90 = 100. *)
-Definition K_dirlink : nat := 100%nat.
-
+Notation K_dirlink := (110%nat) (only parsing).
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)
 Definition dirlink_units : nat := 7%nat.
@@ -490,6 +489,22 @@ Definition wp_dirlink_sconf_body
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->
+  (* ---- THE BORROWED LICENCE, RELAYED TO THE INNER dirlookup (R13(ii),
+     fs-fragments.md §7.1/§7.5.6).  dirlink's own lookup is where the name
+     it is about to link is checked for, and that lookup's [iget] on the
+     FOUND arm needs a licence.  So the two things dirlookup borrows travel
+     one level up: the pure disjunction (verbatim -- see SpecDirlookup's
+     header for why it is a disjunction and not "the home is live"), and the
+     ticket list, over the PRE-state and handed back VERBATIM on both arms.
+     The record dirlookup's licence (c) wants is the one this contract
+     already takes, [dinode_at γi dinum dn0]; its nonzero type follows from
+     [Htype] and [di_type_stable] and costs no premise.  §20.18 ruling 1 is
+     untouched: this is a BORROW, not an obligation -- no [dir_links]
+     obligation at dirlink, and the re-park at the post-state stays exactly
+     where it was, at the caller. ---- *)
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  dir_orphan_clean dn data ->
   (* NO "THE APPEND FITS" PREMISE.  It used to sit here, killing writei's
      own -1 return; it was unsuppliable (see the header) and the return is
      routed through the [tot = 0] corner of the append arm instead. *)
@@ -521,7 +536,7 @@ Definition wp_dirlink_sconf_body
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -545,10 +560,9 @@ Definition wp_dirlink_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -561,7 +575,7 @@ Definition wp_dirlink_sconf_body
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -584,6 +598,8 @@ Definition wp_dirlink_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   ic_sleeplocks cn -∗
   iref_slot -∗
+  (* the borrowed ticket list, over the PRE-state *)
+  dir_links (bv_unsigned dinum) dn data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_op γ ncount -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -598,7 +614,7 @@ Definition wp_dirlink_sconf_body
     (n' : nat) (used' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
@@ -607,7 +623,7 @@ Definition wp_dirlink_sconf_body
       inode_meta ip dn' -∗
       inode_map γfs ip bm' -∗
       inode_blocks γfs bm' data' -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -618,6 +634,10 @@ Definition wp_dirlink_sconf_body
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
       iref_slot -∗
+      (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
+         which is what R13(ii) admits and what the caller's own re-park
+         movers ([DirLinks.dir_link_at_dirlink] and its siblings) take. *)
+      dir_links (bv_unsigned dinum) dn data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       log_op γ n' -∗
@@ -736,6 +756,22 @@ Definition wp_dirlink_gen_body
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->
+  (* ---- THE BORROWED LICENCE, RELAYED TO THE INNER dirlookup (R13(ii),
+     fs-fragments.md §7.1/§7.5.6).  dirlink's own lookup is where the name
+     it is about to link is checked for, and that lookup's [iget] on the
+     FOUND arm needs a licence.  So the two things dirlookup borrows travel
+     one level up: the pure disjunction (verbatim -- see SpecDirlookup's
+     header for why it is a disjunction and not "the home is live"), and the
+     ticket list, over the PRE-state and handed back VERBATIM on both arms.
+     The record dirlookup's licence (c) wants is the one this contract
+     already takes, [dinode_at γi dinum dn0]; its nonzero type follows from
+     [Htype] and [di_type_stable] and costs no premise.  §20.18 ruling 1 is
+     untouched: this is a BORROW, not an obligation -- no [dir_links]
+     obligation at dirlink, and the re-park at the post-state stays exactly
+     where it was, at the caller. ---- *)
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  dir_orphan_clean dn data ->
   (* NO "THE APPEND FITS" PREMISE.  It used to sit here, killing writei's
      own -1 return; it was unsuppliable (see the header) and the return is
      routed through the [tot = 0] corner of the append arm instead. *)
@@ -767,7 +803,7 @@ Definition wp_dirlink_gen_body
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -798,10 +834,9 @@ Definition wp_dirlink_gen_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -814,7 +849,7 @@ Definition wp_dirlink_gen_body
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -837,6 +872,8 @@ Definition wp_dirlink_gen_body
   ic_escrows cn γfs γi cov logstart -∗
   ic_sleeplocks cn -∗
   iref_slot -∗
+  (* the borrowed ticket list, over the PRE-state *)
+  dir_links (bv_unsigned dinum) dn data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_opS γ ncount Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -851,7 +888,7 @@ Definition wp_dirlink_gen_body
     (n' : nat) (used' : gset Z) (Sb' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
@@ -860,7 +897,7 @@ Definition wp_dirlink_gen_body
       inode_meta ip dn' -∗
       inode_map γfs ip bm' -∗
       inode_blocks γfs bm' data' -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -871,6 +908,10 @@ Definition wp_dirlink_gen_body
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
       iref_slot -∗
+      (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
+         which is what R13(ii) admits and what the caller's own re-park
+         movers ([DirLinks.dir_link_at_dirlink] and its siblings) take. *)
+      dir_links (bv_unsigned dinum) dn data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       (* THE SET ONLY GROWS.  No ceiling -- SpecWritei's header's reason

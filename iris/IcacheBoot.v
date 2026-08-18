@@ -547,14 +547,17 @@ Section IcacheBootRegion.
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
        image_root_alive dss nib) ->
-    (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier): the
-       image's authorities are ALL-PLAIN, [wd = 0] at every inum, so (T1) is
-       vacuous at every slot and the image owes NOTHING new.  A d-flavoured
-       fragment is only ever minted by [InodeRegion.ireg_write_link_d], i.e.
-       by a running kernel at a [dp->nlink++]; mkfs's records are handed to
-       the region unflavoured, and the root's own [nlink = 1] is still
-       [image_root_alive]'s business and nobody else's. *)
-    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 0 None 0) -∗
+    (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier;
+       V4+V5's fused widening): the image's authorities are ALL-PLAIN,
+       [wdu = wdt = 0] and [p = None] at every inum, so (T1), (T1') and
+       [ireg_par_ok] are all vacuous-or-zero at every slot and the image
+       owes NOTHING new -- (T1') in particular is not even an image fact
+       ([wl = 0] closes it before the type is asked).  A d-flavoured
+       fragment is only ever minted by a running kernel at create's mkdir
+       arm; mkfs's records are handed to the region unflavoured, and the
+       root's own [nlink = 1] is still [image_root_alive]'s business and
+       nobody else's. *)
+    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 0 0 None 0 None) -∗
     (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
        zero: nobody has ever observed a nonzero nlink, which is exactly the
        [⌜v = 0⌝] disjunct that carries the receipt over the mkfs image's
@@ -563,18 +566,22 @@ Section IcacheBootRegion.
        hand them over ([IcacheRef.icfg_alloc]). *)
     ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
-       fsblock γfs (inodestart + Z.of_nat bi) (bss bi))
+       fsblock γfs (inodestart + Z.of_nat bi) (bss bi)) -∗
+    (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
+       (fs-fragments.md §7.12) -- carried, never consumed here *)
+    ireg_boot
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
       ⌜length dss = nib⌝ ∗ ⌜Forall diblk_wf dss⌝ ∗
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
       ireg_inv γi γfs inodestart nib ∗
+      ireg_boot ∗
       ([∗ set] z ∈ region_inums nib,
          ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0).
-    iIntros "Hlk Hepa Hblks".
+    iIntros "Hlk Hepa Hblks Hboot".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -605,12 +612,22 @@ Section IcacheBootRegion.
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 None 0 Hok Hrt (ireg_dir_ok_zero _)
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
+                  Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
+                  ireg_par_ok_none
                   with "Hla Hep").
+        (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
+           disjunct is free (fs-fragments.md §7.12) *)
+        { iLeft; iPureIntro; reflexivity. }
         iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 None 0 Hok Hrt (ireg_dir_ok_zero _)
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
+                  Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
+                  ireg_par_ok_none
                   with "Hla Hep").
+        (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
+           disjunct is free (fs-fragments.md §7.12) *)
+        { iLeft; iPureIntro; reflexivity. }
         iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
@@ -638,7 +655,7 @@ Section IcacheBootRegion.
       as "#Hinv"; [by iNext |].
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
-    iFrame "Hinv". iExact "Hout".
+    iFrame "Hinv Hboot". iExact "Hout".
   Qed.
 
 End IcacheBootRegion.
@@ -669,7 +686,7 @@ Section IcacheBootPool.
      one conjunct stronger than it was.  It costs the client ONE
      COMPUTATIONAL FACT about the image and nothing else -- every image
      directory has [nlink <= 1] -- because the region's boot authorities
-     are ALL-PLAIN ([ireg_alloc] takes [link_auth z 0 0 0 None 0], V1), so
+     are ALL-PLAIN ([ireg_alloc] takes [link_auth z 0 0 0 0 None 0 None]), so
      the stock is built at [F = fun _ => false], where the clause's
      right-hand side is [1 + 0].  That is true of mkfs: it writes
      [nlink = 1] into the root and creates no subdirectory, so no image

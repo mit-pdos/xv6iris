@@ -100,8 +100,7 @@ Local Open Scope Z_scope.
 
 (* fdalloc's own frame is 4 slots (addi sp,sp,-32) and myproc wants 10
    below it. *)
-Definition fdalloc_stack : nat := 14%nat.
-
+Notation fdalloc_stack := (14%nat) (only parsing).
 (* ===================================================================== *)
 (*  What fdalloc COMPUTES: the free descriptors, least first.             *)
 (* ===================================================================== *)
@@ -230,7 +229,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   (* push_off's transient noff increment stays in int range (myproc) *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (fdalloc_stack <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the block SPLIT at the fd table: fdalloc needs the core only to reach
@@ -240,7 +239,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core p pid V -∗

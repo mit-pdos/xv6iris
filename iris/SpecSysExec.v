@@ -112,7 +112,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -161,8 +160,7 @@ Local Open Scope Z_scope.
    [argv[MAXARG]].  Its deepest callee is kexec by a wide margin
    ([SpecKexec.K_kexec] = 174); argstr wants 60, fetchstr 56, fetchaddr and
    memset and kalloc and kfree less. *)
-Definition K_sys_exec : nat := 234%nat.
-
+Notation K_sys_exec := (244%nat) (only parsing).
 Section SpecSysExec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
@@ -232,7 +230,7 @@ Definition wp_sys_exec_sconf_body
      page [proc_priv] carries *)
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
      callees raise -- kexec's whole FS cone at "log"/"bcache"/"sleep lock",
@@ -240,10 +238,9 @@ Definition wp_sys_exec_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], which this
      contract's own premise forces, so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -267,9 +264,9 @@ Definition wp_sys_exec_sconf_body
          fetchstr's copy-in faults user pages in.  [uptd_ext] is their own
          report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

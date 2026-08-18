@@ -74,7 +74,6 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
-Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKwait.      (* [K_kwait] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
@@ -85,8 +84,7 @@ Import Defs.
 
 (* 4 slots for sys_wait's own frame, and below it the deeper of its two
    callees: kwait's 60 (argaddr's is 18). *)
-Definition sys_wait_stack : nat := (4 + K_kwait)%nat.
-
+Notation sys_wait_stack := ((4 + K_kwait)%nat) (only parsing).
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -101,11 +99,10 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (sys_wait_stack <= av)%nat ->
   (* the PARKING premise, inherited from kwait: everything that sleeps has it *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   kalloc_env γa None -∗
   proc_priv γf pj pid V -∗
@@ -114,7 +111,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗

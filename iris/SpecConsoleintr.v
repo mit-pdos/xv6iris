@@ -19,7 +19,7 @@
      acquire / release   [ConsoleInv.is_conslock]
      consputc            [WpUart.dev_inv] ∗ [UartTxInv.is_txlock] ∗ a
                          [UartTxInv.uart_sent_sub] to extend
-     wakeup              [procs_inv] ∗ [panic_wp_any]
+     wakeup              [procs_inv]
 
    ALL OF THEM ARE PERSISTENT, which is what makes the ripple cheap: the two
    lock credentials and the trace baseline are bundled here as
@@ -71,7 +71,6 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -86,8 +85,7 @@ Require Import ProcAvail.
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
    (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
    lock calls (10) are all shallower than wakeup. *)
-Definition consoleintr_stack : nat := 32%nat.
-
+Notation consoleintr_stack := (32%nat) (only parsing).
 Section ConsoleCaps.
   Context `{!riscvGS Σ, !lockG Σ} `{!uartGhostG Σ}.
 
@@ -124,16 +122,16 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
      see the proof file's report for why that is not this function's
      obligation to supply. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
-  panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
   dev_inv γu γv -∗
   console_caps γu -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b pme -∗
+      sie_cap_gpr KT1 Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       WP (Loop : expr riscv_lang)) -∗

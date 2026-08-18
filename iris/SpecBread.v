@@ -45,7 +45,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -61,8 +62,7 @@ Import Defs.
 
 (* bread's own frame is 48 bytes (6 slots); its deepest callee is
    virtio_disk_rw (34). *)
-Definition K_bread : nat := 40%nat.
-
+Notation K_bread := (58%nat) (only parsing).
 Definition wp_bread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -97,7 +97,7 @@ Definition wp_bread_sconf_body
      is stated at the LOWER rank -- [locks_below_mono] (4 <= 6) lifts it to
      cover the acquiresleep call too, so one premise suffices for both. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  This function acquires at
@@ -117,10 +117,10 @@ Definition wp_bread_sconf_body
      sleepers need can only come from here, and the caller holds it because
      the TRAP handed it over.  See claude-notes/completed/sched-hart-generic.md
      and claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
@@ -143,9 +143,9 @@ Definition wp_bread_sconf_body
   ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

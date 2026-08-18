@@ -81,17 +81,17 @@ Section ProofIinit.
        c <> mword_of_int 8 -> c <> mword_of_int 9 -> c <> s2i -> c <> s3i -> c <> csp_rs1 ->
        Me !!! Regidx c = m !!! Regidx c) ->
     kernel_text -∗
-    sie_cap_gpr Me (K - 6) b p -∗
+    sie_cap_gpr KT1 Me (K - 6) b p -∗
     pc_is (mword_of_int (KernelSyms.iinit + 0x4a)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx s3i : mword 64) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[KT1] v) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -192,8 +192,8 @@ Section ProofIinit.
     assert (Hpop : E5 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E5 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv Hup HE6sp. reflexivity. }
-    iAssert (stack_own sp0 6) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1"; [iExists _; iExact "Hc1"|].
       iSplitL "Hc2"; [iExists _; iExact "Hc2"|].
       iSplitL "Hc3"; [iExists _; iExact "Hc3"|].
@@ -296,21 +296,21 @@ Section ProofIinit.
     (forall c : mword 5, is_cs_idx c = true ->
        c <> mword_of_int 8 -> c <> mword_of_int 9 -> c <> s2i -> c <> s3i -> c <> csp_rs1 ->
        M !!! Regidx c = m !!! Regidx c) ->
-    sie_cap_gpr M (K - 6) b p -∗
+    sie_cap_gpr KT1 M (K - 6) b p -∗
     kernel_text -∗
     sl_str_addr ↦ₛ□ "sleep lock"%string -∗
     name_inode ↦ₛ□ "inode"%string -∗
     pc_is (mword_of_int (KernelSyms.iinit + 0x3a)) -∗
     ([∗ list] i ∈ seq 0 j, sl_fresh (inode_lock i) "inode"%string) -∗
     ([∗ list] i ∈ seq j (NINODE - j), sl_raw (inode_lock i)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx s2i : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx s3i : mword 64) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[KT1] v) -∗
     wp_next b p (fun (CID : CpuId) =>
-      ∀ mr, sie_cap_gpr mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
+      ∀ mr, sie_cap_gpr KT1 mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -597,7 +597,7 @@ Section ProofIinit.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (vra0) "Hc1". iDestruct "S2" as (vs00) "Hc2".
     iDestruct "S3" as (vs10) "Hc3". iDestruct "S4" as (vs20) "Hc4".
@@ -739,7 +739,7 @@ Section ProofIinit.
       rewrite /R3 upd_ne; [| congruence].
       rewrite /R2 upd_ne; [| congruence].
       rewrite /R1 upd_ne; [reflexivity | congruence]. }
-    iApply (Initlock.wp_initlock_sconf R7 vlock vname vcpu "itable"%string (K - 6) b p
+    iApply (Initlock.wp_initlock_sconf KT1 R7 vlock vname vcpu "itable"%string (K - 6) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HR7a1). iExact "Hstr_itable". }
@@ -846,7 +846,7 @@ Section ProofIinit.
        is generic in [b] and its wp_next stays deferred until [iinit_loop]'s
        exit arm resolves it. *)
     iAssert (wp_next (CID0 := CID) b p (fun (CID' : CpuId) =>
-              ∀ mr, sie_cap_gpr mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
+              ∀ mr, sie_cap_gpr KT1 mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
               ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
               WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hlock Hcpu]" as "Hpost".

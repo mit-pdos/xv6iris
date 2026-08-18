@@ -129,6 +129,14 @@ Qed.
 
 Section stack_own.
   Context `{!riscvGS Σ}.
+  (* The ambient TIER.  [stack_own] is a plain NAME (no notation) used
+     textually at ~330 sites, so the tier rides in as an instance-implicit
+     argument rather than as a positional one: [stack_own sp n] is
+     unchanged everywhere, and a file that pins [CurKtier] gets its stack
+     at that tier.  Every lemma in this section is thereby tier-generic --
+     the boot stack (KT0, the identity-mapped [stack0]) and a KSTACK frame
+     (KT1) share one algebra, which is the whole point of the project. *)
+  Context `{KTR : !CurKtier}.
 
   (* Ownership of the [n] eight-byte stack slots just below [sp], region
      [sp-8n, sp), with existential (scratch) contents.  Slot [i] (0-based,
@@ -390,6 +398,26 @@ Section stack_own.
   Qed.
 
 End stack_own.
+
+(* THE WEAKENING ALONG THE TIER ORDER.  A stack region is a big-op of
+   [word_pointsto]s at one tier, and each of those weakens
+   ([RiscvPtsto.word_ktier_mono]), so the region does -- which is what makes
+   the bundles built over it ([IntrDefs.sie_cap]) tier-COVARIANT.
+
+   OUTSIDE the section, necessarily: a heterogeneous statement has to name
+   the two tiers, and a section-local definition is NOT parameterized over
+   its own section variables -- [stack_own (KTR := kt)] written above fails
+   with "Wrong argument name KTR", the same rule the hart binder obeys
+   (durable-notes, "CpuId IS A CLASS, SO A CROSSING NEEDS A NEW SECTION"). *)
+Lemma stack_ktier_mono `{!riscvGS Σ} (kt kt' : ktier) `{!KtierLe kt kt'}
+    (sp : Arch.pa) (n : nat) :
+  stack_own (KTR := kt) sp n ⊢ stack_own (KTR := kt') sp n.
+Proof.
+  rewrite /stack_own. iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
+  iExists ws. iSplitR; [done |].
+  iApply (big_sepL_mono with "H"). iIntros (i w _) "H".
+  iApply (word_ktier_mono kt kt' with "H").
+Qed.
 
 (* [zero_reg] is the null pointer a C null test compares against. *)
 Lemma uint_zero_reg : uint (zero_reg : mword 64) = 0%Z.

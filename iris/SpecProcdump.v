@@ -84,7 +84,7 @@
      would drag that axiom into procdump's [Print Assumptions] and into
      every caller's.
    - [cpu_own 0 eb p C b] is threaded net-zero (printk's acquire/release
-     pair leaves the interrupt level as it found it), and [panic_wp_any] is
+     pair leaves the interrupt level as it found it), and [panic_env] is
      carried because that acquire needs it.  No [procs_inv]: procdump takes
      no proc lock, which is the one respect in which it is EASIER than
      wakeup and kkill.
@@ -114,7 +114,6 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import PrintkFmt.
-Require Import PanicStub.
 Require Import SpecPrintk.
 From Kernel Require KernelSyms.
 Import Defs.
@@ -160,22 +159,21 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* ten slots of its own, forty-eight for printk (printk_stack) *)
   (58 <= K)%nat ->
   (* the callee, as a hypothesis and not a functor -- see the header *)
-  printk_gen_contract γpr γd γv ->
+  printk_gen_contract (kt := KT1) γpr γd γv ->
   (* procdump takes no lock of its own (the header's whole point); its one
      callee, printk, is entered at rank "pr" -- the lowest (only) rank this
      cone touches, so this is the whole order premise. *)
   locks_below lks "pr" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   (* the interrupt level is left exactly as found: printk's acquire/release *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr γd γv -∗
   (* THE RACY-DEBUG READ PERMISSION (see the header) *)
   procdump_view -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
       cpu_own 0%nat eb p b lks -∗

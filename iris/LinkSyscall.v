@@ -72,5 +72,5 @@ Module Syscall : SYSCALL.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
+      wp_syscall_sconf_body (syscall_env) γf γs j γl bn fn us ip dqi m av pid V lks.
 End Syscall.

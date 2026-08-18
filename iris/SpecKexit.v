@@ -94,7 +94,7 @@
    rest.  Same premise, same spelling, as SpecReparent.v's.
 
    NOTE the panic arm is NOT ruled out.  kexit's caller does not have to
-   prove [p <> initproc]: [panic] never returns, so the [panic_wp_any]
+   prove [p <> initproc]: [panic] never returns, so the no-postcondition
    convention closes that arm at zero cost (SpecPanic.v), and the honest
    reading of the contract is "exits the calling process, or panics".  The
    same convention closes the [panic("zombie exit")] that follows sched --
@@ -113,9 +113,12 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelText.
 Require Import IntrDefs.
+Require Import WpMmodeLeafBase.
+Require Import StackOwn.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
+Require Import ProcDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
@@ -127,7 +130,8 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -138,8 +142,7 @@ Import Defs.
 (* kexit's own six frame slots, plus the deepest callee below it: fileclose
    (68 -- a descriptor may name an inode file, so its own arm reaches iput);
    iput wants 60, end_op 58, reparent 24, sched 16. *)
-Definition K_kexit : nat := 74%nat.
-
+Notation K_kexit := (90%nat) (only parsing).
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
@@ -187,7 +190,24 @@ Definition wp_kexit_sconf_body
      all higher and follow by [LockRank.locks_below_mono] /
      [locks_below_union_singleton] at each call site. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
+  (* THE STACK DEPOSIT, THREADED DOWN THE DIVERGING CHAIN.  kexit is where
+     the whole of this thread's kernel stack finally becomes dead, and the
+     slot it is about to leave at ZOMBIE has to own that page again or no
+     later process can run on it ([ProcDefs.kstack_free]).  What kexit can
+     assemble by itself is only the region from ITS sp down -- exactly the
+     region this capability owns; the frames ABOVE it belong to usertrap,
+     syscall and sys_exit, each of which is equally never-returning.  So each
+     of them hands its callee a closer that has captured its own frame, and
+     this is the one that reaches the bottom ([ProcDefs.kstack_closer]).
+     A CLOSER RATHER THAN A BORROW: nothing comes back on the arms that
+     RETURN, because the wand is affine and no such arm exists here anyway.
+     UNPAID FOR NOW, and honestly so -- an unpayable hypothesis is not a
+     vacuous theorem, and since K1/K3a it is not even unpayable: the words
+     exist ([KstackOwn.kstack_bank]) and the slot owns them.  What is still
+     missing is the route from allocproc's hand-out to a running thread's
+     trap frame, which is K3b/K4. *)
+  kstack_closer pj (m !!! Regidx csp_rs1) (trap_res b + av)%nat -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE -- the whole
@@ -202,12 +222,12 @@ Definition wp_kexit_sconf_body
      return (see the header), so the pair is spent along with everything
      else the dead process was holding.
      See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗
-  panic_wp_any -∗
+  panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -271,12 +291,18 @@ Section KexitSeals.
     pv_cwd V = (zero_reg : mword 64) ->
     proc_priv_nocwd γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
+    (* AND THE KERNEL STACK, WHOLE.  A dormant slot owns its page
+       ([ProcDefs.kstack_free]) -- that is what lets the next allocproc give
+       it to a new process -- and the ZOMBIE park is where a dying thread
+       gives it back.  It can, because its swtch never returns: no record is
+       parked, so nothing of the page is captured in a continuation. *)
+    kstack_free (proc_addr j) -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hsp Hir".
+    iIntros "Hpriv Hsp Hir Hkst".
     iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid V Hof Hcwd
-              with "Hpriv Hsp Hir").
+              with "Hpriv Hsp Hir Hkst").
   Qed.
 
 End KexitSeals.

@@ -41,6 +41,9 @@ Section WpMemsetArray.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb kt}.
   (* ------------------------------------------------------------------ *)
   (*  The zero-count arm: the c.beqz at +0x08 is taken straight to the    *)
   (*  epilogue, so no byte is written and the (empty) buffer comes back   *)
@@ -48,7 +51,7 @@ Section WpMemsetArray.
   (* ------------------------------------------------------------------ *)
   Lemma wp_memset_sconf_zero
       (m0 : regfile) (n : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memset_sconf_body m0 n 0 cval olds b pcur.
+    : wp_memset_sconf_body kt ktb m0 n 0 cval olds b pcur.
   Proof.
     cbv beta delta [wp_memset_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
@@ -76,7 +79,7 @@ Section WpMemsetArray.
     iPoseProof (minstr_022 with "Htext") as "HiL4".
     iPoseProof (minstr_024 with "Htext") as "HiL6".
     (* --- HEAD: 0x00..0x06 --- *)
-    iApply (Memset.wp_memset_head_sconf m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
+    iApply (Memset.wp_memset_head_sconf kt m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
               with "Hcg Hpc Hi0 Hi2 Hi4 Hi6 [-]").
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc Hbra Hbs0".
     (* --- SKIP: the count is zero, so 0x08 branches to the epilogue --- *)
@@ -89,14 +92,14 @@ Section WpMemsetArray.
                      (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0"))))
                  = (mword_of_int (KernelSyms.memset + 0x1e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (Memset.wp_memset_skip_sconf m2 (n - 2)%nat imm8_beqz b pcur Hz Htgt
+    iApply (Memset.wp_memset_skip_sconf kt m2 (n - 2)%nat imm8_beqz b pcur Hz Htgt
               with "Hcg Hpc Hi8 [-]").
     iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
     (* --- SUFFIX: 0x1e..0x24 --- *)
     assert (Hsuf_sp : m2 !!! Regidx csp_rs1 = sp').
     { unfold m2. rewrite upd_ne; [| vm_compute; discriminate].
       unfold m1. apply upd_eq. }
-    iApply (Memset.wp_memset_suffix_sconf m2 (n - 2)%nat ra0 s00 b pcur
+    iApply (Memset.wp_memset_suffix_sconf kt m2 (n - 2)%nat ra0 s00 b pcur
               with "Hcg HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
@@ -119,7 +122,7 @@ Section WpMemsetArray.
   (* ------------------------------------------------------------------ *)
   Lemma wp_memset_sconf_pos
       (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : (0 < len)%nat -> wp_memset_sconf_body m0 n len cval olds b pcur.
+    : (0 < len)%nat -> wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
   Proof.
     intro Hlen0.
     cbv beta delta [wp_memset_sconf_body].
@@ -153,7 +156,7 @@ Section WpMemsetArray.
       unfold bv_modulus; simpl. split; [ lia | apply (Z.lt_trans _ (2 ^ 32)); [ lia | vm_compute; reflexivity ] ]. }
     iIntros "Hcg #Htext Hpc Hbuf0 Hcont".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)
-    iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ olds j)%I
+    iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ[ktb] olds j)%I
       with "[Hbuf0]" as "Hbuf".
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
@@ -199,11 +202,11 @@ Section WpMemsetArray.
     { unfold sp', imm_entry, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     (* --- HEAD: 0x00..0x06 --- *)
-    iApply (Memset.wp_memset_head_sconf m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
+    iApply (Memset.wp_memset_head_sconf kt m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
               with "Hcg Hpc Hi0 Hi2 Hi4 Hi6 [-]").
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc Hbra Hbs0".
     (* --- SETUP: 0x08..0x10 (the count is nonzero: c.beqz falls through) --- *)
-    iApply (Memset.wp_memset_setup_sconf m2 (n - 2)%nat shamt_l shamt_r imm8_beqz
+    iApply (Memset.wp_memset_setup_sconf kt m2 (n - 2)%nat shamt_l shamt_r imm8_beqz
               wval_add b pcur Hn0 Hvalue_add
               with "Hcg Hpc Hi8 Hi10 Hi12 Hi14 Hi16 [-]").
     iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
@@ -230,7 +233,7 @@ Section WpMemsetArray.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       rewrite -Hcval. reflexivity. }
     (* --- LOOP: 0x14..0x1a --- *)
-    iApply (Memset.wp_memset_loop_sconf len p wval_add cval a1_idx a4_idx a5_idx imm_bne
+    iApply (Memset.wp_memset_loop_sconf kt ktb len p wval_add cval a1_idx a4_idx a5_idx imm_bne
               olds (n - 2)%nat b pcur
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -256,7 +259,7 @@ Section WpMemsetArray.
     { unfold m7, m6, m5, m4, m3, m2, m1.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
-    iApply (Memset.wp_memset_suffix_sconf m7 (n - 2)%nat ra0 s00 b pcur
+    iApply (Memset.wp_memset_suffix_sconf kt m7 (n - 2)%nat ra0 s00 b pcur
               with "Hcg HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
@@ -292,7 +295,7 @@ Section WpMemsetArray.
   (* the two count arms, dispatched on [len]. *)
   Lemma wp_memset_sconf
       (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memset_sconf_body m0 n len cval olds b pcur.
+    : wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
   Proof.
     destruct len as [| len' ].
     - apply (wp_memset_sconf_zero).

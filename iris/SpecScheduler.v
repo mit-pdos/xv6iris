@@ -24,7 +24,7 @@
 
    The scheduler is the supplier of the chain's dispatch payload and the
    consumer of its parking payload (SchedCtx.p_sched); [procs_inv] provides
-   the 64 proc locks, and [panic_wp] discharges acquire's holding-panic arm. *)
+   the 64 proc locks. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -73,21 +73,21 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      [2 * kv_frame_slots + 20], which is the pathology the arm-dependent carve
      exists to remove. *)
   (kv_frame_slots + 20 <= av)%nat ->
-  sie_cap_gpr m av false p0 -∗
+  sie_cap_gpr KT1 m av false p0 -∗
   cpu_ctx_free -∗
   cpu_own 0 false p0 false ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
      and its [p = zero_reg] hatch express -- but that is not the point: the
-     [acquire] it calls in the scan asks for [panic_wp_any], a resource
+     [acquire] it calls in the scan asked for a hart-generic credential, a resource
      quantified over EVERY hart, and one hart's copy does not yield it.  Same
      propagation as SpecMain / SpecKinit / SpecUserinit / kalloc_env. *)
   (* ONE premise where there were two: [trap_csrs] now carries [intr_res] --
      the installed vector and its contract -- as its fifth member, so the
      scheduler's level-0 SIE flip gets the handler out of the same bundle it
      already took the trap cells from. *)
-  trap_csrs -∗
+  trap_csrs KT1 -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SCHEDULER.

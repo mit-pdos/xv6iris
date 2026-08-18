@@ -88,10 +88,11 @@ Section ProofHolding.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_holding_lockinv_s_sconf
       (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64) (lks : gset string)
-    : wp_holding_lockinv_s_sconf_body γl lka s R Tc Dc m n p lks.
+    : wp_holding_lockinv_s_sconf_body kt γl lka s R Tc Dc m n p lks.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
     intros pcE lk ret_tgt Hlka Hn Hfresh Href.
@@ -199,7 +200,7 @@ Section ProofHolding.
         (add_vec (H1 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> H1) with S0.
     assert (Hpc0a : add_vec_int (mword_of_int (KernelSyms.holding + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0a) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -307,7 +308,7 @@ Section ProofHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd50 : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd50 : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi16").
@@ -442,8 +443,8 @@ Section ProofHolding.
                    = pa_stk (add_vec (S9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspS9. symmetry. exact Hspd4. }
     iPoseProof (his_28 with "Htext") as "Hi28".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HcspS6). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HcspS7). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HcspS8). iExact "Hr8". }
@@ -502,7 +503,7 @@ Section ProofHolding.
   Lemma wp_holding_lockinv_locked_s_sconf
       (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64)
-    : wp_holding_lockinv_locked_s_sconf_body γl lka s R Dc m n p.
+    : wp_holding_lockinv_locked_s_sconf_body kt γl lka s R Dc m n p.
   Proof.
     cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
     intros pcE lk ret_tgt held_cpu Hlka Hn Href.
@@ -566,7 +567,7 @@ Section ProofHolding.
         (add_vec (H1 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> H1) with S0.
     assert (Hpc0a : add_vec_int (mword_of_int (KernelSyms.holding + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0a) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -670,7 +671,7 @@ Section ProofHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd50 : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs kt (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd50 : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi16").
@@ -800,8 +801,8 @@ Section ProofHolding.
                    = pa_stk (add_vec (S9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspS9. symmetry. exact Hspd4. }
     iPoseProof (his_28 with "Htext") as "Hi28".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HcspS6). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HcspS7). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HcspS8). iExact "Hr8". }

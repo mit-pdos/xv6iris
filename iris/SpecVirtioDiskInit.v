@@ -20,7 +20,7 @@
      QUEUE_READY <- 1; disk.free[0..7] <- 1; STATUS <- | DRIVER_OK
 
    EVERY panic path is refuted rather than assumed, so this spec needs no
-   [panic_wp]:
+   panic credential at all (all six are refuted):
      - the four identification reads are constants of the model
        ([virtio_ident_reads], [virtio_queue_num_max_read]);
      - FEATURES_OK sticks because the write took ([virtio_status_readback]);
@@ -123,8 +123,7 @@ Definition disk_lock : mword 64 :=
 (* [virtio_disk_init]'s own frame is 32 bytes (4 slots) and its deepest callee
    is [kalloc], which needs 14 -- stated as a CONSTANT, per the spec-design
    rule that a stack bound is never coupled to the arguments. *)
-Definition K_virtio_disk_init : nat := 18%nat.
-
+Notation K_virtio_disk_init := (18%nat) (only parsing).
 (* THE POSTCONDITION, as one named predicate rather than a twenty-wand chain
    spelled inline at the end of the body.  This is a performance-critical
    abstraction, not tidiness: the whole-function proof carries the continuation
@@ -143,7 +142,7 @@ Definition vdi_post
     (eb : bool) (pp : mword 64) (on : option nat)
     (ret_tgt c_cpu : mword 64) (lks : gset string) : iProp Σ :=
   ( ∀ (mr : regfile) (pd pav pu : mword 64),
-    sie_cap_gpr mr K false pp -∗
+    sie_cap_gpr KT1 mr K false pp -∗
     cpu_own 0%nat eb pp false lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -209,7 +208,7 @@ Definition wp_virtio_disk_init_sconf_body
      "kmem" (13) -- and initlock/memset, which need no premise; "kmem" is
      the whole cone.  Mirrors SpecBfree.v's. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr m K false pp -∗
+  sie_cap_gpr KT1 m K false pp -∗
   cpu_own 0%nat eb pp false lks -∗
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)

@@ -31,7 +31,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
@@ -43,8 +42,7 @@ Require Import ProcAvail.
 Import Defs.
 
 (* intr's own frame is 32 bytes (4 slots); its deepest callee is wakeup (18) *)
-Definition K_virtio_disk_intr : nat := 22%nat.
-
+Notation K_virtio_disk_intr := (22%nat) (only parsing).
 Definition wp_virtio_disk_intr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -62,17 +60,17 @@ Definition wp_virtio_disk_intr_sconf_body
      "virtio_disk"'s -- virtio_disk_intr acquires and releases [disk.vdisk_lock]
      once, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "virtio_disk" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr mf K b pme -∗
+      sie_cap_gpr KT1 mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

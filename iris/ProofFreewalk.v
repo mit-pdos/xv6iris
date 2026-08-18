@@ -53,7 +53,7 @@
    is either the literal zero word (V clear, +0x30 taken) or a valid POINTER
    (V set and R|W|X clear, so +0x30 and +0x36 both fall through).
    [fw_ok] is that dichotomy per slot, phrased over [fw_kid] so the two arms
-   never have to case on [lvl] itself.  [SpecPanic.panic_wp] is not needed
+   never have to case on [lvl] itself.  A panic credential is not needed
    anywhere in this file. *)
 Set Printing Depth 40.
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -404,21 +404,21 @@ Section ProofFreewalk.
        [kmem.lock] internally (balanced -- [lks] is unchanged), so the
        caller must already hold only locks BELOW "kmem"'s rank. *)
     locks_below lks "kmem" ->
-    sie_cap_gpr mj (K - 6) b p -∗
+    sie_cap_gpr KT1 mj (K - 6) b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) -∗
     kfree_pre (page_base bpt) -∗
     kalloc_env γa None -∗
-    pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (mm !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (mm !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ (mm !!! Regidx Rs2) -∗
-    pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
-    (∃ w : mword 64, pa_stk sp0 6 ↦₈ w) -∗
+    pa_stk sp0 1 ↦₈[KT1] (mm !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[KT1] (mm !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[KT1] (mm !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[KT1] (mm !!! Regidx Rs2) -∗
+    pa_stk sp0 5 ↦₈[KT1] (mm !!! Regidx Rs3) -∗
+    (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
@@ -428,7 +428,7 @@ Section ProofFreewalk.
     intros spr HK Hilvl Hmmsp Hjsp Hjs3 Hjthr Hfresh.
     iIntros "Hcg Hcnt #Htext Hpc Hpre #Henv Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hcont".
     iDestruct "Hk6" as (u6) "Hk6".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iPoseProof (fwi_48 with "Htext") as "Hi48".
     iPoseProof (fwi_4a with "Htext") as "Hi4a".
     iPoseProof (fwi_4e with "Htext") as "Hi4e".
@@ -485,7 +485,7 @@ Section ProofFreewalk.
     { rewrite /E1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (cpu_own_transport CID0 CIDe2 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf KT1 γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) E1 None ilvl eb p (K - 6)%nat b lks
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl
               Hfresh
@@ -571,8 +571,8 @@ Section ProofFreewalk.
                    = pa_stk (add_vec (E6 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HE6sp. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 6) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
       iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
       iSplitL "Hk3"; [iExists _; iExact "Hk3" |].
@@ -660,7 +660,7 @@ Section ProofFreewalk.
     (* threaded on this recursion's own binder list too: it is what its
        [REC] call one level down, and its own [IH] back-edge, both need. *)
     locks_below lks "kmem" ->
-    sie_cap_gpr m (K - 6) b p -∗
+    sie_cap_gpr KT1 m (K - 6) b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.freewalk + 0x2a) : mword 64) -∗
@@ -673,7 +673,7 @@ Section ProofFreewalk.
       ⌜ mj !!! Regidx csp_rs1 = spr
         /\ mj !!! Regidx Rs3 = page_base (pt_base t)
         /\ fw_thr mm mj ⌝ -∗
-      sie_cap_gpr mj (K - 6) b p -∗
+      sie_cap_gpr KT1 mj (K - 6) b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) -∗
       fw_done (pt_base t) 512 -∗
@@ -709,7 +709,7 @@ Section ProofFreewalk.
           /\ mt !!! Regidx Rs3 = page_base (pt_base t)
           /\ fw_thr mm mt
           /\ (b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)) ⌝ -∗
-        sie_cap_gpr (CID:=CIDx) mt (K - 6) b p -∗
+        sie_cap_gpr KT1 (CID:=CIDx) mt (K - 6) b p -∗
         cpu_own (CID:=CIDx) ilvl eb p b lks -∗
         pc_is (CID:=CIDx) (mword_of_int (KernelSyms.freewalk + 0x24) : mword 64) -∗
         fw_done (pt_base t) (d + 1) -∗
@@ -799,7 +799,7 @@ Section ProofFreewalk.
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* --- +0x2a c.ld a5,0(s1) --- *)
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.freewalk + 0x2a)) Ra5 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.freewalk + 0x2a)) Ra5 Rs1
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               m (K - 6) (pt_ents t (mword_of_int d)) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1012,7 +1012,7 @@ Section ProofFreewalk.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.freewalk + 0x42)) Rs1
+    iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.freewalk + 0x42)) Rs1
               (mword_of_int 0 : mword 12) mr (K - 6) (pt_ents t (mword_of_int d)) b
               with "Hcg Hpc Hi42 [Hcell]").
     { iEval (rgne; rewrite Hzoff Hmrs1 Hcuraddr). iExact "Hcell". }
@@ -1092,7 +1092,7 @@ Section ProofFreewalk.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> mm) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u1) "Hk1".   iDestruct "S2" as (u2) "Hk2".
     iDestruct "S3" as (u3) "Hk3".   iDestruct "S4" as (u4) "Hk4".

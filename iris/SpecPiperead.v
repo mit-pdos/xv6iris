@@ -45,7 +45,6 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInvDefs ProcInv.
 Require Import PipeInvDefs.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -66,9 +65,8 @@ Local Open Scope Z_scope.
    to spare.  Raising this to 64 would over-charge every caller for slots the
    call site never needs.  (Consequence for the proof: the [52 <= ...] premise
    no longer falls to a bare [lia] -- [trap_res true] has to be reduced first,
-   `assert (trap_res true = 78%nat) as -> by reflexivity; lia`.)  *)
-Definition piperead_stack : nat := 62%nat.
-
+   `assert (trap_res true = 90%nat) as -> by reflexivity; lia`.)  *)
+Notation piperead_stack := (62%nat) (only parsing).
 Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)
@@ -95,7 +93,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (* piperead acquires the pipe lock (7); killed/sleep_prepare/sleep/wakeup all
      sit at "proc" (11), strictly higher, so this ONE premise covers the cone. *)
   locks_below lks "pipe" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -107,13 +105,12 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗

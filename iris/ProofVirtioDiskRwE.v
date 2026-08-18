@@ -68,7 +68,6 @@ Require Import VirtioModel DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
 Require Import SpecVirtioDiskRw.
@@ -244,9 +243,9 @@ Section ProofVirtioDiskRwE.
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-       trap_csrs -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) -∗
        locked γk cpu_id -∗
@@ -255,7 +254,7 @@ Section ProofVirtioDiskRwE.
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -274,9 +273,9 @@ Section ProofVirtioDiskRwE.
         /\ M !!! Regidx Rs1 = (d_lock : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Rs2 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ vdrw_hi M m0⌝ -∗
-       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false ({["virtio_disk"]} ∪ lks) -∗
-       trap_csrs -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b4) : mword 64) -∗
        locked γk cpu_id -∗
@@ -285,7 +284,7 @@ Section ProofVirtioDiskRwE.
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        ⌜tri_ok (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
@@ -383,7 +382,6 @@ Section ProofVirtioDiskRwE.
        "proc" (11) follow from this by [locks_below_mono]. *)
     locks_below lks "virtio_disk" ->
     kernel_text -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -393,7 +391,7 @@ Section ProofVirtioDiskRwE.
                     bs_disk m0 kq ({["virtio_disk"]} ∪ lks).
   Proof.
     intros HK Hj Hjl Hbnz Hbelow.
-    iIntros "#Htext #Hpanic #Hpinv #Hdinv #Hlk Hexit".
+    iIntros "#Htext #Hpinv #Hdinv #Hlk Hexit".
     rewrite /P4.vdrw_p4_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
             "%Hrh %Ha1 %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok Hbody Hclaim Hrm Hrt Hidx".
@@ -534,7 +532,7 @@ Section ProofVirtioDiskRwE.
       iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm")
         as "[Hpay [Hextc Hextm]]".
       (* ================= release(&disk.vdisk_lock) ================= *)
-      iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string
+      iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
                 (disk_res γd pd pav pu) W4 0%nat eb (proc_addr j) (K - 12)%nat
                 ({["virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
@@ -630,7 +628,7 @@ Section ProofVirtioDiskRwE.
       (* ================= acquire(&disk.vdisk_lock) ================= *)
       iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
+      iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
                 (disk_res γd pd pav pu) W7 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                 vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Hown Htext Hpc []").
@@ -676,7 +674,7 @@ Section ProofVirtioDiskRwE.
       assert (Haddr : add_vec (Mf !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                       = (b_disk b : SailStdpp.Values.mword 64))
         by (rewrite HMfs3; apply vdrwe_bdisk_addr).
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca) : mword 64) Ra5 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca) : mword 64) Ra5 Rs3
                 (mword_of_int 4 : mword 12) Mf (trap_res eb + (K - 12))%nat dv false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a8 [Hbd]").
@@ -820,7 +818,7 @@ Section ProofVirtioDiskRwE.
     assert (Haddr0 : add_vec (N1 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                      = (b_disk b : SailStdpp.Values.mword 64))
       by (rewrite HN1s3; apply vdrwe_bdisk_addr).
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a2) : mword 64) Ra5 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a2) : mword 64) Ra5 Rs3
               (mword_of_int 4 : mword 12) N1 (trap_res eb + (K - 12))%nat dv false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18e [Hbd]").

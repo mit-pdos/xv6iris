@@ -51,7 +51,6 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -65,8 +64,7 @@ Require Import ProcAvail.
 
 (* uartintr's own frame is 4 slots; the deepest callee is consoleintr at 32
    (wakeup wants 18, acquire and release 10). *)
-Definition uartintr_stack : nat := 36%nat.
-
+Notation uartintr_stack := (36%nat) (only parsing).
 Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names)
@@ -83,7 +81,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      THRE arm's wakeup call needs only the higher "proc" (11), which
      [locks_below_mono] recovers from this one bound. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr KT1 m av b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE DEVICE, AND NOTHING ELSE.  The transmit lock is gone from this
@@ -97,7 +95,6 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   dev_inv γu γv -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
   procs_inv γs -∗
-  panic_wp_any -∗
   (* CONSOLEINTR'S OWN CREDENTIAL, and the one premise the rx loop adds.
      The handler itself touches neither lock; [console_caps] is passed
      straight through to [consoleintr], which takes cons.lock and -- through
@@ -108,7 +105,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-      sie_cap_gpr mf av b pme -∗
+      sie_cap_gpr KT1 mf av b pme -∗
       cpu_own lvl eb pme b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

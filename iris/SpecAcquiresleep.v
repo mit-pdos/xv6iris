@@ -41,7 +41,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -82,23 +81,22 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   (j < NPROC)%nat ->
   (26 <= av)%nat ->
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
   (* THE DEPOSIT, spent into the lock and recovered by releasesleep *)
   H q -∗
-  panic_wp_any -∗
   p_pid pj ↦₄{dq} pidv -∗
   procs_inv γs -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q -∗
@@ -126,7 +124,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      higher-level "locked" state is a separate ghost token, [sleeplocked],
      untouched by [lks]), so [lks] itself is unchanged end to end. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
      and a parking thread must hand [trap_csrs] and [cpu_claim] across the
@@ -136,11 +134,10 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      instead.  At [eb = false] the push_off frees nothing and the caller
      brings the pair, holding it because the TRAP handed it over; that is the
      case iput/ilock need, and through them kexit and usertrap. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
-  panic_wp_any -∗
   (* the caller's own pid (read-only fraction) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
@@ -155,9 +152,9 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* the lock is now HELD: token + pid field + protected resource *)
@@ -236,18 +233,17 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 4 < 2 ^ 31)%Z ->
   (* NOT a rank bound: only what the held-set insert needs. *)
   "sleep lock" ∉ lks ->
-  sie_cap_gpr m av false pj -∗
+  sie_cap_gpr KT1 m av false pj -∗
   cpu_own (S n) eb pj false lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R (slh_tok γt) -∗
   (* THE EVIDENCE THAT THE LOCK IS FREE *)
   slh_auth γt None -∗
-  panic_wp_any -∗
   p_pid pj ↦₄{dq} pidv -∗
   wp_next false pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av false pj -∗
+      sie_cap_gpr KT1 mf av false pj -∗
       cpu_own (S n) eb pj false lks -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q -∗

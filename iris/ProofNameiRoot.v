@@ -43,6 +43,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import CodeNamei.
+Require Import WpUart.
 Require Import SpecNamex.
 Require Import SpecNamei.
 From Kernel Require KernelSyms.
@@ -84,7 +85,7 @@ Proof. apply nmr_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 (* K_namei_root's single premise, in the three forms the call and the pop want *)
 Lemma nmr_kb (K : nat) : (K_namei_root <= K)%nat ->
   (K_namex_root <= K - 4)%nat /\ (4 <= K)%nat /\ ((K - 4) + 4 = K)%nat.
-Proof. unfold K_namei_root, K_namex_root. intro H. split_and!; lia. Qed.
+Proof. intro H. split_and!; lia. Qed.
 
 (* [c.li a1,0] really writes the zero register's value *)
 Lemma nmr_a1_zero : (mword_of_int 0 : mword 64) = (zero_reg : mword 64).
@@ -105,7 +106,7 @@ Local Ltac regne :=
 
 Section ProofNameiRoot.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
-            !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -126,7 +127,7 @@ Section ProofNameiRoot.
     cbv beta delta [wp_namei_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Hbelow.
     destruct (nmr_kb K HK) as (Knx & K4 & Kpop).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
     iPoseProof (nmi_00 with "Htext") as "Hi00".
     iPoseProof (nmi_02 with "Htext") as "Hi02".
     iPoseProof (nmi_04 with "Htext") as "Hi04".
@@ -151,7 +152,7 @@ Section ProofNameiRoot.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : nmr_sp m R1) by (rewrite /nmr_sp /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -288,7 +289,7 @@ Section ProofNameiRoot.
     iApply (NX.wp_namex_root gtl cn gfs gi cov logstart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
     iIntros (CID8 Hq8 mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
     destruct Hcsp as (Hcs & Hfa0).
     iEval (rewrite HR5a0) in "Hp0".
@@ -361,8 +362,8 @@ Section ProofNameiRoot.
                      = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HP2sp; reflexivity).
-    iAssert (stack_own sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].

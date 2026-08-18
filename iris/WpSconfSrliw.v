@@ -71,6 +71,7 @@ Section WpSconfSrliw.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
+  Context {kt : ktier}.
   (* SRLIW: shift the source's low 32 bits RIGHT (logically) by a 5-bit
      shamt, sign-extend the 32-bit result back.  The [wp_slliw_s_sconf]
      twin, verbatim. *)
@@ -81,10 +82,10 @@ Section WpSconfSrliw.
     ops_ok b rd rs1 rs1 ->
     sign_extend' 64 (shift_bits_right (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt)
       = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRLIW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

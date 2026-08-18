@@ -373,8 +373,12 @@ Proof.
   rewrite /wi_splice list_lookup_total_alt list_lookup_fmap Hlk /=. reflexivity.
 Qed.
 
-Section WriteiRes.
+(* THE BYTE-WINDOW SPLITTERS ARE TIER-GENERIC (ProofReadiParts.ReadiBytes'
+   twin): writei splits its SOURCE (a caller buffer at [ktb]) with the same
+   lemmas that split the bio block window (static, KT0). *)
+Section WriteiBytes.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  Context `{KTR : !CurKtier}.
 
   (* --- three conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so
      the call sites APPLY them (unification, hence conversion-tolerant
@@ -421,6 +425,11 @@ Section WriteiRes.
     iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|]. iExact "H3".
   Qed.
 
+End WriteiBytes.
+
+Section WriteiRes.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+
   (* A [len]-byte WINDOW of a checked-out buffer's data area, borrowed at
      offset [o] and taken back at whatever the copy left there.  The window
      is handed out in exactly the shape either_copyin's destination premise
@@ -439,8 +448,8 @@ Section WriteiRes.
     intros Hol.
     iIntros "(Hb & Hd & %Hlen & Hby)".
     assert (HlenB : length bs = BSIZE) by exact Hlen.
-    iDestruct (wi_bytes_of_list (b_data pb) bs BSIZE HlenB with "Hby") as "Hby".
-    iDestruct (wi_split3 (b_data pb) o len (BSIZE - o - len)%nat BSIZE
+    iDestruct (wi_bytes_of_list (KTR := KT0) (b_data pb) bs BSIZE HlenB with "Hby") as "Hby".
+    iDestruct (wi_split3 (KTR := KT0) (b_data pb) o len (BSIZE - o - len)%nat BSIZE
                  (fun j => bs !!! j) ltac:(lia) with "Hby") as "(Hpre & Hmid & Hsuf)".
     iSplitR; [iPureIntro; exact HlenB|].
     iSplitL "Hmid"; [iExact "Hmid"|].
@@ -449,10 +458,10 @@ Section WriteiRes.
     iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hd"; [iExact "Hd"|].
     iSplitR; [iPureIntro; exact (wi_splice_len bs o len g)|].
     rewrite /wi_splice.
-    iApply (wi_bytes_to_list (b_data pb) BSIZE
+    iApply (wi_bytes_to_list (KTR := KT0) (b_data pb) BSIZE
               (fun i => if decide ((o <= i)%nat /\ (i < o + len)%nat)
                         then g (i - o)%nat else bs !!! i)).
-    iApply (wi_join3 (b_data pb) o len (BSIZE - o - len)%nat BSIZE
+    iApply (wi_join3 (KTR := KT0) (b_data pb) o len (BSIZE - o - len)%nat BSIZE
               (fun i => if decide ((o <= i)%nat /\ (i < o + len)%nat)
                         then g (i - o)%nat else bs !!! i) ltac:(lia)
               with "[Hpre] [Hmid] [Hsuf]").

@@ -19,7 +19,7 @@
    which keeps all three at the standing six -- but that is NOT
    self-containment: balloc's six are modulo a THREADED printk obligation
    that its callers must eventually discharge, exactly the standing that
-   [SpecPanic.panic_wp_any] already has throughout this tree.  A reader who
+   [SpecPanic]'s own credentials already have throughout this tree.  A reader who
    takes the six for "depends on nothing else" is misreading it.          *)
 Require Import LinkBread LinkLogWrite LinkBrelse LinkMemsetArray ProofBalloc.
 

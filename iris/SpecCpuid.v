@@ -54,7 +54,7 @@ Qed.
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -66,10 +66,10 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      id regardless of which hart the continuation resumes on. *)
   let cret := cpuid_ret (rget m0 tp_idx) in
   (2 <= n)%nat ->
-  sie_cap_gpr m0 n false p -∗
+  sie_cap_gpr kt m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   ( ∀ m' : regfile,
-    sie_cap_gpr m' n false p -∗
+    sie_cap_gpr kt m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = cret ⌝ -∗
@@ -88,7 +88,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
+Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -100,11 +100,11 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `
   add_vec P (sign_extend' 64 jimm) = pcE ->
   eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sie_cap_gpr m n false p -∗
+  sie_cap_gpr kt m n false p -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
   ( ∀ mo,
-    sie_cap_gpr mo n false p -∗
+    sie_cap_gpr kt mo n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
       mo !!! Regidx a0_idx = cret ⌝ -∗
@@ -113,9 +113,9 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `
 
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64),
-      wp_cpuid_sconf_body m0 n p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_cpuid_sconf_body kt m0 n p.
   Parameter wp_call_cpuid_sconf_cs :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
-      wp_call_cpuid_sconf_cs_body P jimm m n p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
+      wp_call_cpuid_sconf_cs_body kt P jimm m n p.
 End CPUID.

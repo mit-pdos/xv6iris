@@ -115,13 +115,13 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import ProofKforkParts.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecIput.
 Require Import SpecMyproc SpecArgaddr SpecPipealloc SpecFdalloc SpecFileclose SpecCopyout.
 Require Import IrefSlots InodeRegion.
 Require Import SpecSysPipe.
@@ -275,11 +275,11 @@ Qed.
    a step).  Every arithmetic obligation of this file is therefore packaged
    as a closed lemma over plain [Z]/[nat] and applied as a fact. *)
 Lemma sp_bounds (av : nat) : (sys_pipe_stack <= av)%nat ->
-  (8 <= av)%nat /\ (10 <= av - 8)%nat /\ (74 <= av - 8)%nat /\ (52 <= av - 8)%nat /\
+  (8 <= av)%nat /\ (10 <= av - 8)%nat /\ (90 <= av - 8)%nat /\ (52 <= av - 8)%nat /\
   (argaddr_stack <= av - 8)%nat /\ (fdalloc_stack <= av - 8)%nat /\
   (fileclose_stack <= av - 8)%nat.
 Proof.
-  unfold sys_pipe_stack, argaddr_stack, fdalloc_stack, fileclose_stack, K_iput.
+  
   lia.
 Qed.
 
@@ -418,12 +418,12 @@ Section ProofSysPipe.
   Lemma sp_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (p : mword 64) :
     (0 < k)%nat ->
-    sie_cap_gpr m k b p -∗
+    sie_cap_gpr KT1 m k b p -∗
     ⌜(8 <= uint (m !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res b + k)%nat with "Hstk").
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)
@@ -452,7 +452,7 @@ Section ProofSysPipe.
     add_vec_int (mword_of_int zb : mword 64) 4 = mword_of_int zc ->
     add_vec_int (mword_of_int zc : mword 64) 2 = mword_of_int zd ->
     add_vec_int (mword_of_int zd : mword 64) 4 = mword_of_int ze ->
-    sie_cap_gpr Mt nav b p -∗
+    sie_cap_gpr KT1 Mt nav b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (SHIFTIOP (mword_of_int 3 : mword 6, Regidx Ra5, Regidx Ra5, SLLI)) -∗
@@ -465,7 +465,7 @@ Section ProofSysPipe.
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜forall c : mword 5, c <> Ra5 -> c <> Rd -> Mr !!! Regidx c = Mt !!! Regidx c⌝ -∗
-        sie_cap_gpr Mr nav b p -∗
+        sie_cap_gpr KT1 Mr nav b p -∗
         pc_is (mword_of_int ze : mword 64) -∗
         p_ofile p fd ↦₈ (zero_reg : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -594,17 +594,17 @@ Section ProofSysPipe.
     (* sp_close2's own two fileclose calls want "ftable" (1); nothing else in
        its body touches a lock. *)
     locks_below lks "log" ->
-    sie_cap_gpr Mt nav b p -∗
+    sie_cap_gpr KT1 Mt nav b p -∗
     cpu_own 0%nat eb p b lks -∗
     (* THE COMPLEMENT, THREADED THROUGH BOTH CLOSES.  fileclose takes it at
        the top level of its contract on every arm and gives it back, so this
        block cannot frame it: its two crossings are the literal [true]. *)
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int za : mword 64) -∗
     is_ftable γfl γf -∗
-    panic_wp_any -∗
+    panic_env -∗
     instr (mword_of_int za : mword 64) false
       (LOAD (mword_of_int 0xfd0 : mword 12, Regidx Rs0, Regidx Ra0, false, 8)) -∗
     instr (mword_of_int zb : mword 64) false (JAL (imm1, Regidx Rra)) -∗
@@ -613,8 +613,8 @@ Section ProofSysPipe.
     instr (mword_of_int zd : mword 64) false (JAL (imm2, Regidx Rra)) -∗
     instr (mword_of_int ze : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra5, ADDI)) -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
     file_ref γf k0 q0 Cf0 -∗
     file_ref γf k1 q1 Cf1 -∗
     (* both closes run under ONE environment, threaded through: the first may
@@ -627,13 +627,13 @@ Section ProofSysPipe.
       ∀ Mr : regfile,
         ⌜ (forall c : mword 5, is_cs_idx c = true -> Mr !!! Regidx c = Mt !!! Regidx c)
           /\ Mr !!! Regidx Ra5 = (mword_of_int (-1) : mword 64) ⌝ -∗
-        sie_cap_gpr Mr nav b p -∗
+        sie_cap_gpr KT1 Mr nav b p -∗
         cpu_own 0%nat eb p b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int zf : mword 64) -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
         fd_slot -∗ fd_slot -∗
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
         (∃ us', fileclose_fs_env fn us' 0%nat eb p) -∗
@@ -641,7 +641,7 @@ Section ProofSysPipe.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hnav Hs0 Hr1 Hr2 Hs04 Hs812 Hs1618 Ht1 Ht2 Hbelow.
-    iIntros "Hcg Hcpu Hextc Hextm #Htext Hpc #Hftab #Hpanic Hi0 Hi4 Hi8 Hic Hi10
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hkd Hpc #Hftab #Hpe Hi0 Hi4 Hi8 Hic Hi10
               Hc6 Hc7 Href0 Href1 Hpenv Hfenv Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -684,7 +684,7 @@ Section ProofSysPipe.
       as "[Hfcenv0 Hfcback0]".
     iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p nav b lks
               Hnav sp_noff0 HD2a0 Hbelow
-              with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href0 Hfcenv0").
+              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href0 Hfcenv0").
     all: try lkbelow.
     iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 Hunit0 Hout0".
     iDestruct ("Hfcback0" with "Hout0") as "[Hpenv Hfenv]".
@@ -735,7 +735,7 @@ Section ProofSysPipe.
       as "[Hfcenv1 Hfcback1]".
     iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p nav b lks
               Hnav sp_noff0 HF2a0 Hbelow
-              with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href1 Hfcenv1").
+              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href1 Hfcenv1").
     all: try lkbelow.
     iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 Hunit1 Hout1".
     iDestruct ("Hfcback1" with "Hout1") as "[Hpenv Hfenv]".
@@ -787,21 +787,21 @@ Section ProofSysPipe.
     Mt !!! Regidx Ra5 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 8)%nat b p -∗
+    sie_cap_gpr KT1 Mt (av - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_pipe + 0xda) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr KT1 mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -884,8 +884,8 @@ Section ProofSysPipe.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8)
       by (rewrite Hwv; exact HT4sp).
-    iAssert (stack_own sp0 8) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 8) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -980,7 +980,7 @@ Section ProofSysPipe.
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
     set (s10 := m !!! Regidx Rs1).
-    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Henv Hpriv Hua Hub
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hpe #Hftab #Henv Hpriv Hua Hub
               Hpenv Hfenv Hcont".
     (* [eb = b]: sys_pipe's contract pins push_off level 0, so
        [CpuOwn.cpu_own_eb_agree] gives it.  Used ONLY to align the
@@ -992,7 +992,7 @@ Section ProofSysPipe.
        through the definition sends its [IntoExist] search off into the lock
        invariant and it does not come back. *)
     rewrite /kalloc_env.
-    iDestruct "Henv" as (γk) "(#Hkmem & #Hkav & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hkmem & #Hkav)".
     iPoseProof (spi_00 with "Htext") as "Hi00".
     iPoseProof (spi_02 with "Htext") as "Hi02".
     iPoseProof (spi_04 with "Htext") as "Hi04".
@@ -1023,7 +1023,7 @@ Section ProofSysPipe.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_pipe + 0x2))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -1116,21 +1116,21 @@ Section ProofSysPipe.
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> mj !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-        sie_cap_gpr mj (av - 8)%nat b p -∗
+        sie_cap_gpr KT1 mj (av - 8)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0xda) : mword 64) -∗
         (* fileclose's environment, back from whichever exit this is *)
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
         (∃ us', fileclose_fs_env fn us' 0%nat eb p) -∗
         (∃ w5 w6 w7 : mword 64,
-           word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-           word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-           word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7) -∗
+           word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+           word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+           word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7) -∗
         (∃ lo hi : mword 32,
-           word4_pointsto (pa_stk sp0 8) (DfracOwn 1) lo ∗
-           word4_pointsto (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
+           word4_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) lo ∗
+           word4_pointsto (KTR := KT1) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
         sys_pipe_post γf p pid (upd_upt V P') res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
@@ -1400,7 +1400,7 @@ Section ProofSysPipe.
     iApply (Pipealloc.wp_pipealloc_sconf γfl γf γa γk
               (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p (av - 8)%nat b lks
               Hav24 eq_refl sp_noff0
-              with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpanic Hua Hub Hb6 Hb7").
+              with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpe Hua Hub Hb6 Hb7").
     all: try lkbelow.
     iIntros (CID34 Hcr34 W0) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 Hpost".
     assert (Hpc26 : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x26))
@@ -1673,7 +1673,7 @@ Section ProofSysPipe.
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       iSpecialize ("Hepi" $! CID44 with "[%]"); [wp_next_chain|].
       iApply ("Hepi" $! Mr (pv_upt V) (mword_of_int (-1) : mword 64)
@@ -1896,7 +1896,7 @@ Section ProofSysPipe.
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       iSpecialize ("Hepi" $! CID54 with "[%]"); [wp_next_chain|].
       iApply ("Hepi" $! Mr (pv_upt V) (mword_of_int (-1) : mword 64)
@@ -2031,9 +2031,9 @@ Section ProofSysPipe.
     (* two [kalloc_env] bundles, one per copyout, built from the persistent
        pieces rather than re-derived *)
     iAssert (kalloc_env γa None) with "[]" as "Henva".
-    { rewrite /kalloc_env. iExists γk. iFrame "Hkmem Hkav Hpanic". }
+    { rewrite /kalloc_env. iExists γk. iFrame "Hkmem Hkav". }
     iAssert (kalloc_env γa None) with "[]" as "Henvb".
-    { rewrite /kalloc_env. iExists γk. iFrame "Hkmem Hkav Hpanic". }
+    { rewrite /kalloc_env. iExists γk. iFrame "Hkmem Hkav". }
     (* the pure descriptor facts the tail needs *)
     assert (Hlk0' : pv_ofile (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)) !! fd0
                     = Some (fnode k0)).
@@ -2104,7 +2104,7 @@ Section ProofSysPipe.
     assert (Hsza : add_vec (rget A3 Rs1) (sign_extend' 64 (mword_of_int 72 : mword 12))
                    = p_sz p) by (rgne; rewrite HA3s1; reflexivity).
     iEval (rewrite -Hsza) in "Hszc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x5a)) Ra1 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x5a)) Ra1 Rs1
               (mword_of_int 72 : mword 12) A3 (av - 8)%nat
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2123,7 +2123,7 @@ Section ProofSysPipe.
     assert (Hpta : add_vec (rget A4 Rs1) (sign_extend' 64 (mword_of_int 80 : mword 12))
                    = p_pagetable p) by (rgne; rewrite HA4s1; reflexivity).
     iEval (rewrite -Hpta) in "Hptc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x5c)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x5c)) Ra0 Rs1
               (mword_of_int 80 : mword 12) A4 (av - 8)%nat
               (page_base (ud_root (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2213,7 +2213,7 @@ Section ProofSysPipe.
     iEval (rewrite -HA6a3) in "Hbufhi".
     iDestruct (cpu_own_transport CID48 CID60 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Copyout.wp_copyout_sconf γa A6
+    iApply (Copyout.wp_copyout_sconf KT1 γa A6
               (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
@@ -2255,9 +2255,9 @@ Section ProofSysPipe.
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-        sie_cap_gpr Mt (av - 8)%nat b p -∗
+        sie_cap_gpr KT1 Mt (av - 8)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0x80) : mword 64) -∗
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
@@ -2265,12 +2265,12 @@ Section ProofSysPipe.
         proc_priv γf p pid
           (upd_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)) P') -∗
         fd_slot -∗ fd_slot -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
-        word4_pointsto (pa_stk sp0 8) (DfracOwn 1)
+        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
+        word4_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) -∗
-        word4_pointsto (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
+        word4_pointsto (KTR := KT1) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) -∗
         WP (Loop : expr riscv_lang)))%I).
     (* EPI and T7C are offered as a CONJUNCTION, the pipealloc idiom: exactly
@@ -2395,7 +2395,7 @@ Section ProofSysPipe.
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
                 (mword_of_int 2092016 : mword 21) (mword_of_int 2092008 : mword 21) b lks
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
       iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       (* +0xb2 c.j +0x28 -- into the shared epilogue *)
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0xb2))
@@ -2538,7 +2538,7 @@ Section ProofSysPipe.
     assert (Hszb2 : add_vec (rget C4 Rs1) (sign_extend' 64 (mword_of_int 72 : mword 12))
                     = p_sz p) by (rgne; rewrite HC4s1; reflexivity).
     iEval (rewrite -Hszb2) in "Hszc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x72)) Ra1 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x72)) Ra1 Rs1
               (mword_of_int 72 : mword 12) C4 (av - 8)%nat
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2560,7 +2560,7 @@ Section ProofSysPipe.
     assert (Hptb : add_vec (rget C5 Rs1) (sign_extend' 64 (mword_of_int 80 : mword 12))
                    = p_pagetable p) by (rgne; rewrite HC5s1; reflexivity).
     iEval (rewrite -Hptb) in "Hptc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x74)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.sys_pipe + 0x74)) Ra0 Rs1
               (mword_of_int 80 : mword 12) C5 (av - 8)%nat
               (page_base (ud_root (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2652,7 +2652,7 @@ Section ProofSysPipe.
     iEval (rewrite -HC7a3) in "Hbuflo".
     iDestruct (cpu_own_transport CID61 CID75 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Copyout.wp_copyout_sconf γa C7 Pa
+    iApply (Copyout.wp_copyout_sconf KT1 γa C7 Pa
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
               (av - 8)%nat 0%nat eb p b lks

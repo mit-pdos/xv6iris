@@ -133,7 +133,7 @@
    a functor argument.  See SpecBalloc.v's "READ THIS BEFORE TRUSTING THE
    STANDING SIX": carrying it as a hypothesis keeps [Print Assumptions] at the
    standing six, but the six are then modulo a THREADED printk obligation,
-   exactly as [SpecPanic.panic_wp_any] is.                                 *)
+   exactly as [SpecPanic]'s own credentials are.                                 *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -150,7 +150,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import FdSlots.
@@ -182,8 +181,7 @@ Local Open Scope Z_scope.
    with ra/s0/s1/s2/s3/s4/s5/s6 pushed at 56/48/40/32/24/16/8/0.  Its deepest
    callee is iput (60); end_op wants 58, ilock 44, bread 40, iunlock 26,
    begin_op 26, brelse 26, iget 16. *)
-Definition K_ireclaim : nat := 68%nat.
-
+Notation K_ireclaim := (84%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -234,7 +232,7 @@ Definition wp_ireclaim_sconf_body
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
   (* THE ORPHAN ARM'S FIRST CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev: the RV64 ABI's sign extension of an [int] *)
@@ -248,10 +246,9 @@ Definition wp_ireclaim_sconf_body
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
@@ -268,6 +265,14 @@ Definition wp_ireclaim_sconf_body
      a dinode, so [DinodeSlot.diblk_slot_acc] is all its scan needs and
      [InodeRegion.ireg_claim_au] never appears. *)
   ireg_inv γi γfs inodestart nib -∗
+  (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12 / §7.1.7).  ireclaim's [iget]
+     fires at a claim-SHAPED record (type ≠ 0, nlink 0); the licence alone does
+     not exclude a mid-window claim box, and the exclusion is the boot-order
+     fact that ireclaim runs before [kexec("/init")] and before any second
+     process.  This EXCLUSIVE token is that fact, made statable: while it is
+     held no slot is claimed ([IregLinkNz.ireg_boot_no_claim]).  fsinit, the
+     only caller, hands it in and takes it back. *)
+  ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -303,7 +308,7 @@ Definition wp_ireclaim_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -319,6 +324,9 @@ Definition wp_ireclaim_sconf_body
          caller needs them named.  fsinit, the only caller, threads it on. *)
       ⌜used' ⊆ used⌝ -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
+      (* the boot-shelter token, returned unspent (fs-fragments.md §7.12): the
+         scan refutes claims AGAINST it, never consuming it *)
+      ireg_boot -∗
       (* ...and nothing else.  ireclaim returns void, no log reservation
          crosses the boundary (begin_op mints and end_op retires inside),
          and no inode reference survives (iget's is spent by iput). *)

@@ -93,7 +93,7 @@ under it.
 |---|---|---|
 | F1 | `fs_rep`: the tree type + abstraction relation over the landed invariants | mostly a reading; the design forcing-function |
 | F2 | path resolution as a logically-atomic triple, linearization point = one `dirlookup` under one lock | CORRECTED per fs-fragments.md §5.4: NOT a re-derivation of namex's post — SpecNamex rules there is no path→inode functional statement |
-| F3 | atomic-triple wrappers per proven syscall at the identified linearization points | one wrapper per landed sconf; create first (its walk documents its own points) |
+| F3 | atomic-triple wrappers per proven syscall at the identified linearization points | **the TREE-DELTA half is STOPPED — see fs-fragments-campaign.md's F3 entry, stops S1–S3: no landed syscall seal carries a tree delta, no syscall-level client can hold an ambient tree (the escrow owns every node fragment), and the only carrier that survives needs R3 reopened.** What the wrappers DO deliver is item (c), the calling convention: `FsSyscalls.v`'s `fs_geom`/`fs_world`/`fs_res` + mkdir and chdir |
 | F4 | the path-points-to API + fragment-locality lemmas | the CSL dividend |
 | F5 | a verified user program against F3/F4 (user-rocq substrate exists) | the end-to-end result |
 | F6 | DFSCQ-style durability index over `ln_ep`; crash-awareness | AFTER F1-F5; the research-scale piece |

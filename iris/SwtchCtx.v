@@ -216,49 +216,52 @@ Section SwtchCtx.
      hart, which is what lets [SchedCtx.procs_inv] store one. *)
   Definition valid_context_pre
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
     (∃ (vs : list (mword 64)) (av : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
-      stack_own (nth 1 vs (mword_of_int 0)) av ∗
+      stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr (CID := h) m av false p -∗
+         sie_cap_gpr KT1 (CID := h) m av false p -∗
          cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
-         (∃ (A' : ctx_adm) (cret : mword 64),
-            ▷ rec A' cret p ∗
-            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
+         (∃ (A' : ctx_adm) (cret : mword 64) (back : bool),
+            (if back then ▷ rec A' cret p else own_ctx cret) ∗
+            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back) -∗
          WP (LoopE gen_id h : expr riscv_lang)))%I.
 
   Global Instance valid_context_pre_contractive
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ) :
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ) :
     Contractive (valid_context_pre P).
   (* [solve_contractive] gets all the way to the recursive occurrence and
      stops: the residual goal is [x A' cret p ≡{m}≡ y A' cret p] against a
      [dist] on the THREE-argument discrete function, which is pointwise by
-     definition -- so finish by applying the hypothesis at those points. *)
+     definition -- so finish by applying the hypothesis at those points.
+     The [back] case split comes FIRST: the recursive occurrence now sits in
+     one arm of an [if], and nothing can see through that arm until the
+     boolean is destructed. *)
   Proof.
     solve_proper_prepare.
     repeat (f_contractive || f_equiv).
-    all: apply H.
+    all: try apply H.
   Qed.
 
   Definition valid_context
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ :=
     fixpoint (valid_context_pre P).
 
   Lemma valid_context_unfold
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (A : ctx_adm) (c p : mword 64) :
     valid_context P A c p ⊣⊢
       valid_context_pre P (valid_context P) A c p.

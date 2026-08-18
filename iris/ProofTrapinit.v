@@ -84,7 +84,7 @@ Section ProofTrapinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl ltac:(unfold text_end, time_name_str; lia) Htime
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.trapinit
+    iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.trapinit
               (mword_of_int 5) (mword_of_int 22) (mword_of_int 3658) (mword_of_int 3522)
               (mword_of_int 2090764) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)

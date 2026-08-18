@@ -73,13 +73,11 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import W32Arith.
 Require Import ElfEnc.
@@ -188,10 +186,10 @@ Section KexecB3Ph.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kxc_ph8_of_stack (sp0 : mword 64) :
-    stack_own (pa_stk sp0 54) 8 ⊢
+    stack_own (KTR := KT1) (pa_stk sp0 54) 8 ⊢
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
-    (∃ w : mword 64, word_pointsto (pa_stk sp0 62) (DfracOwn 1) w).
+       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
+    (∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 62) (DfracOwn 1) w).
   Proof.
     rewrite (kxc_slots_asc sp0 8 54). cbn [seq big_opL].
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & _)".
@@ -202,9 +200,9 @@ Section KexecB3Ph.
 
   Lemma kxc_stack8_of_ph (sp0 : mword 64) (w62 : mword 64) :
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
-    word_pointsto (pa_stk sp0 62) (DfracOwn 1) w62 -∗
-    stack_own (pa_stk sp0 54) 8.
+       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 62) (DfracOwn 1) w62 -∗
+    stack_own (KTR := KT1) (pa_stk sp0 54) 8.
   Proof.
     iIntros "H A".
     rewrite (kxc_slots_asc sp0 8 54). cbn [seq big_opL Nat.add Nat.sub].
@@ -217,27 +215,27 @@ Section KexecB3Ph.
      same names. *)
   Lemma kxc_pin_intro (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 w68 : mword 64) :
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
-    stack_own (pa_stk sp0 13) 33 -∗
-    stack_own (pa_stk sp0 54) 8 -∗
-    word_pointsto (pa_stk sp0 63) (DfracOwn 1) w63 -∗
-    word_pointsto (pa_stk sp0 64) (DfracOwn 1) av -∗
-    word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 -∗
-    word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    stack_own (KTR := KT1) (pa_stk sp0 13) 33 -∗
+    stack_own (KTR := KT1) (pa_stk sp0 54) 8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 63) (DfracOwn 1) w63 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 64) (DfracOwn 1) av -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 65) (DfracOwn 1) w65 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 67) (DfracOwn 1) w67 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 68) (DfracOwn 1) w68 -∗
     kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67.
   Proof.
@@ -317,7 +315,7 @@ Section KexecB3Seam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x11a) : mword 64) ∗
-     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
      cpu_own 0 true (proc_addr jp) true ∅ ∗
      kalloc_env ga None ∗
      kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
@@ -537,7 +535,7 @@ Section KexecB3Incr.
     { rewrite (rget_ne T3 Rs0 ltac:(inz)) HT3s0 kxc_elf_off56.
       apply kxc_phnum_slot. }
     iEval (rewrite -Hpa47) in "Hw2".
-    iApply (wp_lhu_s_sconf (mword_of_int (KXB + 0x124)) Ra5 Rs0
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXB + 0x124)) Ra5 Rs0
               (mword_of_int 3720 : mword 12) T3 (K - 68)%nat
               (Z_to_bv 16 (le_at ef 56 2) : mword 16) true
               (dqm := DfracOwn 1) ltac:(inz) ltac:(rdok)
@@ -781,7 +779,6 @@ Section KexecB3Body.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -798,7 +795,7 @@ Section KexecB3Body.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr mf K true (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
           cpu_own 0 true (proc_addr jp) true ∅ -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -807,8 +804,8 @@ Section KexecB3Body.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-          ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) -∗
+          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+          ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
           ([∗ list] k ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
           bslots bn 3 -∗
@@ -838,7 +835,7 @@ Section KexecB3Body.
             (entry spv szv2 : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
-              sie_cap_gpr mf K true (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
               cpu_own 0 true (proc_addr jp) true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -847,8 +844,8 @@ Section KexecB3Body.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-              ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) -∗
+              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+              ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
               ([∗ list] k ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
               bslots bn 3 -∗
@@ -859,10 +856,10 @@ Section KexecB3Body.
   Proof.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
            Hsp Hra Hs0 Hs1 Hs2.
-    pose proof HK as HK'. unfold K_kexec in HK'.
+    pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
-    iIntros "#Htext #Hpanic #Hfab Hst Hcont Hout".
+    iIntros "#Htext #Hfab Hst Hcont Hout".
     rewrite /kxc_at_12c.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs9 & %HMs10 & %HMs11 & %HMa3) &
@@ -872,7 +869,7 @@ Section KexecB3Body.
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
@@ -1099,10 +1096,10 @@ Section KexecB3Body.
     iDestruct (cpu_own_transport CID0 CIDf 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iEval (rewrite -HU5a2) in "Hphb".
-    iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
+    iApply (Readi.wp_readi_sconf KT1 gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry kf) bmf datl dnf false offn 56%nat phb V
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) U5 (K - 68)%nat true
-              true ∅ ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+              true ∅ ltac:(lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(rewrite HoffnZ; lia)
               ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
                     pose proof Hszb as Hs; rewrite Hmb in Hs;
@@ -1110,7 +1107,7 @@ Section KexecB3Body.
                     change (2 ^ 32)%Z with 4294967296%Z; lia)
               Hjp Hgs HU5a0
               ltac:(rewrite HU5a1; vm_compute; reflexivity) HU5a3 HU5a4'
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hka Hidev Hmeta Hmap
                     Hblocks [Hphb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1441,10 +1438,10 @@ Section KexecB3Body.
                     HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                     Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                     Hal Hbelow Hcov
-                    with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                    with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                           Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                           Hcont").
-          { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                          Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                          Hdlock"). }
         * (* well-formed so far *)
@@ -1574,10 +1571,10 @@ Section KexecB3Body.
                        HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                        Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                        Hal Hbelow Hcov
-                       with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                       with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                              Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                              Hcont").
-             { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+             { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                             Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                             Hdlock"). }
           -- iApply (wp_bltu_fall_s_sconf (mword_of_int (KXB + 0x15e))
@@ -1707,10 +1704,10 @@ Section KexecB3Body.
                           HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                           Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                           Hal Hbelow Hcov
-                          with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                          with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                                 Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                                 Hcont").
-                { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+                { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                                Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                                Hdlock"). }
              ++ iApply (wp_bnez_x0_fall_s_sconf (mword_of_int (KXB + 0x168))
@@ -1798,7 +1795,7 @@ Section KexecB3Body.
                   rewrite /U14 upd_ne; [| reg_ne_side].
                   exact (HU13get r Hr Hne). }
                 iApply (Flags2perm.wp_flags2perm_sconf U15 (K - 68)%nat true
-                          (proc_addr jp) ltac:(unfold K_flags2perm; lia)
+                          (proc_addr jp) ltac:(lia)
                           with "Hcg Htext Hpc").
                 iIntros (CIDz2 Hsz2 M3) "Hcg Hpc %Hcsf %Hf2p".
                 assert (Hpc174 : ret_pc (U15 !!! Regidx Rra)
@@ -1949,8 +1946,8 @@ Section KexecB3Body.
                   by (rewrite /Y; apply (tp_pin_id (tp_pin Z0) (rget_tp Z0))).
                 assert (HYsp0 : Y !!! Regidx csp_rs1 = Z0 !!! Regidx csp_rs1)
                   by (rewrite /Y; exact (tp_pin_sp Z0)).
-                assert (Hgpreq : sie_cap_gpr Z0 (K - 68)%nat true (proc_addr jp)
-                                 = sie_cap_gpr Y (K - 68)%nat true (proc_addr jp))
+                assert (Hgpreq : sie_cap_gpr KT1 Z0 (K - 68)%nat true (proc_addr jp)
+                                 = sie_cap_gpr KT1 Y (K - 68)%nat true (proc_addr jp))
                   by (unfold sie_cap_gpr, sie_cap; rewrite HYsp0 HYid;
                       reflexivity).
                 iEval (rewrite Hgpreq) in "Hcg".
@@ -2183,10 +2180,10 @@ Section KexecB3Body.
                              HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb
                              Hib Hn2 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2
                              HM4sp HM4s0 HM4s4 HM4s6' Hal Hbel4z Hcov4z
-                             with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins
+                             with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins
                                    Hbits Hka Hpt Hpriv Hpath Hargv Hargs Helf
                                    Hbs Hirs Hlog Hframe Hcont").
-                   { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab
+                   { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab
                                                   Hitinv Hesc Hslks Hireg Hprocs
                                                   Hdevi Hdgeom Hdlock"). }
                 ** (* ---- the table grew ---- *)
@@ -2632,9 +2629,9 @@ Section KexecB3Body.
                                  Hguard HU24sp HU24s0 HU24s1 HU24s3 HU24s4
                                  HU24s5 HU24s6 HU24s7 HU24s8 HU24s9 HU24s10
                                  HU24s11
-                                 with "Hcg Hcnt Htext Hpanic Hpc [] Hka
+                                 with "Hcg Hcnt Htext Hpc [] Hka
                                        [-Hcont Hout] Hcont [Hout]").
-                       { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert
+                       { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert
                                                       Hitab Hitinv Hesc Hslks
                                                       Hireg Hprocs Hdevi Hdgeom
                                                       Hdlock"). }
@@ -2827,10 +2824,10 @@ Section KexecB3Body.
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                 Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HM2sp HM2s0 HM2s4 HM2s6
                 Hal Hbelow Hcov
-                with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                       Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                       Hcont").
-      { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+      { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                      Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                      Hdlock"). }
   Qed.
@@ -2901,7 +2898,6 @@ Section KexecB3Loop.
     forall (W : nat) (M : regfile) (P : uptd) (i : nat) (szv : mword 64),
     (eh_phnum ef - Z.of_nat i <= Z.of_nat W)%Z ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -2917,7 +2913,7 @@ Section KexecB3Loop.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr mf K true (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
           cpu_own 0 true (proc_addr jp) true ∅ -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2926,8 +2922,8 @@ Section KexecB3Loop.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-          ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) -∗
+          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+          ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
           ([∗ list] k ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
           bslots bn 3 -∗
@@ -2948,7 +2944,7 @@ Section KexecB3Loop.
             (entry spv szv2 : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
-              sie_cap_gpr mf K true (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
               cpu_own 0 true (proc_addr jp) true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2957,8 +2953,8 @@ Section KexecB3Loop.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-              ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) -∗
+              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+              ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
               ([∗ list] k ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
               bslots bn 3 -∗
@@ -2971,7 +2967,7 @@ Section KexecB3Loop.
            Hsp Hra Hs0 Hs1 Hs2.
     intro W. revert CID0.
     induction W as [| W IH]; intros CID0 M P i szv Hfuel;
-      iIntros "#Htext #Hpanic #Hfab Hst Hcont Hc1a4";
+      iIntros "#Htext #Hfab Hst Hcont Hc1a4";
       iApply (kxc_ph_step (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
@@ -2979,7 +2975,7 @@ Section KexecB3Loop.
                 sp0 ra0 s00 s10 s20 pv av w67 ef P i szv
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
                 Hsp Hra Hs0 Hs1 Hs2
-                with "Htext Hpanic Hfab Hst Hcont [Hc1a4]");
+                with "Htext Hfab Hst Hcont [Hc1a4]");
       iIntros (CIDn Hsn M' P' szv') "[Hnext | Hexit] Hcont".
     - (* NO FUEL, and the back edge is what refutes it. *)
       iDestruct "Hnext" as "(_ & _ & %Hp3 & _)".
@@ -2999,7 +2995,7 @@ Section KexecB3Loop.
       iApply (IH CIDn M' P' (S i) szv'
                 ltac:(rewrite Nat2Z.inj_succ; rewrite Nat2Z.inj_succ in Hfuel;
                       lia)
-                with "Htext Hpanic Hfab [Hrest] Hcont Hc1a4").
+                with "Htext Hfab [Hrest] Hcont Hc1a4").
       rewrite /kxc_at_12c.
       iSplitR; [iPureIntro; exact Hp1 |].
       iSplitR; [iPureIntro; exact Hp2 |].
@@ -3159,7 +3155,6 @@ Section KexecB3Close.
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -3177,8 +3172,8 @@ Section KexecB3Close.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
-    pose proof HK as HK'. unfold K_kexec in HK'.
-    iIntros "#Htext #Hpanic #Hfab Hst Hout".
+    pose proof HK as HK'. 
+    iIntros "#Htext #Hfab Hst Hout".
     rewrite /kxc_at_1a4.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs6) &
                          (%Hk & %Hib & %Hn2 & %Hu2 & %Hal) &
@@ -3187,7 +3182,7 @@ Section KexecB3Close.
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
@@ -3252,9 +3247,9 @@ Section KexecB3Close.
               gi cn gtl gilf gislf cov logstart bmapstart inodestart nib size
               dev used2 kf qf sf gyf inumf dnf bmf n2 pidv (DfracOwn (1/4))
               dqb dqs B2 (K - 68)%nat true true ∅
-              ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
+              ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
@@ -3308,8 +3303,8 @@ Section KexecB3Close.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true true ∅ ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
+              true true ∅ ltac:(lia) Hlg Hjp Hgs
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -3411,7 +3406,7 @@ Section KexecB3Main.
     cbv beta delta [kxc_b2_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
            Hsp Hra Hs0 Hs1 Hs2.
-    iIntros "#Htext #Hpanic #Hfab Hst Hcont Hc1ae".
+    iIntros "#Htext #Hfab Hst Hcont Hc1ae".
     iApply (kxc_phdr (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
@@ -3423,7 +3418,7 @@ Section KexecB3Main.
               ltac:(rewrite Z2Nat.id;
                     [ pose proof (Nat2Z.is_nonneg i); lia
                     | pose proof (eh_phnum_bound ef); lia ])
-              with "Htext Hpanic Hfab Hst Hcont [Hc1ae]").
+              with "Htext Hfab Hst Hcont [Hc1ae]").
     iIntros (CIDn Hsn M' P' szv') "Hst4 Hcont".
     assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
               (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -3438,7 +3433,7 @@ Section KexecB3Main.
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w67 ef P' szv'
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
-              with "Htext Hpanic Hfab Hst4 [Hc1ae Hcont]").
+              with "Htext Hfab Hst4 [Hc1ae Hcont]").
     iIntros (CIDm Hsm M'' used3) "Hst1ae".
     assert (Hcr2 : true = false \/ proc_addr jp = zero_reg ->
               (CIDm : CPU) = (CIDn : CPU)) by wp_next_chain.
@@ -3471,7 +3466,7 @@ Section KexecB3Main.
   Proof.
     cbv beta delta [kxc_b2z_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
-    iIntros "#Htext #Hpanic #Hfab Hst Hc1ae".
+    iIntros "#Htext #Hfab Hst Hc1ae".
     iApply (kxc_seam1a2 (CID0 := CID0) jp bn g gfs gi cn ga gf cov logstart
               bmapstart inodestart nib size dev used used2 kf qf sf gyf inumf
               dnf bmf gilf gislf n2 plen pfun na avf aslen afun pidv V
@@ -3494,7 +3489,7 @@ Section KexecB3Main.
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w67 ef P (mword_of_int 0 : mword 64)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
-              with "Htext Hpanic Hfab Hst4 [Hc1ae]").
+              with "Htext Hfab Hst4 [Hc1ae]").
     iIntros (CIDm Hsm M'' used3) "Hst1ae".
     iSpecialize ("Hc1ae" $! CIDm with "[%]"); [wp_next_chain |].
     iApply ("Hc1ae" $! M'' used3 with "Hst1ae").

@@ -142,7 +142,7 @@ Definition ssc_post (f g s : nat -> bv 8) (n k : nat) : Prop :=
   ((k + 1 < n)%nat -> s (k + 1)%nat = (mword_of_int 0 : mword 8)) /\
   (forall j, (k + 1 < j)%nat -> (j < n)%nat -> s j = g j).
 
-Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kts ktt : ktier) (mm : regfile)
     (n ns : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.safestrcpy in
   let s := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -154,17 +154,17 @@ Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
   (Z.of_nat n < 2 ^ 31)%Z ->
   (* how much of [t] is owned below -- see the header *)
   ssc_src_ok f n ns ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
-  ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j) -∗
-  ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ g j) -∗
+  ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ[ktt]{dq} f j) -∗
+  ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kts] g j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (h : nat -> bv 8),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
-    ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ[ktt]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kts] h j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5) = s⌝ -∗
     ⌜(n = 0%nat /\ h = g) \/
@@ -174,7 +174,7 @@ Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
 
 Module Type SAFESTRCPY.
   Parameter wp_safestrcpy_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kts ktt : ktier) (mm : regfile)
       (n ns : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
-      wp_safestrcpy_sconf_body mm n ns f g K dq b p.
+      wp_safestrcpy_sconf_body kts ktt mm n ns f g K dq b p.
 End SAFESTRCPY.

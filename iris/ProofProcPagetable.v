@@ -94,7 +94,7 @@ Proof. lia. Qed.
 
 Lemma ppt_nodes_le (g1 g2 : nat) :
   (g1 <= 2)%nat -> (g2 <= 0)%nat -> (1 + g1 + g2 <= K_proc_pagetable)%nat.
-Proof. unfold K_proc_pagetable. lia. Qed.
+Proof. lia. Qed.
 
 
 Lemma ppt_lt1 (i : nat) : (i < 1)%nat -> i = 0%nat.
@@ -112,7 +112,7 @@ Lemma ppt_fail_n1 (on : option nat) (g : nat) : (g <= 2)%nat ->
   exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n).
 Proof.
   intros Hg Hz. exists (1 + g)%nat.
-  split; [unfold K_proc_pagetable; lia |]. rewrite avail_sub_add. exact Hz.
+  split; [lia |]. rewrite avail_sub_add. exact Hz.
 Qed.
 
 Lemma ppt_fail_n2 (on : option nat) (g1 g2 : nat) : (g1 <= 2)%nat -> (g2 <= 0)%nat ->
@@ -120,13 +120,13 @@ Lemma ppt_fail_n2 (on : option nat) (g1 g2 : nat) : (g1 <= 2)%nat -> (g2 <= 0)%n
   exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n).
 Proof.
   intros H1 H2 Hz. exists (1 + g1 + g2)%nat.
-  split; [unfold K_proc_pagetable; lia |]. rewrite -ppt_env_recomb. exact Hz.
+  split; [lia |]. rewrite -ppt_env_recomb. exact Hz.
 Qed.
 
 Lemma ppt_fail_refute (nb n : nat) :
   (K_proc_pagetable < nb)%nat -> (n <= K_proc_pagetable)%nat ->
   avail_zero (avail_sub (Some nb) n) -> False.
-Proof. rewrite avail_sub_Some. unfold avail_zero, K_proc_pagetable. lia. Qed.
+Proof. rewrite avail_sub_Some. unfold avail_zero. lia. Qed.
 
 Module ProcPagetableCore (UV : UVMCREATE) (MP : MAPPAGES)
                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE_GEN.
@@ -289,7 +289,7 @@ Section ProofProcPagetable.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     iDestruct "S3" as (v3) "Hc3". iDestruct "S4" as (v4) "Hc4".
@@ -353,7 +353,7 @@ Section ProofProcPagetable.
         ⌜ me !!! Regidx csp_rs1 = spr
           /\ me !!! Regidx (mword_of_int 9 : mword 5) = rv
           /\ ppt_thr mm me ⌝ -∗
-        sie_cap_gpr me (K - 4)%nat b p -∗
+        sie_cap_gpr KT1 me (K - 4)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.proc_pagetable + 0x4c) : mword 64) -∗
         p_trapframe pp ↦₈{dqtf} tf -∗
@@ -434,8 +434,8 @@ Section ProofProcPagetable.
       assert (Hpop : E4 !!! Regidx csp_rs1
                      = pa_stk (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HE4sp. symmetry. exact Hsprstk. }
-      iAssert (stack_own sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 4) with "[Hc1 Hc2 Hc3 Hc4]" as "Hframe".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
         iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
         iSplitL "Hc3". { iExists (mm !!! Regidx (mword_of_int 9)). iExact "Hc3". }
@@ -526,7 +526,7 @@ Section ProofProcPagetable.
     { rewrite /Jp. apply (tp_pin_id (tp_pin J) (rget_tp J)). }
     assert (Hjpsp : Jp !!! Regidx csp_rs1 = J !!! Regidx csp_rs1).
     { rewrite /Jp. exact (tp_pin_sp J). }
-    assert (Hgpreq : sie_cap_gpr J (K - 4)%nat b p = sie_cap_gpr Jp (K - 4)%nat b p).
+    assert (Hgpreq : sie_cap_gpr KT1 J (K - 4)%nat b p = sie_cap_gpr KT1 Jp (K - 4)%nat b p).
     { unfold sie_cap_gpr, sie_cap. rewrite Hjpsp Hpinidem. reflexivity. }
     iEval (rewrite Hgpreq) in "Hcg".
     assert (HcidJp : Jp !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
@@ -621,7 +621,7 @@ Section ProofProcPagetable.
       iApply ("EPI" $! M1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
       { split_and!; [exact HM1sp | exact HM1s1 | exact HM1thr]. }
       { iRight. iFrame "Henv0". iPureIntro; split_and!; [reflexivity |].
-        exists 0%nat. split; [unfold K_proc_pagetable; lia |].
+        exists 0%nat. split; [lia |].
         rewrite avail_sub_0. exact Hav0. } }
     assert (Hroot0r : root0 = zero_extend' 64 (concat_vec b0 (zeros' 12 : mword 12)))
       by exact Hroot0.
@@ -727,7 +727,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages wants [Hcnt] at CID18. *)
     iDestruct (cpu_own_transport CIDuv CID18 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf γa M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
+    iApply (MP.wp_mappages_sconf KT1 γa M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
               _ Hlvl Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
@@ -898,7 +898,7 @@ Section ProofProcPagetable.
     (* +0x34 ld a3,88(s2) : a3 := p->trapframe *)
     assert (HN118 : N1 !!! Regidx (mword_of_int 18 : mword 5) = pp)
       by (rewrite /N1; rewrite upd_ne; [exact Hmr118 | reg_neq]).
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.proc_pagetable + 0x34)) (mword_of_int 13 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 88 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.proc_pagetable + 0x34)) (mword_of_int 13 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 88 : mword 12)
               N1 (K - 4)%nat tf b (dqm := dqtf)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [Htfcell]").
@@ -982,7 +982,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages#2 wants [Hcnt] at CID27. *)
     iDestruct (cpu_own_transport CIDmp1 CID27 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf γa N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
+    iApply (MP.wp_mappages_sconf KT1 γa N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
               _ Hlvl Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)

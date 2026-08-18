@@ -31,7 +31,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -61,7 +60,7 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
                    in
   (22 <= av)%nat ->
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr KT1 m av b pme -∗
   cpu_own 0 eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
@@ -69,13 +68,12 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   sleeplocked_q γsl q -∗
   sl_pid slk ↦₄ pd -∗
   R -∗
-  panic_wp_any -∗
   (* wakeup's resources *)
   procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pme -∗
+      sie_cap_gpr KT1 mf av b pme -∗
       cpu_own 0 eb pme b lks -∗
       pc_is ret_tgt -∗
       (* the deposit comes back, at the holder's own fraction *)
@@ -102,7 +100,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      [cpu_own] carry the same [lks] -- because the C's single return path
      releases lk->lk; the wakeup() in between is itself balanced. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr KT1 m av b pme -∗
   cpu_own 0 eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
@@ -110,13 +108,12 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pd -∗
   R -∗
-  panic_wp_any -∗
   (* wakeup's resources *)
   procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pme -∗
+      sie_cap_gpr KT1 mf av b pme -∗
       cpu_own 0 eb pme b lks -∗
       pc_is ret_tgt -∗
           WP (Loop : expr riscv_lang)) -∗

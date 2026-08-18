@@ -20,7 +20,7 @@
 
    THE CONTRACT.  The index is given as a nat [i < NARG] with the register
    pinned at [mword_of_int i]: that PRECONDITION is what refutes the
-   [bltu a5,s1,panic] arm, so argraw needs no [panic_wp] hypothesis at all.
+   [bltu a5,s1,panic] arm, so argraw needs no panic credential at all.
    The resources are the weakest that suffice, deliberately NOT [proc_priv]:
 
      - [p_trapframe p ↦₈{dqt} page_base tfp] -- a fraction of the pointer
@@ -79,7 +79,7 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
      kernel's own mapping. Not previously needed: before the physical-native
      redesign, [tf_page]'s words WERE mem-tier already. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
@@ -88,7 +88,7 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = v ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗

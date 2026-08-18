@@ -121,7 +121,6 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
-Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -139,8 +138,7 @@ Import Defs.
    obligation at [52 <= 50].  copyout's own budget went 50 -> 52 because
    [psz] has to outlive walkaddr / vmfault / memmove, so gcc gave it a
    callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
-Definition K_kwait : nat := 62%nat.
-
+Notation K_kwait := (62%nat) (only parsing).
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
@@ -157,13 +155,12 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
      11); freeproc/either_copyout reach "kmem" (13).  10 is the floor, and the
      nested acquires follow by [locks_below_union_singleton]/[locks_below_mono]. *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain sleep parks into *)
   procs_inv γs -∗
-  panic_wp_any -∗
   (* the running-thread bundle sleep needs *)
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -176,7 +173,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗

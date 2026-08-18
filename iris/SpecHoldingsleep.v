@@ -30,7 +30,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SleepLock.
@@ -57,21 +56,20 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{
      is unchanged across the whole call), so the caller must already hold
      only locks BELOW "sleep lock"'s rank. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
   (* the holder's bundle (returned untouched) *)
   sleeplocked_q γsl q -∗
   sl_pid slk ↦₄ pidv -∗
-  panic_wp_any -∗
   (* the caller's own pid, agreeing with the lock's pid field *)
   p_pid p ↦₄{dq} pidv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q -∗
@@ -91,19 +89,18 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
                    in
   (16 <= av)%nat ->
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pidv -∗
-  panic_wp_any -∗
   p_pid p ↦₄{dq} pidv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       sleeplocked γsl -∗

@@ -5,7 +5,7 @@
    that contract arrives as a Coq HYPOTHESIS
    ([SpecPrintk.printk_gen_contract]) rather than as a functor argument --
    so the obligation is pushed up to whoever finally discharges it, exactly
-   as [SpecPanic.panic_wp_any] is pushed, and procdump's own
+   as [SpecPanic]'s own credentials are pushed, and procdump's own
    [Print Assumptions] stays at the standing platform axioms.
 
    See claude-notes/projects/procdump.md. *)

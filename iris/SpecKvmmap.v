@@ -51,7 +51,7 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* COUNTED-ONLY (mirrors SpecProcMapstacks/SpecKvmmake): every caller in the
      tree already supplies [Some nb] here (kvmmake's six per-region calls,
      proc_mapstacks' boot-only call), and [nb] always dominates the missing
-     nodes, so the kalloc-null / mappages-fail branch is DEAD -- NO panic_wp.
+     nodes, so the kalloc-null / mappages-fail branch is DEAD -- NO panic.
      [on] stays [option nat] in the signature only so it keeps matching the
      dual-mode calling convention shared by [kalloc_env] and the sibling
      specs in this cone. *)
@@ -59,14 +59,14 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* order premise at the lowest rank this cone reaches: kvmmap -> mappages
      -> walk -> kalloc ("kmem", 13). *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT0 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗

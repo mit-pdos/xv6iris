@@ -32,8 +32,7 @@ From Kernel Require KernelSyms.
 (* the table pages proc_pagetable allocates: the root, plus the l1 and l0
    tables the TRAMPOLINE walk builds (TRAPFRAME shares both -- see
    ProcPt.ppt_missing_tf_zero). *)
-Definition K_proc_pagetable : nat := 3.
-
+Notation K_proc_pagetable := (3%nat) (only parsing).
 (* WHAT proc_pagetable RETURNS, with the resources that go with it.  [rv] is
    the returned pointer -- a0 at the [ret], and s1 at the +0x4c join where
    all four exits meet (the two error tails both end [li s1,0; j +0x4c], and
@@ -106,14 +105,14 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (uint tf + 4096 < 2 ^ 56)%Z ->
   (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
@@ -144,14 +143,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   (uint tf + 4096 < 2 ^ 56)%Z ->
   (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗

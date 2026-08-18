@@ -38,7 +38,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
@@ -52,8 +51,7 @@ Import Defs.
 
 (* brelse's own frame is 32 bytes (4 slots); its deepest callee is
    releasesleep (22). *)
-Definition K_brelse : nat := 26%nat.
-
+Notation K_brelse := (26%nat) (only parsing).
 Definition wp_brelse_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -75,10 +73,9 @@ Definition wp_brelse_sconf_body
      gets there from this one, so "bcache" (the lowest rank brelse touches)
      is the only premise stated here. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗
@@ -92,7 +89,7 @@ Definition wp_brelse_sconf_body
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗

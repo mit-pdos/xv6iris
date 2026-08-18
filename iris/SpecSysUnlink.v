@@ -104,7 +104,7 @@
    * ITS SHORT-READ ARM IS A PANIC.  [readi] is EXACT, so
      [!= sizeof(de)] is reachable only where 16 does not divide the
      directory's size; the arm needs no multiple-of-16 invariant, it is
-     closed by [panic_wp_any] and never returns.
+     discharged against [SpecPanic] and never returns.
 
    ==== WHAT THIS CONTRACT IS ABOUT =====================================
 
@@ -217,7 +217,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -257,8 +256,7 @@ Local Open Scope Z_scope.
    callee fits under that: dirlookup 90, readi 78, writei 78, iunlockput 64,
    argstr 60, end_op 58, ilock 44, iupdate 44, begin_op 26, namecmp 4,
    memset 2. *)
-Definition K_sys_unlink : nat := 134%nat.
-
+Notation K_sys_unlink := (144%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  Two, and TWO is what the single resolve buys:
    see the header's reference ledger, and [SysUnlinkBudget]'s section 6. *)
 Definition sys_unlink_slots : nat := 2%nat.
@@ -322,7 +320,7 @@ Definition wp_sys_unlink_sconf_body
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- balloc's out-of-blocks arm (under the zeroing writei) calls
      printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := KT1) γpr gu gd ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* nameiparent's own premise, inherited: the walker runs with the base
@@ -332,7 +330,7 @@ Definition wp_sys_unlink_sconf_body
      page [proc_priv] carries.  Nothing is assumed about it: argstr checks
      the string itself. *)
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
      DERIVES [lks = ∅] and every order goal the ten callees raise is
@@ -340,10 +338,9 @@ Definition wp_sys_unlink_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -383,9 +380,9 @@ Definition wp_sys_unlink_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

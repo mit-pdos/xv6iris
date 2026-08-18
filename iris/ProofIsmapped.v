@@ -94,17 +94,17 @@ Section IsmappedEpi.
       (M : regfile)
     : ⌜callee_saved mw M⌝ -∗
       kernel_text -∗
-      sie_cap_gpr M (K - 2)%nat b p -∗
+      sie_cap_gpr KT1 M (K - 2)%nat b p -∗
       pc_is (mword_of_int (KernelSyms.ismapped + 0x14) : mword 64) -∗
       ptree_own 2 dq t -∗
-      pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
-      pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
+      pa_stk sp0 1 ↦₈[KT1] (mm !!! Regidx (mword_of_int 1)) -∗
+      pa_stk sp0 2 ↦₈[KT1] (mm !!! Regidx (mword_of_int 8)) -∗
       ⌜ (M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0 /\ m !! vpn = None)
         \/ (exists w, m !! vpn = Some w /\
              M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 1) ⌝ -∗
       wp_next b p (fun (CID' : CpuId) =>
         ∀ (mr : regfile),
-        sie_cap_gpr mr K b p -∗
+        sie_cap_gpr KT1 mr K b p -∗
         pc_is ret_tgt -∗
         ptree_own 2 dq t -∗
         ⌜callee_saved mm mr⌝ -∗
@@ -166,8 +166,8 @@ Section IsmappedEpi.
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HspE2. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 2) with "[Hc1 Hc2]" as "Hfr".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 2) with "[Hc1 Hc2]" as "Hfr".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }
@@ -269,7 +269,7 @@ Section ProofIsmapped.
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.ismapped) (mword_of_int 48 : mword 6) mm K 2 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v8) "Hc1". iDestruct "S2" as (v0) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = spr)
@@ -350,7 +350,7 @@ Section ProofIsmapped.
     assert (Hret0e : ret_pc (W4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.ismapped + 0x0e)).
     { rewrite HW4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     (* ---- the call ---- *)
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf W4 t m (K - 2)%nat dq b p
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 W4 t m (K - 2)%nat dq b p
               ltac:(lia) HW4a0 HW4a2
               ltac:(rewrite HW4a1; exact Hvab)
               Hrep
@@ -433,7 +433,7 @@ Section ProofIsmapped.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.ismapped + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ismapped + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12)
               mw (K - 2)%nat w0 b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)

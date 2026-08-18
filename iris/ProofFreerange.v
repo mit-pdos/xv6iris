@@ -113,19 +113,19 @@ Section ProofFreerange.
        caller must already hold only locks BELOW "kmem"'s rank. *)
     locks_below lks "kmem" ->
     kernel_text -∗
-    sie_cap_gpr Me (K - 6) b pcur -∗
+    sie_cap_gpr KT0 Me (K - 6) b pcur -∗
     cpu_own ncnt eb pcur b lks -∗
     pc_is (mword_of_int (KernelSyms.freerange + 0x3e)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-    (∃ v : mword 64, (pa_stk sp0 4) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 5) ↦₈ v) -∗
-    (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
+    (pa_stk sp0 1) ↦₈[KT0] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT0] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT0] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+    (∃ v : mword 64, (pa_stk sp0 4) ↦₈[KT0] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 5) ↦₈[KT0] v) -∗
+    (∃ v : mword 64, (pa_stk sp0 6) ↦₈[KT0] v) -∗
     kalloc_avail γk onf -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mr,
-      sie_cap_gpr mr K b pcur -∗
+      sie_cap_gpr KT0 mr K b pcur -∗
       cpu_own ncnt eb pcur b lks -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
       kalloc_avail γk onf -∗
@@ -198,8 +198,8 @@ Section ProofFreerange.
     assert (Hpop : E3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv Hup HE4sp. reflexivity. }
-    iAssert (stack_own sp0 6) with "[Hs1c Hs2c Hs3c Hs4c Hs5c Hs6c]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT0) sp0 6) with "[Hs1c Hs2c Hs3c Hs4c Hs5c Hs6c]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT0)). cbn [seq].
       iSplitL "Hs1c"; [iExists _; iExact "Hs1c"|].
       iSplitL "Hs2c"; [iExists _; iExact "Hs2c"|].
       iSplitL "Hs3c"; [iExists _; iExact "Hs3c"|].
@@ -309,7 +309,7 @@ Section ProofFreerange.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (vra0) "Hra". iDestruct "S2" as (vs00) "Hs0".
     iDestruct "S3" as (vs10) "Hs1". iDestruct "S4" as (vs20) "Hslot4".
@@ -612,19 +612,19 @@ Section ProofFreerange.
           /\ prun pa_end (M !!! Regidx (mword_of_int 9 : mword 5)) qs
           /\ qs <> []
           /\ avail_inc_n on (length qs) = Some (length (p0 :: rest)) ⌝ -∗
-        sie_cap_gpr (CID:=CID0) M (K - 6) b pcur -∗
+        sie_cap_gpr KT0 (CID:=CID0) M (K - 6) b pcur -∗
         cpu_own (CID:=CID0) ncnt eb pcur b lks -∗
         pc_is (CID:=CID0) (mword_of_int (KernelSyms.freerange + 0x2a)) -∗
         ([∗ list] p ∈ qs, page_own p) -∗
         kalloc_avail γk on -∗
-        (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
-        (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
-        (pa_stk sp0 3) ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
-        (pa_stk sp0 4) ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5) : mword 64) -∗
-        (pa_stk sp0 5) ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5) : mword 64) -∗
-        (pa_stk sp0 6) ↦₈ (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
+        (pa_stk sp0 1) ↦₈[KT0] (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
+        (pa_stk sp0 2) ↦₈[KT0] (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
+        (pa_stk sp0 3) ↦₈[KT0] (m !!! Regidx (mword_of_int 9 : mword 5) : mword 64) -∗
+        (pa_stk sp0 4) ↦₈[KT0] (m !!! Regidx (mword_of_int 18 : mword 5) : mword 64) -∗
+        (pa_stk sp0 5) ↦₈[KT0] (m !!! Regidx (mword_of_int 19 : mword 5) : mword 64) -∗
+        (pa_stk sp0 6) ↦₈[KT0] (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
         wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
-          ∀ mr, sie_cap_gpr mr K b pcur -∗
+          ∀ mr, sie_cap_gpr KT0 mr K b pcur -∗
           cpu_own ncnt eb pcur b lks -∗
           pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
           kalloc_avail γk (Some (length (p0 :: rest))) -∗
@@ -674,7 +674,7 @@ Section ProofFreerange.
         iDestruct (cpu_own_transport CID0 CIDb2 ncnt eb pcur b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         (* ---- kfree(p) ---- *)
-        iApply (Kfree.wp_kfree_sconf γl γk lk fl M2 on ncnt eb pcur (K - 6) b lks
+        iApply (Kfree.wp_kfree_sconf KT0 γl γk lk fl M2 on ncnt eb pcur (K - 6) b lks
                   ltac:(lia)
                   Hlk Hfl
                   ltac:(lia)

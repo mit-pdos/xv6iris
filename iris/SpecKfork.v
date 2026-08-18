@@ -171,7 +171,6 @@ Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -182,8 +181,7 @@ Local Open Scope Z_scope.
    allocproc's UNCOUNTED core, [wp_allocproc_core_body] (48) -- deeper than
    uvmcopy (42), freeproc (44), filedup/idup (14 apiece), acquire/release
    (10), myproc (10), safestrcpy (2). *)
-Definition K_kfork : nat := 56%nat.
-
+Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -191,7 +189,7 @@ Definition kfork_post
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
-  ( sie_cap_gpr mr K b pme ∗
+  ( sie_cap_gpr KT1 mr K b pme ∗
     cpu_own lvl eb pme b lks ∗
     (* THE PARENT COMES BACK VERBATIM on every arm -- kfork only reads it.
        Its cwd reference comes back INSIDE it: idup halves the fraction on
@@ -236,10 +234,9 @@ Definition wp_kfork_sconf_body
      released; allocproc's "proc" (9), the fd scan's "ftable"/"itable" and
      kalloc/uvmcopy's "kmem" all follow by [LockRank.locks_below_mono]. *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

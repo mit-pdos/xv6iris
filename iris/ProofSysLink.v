@@ -125,6 +125,7 @@ Require Import SpecWritei.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import SpecNamex.
+Require Import SpecPrintk.
 Require Import SpecNamei.
 Require Import SpecNameiparent.
 Require Import CodeSysLink.
@@ -521,6 +522,13 @@ Lemma sl_wi_mono (crb crd cru al ind : bool) :
   (wi16_spend crb crd cru al ind <= wi16_spend crb crd false al ind)%nat.
 Proof. destruct crb, crd, cru, al, ind; vm_compute; lia. Qed.
 
+Lemma sl_sub_le (n k : nat) : (n - k <= n)%nat.
+Proof. lia. Qed.
+
+Lemma sl_atomic_lt16 (tot : nat) :
+  (tot = 0%nat \/ tot = 16%nat) -> (tot < 16)%nat -> tot = 0%nat.
+Proof. lia. Qed.
+
 (* ARM G, the success append: the parent's free and then [iput(ip)]. *)
 Lemma sl_ok_close (crb crd cru al ind w1 w2 wd : bool) (n2 n3 n4 : nat) :
   sl_crok crb w1 w2 -> (sl_u3 w1 w2 <= n2)%nat ->
@@ -726,9 +734,10 @@ Section ProofSysLinkBody.
     destruct (sl_kb K HK) as (Kna & Knp & Kdl & Kar & Kbo & Keo & Kil & Kiu
                               & Kiupd & Kip & Kiup & K10 & K38 & Kpop).
     set (sp0 := m !!! Regidx csp_rs1).
-    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpanic #Hprk #Hbio #Hlog Hseam
+    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hprk #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+    iPoseProof (printk_env_panic with "Hprk") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
@@ -1170,7 +1179,7 @@ Section ProofSysLinkBody.
         iApply (BeginOp.wp_begin_op_sconf (CID := CID20) gs j gl bn g gfs cov
                   logstart dev pid (DfracOwn (1/4)) Q0 (K - 38)%nat eb b lks
                   ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hlog Hpidq Hprocs").
+                  with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID21 Hq21 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
@@ -1230,7 +1239,7 @@ Section ProofSysLinkBody.
                   ltac:(exact Kna) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl Heb
-                  with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hkenv Hitab Hitinv
+                  with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                         Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                         Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir2 HopS").
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
@@ -1344,7 +1353,7 @@ Section ProofSysLinkBody.
                     R0 (K - 38)%nat eb b lks
                     ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
                     (Hlb "bcache"%string)
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hesck
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                           Hireg Hslkk Hshr Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -1366,7 +1375,7 @@ Section ProofSysLinkBody.
           iEval (rewrite /i_type) in "Hity".
           iEval (rewrite /i_nlink) in "Hinl".
           (* ===== +0x46 lh a4,68(s1) -- ip->type ===== *)
-          iApply (wp_lh_s_sconf (CID := CID28) (mword_of_int (SL + 0x46)) Ra4 Rs1
+          iApply (wp_lh_s_sconf (CID := CID28) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x46)) Ra4 Rs1
                     (mword_of_int 68 : mword 12) mil (K - 38)%nat
                     (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
                     with "Hcg Hpc Hi46 [Hity]").
@@ -1454,7 +1463,7 @@ Section ProofSysLinkBody.
                        Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                        (sl_regs_sp _ _ _ _ _ HR2regs)
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
-                       with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                              Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep
                              Hidev Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
@@ -1493,7 +1502,7 @@ Section ProofSysLinkBody.
                              = mword_of_int (SL + 0x50)) by pcw.
              iEval (rewrite Hpp50) in "Hpc".
              (* ===== +0x50 lh a5,74(s1) -- ip->nlink, SIGN extended ===== *)
-             iApply (wp_lh_s_sconf (CID := CID31) (mword_of_int (SL + 0x50)) Ra5 Rs1
+             iApply (wp_lh_s_sconf (CID := CID31) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x50)) Ra5 Rs1
                        (mword_of_int 74 : mword 12) R2 (K - 38)%nat
                        (di_nlink dn : mword 16) b ltac:(nz) ltac:(rdok)
                        with "Hcg Hpc Hi50 [Hinl]").
@@ -1607,7 +1616,7 @@ Section ProofSysLinkBody.
                           Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                           (sl_regs_sp _ _ _ _ _ HR5regs)
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
-                          with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam
+                          with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                 Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
                                 Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
@@ -1712,7 +1721,7 @@ Section ProofSysLinkBody.
                                 = mword_of_int (SL + 0x60)) by pcw.
                 iEval (rewrite Hpp60) in "Hpc".
                 (* ===== +0x60 sh a5,74(s1) ===== *)
-                iApply (wp_sh_s_sconf (CID := CID37) (mword_of_int (SL + 0x60))
+                iApply (wp_sh_s_sconf (CID := CID37) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x60))
                           Ra5 Rs1 (mword_of_int 74 : mword 12) S0 (K - 38)%nat
                           (di_nlink dn : mword 16) b with "Hcg Hpc Hi60 [Hinl]").
                 { iEval (rgne; rewrite HS0s1). iExact "Hinl". }
@@ -1784,12 +1793,15 @@ Section ProofSysLinkBody.
                           Hiblk Hiblog Hinb
                           ltac:(exact (sl_setnl_type_stable dn _))
                           ltac:(rewrite /sl_incnl sl_setnl_type; exact Htynz)
-                          ltac:(discriminate)
+                          ltac:(intros od Hc; discriminate Hc)
+                          ltac:(intros _; rewrite /sl_incnl sl_setnl_type;
+                                exact (sl_tdir_zne _ Hty))
+                          ltac:(intros pv Hc; discriminate Hc)
                           ltac:(rewrite /sl_incnl; apply sl_setnl_nlink)
                           Hnl
                           ltac:(rewrite /sl_incnl sl_setnl_addrs; exact Haddreq)
                           Hdirlen Hj Hgl HS2a0 Heb (Hlb "log"%string)
-                          with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hidev Hiinum
+                          with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum
                                 Hmeta Hmap Hsbi Hireg Hdiat Hpidq Hprocs Hdev
                                 Hgeo Hdlk Hbs2 HopS").
                 iIntros (CID41 Hq41 miu)
@@ -1888,7 +1900,7 @@ Section ProofSysLinkBody.
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
                           S4 (K - 38)%nat eb pj b lks
                           ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
-                          with "Hcg Hown Htext Hpc Hpanic Hitinv Hesck Hslkk
+                          with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hslpid Hpidq Hprocs Hdep Hidev Hiinum
                                 Hivalid Hload Hshot2").
                 iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr".
@@ -1985,7 +1997,7 @@ Section ProofSysLinkBody.
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb
                           Hpcstr2 (sl_plen_lt pk2 Hpk2)
                           ltac:(exact (sl_walk2_need _ w1 c1 Hu2)) Hj Hgl Heb
-                          with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hkenv Hitab
+                          with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab
                                 Hitinv Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk
                                 Hsbb Hsbi Hbmres Hpidq Hcwd Hcwdref [Hbufw]
                                 [Hnm14] Hbsl Hir2 HopS").
@@ -2004,7 +2016,7 @@ Section ProofSysLinkBody.
                   by exact (sl_regs_cs m sp0 _ _ T2 mnp Hcsnp HT2regs).
                 assert (Hmem2 : IBLOCK inum inodestart
                                 ∈ (Sb1 ∪ {[IBLOCK inum inodestart]}))
-                  by set_solver.
+                  by (apply elem_of_union_r, elem_of_singleton; reflexivity).
                 assert (Hmem2' : IBLOCK inum inodestart ∈ Sb2)
                   by exact (HSb2 _ Hmem2).
                 (* ===== +0x7c c.mv s2,a0 ===== *)
@@ -2134,7 +2146,7 @@ Section ProofSysLinkBody.
                              U0 (K - 38)%nat eb b lks
                              ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
                              HU0a0 (Hlb "bcache"%string)
-                             with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv
+                             with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv
                                    Hescd Hireg Hslkd0 Hshrd Hsbi Hpidq Hprocs Hdev
                                    Hgeo Hdlk Hbs1d").
                    { rewrite Heb /trap_csrs_ext. done. }
@@ -2187,7 +2199,7 @@ Section ProofSysLinkBody.
                    iDestruct "Hmetad" as "(Hityd & Himajd & Himind & Hinld & Hiszd)".
                    iEval (rewrite /i_nlink) in "Hinld".
                    (* ===== +0x84 lh a5,74(s2) : dp->nlink ===== *)
-                   iApply (wp_lh_s_sconf (CID := CID52) (mword_of_int (SL + 0x84))
+                   iApply (wp_lh_s_sconf (CID := CID52) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x84))
                              Ra5 Rs2 (mword_of_int 74 : mword 12) mild
                              (K - 38)%nat (di_nlink dnd : mword 16) b
                              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 [Hinld]").
@@ -2281,7 +2293,7 @@ Section ProofSysLinkBody.
                                (sl_regs_sp _ _ _ _ _ HUgregs)
                                (sl_regs_thr _ _ _ _ _ HUgregs) HUgs1 HUgs2 Hal
                                Hncd
-                               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam
+                               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
                                      Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
                                      Hslpidd
@@ -2340,7 +2352,7 @@ Section ProofSysLinkBody.
                    iEval (rewrite Hpp8c) in "Hpc".
                    (* ===== +0x8c lw a4,0(s2) -- dp->dev ===== *)
                    iEval (rewrite /i_dev) in "Hidevd".
-                   iApply (wp_lw_s_sconf (CID := CID53) (mword_of_int (SL + 0x8c))
+                   iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (CID := CID53) (mword_of_int (SL + 0x8c))
                              Ra4 Rs2 (mword_of_int 0 : mword 12) U1 (K - 38)%nat
                              dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8c [Hidevd]").
                    { iEval (rgne; rewrite HU1s2). iExact "Hidevd". }
@@ -2372,7 +2384,7 @@ Section ProofSysLinkBody.
                       rides along to the reassembly at +0xa0 below. *)
                    iDestruct "Hkeep"
                      as "(Hkfrag & Hklive & (Hipdev & Hipinum) & Hkshare)".
-                   iApply (wp_clw_s_sconf (CID := CID54) (mword_of_int (SL + 0x90))
+                   iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (CID := CID54) (mword_of_int (SL + 0x90))
                              Ra5 Rs1 (mword_of_int 0 : mword 12) U2 (K - 38)%nat
                              dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi90 [Hipdev]").
                    { iEval (rgne; rewrite HU2s1). iExact "Hipdev". }
@@ -2408,7 +2420,7 @@ Section ProofSysLinkBody.
                                    = mword_of_int (SL + 0x96)) by pcw.
                    iEval (rewrite Hpp96) in "Hpc".
                    (* ===== +0x96 c.lw a2,4(s1) -- ip->inum ===== *)
-                   iApply (wp_clw_s_sconf (CID := CID56) (mword_of_int (SL + 0x96))
+                   iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (CID := CID56) (mword_of_int (SL + 0x96))
                              Ra2 Rs1 (mword_of_int 4 : mword 12) U3 (K - 38)%nat
                              inum b ltac:(nz) ltac:(rdok)
                              with "Hcg Hpc Hi96 [Hipinum]").
@@ -2512,6 +2524,18 @@ Section ProofSysLinkBody.
                              ltac:(rewrite Hcnib;
                                    exact (Hddok ltac:(rewrite Htyd;
                                                       vm_compute; reflexivity)))
+                             (* THE BORROWED LICENCE, LEFT DISJUNCT: earned by
+                                sys_link's OWN orphan guard at [sysfile.c:161]
+                                ([if(dp->nlink == 0) goto bad;], the +0x84/+0x88
+                                pair above).  The fall-through REFUTED it and
+                                left [Hdnl0], so the directory this [dirlink]
+                                appends into is live and the inner [dirlookup]'s
+                                [iget] needs no name-side excuse.
+                                (fs-fragments.md §7.5.6, the sys_link row.) *)
+                             ltac:(left; clear -Hdnl0; intro Hc; apply Hdnl0;
+                                   apply bv_eq; rewrite Hc; vm_compute;
+                                   reflexivity)
+                             Hdocd
                              ltac:(exact (di_type_stable_refl _))
                              ltac:(exact (di_nlink_stable_refl _
                                      (proj1 (proj2 (proj2 (proj2 Hdiok))))))
@@ -2524,15 +2548,15 @@ Section ProofSysLinkBody.
                              Hbm0 Hbmcov Hbmlog Hcovb Hiregb
                              ltac:(exact (sl_dl_need_ok _ w1 w2 _ n2 Hcrok2 Hu3))
                              Hj Hgl HU6a0 HU6a2 Heb (Hlb "log"%string)
-                             with "Hcg Hown Htext Hpc Hpanic Hdata Hprk Hbio Hlog
+                             with "Hcg Hown Htext Hpc Hdata Hprk Hbio Hlog
                                    Hkenv Hidevd Hiinumd Hmetad Hmapd Hblocksd
                                    [Hnm14] Hsbi Hsbs Hsbb Hbmres Hireg Hdiatd Hpidq
                                    Hprocs Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows
-                                   Hslks Hir1c HopS").
+                                   Hslks Hir1c Hdlnkd HopS").
                    { iEval (rewrite HU6a1). iExact "Hnm14". }
                    iIntros (CID60 Hq60 mdl found bmd' datd' dnd' dnd0' n3 used3 Sb3 tot)
                      "%Hcsdl Hcg Hown Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
-                      Hnm14 Hsbi Hsbs Hsbb Hbmres Hdiatd Hpidq Hbsl Hir1c %Hn3
+                      Hnm14 Hsbi Hsbs Hsbb Hbmres Hdiatd Hpidq Hbsl Hir1c Hdlnkd %Hn3
                       %HSb3 %Hdlp %Hfnd HopS %Hcapd %Hsizedd %Harm".
                    iEval (rewrite HU6a1) in "Hnm14".
                    assert (Hpca0 : ret_pc (U6 !!! Regidx Rra : mword 64)
@@ -2641,7 +2665,7 @@ Section ProofSysLinkBody.
                                  (sl_regs_sp _ _ _ _ _ Hdlregs)
                                  (sl_regs_thr _ _ _ _ _ Hdlregs) Hdls1 Hdls2 Hal
                                  Hncd
-                                 with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam
+                                 with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
                                        Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
                                        Hslpidd
@@ -2691,6 +2715,10 @@ Section ProofSysLinkBody.
                                                 (dir_nrec (bv_unsigned (di_size dnd)))
                                          + tot)))
                          by (rewrite Hdne; exact (sl_wi_size_max dnd bmd' _ tot Hoff32)).
+                       assert (Hszmono :
+                                 (bv_unsigned (di_size dnd)
+                                  <= bv_unsigned (di_size dnd'))%Z)
+                         by (clear -Hszmax; rewrite Hszmax; lia).
                        assert (Hddok' : dir_ok icfg_nib dnd' datd').
                        { apply (dir_ok_dirlink icfg_nib dnd dnd' datd datd'
                                  (sl_low16 inum) (bname 14 nf)
@@ -2710,7 +2738,7 @@ Section ProofSysLinkBody.
                                  (dir_nrec (bv_unsigned (di_size dnd)))
                                  (dir_slot datd (dir_nrec (bv_unsigned (di_size dnd))))
                                  tot eq_refl eq_refl Htotle Htyeq Hnleq
-                                 ltac:(rewrite Hszmax; lia) Hrng Hddixd). }
+                                 Hszmono Hrng Hddixd). }
                        (* ...and the COMPLEMENT clause, which the KERNEL FIX
                           is what makes free: xv6 f60ff58's orphan guard at
                           +0x84 has already refused an orphaned parent, so
@@ -2753,6 +2781,10 @@ Section ProofSysLinkBody.
                                     (proj2 (proj2 (proj2 (proj2 (proj2 (proj2 Hdiok))))))). }
                        destruct Hbl as [[Ha0z Ht16] | [Ha0m Htlt]].
                        ++++ (* ====== ARM G: the whole record went in ====== *)
+                            assert (Htot2 : (2 <= tot)%nat)
+                              by (clear -Ht16; lia).
+                            assert (Htotpos : (0 < tot)%nat)
+                              by (clear -Ht16; lia).
                             iApply (wp_blt_x0_fall_s_sconf (CID := CID60)
                                       (mword_of_int (SL + 0xa0))
                                       (mword_of_int 78 : mword 13) Ra0 mdl
@@ -2774,16 +2806,35 @@ Section ProofSysLinkBody.
                                          (bname 14 nf)
                                          (dir_slot datd
                                             (dir_nrec (bv_unsigned (di_size dnd))))
-                                         tot ltac:(lia) Hrng with "[Hilink]")
+                                         tot Htot2 Hrng with "[Hilink]")
                               as "Hk0".
                             { rewrite Hli. iExact "Hilink". }
+                            (* V5': the appended slot is not the [".."] the
+                               parent tie names.  [DirLinks.dir_slot_dots_ge2]
+                               reads it off the dots clause under ARM E2's
+                               own live-parent fall-through. *)
+                            assert (Hslot1 : dir_slot datd
+                                     (dir_nrec (bv_unsigned (di_size dnd)))
+                                     <> 1%nat).
+                            { pose proof (dir_slot_dots_ge2 (bv_unsigned dinum)
+                                            dnd datd
+                                            (dir_nrec (bv_unsigned (di_size dnd)))
+                                            ltac:(clear -Htyd; rewrite Htyd;
+                                                  vm_compute; reflexivity)
+                                            ltac:(clear -Hdnl0; intro Hc;
+                                                  apply Hdnl0; apply bv_eq;
+                                                  rewrite Hc; vm_compute;
+                                                  reflexivity)
+                                            Hddixd eq_refl) as Hge2.
+                              clear -Hge2. lia. }
                             iDestruct (dir_links_dirlink (bv_unsigned dinum)
                                          dnd dnd' datd datd' (sl_low16 inum)
                                          (bname 14 nf)
                                          (dir_nrec (bv_unsigned (di_size dnd)))
                                          (dir_slot datd
                                             (dir_nrec (bv_unsigned (di_size dnd))))
-                                         tot eq_refl eq_refl Htotle Htyeq Hnleq
+                                         tot eq_refl eq_refl Htotle Hslot1
+                                         Htyeq Hnleq
                                          Hszmax Hrng with "Hk0 Hdlnkd") as "Hdlnkd'".
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd]"
@@ -2801,7 +2852,7 @@ Section ProofSysLinkBody.
                               iFrame "Ha Hi Hblocksd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
-                            destruct (Hmemtrio ltac:(lia))
+                            destruct (Hmemtrio Htotpos)
                               as (Hmtgt & Hmiblk & Hmbmap).
                             (* ===== +0xa4 c.mv a0,s2 ===== *)
                             iApply (wp_cmv_s_sconf (CID := CID61)
@@ -2848,7 +2899,8 @@ Section ProofSysLinkBody.
                                   [exact Hcsra | exact HW0regs]).
                             assert (Hiu3 : (iput_units <= n3)%nat)
                               by exact (proj1 (sl_ok_close _ _ _ _ _ w1 w2 false
-                                          n2 n3 n3 Hcrok2 Hu3 Hspend ltac:(lia))).
+                                          n2 n3 n3 Hcrok2 Hu3 Hspend
+                                          (sl_sub_le _ _))).
                             iDestruct (log_opS_named with "HopS") as (e0) "HopE".
                             iDestruct (cpu_own_transport CID60 CID63 0 eb pj b
                                          ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -2866,7 +2918,7 @@ Section ProofSysLinkBody.
                                       Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk
                                       Hdiblog Hdinb Hcovb Hiu3 Hj Hgl HW1a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hslkd0 Hslkdd
                                             Hslpidd Hdepd Hidevd Hiinumd Hivalidd
                                             Hloadd Hshotd3 Hkeepd Hsbb Hsbi Hbmres
@@ -2951,7 +3003,7 @@ Section ProofSysLinkBody.
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hesck Hireg Hslkk Hrefip
                                             Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl [HopS]").
@@ -2997,7 +3049,7 @@ Section ProofSysLinkBody.
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
                                       ltac:(exact Keo) Hgeom Hj Hgl
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
@@ -3156,7 +3208,7 @@ Section ProofSysLinkBody.
                             { right. rewrite Ha0f HW7a5. reflexivity. }
                        ++++ (* ====== ARM F-0: the EMPTY append ====== *)
                             assert (Htot0 : tot = 0%nat)
-                              by (destruct Hatom as [Hz | Hs]; [exact Hz | lia]).
+                              by exact (sl_atomic_lt16 tot Hatom Htlt).
                             iApply (wp_blt_x0_taken_s_sconf (CID := CID60)
                                       (mword_of_int (SL + 0xa0))
                                       (mword_of_int 78 : mword 13) Ra0 mdl
@@ -3241,7 +3293,7 @@ Section ProofSysLinkBody.
                                       (sl_regs_sp _ _ _ _ _ Hdlregs)
                                       (sl_regs_thr _ _ _ _ _ Hdlregs) Hdls1 Hdls2 Hal
                                       Hncd
-                                      with "Hcg Hown Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
                                             Hireg Hslkk Hslkd0 Hkeep Hshr Hshot2
                                             Hilink
@@ -3326,7 +3378,7 @@ Section ProofSysLinkBody.
                              (sl_regs_sp _ _ _ _ _ HT3regs)
                              (sl_regs_thr _ _ _ _ _ HT3regs)
                              (sl_regs_s1 _ _ _ _ _ HT3regs) Hal Hncd
-                             with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                             with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                                    Hitab Hitinv Hesck Hireg Hslkk Hkeep Hshr
                                    Hshot2 Hilink Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
@@ -3375,7 +3427,7 @@ Section ProofSysLinkBody.
                     ltac:(reflexivity)
                     (sl_regs_sp _ _ _ _ _ HQ3regs) (sl_regs_thr _ _ _ _ _ HQ3regs)
                     HQ3s2 Hal
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
                           HbN HbW HbO
                           [Hbsl Hsbb Hsbi Hsbs Hbmres Hir1 Hir2b Hcwd Hcwdref

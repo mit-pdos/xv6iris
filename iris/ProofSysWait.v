@@ -70,13 +70,13 @@ Qed.
    [nat]/[Z] in scope: an inline [ltac:(lia)] answers "Cannot find witness"
    under the zify hook once the context carries [bv_unsigned]s. *)
 Lemma sw_frame (av : nat) : (sys_wait_stack <= av)%nat -> (4 <= av)%nat.
-Proof. unfold sys_wait_stack, K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_Kaa (av : nat) : (sys_wait_stack <= av)%nat -> (argaddr_stack <= av - 4)%nat.
-Proof. unfold sys_wait_stack, K_kwait, argaddr_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_Kkw (av : nat) : (sys_wait_stack <= av)%nat -> (K_kwait <= av - 4)%nat.
-Proof. unfold sys_wait_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_back (av : nat) : (sys_wait_stack <= av)%nat -> ((av - 4) + 4)%nat = av.
-Proof. unfold sys_wait_stack, K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_ilvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
 Lemma sw_arg0 : (0 < NARG)%nat.
@@ -104,7 +104,7 @@ Section ProofSysWait.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs
              #Hlk #Henv Hpriv Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
@@ -136,7 +136,7 @@ Section ProofSysWait.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -297,7 +297,7 @@ Section ProofSysWait.
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb b pid V lks
               Hj Hgl (sw_Kkw av Hav) Heb
-              with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk Henv Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hpriv").
     all: try lkbelow.
     iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpriv".
     destruct Hkw as (HcsKw & HKwa0).
@@ -353,8 +353,8 @@ Section ProofSysWait.
                    = pa_stk (add_vec (E1 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HE1sp).
-    iAssert (stack_own sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1". { iExists _. iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iExact "Hb3". }

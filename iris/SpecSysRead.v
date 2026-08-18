@@ -149,7 +149,7 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -182,8 +182,7 @@ Local Open Scope Z_scope.
    fileread wants [fileread_stack] = 76, which dominates argfd's 24 and
    argint's / argaddr's 18.  An expression, not a literal, so a change to
    readi's budget cannot silently leave this one behind. *)
-Definition sys_read_stack : nat := (6 + fileread_stack)%nat.
-
+Notation sys_read_stack := ((6 + fileread_stack)%nat) (only parsing).
 (* THE COUNT THAT REACHES file.c, as a function of the trapframe word the
    user wrote: argint's [c.sw] narrowing followed by the [lw]'s sign
    extension.  Shared with sys_write, whose +0x30 is the same instruction. *)
@@ -290,13 +289,16 @@ Definition wp_sys_read_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol): every fileread arm
      sleeps, so this syscall parks. *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* a syscall runs at push_off level 0 *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* fileread itself never panics on a well-typed file; its default arm and
      its callees do, and this is theirs *)
-  panic_wp_any -∗
+  (* fileread's default arm calls [panic("fileread")], which is an ordinary
+     call: [kernel_data] above mints the literal, and this is the console
+     bundle printk needs.  Persistent, and syscall already holds it. *)
+  panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
@@ -312,7 +314,7 @@ Definition wp_sys_read_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_read_ret V v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗

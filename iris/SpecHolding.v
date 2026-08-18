@@ -19,7 +19,7 @@
 
    THE EVIDENCE-FREE FORM IS GONE.  It concluded [a0 = 0 ∨ a0 = 1] -- all a
    caller with no evidence at all can know -- and its only client was
-   acquire, which had to close the 1 arm with [PanicStub.panic_wp_any].
+   acquire, which had to close the 1 arm with the placeholder panic credential.
    Since the held-set authority is already inside acquire's [cpu_own], the
    evidence costs the call site nothing and the arm goes away instead.
 
@@ -60,7 +60,7 @@ Import Defs.
    also makes the holder token's hart identity track a SINGLE ambient [CID]
    throughout the body (no migrated-hart mismatch can arise at the +0x12
    [lk->cpu] read below). *)
-Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) (lks : gset string) :=
+Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -71,7 +71,7 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
      authority below is what turns it into a fact about [lk->cpu]. *)
   s ∉ lks ->
   (⊢ Tc -∗ Dc -∗ False) ->
-  sie_cap_gpr m n false p -∗
+  sie_cap_gpr kt m n false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka s R Dc -∗
   Tc -∗
@@ -82,7 +82,7 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
   ( ∀ mh,
     Tc -∗
     cpu_locks lks -∗
-    sie_cap_gpr mh n false p -∗
+    sie_cap_gpr kt mh n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
       mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) ⌝ -∗
@@ -97,7 +97,7 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
    where a [b]-generic statement would otherwise hand that leaf a token about
    the entry hart while it demands one about its own (post-migration)
    ambient hart. *)
-Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) :=
+Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -108,12 +108,12 @@ Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lock
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   (6 <= n)%nat ->
   (⊢ locked γl held_cpu -∗ Dc -∗ False) ->
-  sie_cap_gpr m n false p -∗
+  sie_cap_gpr kt m n false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka s R Dc -∗
   locked γl held_cpu -∗
   ( ∀ mh,
-    sie_cap_gpr mh n false p -∗
+    sie_cap_gpr kt mh n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
       mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
@@ -123,9 +123,9 @@ Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lock
 
 Module Type HOLDING.
   Parameter wp_holding_lockinv_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) (lks : gset string),
-      wp_holding_lockinv_s_sconf_body γl lka s R Tc Dc m n p lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) (lks : gset string),
+      wp_holding_lockinv_s_sconf_body kt γl lka s R Tc Dc m n p lks.
   Parameter wp_holding_lockinv_locked_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64),
-      wp_holding_lockinv_locked_s_sconf_body γl lka s R Dc m n p.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64),
+      wp_holding_lockinv_locked_s_sconf_body kt γl lka s R Dc m n p.
 End HOLDING.

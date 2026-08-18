@@ -234,9 +234,9 @@ Section KexecDName.
            M' !!! Regidx Ra5 = pa_add pv (S (S i))⌝
           ∗ pc_is (mword_of_int (KXD + 0x2c8) : mword 64)
         ∨ pc_is (mword_of_int (KXD + 0x2d2) : mword 64) ) -∗
-        sie_cap_gpr M' n b pj -∗
-        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-        word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
+        sie_cap_gpr KT1 M' n b pj -∗
+        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -258,9 +258,9 @@ Section KexecDName.
     M !!! Regidx Ra5 = pa_add pv (S i) ->
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2c0) : mword 64) -∗
-    sie_cap_gpr M n b pj -∗
-    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    sie_cap_gpr KT1 M n b pj -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -312,7 +312,7 @@ Section KexecDName.
                         = pa_add pv (S i))
       by (rewrite HN1a5; apply pa_add_pred).
     iEval (rewrite -Hloadaddr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2c2)) Ra4 Ra5
               (mword_of_int 4095 : mword 12) N1 n (pfun (S i)) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c2 Hbyte").
     iIntros (CID2 Hs2) "Hcg Hpc Hbyte".
@@ -419,9 +419,9 @@ Section KexecDName.
     M !!! Regidx Ra5 = pa_add pv (S i) ->
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
-    sie_cap_gpr M n b pj -∗
-    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    sie_cap_gpr KT1 M n b pj -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -526,9 +526,9 @@ Section KexecDName.
     M !!! Regidx Ra5 = pa_add pv (S i) ->
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
-    sie_cap_gpr M n b pj -∗
-    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    sie_cap_gpr KT1 M n b pj -∗
+    ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (M' : regfile) (q' : nat),
         ⌜(q' <= plen)%nat /\
@@ -537,9 +537,9 @@ Section KexecDName.
           M' !!! Regidx Rs4 = v4 /\ M' !!! Regidx Rs5 = v5 /\
           M' !!! Regidx Rs6 = v6 /\ M' !!! Regidx Rs10 = v10⌝ -∗
         pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
-        sie_cap_gpr M' n b pj -∗
-        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-        word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
+        sie_cap_gpr KT1 M' n b pj -∗
+        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -641,16 +641,16 @@ Section KexecDCommit.
   Lemma kxd_win8 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 8 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 8 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
-    ((pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢
+    (pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
+    ((pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
     rewrite (bb_split3 a o 8 r n f Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro _ _ _ Hal).
+    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
@@ -758,11 +758,11 @@ Section KexecDCommit.
      bslots bn 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv Vc ∗
-     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
-     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameB sp0 ra0 s00 s10 s20 last (pa_add av (8 * c))
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
 
@@ -902,7 +902,7 @@ Section KexecDCommit.
     M !!! Regidx Rs10 = pv_sz V ->
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
-    sie_cap_gpr M (K - 68)%nat true (proc_addr jp) -∗
+    sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) -∗
     cpu_own 0 true (proc_addr jp) true ∅ -∗
     kalloc_env ga None -∗
     kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
@@ -917,7 +917,7 @@ Section KexecDCommit.
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-        sie_cap_gpr mf K true (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
         cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -926,8 +926,8 @@ Section KexecDCommit.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -943,7 +943,7 @@ Section KexecDCommit.
        exit's [alen na] and the state's [alen c] are the same term.  [subst
        na], not [subst c]: the block's own text is written in [c]. *)
     subst na.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hpc Hcg Hcnt #Hka Hres Hcont".
     rewrite /kxd_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & Hpt & Hpriv &
@@ -1118,7 +1118,7 @@ Section KexecDCommit.
       destruct Hcstr as [_ Hnul].
       assert (Hqp : (q + (plen - q))%nat = plen) by lia.
       rewrite Hqp. exact Hnul. }
-    iApply (SS.wp_safestrcpy_sconf E4 PNAMELEN (S plen - q)%nat
+    iApply (SS.wp_safestrcpy_sconf KT0 KT1 E4 PNAMELEN (S plen - q)%nat
               (fun j => pfun (q + j)%nat) (kxd_name_fn (pv_name V))
               (K - 68)%nat (DfracOwn 1) true (proc_addr jp)
               ltac:(unfold PNAMELEN; lia)
@@ -1132,7 +1132,7 @@ Section KexecDCommit.
     iEval (rewrite Hpc2e0) in "Hpc".
     (* ---- put both buffers back ---- *)
     iEval (rewrite HE4a1) in "Hsrc".
-    iAssert ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k)%I
+    iAssert ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k)%I
       with "[Hpre Hsrc Hsuf]" as "Hpath".
     { iEval (rewrite (bb_split3 pv q (S plen - q) 0 (S plen) pfun Hsplit3)).
       iSplitL "Hpre"; [iExact "Hpre" |].
@@ -1202,7 +1202,7 @@ Section KexecDCommit.
                       = p_pagetable (proc_addr jp))
       by (rewrite HF0s5; reflexivity).
     iEval (rewrite -Hppaddr) in "Hppt".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2e0)) Ra0 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e0)) Ra0 Rs5
               (mword_of_int 80 : mword 12) mr (K - 68)%nat
               (page_base (ud_root (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2e0 Hppt").
@@ -1237,7 +1237,7 @@ Section KexecDCommit.
                        = p_pagetable (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hppaddr1) in "Hppt".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2e4)) Rs6 Rs5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e4)) Rs6 Rs5
               (mword_of_int 80 : mword 12) F1 (K - 68)%nat
               (page_base (ud_root (pv_upt V))) true
               with "Hcg Hpc Hi2e4 Hppt").
@@ -1252,7 +1252,7 @@ Section KexecDCommit.
                       = p_sz (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hszaddr) in "Hpsz".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2e8)) Rs4 Rs5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e8)) Rs4 Rs5
               (mword_of_int 72 : mword 12) F1 (K - 68)%nat (pv_sz V) true
               with "Hcg Hpc Hi2e8 Hpsz").
     iIntros (CID8 Hs8) "Hcg Hpc Hpsz". iEval (rewrite Hszaddr) in "Hpsz".
@@ -1266,7 +1266,7 @@ Section KexecDCommit.
                       = p_trapframe (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Htfaddr) in "Hptf".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2ec)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2ec)) Ra5 Rs5
               (mword_of_int 88 : mword 12) F1 (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2ec Hptf").
@@ -1363,7 +1363,7 @@ Section KexecDCommit.
       { unfold tf_epc_idx. lia. }
       unfold tf_epc_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr24) in "Hword3".
-    iApply (wp_csd_s_sconf (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
+    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
               (mword_of_int 24 : mword 12) F3 (K - 68)%nat u3 true
               with "Hcg Hpc Hi2f4 Hword3").
     iIntros (CID11 Hs11) "Hcg Hpc Hword3". iEval (rewrite Haddr24) in "Hword3".
@@ -1378,7 +1378,7 @@ Section KexecDCommit.
                        = p_trapframe (proc_addr jp))
       by (rewrite HF3s5; reflexivity).
     iEval (rewrite -Htfaddr2) in "Hptf".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2f6)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f6)) Ra5 Rs5
               (mword_of_int 88 : mword 12) F3 (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2f6 Hptf").
@@ -1428,7 +1428,7 @@ Section KexecDCommit.
       { unfold kxc_tf_sp_idx. lia. }
       unfold kxc_tf_sp_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr48) in "Hword6".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
               (mword_of_int 48 : mword 12) F4 (K - 68)%nat u6 true
               with "Hcg Hpc Hi2fa Hword6").
     iIntros (CID13 Hs13) "Hcg Hpc Hword6". iEval (rewrite Haddr48) in "Hword6".
@@ -1732,7 +1732,7 @@ Section KexecDCommit.
       iSplitL "Hf12"; [by iExists (m !!! Regidx Rs10) |].
       iSplitL "Hf13"; [by iExists (m !!! Regidx Rs11) |].
       change 55%nat with (50 + 5)%nat.
-      rewrite stack_own_app (pa_stk_assoc sp0 13 50).
+      rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Amid50"; [iExact "Amid50" | iExact "Htop5"]. }
     iApply (kxc_epi_frame m G10 K sp0 ra0 s00 s10 s20 (proc_addr jp) true
               ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms2 HG10sp HG10thr
@@ -1820,8 +1820,8 @@ Section KexecDMain.
      solved, and fails with "cannot instantiate ?b because pv is not in its
      scope". *)
   Lemma kxd_last_at0 (sp0 pv : mword 64) :
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv 0).
+    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv 0).
   Proof. rewrite pa_add_0. iIntros "H". iExact "H". Qed.
 
   (* [c.addi a5,a5,1] at +0x2b8 steps [path] to [path + 1] *)
@@ -1878,7 +1878,7 @@ Section KexecDMain.
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-        sie_cap_gpr mf K true (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
         cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1887,8 +1887,8 @@ Section KexecDMain.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -1898,7 +1898,7 @@ Section KexecDMain.
   Proof.
     intros HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hst Hcont".
     rewrite /kxc_at_2a6.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
@@ -1945,7 +1945,7 @@ Section KexecDMain.
                       = p_trapframe (proc_addr jp))
       by (rewrite HMs5; reflexivity).
     iEval (rewrite -Htfaddr) in "Hptf".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2a6)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2a6)) Ra5 Rs5
               (mword_of_int 88 : mword 12) M (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2a6 Hptf").
@@ -1988,7 +1988,7 @@ Section KexecDMain.
       { unfold tf_arg_idx. lia. }
       unfold tf_arg_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr120) in "Hword".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2aa)) Rs2 Ra5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2aa)) Rs2 Ra5
               (mword_of_int 120 : mword 12) D1 (K - 68)%nat u15 true
               with "Hcg Hpc Hi2aa Hword").
     iIntros (CID2 Hs2) "Hcg Hpc Hword".
@@ -2052,7 +2052,7 @@ Section KexecDMain.
                      = pa_add pv 0)
       by (rewrite HD2a5; apply kxd_add_zero).
     iEval (rewrite -Haddr0) in "Hbyte0".
-    iApply (wp_lbu_s_sconf (mword_of_int (KXD + 0x2b2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2b2)) Ra4 Ra5
               (mword_of_int 0 : mword 12) D2 (K - 68)%nat (pfun 0%nat) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2b2 Hbyte0").
     iIntros (CID4 Hs4) "Hcg Hpc Hbyte0". iEval (rewrite Haddr0) in "Hbyte0".
@@ -2083,8 +2083,8 @@ Section KexecDMain.
     (* the resource bundle the commit takes, assembled once and used by both
        arms of the [beqz] below *)
     iAssert (∀ (last : mword 64),
-               word_pointsto (pa_stk sp0 66) (DfracOwn 1) last -∗
-               ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
+               word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) last -∗
+               ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
                kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
                        used2 plen pfun na avf aslen afun pidv
                        (upd_tf V (<[tf_arg_idx 1
@@ -2143,7 +2143,7 @@ Section KexecDMain.
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
-                ltac:(unfold K_kexec; lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
+                ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
@@ -2276,7 +2276,7 @@ Section KexecDMain.
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
-                ltac:(unfold K_kexec; lia) Hcstr Hq' Hnamax Hsz1ge Hceq
+                ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13

@@ -63,7 +63,7 @@ Section ProofSwtch.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
-    Timeless (stack_own sp n).
+    Timeless (stack_own (KTR := KT1) sp n).
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
@@ -85,11 +85,11 @@ Section ProofSwtch.
 
   Lemma wp_swtch_sconf
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
+      (av : nat) (eb : bool) (p : mword 64) (back : bool) :
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -101,7 +101,7 @@ Section ProofSwtch.
        sie_cap into stack + strans_inv + arm ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iEval (rewrite /sie_cap) in "Hcap".
-    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -179,7 +179,8 @@ Section ProofSwtch.
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+              (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hcode [Holdcells Hnewcells] []").
     { rewrite /vheap_own /swtch_heap0 big_sepL_app.
@@ -205,9 +206,21 @@ Section ProofSwtch.
        wand.  Pack p := the spec's [p] param; the caller continuation [Hwold]
        is already [∀ m eb', … cpu_own γ 1 eb' p emp …], matching the record's
        [∀ m eb'] wand at that same p. ---- *)
-    iAssert (valid_context P Ao oldc p)
+    (* WHAT THE OLD SIDE LEAVES BEHIND, and it is one of two things.  At
+       [back = true] it is the caller's record, built from its continuation,
+       its cells and its parked stack, exactly as a coroutine crossing
+       demands.  At [back = false] the caller is not coming back: there is no
+       continuation to park (the spec asked for none) and the stack is the
+       caller's own business, so what crosses is just the CELLS the block
+       above wrote -- which is all a slot that will never be resumed can use
+       ([SchedCtx.proc_slots] at ZOMBIE wants [own_ctx] and nothing more). *)
+    iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
+    { destruct back; last first.
+      { iExists (callee_img m0). iSplitR.
+        { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
+        iExact "Holdpart". }
+      rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
       iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
@@ -275,8 +288,8 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
-    iAssert (sie_cap (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
-    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iExact "Hq0". }
+    iAssert (sie_cap KT1 (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
+    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit". iExact "Hq0". }
     (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
        rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it
        under [tp_pin] -- a no-op, since that map's own tp slot is ALREADY
@@ -295,8 +308,8 @@ Section ProofSwtch.
               with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }
-    iExists Ao, oldc. iSplitL "Hvoldc".
-    { iApply bi.later_intro. iExact "Hvoldc". }
+    iExists Ao, oldc, back. iSplitL "Hvoldc".
+    { destruct back; [iApply bi.later_intro |]; iExact "Hvoldc". }
     { rewrite Hm4. iExact "HP". }
   Qed.
 

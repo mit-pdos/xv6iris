@@ -22,7 +22,7 @@
 
    A buffer's BASE is its LOWEST address, i.e. its HIGHEST slot index, and it
    grows toward smaller indices -- which is the direction
-   [StackBytes.slotsn_bytes_own] carves in.  [ustack] ends at sp+439, abutting
+   [StackBytes.slotsn_bytes_own (KTR := KT1)] carves in.  [ustack] ends at sp+439, abutting
    s11's spill at sp+440 with ZERO slack: an off-by-one in a carve collides
    with a callee-saved spill rather than landing in padding.
 
@@ -42,7 +42,7 @@
      [add_vec s0 (sign_extend' 64 (mword_of_int 3664 : mword 12))]), each shown
      equal to its slot.
    * [kxc_slots_elf] / [kxc_bytes_elf] and the two siblings -- the carves,
-     instances of [StackBytes.slotsn_bytes_own] / [bytes_own_slotsn].
+     instances of [StackBytes.slotsn_bytes_own (KTR := KT1)] / [bytes_own_slotsn (KTR := KT1)].
    * [kxc_frame] / [kxc_frame_at] / [kxc_frame_at_weaken] -- the frame as the
      several exits agree to present it: slots 1..4 pinned, the NINE lazily
      spilled slots 5..13 (s3..s11) existential in [kxc_frame] and pinned in
@@ -189,49 +189,49 @@ Section ProofKexecParts.
 
   (* struct elfhdr elf -- 64 bytes, slots 54 down to 47. *)
   Lemma kxc_slots_elf (sp0 : mword 64) :
-    ([∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈ w) ⊢
+    ([∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈[KT1] w) ⊢
     ⌜forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 54) 64.
-  Proof. exact (slotsn_bytes_own sp0 54 8 ltac:(lia)). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 54) 64.
+  Proof. exact (slotsn_bytes_own (KTR := KT1) sp0 54 8 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_elf (sp0 : mword 64) :
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 54) 64 ⊢
-    [∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈ w.
-  Proof. exact (bytes_own_slotsn sp0 54 8 ltac:(lia)). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 54) 64 ⊢
+    [∗ list] i ∈ seq 0 8, ∃ w : mword 64, pa_stk sp0 (54 - i) ↦₈[KT1] w.
+  Proof. exact (bytes_own_slotsn (KTR := KT1) sp0 54 8 ltac:(lia)). Qed.
 
   (* struct proghdr ph -- 56 bytes, slots 61 down to 55. *)
   Lemma kxc_slots_ph (sp0 : mword 64) :
-    ([∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈ w) ⊢
+    ([∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈[KT1] w) ⊢
     ⌜forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 61) 56.
-  Proof. exact (slotsn_bytes_own sp0 61 7 ltac:(lia)). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 61) 56.
+  Proof. exact (slotsn_bytes_own (KTR := KT1) sp0 61 7 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_ph (sp0 : mword 64) :
     (forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 61) 56 ⊢
-    [∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈ w.
-  Proof. exact (bytes_own_slotsn sp0 61 7 ltac:(lia)). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 61) 56 ⊢
+    [∗ list] i ∈ seq 0 7, ∃ w : mword 64, pa_stk sp0 (61 - i) ↦₈[KT1] w.
+  Proof. exact (bytes_own_slotsn (KTR := KT1) sp0 61 7 ltac:(lia)). Qed.
 
   (* uint64 ustack[33] -- 264 bytes, slots 46 down to 14.  Slot 14 is
      sp+432..sp+439, and s11's spill is sp+440: there is NO slack here. *)
   Lemma kxc_slots_ustack (sp0 : mword 64) :
-    ([∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈ w) ⊢
+    ([∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[KT1] w) ⊢
     ⌜forall i, (i < 33)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (46 - i))) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 46) 264.
-  Proof. exact (slotsn_bytes_own sp0 46 33 ltac:(lia)). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 46) 264.
+  Proof. exact (slotsn_bytes_own (KTR := KT1) sp0 46 33 ltac:(lia)). Qed.
 
   Lemma kxc_bytes_ustack (sp0 : mword 64) :
     (forall i, (i < 33)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (46 - i))) 8 = true) ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 46) 264 ⊢
-    [∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈ w.
-  Proof. exact (bytes_own_slotsn sp0 46 33 ltac:(lia)). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 46) 264 ⊢
+    [∗ list] i ∈ seq 0 33, ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[KT1] w.
+  Proof. exact (bytes_own_slotsn (KTR := KT1) sp0 46 33 ltac:(lia)). Qed.
 
   (* =================================================================== *)
   (*  +0x72 .. +0x86 -- THE EPILOGUE.  Every exit reaches it.             *)
@@ -263,23 +263,23 @@ Section ProofKexecParts.
        have lost. *)
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 68)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 68)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
-    stack_own (pa_stk sp0 13) 55 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    stack_own (KTR := KT1) (pa_stk sp0 13) 55 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -290,7 +290,7 @@ Section ProofKexecParts.
            sp pop); everything else comes through. *)
         ⌜forall r : mword 5, r <> csp_rs1 -> r <> Rra -> r <> Rs0 ->
             r <> Rs1 -> r <> Rs2 -> mf !!! Regidx r = Mt !!! Regidx r⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -388,12 +388,12 @@ Section ProofKexecParts.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (mword_of_int 544 : mword 12))) 68)
       by (rewrite Hwv; exact HT4sp).
-    iAssert (stack_own sp0 68) with
+    iAssert (stack_own (KTR := KT1) sp0 68) with
       "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12 Hb13 Hrest]"
       as "Hframe".
     { change 68%nat with (13 + 55)%nat.
-      rewrite stack_own_app. iSplitR "Hrest"; [| iExact "Hrest"].
-      rewrite stack_own_slots. cbn [seq].
+      rewrite (stack_own_app (KTR := KT1)). iSplitR "Hrest"; [| iExact "Hrest"].
+      rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -484,20 +484,20 @@ Section ProofKexecParts.
   (*  dead by the epilogue and travel as a plain [stack_own].              *)
   (* =================================================================== *)
   Definition kxc_frame (sp0 ra0 s00 s10 s20 : mword 64) : iProp Σ :=
-    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     (∃ w5, word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5) ∗
-     (∃ w6, word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6) ∗
-     (∃ w7, word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7) ∗
-     (∃ w8, word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8) ∗
-     (∃ w9, word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9) ∗
-     (∃ w10, word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10) ∗
-     (∃ w11, word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11) ∗
-     (∃ w12, word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12) ∗
-     (∃ w13, word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13) ∗
-     stack_own (pa_stk sp0 13) 55)%I.
+    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     (∃ w5, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) ∗
+     (∃ w6, word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6) ∗
+     (∃ w7, word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7) ∗
+     (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8) ∗
+     (∃ w9, word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9) ∗
+     (∃ w10, word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10) ∗
+     (∃ w11, word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11) ∗
+     (∃ w12, word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12) ∗
+     (∃ w13, word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13) ∗
+     stack_own (KTR := KT1) (pa_stk sp0 13) 55)%I.
 
   (* ... AND THE SAME FRAME WITH THE LAZY SLOTS PINNED.                    *)
   (*                                                                       *)
@@ -509,20 +509,20 @@ Section ProofKexecParts.
   (* the exit that does not care.                                          *)
   Definition kxc_frame_at (sp0 ra0 s00 s10 s20 : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 : mword 64) : iProp Σ :=
-    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 ∗
-     word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 ∗
-     word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 ∗
-     word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 ∗
-     word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
-     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
-     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (pa_stk sp0 13) 55)%I.
+    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
+     stack_own (KTR := KT1) (pa_stk sp0 13) 55)%I.
 
   Lemma kxc_frame_at_weaken (sp0 ra0 s00 s10 s20 : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 : mword 64) :
@@ -556,7 +556,7 @@ Section ProofKexecParts.
     Mt !!! Regidx csp_rs1 = pa_stk sp0 68 ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 68)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 68)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
     kxc_frame sp0 ra0 s00 s10 s20 -∗
@@ -565,7 +565,7 @@ Section ProofKexecParts.
         ⌜callee_saved m mf⌝ -∗
         ⌜forall r : mword 5, r <> csp_rs1 -> r <> Rra -> r <> Rs0 ->
             r <> Rs1 -> r <> Rs2 -> mf !!! Regidx r = Mt !!! Regidx r⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

@@ -48,7 +48,6 @@ Require Import WaitInv.
 Require Import CodeReparent.
 Require Import SpecWakeup.
 Require Import SpecReparent.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
@@ -79,8 +78,8 @@ Definition rp_fcell (spF : mword 64) (u : Z) : mword 64 :=
 
 Definition rp_frame `{!riscvGS Σ} (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 : mword 64) : iProp Σ :=
-  (rp_fcell spF 5 ↦₈ vra ∗ rp_fcell spF 4 ↦₈ vs0 ∗ rp_fcell spF 3 ↦₈ vs1 ∗
-   rp_fcell spF 2 ↦₈ vs2 ∗ rp_fcell spF 1 ↦₈ vs3 ∗ rp_fcell spF 0 ↦₈ vs4)%I.
+  (rp_fcell spF 5 ↦₈[KT1] vra ∗ rp_fcell spF 4 ↦₈[KT1] vs0 ∗ rp_fcell spF 3 ↦₈[KT1] vs1 ∗
+   rp_fcell spF 2 ↦₈[KT1] vs2 ∗ rp_fcell spF 1 ↦₈[KT1] vs3 ∗ rp_fcell spF 0 ↦₈[KT1] vs4)%I.
 
 (* the register shape the loop threads: the cursor, the frame pointer, the
    three loop constants, and the seven callee-saved registers reparent never
@@ -133,7 +132,7 @@ Section ProofReparentEnds.
     let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     (6 <= K)%nat ->
     (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-    sie_cap_gpr m K b pme -∗
+    sie_cap_gpr KT1 m K b pme -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.reparent) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ M : regfile,
@@ -142,7 +141,7 @@ Section ProofReparentEnds.
             (m !!! Regidx (mword_of_int 23)) (m !!! Regidx (mword_of_int 24))
             (m !!! Regidx (mword_of_int 25)) (m !!! Regidx (mword_of_int 26))
             (m !!! Regidx (mword_of_int 27)) 0 ⌝ -∗
-        sie_cap_gpr M (K - 6) b pme -∗
+        sie_cap_gpr KT1 M (K - 6) b pme -∗
         pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
         rp_frame spF (m !!! Regidx (mword_of_int 1)) (m !!! Regidx (mword_of_int 8))
                      (m !!! Regidx (mword_of_int 9)) (m !!! Regidx (mword_of_int 18))
@@ -179,7 +178,7 @@ Section ProofReparentEnds.
               with "Hcg Hpc Hi00").
     iIntros (CID1 Hst1) "Hcg Hframe Hpc".
     assert (Hsp0f : m !!! Regidx csp_rs1 = sp0) by reflexivity.
-    iEval (rewrite Hsp0f stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite Hsp0f (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & _)".
     iDestruct "C1" as (v1) "Hc1". iDestruct "C2" as (v2) "Hc2".
     iDestruct "C3" as (v3) "Hc3". iDestruct "C4" as (v4) "Hc4".
@@ -425,7 +424,7 @@ Section ProofReparentEnds.
     let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) in
     (6 <= K)%nat ->
     (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
-    sie_cap_gpr M (K - 6) b pme -∗
+    sie_cap_gpr KT1 M (K - 6) b pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
     rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
     wp_next b pme (fun (CID : CpuId) =>
@@ -445,7 +444,7 @@ Section ProofReparentEnds.
         /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
         /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
         /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-        sie_cap_gpr Mf K b pme -∗
+        sie_cap_gpr KT1 Mf K b pme -∗
         pc_is (ret_pc vra) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -546,8 +545,8 @@ Section ProofReparentEnds.
     { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb0 : rp_fcell spF 0 = pa_stk sp0 6).
     { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 6) with "[Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf5"; [iEval (rewrite -Hb5); iExists _; iExact "Hf5"|].
       iSplitL "Hf4"; [iEval (rewrite -Hb4); iExists _; iExact "Hf4"|].
       iSplitL "Hf3"; [iEval (rewrite -Hb3); iExists _; iExact "Hf3"|].
@@ -614,12 +613,11 @@ Section ProofReparentLoop.
        this bound -- is a loop INVARIANT, unchanged across every iteration. *)
     locks_below lks "proc" ->
     procs_inv γs -∗
-    panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [reparent+0x46]. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
       ∀ Mexit : regfile,
         ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
-        sie_cap_gpr Mexit av b pme -∗
+        sie_cap_gpr KT1 Mexit av b pme -∗
         cpu_own lvl eb pme b lks -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
         rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -628,7 +626,7 @@ Section ProofReparentLoop.
         WP (Loop : expr riscv_lang)) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜rpl_regs M spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-      sie_cap_gpr M av b pme -∗
+      sie_cap_gpr KT1 M av b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
       rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -637,7 +635,7 @@ Section ProofReparentLoop.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hpslen Hlvl Hav Hno.
-    iIntros "#Hpinv #Hpanic Hqexit".
+    iIntros "#Hpinv Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                  ∀ (k : nat) (M : regfile),
@@ -646,14 +644,14 @@ Section ProofReparentLoop.
                    wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
                      ∀ Mexit : regfile,
                        ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
-                       sie_cap_gpr Mexit av b pme -∗
+                       sie_cap_gpr KT1 Mexit av b pme -∗
                        cpu_own lvl eb pme b lks -∗
                        kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
                        rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                        parents_own (rp_map pv ip ps) -∗
                        WP (Loop : expr riscv_lang)) -∗
-                   sie_cap_gpr M av b pme -∗
+                   sie_cap_gpr KT1 M av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -671,7 +669,7 @@ Section ProofReparentLoop.
       iAssert (wp_next (CID0 := CID0) b pme (fun (CIDt : CpuId) =>
                  ∀ Mt : regfile,
                    ⌜ rpl_regs Mt spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
-                   sie_cap_gpr Mt av b pme -∗
+                   sie_cap_gpr KT1 Mt av b pme -∗
                    cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.reparent + 0x2c)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
@@ -794,7 +792,7 @@ Section ProofReparentLoop.
       (* +0x34 c.ld a5,56(s1) : a5 := pp->parent *)
       assert (Hrgk9 : rget (CID := CIDk) M (mword_of_int 9 : mword 5)
                       = M !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
-      iApply (wp_cld_s_sconf (CID := CIDk) (mword_of_int (KernelSyms.reparent + 0x34))
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDk) (mword_of_int (KernelSyms.reparent + 0x34))
                 (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 56 : mword 12)
                 M av v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [Hcell]").
@@ -854,7 +852,7 @@ Section ProofReparentLoop.
         (* +0x3a ld a0,0(s4) : a0 := initproc *)
         assert (Hrgm20 : rget (CID := CIDm) M34 (mword_of_int 20 : mword 5)
                          = M34 !!! Regidx (mword_of_int 20 : mword 5)) by (rgne; reflexivity).
-        iApply (wp_ld_s_sconf (CID := CIDm) (mword_of_int (KernelSyms.reparent + 0x3a))
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDm) (mword_of_int (KernelSyms.reparent + 0x3a))
                   (mword_of_int 10 : mword 5) (mword_of_int 20 : mword 5) (mword_of_int 0 : mword 12)
                   M34 av ip b (dqm := dqi) ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi3a [Hinit]").
@@ -873,7 +871,7 @@ Section ProofReparentLoop.
                         = M3a !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
         assert (Hrgn10 : rget (CID := CIDn) M3a (mword_of_int 10 : mword 5)
                          = M3a !!! Regidx (mword_of_int 10 : mword 5)) by (rgne; reflexivity).
-        iApply (wp_csd_s_sconf (CID := CIDn) (mword_of_int (KernelSyms.reparent + 0x3e))
+        iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDn) (mword_of_int (KernelSyms.reparent + 0x3e))
                   (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 56 : mword 12)
                   M3a av v b
                   with "Hcg Hpc Hi3e [Hcell]").
@@ -922,7 +920,7 @@ Section ProofReparentLoop.
                   Hlen
                   ltac:(lia)
                   Hno
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                  with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
         iIntros (CIDq Hsq Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
         assert (Hpc44 : ret_pc (M40 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1052,11 +1050,11 @@ Section ProofReparent.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
     intros pcE pv rettgt HK Hdom Hlen Hlvl Hno.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv Hinit Hpar".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv Hinit Hpar".
     iDestruct (parents_own_length with "Hpar") as %Hpslen.
     iIntros "Hcont".
     (* ---- prologue ---- *)
-    iApply (rp_prologue (CID := CID0) m K b pme ltac:(unfold K_reparent in HK; lia) Hdom
+    iApply (rp_prologue (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
     iIntros (CIDpro Hspro M) "%Hpro Hcg Hpc Hframe".
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
@@ -1073,8 +1071,8 @@ Section ProofReparent.
                   (m !!! Regidx (mword_of_int 25 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5))
                   (m !!! Regidx (mword_of_int 27 : mword 5))
                   lvl (K - 6)%nat eb b lks
-                  Hlen Hpslen Hlvl ltac:(unfold K_reparent in HK; lia) Hno
-                  with "Hpinv Hpanic") as "Hloop".
+                  Hlen Hpslen Hlvl ltac:(lia) Hno
+                  with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* exit continuation = the epilogue at +0x46 *)
       iIntros (CIDex Hsex Mexit) "%Hex Hcg Hown Htextx Hpc Hframe Hinit Hpar".
@@ -1084,7 +1082,7 @@ Section ProofReparent.
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
                 b pme
-                ltac:(unfold K_reparent in HK; lia) Hedom
+                ltac:(lia) Hedom
                 with "Hcg Htextx Hpc [Hframe]").
       { iEval (rewrite Hecsp). iExact "Hframe". }
       iIntros (CIDend Hsend Mf) "%Hepi Hcg Hpc".

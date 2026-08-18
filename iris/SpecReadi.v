@@ -159,7 +159,8 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -194,8 +195,7 @@ Local Open Scope Z_scope.
    balloc's out-of-blocks arm 50 -> 58, which pushed bmap 56 -> 64 (6 + 58).
    either_copyout's 58 (SpecCopyout.v's own, unrelated, [psz]-in-s11 chain)
    does NOT reach printk, so it is unaffected and is no longer the max. *)
-Definition K_readi : nat := 78%nat.
-
+Notation K_readi := (88%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE TWO PURE FUNCTIONS THE CONTRACT SPEAKS IN                        *)
 (* ===================================================================== *)
@@ -230,12 +230,15 @@ Proof.
   split; [apply Nat2Z.is_nonneg | exact Hx].
 Qed.
 
+(* THE BUFFER CARRIES ITS OWN TIER [ktb] -- the kernel arm's destination is
+   a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
+   next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_readi_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -308,7 +311,7 @@ Definition wp_readi_sconf_body
      locks_below premise of their own, so "bcache" is the lowest -- and
      only -- bound this contract states. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires
      anything itself -- its interior sleepers (bmap's bread, its own
@@ -318,10 +321,10 @@ Definition wp_readi_sconf_body
      the caller holds it because the trap handed it over, and readi
      threads it to bmap and bread unchanged and takes it back from each in
      turn.  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* either_copyout's user arm reaches copyout, which reaches vmfault/kalloc *)
   kalloc_env γa None -∗
@@ -356,7 +359,7 @@ Definition wp_readi_sconf_body
      shape -- see claude-notes/design/file-table.md.) *)
   (if user
    then proc_priv_core pj pidv V
-   else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ dst_olds i) ∗
+   else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ[ktb] dst_olds i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
@@ -390,9 +393,9 @@ Definition wp_readi_sconf_body
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)
            /\ tot = rd_clamp (di_size dn) off n)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
@@ -406,7 +409,7 @@ Definition wp_readi_sconf_body
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n,
-              pa_add dst i ↦ₘ rd_delivered data dst_olds off tot i) ∗
+              pa_add dst i ↦ₘ[ktb] rd_delivered data dst_olds off tot i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslot bn -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -418,7 +421,7 @@ Module Type READI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
-      (γs : list gname) (j : nat) (γl : gname)
+      (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -433,7 +436,7 @@ Module Type READI.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
+      wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V
                           pidv dq dqd m K eb b lks.

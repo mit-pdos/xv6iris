@@ -66,11 +66,11 @@ Proof. reflexivity. Qed.
    with any mword in context (the bitvector zify hook), so every numeric
    side condition of a leaf or a callee spec is discharged by one of these. *)
 Lemma vdrw_K12 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (12 <= K)%nat.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrw_K10 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (10 <= K - 12)%nat.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrw_K22 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (22 <= K - 12)%nat.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrw_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
@@ -302,7 +302,10 @@ Section VdrwDefs.
      lives at [s0-96 .. s0-85] and is therefore SPLIT across the low slot
      (idx[0], idx[1]) and the high one (idx[2] plus four padding bytes).
      That is the "C local taken by address" recipe of durable-notes.md. *)
-  Definition vdrw_saved (sp0 : Arch.pa) (m : regfile) : iProp Σ :=
+  (* a STACK bundle: it rides the accessing hart's regime, so the tier is a
+     binder here rather than a section Context -- the device definitions in
+     this section are KT0 and must not move with it. *)
+  Definition vdrw_saved `{KTR : !CurKtier} (sp0 : Arch.pa) (m : regfile) : iProp Σ :=
     (pa_stk sp0 1  ↦₈ (m !!! Regidx Rra) ∗
      pa_stk sp0 2  ↦₈ (m !!! Regidx Rs0) ∗
      pa_stk sp0 3  ↦₈ (m !!! Regidx Rs1) ∗
@@ -324,11 +327,17 @@ Section VdrwDefs.
   Proof. reflexivity. Qed.
 
   (* the two scratch slots, contents irrelevant until P2 stores into them *)
-  Definition vdrw_scratch (sp0 : Arch.pa) : iProp Σ :=
+  (* a STACK bundle: it rides the accessing hart's regime, so the tier is a
+     binder here rather than a section Context -- the device definitions in
+     this section are KT0 and must not move with it. *)
+  Definition vdrw_scratch `{KTR : !CurKtier} (sp0 : Arch.pa) : iProp Σ :=
     (∃ w11 w12 : mword 64, pa_stk sp0 11 ↦₈ w11 ∗ pa_stk sp0 12 ↦₈ w12)%I.
 
   (* [idx[0..2]] once P2 has stored the three descriptor indices *)
-  Definition vdrw_idx (sp0 : Arch.pa) (i0 i1 i2 : mword 32) : iProp Σ :=
+  (* a STACK bundle: it rides the accessing hart's regime, so the tier is a
+     binder here rather than a section Context -- the device definitions in
+     this section are KT0 and must not move with it. *)
+  Definition vdrw_idx `{KTR : !CurKtier} (sp0 : Arch.pa) (i0 i1 i2 : mword 32) : iProp Σ :=
     (pa_stk sp0 12 ↦₄ i0 ∗
      pa_add (pa_stk sp0 12) 4 ↦₄ i1 ∗
      pa_stk sp0 11 ↦₄ i2 ∗
@@ -482,7 +491,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the sleep/free_desc stack budgets, mword-free *)
 Lemma vdrwb_K20 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (K_free_desc <= K - 12)%nat.
-Proof. unfold K_virtio_disk_rw, K_free_desc. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrwb_lvl1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
@@ -562,10 +571,10 @@ Section VdrwbDefs.
   Qed.
 
   (* re-joining the [int idx[3]] straddle into the two frame slots *)
-  Lemma vdrw_idx_join (sp0 : Arch.pa) (v0 v1 v2 : mword 32) :
+  Lemma vdrw_idx_join {KTR : CurKtier} (sp0 : Arch.pa) (v0 v1 v2 : mword 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true ->
-    vdrw_idx sp0 v0 v1 v2 -∗ vdrw_scratch sp0.
+    vdrw_idx (KTR := KTR) sp0 v0 v1 v2 -∗ vdrw_scratch (KTR := KTR) sp0.
   Proof.
     intros Hal11 Hal12. iIntros "(Hx0 & Hx1 & Hx2 & Hxp)".
     iDestruct "Hxp" as (vp) "Hxp".

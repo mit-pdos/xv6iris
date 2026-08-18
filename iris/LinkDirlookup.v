@@ -8,13 +8,12 @@
 
    panic is NOT a module here.  Both of dirlookup's panics are DEAD --
    panic("dirlookup not DIR") is refuted from the contract's
-   [di_type dn = T_DIR] premise and panic("dirlookup read") from the
-   GRANULARITY premise via [ProofDirlookupParts.dlk_rd_clamp_full] -- so the
-   [panic_wp_any] resource the contract takes is threaded to readi and iget
-   and never consumed locally.
+   [di_type dn = T_DIR] premise; panic("dirlookup read") is LIVE and is
+   discharged against [Panic] below, out of the [kernel_data] / [panic_env]
+   the contract takes.
 
    So this cone's assumption count stays at the five platform axioms plus
    funext. *)
-Require Import LinkReadi LinkNamecmp LinkIget ProofDirlookup.
+Require Import LinkReadi LinkNamecmp LinkIget LinkPanic ProofDirlookup.
 
-Module Dirlookup := DirlookupProof Readi Namecmp Iget.
+Module Dirlookup := DirlookupProof Readi Namecmp Iget Panic.

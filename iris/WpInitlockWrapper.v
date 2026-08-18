@@ -47,11 +47,12 @@ Section WpInitlockWrapper.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_initlock_wrapper_sconf
       (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
       (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
-    : wp_initlock_wrapper_sconf_body m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.
+    : wp_initlock_wrapper_sconf_body kt m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.
   Proof.
     cbv beta delta [wp_initlock_wrapper_sconf_body].
     intros ret_tgt c_name c_cpu HK Halign Hnamerel Hlkrel Hjrel.
@@ -77,7 +78,7 @@ Section WpInitlockWrapper.
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (vra0) "Hras". iDestruct "S2" as (vs00) "Hs0s".
     iEval (rewrite (avi_mword F 2)) in "Hpc".
@@ -171,7 +172,7 @@ Section WpInitlockWrapper.
     assert (HR7ra : R7 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (F + 0x1c)).
     { rewrite /R7 upd_eq. exact (pc_step F 0x18 4 0x1c eq_refl). }
     (* initlock(&lock, "name") : owns lk's 3 struct fields, returns them init'd *)
-    iApply (Initlock.wp_initlock_sconf R7 vlock vname vcpu s (K - 2) b p
+    iApply (Initlock.wp_initlock_sconf kt R7 vlock vname vcpu s (K - 2) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HR7a1). iExact "Hstr". }
@@ -222,8 +223,8 @@ Section WpInitlockWrapper.
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HE2sp. exact Hspr2. }
-    iAssert (stack_own sp0 2) with "[Hras Hs0s]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 2) with "[Hras Hs0s]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hras"; [iExists _; iExact "Hras"|].
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|]. done. }
     iEval (rewrite -Hwv) in "Hframe".

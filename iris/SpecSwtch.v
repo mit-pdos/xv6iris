@@ -49,10 +49,21 @@ Import Defs.
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-         mword 64 -d> mword 64 -d> iPropO Σ)
+         mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-    (av : nat) (eb : bool) (p : mword 64) :=
+    (av : nat) (eb : bool) (p : mword 64)
+    (* IS THE CALLER COMING BACK?  At [true] this is the coroutine crossing:
+       the caller's continuation below becomes its [valid_context] record and
+       a later resumption runs it.  At [false] the caller is LEAVING FOR
+       GOOD -- kexit's park, where the C swtch's return is the dead
+       [panic("zombie exit")] tail -- so there is no continuation to give and
+       no record to build, and the resumed party is handed the old context's
+       raw CELLS instead ([SwtchCtx.valid_context_pre]'s [else] arm).  swtch
+       itself learns nothing about why: the flag is pinned by the chain
+       payload, which is where process states live
+       ([SchedCtx.p_sched] pins it at [needs_ctx st]). *)
+    (back : bool) :=
   length old_vs = 14%nat ->
   m0 !!! Regidx (mword_of_int 10 : mword 5) = oldc ->
   m0 !!! Regidx (mword_of_int 11 : mword 5) = newc ->
@@ -77,7 +88,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      resumer's bundle match) and the RESUMER's [eb'] -- swtch stores nothing
      to struct cpu, so the same-eb contract is realized one level up by
      sched's own epilogue intena store + ghost retune. *)
-  sie_cap_gpr m0 av false p -∗
+  sie_cap_gpr KT1 m0 av false p -∗
   (* THE HELD SET IS PINNED AT THE PROC LOCK, both directions.  swtch is
      reachable only from [sched] and the scheduler, and xv6's rule for it is
      "hold p->lock across the switch" -- [sched]'s own
@@ -93,27 +104,34 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
   ▷ valid_context P An newc p -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
-  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p -∗
-  ( ∀ (h : CPU) (m : regfile) (eb' : bool),
-      ⌜adm Ao h⌝ -∗
-      ⌜callee_img m = callee_img m0⌝ -∗
-      sie_cap_gpr (CID := h) m av false p -∗
-      cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
-      pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-      ctx_cells oldc (callee_img m0) -∗
-      (∃ (A' : ctx_adm) (cret : mword 64),
-         ▷ valid_context P A' cret p ∗
-         P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
-      WP (LoopE gen_id h : expr riscv_lang) ) -∗
+  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back -∗
+  (* THE CALLER'S CONTINUATION -- its record's contents -- and only at
+     [back = true].  At [false] there is nothing to prove about a
+     resumption that cannot happen, which is exactly the point: it is what
+     lets a dying thread give its whole stack away before the crossing
+     rather than park it in a record nobody will ever run. *)
+  (if back then
+     ( ∀ (h : CPU) (m : regfile) (eb' : bool),
+         ⌜adm Ao h⌝ -∗
+         ⌜callee_img m = callee_img m0⌝ -∗
+         sie_cap_gpr KT1 (CID := h) m av false p -∗
+         cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
+         pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
+         ctx_cells oldc (callee_img m0) -∗
+         (∃ (A' : ctx_adm) (cret : mword 64) (back' : bool),
+            (if back' then ▷ valid_context P A' cret p else own_ctx cret) ∗
+            P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back') -∗
+         WP (LoopE gen_id h : expr riscv_lang) )
+   else emp) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64),
-      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
+      (av : nat) (eb : bool) (p : mword 64) (back : bool),
+      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
 End SWTCH.

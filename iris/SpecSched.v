@@ -54,6 +54,8 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
+Require Import WpMmodeLeafBase.
+Require Import StackOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -103,7 +105,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      that called it -- which is false twice over ([SpecSwtch]'s continuation
      is over an arbitrary hart, and the post-resume release exits at
      [outb = eb = true]).  There is consequently no [b] binder left. *)
-  sie_cap_gpr m av false pj -∗
+  sie_cap_gpr KT1 m av false pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   proc_held cpu_id j γl st ch -∗
@@ -111,10 +113,21 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      [emp] at a resumable park -- the private block stays in the parking
      thread's own closure -- and, at the ZOMBIE park, the dormant block minus
      its context cells, because nothing will ever resume the closure and
-     wait()/freeproc must find that block in the lock. *)
-  park_pay pj st -∗
+     wait()/freeproc must find that block in the lock.
+
+     AND IT IS A CLOSER, NOT A RESOURCE, taking back the whole stack region
+     sched was called with.  At a park that never returns ([needs_ctx st]
+     false) sched's own frame and its unused tail are dead the moment the
+     swtch happens, and the slot needs them: they are part of the page the
+     dying thread has to leave behind ([ProcDefs.kstack_free]).  So sched
+     hands them to the payload instead of carrying them into a continuation
+     that will never run.  At a RESUMABLE park the argument is unusable --
+     sched needs its frame after the swtch -- but so is the closer:
+     [park_pay] is [emp] there, so the caller passes [fun _ => emp] and
+     nothing is promised. *)
+  (stack_own (KTR := KT1) (m !!! Regidx csp_rs1) av -∗ park_pay pj st) -∗
   (* handed over at the crossing, taken back from the dispatch payload. *)
-  trap_csrs -∗
+  trap_csrs KT1 -∗
   (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:
      the parked-scheduler slot content is the ▷ sched_vc premise below.
      sched PRESERVES [eb] across the park -- its intena save/restore is
@@ -131,20 +144,29 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      [cpu_claim] out of one resource. *)
   hart_full j cpu_id -∗
   ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
-  wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (ch' : mword 64),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av false pj -∗
-      pc_is ret_tgt -∗
-      proc_held cpu_id j γl RUNNING ch' -∗
-      (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
-         rides inside it, which is what the caller's own retune needs. *)
-      trap_csrs -∗
-      cpu_own 1 eb pj false {["proc"]} -∗
-      own_ctx (p_context pj) -∗
-      hart_full j cpu_id -∗
-      ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang)) -∗
+  (* THE POST-RESUME HALF EXISTS ONLY AT A RESUMABLE PARK.  [needs_ctx st] is
+     the proc lock's own predicate for "this slot owns a saved context", and
+     it is exactly the [back] flag sched hands the crossing
+     ([SchedCtx.p_sched]): where no record is left, no resumption can occur,
+     and there is nothing for the caller to prove.  That is what makes
+     kexit's [panic("zombie exit")] tail dead code rather than an arm to
+     discharge. *)
+  (if needs_ctx st then
+     wp_next true pj (fun (CID : CpuId) =>
+       ∀ (mf : regfile) (ch' : mword 64),
+         ⌜callee_saved m mf⌝ -∗
+         sie_cap_gpr KT1 mf av false pj -∗
+         pc_is ret_tgt -∗
+         proc_held cpu_id j γl RUNNING ch' -∗
+         (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
+            rides inside it, which is what the caller's own retune needs. *)
+         trap_csrs KT1 -∗
+         cpu_own 1 eb pj false {["proc"]} -∗
+         own_ctx (p_context pj) -∗
+         hart_full j cpu_id -∗
+         ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
+         WP (Loop : expr riscv_lang))
+   else emp) -∗
   WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
@@ -153,7 +175,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
 (* sched() panics ("sched locks") unless [mycpu()->noff == 1], and this file
    used to publish a SECOND contract, [wp_sched_locks], entered at
    noff >= 2: it took the branch, jumped to panic and consumed the caller's
-   [panic_wp_any].  It existed for exactly one client -- the LOCKED branch of
+   a panic credential.  It existed for exactly one client -- the LOCKED branch of
    a NESTED [acquiresleep], through [SpecSleep.wp_sleep_nested] -- and that
    client is gone: iput now takes [SpecAcquiresleep.wp_acquiresleep_nb_sconf],
    which PROVES it does not sleep (claude-notes/projects/iput-acquiresleep.md).
@@ -161,7 +183,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
    to panic.
 
    WHAT IS LEFT IS A REFUTATION.  [wp_sched_sconf] is now sched's ONLY
-   contract.  It demands [cpu_own 1] and takes NO [panic_wp_any], and its
+   contract.  It demands [cpu_own 1] and takes NO panic credential, and its
    proof discharges the [bne] at sched+0x30 from the level alone.  So no
    proof in this tree can hand a WP to sched's entry PC at any level but 1,
    and along the one it can hand, the panic's basic block is not reached --

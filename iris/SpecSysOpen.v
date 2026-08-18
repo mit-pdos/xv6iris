@@ -180,7 +180,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -222,8 +221,7 @@ Local Open Scope Z_scope.
    fits under that: namei 106, fileclose [8 + K_iput] = 68, iunlockput 64,
    argstr 60, end_op 58, itrunc 50, ilock 44, begin_op 26, iunlock 26,
    argint 18, filealloc 14, fdalloc 14. *)
-Definition K_sys_open : nat := 138%nat.
-
+Notation K_sys_open := (148%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  create's own, and for create's own reason; see
    the header's reference ledger. *)
 Definition sys_open_slots : nat := create_slots.
@@ -304,7 +302,7 @@ Definition wp_sys_open_sconf_body
   ninodes < 2 ^ 31 ->
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := KT1) γpr gu gd ->
   (* ---- the reference allowance: create's own ---- *)
   (sys_open_slots <= ns)%nat ->
   (j < NPROC)%nat ->
@@ -318,7 +316,7 @@ Definition wp_sys_open_sconf_body
      [omode] as a plain int. *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
   pv_tf V !! tf_arg_idx 1 = Some vom ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, exactly as sys_mkdir: the depth is pinned at
      ZERO, so [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order
      goal the twelve callees raise is [locks_below ∅ _] -- including
@@ -326,10 +324,9 @@ Definition wp_sys_open_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* ---- the two persistent credentials ialloc's printk arm needs ---- *)
   printk_env γpr gu gd -∗
   (* ---- the open-file table: filealloc, fdalloc and fileclose ---- *)
@@ -374,9 +371,9 @@ Definition wp_sys_open_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

@@ -56,7 +56,6 @@ Require Import ProcGeom.
 Require Import WaitInv.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import CalleeSaved.
 Require Import IntrDefs WpNext.
 Require Import CpuOwn.
@@ -65,8 +64,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 
 (* six frame slots of reparent's own, plus wakeup's 18. *)
-Definition K_reparent : nat := 24%nat.
-
+Notation K_reparent := (24%nat) (only parsing).
 Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
      (m : regfile) (γs : list gname) (pme ip : mword 64)
     (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
@@ -87,16 +85,16 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
      no lock of its own and wakeup's own contract is balanced -- so [lks] is
      unchanged end to end and this premise is not re-established anywhere. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   parents_own ps -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b pme -∗
+      sie_cap_gpr KT1 Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗

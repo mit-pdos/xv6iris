@@ -109,9 +109,13 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIget.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import WpUart.
+Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
+Require Import IgetLic.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -320,11 +324,66 @@ Proof. set_solver. Qed.
 (*  2.  THE FUNCTION                                                      *)
 (* ===================================================================== *)
 
-Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) : IGET.
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  iget's one live arm is [panic("iget: no inodes")] *)
+(*  at +0xa6 -- the full-table scan; the literal sits at 0x80007400 in    *)
+(*  .rodata, fifteen characters and a NUL.  NAMED pure lemmas, not inline *)
+(*  [ltac:] -- see optimization.md and the panic recipe.                  *)
+(* ===================================================================== *)
+Definition ig_msg_a : Z := 0x80007400.
+Definition ig_msg : string := "iget: no inodes".
+
+Lemma ig_panic_K (K : nat) (b : bool) :
+  (K_iget <= K)%nat -> (panic_stack <= trap_res b + (K - 6))%nat.
+Proof. lia. Qed.
+
+Lemma ig_panic_noff (n : nat) :
+  (Z.of_nat n + 3 < 2 ^ 31)%Z -> (Z.of_nat (S n) + 2 < 2 ^ 31)%Z.
+Proof. rewrite Nat2Z.inj_succ. lia. Qed.
+
+(* THE ARM FIRES HOLDING itable.lock (rank 14), which is why the rank table
+   puts "itable" below "pr" (16).  A CLOSED lemma over the plain gset, not
+   an inline [ltac:(lkbelow)]. *)
+Lemma ig_panic_below (lks : gset string) :
+  locks_below lks "itable" -> locks_below ({["itable"]} ∪ lks) "pr".
+Proof.
+  intros H. apply locks_below_union_singleton; [vm_compute; lia|].
+  apply (locks_below_mono lks "itable" "pr" H). vm_compute; lia.
+Qed.
+
+Lemma ig_msg_nz : eq_vec (mword_of_int ig_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma ig_msg_nonul : PrintkFmt.nonul ig_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma ig_msg_bytes :
+  forall j b, cstring_bytes ig_msg !! j = Some b ->
+    KernelData.kernel_data !! (ig_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 16 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section IgetMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma ig_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int ig_msg_a : mword 64) ↦ₛ□ ig_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string ig_msg_a ig_msg _ eq_refl
+              ltac:(unfold text_end, ig_msg_a; lia) ig_msg_bytes with "Hd").
+  Qed.
+End IgetMsg.
+
+Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) (PN : PANIC) : IGET.
 
 Section ProofIget.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -347,14 +406,14 @@ Section ProofIget.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
     - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[_ Hint]".
-      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
+      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm & _) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
@@ -406,16 +465,23 @@ Section ProofIget.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
+      (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
+    : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
     intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
-    unfold K_iget in HK.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hcont".
+    (* [Hlic] is the LICENCE (increment C'-lite, fs-fragments.md §7.1).
+       iget spends it on nothing: it is framed across the whole function
+       inside the shared tail's closure below, handed back on the two
+       RETURNING arms, and simply dropped on the diverging
+       panic("iget: no inodes") arm at +0x6a -- which is what a partial
+       correctness post owes there and nothing more. *)
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hpenv Hislot Hlic Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -449,7 +515,7 @@ Section ProofIget.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (w1) "Hf1". iDestruct "S2" as (w2) "Hf2".
     iDestruct "S3" as (w3) "Hf3". iDestruct "S4" as (w4) "Hf4".
@@ -607,9 +673,9 @@ Section ProofIget.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
+              n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
@@ -743,13 +809,13 @@ Section ProofIget.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
                 c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
+        sie_cap_gpr KT1 (CID := CIDt) mt (K - 6)%nat b p -∗
         cpu_own (CID := CIDt) n eb p b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
-      with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
+      with "[Hcont Hlic Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
     { rewrite /TAILC. iIntros (CIDt Hst).
       iIntros (mt kk q) "%Hmt Hcg Hcnt Hpc Href".
       destruct Hmt as (Hkk & Hmts3 & Hmtsp & Hmtcs).
@@ -838,8 +904,8 @@ Section ProofIget.
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
       { rewrite Hwv HP7sp. unfold spr, sp0, pa_stk, add_vec_int.
         apply f_equal. pcw. }
-      iAssert (stack_own sp0 6) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe6".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe6".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hf1"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hf1"|].
         iSplitL "Hf2"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hf2"|].
         iSplitL "Hf3"; [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hf3"|].
@@ -881,7 +947,7 @@ Section ProofIget.
       iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href").
+      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href Hlic").
       (* [callee_saved m P8], the slot bound, and [a0 = ientry kk] *)
       split; [| split; [exact Hkk | exact HP8a0]].
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -954,10 +1020,10 @@ Section ProofIget.
       ⌜ Mr !!! Regidx Rs3 = (zero_reg : mword 64)
         \/ (exists e : nat, (e < NINODE)%nat /\ Mr !!! Regidx Rs3 = ientry e
                             /\ M !! e = None) ⌝ -∗
-      sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
+      sie_cap_gpr KT1 Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
       cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
-      arm_pay n eb p -∗
+      arm_pay KT1 n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
       iref_slots_auth -∗
@@ -990,10 +1056,10 @@ Section ProofIget.
         ⌜ Ms !!! Regidx Rs3 = (zero_reg : mword 64)
           \/ (exists e : nat, (e < NINODE)%nat /\ Ms !!! Regidx Rs3 = ientry e
                               /\ M !! e = None) ⌝ -∗
-        sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
+        sie_cap_gpr KT1 Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
         cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
-        arm_pay n eb p -∗
+        arm_pay KT1 n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗
         iref_slots_auth -∗
@@ -1097,8 +1163,28 @@ Section ProofIget.
                                (sign_extend' 64 (mword_of_int 2087190 : mword 21))
                              = mword_of_int KernelSyms.panic) by pcw.
             iEval (rewrite Htgtpn) in "Hpc".
-            iPoseProof (panic_wp_any_at _ with "Hpanic") as "Hpan".
-            iApply ("Hpan" with "Htext Hpc Hcg").
+            (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+               a0 holds &"iget: no inodes".  The whole scan runs with
+               interrupts OFF (acquire's push_off), so no hart ever moves
+               and [cpu_own] needs no transport -- but it IS at [S n] and
+               at [{["itable"]} ∪ lks], which is what the rank table's
+               "itable" < "pr" edge exists for. *)
+            iPoseProof (ig_msg_str with "Hkd") as "#Hstr".
+            (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+            pose (PA3 := <[Regidx Rra := regval_into_reg
+                            (add_vec_int
+                               (mword_of_int (KernelSyms.iget + 0xa6) : mword 64) 4)]> PA2).
+            assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int ig_msg_a : mword 64))
+              by pcw.
+            iApply (PN.wp_panic_sconf KT1 PA3 (trap_res b + (K - 6))%nat
+                      (S n) eb false p (PkAStr DfracDiscarded ig_msg)
+                      ({["itable"]} ∪ lks)
+                      (ig_panic_K K b HK) eq_refl (ig_panic_noff n HnZ)
+                      (ig_panic_below lks Hfresh)
+                      with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+            { rewrite /pk_desc_res Ha0msg.
+              iSplit; [iPureIntro; exact ig_msg_nonul|].
+              iSplit; [iPureIntro; exact ig_msg_nz|]. iExact "Hstr". }
           + (* ===== THE RECYCLE, four stores wide ===== *)
             iPoseProof (igi_6e with "Htext") as "Hi6e".
             iPoseProof (igi_72 with "Htext") as "Hi72".
@@ -1467,7 +1553,7 @@ Section ProofIget.
                are the same bool.  Pure re-spelling; it is what makes the
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
-            iApply (Release.wp_release_sconf γl itable_lock "itable"%string
+            iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
                       (itable_res2 cn γfs γi cov logstart nib dev) V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
@@ -1593,7 +1679,7 @@ Section ProofIget.
         assert (Hpa4a : add_vec (rget L1 Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = i_dev (ientry j)).
         { rewrite (rget_ne L1 Rs1 ltac:(nz)) HL1s1. reflexivity. }
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.iget + 0x4a)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x4a)) Ra4 Rs1
                   (mword_of_int 0 : mword 12) L1 (trap_res b + (K - 6))%nat dj false
                   (dqm := DfracOwn qj') ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi4a [Hdcell]").
@@ -1665,7 +1751,7 @@ Section ProofIget.
         assert (Hpa50 : add_vec (rget L2 Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                         = i_inum (ientry j)).
         { rewrite (rget_ne L2 Rs1 ltac:(nz)) HL2s1. reflexivity. }
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.iget + 0x50)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x50)) Ra4 Rs1
                   (mword_of_int 4 : mword 12) L2 (trap_res b + (K - 6))%nat ij false
                   (dqm := DfracOwn qj') ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi50 [Hncell]").
@@ -1887,7 +1973,7 @@ Section ProofIget.
           by (rewrite (HL7thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HL3sp).
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (Release.wp_release_sconf γl itable_lock "itable"%string
+        iApply (Release.wp_release_sconf KT1 γl itable_lock "itable"%string
                   (itable_res2 cn γfs γi cov logstart nib dev) L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)

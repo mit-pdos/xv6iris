@@ -63,8 +63,7 @@ Local Open Scope Z_scope.
 
 
 (* flags2perm's own 2-slot frame; it calls nothing. *)
-Definition K_flags2perm : nat := 2%nat.
-
+Notation K_flags2perm := (2%nat) (only parsing).
 (* THE ANSWER, as a function of the two bits the machine actually inspects. *)
 Definition f2p (fl : mword 64) : Z :=
   (if Z.testbit (bv_unsigned fl) 0 then 8 else 0)
@@ -88,12 +87,12 @@ Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
   let fl := mm !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_flags2perm <= K)%nat ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5)

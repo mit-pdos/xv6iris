@@ -12,7 +12,7 @@
    resource [intr_inv_alloc] needs to build the interrupt invariant and hence
    to fold the SIE = 1 arm of the capability.
 
-   Straight-line, no callees -> unconditional success, no panic_wp.  Follows
+   Straight-line, no callees -> unconditional success, no panic credential.  Follows
    SpecKvminithart.v's file conventions. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
@@ -46,12 +46,12 @@ Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
   let pcE : mword 64 := mword_of_int KernelSyms.trapinithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (2 <= K)%nat ->
-  sie_cap_gpr mm K false p -∗
+  sie_cap_gpr KT1 mm K false p -∗
   kernel_text -∗
   pc_is pcE -∗
   stvec ↦ᵣ tv0 -∗
   ( ∀ (mr : regfile),
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr KT1 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗

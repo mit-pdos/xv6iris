@@ -112,7 +112,7 @@
    [ref > 0] and none of them this inode -- and no premise a caller could
    state would rule it out, because whether the table is full is a fact
    about every OTHER process's open files.  So on that arm iget diverges
-   through [SpecPanic.panic_wp_any] and this postcondition speaks only for
+   through [SpecPanic]'s own contract and this postcondition speaks only for
    the calls that return.  That is sound in a partial-correctness WP and it
    is the honest statement; the proof file says at which instruction (+0x6a,
    [beq s3,zero]) it is taken.
@@ -123,7 +123,37 @@
    takes no sleeplock and never sleeps, its whole body runs inside one
    fully-nested acquire/release, and [n], [eb] and the SIE index [b]
    therefore come back exactly as they went in.  It is NOT the
-   running-process bundle ilock threads -- nothing here can park.        *)
+   running-process bundle ilock threads -- nothing here can park.
+
+   ---- THE LICENCE (increment C'-lite, fs-fragments.md §7.1) ------------
+
+   iget is where a REFERENCE is minted for an inum that came off a disk
+   block, and nothing in the scan can say the inum names a live inode.
+   §20.17.5 answered that with a paragraph -- the enumeration of the six
+   reasons a caller believes its inum -- and [IgetLic.v] makes it a type:
+   one binder [l : ilic] and one premise [iname γi γfs inum l].  The user's
+   invariant ("the kernel will never invoke iget on inode numbers in
+   directories in a disconnected subtree") is not statable about the
+   machine's traces; it IS statable here, at DELIVERY, and that is why the
+   enumeration lives on THIS contract and not on a payload.
+
+   BORROWED AND RETURNED, AT THE SAME [l] (§7.1.2).  The licence comes back
+   in the postcondition, unspent and at the SAME constructor.  Both halves
+   are load-bearing.  Returning it is what keeps this increment
+   caller-side: the borrow lives inside one call, so no syscall-level
+   contract sees it and [SpecNamex] / [SpecCreate] / [SpecSysLink] /
+   [SpecIalloc] / [SpecIlock] / [SpecIput] / [SpecIupdate] are all
+   byte-identical.  Returning it at the SAME [l] -- rather than at a [∃ l']
+   -- is what keeps the audit a grep: a [∃ l'] post is equally sound and
+   silently permits a licence swap, which would destroy the per-site
+   documentation the increment exists for.
+
+   iget SPENDS IT ON NOTHING.  The proof frames it across the whole
+   function and hands it back on the two returning arms; the diverging
+   panic arm drops it.  That is the honest shape -- iget never reads a
+   dinode, so there is nothing here that COULD consume a licence, and
+   §7.1.6's death certificate says so: the licence is returned at the iget,
+   [iput] holds none, and §20.7's ordering wall is untouched.           *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -142,13 +172,16 @@ Require Import CalleeSaved.
 Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import DiskPtsto.
+Require Import WpUart.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import IgetLic.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
@@ -157,21 +190,23 @@ Local Open Scope Z_scope.
    s1 / s2 / s3 / s4 pushed at 40 / 32 / 24 / 16 / 8 / 0 and [c.addi4spn
    s0,sp,48] on top); acquire and release want 10 below that, and panic wants
    none.  [K_idup]'s budget for a frame half again as deep. *)
-Definition K_iget : nat := 16%nat.
-
+Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-      !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
     (dev inum : mword 32)
+    (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iget in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_iget <= K)%nat ->
-  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* [+3], not [+1]: iget's own [acquire] is one, and the LIVE panic arm
+     fires INSIDE that critical section, where printk takes two more. *)
+  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   (* the requested inum is inside the inode region: [ipool_acc]'s premise on
      the recycle arm, and the ONLY constraint on either argument *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
@@ -183,9 +218,9 @@ Definition wp_iget_sconf_body
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   (* the [ref] words *)
@@ -193,31 +228,39 @@ Definition wp_iget_sconf_body
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
   ic_escrows cn γfs γi cov logstart -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
-  panic_wp_any -∗
+  (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
+     is the console bundle printk needs.  Note the arm fires while iget
+     HOLDS itable.lock, which is why "itable" ranks below "pr". *)
+  panic_env -∗
   (* THE precondition that makes the mint safe, on both arms *)
   iref_slot -∗
+  (* THE LICENCE: borrowed here, returned below at the SAME [l] *)
+  iname γi γfs inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ (k < NINODE)%nat
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
     inode_ref k q dev inum -∗
+    (* ...and BACK, unspent and at the SAME [l] *)
+    iname γi γfs inum l -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IGET.
   Parameter wp_iget_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
+      (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
+      wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
                          m n eb p K b lks.
 End IGET.

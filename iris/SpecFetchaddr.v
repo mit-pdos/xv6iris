@@ -80,8 +80,7 @@ Local Open Scope Z_scope.
 
 (* fetchaddr's own frame is 4 slots; copyin wants 50 below it (walkaddr 10,
    vmfault 38, memmove 2) and myproc 10, so 50 covers both calls. *)
-Definition fetchaddr_stack : nat := 54%nat.
-
+Notation fetchaddr_stack := (54%nat) (only parsing).
 (* ===================================================================== *)
 (*  What fetchaddr TESTS.                                                 *)
 (* ===================================================================== *)
@@ -101,9 +100,9 @@ Section SpecFetchaddr.
 
   (* fetchaddr's result, keyed by the returned a0 (the [argfd_post] shape). *)
   Definition fetchaddr_post (ip oldv addr szv r : mword 64) : iProp Σ :=
-    (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈ oldv
+    (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[KT1] oldv
      ∨ ⌜(r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64))
-        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈ w)%I.
+        /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[KT1] w)%I.
 
 End SpecFetchaddr.
 
@@ -116,19 +115,19 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (fetchaddr_stack <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: copyin's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyin.v) *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  ip ↦₈ oldv -∗
+  ip ↦₈[KT1] oldv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗

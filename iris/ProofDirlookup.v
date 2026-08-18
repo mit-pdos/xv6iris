@@ -46,7 +46,7 @@
    found arm; [dir_first_None] closes the exhausted arm at [nrec].
 
    The nine AMBIENT resources dirlookup threads are all PERSISTENT and are
-   introduced with [#] -- [kernel_text], [panic_wp_any], [bio_ctx],
+   introduced with [#] -- [kernel_text], [kernel_data], [bio_ctx],
    [kalloc_env], [procs_inv], [dev_inv], [disk_geom], the disk [is_lock],
    [is_itable2], [itable_inv], [ic_escrows].  That is forced by readi's own
    contract (which hands none of them back) and it is what keeps the loop's
@@ -92,13 +92,16 @@ Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import DirView.
-Require Import PanicStub.
 Require Import SpecReadi SpecNamecmp SpecIget.
 Require Import CodeDirlookup.
+Require Import DirLinks.
+Require Import IgetLic.
 Require Import SpecDirlookup.
 Require Import ProofDirlookupParts.
 From Kernel Require KernelSyms.
@@ -111,7 +114,55 @@ Set Printing Depth 40.
 (*  6.  THE PROOF                                                         *)
 (* ===================================================================== *)
 
-Module DirlookupProof (RD : READI) (NC : NAMECMP) (IG : IGET) : DIRLOOKUP.
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  dirlookup's one live arm is the SHORT READ,       *)
+(*  [panic("dirlookup read")] at +0x4e; the literal sits at 0x800074d8    *)
+(*  in .rodata, fourteen characters and a NUL.  NAMED pure lemmas, not    *)
+(*  inline [ltac:] -- see optimization.md and the panic recipe.           *)
+(* ===================================================================== *)
+Definition dlk_msg_a : Z := 0x800074d8.
+Definition dlk_msg : string := "dirlookup read".
+
+Lemma dlk_panic_K (K : nat) : (K_dirlookup <= K)%nat -> (panic_stack <= K - 12)%nat.
+Proof. lia. Qed.
+
+Lemma dlk_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+Lemma dlk_panic_below (lks : gset string) :
+  locks_below lks "bcache" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "bcache" "pr" H). vm_compute; lia. Qed.
+
+Lemma dlk_msg_nz : eq_vec (mword_of_int dlk_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma dlk_msg_nonul : PrintkFmt.nonul dlk_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma dlk_msg_bytes :
+  forall j b, cstring_bytes dlk_msg !! j = Some b ->
+    KernelData.kernel_data !! (dlk_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 15 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section DirlookupMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma dlk_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int dlk_msg_a : mword 64) ↦ₛ□ dlk_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string dlk_msg_a dlk_msg _ eq_refl
+              ltac:(unfold text_end, dlk_msg_a; lia) dlk_msg_bytes with "Hd").
+  Qed.
+End DirlookupMsg.
+
+Module DirlookupProof (RD : READI) (NC : NAMECMP) (IG : IGET) (PN : PANIC)
+  : DIRLOOKUP.
 
 Notation DL := KernelSyms.dirlookup (only parsing).
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -200,14 +251,14 @@ Section ProofDirlookupMain.
      rewrite a partially-applied byte function. *)
   Lemma dlk_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ file_byte data (16 * i + jj)%nat)
-    ⊣⊢ a ↦₂ dir_inum data i
-       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ dir_name data i jj).
+    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)
+    ⊣⊢ a ↦₂[KT1] dir_inum data i
+       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[KT1] dir_name data i jj).
   Proof.
     intro Hal.
-    rewrite -(dlk_half_acc data i a Hal).
-    rewrite -(dlk_name_acc data i (pa_add a 2)).
-    exact (dlk_de_split a (fun jj => file_byte data (16 * i + jj)%nat)).
+    rewrite -(dlk_half_acc (KTR := KT1) data i a Hal).
+    rewrite -(dlk_name_acc (KTR := KT1) data i (pa_add a 2)).
+    exact (dlk_de_split (KTR := KT1) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
   (* the [V] slot of readi's contract is dead on the kernel arm *)
@@ -236,24 +287,24 @@ Section ProofDirlookupMain.
       (CIDt : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (uu10 : mword 64) (dnew : nat -> bv 8),
        ⌜dlk_tregs m sp0 Mt⌝ -∗
-       sie_cap_gpr Mt (K - 12)%nat b pj -∗
+       sie_cap_gpr KT1 Mt (K - 12)%nat b pj -∗
        pc_is (mword_of_int (DL + 0x96)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-       (pa_stk sp0 10) ↦₈ uu10 -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dnew jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈[KT1] uu10 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dnew jj) -∗
        wp_next (CID0 := CIDt) true pj (fun CIDf : CpuId =>
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
            ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
-           sie_cap_gpr mf K b pj -∗
+           sie_cap_gpr KT1 mf K b pj -∗
            pc_is ret_tgt -∗
            WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
@@ -268,19 +319,23 @@ Section ProofDirlookupMain.
       (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
-      (gfs : fs_names) (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
+      (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
+      (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
        ⌜callee_saved m mf⌝ -∗
-       sie_cap_gpr mf K b pj -∗
+       sie_cap_gpr KT1 mf K b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is ret_tgt -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
-       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
+       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        p_pid pj ↦₄{dq} pidv -∗
        bslot bn -∗
+       (* the borrow, back verbatim on both arms (fs-fragments.md §7.1) *)
+       dir_links (bv_unsigned dinum) dn data -∗
+       dinode_at gi dinum dr -∗
        (if found
         then ⌜dir_first data nrec s = Some kk
               /\ (kslot < NINODE)%nat
@@ -288,12 +343,12 @@ Section ProofDirlookupMain.
              inode_ref kslot q dev
                (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
              (if hasp
-              then pf ↦₄ (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
+              then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
               else emp)
         else ⌜dir_first data nrec s = None
               /\ mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
              iref_slot ∗
-             (if hasp then pf ↦₄ pofv else emp)) -∗
+             (if hasp then pf ↦₄[KT1] pofv else emp)) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_loop_body
@@ -301,38 +356,41 @@ Section ProofDirlookupMain.
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
-      (gfs : fs_names) (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
+      (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
+      (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
        ⌜(S nrec - i <= fuel)%nat⌝ -∗
        ⌜Z.of_nat i * 16 < bv_unsigned (di_size dn)⌝ -∗
        ⌜dir_first data i s = None⌝ -∗
        ⌜dlk_regs m sp0 ip nb pf (16 * i) Ml⌝ -∗
-       sie_cap_gpr Ml (K - 12)%nat b pj -∗
+       sie_cap_gpr KT1 Ml (K - 12)%nat b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is (mword_of_int (DL + 0x5c)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-       (pa_stk sp0 10) ↦₈ mt10 -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈[KT1] mt10 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dol jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
-       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
-       (if hasp then pf ↦₄ pofv else emp) -∗
+       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
+       (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        p_pid pj ↦₄{dq} pidv -∗
        bslot bn -∗
        iref_slot -∗
+       dir_links (bv_unsigned dinum) dn data -∗
+       dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks
-           dq dqd dqn dev pofv pidv fn bn gfs bm CIDc) -∗
+           dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_latch_body
@@ -340,36 +398,39 @@ Section ProofDirlookupMain.
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
-      (gfs : fs_names) (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
+      (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
+      (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
        ⌜dlk_regs m sp0 ip nb pf (16 * i) Mp⌝ -∗
        ⌜dir_first data (S i) s = None⌝ -∗
-       sie_cap_gpr Mp (K - 12)%nat b pj -∗
+       sie_cap_gpr KT1 Mp (K - 12)%nat b pj -∗
        cpu_own 0 eb pj b lks -∗
        pc_is (mword_of_int (DL + 0x52)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       (pa_stk sp0 9) ↦₈ (m !!! Regidx Rs7 : mword 64) -∗
-       (pa_stk sp0 10) ↦₈ mt10' -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ dol' jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       (pa_stk sp0 9) ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) -∗
+       (pa_stk sp0 10) ↦₈[KT1] mt10' -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj ↦ₘ[KT1] dol' jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
-       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ{dqn} fn ii) -∗
-       (if hasp then pf ↦₄ pofv else emp) -∗
+       ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
+       (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        p_pid pj ↦₄{dq} pidv -∗
        bslot bn -∗
        iref_slot -∗
+       dir_links (bv_unsigned dinum) dn data -∗
+       dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks
-           dq dqd dqn dev pofv pidv fn bn gfs bm CIDc) -∗
+           dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_dirlookup_sconf
@@ -381,30 +442,34 @@ Section ProofDirlookupMain.
       (cn : ic_names) (gtl : gname)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
-      (ip : mword 64)
+      (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (dn : dinode)
+      (dn : dinode) (dr : dinode)
       (fn : nat -> bv 8)
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
-                              ga gf cov logstart nib dev ip bm data dn
+                              ga gf cov logstart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
-           Hinums Hj Hgs Ha0 Hposs Heb Hbelow.
-    pose proof HK as HK'. unfold K_dirlookup in HK'.
+           Hinums Hdisj Horph Hdrnz Hj Hgs Ha0 Hposs Heb Hbelow.
+    (* the reading of the type premise the LICENCE work needs, taken
+       once here (increment C'-lite, fs-fragments.md §7.1) *)
+    assert (Htyz : bv_unsigned (di_type dn) = T_DIR_z)
+      by (rewrite Htype; vm_compute; reflexivity).
+    pose proof HK as HK'. 
     (* readi's contract has its OWN [let pj := proc_addr j], so everything it
        hands back is phrased at [proc_addr j] while ours is phrased at the
        [let]-bound [pj].  The two are convertible but [iSpecialize] matches
        syntactically, so fold them back at the seam. *)
     assert (Hpjd : proc_addr j = pj) by reflexivity.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
               Hnm Hpoff Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbslot #Hitb2 #Hitbl
-              #Hesc Hislot Hcont".
+              #Hesc Hislot Hlinks Hdi Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
        [true] here.  Making that explicit is what keeps every hart-chain in
@@ -447,7 +512,7 @@ Section ProofDirlookupMain.
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 12)
       by (rewrite /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -578,7 +643,7 @@ Section ProofDirlookupMain.
                     = mword_of_int (DL + 0x16)) by pcw.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 lh a4,68(a0) : ip->type ===== *)
-    iApply (wp_lh_s_sconf (mword_of_int (DL + 0x16)) Ra4 Ra0
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x16)) Ra4 Ra0
               (mword_of_int 68 : mword 12) R2 (K - 12)%nat (di_type dn : mword 16) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 [Hity]").
     { iEval (rgne; rewrite HR2a0). iExact "Hity". }
@@ -689,7 +754,7 @@ Section ProofDirlookupMain.
                     = mword_of_int (DL + 0x26)) by pcw.
     iEval (rewrite Hpp26) in "Hpc".
     (* ===== +0x26 c.lw a5,76(a0) : dp->size ===== *)
-    iApply (wp_clw_s_sconf (mword_of_int (DL + 0x26)) Ra5 Ra0
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x26)) Ra5 Ra0
               (mword_of_int 76 : mword 12) R7 (K - 12)%nat (di_size dn : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi26 [Hisz]").
     { iEval (rgne; rewrite HR7a0). iExact "Hisz". }
@@ -984,9 +1049,9 @@ Section ProofDirlookupMain.
       (* ---- the [de] buffer goes back to being two frame slots ---- *)
       iDestruct (dlk_name_bytes with "Hde") as "Hdeb2".
       iDestruct (dlk_bytes_slots sp0 Hal12 Hal11 with "Hdeb2") as (w12 w11) "[Hc12 Hc11]".
-      iAssert (stack_own sp0 12) with
+      iAssert (stack_own (KTR := KT1) sp0 12) with
         "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hc11 Hc12]" as "Hstk".
-      { rewrite stack_own_slots. cbn [seq].
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
         iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
         iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
@@ -1160,7 +1225,7 @@ Section ProofDirlookupMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf false 0%nat 0%nat 1%Qp with
                 "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbslot
-                 [Hislot Hpoff]").
+                 Hlinks Hdi [Hislot Hpoff]").
       { exact Hcsf. }
       iSplitR.
       { iPureIntro. split; [exact Hnone |]. rewrite Ha0f. exact HR13a0. }
@@ -1174,12 +1239,13 @@ Section ProofDirlookupMain.
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
           dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks
-            dq dqd dqn dev pofv pidv fn bn gfs bm fuel CIDl))%I with "[]" as "Hloop".
+            dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm fuel CIDl))%I
+        with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (CIDl Hsl i Ml dol mt10)
             "%Hfuel %Hilt16 %Hnone %Hregs Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
              Hb8 Hb9 Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
-             Hislot Hqc".
+             Hislot Hlinks Hdi Hqc".
           exfalso.
           assert (Hile : (i <= nrec)%nat)
             by exact (dlk_le_nrec (bv_unsigned (di_size dn)) i Hsznn Hilt16).
@@ -1187,7 +1253,7 @@ Section ProofDirlookupMain.
         iIntros (CIDl Hsl i Ml dol mt10)
           "%Hfuel %Hilt16 %Hnone %Hregs Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
            Hb8 Hb9 Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
-           Hislot Hqc".
+           Hislot Hlinks Hdi Hqc".
         assert (Hoff31 : Z.of_nat (16 * i) + 16 < 2 ^ 31)
           by exact (dlk_off_lt31' (bv_unsigned (di_size dn)) i Hsznn Hilt16 Hszb).
         assert (Hcv : Z.of_nat (16 * S i) = Z.of_nat (S i) * 16)
@@ -1196,11 +1262,13 @@ Section ProofDirlookupMain.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
                    dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
-                     eb hasp lks dq dqd dqn dev pofv pidv fn bn gfs bm i CIDp))%I
+                     eb hasp lks dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr
+                     bm i CIDp))%I
           with "[]" as "Hlatch".
         { iIntros (CIDp Hsp Mp dol' mt10')
             "%Hpregs %Hnone2 Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
-             Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot Hislot Hqc".
+             Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot Hislot
+             Hlinks Hdi Hqc".
           destruct Hpregs as (Hp2 & Hp8 & Hp9 & Hp18 & Hp19 & Hp20 & Hp21 & Hp22
                               & Hp23 & Hpthr).
           pose proof (conj Hp2 (conj Hp8 (conj Hp9 (conj Hp18 (conj Hp19
@@ -1237,7 +1305,7 @@ Section ProofDirlookupMain.
           (* +0x54 lw a5,76(s2) : the size is re-read every iteration *)
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_size) in "Hisz".
-          iApply (wp_lw_s_sconf (mword_of_int (DL + 0x54)) Ra5 Rs2
+          iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x54)) Ra5 Rs2
                     (mword_of_int 76 : mword 12) Q1 (K - 12)%nat
                     (di_size dn : mword 32) b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi54 [Hisz]").
@@ -1330,7 +1398,7 @@ Section ProofDirlookupMain.
             iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
             iApply ("Hqc" $! mf false 0%nat 0%nat 1%Qp with
                       "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid
-                       Hbslot [Hislot Hpoff]").
+                       Hbslot Hlinks Hdi [Hislot Hpoff]").
             { exact Hcsf. }
             iSplitR.
             { iPureIntro. split; [exact Hnn |]. rewrite Ha0f. exact HQ3a0. }
@@ -1358,7 +1426,7 @@ Section ProofDirlookupMain.
             iApply ("IHf" $! (S i) Q2 dol' mt10' with
                       "[%] [%] [%] [%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                        Hb8 Hb9 Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid
-                       Hbslot Hislot Hqc").
+                       Hbslot Hislot Hlinks Hdi Hqc").
             { lia. }
             { exact Hgtc. }
             { exact Hnone2. }
@@ -1518,23 +1586,23 @@ Section ProofDirlookupMain.
           by (rewrite HL6a4; apply rd_arg32_small; lia).
         (* readi's destination buffer, at the address readi names it by *)
         iAssert (([∗ list] ii ∈ seq 0 16,
-                    pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ dol ii)
+                    pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[KT1] dol ii)
                  ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hde Hppid]" as "Hdst".
         { iEval (rewrite HL6a2 Hpjd). iFrame. }
         iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb pj b 
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (RD.wp_readi_sconf gs j gl gu gd gk pd pav pu bn gfs ga gf
+        iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol dlk_dummyV
                   pidv dq dqd L6 (K - 12)%nat eb b lks
-                  ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+                  ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                   ltac:(lia)
                   ltac:(intros _; change (Z.of_nat 16) with 16; lia)
                   Hj Hgs HL6a0
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
                   ltac:(lkbelow)
-                  with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
@@ -1546,7 +1614,7 @@ Section ProofDirlookupMain.
         first [ iEval (rewrite Hpjd) in "Hcnt" | idtac ].
         iAssert (([∗ list] ii ∈ seq 0 16,
                     pa_add (L6 !!! Regidx Ra2 : mword 64) ii
-                      ↦ₘ rd_delivered data dol (16 * i) tot ii)
+                      ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)
                  ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hdst2]" as "[Hde Hppid]".
         { iExact "Hdst2". }
         first [ iEval (rewrite Hpjd) in "Hppid" | idtac ].
@@ -1622,8 +1690,26 @@ Section ProofDirlookupMain.
                              (sign_extend' 64 (mword_of_int 2084912 : mword 21))
                            = mword_of_int KernelSyms.panic) by pcw.
           iEval (rewrite Htgtpn) in "Hpc".
-          iPoseProof (panic_wp_any_at CIDpa4 with "Hpanic") as "Hpan".
-          iApply ("Hpan" with "Htext Hpc Hcg"). }
+          (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+             a0 holds &"dirlookup read"; [kernel_data] mints the literal.
+             [cpu_own] has to arrive AT THE PANIC HART (CIDpa4), and its
+             source is readi's continuation, not where readi was called. *)
+          iPoseProof (dlk_msg_str with "Hkd") as "#Hstr".
+          iDestruct (cpu_own_transport CIDrd CIDpa4 0%nat eb pj b
+                       ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+          pose (PA3 := <[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (DL + 0x4e) : mword 64) 4)]> PA2).
+          assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int dlk_msg_a : mword 64))
+            by pcw.
+          iApply (PN.wp_panic_sconf KT1 (CID := CIDpa4) PA3 (K - 12)%nat
+                    0%nat eb b pj (PkAStr DfracDiscarded dlk_msg) lks
+                    (dlk_panic_K K HK) eq_refl dlk_panic_noff
+                    (dlk_panic_below lks Hbelow)
+                    with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+          { rewrite /pk_desc_res Ha0msg.
+            iSplit; [iPureIntro; exact dlk_msg_nonul|].
+            iSplit; [iPureIntro; exact dlk_msg_nz|]. iExact "Hstr". } }
         (* ---------------- THE FULL READ: exactly as before ----------- *)
         assert (Hclamp : rd_clamp (di_size dn) (16 * i) 16 = 16%nat)
           by exact (dlk_rd_clamp_full' (di_size dn) i Hfull).
@@ -1652,7 +1738,7 @@ Section ProofDirlookupMain.
                         = mword_of_int (DL + 0x6e)) by pcw.
         iEval (rewrite Hbb6e) in "Hpc".
         (* +0x6e lhu a5,-96(s0) : de.inum *)
-        iApply (wp_lhu_s_sconf (mword_of_int (DL + 0x6e)) Ra5 Rs0
+        iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DL + 0x6e)) Ra5 Rs0
                   (mword_of_int 4000 : mword 12) mrd (K - 12)%nat
                   (dir_inum data i) b ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi6e [Hdehi]").
@@ -1687,7 +1773,7 @@ Section ProofDirlookupMain.
           iNext. iIntros (CIDB9 HqB9) "Hcg Hpc".
           iEval (rewrite Htgt52) in "Hpc".
           iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
-                     ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                     ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
             with "[Hdehi Hdenm]" as "Hde".
           { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                               (dlk_align_8_2 _ Hal12))).
@@ -1699,7 +1785,7 @@ Section ProofDirlookupMain.
                     mt10 with
                     "[%] [%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                      Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
-                     Hislot Hqc").
+                     Hislot Hlinks Hdi Hqc").
           { exact HN1regs. }
           { exact (dir_first_step_miss data i s Hnone Hnm). }
         + (* ---- the record is LIVE: compare the names ---- *)
@@ -1770,8 +1856,8 @@ Section ProofDirlookupMain.
             by (rewrite /N4; apply upd_eq).
           iEval (rewrite -HN4a0) in "Hnm".
           iEval (rewrite -HN4a1) in "Hdenm".
-          iApply (NC.wp_namecmp_sconf N4 fn (dir_name data i) (K - 12)%nat
-                    dqn (DfracOwn 1) b pj ltac:(unfold K_namecmp; lia)
+          iApply (NC.wp_namecmp_sconf KT1 KT1 N4 fn (dir_name data i) (K - 12)%nat
+                    dqn (DfracOwn 1) b pj ltac:(lia)
                     with "Hcg Htext Hpc Hnm Hdenm").
           iIntros (CIDnc Hsnc mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
           iEval (rewrite HN4a0) in "Hnm".
@@ -1818,14 +1904,14 @@ Section ProofDirlookupMain.
                       (sign_extend' 64 (mword_of_int 8 : mword 13))
                       = mword_of_int (DL + 0x86)) by pcw.
             (* +0x7e beq s7,x0 / +0x82 sw s1,0(s7) : the optional [*poff = off] *)
-            iAssert (sie_cap_gpr mnc (K - 12)%nat b pj -∗
+            iAssert (sie_cap_gpr KT1 mnc (K - 12)%nat b pj -∗
                      pc_is (mword_of_int (DL + 0x7e)) -∗
-                     (if hasp then pf ↦₄ pofv else emp) -∗
+                     (if hasp then pf ↦₄[KT1] pofv else emp) -∗
                      wp_next (CID0 := CIDB13) true pj (fun CIDs : CpuId =>
-                       sie_cap_gpr mnc (K - 12)%nat b pj -∗
+                       sie_cap_gpr KT1 mnc (K - 12)%nat b pj -∗
                        pc_is (mword_of_int (DL + 0x86)) -∗
                        (if hasp
-                        then pf ↦₄ (mword_of_int (Z.of_nat (16 * i)) : mword 32)
+                        then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * i)) : mword 32)
                         else emp) -∗
                        WP (Loop : expr riscv_lang)) -∗
                      WP (Loop : expr riscv_lang))%I with "[]" as "Hpoffst".
@@ -1864,7 +1950,7 @@ Section ProofDirlookupMain.
             iApply ("Hpoffst" with "Hcg Hpc Hpoff").
             iIntros (CIDB14 HqB14) "Hcg Hpc Hpoff".
             (* +0x86 lhu a1,-96(s0) : the inum again *)
-            iApply (wp_lhu_s_sconf (mword_of_int (DL + 0x86)) Ra1 Rs0
+            iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DL + 0x86)) Ra1 Rs0
                       (mword_of_int 4000 : mword 12) mnc (K - 12)%nat
                       (dir_inum data i) b ltac:(nz) ltac:(rdok)
                       with "Hcg Hpc Hi86 [Hdehi]").
@@ -1885,7 +1971,7 @@ Section ProofDirlookupMain.
             iEval (rewrite Hbb8a) in "Hpc".
             (* +0x8a lw a0,0(s2) : dp->dev *)
             iEval (rewrite /i_dev) in "Hidev".
-            iApply (wp_lw_s_sconf (mword_of_int (DL + 0x8a)) Ra0 Rs2
+            iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x8a)) Ra0 Rs2
                       (mword_of_int 0 : mword 12) N5 (K - 12)%nat dev b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8a [Hidev]").
             { iEval (rgne; rewrite HN5s2). iExact "Hidev". }
@@ -1932,16 +2018,85 @@ Section ProofDirlookupMain.
               exact (Hinums i Hilt Hlive). }
             iDestruct (cpu_own_transport CIDrd CIDB17 0%nat eb pj b 
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+            (* ================================================================ *)
+            (*  THE LICENCE (increment C'-lite, fs-fragments.md §7.1/§7.5.6)    *)
+            (* ================================================================ *)
+            (*  This is the delivery point the whole enumeration exists for: an
+                inum that came off a disk block is about to become a REFERENCE.
+                Two steps.
+
+                (1) THE DISJUNCTION COLLAPSES AT A HIT.  [dl_lic_live] turns
+                    the contract's suppliable premise into the home-live fact
+                    the tickets need: under [dir_orphan_clean] an orphaned
+                    directory's live records are all dot records, and the
+                    matched record's name is the caller's [s].  So sys_unlink,
+                    which cannot re-check [dp->nlink], still gets here -- by
+                    its two [namecmp] refusals rather than by a guard.
+
+                (2) (a) OR (c), AND THE KERNEL DRAWS THE LINE.  If the matched
+                    record names the home itself -- a lookup of ["."] -- there
+                    is NO ticket to lend: xv6 deliberately does not count the
+                    self record ("No ip->nlink++ for '.': avoid cyclic ref
+                    count"), so [dir_link_at]'s guard is false there.  The
+                    home's own [dinode_at] is licence (c) and is a strictly
+                    better witness.  Otherwise the ticket at index [i] is
+                    licence (a), borrowed by [dir_links_borrow] and re-sealed
+                    by its wand.
+
+                Nothing is spent either way: iget returns the licence at the
+                SAME [l], and the closing wand puts the payload back exactly as
+                it was -- which is what makes this increment caller-side. *)
+            assert (Hsome : dir_first data nrec s = Some i).
+            { apply (dir_first_mono data (S i) nrec i s ltac:(lia)).
+              exact (dir_first_step_hit data i s Hnone Hmatch). }
+            assert (Hnl0 : bv_unsigned (di_nlink dn) <> 0)
+              by exact (dl_lic_live dn data s i Htyz Horph Hdisj Hsome).
+            assert (Hzu : bv_unsigned
+                      (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
+                      = bv_unsigned (dir_inum data i))
+              by exact (dlk_zext32_unsigned (dir_inum data i)).
+            iAssert (∃ lic : ilic,
+                       iname gi gfs
+                         (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
+                         lic
+                       ∗ (iname gi gfs
+                            (zero_extend' 32 (dir_inum data i : mword 16)
+                             : mword 32) lic
+                          -∗ dir_links (bv_unsigned dinum) dn data
+                             ∗ dinode_at gi dinum dr))%I
+              with "[Hlinks Hdi]" as (lic) "[Hlic Hlicback]".
+            { destruct (decide (bv_unsigned (dir_inum data i)
+                                = bv_unsigned dinum)) as [Hself | Hnself].
+              - (* the SELF record: licence (c) *)
+                assert (Hii : (zero_extend' 32 (dir_inum data i : mword 16)
+                               : mword 32) = dinum)
+                  by (apply bv_eq; rewrite Hzu; exact Hself).
+                iExists (HeldL dr). rewrite Hii.
+                iSplitL "Hdi".
+                { iApply (iname_held_intro gi gfs dinum dr Hdrnz with "Hdi"). }
+                iIntros "Hl".
+                iDestruct (iname_held_alloc with "Hl") as "[_ Hdi]".
+                iFrame "Hlinks Hdi".
+              - (* any other record: licence (a), the payload's own ticket *)
+                iDestruct (dir_links_borrow (bv_unsigned dinum) dn data i
+                             Htyz Hnl0 Hilt Hlive Hnself with "Hlinks")
+                  as (fl) "[Hp Hback]".
+                iExists (LinkedL fl). rewrite /iname Hzu.
+                iSplitL "Hp"; [iExact "Hp" |].
+                iIntros "Hp". iFrame "Hdi". iApply ("Hback" with "Hp"). }
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
+                      lic
                       N7 0%nat eb pj (K - 12)%nat b lks
-                      ltac:(unfold K_iget; lia)
+                      ltac:(lia)
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
-                      with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hislot").
+                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hislot
+                            Hlic").
             all: try lkbelow.
-            iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href".
+            iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href Hlic".
+            iDestruct ("Hlicback" with "Hlic") as "[Hlinks Hdi]".
             destruct Higp as (Hcsig & Hkslot & Higa0).
             assert (Higregs : dlk_regs m sp0 ip nb pf (16 * i) mig)
               by exact (dlk_regs_cs m sp0 ip nb pf (16 * i) N7 mig Hcsig HN7regs).
@@ -1962,14 +2117,11 @@ Section ProofDirlookupMain.
             iEval (rewrite Htgt96b) in "Hpc".
             (* the de buffer goes back to sixteen raw bytes for the tail *)
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                                 (dlk_align_8_2 _ Hal12))).
               iSplitL "Hdehi"; [iExact "Hdehi" | iExact "Hdenm"]. }
-            assert (Hsome : dir_first data nrec s = Some i).
-            { apply (dir_first_mono data (S i) nrec i s ltac:(lia)).
-              exact (dir_first_step_hit data i s Hnone Hmatch). }
             iPoseProof ("Htail" $! CIDB18) as "Ht".
             iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
             iApply ("Ht" $! mig mt10 (fun jj => file_byte data (16 * i + jj)%nat)
@@ -1982,7 +2134,7 @@ Section ProofDirlookupMain.
             iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
             iApply ("Hqc" $! mf true i kslot q with
                       "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid
-                       Hbslot [Href Hpoff]").
+                       Hbslot Hlinks Hdi [Href Hpoff]").
             { exact Hcsf. }
             iSplitR.
             { iPureIntro. split; [exact Hsome |]. split; [exact Hkslot |].
@@ -2001,7 +2153,7 @@ Section ProofDirlookupMain.
             iNext. iIntros (CIDB13 HqB13) "Hcg Hpc".
             iEval (rewrite Htgt52b) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                                 (dlk_align_8_2 _ Hal12))).
@@ -2013,7 +2165,7 @@ Section ProofDirlookupMain.
                       mt10 with
                       "[%] [%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                        Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
-                       Hislot Hqc").
+                       Hislot Hlinks Hdi Hqc").
             { exact Hncregs. }
             { exact (dir_first_step_miss data i s Hnone Hnm). } }
       (* ---------- the loop is entered at +0x5c with off = 0 ---------- *)
@@ -2032,7 +2184,7 @@ Section ProofDirlookupMain.
       iApply ("Hloop" $! 0%nat R13 dolds0 u10 with
                 "[%] [%] [%] [%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                  Hb9 Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
-                 Hislot Hcont").
+                 Hislot Hlinks Hdi Hcont").
       { lia. }
       { exact (dlk_off0_lt (bv_unsigned (di_size dn)) Hsznn Hszn). }
       { unfold dir_first. apply dfirst_0. }

@@ -25,7 +25,7 @@
        live bit, menvcfg bundled),
        the kernel-code capability [sie_cap m avail b] -- the
        [trap_res b + avail] free-stack slots below sp, i.e. [avail] usable
-       plus the ARM-DEPENDENT trap reserve [trap_res b] (78 at b = true,
+       plus the ARM-DEPENDENT trap reserve [trap_res b] (90 at b = true,
        0 at b = false -- see [trap_res]; sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
        SLOT [strans_inv] (Bare-with-stvec ∨ ∃root kernel-PT, consumed
@@ -42,7 +42,8 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap.
+From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap
+                                        mono_nat.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -275,6 +276,8 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
+Notation kv_frame_slots := (90%nat) (only parsing).
+
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -505,7 +508,6 @@ Section IntrDefsBase.
      cannot drift silently -- growing kerneltrap's cone without growing this
      would otherwise still compile and only fail deep inside the handler
      proof. *)
-  Definition kv_frame_slots : nat := 78.
 
   (* ------------------------------------------------------------------- *)
   (* THE TRAP RESERVE IS ARM-DEPENDENT, AND THAT IS NOT AN OPTIMISATION  *)
@@ -802,7 +804,7 @@ Section IntrDefsBase.
      WHY IT CANNOT LIVE IN [sie_cap].  The capability is threaded from the
      very first S-mode instruction, long before kvminithart installs the
      kernel table -- [sie_cap_intro_bare] builds it over the Bare arm -- so
-     a capability that always carried [strans_bit_kpt] could not be
+     a capability that always carried [kpt_on] could not be
      constructed at boot at all.
 
      WHY IT BELONGS TO THIS BUNDLE.  Once interrupts are ENABLED the
@@ -815,9 +817,89 @@ Section IntrDefsBase.
      INVARIANT instead of a convention, and it is what lets kernel code READ
      satp ([strans_inv_acc_kpt]) -- which usertrapret's
      [p->trapframe->kernel_satp = r_satp()] needs and which nothing could do
-     before, the receipt having been dropped by [main]. *)
-  Definition strans_bit (b : mword 1) : iProp Σ :=
-    ghost_var (strans_name cpu_id) (1/2)%Qp b.
+     before, the receipt having been dropped by [main].
+
+     THE RECEIPT IS PERSISTENT, and that is what the whole shape is for.  The
+     per-hart translation regime is MONOTONE -- Bare -> KPT, once per era
+     (kexec starts a new era with a fresh [era_strans_name], so within-era
+     persistence is safe) -- so it is tracked by a ONE-SHOT [mono_nat] rather
+     than a two-valued [ghost_var]:
+
+       [strans_pending]  auth at 0, HALF.  Two halves exist: the Bare arm of
+                         [strans_inv] holds one, the boot receipt is the
+                         other.  Their conjunction is the full auth at 0,
+                         which is what the kvminithart flip shoots.
+       [strans_kpt]      the FULL auth at 1 -- the KPT arm's own conjunct,
+                         and exclusive, so a slot cannot be in two places.
+       [kpt_on c]        the lower bound 1: PERSISTENT and TIMELESS, the
+                         shot's certificate, i.e. "hart [c] has the kernel
+                         page table installed".  This is what every CLIENT
+                         holds; nothing needs it to be exclusive.
+
+     The three conflicts that replace the old bit AGREEMENT:
+       - [kpt_on] against a pending half     -> 1 <= 0            (pins KPT)
+       - a pending half against [strans_kpt] -> 1/2 + 1 <= 1      (pins Bare)
+       - two pending halves                  -> agree at 0, no work.
+
+     The three faces are [RiscvPtsto]'s gname-explicit [strans_pending_at] /
+     [strans_kpt_at] / [kpt_on_at] at this hart's [strans_name] -- see the
+     note there for why they are definitions and not raw [mono_nat] at each
+     site. *)
+  Definition strans_pending : iProp Σ :=
+    strans_pending_at (strans_name cpu_id).
+
+  Definition strans_kpt : iProp Σ :=
+    strans_kpt_at (strans_name cpu_id).
+
+  Definition kpt_on (c : CPU) : iProp Σ :=
+    kpt_on_at (strans_name c).
+
+  Global Instance kpt_on_persistent (c : CPU) : Persistent (kpt_on c).
+  Proof. rewrite /kpt_on /kpt_on_at. apply _. Qed.
+  Global Instance kpt_on_timeless (c : CPU) : Timeless (kpt_on c).
+  Proof. rewrite /kpt_on /kpt_on_at. apply _. Qed.
+  Global Instance strans_pending_timeless : Timeless strans_pending.
+  Proof. rewrite /strans_pending /strans_pending_at. apply _. Qed.
+  Global Instance strans_kpt_timeless : Timeless strans_kpt.
+  Proof. rewrite /strans_kpt /strans_kpt_at. apply _. Qed.
+
+  (* THE TWO CONFLICTS, stated here beside the definitions because
+     [strans_inv]'s accessors below are their only real consumers. *)
+  Lemma kpt_on_pending_False : kpt_on cpu_id -∗ strans_pending -∗ ⌜ False ⌝.
+  Proof.
+    rewrite /kpt_on /kpt_on_at /strans_pending /strans_pending_at.
+    iIntros "Hlb Hauth".
+    iDestruct (mono_nat_lb_own_valid with "Hauth Hlb") as %[_ Hle].
+    iPureIntro. lia.
+  Qed.
+
+  Lemma strans_pending_kpt_False : strans_pending -∗ strans_kpt -∗ ⌜ False ⌝.
+  Proof.
+    rewrite /strans_pending /strans_pending_at /strans_kpt /strans_kpt_at.
+    iIntros "H1 H2".
+    iDestruct (mono_nat_auth_own_agree with "H1 H2") as %[Hq _].
+    iPureIntro. by eapply Qp.not_add_le_r.
+  Qed.
+
+  (* the two pending halves are the full auth: what the flip consumes.
+     NOTE THE DIRECTION OF THE [Qp.half_half] REWRITE.  Going BACKWARDS (turn
+     the goal's [1] into [1/2 + 1/2]) also rewrites the [1] INSIDE every
+     [1/2] in the proofmode context -- the whole [envs_entails Δ Q] is one
+     term -- and leaves [((1/2 + 1/2)/2)] hypotheses that frame against
+     nothing.  Build the sum first, then rewrite FORWARDS. *)
+  Lemma strans_pending_combine :
+    strans_pending -∗ strans_pending -∗
+    mono_nat_auth_own (strans_name cpu_id) 1%Qp 0%nat.
+  Proof.
+    rewrite /strans_pending /strans_pending_at. iIntros "H1 H2".
+    iAssert (mono_nat_auth_own (strans_name cpu_id) (1/2 + 1/2)%Qp 0%nat)
+      with "[H1 H2]" as "H".
+    { iApply (bi.equiv_entails_1_2 _ _
+                (mono_nat_auth_own_fractional (strans_name cpu_id) 0%nat
+                   (1/2)%Qp (1/2)%Qp)).
+      iFrame "H1 H2". }
+    rewrite Qp.half_half. iExact "H".
+  Qed.
 
   (* [intr_count] IS NOW LEVEL + EIGHTH, WITH NO PAYLOAD.  It used to carry
      [intr_handler_avail] at [n ≥ 1 ∧ eb = true] -- the "the pop will re-enable,
@@ -1098,78 +1180,74 @@ Section IntrDefsBase.
      The Bare→KPT move happens once, at kvminithart: dissolve the left arm
      (it owns the satp cell the switch writes), build [tlb_inv_pt], hand the
      stvec cell out to the boot code.
-     GHOST-TRACKED ARM: each arm carries half of a [ghost_var strans_name]
-     bit ('b"0" = Bare, 'b"1" = kernel PT installed); the bit is the arm
-     INDICATOR.  A client that holds the matching half pins the arm
-     (agreement -- the "still-Bare receipt"), and the kvminithart switch
-     flips it with both halves.  In practice the flip is one-way: the boot
-     receipt is the only outside half ever minted, so the arm only ever
-     moves Bare→KPT. *)
-  (* [strans_bit] itself is DEFINED ABOVE [trap_csrs] (§6b), because the KPT
+     GHOST-TRACKED ARM: the arm is the value of a per-hart ONE-SHOT
+     ([strans_pending] / [strans_kpt] / [kpt_on], §6b).  The Bare arm holds
+     one PENDING half (the boot receipt is the other); the KPT arm holds the
+     shot's FULL auth.  A client pins an arm by CONFLICT rather than by
+     agreement -- [kpt_on] against a pending half is 1 <= 0, a pending half
+     against the shot auth is a fraction above 1 -- and the kvminithart
+     switch SHOOTS, with both pending halves.  The flip is one-way by
+     construction now, not merely in practice: [kpt_on] is persistent and
+     [mono_nat] cannot go back down. *)
+  (* the one-shot itself is DEFINED ABOVE [trap_csrs] (§6b), because the KPT
      receipt is one of that bundle's members.  Only the slot and its movers
      live here. *)
 
   Definition strans_inv : iProp Σ :=
-    ((strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
-     ∨ (strans_bit ('b"1") ∗ ∃ root_ppn : mword 44, tlb_res_pt root_ppn))%I.
+    ((strans_pending ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
+     ∨ (strans_kpt ∗ ∃ root_ppn : mword 44, tlb_res_pt root_ppn))%I.
 
   Lemma strans_inv_intro (root_ppn : mword 44) :
-    strans_bit ('b"1") -∗ tlb_res_pt root_ppn -∗ strans_inv.
+    strans_kpt -∗ tlb_res_pt root_ppn -∗ strans_inv.
   Proof. iIntros "Hbit H". iRight. iFrame "Hbit". iExists root_ppn. iExact "H". Qed.
 
   Lemma strans_inv_intro_bare (v : mword 64) :
-    strans_bit ('b"0") -∗ bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
+    strans_pending -∗ bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
   Proof. iIntros "Hbit Hb Hstv". iLeft. iFrame "Hbit Hb". iExists v. iExact "Hstv". Qed.
 
-  Lemma strans_bit_agree b b' : strans_bit b -∗ strans_bit b' -∗ ⌜b = b'⌝.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ghost_var_agree with "H1 H2") as %He. done.
-  Qed.
-
-  (* the receipt pins the arm at Bare and opens it, returning BOTH halves
-     (the client's + the arm's) so the switch can flip the bit. *)
+  (* the still-Bare receipt pins the arm at Bare and opens it, returning BOTH
+     pending halves so the switch can shoot. *)
   Lemma strans_inv_acc_bare :
-    strans_bit ('b"0") -∗ strans_inv -∗
-    strans_bit ('b"0") ∗ strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v).
+    strans_pending -∗ strans_inv -∗
+    strans_pending ∗ strans_pending ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v).
   Proof.
     iIntros "Hrcpt [(Hbit & Hb & Hstv) | (Hbit & _)]".
     - iFrame "Hrcpt Hbit Hb Hstv".
-    - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate.
+    - iDestruct (strans_pending_kpt_False with "Hrcpt Hbit") as %[].
   Qed.
 
   (* THE KPT MIRROR of [strans_inv_acc_bare], and the reason the receipt is
      worth carrying.  It BORROWS rather than dissolves: the Bare accessor
-     hands both halves out because kvminithart is about to flip the bit,
-     whereas a reader of the kernel table wants the slot back unchanged, so
-     this returns the client's receipt plus a wand that re-seals the arm from
-     the residue.  The root stays EXISTENTIAL -- the sconf tier is
-     deliberately root-free, and a caller that needs to identify the root
-     does so at the boundary where it is named, not here. *)
+     hands both halves out because kvminithart is about to shoot, whereas a
+     reader of the kernel table wants the slot back unchanged, so this
+     returns a wand that re-seals the arm from the residue.  The receipt
+     itself is NOT returned -- [kpt_on] is persistent, so the caller still
+     has it.  The root stays EXISTENTIAL -- the sconf tier is deliberately
+     root-free, and a caller that needs to identify the root does so at the
+     boundary where it is named, not here. *)
   Lemma strans_inv_acc_kpt :
-    strans_bit strans_bit_kpt -∗ strans_inv -∗
-    strans_bit strans_bit_kpt ∗
+    kpt_on cpu_id -∗ strans_inv -∗
     ∃ root_ppn : mword 44,
       tlb_res_pt root_ppn ∗ (tlb_res_pt root_ppn -∗ strans_inv).
   Proof.
     iIntros "Hrcpt [(Hbit & _ & _) | (Hbit & Hres)]".
-    - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate.
-    - iFrame "Hrcpt". iDestruct "Hres" as (root_ppn) "Hres".
+    - iDestruct (kpt_on_pending_False with "Hrcpt Hbit") as %[].
+    - iDestruct "Hres" as (root_ppn) "Hres".
       iExists root_ppn. iFrame "Hres".
       iIntros "Hres". iApply (strans_inv_intro root_ppn with "Hbit Hres").
   Qed.
 
-  (* both halves -> flip to '1', split back into two halves. *)
-  Lemma strans_bit_flip :
-    strans_bit ('b"0") -∗ strans_bit ('b"0") ==∗ strans_bit ('b"1") ∗ strans_bit ('b"1").
+  (* THE SHOT: both pending halves -> the KPT arm's full auth, plus the
+     persistent certificate.  Only ONE thing comes back for the client, and
+     it never has to be handed anywhere again. *)
+  Lemma strans_flip :
+    strans_pending -∗ strans_pending ==∗ strans_kpt ∗ kpt_on cpu_id.
   Proof.
     iIntros "H1 H2".
-    iMod (ghost_var_update_halves ('b"1" : mword 1) with "H1 H2") as "[H1 H2]".
-    iModIntro. iFrame.
+    iDestruct (strans_pending_combine with "H1 H2") as "H".
+    rewrite /strans_kpt /strans_kpt_at /kpt_on /kpt_on_at.
+    iMod (mono_nat_own_update 1%nat with "H") as "[Ha Hlb]"; [lia|].
+    iModIntro. iFrame "Ha Hlb".
   Qed.
 
   (* two FULL cells of the same register cannot coexist -- the Bare∧SIE='1'
@@ -1266,9 +1344,55 @@ Section IntrDefsBase.
       iApply (res_tmode root_ppn σ HSXL with "Hri Ht").
   Qed.
 
+  (* THE WITNESSED ARM (SRegime.v's [sr_kwit]/[sr_absorb_wit],
+     claude-notes/projects/sp-migration.md design §3): the slot's witness
+     pins its arm at KPT.  Mirrors [strans_absorb]'s case split -- the
+     Bare arm holds [strans_pending], which conflicts with the witness
+     [kpt_on cpu_id] by [kpt_on_pending_False]; the KPT arm delegates to
+     [res_absorb] exactly as [strans_absorb]'s right branch does. *)
+  Lemma strans_absorb_wit :
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      ⊢ kpt_on cpu_id -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
+  Proof.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "Hwit Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
+    - iDestruct (kpt_on_pending_False with "Hwit Hbit") as %[].
+    - iDestruct "Hk" as (root_ppn) "Ht".
+      iMod (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
+              with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iModIntro. iExists σ'.
+      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+      iFrame "Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
-            strans_absorb strans_transform strans_tmode.
+            strans_absorb strans_transform strans_tmode
+            (kpt_on cpu_id) _ strans_absorb_wit.
 
   (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
      leaf/engine call sites use without unfolding the record. *)
@@ -1323,7 +1447,7 @@ Section IntrDefsBase.
            R cpu_id ∗
            (* the KPT receipt: interrupts on implies the kernel table is
               installed, so it has exactly this arm's lifetime (§6b). *)
-           strans_bit strans_bit_kpt ∗
+           kpt_on cpu_id ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1332,17 +1456,62 @@ Section IntrDefsBase.
            cpu_hart 0 true p ∅)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
-  Definition sie_cap_of (R : CPU -d> iPropO Σ) (m : regfile) (avail : nat)
-      (b : bool) (p : mword 64) : iProp Σ :=
-    (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
-     strans_inv ∗
-     sie_arm_of R b p)%I.
+  (* THE TIER IS AN EXPLICIT LEADING ARGUMENT, AND IT MEANS THE HART'S
+     TRANSLATION REGIME (sp-migration.md, K2b SETTLED): [sie_cap_of kt R m
+     avail b p] is the bundle held by a hart running at regime [kt] --
+     [KT0] = Bare, [KT1] = the kernel table installed.  It is ORTHOGONAL to
+     the SIE index [b]: the scheduler is a KPT hart with interrupts ENABLED
+     and boot is a Bare hart with them disabled, and every correlation
+     design between the two is dead.
+     Function specs UNIVERSALLY QUANTIFY [kt] and return the SAME [kt];
+     concrete regimes appear only where a regime is a FACT
+     ([sie_cap_intro_bare] at KT0, [sie_cap_ktier_up] at the kvminithart
+     flip).
+     TWO of the conjuncts see the tier: [stack_own], uniformly at [kt]
+     (KT0 ⊑ KT1 absorbs a physical stack by weakening, so no per-thread
+     stack-tier bookkeeping exists), and the witness.  [strans_inv] is the
+     translation slot (physical tier) and [sie_arm_of] is ghost + registers
+     + the OPEN resource [R] -- which is why [sie_arm_of] deliberately does
+     NOT take the binder: parameterized over [R] it has no tier-dependent
+     conjunct at all, and an argument its body never mentions would be a
+     phantom (durable-notes, "a definition that DROPS the arguments the
+     taken branch does not mention").  Its INSTANTIATED form [sie_arm] does
+     take it, because [intr_res kt] is tier-indexed. *)
+  (* THE FOURTH CONJUNCT IS THE TIER WITNESS, AND IT SITS HERE -- AT THE
+     CAPABILITY, NOT IN AN ARM -- SO THAT BOTH SIE ARMS CARRY IT.
+     [sr_ktier_wit strans_regime kt] is read at the bundle's OWN regime,
+     exactly as the [stack_own] conjunct above it is: [emp] at KT0 (so a
+     Bare hart's capability costs nothing), [kpt_on cpu_id] at KT1 (so a
+     kstack capability ATTESTS the access right its own carve needs).  It is
+     persistent at both tiers ([SRegime.sr_ktier_wit_persistent]), so
+     splitting the bundle duplicates it for free.
 
-  Definition sie_cap_gpr_of (R : CPU -d> iPropO Σ)
+     WHY NOT LEAVE IT TO THE ENABLED ARM.  [sie_arm_of]'s [b = true] branch
+     already holds [kpt_on cpu_id] (§6b: interrupts on implies the kernel
+     table is installed) -- but only there.  The KT1 windows that matter
+     post-boot are exactly the SIE=0 ones (push_off), where the arm carries
+     nothing; that is what this conjunct buys and it is why the placement is
+     at [sie_cap_of] rather than inside the arm.
+
+     THE ARM'S COPY STAYS, and the two coexist harmlessly at KT1 (both
+     persistent).  The arm's copy is HART-REBIND-LOAD-BEARING:
+     [WpSconfMem.sie_ktier_wit_rebind]'s [b = true] branch needs the receipt
+     AT THE HART THE FUNNEL'S σ-CALLBACK WAS REBOUND TO, and the arm is
+     delivered there; this conjunct is the SIE-INDEPENDENT one and is stated
+     at the capability's own hart. *)
+  Definition sie_cap_of (kt : ktier)
+      (R : CPU -d> iPropO Σ) (m : regfile) (avail : nat)
+      (b : bool) (p : mword 64) : iProp Σ :=
+    (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
+     strans_inv ∗
+     sie_arm_of R b p ∗
+     sr_ktier_wit strans_regime kt)%I.
+
+  Definition sie_cap_gpr_of (kt : ktier) (R : CPU -d> iPropO Σ)
       (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
      sconf ∗
-     sie_cap_of R m avail b p ∗
+     sie_cap_of kt R m avail b p ∗
      gpr_file (tp_pin m))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -1360,9 +1529,17 @@ Section IntrDefsBase.
   (* its own conjunct -- and it is the recursive occurrence, which is why *)
   (* [ires_of]'s [▷] is the fixpoint's guard.                            *)
   (* ------------------------------------------------------------------- *)
-  Definition ihs_entry_of (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+  (* THE CONTRACT'S THREE PIECES TAKE THE TIER, AND THE FIXPOINT IS TAKEN
+     PER-TIER.  A trap on a [kt]-regime hart runs and resumes at [kt] -- the
+     regime cannot change under a handler -- so [kt] is UNIFORM outside the
+     recursion: [ihs kt := fixpoint (ihs_pre kt)] below, one Banach fixpoint
+     per tier, and [ires_of] (the only place the recursive occurrence sits)
+     needs no binder at all because it is parameterized over the spec family
+     it carries.  That uniformity is why [ires_of_contractive] and
+     [ihs_of_ne] close with their scripts unchanged. *)
+  Definition ihs_entry_of (kt : ktier) (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
       (p pc0 sc tv handler : mword 64) : iProp Σ :=
-    (sie_cap_gpr_of R m (trap_res true + av) false p ∗
+    (sie_cap_gpr_of kt R m (trap_res true + av) false p ∗
      sret_bits ('b"1" : mword 1) ('b"1" : mword 1) ∗
      sepc ↦ᵣ pc0 ∗
      scause ↦ᵣ sc ∗
@@ -1372,7 +1549,7 @@ Section IntrDefsBase.
         members.  A trap cannot change which table is installed, so this is a
         pure hand-over -- and it is what [WpSconfSret.wp_sret_s_sconf] asks of
         whoever re-enables interrupts. *)
-     strans_bit strans_bit_kpt ∗
+     kpt_on cpu_id ∗
      (* ∅: the trap fired with interrupts ENABLED, and an enabled hart holds
         no spinlock -- so a handler always starts from the empty held set,
         which is what makes its own acquires (clockintr's tickslock,
@@ -1387,21 +1564,21 @@ Section IntrDefsBase.
      "the enabled bundle at [pc0]", and the handler's continuation hands back
      precisely that -- no re-assembly, no [intr_config], no [intr_frame].  The
      avail is [av], the reserve having been spent as the handler's budget. *)
-  Definition ihs_post_of (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+  Definition ihs_post_of (kt : ktier) (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
       (p pc0 : mword 64) : iProp Σ :=
-    (sie_cap_gpr_of R m av true p -∗
+    (sie_cap_gpr_of kt R m av true p -∗
      pc_is pc0 -∗
      WP (Loop : expr riscv_lang))%I.
 
   (* ONE TRAP'S OBLIGATION, at the ambient hart, with the continuation left
      as a parameter -- because the continuation is the one thing that is NOT
      at this hart.  [K] is what [wp_next] quantifies. *)
-  Definition ihs_trap_of (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+  Definition ihs_trap_of (kt : ktier) (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
       (p pc0 sc tv handler : mword 64)
       (K : forall CID : CpuId, iProp Σ) : iProp Σ :=
     (⌜ ret_pc pc0 = pc0 ⌝ -∗
      ⌜ s_cause_ok sc ⌝ -∗
-     ihs_entry_of R m av p pc0 sc tv handler -∗
+     ihs_entry_of kt R m av p pc0 sc tv handler -∗
      wp_next true p K -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -1469,47 +1646,50 @@ Section IntrDefs.
      and its [MIE_S] pin, the menvcfg pin), which is what makes the statement
      this short.  [av] is the handler's usable stack budget; the reserve it
      runs in is the enabled index's, re-indexed. *)
-  Definition ihs_body_of (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
+  Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
       (handler : mword 64) : iProp Σ :=
     (□ ∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
-        ihs_trap_of (CID := CIDb) R m av p pc0 sc tv handler
-          (fun c' => ihs_post_of (CID := c') R m av p pc0))%I.
+        ihs_trap_of (CID := CIDb) kt R m av p pc0 sc tv handler
+          (fun c' => ihs_post_of (CID := c') kt R m av p pc0))%I.
 
-  Definition ihs_of (R : CPU -d> iPropO Σ) : CPU -d> mword 64 -d> iPropO Σ :=
-    fun (c : CPU) (handler : mword 64) => ihs_body_of R (CIDb := c) handler.
+  Definition ihs_of (kt : ktier) (R : CPU -d> iPropO Σ)
+      : CPU -d> mword 64 -d> iPropO Σ :=
+    fun (c : CPU) (handler : mword 64) => ihs_body_of kt R (CIDb := c) handler.
 
-  Global Instance ihs_of_ne : NonExpansive ihs_of.
+  Global Instance ihs_of_ne (kt : ktier) : NonExpansive (ihs_of kt).
   Proof.
     rewrite /ihs_of /ihs_body_of /ihs_trap_of /ihs_entry_of /ihs_post_of
             /sie_cap_gpr_of /sie_cap_of /sie_arm_of /wp_next.
     solve_proper.
   Qed.
 
-  Definition ihs_pre (S : CPU -d> mword 64 -d> iPropO Σ)
-      : CPU -d> mword 64 -d> iPropO Σ := ihs_of (ires_of S).
+  Definition ihs_pre (kt : ktier) (S : CPU -d> mword 64 -d> iPropO Σ)
+      : CPU -d> mword 64 -d> iPropO Σ := ihs_of kt (ires_of S).
 
-  Global Instance ihs_pre_contractive : Contractive ihs_pre.
+  Global Instance ihs_pre_contractive (kt : ktier) : Contractive (ihs_pre kt).
   Proof.
     intros n S1 S2 HS. rewrite /ihs_pre.
     apply ihs_of_ne. by apply ires_of_contractive.
   Qed.
 
-  Definition ihs : CPU -d> mword 64 -d> iPropO Σ := fixpoint ihs_pre.
+  Definition ihs (kt : ktier) : CPU -d> mword 64 -d> iPropO Σ :=
+    fixpoint (ihs_pre kt).
 
-  (* THE PUBLIC NAME AND ARITY ARE UNCHANGED: the contract at the ambient
-     hart.  Every existing spelling [intr_handler_spec h] still means what it
-     meant; what changed is that its body now threads the bundle. *)
-  Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
-    ihs cpu_id handler.
+  (* THE CONTRACT AT THE AMBIENT HART, AT THE HART'S REGIME [kt].  A trap on
+     a [kt]-regime hart runs and resumes at [kt]; the handler's own proof is
+     tier-generic, so [intr_handler_spec kt h] is available at whatever
+     regime its holder is running. *)
+  Definition intr_handler_spec (kt : ktier) (handler : mword 64) : iProp Σ :=
+    ihs kt cpu_id handler.
 
   (* PERSISTENCE HAS TO NAME THE INSTANCE.  The body is [□ _], so there is
      exactly one, but [apply _] after the [fixpoint_unfold] rewrite searches
      the whole unfolded contract and does not come back (>90s, measured).
      The pre-fixpoint definition could afford [apply _]; this one cannot. *)
-  Global Instance intr_handler_spec_persistent handler :
-    Persistent (intr_handler_spec handler).
+  Global Instance intr_handler_spec_persistent (kt : ktier) handler :
+    Persistent (intr_handler_spec kt handler).
   Proof.
-    rewrite /intr_handler_spec /ihs (fixpoint_unfold ihs_pre cpu_id handler)
+    rewrite /intr_handler_spec /ihs (fixpoint_unfold (ihs_pre kt) cpu_id handler)
             /ihs_pre /ihs_of /ihs_body_of.
     apply bi.intuitionistically_persistent.
   Qed.
@@ -1517,10 +1697,11 @@ Section IntrDefs.
   (* THE ONE-STEP UNFOLDING, which every consumer of the contract needs: the
      spec is not syntactically a [□ ∀ …] any more, so [iApply "Hspec"] must
      be preceded by a rewrite with this. *)
-  Lemma intr_handler_spec_unfold (handler : mword 64) :
-    intr_handler_spec handler ⊣⊢ ihs_body_of (ires_of ihs) handler.
+  Lemma intr_handler_spec_unfold {kt : ktier} (handler : mword 64) :
+    intr_handler_spec kt handler ⊣⊢ ihs_body_of kt (ires_of (ihs kt)) handler.
   Proof.
-    rewrite /intr_handler_spec /ihs. apply (fixpoint_unfold ihs_pre cpu_id handler).
+    rewrite /intr_handler_spec /ihs.
+    apply (fixpoint_unfold (ihs_pre kt) cpu_id handler).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1533,13 +1714,14 @@ Section IntrDefs.
   (*   - the ENGINE ([WpIntrInv.wp_exec_step_intr]) applies the spec;        *)
   (*   - the PRODUCER ([ProofKernelvec.kernelvec_handler_spec]) builds it.   *)
   (* ------------------------------------------------------------------- *)
-  Lemma intr_handler_spec_apply (handler : mword 64)
+  Lemma intr_handler_spec_apply {kt : ktier} (handler : mword 64)
       (m : regfile) (av : nat) (p pc0 sc tv : mword 64) :
     ret_pc pc0 = pc0 ->
     s_cause_ok sc ->
-    intr_handler_spec handler -∗
-    ihs_entry_of (ires_of ihs) m av p pc0 sc tv handler -∗
-    wp_next true p (fun c' => ihs_post_of (CID := c') (ires_of ihs) m av p pc0) -∗
+    intr_handler_spec kt handler -∗
+    ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 sc tv handler -∗
+    wp_next true p
+      (fun c' => ihs_post_of (CID := c') kt (ires_of (ihs kt)) m av p pc0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpc0 Hsc) "Hsp Hentry Hnext".
@@ -1549,15 +1731,15 @@ Section IntrDefs.
     iApply ("Hsp" with "[%] [%] Hentry Hnext"); done.
   Qed.
 
-  Lemma intr_handler_spec_intro (handler : mword 64) :
+  Lemma intr_handler_spec_intro {kt : ktier} (handler : mword 64) :
     □ (∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
          ⌜ ret_pc pc0 = pc0 ⌝ -∗
          ⌜ s_cause_ok sc ⌝ -∗
-         ihs_entry_of (ires_of ihs) m av p pc0 sc tv handler -∗
+         ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 sc tv handler -∗
          wp_next true p
-           (fun c' => ihs_post_of (CID := c') (ires_of ihs) m av p pc0) -∗
+           (fun c' => ihs_post_of (CID := c') kt (ires_of (ihs kt)) m av p pc0) -∗
          WP (Loop : expr riscv_lang)) -∗
-    intr_handler_spec handler.
+    intr_handler_spec kt handler.
   Proof.
     iIntros "#H".
     iEval (rewrite intr_handler_spec_unfold /ihs_body_of).
@@ -1643,13 +1825,18 @@ Section IntrDefs.
      [kernelvec_handler_spec] is in hand.  The resource says "a trap vector
      is installed and here is its contract", and at boot that is simply
      false. *)
-  Definition intr_res : iProp Σ :=
+  (* TIER-INDEXED, BECAUSE IT CARRIES THE CONTRACT.  [intr_res kt] is "a
+     trap vector is installed and here is its contract FOR A [kt]-REGIME
+     HART".  It is NOT tier-covariant in either direction (the contract has
+     the bundle in both a negative and a positive position), which is what
+     restricts [sie_cap_ktier_up] to the DISABLED arm -- see there. *)
+  Definition intr_res (kt : ktier) : iProp Σ :=
     (∃ (h : mword 64) (b : mword 1),
        ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
        ⌜ stvec_base h = h ⌝ ∗
        ghost_var sie_gname (1/4) b ∗
        stvec ↦ᵣ h ∗
-       ▷ intr_handler_spec h)%I.
+       ▷ intr_handler_spec kt h)%I.
 
   (* THE constructor.  No fupd -- there is no invariant to allocate, which is
      why the boot chain's [intr_inv_alloc_off] site loses its [iMod].  There
@@ -1658,13 +1845,13 @@ Section IntrDefs.
      ([iDestruct "H" as (h vb) "(%Htvd & %Hsb & Hq & Hstv & #Hspec)"]) and
      rebuild with this.  The five old [iInv]/[inv_acc] sites are all that
      shape now. *)
-  Lemma intr_res_intro (h : mword 64) (b : mword 1) :
+  Lemma intr_res_intro {kt : ktier} (h : mword 64) (b : mword 1) :
     trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ->
     stvec_base h = h ->
     ghost_var sie_gname (1/4) b -∗
     stvec ↦ᵣ h -∗
-    ▷ intr_handler_spec h -∗
-    intr_res.
+    ▷ intr_handler_spec kt h -∗
+    intr_res kt.
   Proof.
     iIntros (Htvd Hsb) "Hq Hstv #Hspec".
     iExists h, b. iFrame "Hq Hstv Hspec". by iSplit.
@@ -1696,25 +1883,25 @@ Section IntrDefs.
   (* SPELLED FLAT, not as [trap_csrs_raw ∗ intr_res]: the tier destructures
      this bundle positionally in dozens of places, and a nested pair would
      silently rebind the fourth name to a pair instead of failing loudly. *)
-  Definition trap_csrs : iProp Σ :=
+  Definition trap_csrs (kt : ktier) : iProp Σ :=
     ((∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v) ∗
      (∃ a b : mword 1, sret_bits a b) ∗
-     intr_res ∗
-     strans_bit strans_bit_kpt)%I.
+     intr_res kt ∗
+     kpt_on cpu_id)%I.
 
-  Lemma trap_csrs_of_raw :
-    trap_csrs_raw -∗ intr_res -∗ strans_bit strans_bit_kpt -∗ trap_csrs.
+  Lemma trap_csrs_of_raw {kt : ktier} :
+    trap_csrs_raw -∗ intr_res kt -∗ kpt_on cpu_id -∗ trap_csrs kt.
   Proof. iIntros "(Ha & Hb & Hc & Hd) Hres Hkpt". iFrame. Qed.
 
-  Lemma trap_csrs_to_raw :
-    trap_csrs -∗ trap_csrs_raw ∗ intr_res ∗ strans_bit strans_bit_kpt.
+  Lemma trap_csrs_to_raw {kt : ktier} :
+    trap_csrs kt -∗ trap_csrs_raw ∗ intr_res kt ∗ kpt_on cpu_id.
   Proof. iIntros "(Ha & Hb & Hc & Hd & Hres & Hkpt)". iFrame. Qed.
 
-  Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
+  Definition trap_csrs_pay (kt : ktier) (n : nat) (eb : bool) : iProp Σ :=
     (match n with
-     | O => if eb then trap_csrs else emp
+     | O => if eb then trap_csrs kt else emp
      | S _ => emp
      end)%I.
 
@@ -1734,11 +1921,11 @@ Section IntrDefs.
      the pushing acquire records intena = 0 and hands out nothing, and the
      handler is holding the trap CSRs itself because the TRAP gave them to
      it. *)
-  Definition trap_csrs_ext (eb : bool) : iProp Σ :=
-    (if eb then emp else trap_csrs)%I.
+  Definition trap_csrs_ext (kt : ktier) (eb : bool) : iProp Σ :=
+    (if eb then emp else trap_csrs kt)%I.
 
-  Lemma trap_csrs_ext_split (eb : bool) :
-    trap_csrs_pay 0 eb ∗ trap_csrs_ext eb ⊣⊢ trap_csrs.
+  Lemma trap_csrs_ext_split {kt : ktier} (eb : bool) :
+    trap_csrs_pay kt 0 eb ∗ trap_csrs_ext kt eb ⊣⊢ trap_csrs kt.
   Proof.
     destruct eb; rewrite /trap_csrs_pay /trap_csrs_ext.
     - by rewrite bi.sep_emp.
@@ -1778,15 +1965,15 @@ Section IntrDefs.
   (* which is what keeps a single hypothesis threading through the whole    *)
   (* push_off / acquire / release / pop_off cone.                           *)
   (* ==================================================================== *)
-  Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
+  Definition arm_pay (kt : ktier) (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (trap_csrs_pay kt n eb ∗ cpu_claim_pay n eb p)%I.
 
-  Lemma arm_pay_parts (n : nat) (eb : bool) (p : mword 64) :
-    arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
+  Lemma arm_pay_parts {kt : ktier} (n : nat) (eb : bool) (p : mword 64) :
+    arm_pay kt n eb p ⊣⊢ trap_csrs_pay kt n eb ∗ cpu_claim_pay n eb p.
   Proof. reflexivity. Qed.
 
-  Lemma arm_pay_on (p : mword 64) :
-    arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
+  Lemma arm_pay_on {kt : ktier} (p : mword 64) :
+    arm_pay kt 0 true p ⊣⊢ trap_csrs kt ∗ cpu_claim p.
   Proof. reflexivity. Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1806,32 +1993,37 @@ Section IntrDefs.
   (* [reflexivity]; that is why an existing enabled-index caller sees no   *)
   (* change beyond passing two hypotheses where it passed one.             *)
   (* ------------------------------------------------------------------- *)
-  Lemma arm_pay_ext_split (eb : bool) (p : mword 64) :
-    trap_csrs -∗ cpu_claim p -∗
-    arm_pay 0 eb p ∗ (trap_csrs_ext eb ∗ cpu_claim_ext eb p).
+  Lemma arm_pay_ext_split {kt : ktier} (eb : bool) (p : mword 64) :
+    trap_csrs kt -∗ cpu_claim p -∗
+    arm_pay kt 0 eb p ∗ (trap_csrs_ext kt eb ∗ cpu_claim_ext eb p).
   Proof.
     rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay /trap_csrs_ext /cpu_claim_ext.
     destruct eb; iIntros "Htc Hclm"; iFrame; try done.
   Qed.
 
-  Lemma arm_pay_ext_join (eb : bool) (p : mword 64) :
-    arm_pay 0 eb p -∗ (trap_csrs_ext eb ∗ cpu_claim_ext eb p) -∗
-    trap_csrs ∗ cpu_claim p.
+  Lemma arm_pay_ext_join {kt : ktier} (eb : bool) (p : mword 64) :
+    arm_pay kt 0 eb p -∗ (trap_csrs_ext kt eb ∗ cpu_claim_ext eb p) -∗
+    trap_csrs kt ∗ cpu_claim p.
   Proof.
     rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay /trap_csrs_ext /cpu_claim_ext.
     destruct eb; iIntros "Hpay Hext"; iFrame; try done.
   Qed.
 
   (* THE KPT RECEIPT IS AN ENABLED-ARM MEMBER, for the reason spelled out at
-     [strans_bit] (§6b): interrupts on implies the kernel table is installed,
+     the one-shot (§6b): interrupts on implies the kernel table is installed,
      so the receipt has exactly this arm's lifetime.  The DISABLED arm does
      not carry it -- which is what keeps boot constructible, since every
      instruction before kvminithart runs at [b = false] over the Bare slot. *)
-  Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
+  (* TIER-INDEXED ONLY THROUGH [intr_res].  At [b = false] the branch does
+     not mention [kt] at all, so [sie_arm KT0 false p] and
+     [sie_arm KT1 false p] are DEFINITIONALLY EQUAL -- which is exactly what
+     makes the kvminithart upgrade below provable, boot running with
+     interrupts off. *)
+  Definition sie_arm (kt : ktier) (b : bool) (p : mword 64) : iProp Σ :=
     (if b
      then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-           intr_res ∗
-           strans_bit strans_bit_kpt ∗
+           intr_res kt ∗
+           kpt_on cpu_id ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1845,9 +2037,9 @@ Section IntrDefs.
      fragments of the same ghost, so agreement reads the live SIE off the
      index -- which is what every leaf that has to know whether interrupts
      are on (the sstatus reads, the sstatus RESTORE) actually needs. *)
-  Lemma sie_arm_half_agree (b : bool) (px : mword 64) (ms : mword 64) :
+  Lemma sie_arm_half_agree {kt : ktier} (b : bool) (px : mword 64) (ms : mword 64) :
     ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
-    sie_arm b px -∗
+    sie_arm kt b px -∗
     ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
   Proof.
     iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
@@ -1856,12 +2048,12 @@ Section IntrDefs.
     - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
   Qed.
 
-  Lemma sie_arm_of_ex (p : mword 64) :
-    (∃ b : bool, sie_arm b p) ⊣⊢
+  Lemma sie_arm_of_ex {kt : ktier} (p : mword 64) :
+    (∃ b : bool, sie_arm kt b p) ⊣⊢
     (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
      (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-      intr_res ∗
-      strans_bit strans_bit_kpt ∗
+      intr_res kt ∗
+      kpt_on cpu_id ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1881,27 +2073,32 @@ Section IntrDefs.
      else in the arm is untouched, so these are pure re-associations. *)
   (* [intr_res] is no longer handed out BESIDE [trap_csrs]: it is a conjunct
      OF it, so these two are pure re-associations of the same five cells. *)
-  Lemma sie_arm_on_out (p : mword 64) :
-    sie_arm true p -∗
+  Lemma sie_arm_on_out {kt : ktier} (p : mword 64) :
+    sie_arm kt true p -∗
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-    trap_csrs ∗
+    trap_csrs kt ∗
     cpu_claim p ∗
     cpu_hart 0 true p ∅.
   Proof. iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
-  Lemma sie_arm_on_in (p : mword 64) :
+  Lemma sie_arm_on_in {kt : ktier} (p : mword 64) :
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
-    trap_csrs -∗
+    trap_csrs kt -∗
     cpu_claim p -∗
     cpu_hart 0 true p ∅ -∗
-    sie_arm true p.
+    sie_arm kt true p.
   Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres & Hkpt) Hclm Hcpu". iFrame. Qed.
 
-  Definition sie_cap (m : regfile) (avail : nat) (b : bool)
+  (* THE PUBLIC CAPABILITY, at the hart's regime [kt] -- see [sie_cap_of]
+     above for what the index means.  Written out verbatim rather than as
+     [sie_cap_of kt (ires_of (ihs kt))] so that every [rewrite /sie_cap]
+     site in the tree keeps opening the shape it opens today. *)
+  Definition sie_cap (kt : ktier) (m : regfile) (avail : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
-    (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
+    (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
-     sie_arm b p)%I.
+     sie_arm kt b p ∗
+     sr_ktier_wit strans_regime kt)%I.
 
   (* THE WRITE-SIDE PREMISE of every gpr-writing leaf.  Replaces the old
      [rd <> csp_rs1] IN PLACE (same premise slot, so no call site changes
@@ -1920,24 +2117,133 @@ Section IntrDefs.
      what makes it PROVABLE here is that a trap vector cannot be installed
      while translation is Bare.)  Both the absorbing engine and the SIE=1
      instruction engine need exactly this shape -- the reserved carve, the
-     arm bit, the table, and the arm -- so it is stated once. *)
-  Lemma sie_cap_on_kpt (m : regfile) (avail : nat) (p : mword 64) :
-    sie_cap m avail true p -∗
+     arm bit, the table, and the arm -- so it is stated once.  THE TIER
+     WITNESS COMES OUT TOO: the caller re-assembles the capability from
+     these pieces, and at KT1 the witness cannot be re-conjured there. *)
+  Lemma sie_cap_on_kpt {kt : ktier}
+      (m : regfile) (avail : nat) (p : mword 64) :
+    sie_cap kt m avail true p -∗
     ∃ root_ppn : mword 44,
-      stack_own (m !!! Regidx csp_rs1) (trap_res true + avail) ∗
-      strans_bit ('b"1") ∗ tlb_res_pt root_ppn ∗ sie_arm true p.
+      stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res true + avail) ∗
+      strans_kpt ∗ tlb_res_pt root_ppn ∗ sie_arm kt true p ∗
+      sr_ktier_wit strans_regime kt.
   Proof.
-    iIntros "(Hstk & Htr & Harm)".
+    iIntros "(Hstk & Htr & Harm & #Hwit)".
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-    { (* the arm's own KPT RECEIPT against the Bare arm's bit: agreement, no
-         cell conflict needed (the receipt landed in the arm upstream). *)
+    { (* the arm's own KPT RECEIPT against the Bare arm's pending half: the
+         one-shot conflict, no cell conflict needed (the receipt landed in
+         the arm upstream). *)
       iEval (rewrite /sie_arm) in "Harm".
       iDestruct "Harm" as "(_ & _ & Hrcpt & _)".
-      iDestruct (strans_bit_agree with "Hrcpt Hbit0") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate. }
+      iDestruct (kpt_on_pending_False with "Hrcpt Hbit0") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlb".
-    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm".
+    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm Hwit".
+  Qed.
+
+  (* =================================================================== *)
+  (* §6d THE TIER WITNESS, AND WHERE CODE ALREADY HAS IT                  *)
+  (*     (claude-notes/projects/sp-migration.md, design §5 -- phase D).   *)
+  (*                                                                      *)
+  (* What a KT1 memory access asks of the accessing hart is               *)
+  (* [SRegime.sr_ktier_wit strans_regime kt]: [emp] at KT0, and at KT1    *)
+  (* the regime's all-claims witness, which for [strans_regime] IS        *)
+  (* [kpt_on cpu_id].  There is deliberately NO separate [ktier_wit]      *)
+  (* definition here -- [sr_ktier_wit strans_regime] already unfolds to   *)
+  (* exactly that, and a second name would be a second thing to keep in   *)
+  (* step with the record.                                                *)
+  (*                                                                      *)
+  (* THE WITNESS IS A CONJUNCT OF [sie_cap] (see the note at              *)
+  (* [sie_cap_of]).  It costs one pattern slot at the ~20 files that take  *)
+  (* the bundle apart positionally, and it buys the thing the KSTACK flip  *)
+  (* needs: a capability at KT1 attests the access right REGARDLESS of the *)
+  (* SIE index, so a flipped file's leaf applications keep their ambient   *)
+  (* spellings instead of threading an explicit witness at every site.     *)
+  (* The two bundles post-boot code already threads carry the receipt      *)
+  (* anyway (§6b: the ENABLED ARM and [trap_csrs]) -- those readings are   *)
+  (* kept below because they hold at ANY tier index and without a          *)
+  (* capability in hand, which is what the interrupts-OFF handler body and *)
+  (* the funnel's hart rebinding still need.                               *)
+  (* =================================================================== *)
+
+  (* MINTING: the flip's [kpt_on] IS the KT1 access right, for this hart, *)
+  (* for the rest of the era ([strans_flip], §6b).                        *)
+  Lemma strans_ktier_wit_intro (kt : ktier) :
+    kpt_on cpu_id -∗ sr_ktier_wit strans_regime kt.
+  Proof. iIntros "#Hkpt". destruct kt; [ done | iExact "Hkpt" ]. Qed.
+
+  (* READING THE WITNESS OFF THE CAPABILITY -- now trivial, because the
+     conjunct IS the witness and it is persistent, so the capability is
+     handed straight back.  This SUPERSEDES the enabled-arm-only
+     [sie_cap_ktier_wit] of phase D: that lemma existed because an
+     unindexed capability could only be mined at [b = true], and it had no
+     consumers.  The tier here is the capability's OWN ambient tier -- at
+     KT0 the result is [emp] (true and useless), at KT1 it is the receipt. *)
+  Lemma sie_cap_wit {kt : ktier}
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap kt m avail b p -∗
+    sie_cap kt m avail b p ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "(Hstk & Htr & Harm & #Hwit)". iFrame "Hstk Htr Harm Hwit".
+  Qed.
+
+  (* THERE IS DELIBERATELY NO "CONJURE THE WITNESS AT THE DEFAULT TIER"
+     LEMMA HERE.  [sie_cap_wit_KT0] used to be it, and every one of its six
+     consumers was a site that had just crossed an ENGINE TRIPLE and so had
+     no witness left to re-frame.  Under a tier-GENERIC capability that
+     shape is unsound-by-construction -- the site would be closing a
+     [sr_ktier_wit strans_regime kt] goal at a [kt] it knows nothing about
+     -- so the triple was widened instead
+     ([WpSconfCsr.wp_csrr_sstatus_s_sconf]'s σ-callback carries the witness
+     as a fourth give-back conjunct) and every crutch site retired.  The
+     shape is: THREAD IT, or mint it from [kpt_on]
+     ([strans_ktier_wit_intro]), never re-conjure it. *)
+
+  (* ... and so is [trap_csrs], the bundle an interrupts-OFF handler body
+     threads: the receipt is one of its members for the same reason. *)
+  Lemma trap_csrs_ktier_wit {kt0 : ktier} (kt : ktier) :
+    trap_csrs kt0 -∗ trap_csrs kt0 ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "(Ha & Hb & Hc & Hd & Hres & #Hkpt)".
+    iSplitL "Ha Hb Hc Hd Hres".
+    - iFrame "Ha Hb Hc Hd Hres Hkpt".
+    - iApply (strans_ktier_wit_intro with "Hkpt").
+  Qed.
+
+  (* THE CAPABILITY IS NO LONGER TIER-COVARIANT, AND THAT IS THE POINT.
+     Two of the four conjuncts see the tier now: [stack_own], which weakens
+     along [KtierLe] ([StackOwn.stack_ktier_mono]), and the WITNESS, which
+     does NOT -- [emp] does not entail [kpt_on cpu_id].  So the bare
+     [sie_cap_ktier_mono] of the tier-index increment is GONE (it had no
+     consumers) and [sie_cap_ktier_up] is the only upgrade: the receipt is
+     what pays for the KT1 index, because at KT1 the index IMPLIES the
+     access right.  Downward (KT1 -> KT0) covariance is not stated -- it
+     would have to throw the witness away, and nothing wants it.
+
+     THE UPGRADE AT THE kvminithart FLIP: the capability comes out at the
+     higher tier, and what pays for it is the receipt the flip just minted.
+
+     IT IS RESTRICTED TO THE DISABLED ARM, AND THAT IS FORCED, NOT A
+     CONVENIENCE.  With the contract tier-indexed the ENABLED arm holds
+     [intr_res kt], and [intr_res] is monotone in NEITHER direction: the
+     handler contract has the capability in a negative position (its entry
+     package) AND in a positive one (the post it must hand back), so
+     [intr_handler_spec KT0 h] neither implies nor is implied by
+     [intr_handler_spec KT1 h].  At [b = false] the arm's branch does not
+     mention [kt] at all, so the two arms are definitionally equal and the
+     upgrade is the [stack_own] weakening plus the minted witness.
+     THAT IS ENOUGH FOR THE ONLY CALLER: xv6 runs kvminithart with
+     interrupts off (SIE is first set in the scheduler), and before
+     trapinithart there is no installed handler to upgrade -- boot carries
+     [trap_csrs_raw], which is tier-blind. *)
+  Lemma sie_cap_ktier_up (kt kt' : ktier) `{!KtierLe kt kt'}
+      (m : regfile) (avail : nat) (p : mword 64) :
+    sie_cap kt m avail false p -∗ kpt_on cpu_id -∗
+    sie_cap kt' m avail false p.
+  Proof.
+    iIntros "(Hstk & Htr & Harm & _) #Hkpt".
+    iSplitL "Hstk"; [ iApply (stack_ktier_mono kt kt' with "Hstk") |].
+    iFrame "Htr Harm".
+    iApply (strans_ktier_wit_intro with "Hkpt").
   Qed.
 
   Definition rd_ok (rd : mword 5) : Prop :=
@@ -2176,7 +2482,7 @@ Section IntrDefs.
   (* BOOT ENTRY: the capability at the Bare regime, from raw boot
      resources -- the free-stack carve, satp still Bare + PMP, the
      UNWRITTEN stvec cell (no trap handler installed), the translation
-     slot's Bare arm-bit half [strans_bit ('b"0")] (its twin is kept boot
+     slot's PENDING half [strans_pending] (its twin is kept boot
      side as the still-Bare receipt), and the SIE ghost's kernel-code
      eighth at '0' -- i.e. the capability comes out at the [b = false]
      arm, interrupts off.  Nothing here requires the
@@ -2191,53 +2497,74 @@ Section IntrDefs.
      accounting (BootBridge.v does exactly that).  Instantiating at [K] and
      dropping the deeper 78 would compile too, and would leave [main] unable
      to ever fund a trap. *)
+  (* THE BOOT CAPABILITY IS AT KT0, AND THE LEMMA NO LONGER TAKES THE TIER
+     BINDER.  It used to be tier-generic, which was vacuously fine while the
+     bundle's only tier-dependent conjunct was [stack_own]; with the witness
+     in the bundle a KT1 boot capability would have to attest [kpt_on
+     cpu_id] over a still-BARE hart, which is exactly what must not be
+     constructible.  Dropping the binder resolves both the premise and the
+     conclusion at the ambient default (KT0), so the statement text and
+     every call site ([BootBridge.v]) are unchanged. *)
   Lemma sie_cap_intro_bare (m : regfile) (avail : nat)
       (v : mword 64) {p : mword 64} :
-    stack_own (m !!! Regidx csp_rs1) avail -∗
-    strans_bit ('b"0") -∗
+    stack_own (KTR := KT0) (m !!! Regidx csp_rs1) avail -∗
+    strans_pending -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
-    sie_cap m avail false p.
+    sie_cap KT0 m avail false p.
   Proof.
     iIntros "Hstk Hbit Hb Hstv Htok".
     iFrame "Hstk".
     iSplitL "Hbit Hb Hstv".
     { iApply (strans_inv_intro_bare with "Hbit Hb Hstv"). }
-    rewrite /sie_arm. iExact "Htok".
+    iSplitL "Htok"; [ rewrite /sie_arm; iExact "Htok" |].
+    iApply (sr_ktier_wit_KT0 strans_regime).
   Qed.
 
   (* NOTE [gpr_file (tp_pin m)]: the bundle owns this hart's registers, whose
      [tp] is [cid_word_of cpu_id] -- the map's [tp] slot is ignored (HartTp.v).
      That is what lets a migration hand back the SAME map [m] at the new hart
      instead of an [rf_upd m Rtp …] layer per instruction. *)
-  Definition sie_cap_gpr
+  Definition sie_cap_gpr (kt : ktier)
       (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
      sconf ∗
-     sie_cap m avail b p ∗
+     sie_cap kt m avail b p ∗
      gpr_file (tp_pin m))%I.
+
+  (* the bundle inherits the capability's upgrade, the other three
+     conjuncts being tier-blind.  Like [sie_cap_ktier_up] it needs the
+     receipt: the witness conjunct is not tier-covariant. *)
+  Lemma sie_cap_gpr_ktier_up (kt kt' : ktier) `{!KtierLe kt kt'}
+      (m : regfile) (avail : nat) (p : mword 64) :
+    sie_cap_gpr kt m avail false p -∗ kpt_on cpu_id -∗
+    sie_cap_gpr kt' m avail false p.
+  Proof.
+    iIntros "(Hhs & Hsc & Hcap & Hfile) #Hkpt". iFrame "Hhs Hsc Hfile".
+    iApply (sie_cap_ktier_up kt kt' with "Hcap Hkpt").
+  Qed.
 
   (* the [sie_cap_gpr] flavour with mstatus exposed -- see [sconf_at].
      Boundary use only; [sie_cap_gpr_at_close] is how it rejoins the
      ordinary threading. *)
-  Definition sie_cap_gpr_at (ms : mword 64)
+  Definition sie_cap_gpr_at (kt : ktier) (ms : mword 64)
       (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
      sconf_at ms ∗
-     sie_cap m avail b p ∗
+     sie_cap kt m avail b p ∗
      gpr_file (tp_pin m))%I.
 
-  Lemma sie_cap_gpr_at_close (ms : mword 64) m avail b p :
-    sie_cap_gpr_at ms m avail b p -∗ sie_cap_gpr m avail b p.
+  Lemma sie_cap_gpr_at_close {kt : ktier} (ms : mword 64) m avail b p :
+    sie_cap_gpr_at kt ms m avail b p -∗ sie_cap_gpr kt m avail b p.
   Proof.
     iIntros "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     rewrite /sie_cap_gpr. iFrame "Hhs Hsc Hcap Hfile".
   Qed.
 
-  Lemma sie_cap_gpr_at_open m avail b p :
-    sie_cap_gpr m avail b p -∗ ∃ ms : mword 64, sie_cap_gpr_at ms m avail b p.
+  Lemma sie_cap_gpr_at_open {kt : ktier} m avail b p :
+    sie_cap_gpr kt m avail b p -∗ ∃ ms : mword 64, sie_cap_gpr_at kt ms m avail b p.
   Proof.
     iIntros "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_at_open with "Hsc") as (ms) "Hsc".
@@ -2254,46 +2581,48 @@ Section IntrDefs.
   (* form after [intr_handler_spec_unfold] -- and each is a conversion, not   *)
   (* a proof.                                                                *)
   (* ------------------------------------------------------------------- *)
-  Lemma intr_res_of_eq : intr_res ⊣⊢ ires_of ihs cpu_id.
+  Lemma intr_res_of_eq {kt : ktier} : intr_res kt ⊣⊢ ires_of (ihs kt) cpu_id.
   Proof. reflexivity. Qed.
 
-  Lemma sie_arm_of_eq (b : bool) (p : mword 64) :
-    sie_arm b p ⊣⊢ sie_arm_of (ires_of ihs) b p.
+  Lemma sie_arm_of_eq {kt : ktier} (b : bool) (p : mword 64) :
+    sie_arm kt b p ⊣⊢ sie_arm_of (ires_of (ihs kt)) b p.
   Proof. reflexivity. Qed.
 
-  Lemma sie_cap_of_eq (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap m avail b p ⊣⊢ sie_cap_of (ires_of ihs) m avail b p.
+  Lemma sie_cap_of_eq {kt : ktier}
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap kt m avail b p ⊣⊢ sie_cap_of kt (ires_of (ihs kt)) m avail b p.
   Proof. reflexivity. Qed.
 
-  Lemma sie_cap_gpr_of_eq (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr m avail b p ⊣⊢ sie_cap_gpr_of (ires_of ihs) m avail b p.
+  Lemma sie_cap_gpr_of_eq {kt : ktier}
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap_gpr kt m avail b p ⊣⊢ sie_cap_gpr_of kt (ires_of (ihs kt)) m avail b p.
   Proof. reflexivity. Qed.
 
-  Global Instance sie_cap_gpr_into_sep m avail b p :
-    IntoSep (sie_cap_gpr m avail b p)
+  Global Instance sie_cap_gpr_into_sep {kt : ktier} m avail b p :
+    IntoSep (sie_cap_gpr kt m avail b p)
             (hart_state ↦ᵣ HART_ACTIVE tt)
-            (sconf ∗ sie_cap m avail b p ∗ gpr_file (tp_pin m)).
+            (sconf ∗ sie_cap kt m avail b p ∗ gpr_file (tp_pin m)).
   Proof. rewrite /IntoSep /sie_cap_gpr. by iIntros "($ & $ & $ & $)". Qed.
 
-  Global Instance sie_cap_gpr_from_sep m avail b p :
-    FromSep (sie_cap_gpr m avail b p)
+  Global Instance sie_cap_gpr_from_sep {kt : ktier} m avail b p :
+    FromSep (sie_cap_gpr kt m avail b p)
             (hart_state ↦ᵣ HART_ACTIVE tt)
-            (sconf ∗ sie_cap m avail b p ∗ gpr_file (tp_pin m)).
+            (sconf ∗ sie_cap kt m avail b p ∗ gpr_file (tp_pin m)).
   Proof. rewrite /FromSep /sie_cap_gpr. by iIntros "[$ [$ [$ $]]]". Qed.
 
   (* Foolproof split/join for the ports (no instance-resolution surprises). *)
-  Lemma sie_cap_gpr_split m avail b p :
-    sie_cap_gpr m avail b p -∗
-    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ sie_cap m avail b p ∗
+  Lemma sie_cap_gpr_split {kt : ktier} m avail b p :
+    sie_cap_gpr kt m avail b p -∗
+    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ sie_cap kt m avail b p ∗
     gpr_file (tp_pin m).
   Proof. by iIntros "$". Qed.
 
-  Lemma sie_cap_gpr_join m avail b p :
+  Lemma sie_cap_gpr_join {kt : ktier} m avail b p :
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sconf -∗
-    sie_cap m avail b p -∗
+    sie_cap kt m avail b p -∗
     gpr_file (tp_pin m) -∗
-    sie_cap_gpr m avail b p.
+    sie_cap_gpr kt m avail b p.
   Proof. iIntros "Hhs Hsc Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
 
   (* [hw_config] is persistent and rides at the head of [sconf]; a
@@ -2301,8 +2630,8 @@ Section IntrDefs.
      bundle intact) whenever it needs the ambient static-claims bundle for a
      ghost conversion between instructions (e.g. the walk's kalloc-page ->
      PT-node ↦ₘ→↦ₚ disassembly, which needs [kmap_static_claims]). *)
-  Lemma sie_cap_gpr_dup_hw_config m avail b p :
-    sie_cap_gpr m avail b p -∗ hw_config ∗ sie_cap_gpr m avail b p.
+  Lemma sie_cap_gpr_dup_hw_config {kt : ktier} m avail b p :
+    sie_cap_gpr kt m avail b p -∗ hw_config ∗ sie_cap_gpr kt m avail b p.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
@@ -2334,8 +2663,8 @@ Section IntrDefs.
     rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"].
   Qed.
 
-  Lemma sie_cap_gpr_kmap_claims m avail b p :
-    sie_cap_gpr m avail b p -∗ kmap_static_claims ∗ sie_cap_gpr m avail b p.
+  Lemma sie_cap_gpr_kmap_claims {kt : ktier} m avail b p :
+    sie_cap_gpr kt m avail b p -∗ kmap_static_claims ∗ sie_cap_gpr kt m avail b p.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
@@ -2345,10 +2674,10 @@ Section IntrDefs.
 
   (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof
      threading [sie_cap_gpr] can read the map's x0 slot and keep the bundle. *)
-  Lemma sie_cap_gpr_x0 m avail b p (i : mword 5) :
+  Lemma sie_cap_gpr_x0 {kt : ktier} m avail b p (i : mword 5) :
     uint i = 0 ->
-    sie_cap_gpr m avail b p -∗
-    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr m avail b p.
+    sie_cap_gpr kt m avail b p -∗
+    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr kt m avail b p.
   Proof.
     intro Hi. iIntros "Hcg".
     (* x0 is not tp, so the pinned file's x0 slot IS the map's. *)
@@ -2373,12 +2702,13 @@ Section IntrDefs.
      [trap_res]).  It had no users. *)
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
-  Lemma sie_cap_retarget
+  Lemma sie_cap_retarget {kt : ktier}
       (m m' : regfile) (avail : nat) (b : bool) {p : mword 64} :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    sie_cap m avail b p -∗ sie_cap m' avail b p.
+    sie_cap kt m avail b p -∗ sie_cap kt m' avail b p.
   Proof.
-    iIntros (Hsp) "(Hstk & Htr & Harm)". iFrame "Htr Harm". rewrite Hsp. iExact "Hstk".
+    iIntros (Hsp) "(Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    rewrite Hsp. iExact "Hstk".
   Qed.
 
   (* sp DECREMENT by k slots (sp' = sp - 8k, a prologue's frame
@@ -2386,62 +2716,73 @@ Section IntrDefs.
      can't-go-below-zero check) and the freed frame region [sp', sp) --
      the top k slots, ABOVE the new sp and therefore trap-stable --
      comes OUT for the client. *)
-  Lemma sie_cap_push
+  Lemma sie_cap_push {kt : ktier}
       (m m' : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     (k <= avail)%nat ->
     m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
-    sie_cap m avail b p -∗
-    sie_cap m' (avail - k) b p ∗ stack_own (m !!! Regidx csp_rs1) k.
+    sie_cap kt m avail b p -∗
+    sie_cap kt m' (avail - k) b p ∗
+    stack_own (KTR := kt) (m !!! Regidx csp_rs1) k.
   Proof.
-    iIntros (Hk Hsp') "(Hstk & Htr & Harm)". iFrame "Htr Harm".
+    iIntros (Hk Hsp') "(Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
     (* [trap_res b] is an OPAQUE [nat] atom here -- [lia] carries it through
        untouched, which is why the premise [k <= avail] does not move. *)
     replace (trap_res b + avail)%nat
       with (k + (trap_res b + (avail - k)))%nat by lia.
-    iDestruct (stack_own_app with "Hstk") as "[Htop Hrest]".
+    (* [(KTR := kt)] IS MANDATORY AT EVERY DATUM-FAMILY LEMMA IN A
+       TIER-GENERIC PROOF.  [stack_own] keeps its instance-implicit binder
+       (the datum side is untouched by this design), so a bare
+       [stack_own_app] resolves [CurKtier] at Ktier.v's priority-100 DEFAULT
+       (KT0) and then does not match a [kt]-indexed hypothesis.  The failure
+       is [iApply: cannot apply (stack_own ?Goal … )] with every argument an
+       evar, which reads like a missing hypothesis. *)
+    iDestruct (stack_own_app (KTR := kt) with "Hstk") as "[Htop Hrest]".
     iFrame "Htop". rewrite Hsp'. iExact "Hrest".
   Qed.
 
   (* sp INCREMENT by k slots (sp' = sp + 8k, an epilogue's frame
      release): the function's frame [sp, sp') = the top k slots at sp'
      is fed back IN and k returns to [avail]. *)
-  Lemma sie_cap_pop
+  Lemma sie_cap_pop {kt : ktier}
       (m m' : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
-    stack_own (m' !!! Regidx csp_rs1) k -∗
-    sie_cap m avail b p -∗
-    sie_cap m' (avail + k) b p.
+    stack_own (KTR := kt) (m' !!! Regidx csp_rs1) k -∗
+    sie_cap kt m avail b p -∗
+    sie_cap kt m' (avail + k) b p.
   Proof.
-    iIntros (Hsp) "Hframe (Hstk & Htr & Harm)". iFrame "Htr Harm".
+    iIntros (Hsp) "Hframe (Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
     replace (trap_res b + (avail + k))%nat
       with (k + (trap_res b + avail))%nat by lia.
-    iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
+    iApply (stack_own_app (KTR := kt)). iFrame "Hframe". rewrite -Hsp.
+    iExact "Hstk".
   Qed.
 
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
-  Lemma sie_cap_grow
+  Lemma sie_cap_grow {kt : ktier}
       (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
-    stack_own (pa_stk (m !!! Regidx csp_rs1) (trap_res b + avail)) k -∗
-    sie_cap m avail b p -∗
-    sie_cap m (avail + k) b p.
+    stack_own (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) (trap_res b + avail)) k -∗
+    sie_cap kt m avail b p -∗
+    sie_cap kt m (avail + k) b p.
   Proof.
-    iIntros "Hdeep (Hstk & Htr & Harm)". iFrame "Htr Harm".
-    rewrite Nat.add_assoc. iApply stack_own_app. iFrame "Hstk Hdeep".
+    iIntros "Hdeep (Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    rewrite Nat.add_assoc. iApply (stack_own_app (KTR := kt)).
+    iFrame "Hstk Hdeep".
   Qed.
 
   (* ... and release the k deepest slots back out. *)
-  Lemma sie_cap_shrink
+  Lemma sie_cap_shrink {kt : ktier}
       (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     (k <= avail)%nat ->
-    sie_cap m avail b p -∗
-    sie_cap m (avail - k) b p ∗
-    stack_own (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
+    sie_cap kt m avail b p -∗
+    sie_cap kt m (avail - k) b p ∗
+    stack_own (KTR := kt)
+      (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
   Proof.
-    iIntros (Hk) "(Hstk & Htr & Harm)". iFrame "Htr Harm".
+    iIntros (Hk) "(Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
     replace (trap_res b + avail)%nat
       with ((trap_res b + (avail - k)) + k)%nat by lia.
-    iDestruct (stack_own_app with "Hstk") as "[Htop Hdeep]".
+    iDestruct (stack_own_app (KTR := kt) with "Hstk") as "[Htop Hdeep]".
     iFrame "Htop Hdeep".
   Qed.
 
@@ -2572,9 +2913,9 @@ End IntrDefs.
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
 Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
-    (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
+    {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-  trap_csrs_ext (CID := CID0) eb -∗ trap_csrs_ext (CID := CID1) eb.
+  trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.
 Proof.
   intros Heq. destruct eb.
   - (* [emp]: no hart in the term *) rewrite /trap_csrs_ext. iIntros "$".

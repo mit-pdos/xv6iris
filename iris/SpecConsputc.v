@@ -28,8 +28,8 @@
    [eq_vec]/[neq_vec] refutation premises, and it DOES carry what any spinlock
    caller carries -- [cpu_own] threaded net-zero (the acquire/release pair
    inside each uartputc_sync leaves the interrupt level as it found it), the
-   transient-increment bound on [noff], and [panic_wp_any] for acquire's
-   "already holding" arm.
+   transient-increment bound on [noff].  Acquire's "already holding" arm is
+   refuted, so nothing panic-related is threaded.
 
    THE TRANSMITTER IS NOT THREADED.  It is [tx_lock]'s resource
    ([UartTxInv.tx_res]), taken and given back inside each callee, so
@@ -62,10 +62,9 @@ From Kernel Require KernelSyms.
 
 (* consputc's own frame is 2 slots ([c.addi16sp sp,-16] at 0x8000028a), over
    uartputc_sync's 14. *)
-Definition consputc_stack : nat := 16%nat.
-
+Notation consputc_stack := (16%nat) (only parsing).
 Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+    (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.consputc in
@@ -76,7 +75,7 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "uart" ->
-  sie_cap_gpr m0 K b p -∗
+  sie_cap_gpr kt m0 K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
@@ -84,7 +83,7 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
-    sie_cap_gpr mf K b p -∗
+    sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
@@ -95,7 +94,7 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
 Module Type CONSPUTC.
   Parameter wp_consputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+      (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
-      wp_consputc_sconf_body γl γd γv m0 K bs n eb b p lks.
+      wp_consputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
 End CONSPUTC.
