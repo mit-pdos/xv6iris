@@ -34,7 +34,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpDecodeBridge HartGoodb HartMemRun HartMemAsm PtBytes.
-Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte CommonWalk PtAdBits Pt4kWalk PtreeType PtTree PtTreeAdue.
+Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -2372,7 +2372,7 @@ Section TranslateFront.
   Hypothesis HDsatp : Dr satp = true.
 
   Lemma goodmb_translateAddr_pt_front (vpn : mword 27) (root : mword 44)
-      (ppnv : mword 44) (satp0 va : mword 64) (s s' : mstate) (mm : pamap) :
+      (ppnv : mword 44) (satp0 va : mword 64) (s : mstate) (mm : pamap) :
     exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) pv) s
       = Some (pv, s) ->
     goodb Dr (effectivePrivilege acc (register_lookup mstatus s.(sregs)) pv) s
@@ -2392,9 +2392,10 @@ Section TranslateFront.
     autocast (T := mword) (subrange_vec_dec
       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)
       (Z.sub 39 1) pagesize_bits) = vpn ->
-    (forall mxr do_sum,
-       exec (translate 39 (mword_of_int 0 : mword 16) root vpn acc pv mxr do_sum tt) s
-       = Some (Ok (ppnv, PBMT_PMA, tt), s')) ->
+    (exists s' : mstate,
+       forall mxr do_sum,
+         exec (translate 39 (mword_of_int 0 : mword 16) root vpn acc pv mxr do_sum tt) s
+         = Some (Ok (ppnv, PBMT_PMA, tt), s')) ->
     (forall mxr do_sum,
        goodmb Dr Dw
          (translate 39 (mword_of_int 0 : mword 16) root vpn acc pv mxr do_sum tt)
@@ -2402,7 +2403,7 @@ Section TranslateFront.
     goodmb Dr Dw (translateAddr (Virtaddr va) acc) s mm = true.
   Proof.
     intros Heff Heffg Hss Hssg Hcp Htm Htmg Hsatp Hppn Hasid Hcanon Hvpn_def
-           Htr Htrg.
+           [s' Htr] Htrg.
     unfold translateAddr. apply goodmb_cer.
     gmm_liftT ltac:(rewrite goodmb_read_reg; exact HDms)
               ltac:(apply (exec_read_reg mstatus)).
@@ -2460,3 +2461,504 @@ Section TranslateFront.
   Qed.
 
 End TranslateFront.
+
+(* ===================================================================== *)
+(* 7. THE PER-SLOT ACCESS CERTIFICATES ([PtTree.pt_read_pte_slot]'s        *)
+(* twins): a page-table slot recorded by [pt_slot_mem] and OWNED in [mm]   *)
+(* is readable, exclusively readable and conditionally writable, with the  *)
+(* PMP/PMA side conditions derived exactly as the exec lemmas derive them. *)
+(* ===================================================================== *)
+Section SlotCert.
+  Context (Dr Dw : register -> bool).
+  Hypothesis HDc : Dr pmpcfg_n = true.
+  Hypothesis HDa : Dr pmpaddr_n = true.
+  Hypothesis HDp : Dr pma_regions = true.
+  Hypothesis HDh : Dr htif_tohost_base = true.
+
+  Lemma slot_pmp_range (sg : mstate) (a w : mword 64) :
+    pt_slot_mem sg a w ->
+    (ram_base + ram_size
+       <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0)) 4)
+      (uint a) (uint (to_bits 64 8)) = PMP_Match.
+  Proof.
+    intros (Hbytes & Hram & Hram7 & Halign) Hcov.
+    assert (Hnw : (uint a + Z.of_nat 7 < 18446744073709551616)%Z).
+    { destruct Hram as [_ Hh]. unfold ram_base, ram_size in Hh.
+      change (Z.of_nat 7) with 7. lia. }
+    assert (Hfit : (uint a + 8 <= ram_base + ram_size)%Z).
+    { pose proof (uint_pa_add a 7 Hnw) as Heq.
+      destruct Hram7 as [_ Hhi7]. rewrite Heq in Hhi7.
+      change (Z.of_nat 7) with 7 in Hhi7.
+      unfold ram_base, ram_size in *. lia. }
+    apply (ram_pmp_match_w a _ 8);
+      [ lia | vm_compute; reflexivity | | exact Hfit | exact Hcov ].
+    destruct Hram as [Hlo _]. exact Hlo.
+  Qed.
+
+  Lemma goodmb_read_pte_slot (sg : mstate) (mm : pamap) (a w : mword 64)
+      (region : PMA_Region) :
+    pt_slot_mem sg a w ->
+    bytes_owned mm a 8 = true ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+    matching_pma_region (register_lookup pma_regions sg.(sregs)) (Physaddr a) 8 = Some region ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
+    register_lookup htif_tohost_base sg.(sregs) = None ->
+    goodmb Dr Dw (read_pte (Physaddr a) 8) sg mm = true.
+  Proof.
+    intros Hsm Hown HA Hord HR Hcov Hmatch Hpma Hhtif.
+    pose proof (slot_pmp_range sg a w Hsm Hcov) as Hrange.
+    destruct Hsm as (Hbytes & Hram & Hram7 & Halign).
+    exact (goodmb_read_pte_S Dr Dw a region w sg mm HDc HDa HDp HDh
+             HA Hord Hrange HR Hmatch Halign Hpma
+             (within_clint_false a 8 sg (addr_is_ram_not_in_clint _ Hram) ltac:(lia))
+             (within_sig_false a 8 sg (addr_is_ram_not_in_sig _ Hram) ltac:(lia))
+             Hhtif (addr_is_ram_not_dev _ Hram) Hown Hbytes).
+  Qed.
+
+  Lemma goodmb_read_pte_exclusive_slot (sg : mstate) (mm : pamap) (a w : mword 64)
+      (region : PMA_Region) :
+    pt_slot_mem sg a w ->
+    bytes_owned mm a 8 = true ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+    matching_pma_region (register_lookup pma_regions sg.(sregs)) (Physaddr a) 8 = Some region ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
+    register_lookup htif_tohost_base sg.(sregs) = None ->
+    goodmb Dr Dw (read_pte_exclusive (Physaddr a) 8) sg mm = true.
+  Proof.
+    intros Hsm Hown HA Hord HR Hcov Hmatch Hpma Hhtif.
+    pose proof (slot_pmp_range sg a w Hsm Hcov) as Hrange.
+    destruct Hsm as (Hbytes & Hram & Hram7 & Halign).
+    exact (goodmb_read_pte_exclusive_S Dr Dw a region w sg mm HDc HDa HDp HDh
+             HA Hord Hrange HR Hmatch Halign Hpma
+             (within_clint_false a 8 sg (addr_is_ram_not_in_clint _ Hram) ltac:(lia))
+             (within_sig_false a 8 sg (addr_is_ram_not_in_sig _ Hram) ltac:(lia))
+             Hhtif (addr_is_ram_not_dev _ Hram) Hown Hbytes).
+  Qed.
+
+  Lemma goodmb_write_pte_conditional_slot (sg : mstate) (mm : pamap)
+      (a w w' : mword 64) (region : PMA_Region) :
+    pt_slot_mem sg a w ->
+    bytes_owned mm a 8 = true ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+    matching_pma_region (register_lookup pma_regions sg.(sregs)) (Physaddr a) 8 = Some region ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_write) = true ->
+    register_lookup htif_tohost_base sg.(sregs) = None ->
+    goodmb Dr Dw (write_pte_conditional (Physaddr a) 8 (w' : mword 64)) sg mm = true.
+  Proof.
+    intros Hsm Hown HA Hord HW Hcov Hmatch Hpma Hhtif.
+    destruct Hsm as (Hbytes & Hram & Hram7 & Halign).
+    exact (goodmb_write_pte_conditional_ram Dr Dw a w' region sg mm HDc HDa HDp HDh
+             Hram Hram7 Halign HA Hord HW Hcov Hmatch Hpma Hhtif Hown).
+  Qed.
+
+End SlotCert.
+
+(* ===================================================================== *)
+(* 8. THE TOP OF THE WALK: [KptTree.ptree_translateAddr_cases]'s twin.     *)
+(*                                                                        *)
+(* One certificate for the whole of [translateAddr] over an owned ptree,   *)
+(* with the SAME five-way case analysis the exec lemma makes -- TLB hit    *)
+(* with no update / with a refresh / with a write-back, a foreign entry,   *)
+(* an empty slot -- because a certificate follows the STATE-RESOLVED path  *)
+(* and therefore has to know which one the machine takes.                  *)
+(*                                                                        *)
+(* The new premises over the exec lemma's are: the [Dr]/[Dw] entries for   *)
+(* the ten cells the walk touches, the [goodb] companion of each pure PTE  *)
+(* test (which the tier's instances discharge by [vm_compute] at a         *)
+(* concrete flag byte, exactly where they discharge the exec versions),    *)
+(* and [bytes_owned mm <slot> 8 = true] for the three slots -- the         *)
+(* projection of [UserBytes.u_mem_wf] that says the hart OWNS its table.   *)
+(* ===================================================================== *)
+Section PtreeTranslateCert.
+  Context (Dr Dw : register -> bool).
+  Context (acc : MemoryAccessType mem_payload) (pv : Privilege).
+  Hypothesis HDmi : Dr misa = true.
+  Hypothesis HDme : Dr menvcfg = true.
+  Hypothesis HDms : Dr mstatus = true.
+  Hypothesis HDcp : Dr cur_privilege = true.
+  Hypothesis HDsatp : Dr satp = true.
+  Hypothesis HDt : Dr tlb = true.
+  Hypothesis HWt : Dw tlb = true.
+  Hypothesis HDc : Dr pmpcfg_n = true.
+  Hypothesis HDa : Dr pmpaddr_n = true.
+  Hypothesis HDp : Dr pma_regions = true.
+  Hypothesis HDh : Dr htif_tohost_base = true.
+
+  (* the shared miss path, certified *)
+  Lemma goodmb_ptree_translate_miss_core (root_ppn : mword 44) (va w : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (p2 p1 : mword 64)
+      (a0 d0 : mword 1) (mxr do_sum : bool) (sg : mstate) (mm : pamap) :
+    let vpn := svpn_of va in
+    let p0 := pte_set_ad w a0 d0 in
+    (forall (a d : mword 1) (mxr0 do_sum0 : bool),
+       pte_check_ok acc pv mxr0 do_sum0 (pte_set_ad w a d)) ->
+    (forall (a d : mword 1) (mxr0 do_sum0 : bool) (Db : register -> bool) s0,
+       goodb Db (check_PTE_permission acc pv mxr0 do_sum0
+                   (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+                   (ext_bits_of_PTE (pte_set_ad w a d)) tt) s0 = true) ->
+    pte_valid p2 -> pte_ptr p2 ->
+    pte_valid p1 -> pte_ptr p1 ->
+    pte_valid p0 -> pte_leaf p0 -> pte_no_napot p0 ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec p2 7 0))
+                   (ext_bits_of_PTE p2)) s0 = true) ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec p1 7 0))
+                   (ext_bits_of_PTE p1)) s0 = true) ->
+    (forall (a d : mword 1) (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+                   (ext_bits_of_PTE (pte_set_ad w a d))) s0 = true) ->
+    pt_slot_mem sg (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) p2 ->
+    pt_slot_mem sg (pt_addr1 p2 vpn) p1 ->
+    pt_slot_mem sg (pt_addr0 p1 vpn) p0 ->
+    bytes_owned mm (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) 8 = true ->
+    bytes_owned mm (pt_addr1 p2 vpn) 8 = true ->
+    bytes_owned mm (pt_addr0 p1 vpn) 8 = true ->
+    register_lookup misa sg.(sregs) = MISA_C ->
+    register_lookup menvcfg sg.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base sg.(sregs) = None ->
+    register_lookup tlb sg.(sregs) = tlbvec ->
+    exec (lookup_TLB 39 (mword_of_int 0) vpn) sg = Some (None, sg) ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+    pma_allows_pte_read (register_lookup pma_regions sg.(sregs)) ->
+    pma_allows_pte_write (register_lookup pma_regions sg.(sregs)) ->
+    goodmb Dr Dw (translate 39 (mword_of_int 0 : mword 16) root_ppn vpn acc pv mxr do_sum tt)
+      sg mm = true.
+  Proof.
+    intros vpn p0 Hchk Hgchk Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hg2 Hg1 Hg0
+           Hsm2 Hsm1 Hsm0 Hown2 Hown1 Hown0
+           Hmisa Hmenv Hhtif Htlb Hlk HA Hord HR HW Hcov Hpmar Hpmaw.
+    assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
+      by (vm_compute; reflexivity).
+    assert (HADUE : eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1") = true)
+      by (vm_compute; reflexivity).
+    (* the three slot reads, exec side and certificate side *)
+    destruct (Hpmar (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) (pt_slot_ram_access _ _ _ Hsm2))
+      as (region2 & Hm2 & Hs2).
+    destruct (Hpmar (pt_addr1 p2 vpn) (pt_slot_ram_access _ _ _ Hsm1))
+      as (region1 & Hm1 & Hs1).
+    destruct (Hpmar (pt_addr0 p1 vpn) (pt_slot_ram_access _ _ _ Hsm0))
+      as (region0 & Hm0r & Hs0).
+    pose proof (pt_read_pte_slot sg _ p2 region2 Hsm2 HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2.
+    pose proof (pt_read_pte_slot sg _ p1 region1 Hsm1 HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1.
+    pose proof (pt_read_pte_slot sg _ p0 region0 Hsm0 HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrd0.
+    pose proof (pt_read_pte_exclusive_slot sg _ p0 region0 Hsm0 HA Hord HR Hcov Hm0r Hs0 Hhtif)
+      as Hrdx.
+    pose proof (goodmb_read_pte_slot Dr Dw HDc HDa HDp HDh sg mm _ p2 region2
+                  Hsm2 Hown2 HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2g.
+    pose proof (goodmb_read_pte_slot Dr Dw HDc HDa HDp HDh sg mm _ p1 region1
+                  Hsm1 Hown1 HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1g.
+    pose proof (goodmb_read_pte_slot Dr Dw HDc HDa HDp HDh sg mm _ p0 region0
+                  Hsm0 Hown0 HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrd0g.
+    pose proof (goodmb_read_pte_exclusive_slot Dr Dw HDc HDa HDp HDh sg mm _ p0 region0
+                  Hsm0 Hown0 HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrdxg.
+    unfold translate.
+    gmm_peel (goodmb_lookup_TLB vpn Dr Dw (mword_of_int 0) sg mm HDt) Hlk.
+    cbn match. try rewrite <- Htlb.
+    destruct (update_PTE_Bits (p0 : mword 64) acc) as [p0'|] eqn:Hup.
+    - (* the walk writes the A/D-updated leaf back *)
+      destruct (Hpmaw (pt_addr0 p1 vpn) (pt_slot_ram_access _ _ _ Hsm0))
+        as (regionw & Hmw & Hww).
+      pose proof (goodmb_write_pte_conditional_slot Dr Dw HDc HDa HDp HDh sg mm
+                    _ p0 p0' regionw Hsm0 Hown0 HA Hord HW Hcov Hmw Hww Hhtif) as Hwrg.
+      destruct Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
+      pose proof (exec_write_pte_conditional_ram (pt_addr0 p1 vpn) p0' regionw sg
+                    Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif) as Hwr.
+      exact (goodmb_translate_TLB_miss_pt_upd Dr Dw acc pv mxr do_sum HDt HWt HDme
+               vpn root_ppn p2 p1 p0 p0' MENVCFG_S (mword_of_int 0) _ sg mm
+               HDmi Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap (Hchk a0 d0 mxr do_sum)
+               Hg2 Hg1 (Hg0 a0 d0) (Hgchk a0 d0 mxr do_sum) Hup
+               Hrd2 Hrd2g Hrd1 Hrd1g Hrd0 Hrd0g Hrdx Hrdxg
+               Hmisa Hmenv HPBMTE HADUE Hwr Hwrg eq_refl).
+    - (* clean fill *)
+      assert (Hupd : update_PTE_Bits (autocast (T := mword) p0 : mword 64) acc = None)
+        by exact Hup.
+      exact (goodmb_translate_TLB_miss_user vpn root_ppn p2 p1 p0 acc pv mxr do_sum
+               Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 (Hchk a0 d0 mxr do_sum) Hnap
+               Hg1 Hg2 (Hg0 a0 d0) (Hgchk a0 d0 mxr do_sum) Dr Dw HDmi HDme
+               (mword_of_int 0) MENVCFG_S sg mm HDt HWt Hmisa Hupd
+               Hrd2 Hrd2g Hrd1 Hrd1g Hrd0 Hrd0g Hmenv HPBMTE).
+  Qed.
+
+  (* THE WHOLE OF [translateAddr] OVER AN OWNED PTREE, certified.  Same
+     five-way split as [KptTree.ptree_translateAddr_cases]. *)
+  Lemma goodmb_ptree_translateAddr (root_ppn : mword 44) (t : ptree)
+      (va w pa satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (p2 p1 : mword 64) (a0 d0 : mword 1) (sg : mstate) (mm : pamap) :
+    let vpn := svpn_of va in
+    let p0 := pte_set_ad w a0 d0 in
+    (forall (a d : mword 1) (mxr do_sum : bool),
+       pte_check_ok acc pv mxr do_sum (pte_set_ad w a d)) ->
+    (forall (a d : mword 1) (mxr do_sum : bool) (Db : register -> bool) s0,
+       goodb Db (check_PTE_permission acc pv mxr do_sum
+                   (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+                   (ext_bits_of_PTE (pte_set_ad w a d)) tt) s0 = true) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec
+        ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (w : mword 64))) : mword 44)) : mword 44)
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    (forall a d : mword 1, pte_pbmt0 (pte_set_ad w a d)) ->
+    pt_base t = root_ppn ->
+    ptree_maps t vpn p2 p1 p0 ->
+    tlb_ok_pt (mword_of_int 0) t tlbvec ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec p2 7 0))
+                   (ext_bits_of_PTE p2)) s0 = true) ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec p1 7 0))
+                   (ext_bits_of_PTE p1)) s0 = true) ->
+    (forall (a d : mword 1) (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+                   (ext_bits_of_PTE (pte_set_ad w a d))) s0 = true) ->
+    pt_slot_mem sg (pt_addr2 t vpn) p2 ->
+    pt_slot_mem sg (pt_addr1 p2 vpn) p1 ->
+    pt_slot_mem sg (pt_addr0 p1 vpn) p0 ->
+    bytes_owned mm (pt_addr2 t vpn) 8 = true ->
+    bytes_owned mm (pt_addr1 p2 vpn) 8 = true ->
+    bytes_owned mm (pt_addr0 p1 vpn) 8 = true ->
+    register_lookup misa sg.(sregs) = MISA_C ->
+    register_lookup menvcfg sg.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base sg.(sregs) = None ->
+    register_lookup cur_privilege sg.(sregs) = pv ->
+    exec (translationMode pv) sg = Some (Sv39, sg) ->
+    goodb Dr (translationMode pv) sg = true ->
+    exec (effectivePrivilege acc (register_lookup mstatus sg.(sregs)) pv) sg
+      = Some (pv, sg) ->
+    goodb Dr (effectivePrivilege acc (register_lookup mstatus sg.(sregs)) pv) sg = true ->
+    exec (is_shadow_stack_access acc) sg = Some (false, sg) ->
+    goodb Dr (is_shadow_stack_access acc) sg = true ->
+    register_lookup satp sg.(sregs) = satp0 ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    register_lookup tlb sg.(sregs) = tlbvec ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+    pma_allows_pte_read (register_lookup pma_regions sg.(sregs)) ->
+    pma_allows_pte_write (register_lookup pma_regions sg.(sregs)) ->
+    goodmb Dr Dw (translateAddr (Virtaddr va) acc) sg mm = true.
+  Proof.
+    intros vpn p0 Hchk Hgchk Hcanon Hout Hvarp Hbase Hmaps Htlbok Hg2 Hg1 Hg0
+           Hsm2 Hsm1 Hsm0 Hown2 Hown1 Hown0
+           Hmisa Hmenv Hhtif Hcp Htm Htmg Heff Heffg Hss Hssg
+           Hsatp Hppn Hasid Htlb HA Hord HR HW Hcov Hpmar Hpmaw.
+    pose proof Hmaps as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ &
+                         Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hl0 & Hnap & Hpb0).
+    assert (Hsm2' : pt_slot_mem sg (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) p2).
+    { assert (Ha2 : pt_addr2 t vpn = u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)).
+      { unfold pt_addr2. rewrite Hbase. reflexivity. }
+      rewrite Ha2 in Hsm2. exact Hsm2. }
+    assert (Hown2' : bytes_owned mm (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) 8 = true).
+    { assert (Ha2 : pt_addr2 t vpn = u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)).
+      { unfold pt_addr2. rewrite Hbase. reflexivity. }
+      rewrite Ha2 in Hown2. exact Hown2. }
+    destruct (Hpmar (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18))
+                (pt_slot_ram_access _ _ _ Hsm2')) as (region2 & Hm2 & Hs2).
+    destruct (Hpmar (pt_addr1 p2 vpn) (pt_slot_ram_access _ _ _ Hsm1))
+      as (region1 & Hm1 & Hs1).
+    destruct (Hpmar (pt_addr0 p1 vpn) (pt_slot_ram_access _ _ _ Hsm0))
+      as (region0 & Hm0r & Hs0).
+    pose proof (pt_read_pte_exclusive_slot sg _ p0 region0 Hsm0 HA Hord HR Hcov Hm0r Hs0 Hhtif)
+      as Hrdx.
+    pose proof (goodmb_read_pte_exclusive_slot Dr Dw HDc HDa HDp HDh sg mm _ p0 region0
+                  Hsm0 Hown0 HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrdxg.
+    assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
+      by (vm_compute; reflexivity).
+    assert (HADUE : eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1") = true)
+      by (vm_compute; reflexivity).
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
+    - destruct (Htlbok vpn ent Hslot) as (vpn0 & q2 & q1 & qp0 & a' & d' & Hm0 & Hh & ->).
+      destruct (decide (vpn0 = vpn)) as [-> | Hne].
+      + (* HIT on this vpn's own entry *)
+        destruct (ptree_maps_det t vpn q2 q1 qp0 p2 p1 p0 Hm0 Hmaps) as (-> & -> & ->).
+        assert (Habs : pte_set_ad p0 a' d' = pte_set_ad w a' d')
+          by exact (pte_set_ad_absorb w a0 d0 a' d').
+        assert (Hchkc : forall mxr do_sum,
+                  pte_check_ok acc pv mxr do_sum (pte_set_ad p0 a' d')).
+        { intros mxr do_sum. rewrite Habs. exact (Hchk a' d' mxr do_sum). }
+        assert (Hchkcg : forall (mxr do_sum : bool) (Db : register -> bool) s0,
+                  goodb Db (check_PTE_permission acc pv mxr do_sum
+                              (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad p0 a' d') 7 0))
+                              (ext_bits_of_PTE (pte_set_ad p0 a' d')) tt) s0 = true).
+        { intros mxr do_sum Db s0. rewrite Habs. exact (Hgchk a' d' mxr do_sum Db s0). }
+        assert (Hpbc : pte_pbmt0 (pte_set_ad p0 a' d'))
+          by (rewrite Habs; apply Hvarp).
+        assert (Hidc : zero_extend' 64 (concat_vec
+                  ((autocast (T := mword) ((autocast (T := mword)
+                      (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44)) : mword 44)
+                  (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
+        { rewrite pte_set_ad_ppn. unfold p0. rewrite pte_set_ad_ppn. exact Hout. }
+        assert (Hlkh : exec (lookup_TLB 39 (mword_of_int 0) vpn) sg
+                       = Some (Some (tlb_hash (__id 39) vpn,
+                                     u_walk_entry vpn p2 p1 (pte_set_ad p0 a' d')
+                                       (mword_of_int 0)), sg))
+          by exact (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ sg Htlb Hslot
+                      (uwe_match_self vpn p2 p1 (pte_set_ad p0 a' d'))).
+        destruct (update_PTE_Bits (pte_set_ad p0 a' d' : mword 64) acc) as [q0'|] eqn:Hupq.
+        * destruct (update_PTE_Bits (p0 : mword 64) acc) as [p0'|] eqn:Hupm.
+          -- (* memory needs the update too: write it back *)
+             assert (Hvarm : exists a2 d2 : mword 1, p0 = pte_set_ad (pte_set_ad p0 a' d') a2 d2).
+             { exists a0, d0. rewrite pte_set_ad_absorb.
+               unfold p0. rewrite pte_set_ad_absorb. reflexivity. }
+             destruct (Hpmaw (pt_addr0 p1 vpn) (pt_slot_ram_access _ _ _ Hsm0))
+               as (regionw & Hmw & Hww).
+             pose proof (goodmb_write_pte_conditional_slot Dr Dw HDc HDa HDp HDh sg mm
+                           _ p0 p0' regionw Hsm0 Hown0 HA Hord HW Hcov Hmw Hww Hhtif) as Hwrg.
+             pose proof Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
+             pose proof (exec_write_pte_conditional_ram (pt_addr0 p1 vpn) p0' regionw sg
+                           Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif) as Hwr.
+             apply (goodmb_translateAddr_pt_front Dr Dw acc pv HDms HDcp HDsatp
+                      vpn root_ppn
+                      (autocast (T := mword) ((autocast (T := mword)
+                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
+                      satp0 va sg mm
+                      Heff Heffg Hss Hssg Hcp Htm Htmg Hsatp Hppn Hasid Hcanon eq_refl).
+             ++ eexists. intros mxr do_sum. unfold translate.
+                rewrite (exec_bind_Some _ _ _ _ _ Hlkh). cbn match.
+                apply (exec_translate_TLB_hit_pt_upd acc pv mxr do_sum
+                         vpn p2 p1 (pte_set_ad p0 a' d') q0' p0 p0' MENVCFG_S
+                         (mword_of_int 0) (tlb_hash (__id 39) vpn) _ sg
+                         (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
+                         Hrdx Hv0 Hl0 Hnap (Hchk a0 d0 mxr do_sum) Hmisa HPBMTE
+                         Hvarm Hupm Hwr eq_refl).
+             ++ intros mxr do_sum. unfold translate.
+                gmm_peel (goodmb_lookup_TLB vpn Dr Dw (mword_of_int 0) sg mm HDt) Hlkh.
+                cbn match.
+                apply (goodmb_translate_TLB_hit_pt_upd Dr Dw acc pv mxr do_sum HDt HWt HDme
+                         vpn p2 p1 (pte_set_ad p0 a' d') q0' p0 p0' MENVCFG_S
+                         (mword_of_int 0) (tlb_hash (__id 39) vpn) _ sg mm
+                         (Hchkc mxr do_sum) (Hchkcg mxr do_sum) Hupq Hpbc Hmenv HADUE
+                         Hrdx Hrdxg Hv0 Hl0 Hnap (Hchk a0 d0 mxr do_sum)
+                         (goodmb_check_leaf_pte_leaf0 vpn p0 acc pv mxr do_sum
+                            Hv0 Hl0 (Hchk a0 d0 mxr do_sum) Hnap (Hg0 a0 d0)
+                            (Hgchk a0 d0 mxr do_sum) Dr Dw HDmi HDme
+                            (Physaddr (pt_addr0 p1 vpn)) MENVCFG_S sg mm
+                            Hmisa Hmenv HPBMTE)
+                         Hmisa HPBMTE Hvarm Hupm Hwr Hwrg eq_refl).
+          -- (* memory ALREADY has them: no write, the entry is refreshed *)
+             assert (Hvarm : exists a2 d2 : mword 1, p0 = pte_set_ad (pte_set_ad p0 a' d') a2 d2).
+             { exists a0, d0. rewrite pte_set_ad_absorb.
+               unfold p0. rewrite pte_set_ad_absorb. reflexivity. }
+             apply (goodmb_translateAddr_pt_front Dr Dw acc pv HDms HDcp HDsatp
+                      vpn root_ppn
+                      (autocast (T := mword) ((autocast (T := mword)
+                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
+                      satp0 va sg mm
+                      Heff Heffg Hss Hssg Hcp Htm Htmg Hsatp Hppn Hasid Hcanon eq_refl).
+             ++ eexists. intros mxr do_sum. unfold translate.
+                rewrite (exec_bind_Some _ _ _ _ _ Hlkh). cbn match.
+                apply (exec_translate_TLB_hit_pt_refresh acc pv mxr do_sum
+                         vpn p2 p1 (pte_set_ad p0 a' d') q0' p0 MENVCFG_S
+                         (mword_of_int 0) (tlb_hash (__id 39) vpn) sg
+                         (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
+                         Hrdx Hv0 Hl0 Hnap (Hchk a0 d0 mxr do_sum) Hmisa HPBMTE
+                         Hvarm Hupm).
+             ++ intros mxr do_sum. unfold translate.
+                gmm_peel (goodmb_lookup_TLB vpn Dr Dw (mword_of_int 0) sg mm HDt) Hlkh.
+                cbn match.
+                apply (goodmb_translate_TLB_hit_pt_refresh Dr Dw acc pv mxr do_sum
+                         HDt HWt HDme
+                         vpn p2 p1 (pte_set_ad p0 a' d') q0' p0 MENVCFG_S
+                         (mword_of_int 0) (tlb_hash (__id 39) vpn) sg mm
+                         (Hchkc mxr do_sum) (Hchkcg mxr do_sum) Hupq Hpbc Hmenv HADUE
+                         Hrdx Hrdxg Hv0 Hl0 Hnap (Hchk a0 d0 mxr do_sum)
+                         (goodmb_check_leaf_pte_leaf0 vpn p0 acc pv mxr do_sum
+                            Hv0 Hl0 (Hchk a0 d0 mxr do_sum) Hnap (Hg0 a0 d0)
+                            (Hgchk a0 d0 mxr do_sum) Dr Dw HDmi HDme
+                            (Physaddr (pt_addr0 p1 vpn)) MENVCFG_S sg mm
+                            Hmisa Hmenv HPBMTE)
+                         Hmisa HPBMTE Hvarm Hupm).
+        * (* hit, A/D already sufficient *)
+          assert (Hupq' : update_PTE_Bits
+                    (autocast (T := mword) (pte_set_ad p0 a' d') : mword 64) acc = None)
+            by exact Hupq.
+          apply (goodmb_translateAddr_pt_front Dr Dw acc pv HDms HDcp HDsatp
+                   vpn root_ppn
+                   (autocast (T := mword) ((autocast (T := mword)
+                      (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
+                   satp0 va sg mm
+                   Heff Heffg Hss Hssg Hcp Htm Htmg Hsatp Hppn Hasid Hcanon eq_refl).
+          -- exists sg. intros mxr do_sum. unfold translate.
+             rewrite (exec_bind_Some _ _ _ _ _ Hlkh). cbn match.
+             apply (exec_translate_TLB_hit_pt acc pv mxr do_sum
+                      vpn p2 p1 (pte_set_ad p0 a' d') (mword_of_int 0)
+                      (tlb_hash (__id 39) vpn) sg (Hchkc mxr do_sum) Hupq' Hpbc).
+          -- intros mxr do_sum. unfold translate.
+             gmm_peel (goodmb_lookup_TLB vpn Dr Dw (mword_of_int 0) sg mm HDt) Hlkh.
+             cbn match.
+             apply (goodmb_translate_TLB_hit_pt Dr Dw acc pv mxr do_sum
+                      vpn p2 p1 (pte_set_ad p0 a' d') (mword_of_int 0)
+                      (tlb_hash (__id 39) vpn) sg mm (Hchkc mxr do_sum)
+                      (fun s0 => Hchkcg mxr do_sum Dr s0) Hupq' Hpbc).
+      + (* foreign entry: rejected by the tag, so the walk runs *)
+        assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) sg = Some (None, sg))
+          by exact (exec_lookup_TLB_nomatch_s vpn (mword_of_int 0) _ tlbvec sg Htlb Hslot
+                      (uwe_match_other vpn0 vpn q2 q1 (pte_set_ad qp0 a' d')
+                         (mword_of_int 0) Hne)).
+        destruct (ptree_translate_miss_core acc pv root_ppn va w tlbvec p2 p1 a0 d0 sg Hchk
+                    Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
+                    (pt_read_pte_slot sg _ p2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif)
+                    (pt_read_pte_slot sg _ p1 region1 Hsm1 HA Hord HR Hcov Hm1 Hs1 Hhtif)
+                    (pt_read_pte_slot sg _ p0 region0 Hsm0 HA Hord HR Hcov Hm0r Hs0 Hhtif)
+                    Hrdx Hmisa Hmenv Hhtif Htlb Hlk HA Hord HW Hcov Hpmaw)
+          as (sg' & Htr & _).
+        apply (goodmb_translateAddr_pt_front Dr Dw acc pv HDms HDcp HDsatp
+                 vpn root_ppn
+                 (autocast (T := mword) ((autocast (T := mword)
+                    (PPN_of_PTE (p0 : mword 64))) : mword 44))
+                 satp0 va sg mm
+                 Heff Heffg Hss Hssg Hcp Htm Htmg Hsatp Hppn Hasid Hcanon eq_refl
+                 (ex_intro _ sg' Htr)).
+        intros mxr do_sum.
+        exact (goodmb_ptree_translate_miss_core root_ppn va w tlbvec p2 p1 a0 d0
+                 mxr do_sum sg mm Hchk Hgchk Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hg2 Hg1 Hg0
+                 Hsm2' Hsm1 Hsm0 Hown2' Hown1 Hown0
+                 Hmisa Hmenv Hhtif Htlb Hlk HA Hord HR HW Hcov Hpmar Hpmaw).
+    - (* empty slot: the walk runs *)
+      assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) sg = Some (None, sg))
+        by exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec sg Htlb Hslot).
+      destruct (ptree_translate_miss_core acc pv root_ppn va w tlbvec p2 p1 a0 d0 sg Hchk
+                  Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
+                  (pt_read_pte_slot sg _ p2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif)
+                  (pt_read_pte_slot sg _ p1 region1 Hsm1 HA Hord HR Hcov Hm1 Hs1 Hhtif)
+                  (pt_read_pte_slot sg _ p0 region0 Hsm0 HA Hord HR Hcov Hm0r Hs0 Hhtif)
+                  Hrdx Hmisa Hmenv Hhtif Htlb Hlk HA Hord HW Hcov Hpmaw)
+        as (sg' & Htr & _).
+      apply (goodmb_translateAddr_pt_front Dr Dw acc pv HDms HDcp HDsatp
+               vpn root_ppn
+               (autocast (T := mword) ((autocast (T := mword)
+                  (PPN_of_PTE (p0 : mword 64))) : mword 44))
+               satp0 va sg mm
+               Heff Heffg Hss Hssg Hcp Htm Htmg Hsatp Hppn Hasid Hcanon eq_refl
+               (ex_intro _ sg' Htr)).
+      intros mxr do_sum.
+      exact (goodmb_ptree_translate_miss_core root_ppn va w tlbvec p2 p1 a0 d0
+               mxr do_sum sg mm Hchk Hgchk Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hg2 Hg1 Hg0
+               Hsm2' Hsm1 Hsm0 Hown2' Hown1 Hown0
+               Hmisa Hmenv Hhtif Htlb Hlk HA Hord HR HW Hcov Hpmar Hpmaw).
+  Qed.
+
+End PtreeTranslateCert.
