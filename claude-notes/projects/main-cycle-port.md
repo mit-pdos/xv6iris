@@ -1980,8 +1980,7 @@ platform ones + `functional_extensionality_dep` where inherited)
 - S-mode leaves ALL converted, statements byte-identical except the
   user-approved ones: WpSconfAlu(50)/Btype(28)/Ctl(8)/Csr(16)/Sret/Timer/
   Mem(29)/Lock(9)/PLIC/Virtio/UART, WpSmodePt* (30), parked leaves folded
-  into WpSconfAlu (WpSconfSrliw.v deleted).  WFI: wait loop verified in
-  ZZWfi.v; enter step + fold into WpSmodeWfi.v IN FLIGHT.
+  into WpSconfAlu (WpSconfSrliw.v deleted).  WFI: DONE (ea30fb5a, `wp_wfi_s_sconf` byte-identical; ZZWfi.v deleted).
 - User tier: P0-P6 done; UserExec/KernelBridge/Step/StepFull/ActiveClass
   §1-4/TotalU/ClassifyAsm green; `u_fetch_pure` (4-byte) + fault composer
   `u_fetch_fault_pure` landed; UserMemCert/UserMemArmsBase (P4b part 1)
@@ -2018,7 +2017,6 @@ platform ones + `functional_extensionality_dep` where inherited)
   `user_trap_frame_open` ipattern edits.
 - P4b: UserMemClassify(+Amo) arms onto the pure pair; then P7's
   UserActiveClass §5 assembly (interface written in user-tier-port.md §14).
-- WFI helper: enter step on `swp_run_hart_active_gen_exf_res`, fold ZZWfi.
 
 ### Not started
 - `u_fetch_pure_2` (2-aligned/straddle fetch: width-2 goodmb twins,
