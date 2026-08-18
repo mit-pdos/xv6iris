@@ -961,52 +961,67 @@ joined into the frame), flips the SIE ghost, assembles `ihs_entry_of` and
 runs the handler contract exactly as today, then re-enters the Löb; the
 RETIRE arm hands the leaf's swp obligation the cells.
 
-### WHAT IS LEFT OF THE S-MODE CSR/SRET/TIMER SWEEP (2026-08-18, after the b'/ms' generalization landed)
+### THE S-MODE CSR/SRET/TIMER SWEEP IS DONE (2026-08-18)
 
-The `b'`/`ms'` generalization below was made and unblocked most of the sweep:
-**14 of WpSconfCsr's 16 leaves and `WpSconfTimer.wp_csrr_time_s_sconf` are
-converted and verified**, all statements byte-identical except
-`wp_csrr_ro_s_sconf`'s forced exec→swp premise change.  Three things are
-left, and each is a DIFFERENT kind of gap -- none is proof volume:
+`WpSconfCsr` (16 leaves), `WpSconfSret` (1) and `WpSconfTimer` (2) are GREEN,
+`HartSCsr.v` is the engine file under them, and **every statement is
+byte-identical except `wp_csrr_ro_s_sconf`'s**, whose whole-`execute` `exec`
+premise had to become an `swp` obligation (the same forced change
+`wp_gpr_write_s_sconf` made; its three instances are untouched).  Nothing is
+`Admitted`; all of them close at the 5 rv64d platform axioms.
 
-1. **THE RIDER IS AT THE ENTRY HART.**  `R : mword 64 -> mword 64 -> regfile
-   -> nat -> iProp` is a parameter of `wp_instr_s_sconf`, so it is elaborated
-   BEFORE the callback binds its hart, while `sconf_step_obl … CID` applies it
-   at the REBOUND one.  A pure rider does not care; a rider carrying
-   hart-indexed resources cannot be written at all.  That blocks exactly the
-   two csrci DISABLE flips (`wp_csrci_sstatus_s_sconf`,
-   `wp_csrci_sstatus_x0_s_sconf`), which hand their continuation the enabled
-   arm's payload -- the trap CSRs, the count token, the running claim, the
-   per-cpu cells.  **The edit is `R : CpuId -> …`, applied at
-   `sconf_step_obl`'s own `CID` in both the post and the continuation.**  The
-   ENABLE flips and `wp_sret_s_sconf` are unaffected: their already-enabled
-   arm is refuted ABOVE the funnel (a register cell is per hart, so the
-   payload's sepc and the arm's cannot coexist at the entry hart), which
-   leaves `b = false` and `wp_next_off_intro` retires the hart question.
+**THE SWEEP DROVE THREE GENERALIZATIONS OF THE WRAPPER OBLIGATION, and each
+was FORCED by one leaf, not chosen:**
 
-2. **AN INVARIANT CANNOT SPAN A CSR WRITE.**  `WpSconfTimer.
-   wp_csrw_stimecmp_s_sconf` is blocked on the RESOURCE, not the wrapper:
-   `TimerCap.timer_cap` seals the deadline cell in an invariant, and
-   `write_CSR 0x14D` touches that cell THREE times across a long stretch
-   (read old / write legalized / `clint_dispatch` / read back).  The one-node
-   seam (`HartSCsr.swp_write_reg_acc`, the atomic-accessor form over
-   `swp_hart_regwrite`) covers a SINGLE register-write node and nothing
-   covers a stretch -- an Iris invariant does not stay open across a machine
-   step.  The fix is at the resource: thread `stimecmp_free` as an exclusive
-   cell the way `wp_csrw_stvec_s_sconf` threads stvec.  That changes
-   `timer_cap` and both timer statements, so it is the timer owner's call.
+1. **the second arm index `b'`** — the four sstatus flips MOVE the SIE arm.
+   Before it the flip could not be *stated*: `sconf`'s ghost half at the new
+   bit and `sie_arm true`'s quarter at the old one are contradictory, so the
+   old post was FALSE, not merely unreachable.
+2. **the mstatus witness `ms'`** — `wp_csrr_sstatus_s_sconf` names the word
+   it read, so its `sconf_at ms` and the `sstatus_read ms` that landed in rd
+   are about the same word by construction.  `sconf` hid it both ways, and
+   no rider could recover it (`P ⊢ Q ∗ (Q -∗ P)` is false when `P` carries
+   more than `Q`).
+3. **the rider's hart, `R CID …`** — the two csrci DISABLE flips hand their
+   continuation the enabled arm's payload (trap CSRs, count token, running
+   claim, per-cpu cells) and every one is hart-indexed, while `R` is a
+   parameter of `wp_instr_s_sconf` and so is elaborated at the ENTRY hart.
+   A PURE rider is unaffected, which is why the ENABLE flips and
+   `wp_sret_s_sconf` were never blocked: their case split refutes the
+   already-enabled arm ABOVE the funnel (a register cell is per hart, so the
+   payload's sepc and the arm's cannot coexist at the entry hart), leaving
+   `b = false` where `wp_next_off_intro` retires the hart question.
 
-3. **`WpSconfSret.wp_sret_s_sconf` needs the MRET walk one privilege over.**
-   No interface gap: `execute (SRET tt)` writes mstatus five times,
-   cur_privilege, elp and nextPC, so it is `WpMmodeMret`'s per-node walk with
-   the `sret_ms1..5` tower in place of MRET's, CHOPPED at the elp write
-   (`HartRegNode.swp_write_reg_same` -- elp is pinned persistently by
-   `hw_config` and the write is value-preserving, which is exactly the M-mode
-   twin's shape).  `HartMemRun.swp_hmrun_of_exec` is NOT the shortcut here:
-   it demands every written register in `Drw` at full ownership, and elp is
-   only persistently owned.
+**AND FOUR SHAPES WORTH REUSING (all in `HartSCsr.v`):**
 
-### THE S-MODE WRAPPER IS TOO RIGID FOR THREE FAMILIES OF LEAF (found 2026-08-18, during the CSR/SRET/timer sweep; the b'/ms' half is FIXED)
+- **THE REFERENCE STATE CAN BE THE CALLER'S OWN FILE.**  satp's check reads
+  mstatus and branches on TVM, so no concrete reference state agrees with the
+  leaf.  Taking `dst := MState rs ∅ dev0_state` makes `hval_of_goodb`'s
+  agreement premise `eq_refl` and leaves only the certificate, which is then
+  ASSEMBLED at the accessibility step off the leaf's own TVM fact.  This is
+  the general answer for a value-DEPENDENT check.
+- **THE CHECK AS AN OBLIGATION** (`swp_doCSR_r_obl_p`, the `hval` form its
+  instance).  Supervisor's `csrr time` is value-dependent on one OWNED cell
+  (mcounteren.TM) and value-blind on an UNOWNED one (scounteren): no single
+  `goodb` certificate covers it (`hval_of_goodb` wants every read register
+  owned) and no ∀-peel does either.  At the swp layer `swp_read_reg_pinned`
+  and `swp_read_reg_any` mix freely.
+- **AN INVARIANT-SEALED CELL NEEDS A NODE SEAM, NOT THREADING.**
+  `write_CSR stimecmp` touches the deadline cell three times across a long
+  stretch, but `TimerCap`'s invariant carries no value information, so each
+  touch is opened and closed on its own: the reads need nothing (an unowned
+  read is ungated) and the write takes `swp_write_reg_cellinv`.  Note the
+  accessor form (`swp_write_reg_acc`) CANNOT take an invariant — an invariant
+  hands its content out under a LATER and the accessor is consumed at the
+  ⊤→∅ step, before the node rule's later.  What is given up is naming the
+  value the write returns, hence the existential-result engine
+  `swp_doCSR_w_ex_p`.
+- **THE GHOST WORK GOES IN THE swp's POST.**  Every SIE flip is a `bupd`
+  (`sie_ghost_flip_on/off`, `sret_bits_update`), and `HartSwp.swp_fupd_post`
+  is what lets it run after the instruction, where the new mstatus is already
+  installed.
+
+### THE S-MODE WRAPPER'S THREE RIGIDITIES (found 2026-08-18; ALL THREE ARE NOW FIXED -- kept for the analysis of WHY each was false rather than merely unprovable)
 
 `WpSmodeIntr.sconf_step_obl` fixes THREE things across the instruction that
 some S-mode leaves have to move, and each is a one-parameter generalization
