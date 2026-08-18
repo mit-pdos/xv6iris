@@ -53,6 +53,13 @@ Local Open Scope Z_scope.
 (* 1. A PHYSICAL DOUBLEWORD, AS A BYTE MAP.                               *)
 (* ===================================================================== *)
 
+(* THE BYTE-MAP TYPE, FROZEN at the instances [read_bytes] / [bytes_own] are
+   stated over -- see the import-set note in the header.  A file that has to
+   MENTION the type (in a list, a record field, a fixpoint's result) should
+   spell it [pamap] rather than re-elaborate [gmap Arch.pa (bv 8)] under its
+   own import set, where a second [Countable Arch.pa] instance may win. *)
+Definition pamap : Type := gmap Arch.pa (bv 8).
+
 Definition word_bytes (a : Arch.pa) (w : bv 64) : gmap Arch.pa (bv 8) :=
   list_to_map ((fun j : nat => (pa_add a j, nth_byte w j)) <$> seq 0 8).
 
@@ -239,3 +246,71 @@ Section BytesOwnFacts.
   Qed.
 
 End BytesOwnFacts.
+
+(* ===================================================================== *)
+(* 4. A LIST OF BYTE MAPS AND ITS UNION.                                  *)
+(*                                                                       *)
+(* A page table's bytes are the bytes of its slots, node by node, and     *)
+(* the hart holds them as ONE map -- [hmrun] reads and writes a single    *)
+(* [gmap], and [goodmb] certifies against a single domain.  So the        *)
+(* separating conjunction over the pieces has to become a union, and      *)
+(* THAT NEEDS DISJOINTNESS -- which section 3 derives from the ownership  *)
+(* itself, so no caller has to assume it.                                 *)
+(* ===================================================================== *)
+
+Fixpoint maps_disj (l : list (gmap Arch.pa (bv 8))) : Prop :=
+  match l with
+  | [] => True
+  | m :: l' => (forall m', m' ∈ l' -> m ##ₘ m') /\ maps_disj l'
+  end.
+
+(* disjointness is a fact about DOMAINS only, so a list whose maps have the
+   same domains pointwise inherits it -- which is what makes an A/D
+   write-back preserve it *)
+Lemma maps_disj_dom (l l' : list (gmap Arch.pa (bv 8))) :
+  Forall2 (fun m m' => (dom m : gset Arch.pa) = dom m') l l' ->
+  maps_disj l -> maps_disj l'.
+Proof.
+  revert l'. induction l as [| m l IH]; intros l' Hf2 Hd.
+  - by inversion Hf2.
+  - inversion Hf2 as [| ? m2 ? l2 Hdm Hrest]; subst.
+    destruct Hd as [Hhd Htl]. split; [| by apply IH].
+    intros m'' Hm''.
+    (* locate [m''] in [l2] and its partner in [l] *)
+    apply elem_of_list_lookup in Hm'' as [k Hk].
+    destruct (Forall2_lookup_r _ _ _ _ _ Hrest Hk) as (mk & Hmk & Hdomk).
+    apply map_disjoint_dom. rewrite <- Hdm, <- Hdomk.
+    apply map_disjoint_dom, Hhd, elem_of_list_lookup. by exists k.
+Qed.
+
+Section MapsUnion.
+  Context `{!riscvGS Σ}.
+
+  Lemma bytes_own_list_disj (l : list (gmap Arch.pa (bv 8))) :
+    ([∗ list] m ∈ l, bytes_own m) ⊢ ⌜maps_disj l⌝.
+  Proof.
+    induction l as [| m l IH]; [by iIntros "_" |].
+    rewrite big_sepL_cons. iIntros "[Hm Hl]".
+    iDestruct (IH with "Hl") as %Hd.
+    iAssert (⌜forall m', m' ∈ l -> m ##ₘ m'⌝)%I with "[Hm Hl]" as %Hhd.
+    { rewrite bi.pure_forall. iIntros (m'). rewrite bi.pure_impl. iIntros (Hm').
+      apply elem_of_list_lookup in Hm' as [k Hk].
+      iDestruct (big_sepL_lookup _ _ _ _ Hk with "Hl") as "Hm'".
+      by iDestruct (bytes_own_disj with "Hm Hm'") as %?. }
+    iPureIntro. by split.
+  Qed.
+
+  Lemma bytes_own_list_union (l : list (gmap Arch.pa (bv 8))) :
+    maps_disj l -> ([∗ list] m ∈ l, bytes_own m) ⊣⊢ bytes_own (⋃ l).
+  Proof.
+    induction l as [| m l IH]; intros Hd.
+    - rewrite /bytes_own /=. by rewrite big_sepM_empty.
+    - destruct Hd as [Hhd Htl].
+      assert (Hdisj : m ##ₘ ⋃ l).
+      { apply map_disjoint_union_list_r, Forall_forall.
+        intros m' Hm'. by apply symmetry, Hhd. }
+      rewrite big_sepL_cons (IH Htl) /=.
+      by rewrite (bytes_own_union _ _ Hdisj).
+  Qed.
+
+End MapsUnion.

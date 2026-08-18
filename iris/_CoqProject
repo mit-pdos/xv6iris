@@ -170,6 +170,7 @@ LinkSpin.v
 SmodePte.v
 UserFrame.v
 PtBytes.v
+UserBytes.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
