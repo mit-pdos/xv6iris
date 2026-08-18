@@ -268,8 +268,32 @@ So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
    `s_tick_agree`, `s_pre_agree`, `s_rw_ext` / `s_ro_ext`.  It came in at the
    size `mm_cycle`'s header predicted, and adds nothing to the generic rule
    but the two bridges.
-4. `wp_instr_s` = `s_cycle` + the fetch-shape dispatch over
-   `HartSTrans.swp_fetch_S`.  **ONE CAVEAT, found while scoping it:**
+4. ~~`wp_instr_s`~~ — **DONE**, but NOT on `s_cycle`, and the correction is
+   the useful part.
+
+   **`s_cycle` IS THE WRONG BASE FOR THE GENERAL S-MODE WRAPPER.**  It sits on
+   `swp_exec_step_decode_execute`, whose body is RETIRE-ONLY;
+   `swp_run_hart_active_gen`'s conclusion is a DISJUNCTION, because at
+   Supervisor the dispatch reads the PLIC wires and the MACHINE picks the
+   arm.  M-mode gets away with the one-armed base only because
+   `swp_dispatchInterrupt_M` pins `None`.  This is the same mistake —
+   mirroring an M-mode rule shape into S-mode — that made `HartMIntr`
+   unusable and started this whole effort; the type checker caught it the
+   second time.
+
+   So the base is `s_cycle_any` (`HartStepAny.swp_exec_step_any` at the
+   S-mode tower, post-file a PREDICATE since the two arms land on different
+   files), and `wp_instr_s` sits on that.  `s_cycle` is KEPT: it is right and
+   cheaper wherever a caller CAN rule out a trap (SIE clear).
+
+   Two shapes the seam forces, both worth knowing before touching it:
+   the disjunction→match conversion is ONE `swp_mono`, and it is where the
+   caller's `Qi` meets the handler slot; and the `∃` over the post-handler
+   file sits OUTSIDE the `swp`, because that is where `swp_exec_step_any`
+   puts it — a caller names the file its handler lands on before running it,
+   which is what a handler spec gives.
+
+   **Old caveat, still true for the other shapes:**
    `swp_fetch_S` covers the 4-ALIGNED BASE shape only.  The other three
    (`base2`, `rvc`, `rvc2`) each need an S-mode `fetch_bytes` instance the
    way `swp_fetch_bytes_S` is one — the halfword reads at the TRANSLATED
