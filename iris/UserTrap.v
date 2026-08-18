@@ -63,7 +63,7 @@ Import Defs.
 (* discharged.  Those are the hand-peeled [swp] walk (user-tier-port       *)
 (* §3.3, §4.4 item 2), not a twin.                                         *)
 (* ===================================================================== *)
-Require Import HartMemRun.
+Require Import HartMemRun UserExecFacts.
 
 
 (* ONE PEEL FOR EVERY BIND SHAPE the generated code produces: [bind0], the
@@ -107,26 +107,6 @@ Proof.
   apply goodmb_returnm.
 Qed.
 
-Lemma goodmb_hartSupports_Zicsr (Dr Dw : register -> bool) (s : mstate) mm :
-  goodmb Dr Dw (hartSupports Ext_Zicsr) s mm = true.
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Zicsr) 0) with true by reflexivity.
-  cbn match.
-  erewrite goodmb_bind; [ | apply goodmb_returnm | apply (exec_returnM eq_refl s) ].
-  apply goodmb_returnm.
-Qed.
-
-Lemma goodmb_rec_cE_Zicsr (Dr Dw : register -> bool) (s : mstate)
-    (acc : Acc (Zwf 0) 0) mm :
-  goodmb Dr Dw (_rec_currentlyEnabled Ext_Zicsr 0 acc) s mm = true.
-Proof.
-  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb 0 0) with true by reflexivity. cbn match.
-  erewrite goodmb_bind; [ | apply goodmb_returnm | apply (exec_returnM eq_refl s) ].
-  cbn match. apply goodmb_hartSupports_Zicsr.
-Qed.
 
 Lemma goodmb_currentlyEnabled_S (Dr Dw : register -> bool) (s : mstate) :
   Dr misa = true ->

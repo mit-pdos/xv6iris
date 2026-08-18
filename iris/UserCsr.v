@@ -23,12 +23,47 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
+(* THE [goodmb] TWINS (the <exec, goodmb> pair convention).               *)
+(*                                                                        *)
+(* Every [exec_X] below has a [goodmb_X] immediately after it, with the    *)
+(* SAME binders and hypotheses plus one [Dr r = true] per register the     *)
+(* stretch READS and one [Dw r = true] per register it WRITES, over        *)
+(* abstract [Dr]/[Dw].  All at [mm := ∅]: the CSR families touch no        *)
+(* memory, and [HartMemRun.goodmb_map_mono] lifts an ∅-certificate to any  *)
+(* map.  Where the exec fact is EXISTENTIAL in the result the twin is      *)
+(* unconditional -- a certificate does not depend on the outcome -- which  *)
+(* is why the accessibility traversal's twin has no                        *)
+(* [u_csr_readable] obligation and is strictly shorter than its exec twin. *)
+(*                                                                        *)
+(* THE 200-CLAUSE TRAVERSAL COSTS ALMOST NOTHING TO MIRROR: the dispatch   *)
+(* guards are PURE (address-bit comparisons, no reads), so                 *)
+(* [gm_csr_step] is [csr_step] with the [exists _, exec _ = Some _ /\ _]   *)
+(* pattern replaced by [goodmb _ _ _ _ _ = true] and the per-clause result *)
+(* obligations DELETED.  The dead branches die on exactly the same three   *)
+(* facts ([pmp_subrange_dead], [hpm_subrange_dead], the priv gate).        *)
+(* ===================================================================== *)
+Require Import HartMemRun.
+
+(* ===================================================================== *)
 (* §1 Extension-gate probes at the xv6 config.                            *)
 (* ===================================================================== *)
 
+(* the hartSupports probes read NOTHING, so their certificate is the same
+   walk with [goodmb] in place of [exec]. *)
+Ltac gm_hs X :=
+  unfold hartSupports; destruct (Defs.Zwf_guarded _);
+  cbn [_rec_hartSupports]; unfold Defs.assert_exp';
+  replace (Z.geb (hartSupports_measure X) 0) with true by reflexivity;
+  cbn match;
+  erewrite goodmb_bind; [ | apply goodmb_returnm | apply exec_returnM ];
+  cbn beta; apply goodmb_returnm.
 (* Zfinx is not hart-supported: the gate is a closed false. *)
 Lemma exec_currentlyEnabled_Zfinx (s : mstate) :
   exec (currentlyEnabled Ext_Zfinx) s = Some (false, s).
+Proof. reflexivity. Qed.
+
+Lemma goodmb_currentlyEnabled_Zfinx (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (currentlyEnabled Ext_Zfinx) s mm = true.
 Proof. reflexivity. Qed.
 
 Lemma exec_hartSupports_F (s : mstate) :
@@ -43,6 +78,10 @@ Proof.
           apply exec_returnM
         | reflexivity ].
 Qed.
+
+Lemma goodmb_hartSupports_F (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_F) s mm = true.
+Proof. gm_hs Ext_F. Qed.
 
 (* F is hart-supported and misa.F is set, but the FS = Off pin turns the
    gate false BEFORE the Zicsr recursion (and_boolM short-circuits), so
@@ -73,6 +112,35 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma goodmb_currentlyEnabled_F_off (Dr Dw : register -> bool) (s : mstate)
+    (ms_v : mword 64) :
+  Dr misa = true -> Dr mstatus = true ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  goodmb Dr Dw (currentlyEnabled Ext_F) s ∅ = true.
+Proof.
+  intros HDmi HDms Hms Hfs.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_F) 0) with true.
+  cbn match. gm_pure. cbn beta. cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_hartSupports_F | apply (exec_hartSupports_F s) ].
+  cbn match.
+  erewrite goodmb_and_boolM_empty.
+  2:{ gm_rr misa HDmi. apply goodmb_returnm. }
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). apply exec_returnM. }
+  destruct (eq_vec (_get_Misa_F (register_lookup misa s.(sregs))) ('b"1"));
+    [ | reflexivity ].
+  erewrite goodmb_and_boolM_empty.
+  2:{ gm_rr mstatus HDms. cbn beta. apply goodmb_returnm. }
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+      rewrite Hms. apply exec_returnM. }
+  assert (Hneq : neq_vec (_get_Mstatus_FS ms_v) ('b"00") = false)
+    by (unfold neq_vec; rewrite Hfs; reflexivity).
+  rewrite Hneq. reflexivity.
+Qed.
+
 (* the hart-supported flags the U-addressed gates consult *)
 Lemma exec_hartSupports_Zicntr (s : mstate) :
   exec (hartSupports Ext_Zicntr) s = Some (true, s).
@@ -84,6 +152,10 @@ Proof.
   cbn beta. apply exec_returnM.
 Qed.
 
+Lemma goodmb_hartSupports_Zicntr (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_Zicntr) s mm = true.
+Proof. gm_hs Ext_Zicntr. Qed.
+
 Lemma exec_hartSupports_Zicfiss (s : mstate) :
   exec (hartSupports Ext_Zicfiss) s = Some (true, s).
 Proof.
@@ -93,6 +165,10 @@ Proof.
   erewrite exec_bind_Some. 2:{ apply exec_returnM. }
   cbn beta. apply exec_returnM.
 Qed.
+
+Lemma goodmb_hartSupports_Zicfiss (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_Zicfiss) s mm = true.
+Proof. gm_hs Ext_Zicfiss. Qed.
 
 Lemma exec_hartSupports_Zimop (s : mstate) :
   exec (hartSupports Ext_Zimop) s = Some (true, s).
@@ -104,6 +180,10 @@ Proof.
   cbn beta. apply exec_returnM.
 Qed.
 
+Lemma goodmb_hartSupports_Zimop (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_Zimop) s mm = true.
+Proof. gm_hs Ext_Zimop. Qed.
+
 Lemma exec_hartSupports_Zaamo (s : mstate) :
   exec (hartSupports Ext_Zaamo) s = Some (false, s).
 Proof.
@@ -114,6 +194,10 @@ Proof.
   cbn beta. apply exec_returnM.
 Qed.
 
+Lemma goodmb_hartSupports_Zaamo (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_Zaamo) s mm = true.
+Proof. gm_hs Ext_Zaamo. Qed.
+
 Lemma exec_hartSupports_A (s : mstate) :
   exec (hartSupports Ext_A) s = Some (true, s).
 Proof.
@@ -123,6 +207,10 @@ Proof.
   erewrite exec_bind_Some. 2:{ apply exec_returnM. }
   cbn beta. apply exec_returnM.
 Qed.
+
+Lemma goodmb_hartSupports_A (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_A) s mm = true.
+Proof. gm_hs Ext_A. Qed.
 
 (* limit-instantiated recursive probes (the Zicfiss clause runs its
    sub-probes at measure-1 = 1, and Zaamo's Ext_A at 0) *)
@@ -135,6 +223,16 @@ Proof.
   cbn beta. apply exec_hartSupports_Zicsr.
 Qed.
 
+Lemma goodmb_rec_cE_Zicsr_1 (Dr Dw : register -> bool) (s : mstate)
+    (acc : Acc (Zwf 0) 1) mm :
+  goodmb Dr Dw (_rec_currentlyEnabled Ext_Zicsr 1 acc) s mm = true.
+Proof.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb 1 0) with true. cbn match.
+  erewrite goodmb_bind; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. apply goodmb_hartSupports_Zicsr.
+Qed.
+
 Lemma exec_rec_cE_Zimop_1 (s : mstate) (acc : Acc (Zwf 0) 1) :
   exec (_rec_currentlyEnabled Ext_Zimop 1 acc) s = Some (true, s).
 Proof.
@@ -142,6 +240,16 @@ Proof.
   change (Z.geb 1 0) with true. cbn match.
   erewrite exec_bind_Some. 2:{ apply exec_returnM. }
   cbn beta. apply exec_hartSupports_Zimop.
+Qed.
+
+Lemma goodmb_rec_cE_Zimop_1 (Dr Dw : register -> bool) (s : mstate)
+    (acc : Acc (Zwf 0) 1) mm :
+  goodmb Dr Dw (_rec_currentlyEnabled Ext_Zimop 1 acc) s mm = true.
+Proof.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb 1 0) with true. cbn match.
+  erewrite goodmb_bind; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. apply goodmb_hartSupports_Zimop.
 Qed.
 
 Lemma exec_rec_cE_A_0 (s : mstate) (acc : Acc (Zwf 0) 0) :
@@ -160,6 +268,22 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_rec_cE_A_0 (Dr Dw : register -> bool) (s : mstate)
+    (acc : Acc (Zwf 0) 0) :
+  Dr misa = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  goodmb Dr Dw (_rec_currentlyEnabled Ext_A 0 acc) s ∅ = true.
+Proof.
+  intros HDmi Hmisa.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb 0 0) with true. cbn match.
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_hartSupports_A | apply (exec_hartSupports_A s) ].
+  cbn match. gm_rr misa HDmi. cbn beta. apply goodmb_returnm.
+Qed.
+
 Lemma exec_rec_cE_Zaamo_1 (s : mstate) (acc : Acc (Zwf 0) 1) :
   register_lookup misa s.(sregs) = MISA_C ->
   exec (_rec_currentlyEnabled Ext_Zaamo 1 acc) s = Some (true, s).
@@ -174,6 +298,22 @@ Proof.
   apply exec_rec_cE_A_0. exact Hmisa.
 Qed.
 
+Lemma goodmb_rec_cE_Zaamo_1 (Dr Dw : register -> bool) (s : mstate)
+    (acc : Acc (Zwf 0) 1) :
+  Dr misa = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  goodmb Dr Dw (_rec_currentlyEnabled Ext_Zaamo 1 acc) s ∅ = true.
+Proof.
+  intros HDmi Hmisa.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb 1 0) with true. cbn match.
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta.
+  erewrite goodmb_or_boolM_empty;
+    [ | apply goodmb_hartSupports_Zaamo | apply (exec_hartSupports_Zaamo s) ].
+  cbn match. apply goodmb_rec_cE_A_0; assumption.
+Qed.
+
 (* the two gates the U-addressed CSR clauses actually consult *)
 Lemma exec_currentlyEnabled_Zicntr (s : mstate) :
   exec (currentlyEnabled Ext_Zicntr) s = Some (true, s).
@@ -185,6 +325,19 @@ Proof.
   cbn beta. cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zicntr s)).
   apply exec_rec_cE_Zicsr.
+Qed.
+
+Lemma goodmb_currentlyEnabled_Zicntr (Dr Dw : register -> bool) (s : mstate) :
+  goodmb Dr Dw (currentlyEnabled Ext_Zicntr) s ∅ = true.
+Proof.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_Zicntr) 0) with true. cbn match.
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_hartSupports_Zicntr | apply (exec_hartSupports_Zicntr s) ].
+  cbn match. apply goodmb_rec_cE_Zicsr.
 Qed.
 
 Lemma exec_currentlyEnabled_Zicfiss (s : mstate) :
@@ -201,6 +354,29 @@ Proof.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_rec_cE_Zicsr_1 s _)).
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_rec_cE_Zimop_1 s _)).
   apply exec_rec_cE_Zaamo_1. exact Hmisa.
+Qed.
+
+Lemma goodmb_currentlyEnabled_Zicfiss (Dr Dw : register -> bool) (s : mstate) :
+  Dr misa = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  goodmb Dr Dw (currentlyEnabled Ext_Zicfiss) s ∅ = true.
+Proof.
+  intros HDmi Hmisa.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_Zicfiss) 0) with true. cbn match.
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_hartSupports_Zicfiss | apply (exec_hartSupports_Zicfiss s) ].
+  cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_rec_cE_Zicsr_1 | apply (exec_rec_cE_Zicsr_1 s _) ].
+  cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_rec_cE_Zimop_1 | apply (exec_rec_cE_Zimop_1 s _) ].
+  cbn match.
+  apply goodmb_rec_cE_Zaamo_1; assumption.
 Qed.
 
 (* Zve32x: NOT hart-supported.  It comes from V's [support_level], which
@@ -222,6 +398,10 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_hartSupports_Zve32x (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_Zve32x) s mm = true.
+Proof. gm_hs Ext_Zve32x. Qed.
+
 Lemma exec_rec_cE_Zvl32b_0 (s : mstate) (acc : Acc (Zwf 0) 0) :
   exec (_rec_currentlyEnabled Ext_Zvl32b 0 acc) s = Some (true, s).
 Proof.
@@ -237,6 +417,16 @@ Proof.
                   replace v with true by (vm_compute; reflexivity)
               end; apply exec_returnM ]
   end.
+Qed.
+
+Lemma goodmb_rec_cE_Zvl32b_0 (Dr Dw : register -> bool) (s : mstate)
+    (acc : Acc (Zwf 0) 0) mm :
+  goodmb Dr Dw (_rec_currentlyEnabled Ext_Zvl32b 0 acc) s mm = true.
+Proof.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb 0 0) with true. cbn match.
+  erewrite goodmb_bind; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. apply goodmb_returnm.
 Qed.
 
 Lemma exec_currentlyEnabled_Zve32x_off (s : mstate) (ms_v : mword 64) :
@@ -258,6 +448,23 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma goodmb_currentlyEnabled_Zve32x_off (Dr Dw : register -> bool) (s : mstate)
+    (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  goodmb Dr Dw (currentlyEnabled Ext_Zve32x) s ∅ = true.
+Proof.
+  intros _ _.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_Zve32x) 0) with true. cbn match.
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_hartSupports_Zve32x | apply (exec_hartSupports_Zve32x s) ].
+  reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (* §2 The check-chain component reductions.                               *)
 (* ===================================================================== *)
@@ -271,6 +478,16 @@ Proof.
   unfold check_CSR_priv, privLevel_to_CSR_privbits. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM ('b"00" : mword 2) s)). cbn beta.
   apply exec_returnM.
+Qed.
+
+Lemma goodmb_check_CSR_priv_U (Dr Dw : register -> bool) (csr : mword 12)
+    (s : mstate) :
+  goodmb Dr Dw (check_CSR_priv csr User) s ∅ = true.
+Proof.
+  unfold check_CSR_priv, privLevel_to_CSR_privbits. cbn match.
+  erewrite goodmb_bind_empty;
+    [ | apply goodmb_returnm | apply (exec_returnM ('b"00" : mword 2) s) ].
+  cbn beta. apply goodmb_returnm.
 Qed.
 
 (* feature_enabled_for_priv at U, totality: SOME result comes out
@@ -317,6 +534,39 @@ Proof.
     apply exec_returnM.
 Qed.
 
+Lemma goodmb_feature_U (Dr Dw : register -> bool) (m sb h : mword 1) (s : mstate) :
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (feature_enabled_for_priv User m sb h) s ∅ = true.
+Proof.
+  intros HgES HES.
+  unfold feature_enabled_for_priv. cbn match.
+  unfold and_boolM, or_boolM.
+  destruct (eq_vec m ('b"1")).
+  - erewrite goodmb_bind_empty.
+    2:{ erewrite goodmb_bind_empty;
+          [ | apply goodmb_returnm | apply (exec_returnM true s) ].
+        cbn beta. cbn match.
+        erewrite goodmb_bind_empty.
+        2:{ erewrite goodmb_bind_empty; [ | exact HgES | exact HES ].
+            cbn beta. apply goodmb_returnm. }
+        2:{ rewrite (exec_bind_Some _ _ _ _ _ HES). cbn beta. apply exec_returnM. }
+        cbn beta. cbn [not negb]. cbn match. apply goodmb_returnm. }
+    2:{ erewrite exec_bind_Some; [ | apply (exec_returnM true s) ].
+        cbn beta. cbn match.
+        erewrite exec_bind_Some.
+        2:{ rewrite (exec_bind_Some _ _ _ _ _ HES). cbn beta. apply exec_returnM. }
+        cbn beta. cbn [not negb]. cbn match. apply exec_returnM. }
+    cbn beta. cbv zeta. apply goodmb_returnm.
+  - erewrite goodmb_bind_empty.
+    2:{ erewrite goodmb_bind_empty;
+          [ | apply goodmb_returnm | apply (exec_returnM false s) ].
+        cbn beta. cbn match. apply goodmb_returnm. }
+    2:{ erewrite exec_bind_Some; [ | apply (exec_returnM false s) ].
+        cbn beta. cbn match. apply exec_returnM. }
+    cbn beta. cbv zeta. apply goodmb_returnm.
+Qed.
+
 (* counter enables at U: SOME boolean comes out (values never matter) *)
 Lemma exec_counter_enabled_U_total (i : Z) (s : mstate) :
   exec (currentlyEnabled Ext_S) s = Some (true, s) ->
@@ -336,6 +586,25 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_counter_enabled_U (Dr Dw : register -> bool) (i : Z) (s : mstate) :
+  Dr mcounteren = true -> Dr scounteren = true ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (counter_enabled i User) s ∅ = true.
+Proof.
+  intros HDmc HDsc HgES HES.
+  unfold counter_enabled.
+  gm_rr mcounteren HDmc. cbn beta.
+  gm_rr scounteren HDsc. cbn beta.
+  unfold feature_enabled_for_priv_bool.
+  destruct (exec_feature_U_total
+              (access_vec_dec (register_lookup mcounteren s.(sregs)) i)
+              (access_vec_dec (register_lookup scounteren s.(sregs)) i)
+              ('b"0") s HES) as [r Hr].
+  erewrite goodmb_bind_empty; [ | apply goodmb_feature_U; assumption | exact Hr ].
+  cbn beta. apply goodmb_returnm.
+Qed.
+
 (* ssp (0x011) is inaccessible: Zicfiss is enabled, but MENVCFG_S has SSE
    clear, so the User arm's menvcfg conjunct is false (and_boolM
    short-circuits before senvcfg is consulted). *)
@@ -349,6 +618,29 @@ Proof.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zicfiss s Hmisa)).
   cbn match.
   erewrite exec_and_boolM_Some.
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn beta.
+      rewrite Hmenv. apply exec_returnM. }
+  match goal with
+  | |- context [ if ?g then _ else _ ] =>
+      replace g with false by (vm_compute; reflexivity)
+  end.
+  reflexivity.
+Qed.
+
+Lemma goodmb_is_ssp_accessible_U_off (Dr Dw : register -> bool) (s : mstate) :
+  Dr misa = true -> Dr menvcfg = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (is_ssp_accessible User) s ∅ = true.
+Proof.
+  intros HDmi HDme Hmisa Hmenv.
+  unfold is_ssp_accessible.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_currentlyEnabled_Zicfiss; assumption
+      | apply (exec_currentlyEnabled_Zicfiss s Hmisa) ].
+  cbn match.
+  erewrite goodmb_and_boolM_empty.
+  2:{ gm_rr menvcfg HDme. cbn beta. apply goodmb_returnm. }
   2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn beta.
       rewrite Hmenv. apply exec_returnM. }
   match goal with
@@ -454,6 +746,10 @@ Proof.
   cbn beta. apply exec_returnM.
 Qed.
 
+Lemma goodmb_hartSupports_Zihpm (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (hartSupports Ext_Zihpm) s mm = true.
+Proof. gm_hs Ext_Zihpm. Qed.
+
 Lemma exec_currentlyEnabled_Zihpm (s : mstate) :
   exec (currentlyEnabled Ext_Zihpm) s = Some (true, s).
 Proof.
@@ -464,6 +760,19 @@ Proof.
   cbn beta. cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zihpm s)).
   apply exec_rec_cE_Zicsr.
+Qed.
+
+Lemma goodmb_currentlyEnabled_Zihpm (Dr Dw : register -> bool) (s : mstate) :
+  goodmb Dr Dw (currentlyEnabled Ext_Zihpm) s ∅ = true.
+Proof.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_Zihpm) 0) with true. cbn match.
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+  cbn beta. cbn match.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_hartSupports_Zihpm | apply (exec_hartSupports_Zihpm s) ].
+  cbn match. apply goodmb_rec_cE_Zicsr.
 Qed.
 
 Lemma sub115_unsigned (x : mword 12) :
@@ -524,6 +833,16 @@ Lemma exec_or_ff (l r : M bool) (s : mstate) :
 Proof.
   intros Hl Hr. unfold or_boolM.
   rewrite (exec_bind_Some _ _ _ _ _ Hl). cbn match. exact Hr.
+Qed.
+
+Lemma goodmb_or_ff (Dr Dw : register -> bool) (l r : M bool) (s : mstate) :
+  goodmb Dr Dw l s ∅ = true ->
+  exec l s = Some (false, s) ->
+  goodmb Dr Dw r s ∅ = true ->
+  goodmb Dr Dw (or_boolM l r) s ∅ = true.
+Proof.
+  intros Hgl Hl Hgr.
+  erewrite goodmb_or_boolM_empty; [ | exact Hgl | exact Hl ]. exact Hgr.
 Qed.
 
 (* per-clause closers for the U-addressed survivors of the priv gate *)
@@ -633,6 +952,88 @@ Ltac csr_step HES EP Hms Hfs Hvs Hmisa Hmenv :=
       | clear E ]
   end.
 
+Ltac gm_csr_close :=
+  lazymatch goal with
+  | |- goodmb _ _ (or_boolM _ _) _ _ = true =>
+      apply goodmb_or_ff;
+      [ eapply goodmb_currentlyEnabled_F_off; eassumption
+      | eapply exec_currentlyEnabled_F_off; eassumption
+      | apply goodmb_currentlyEnabled_Zfinx ]
+  | |- goodmb _ _ (currentlyEnabled Ext_Zve32x) _ _ = true =>
+      eapply goodmb_currentlyEnabled_Zve32x_off; eassumption
+  | |- goodmb _ _ (is_ssp_accessible _) _ _ = true =>
+      apply goodmb_is_ssp_accessible_U_off; assumption
+  | |- goodmb _ _ (and_boolM _ (and_boolM (returnM _) _)) _ _ = true =>
+      erewrite goodmb_and_boolM_empty;
+        [ | apply goodmb_currentlyEnabled_Zicntr
+          | apply exec_currentlyEnabled_Zicntr ];
+      cbn match;
+      unfold and_boolM at 1;
+      erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ];
+      cbn beta;
+      match goal with
+      | |- goodmb _ _ (if ?g then _ else _) _ _ = _ =>
+          replace g with false by (vm_compute; reflexivity)
+      end;
+      cbn match; apply goodmb_returnm
+  | |- goodmb _ _ (and_boolM _ (counter_enabled ?i _)) _ _ = true =>
+      erewrite goodmb_and_boolM_empty;
+        [ | apply goodmb_currentlyEnabled_Zicntr
+          | apply exec_currentlyEnabled_Zicntr ];
+      cbn match; apply goodmb_counter_enabled_U; assumption
+  end.
+
+Ltac gm_csr_close_hpm :=
+  cbv zeta;
+  lazymatch goal with
+  | |- goodmb _ _ (and_boolM _ (and_boolM (returnM _) _)) _ _ = true =>
+      erewrite goodmb_and_boolM_empty;
+        [ | apply goodmb_currentlyEnabled_Zihpm
+          | apply exec_currentlyEnabled_Zihpm ];
+      cbn match;
+      unfold and_boolM at 1;
+      erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ];
+      cbn beta;
+      match goal with
+      | |- goodmb _ _ (if ?g then _ else _) _ _ = _ =>
+          replace g with false by (vm_compute; reflexivity)
+      end;
+      cbn match; apply goodmb_returnm
+  | |- goodmb _ _ (and_boolM _ (counter_enabled ?i _)) _ _ = true =>
+      erewrite goodmb_and_boolM_empty;
+        [ | apply goodmb_currentlyEnabled_Zihpm
+          | apply exec_currentlyEnabled_Zihpm ];
+      cbn match; apply goodmb_counter_enabled_U; assumption
+  end.
+
+Ltac gm_csr_step EP :=
+  lazymatch goal with
+  | |- goodmb _ _ (if andb ?g1 ?g2 then _ else _) _ _ = true =>
+      let E := fresh "E" in
+      destruct (andb g1 g2) eqn:E;
+      [ apply andb_prop in E;
+        let E1 := fresh "E1" in let E2 := fresh "E2" in
+        destruct E as [E1 E2];
+        first
+          [ exfalso;
+            exact (hpm_subrange_dead _ _ E1 ltac:(vm_compute; congruence) EP)
+          | gm_csr_close_hpm ]
+      | clear E ]
+  | |- goodmb _ _ (if eq_vec (subrange_vec_dec ?c 11 4) ?h then _ else _) _ _ = true =>
+      let E := fresh "E" in
+      destruct (eq_vec (subrange_vec_dec c 11 4) h) eqn:E;
+      [ exfalso;
+        exact (pmp_subrange_dead c h E ltac:(vm_compute; reflexivity) EP)
+      | clear E ]
+  | |- goodmb _ _ (if eq_vec ?c ?a then _ else _) _ _ = true =>
+      let E := fresh "E" in
+      destruct (eq_vec c a) eqn:E;
+      [ apply eq_vec_true_iff in E; subst c;
+        first
+          [ exfalso; vm_compute in EP; discriminate EP
+          | gm_csr_close ]
+      | clear E ]
+  end.
 Lemma exec_is_CSR_accessible_U (csr : mword 12) (acc : CSRAccessType)
     (s : mstate) (ms_v : mword 64) :
   register_lookup mstatus s.(sregs) = ms_v ->
@@ -651,6 +1052,26 @@ Proof.
   (* the fall-through default *)
   eexists; split; [ apply exec_returnM | ].
   intro Hb; discriminate Hb.
+Qed.
+
+Lemma goodmb_is_CSR_accessible_U (Dr Dw : register -> bool) (csr : mword 12)
+    (acc : CSRAccessType) (s : mstate) (ms_v : mword 64) :
+  Dr misa = true -> Dr mstatus = true -> Dr menvcfg = true ->
+  Dr mcounteren = true -> Dr scounteren = true ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  zopz0zKzJ_u ('b"00") (csrPriv csr) = true ->
+  goodmb Dr Dw (is_CSR_accessible csr User acc) s ∅ = true.
+Proof.
+  intros HDmi HDms HDme HDmc HDsc Hms Hfs Hvs Hmisa Hmenv HgES HES EP.
+  unfold is_CSR_accessible.
+  repeat gm_csr_step EP.
+  apply goodmb_returnm.
 Qed.
 
 (* ===================================================================== *)
@@ -738,6 +1159,54 @@ Proof.
     intro Hb'; discriminate Hb'.
 Qed.
 
+Lemma goodmb_check_CSR_U (Dr Dw : register -> bool) (csr : mword 12)
+    (acc : CSRAccessType) (s : mstate) (ms_v : mword 64) :
+  Dr misa = true -> Dr mstatus = true -> Dr menvcfg = true ->
+  Dr mcounteren = true -> Dr scounteren = true ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (check_CSR csr User acc) s ∅ = true.
+Proof.
+  intros HDmi HDms HDme HDmc HDsc Hms Hfs Hvs Hmisa Hmenv HgES HES.
+  unfold check_CSR.
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_check_CSR_priv_U | apply (exec_check_CSR_priv_U csr s) ].
+  destruct (zopz0zKzJ_u ('b"00") (csrPriv csr)) eqn:EP; [ | reflexivity ].
+  erewrite goodmb_and_boolM_empty;
+    [ | apply goodmb_returnm
+      | apply (exec_returnM (check_CSR_access csr acc) s) ].
+  destruct (check_CSR_access csr acc) eqn:EA; [ | reflexivity ].
+  destruct (exec_is_CSR_accessible_U csr acc s ms_v Hms Hfs Hvs Hmisa Hmenv HES EP)
+    as (b & Hb & Himp).
+  erewrite goodmb_and_boolM_empty;
+    [ | eapply goodmb_is_CSR_accessible_U; eassumption | exact Hb ].
+  destruct b; [ | reflexivity ].
+  pose proof (Himp eq_refl) as Hr.
+  destruct Hr as [-> | [-> | [-> | Hhpm]]].
+  1-3: (unfold stateen_allows_CSR_access; cbn match;
+        repeat match goal with
+        | |- goodmb _ _ (if ?g then _ else _) _ _ = _ =>
+            replace g with false by (vm_compute; reflexivity)
+        end;
+        apply goodmb_returnm).
+  destruct Hhpm as [E1 E2].
+  unfold stateen_allows_CSR_access. cbn match.
+  repeat match goal with
+  | |- goodmb _ _ (if eq_vec ?c ?a then _ else _) _ _ = _ =>
+      let EX := fresh "EX" in
+      destruct (eq_vec c a) eqn:EX;
+      [ exfalso; apply eq_vec_true_iff in EX; subst c;
+        vm_compute in E1; discriminate E1
+      | clear EX ]
+  end.
+  apply goodmb_returnm.
+Qed.
+
 (* ===================================================================== *)
 (* §3d check_CSR_result and the survivor reads.                           *)
 (* ===================================================================== *)
@@ -780,6 +1249,38 @@ Proof.
     intro Hr; discriminate Hr.
 Qed.
 
+Lemma goodmb_check_CSR_result_U (Dr Dw : register -> bool) (csr : mword 12)
+    (acc : CSRAccessType) (s : mstate) (ms_v : mword 64) :
+  Dr misa = true -> Dr mstatus = true -> Dr menvcfg = true ->
+  Dr mcounteren = true -> Dr scounteren = true ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (check_CSR_result csr User acc) s ∅ = true.
+Proof.
+  intros HDmi HDms HDme HDmc HDsc Hms Hfs Hvs Hmisa Hmenv HgES HES.
+  unfold check_CSR_result.
+  destruct (exec_check_CSR_U csr acc s ms_v Hms Hfs Hvs Hmisa Hmenv HES)
+    as (ok & Hok & Himp).
+  erewrite goodmb_bind_empty;
+    [ | eapply goodmb_check_CSR_U; eassumption | exact Hok ].
+  destruct ok.
+  - cbn match. apply goodmb_returnm.
+  - cbn match.
+    erewrite goodmb_bind_empty.
+    2:{ unfold and_boolM.
+        erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+        cbn beta. cbn match. apply goodmb_returnm. }
+    2:{ unfold and_boolM.
+        erewrite exec_bind_Some; [ | apply exec_returnM ].
+        cbn beta. cbn match. apply (exec_returnM false s). }
+    cbn beta. cbv zeta. apply goodmb_returnm.
+Qed.
+
 (* the two missing Zicntr counter reads (time exists in WpGprCsrrB) *)
 Lemma exec_read_CSR_cycle_u (s : mstate) :
   exec (read_CSR (Ox"C00")) s
@@ -790,6 +1291,10 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_read_CSR_cycle_u (Dr Dw : register -> bool) (s : mstate) :
+  Dr mcycle = true -> goodmb Dr Dw (read_CSR (Ox"C00")) s ∅ = true.
+Proof. intros H. drive_csr_term. gm_rr mcycle H. apply goodmb_returnm. Qed.
+
 Lemma exec_read_CSR_time_u (s : mstate) :
   exec (read_CSR (Ox"C01")) s
     = Some (subrange_vec_dec (register_lookup mtime s.(sregs)) (Z.sub xlen 1) 0, s).
@@ -799,6 +1304,10 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_read_CSR_time_u (Dr Dw : register -> bool) (s : mstate) :
+  Dr mtime = true -> goodmb Dr Dw (read_CSR (Ox"C01")) s ∅ = true.
+Proof. intros H. drive_csr_term. gm_rr mtime H. apply goodmb_returnm. Qed.
+
 Lemma exec_read_CSR_instret_u (s : mstate) :
   exec (read_CSR (Ox"C02")) s
     = Some (subrange_vec_dec (register_lookup minstret s.(sregs)) (Z.sub xlen 1) 0, s).
@@ -807,6 +1316,10 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstret s)).
   apply exec_returnM.
 Qed.
+
+Lemma goodmb_read_CSR_instret_u (Dr Dw : register -> bool) (s : mstate) :
+  Dr minstret = true -> goodmb Dr Dw (read_CSR (Ox"C02")) s ∅ = true.
+Proof. intros H. drive_csr_term. gm_rr minstret H. apply goodmb_returnm. Qed.
 
 (* a readable csr sits at a read-only address (bits 11:10 = 11), so the
    only access shape check_CSR_access admits is CSRRead *)
@@ -989,6 +1502,50 @@ Ltac csr_read_step E1 :=
       | clear E ]
   end.
 
+Ltac gm_csr_read_step E1 :=
+  lazymatch goal with
+  | |- goodmb _ _ (if andb false ?g2 then _ else _) _ _ = true =>
+      rewrite (andb_false_l g2); cbn match
+  | |- goodmb _ _ (if andb (Z.eqb xlen 32) ?g2 then _ else _) _ _ = true =>
+      change (Z.eqb xlen 32) with false;
+      rewrite (andb_false_l g2); cbn match
+  | |- goodmb _ _ (if andb (eq_vec (subrange_vec_dec ?c 11 4) ?h) ?g2 then _ else _)
+              _ _ = true =>
+      let E := fresh "E" in
+      destruct (andb (eq_vec (subrange_vec_dec c 11 4) h) g2) eqn:E;
+      [ apply andb_prop in E;
+        let Ea := fresh "Ea" in let Eb := fresh "Eb" in
+        destruct E as [Ea Eb];
+        exfalso;
+        exact (pmp_vs_hpm_dead c h Ea ltac:(vm_compute; reflexivity) E1)
+      | clear E ]
+  | |- goodmb _ _ (if andb (eq_vec (subrange_vec_dec ?c 11 5) ?k) ?g2 then _ else _)
+              _ _ = true =>
+      let E := fresh "E" in
+      destruct (andb (eq_vec (subrange_vec_dec c 11 5) k) g2) eqn:E;
+      [ apply andb_prop in E;
+        let Ea := fresh "Ea" in let Eb := fresh "Eb" in
+        destruct E as [Ea Eb];
+        exfalso;
+        apply eq_vec_true_iff in Ea;
+        let E1' := fresh "E1x" in
+        pose proof E1 as E1';
+        apply eq_vec_true_iff in E1';
+        rewrite E1' in Ea; vm_compute in Ea; discriminate Ea
+      | clear E ]
+  | |- goodmb _ _ (if eq_vec (subrange_vec_dec ?c 11 4) ?h then _ else _) _ _ = true =>
+      let E := fresh "E" in
+      destruct (eq_vec (subrange_vec_dec c 11 4) h) eqn:E;
+      [ exfalso;
+        exact (pmp_vs_hpm_dead c h E ltac:(vm_compute; reflexivity) E1)
+      | clear E ]
+  | |- goodmb _ _ (if eq_vec ?c ?a then _ else _) _ _ = true =>
+      let E := fresh "E" in
+      destruct (eq_vec c a) eqn:E;
+      [ exfalso; apply eq_vec_true_iff in E; subst c;
+        vm_compute in E1; discriminate E1
+      | clear E ]
+  end.
 Lemma exec_read_CSR_hpm (csr : mword 12) (s : mstate) :
   u_hpm_range csr ('b"1100000") ->
   exists v, exec (read_CSR csr) s = Some (v, s).
@@ -1021,6 +1578,50 @@ Proof.
   unfold read_mhpmcounter.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mhpmcounter s)). cbn beta.
   apply exec_returnM.
+Qed.
+
+Lemma goodmb_read_CSR_hpm (Dr Dw : register -> bool) (csr : mword 12) (s : mstate) :
+  Dr mhpmcounter = true ->
+  u_hpm_range csr ('b"1100000") ->
+  goodmb Dr Dw (read_CSR csr) s ∅ = true.
+Proof.
+  intros HDh [E1 E2].
+  unfold read_CSR.
+  repeat gm_csr_read_step E1.
+  cbv zeta.
+  match goal with
+  | |- goodmb _ _ (if ?g then _ else _) _ _ = true =>
+      replace g with true
+        by (symmetry; apply andb_true_iff; split; [ exact E1 | exact E2 ])
+  end.
+  erewrite goodmb_bind_empty.
+  2:{ unfold hpmidx_from_bits, Defs.assert_exp'. cbv zeta.
+      lazymatch goal with
+      | |- goodmb _ _ (Defs.bind (match ?g with true => _ | false => _ end) _) _ _ = _ =>
+          lazymatch type of E2 with
+          | ?g2 = true => change g2 with g in E2
+          end;
+          let E3 := fresh "E3" in
+          destruct g eqn:E3; [ | discriminate E2 ]
+      end.
+      cbn match.
+      erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnM ].
+      cbn beta. apply goodmb_returnm. }
+  2:{ unfold hpmidx_from_bits, Defs.assert_exp'. cbv zeta.
+      lazymatch goal with
+      | |- exec (Defs.bind (match ?g with true => _ | false => _ end) _) _ = _ =>
+          lazymatch type of E2 with
+          | ?g2 = true => change g2 with g in E2
+          end;
+          let E3 := fresh "E3" in
+          destruct g eqn:E3; [ | discriminate E2 ]
+      end.
+      cbn match.
+      erewrite exec_bind_Some; [ | apply exec_returnM ].
+      cbn beta. apply exec_returnM. }
+  cbn beta.
+  unfold read_mhpmcounter.
+  gm_rr mhpmcounter HDh. cbn beta. apply goodmb_returnm.
 Qed.
 
 (* ===================================================================== *)
@@ -1125,6 +1726,21 @@ Ltac docsr_retire_tail rd HCB :=
   | erewrite exec_bind0_Some; [ | exact HCB ];
     apply (exec_wX_bits_gpr rd _ _) ].
 
+Ltac gm_docsr_specials :=
+  cbv zeta;
+  repeat match goal with
+  | |- goodmb _ _ (if ?g then _ else _) _ _ = _ =>
+      replace g with false by (vm_compute; reflexivity)
+  end;
+  cbn match.
+
+Ltac gm_docsr_retire_tail rd HgCB HCB Hd :=
+  erewrite goodmb_bind0_empty;
+    [ apply goodmb_returnm
+    | erewrite goodmb_bind0_empty; [ | exact HgCB | exact HCB ];
+      apply goodmb_wX_bits_gpr, Hd
+    | erewrite exec_bind0_Some; [ | exact HCB ];
+      apply (exec_wX_bits_gpr rd _ _) ].
 Lemma exec_doCSR_U (csr : mword 12) (rs1v : mword 64) (rd : mword 5)
     (op : csrop) (acc : CSRAccessType)
     (s : mstate) (ms_v : mword 64) :
@@ -1241,6 +1857,149 @@ Proof.
     left. split; reflexivity.
 Qed.
 
+Lemma goodmb_doCSR_U (Dr Dw : register -> bool) (csr : mword 12)
+    (rs1v : mword 64) (rd : mword 5) (op : csrop) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  Dr cur_privilege = true -> Dr misa = true -> Dr mstatus = true ->
+  Dr menvcfg = true -> Dr mcounteren = true -> Dr scounteren = true ->
+  Dr mcycle = true -> Dr mtime = true -> Dr minstret = true ->
+  Dr mhpmcounter = true ->
+  (uint rd <> 0 -> Dw (R_bitvector_64 (gpr_of_Z (uint rd))) = true) ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (doCSR csr rs1v (Regidx rd) op acc) s ∅ = true.
+Proof.
+  intros HDcp HDmi HDms HDme HDmc HDsc HDcy HDti HDin HDh Hd
+         Hpriv Hms Hfs Hvs Hmisa Hmenv HgES HES.
+  unfold doCSR.
+  gm_rr cur_privilege HDcp. cbn beta. rewrite Hpriv.
+  destruct (exec_check_CSR_result_U csr acc s ms_v Hms Hfs Hvs Hmisa Hmenv HES)
+    as (res0 & Hres & Hcls & Himp).
+  erewrite goodmb_bind_empty;
+    [ | eapply goodmb_check_CSR_result_U; eassumption | exact Hres ].
+  cbn beta.
+  destruct Hcls as [-> | ->].
+  - cbn match.
+    destruct (Himp eq_refl) as [Hread EA].
+    pose proof (u_readable_acc_read csr acc Hread EA) as ->.
+    gm_rr cur_privilege HDcp. cbn beta. rewrite Hpriv.
+    replace (not (ext_check_CSR csr User CSRRead)) with false
+      by (vm_compute; reflexivity).
+    cbn match.
+    replace (generic_neq CSRRead CSRWrite) with true by (vm_compute; reflexivity).
+    cbn match.
+    destruct Hread as [-> | [-> | [-> | Hrange]]].
+    + erewrite goodmb_bind_empty;
+        [ | apply goodmb_read_CSR_cycle_u, HDcy | apply (exec_read_CSR_cycle_u s) ].
+      cbn beta.
+      erewrite goodmb_bind_empty.
+      2:{ gm_docsr_specials. apply goodmb_returnm. }
+      2:{ docsr_specials. apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback (Ox"C00")
+                            (subrange_vec_dec (register_lookup mcycle s.(sregs))
+                               (Z.sub xlen 1) 0)) s
+                    = Some (tt, s)) by reflexivity.
+      assert (HgCB : goodmb Dr Dw (csr_id_read_callback (Ox"C00")
+                            (subrange_vec_dec (register_lookup mcycle s.(sregs))
+                               (Z.sub xlen 1) 0)) s ∅ = true) by reflexivity.
+      gm_docsr_retire_tail rd HgCB HCB Hd.
+    + erewrite goodmb_bind_empty;
+        [ | apply goodmb_read_CSR_time_u, HDti | apply (exec_read_CSR_time_u s) ].
+      cbn beta.
+      erewrite goodmb_bind_empty.
+      2:{ gm_docsr_specials. apply goodmb_returnm. }
+      2:{ docsr_specials. apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback (Ox"C01")
+                            (subrange_vec_dec (register_lookup mtime s.(sregs))
+                               (Z.sub xlen 1) 0)) s
+                    = Some (tt, s)) by reflexivity.
+      assert (HgCB : goodmb Dr Dw (csr_id_read_callback (Ox"C01")
+                            (subrange_vec_dec (register_lookup mtime s.(sregs))
+                               (Z.sub xlen 1) 0)) s ∅ = true) by reflexivity.
+      gm_docsr_retire_tail rd HgCB HCB Hd.
+    + erewrite goodmb_bind_empty;
+        [ | apply goodmb_read_CSR_instret_u, HDin
+          | apply (exec_read_CSR_instret_u s) ].
+      cbn beta.
+      erewrite goodmb_bind_empty.
+      2:{ gm_docsr_specials. apply goodmb_returnm. }
+      2:{ docsr_specials. apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback (Ox"C02")
+                            (subrange_vec_dec (register_lookup minstret s.(sregs))
+                               (Z.sub xlen 1) 0)) s
+                    = Some (tt, s)) by reflexivity.
+      assert (HgCB : goodmb Dr Dw (csr_id_read_callback (Ox"C02")
+                            (subrange_vec_dec (register_lookup minstret s.(sregs))
+                               (Z.sub xlen 1) 0)) s ∅ = true) by reflexivity.
+      gm_docsr_retire_tail rd HgCB HCB Hd.
+    + destruct (exec_read_CSR_hpm csr s Hrange) as (v & Hv).
+      erewrite goodmb_bind_empty;
+        [ | apply goodmb_read_CSR_hpm; assumption | exact Hv ].
+      cbn beta.
+      destruct Hrange as [E1 E2].
+      erewrite goodmb_bind_empty.
+      2:{ cbv zeta.
+          repeat match goal with
+          | |- goodmb _ _ (if eq_vec ?c ?a then _ else _) _ _ = _ =>
+              let EX := fresh "EX" in
+              destruct (eq_vec c a) eqn:EX;
+              [ exfalso; apply eq_vec_true_iff in EX; subst c;
+                vm_compute in E1; discriminate E1
+              | clear EX ]
+          end.
+          apply goodmb_returnm. }
+      2:{ cbv zeta.
+          repeat match goal with
+          | |- exec (if eq_vec ?c ?a then _ else _) _ = _ =>
+              let EX := fresh "EX" in
+              destruct (eq_vec c a) eqn:EX;
+              [ exfalso; apply eq_vec_true_iff in EX; subst c;
+                vm_compute in E1; discriminate E1
+              | clear EX ]
+          end.
+          apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback csr v) s = Some (tt, s)).
+      { pose proof (u_hpm_cases csr (conj E1 E2)) as Hc.
+        repeat (destruct Hc as [Hc | Hc]);
+          (assert (Hcsr : csr = Z_to_bv _ (bv_unsigned csr))
+             by (apply bv_eq; rewrite Z_to_bv_unsigned; symmetry;
+                 apply bv_wrap_small;
+                 pose proof (bv_unsigned_in_range _ csr);
+                 unfold bv_modulus in *; lia);
+           rewrite Hc in Hcsr; rewrite Hcsr;
+           reflexivity). }
+      assert (HgCB : goodmb Dr Dw (csr_id_read_callback csr v) s ∅ = true).
+      { pose proof (u_hpm_cases csr (conj E1 E2)) as Hc.
+        repeat (destruct Hc as [Hc | Hc]);
+          (assert (Hcsr : csr = Z_to_bv _ (bv_unsigned csr))
+             by (apply bv_eq; rewrite Z_to_bv_unsigned; symmetry;
+                 apply bv_wrap_small;
+                 pose proof (bv_unsigned_in_range _ csr);
+                 unfold bv_modulus in *; lia);
+           rewrite Hc in Hcsr; rewrite Hcsr;
+           reflexivity). }
+      gm_docsr_retire_tail rd HgCB HCB Hd.
+  - cbn match. apply goodmb_returnm.
+Qed.
+
 (* ===================================================================== *)
 (* §4 The execute-level CSR totality at User.                             *)
 (* ===================================================================== *)
@@ -1276,6 +2035,33 @@ Proof.
   exact Hdo.
 Qed.
 
+Lemma goodmb_execute_CSRReg_total_U (Dr Dw : register -> bool) (csr : mword 12)
+    (i1 rd : mword 5) (op : csrop) (s : mstate) (ms_v : mword 64) :
+  Dr cur_privilege = true -> Dr misa = true -> Dr mstatus = true ->
+  Dr menvcfg = true -> Dr mcounteren = true -> Dr scounteren = true ->
+  Dr mcycle = true -> Dr mtime = true -> Dr minstret = true ->
+  Dr mhpmcounter = true ->
+  (uint i1 <> 0 -> Dr (R_bitvector_64 (gpr_of_Z (uint i1))) = true) ->
+  (uint rd <> 0 -> Dw (R_bitvector_64 (gpr_of_Z (uint rd))) = true) ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (execute (CSRReg (csr, Regidx i1, Regidx rd, op))) s ∅ = true.
+Proof.
+  intros HDcp HDmi HDms HDme HDmc HDsc HDcy HDti HDin HDh H1 Hd
+         Hpriv Hms Hfs Hvs Hmisa Hmenv HgES HES.
+  change (execute (CSRReg (csr, Regidx i1, Regidx rd, op)))
+    with (execute_CSRReg csr (Regidx i1) (Regidx rd) op).
+  unfold execute_CSRReg. cbv zeta.
+  gm_rd i1 H1. cbn beta.
+  eapply goodmb_doCSR_U; eassumption.
+Qed.
+
 Lemma exec_execute_CSRImm_total_U (csr : mword 12) (imm : mword 5) (rd : mword 5)
     (op : csrop) (s : mstate) (ms_v : mword 64) :
   register_lookup cur_privilege s.(sregs) = User ->
@@ -1300,4 +2086,29 @@ Proof.
               s ms_v Hpriv Hms Hfs Hvs Hmisa Hmenv HES)
     as (res & s' & Hdo & Hcls).
   exists res, s'. split; [ exact Hdo | exact Hcls ].
+Qed.
+
+Lemma goodmb_execute_CSRImm_total_U (Dr Dw : register -> bool) (csr : mword 12)
+    (imm rd : mword 5) (op : csrop) (s : mstate) (ms_v : mword 64) :
+  Dr cur_privilege = true -> Dr misa = true -> Dr mstatus = true ->
+  Dr menvcfg = true -> Dr mcounteren = true -> Dr scounteren = true ->
+  Dr mcycle = true -> Dr mtime = true -> Dr minstret = true ->
+  Dr mhpmcounter = true ->
+  (uint rd <> 0 -> Dw (R_bitvector_64 (gpr_of_Z (uint rd))) = true) ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  goodmb Dr Dw (currentlyEnabled Ext_S) s ∅ = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  goodmb Dr Dw (execute (CSRImm (csr, imm, Regidx rd, op))) s ∅ = true.
+Proof.
+  intros HDcp HDmi HDms HDme HDmc HDsc HDcy HDti HDin HDh Hd
+         Hpriv Hms Hfs Hvs Hmisa Hmenv HgES HES.
+  change (execute (CSRImm (csr, imm, Regidx rd, op)))
+    with (execute_CSRImm csr imm (Regidx rd) op).
+  unfold execute_CSRImm. cbv zeta.
+  eapply goodmb_doCSR_U; eassumption.
 Qed.
