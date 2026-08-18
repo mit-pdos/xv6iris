@@ -29,6 +29,7 @@ Require Import RegFile WpGpr InstrBytes MinstretInv.
 Require Import HartLift HartSpan HartSpanChar HartRegNode HartGoodb WpDecodeBridge ExecCommon.
 Require Import HartSwp.
 Require Import MstatusBits WpGprMret WpMmodeLeafBase HartRunGen.
+Require Import HartMFrame HartMCycle WpMmodeJump.
 Require Import SmodeCore.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -885,3 +886,192 @@ Section SdaFrames.
   Proof. rewrite sda_frames. iIntros "H". iExact "H". Qed.
 
 End SdaFrames.
+
+
+(* ===================================================================== *)
+(* §4  THE BRANCH WALKS.                                                  *)
+(*                                                                       *)
+(* A branch is the one instruction family that writes NO gpr: the         *)
+(* fall-through arm is two register reads and a [Ret], and the taken arm   *)
+(* adds a PC read and a nextPC write.  Both are privilege- and            *)
+(* bundle-free.  (The same three walks exist in [WpSconfEngine]; that file *)
+(* sits on the sconf wrapper and therefore on [IntrDefs], which this tier  *)
+(* must not depend on -- so they are cloned here under [sb_]/[swp_sb_]     *)
+(* names.  Fold the two copies together when the sconf side settles.)     *)
+(* ===================================================================== *)
+Notation sb_btype_body imm rs2 rs1 cmp :=
+  (Defs.bind
+     (Defs.bind (rX_bits (Regidx rs1))
+        (fun a => Defs.bind (rX_bits (Regidx rs2))
+                    (fun c => returnM (cmp a c))))
+     (fun taken : bool =>
+        if taken
+        then Defs.bind (Defs.read_reg (R_bitvector_64 PC))
+               (fun w => jump_to (add_vec w (sign_extend' 64 imm)))
+        else returnM RETIRE_SUCCESS)).
+
+(* the target's bit 0, spelled as the MODEL spells it (design §5 item 1(g)) *)
+Local Notation sb_zerobit :=
+  (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 1)
+     (BinaryString.Raw.to_N "0" 0%N)).
+
+Definition sb_Drw : gset register := {[ (R_bitvector_64 nextPC : register) ]}.
+Definition sb_Dro : gset register := {[ (misa : register) ]}.
+Definition sb_Df : register -> dfrac := fun _ => DfracDiscarded.
+Definition sb_rs (npc0 : SailStdpp.Values.mword 64) : regstate :=
+  register_set (R_bitvector_64 nextPC) npc0
+    (register_set misa MISA_C init_regstate).
+
+Lemma sb_disj : sb_Drw ## sb_Dro.
+Proof. rewrite /sb_Drw /sb_Dro. set_solver. Qed.
+Lemma sb_w_nPC : (R_bitvector_64 nextPC : register) ∈ sb_Drw.
+Proof. rewrite /sb_Drw. set_solver. Qed.
+Lemma sb_in_misa : (misa : register) ∈ sb_Drw ∪ sb_Dro.
+Proof. rewrite /sb_Drw /sb_Dro. set_solver. Qed.
+
+Lemma sb_rs_nPC npc0 :
+  register_lookup (R_bitvector_64 nextPC) (sb_rs npc0) = npc0.
+Proof. rewrite /sb_rs. by rewrite register_lookup_set. Qed.
+Lemma sb_rs_misa npc0 : register_lookup misa (sb_rs npc0) = MISA_C.
+Proof.
+  rewrite /sb_rs.
+  etransitivity; [apply irrelevant_register_set; vm_compute; reflexivity|].
+  apply register_lookup_set.
+Qed.
+
+Lemma sb_set_agree (npc0 target : SailStdpp.Values.mword 64) :
+  reg_agree_on (sb_Drw ∪ sb_Dro)
+    (register_set (R_bitvector_64 nextPC) target (sb_rs npc0)) (sb_rs target).
+Proof.
+  intros r Hr. rewrite /sb_Drw /sb_Dro in Hr.
+  apply elem_of_union in Hr as [Hr|Hr]; apply elem_of_singleton in Hr; subst r.
+  - etransitivity; [apply register_lookup_set|]. symmetry. apply sb_rs_nPC.
+  - etransitivity;
+      [apply irrelevant_register_set; vm_compute; reflexivity|].
+    etransitivity; [apply sb_rs_misa|]. symmetry. apply sb_rs_misa.
+Qed.
+
+Section SbBranch.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the ONE cell a jump needs out of the persistent config bundle *)
+  Lemma sb_hw_config_misa : hw_config -∗ misa ↦ᵣ□ MISA_C.
+  Proof.
+    iIntros "H". iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
+      "(Hmisa & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hv & _)".
+    rewrite Hv. iExact "Hmisa".
+  Qed.
+
+  Lemma sb_frames (npc0 : SailStdpp.Values.mword 64) :
+    (hreg_frame (sb_rs npc0) sb_Drw ∗
+     hreg_frame_ro sb_Df (sb_rs npc0) sb_Dro : iProp Σ)
+    ⊣⊢ ((R_bitvector_64 nextPC) ↦ᵣ npc0 ∗ misa ↦ᵣ□ MISA_C).
+  Proof.
+    rewrite /hreg_frame /hreg_frame_ro /sb_Drw /sb_Dro.
+    rewrite !big_sepS_singleton.
+    by rewrite sb_rs_nPC sb_rs_misa.
+  Qed.
+
+  Lemma swp_sb_jump (target npc0 : SailStdpp.Values.mword 64) :
+    eq_vec (access_vec_dec target 0) sb_zerobit = true ->
+    gen_cert -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    misa ↦ᵣ□ MISA_C -∗
+    swp (jump_to target)
+      (fun r => ⌜r = RETIRE_SUCCESS⌝ ∗
+                (R_bitvector_64 nextPC) ↦ᵣ target ∗ misa ↦ᵣ□ MISA_C).
+  Proof.
+    intros Halign. iIntros "#Hcert HnPC Hmisa".
+    iAssert (hreg_frame (sb_rs npc0) sb_Drw ∗
+             hreg_frame_ro sb_Df (sb_rs npc0) sb_Dro)%I with "[HnPC Hmisa]"
+      as "[Hrw Hro]".
+    { rewrite sb_frames. iFrame. }
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_hfrun 6 sb_Drw sb_Dro sb_Df (sb_rs npc0)
+                   (register_set (R_bitvector_64 nextPC) target (sb_rs npc0))
+                   (jump_to target) RETIRE_SUCCESS sb_disj
+                   (hfrun_jump_to_zca (sb_Drw ∪ sb_Dro) sb_Drw (sb_rs npc0)
+                      target sb_in_misa sb_w_nPC Halign
+                      ltac:(rewrite sb_rs_misa; vm_compute; reflexivity))
+                   with "Hcert Hrw Hro") ].
+    iIntros (r) "(-> & Hrw & Hro)".
+    rewrite (hreg_frame_ext _ (sb_rs target) sb_Drw
+               (reg_agree_l _ _ _ _ (sb_set_agree npc0 target))).
+    rewrite (hreg_frame_ro_ext sb_Df _ (sb_rs target) sb_Dro
+               (reg_agree_r _ _ _ _ (sb_set_agree npc0 target))).
+    iSplitR; [done|]. rewrite -sb_frames. iFrame.
+  Qed.
+
+  Lemma swp_sb_cmp (rs2 rs1 : SailStdpp.Values.mword 5) (m : regfile)
+      (cmp : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64 -> bool) :
+    gen_cert -∗ gpr_file m -∗
+    swp (Defs.bind (rX_bits (Regidx rs1))
+           (fun a => Defs.bind (rX_bits (Regidx rs2))
+                       (fun c => returnM (cmp a c))))
+      (fun v => ⌜v = cmp (m !!! Regidx rs1) (m !!! Regidx rs2)⌝ ∗ gpr_file m).
+  Proof.
+    iIntros "#Hcert Hf".
+    iApply (swp_bind_use (rX_bits (Regidx rs1)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file rs1 m with "Hcert Hf"). }
+    iIntros (v1) "[-> Hf]".
+    iApply (swp_bind_use (rX_bits (Regidx rs2)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file rs2 m with "Hcert Hf"). }
+    iIntros (v2) "[-> Hf]".
+    iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_sb_BTYPE_fall (imm : SailStdpp.Values.mword 13)
+      (rs2 rs1 : SailStdpp.Values.mword 5) (m : regfile)
+      (mo : M ExecutionResult)
+      (cmp : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64 -> bool) :
+    mo = sb_btype_body imm rs2 rs1 cmp ->
+    cmp (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
+    gen_cert -∗ gpr_file m -∗
+    swp mo (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m).
+  Proof.
+    intros Hred Hcmp. iIntros "#Hcert Hf". rewrite Hred.
+    iApply (swp_bind_use _ _
+              (fun v => ⌜v = cmp (m !!! Regidx rs1) (m !!! Regidx rs2)⌝ ∗
+                        gpr_file m)%I _ with "[Hf] [-]").
+    { iApply (swp_sb_cmp rs2 rs1 m cmp with "Hcert Hf"). }
+    iIntros (v) "[-> Hf]". rewrite Hcmp.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_sb_BTYPE_taken (imm : SailStdpp.Values.mword 13)
+      (rs2 rs1 : SailStdpp.Values.mword 5) (m : regfile)
+      (mo : M ExecutionResult)
+      (pc npc0 : SailStdpp.Values.mword 64)
+      (cmp : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64 -> bool) :
+    mo = sb_btype_body imm rs2 rs1 cmp ->
+    cmp (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) sb_zerobit
+      = true ->
+    gen_cert -∗ gpr_file m -∗
+    (R_bitvector_64 PC) ↦ᵣ pc -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    misa ↦ᵣ□ MISA_C -∗
+    swp mo (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
+              (R_bitvector_64 PC) ↦ᵣ pc ∗
+              (R_bitvector_64 nextPC) ↦ᵣ (add_vec pc (sign_extend' 64 imm)) ∗
+              misa ↦ᵣ□ MISA_C).
+  Proof.
+    intros Hred Hcmp Halign. iIntros "#Hcert Hf HPC HnPC Hmisa". rewrite Hred.
+    iApply (swp_bind_use _ _
+              (fun v => ⌜v = cmp (m !!! Regidx rs1) (m !!! Regidx rs2)⌝ ∗
+                        gpr_file m)%I _ with "[Hf] [-]").
+    { iApply (swp_sb_cmp rs2 rs1 m cmp with "Hcert Hf"). }
+    iIntros (v) "[-> Hf]". rewrite Hcmp.
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC)) _
+              (fun w => ⌜w = pc⌝ ∗ (R_bitvector_64 PC) ↦ᵣ pc)%I _
+              with "[HPC] [-]").
+    { iApply (swp_read_reg_cell (R_bitvector_64 PC) pc with "Hcert HPC"). }
+    iIntros (w) "[-> HPC]".
+    iApply (swp_mono with "[Hf HPC] [HnPC Hmisa]");
+      [| iApply (swp_sb_jump (add_vec pc (sign_extend' 64 imm)) npc0 Halign
+                   with "Hcert HnPC Hmisa") ].
+    iIntros (r) "(-> & HnPC & Hmisa)". iFrame. done.
+  Qed.
+
+End SbBranch.
