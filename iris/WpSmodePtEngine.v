@@ -29,7 +29,7 @@ Require Import RegFile WpGpr InstrBytes MinstretInv.
 Require Import HartLift HartSpan HartSpanChar HartRegNode HartGoodb WpDecodeBridge ExecCommon.
 Require Import HartSwp.
 Require Import MstatusBits WpGprMret WpMmodeLeafBase HartRunGen.
-Require Import HartMFrame HartMCycle WpMmodeJump.
+Require Import HartMFrame HartMCycle WpMmodeJump WpDecode.
 Require Import SmodeCore.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -1075,3 +1075,249 @@ Section SbBranch.
   Qed.
 
 End SbBranch.
+
+
+(* ===================================================================== *)
+(* §5  THE CONTROL-TRANSFER WALKS (JAL and the JALR return).              *)
+(*                                                                       *)
+(* Cloned from [WpSconfEngine]'s for the reason §4 records -- that file    *)
+(* sits on IntrDefs and does not currently build.  [WpMmodeJump]'s twins   *)
+(* pin cur_privilege to Machine in two places, so they cannot serve; the   *)
+(* only real S-mode difference is [update_elp_state], which reads the      *)
+(* privilege through [currentlyEnabled Ext_Zicfilp] and is bridged at      *)
+(* [dstateS].  Four cells: nextPC written, cur_privilege/menvcfg/misa read.*)
+(* ===================================================================== *)
+Lemma cj_ds_sub (D : gset register) :
+  (cur_privilege : register) ∈ D -> (menvcfg : register) ∈ D ->
+  (misa : register) ∈ D ->
+  forall r : register, D_s r = true -> r ∈ D.
+Proof.
+  intros H1 H2 H3 r Hr. unfold D_s in Hr.
+  apply orb_prop in Hr as [Hr|Hr];
+    [apply orb_prop in Hr as [Hr|Hr]|];
+    apply register_beq_eq in Hr; subst r; assumption.
+Qed.
+
+Lemma hval_cj_update_elp (D Drw : gset register) (rs : regstate)
+    (ra : SailStdpp.Values.mword 5) :
+  (cur_privilege : register) ∈ D -> (menvcfg : register) ∈ D ->
+  (misa : register) ∈ D ->
+  register_lookup cur_privilege rs = Supervisor ->
+  register_lookup menvcfg rs = MENVCFG_S ->
+  register_lookup misa rs = MISA_C ->
+  hval D Drw rs (update_elp_state (Regidx ra)) tt rs.
+Proof.
+  intros HD1 HD2 HD3 Hp Hme Hm.
+  apply (hval_of_goodb D_s D Drw _ dstateS rs tt
+           (cj_ds_sub D HD1 HD2 HD3)
+           (agree_s (MState rs ∅ dev0_state) Hp Hme Hm)).
+  - vm_compute. reflexivity.
+  - unfold update_elp_state.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_cE_zicfilp_false_S dstateS
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity))).
+    cbn match. apply exec_returnm.
+Qed.
+
+Definition cj_Drw : gset register := {[ (R_bitvector_64 nextPC : register) ]}.
+Definition cj_Dro : gset register :=
+  {[ (cur_privilege : register); (menvcfg : register); (misa : register) ]}.
+(* DFRAC-PARAMETRIC: the S-mode config cells arrive at whatever fraction the
+   wrapper lends, and the JALR return only READS them. *)
+Definition cj_Df (dq : dfrac) : register -> dfrac := fun r =>
+  if decide (r = (misa : register)) then DfracDiscarded else dq.
+Definition cj_rs (npc0 : SailStdpp.Values.mword 64) : regstate :=
+  register_set (R_bitvector_64 nextPC) npc0
+    (register_set misa MISA_C
+       (register_set menvcfg MENVCFG_S
+          (register_set cur_privilege Supervisor init_regstate))).
+
+Lemma cj_disj : cj_Drw ## cj_Dro.
+Proof. rewrite /cj_Drw /cj_Dro. set_solver. Qed.
+Lemma cj_in_priv : (cur_privilege : register) ∈ cj_Drw ∪ cj_Dro.
+Proof. rewrite /cj_Drw /cj_Dro. set_solver. Qed.
+Lemma cj_in_menv : (menvcfg : register) ∈ cj_Drw ∪ cj_Dro.
+Proof. rewrite /cj_Drw /cj_Dro. set_solver. Qed.
+Lemma cj_in_misa : (misa : register) ∈ cj_Drw ∪ cj_Dro.
+Proof. rewrite /cj_Drw /cj_Dro. set_solver. Qed.
+
+Ltac sjeskip :=
+  etransitivity; [apply irrelevant_register_set; vm_compute; reflexivity|].
+
+Lemma cj_rs_nPC npc0 :
+  register_lookup (R_bitvector_64 nextPC) (cj_rs npc0) = npc0.
+Proof. rewrite /cj_rs. by rewrite register_lookup_set. Qed.
+Lemma cj_rs_misa npc0 : register_lookup misa (cj_rs npc0) = MISA_C.
+Proof. rewrite /cj_rs. sjeskip. apply register_lookup_set. Qed.
+Lemma cj_rs_menv npc0 : register_lookup menvcfg (cj_rs npc0) = MENVCFG_S.
+Proof. rewrite /cj_rs. sjeskip. sjeskip. apply register_lookup_set. Qed.
+Lemma cj_rs_priv npc0 :
+  register_lookup cur_privilege (cj_rs npc0) = Supervisor.
+Proof. rewrite /cj_rs. sjeskip. sjeskip. sjeskip. apply register_lookup_set. Qed.
+
+Ltac sjedf :=
+  unfold cj_Df;
+  repeat first [ rewrite decide_True; [reflexivity|reflexivity]
+               | rewrite decide_False; [|discriminate] ];
+  reflexivity.
+Lemma cj_Df_misa dq : cj_Df dq misa = DfracDiscarded.
+Proof. sjedf. Qed.
+Lemma cj_Df_menv dq : cj_Df dq menvcfg = dq.
+Proof. sjedf. Qed.
+Lemma cj_Df_priv dq : cj_Df dq cur_privilege = dq.
+Proof. sjedf. Qed.
+
+Section CjCtl.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma cj_frames (dq : dfrac) (npc0 : SailStdpp.Values.mword 64) :
+    (hreg_frame (cj_rs npc0) cj_Drw ∗
+     hreg_frame_ro (cj_Df dq) (cj_rs npc0) cj_Dro : iProp Σ)
+    ⊣⊢ ((R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+        cur_privilege ↦ᵣ{ dq } Supervisor ∗ menvcfg ↦ᵣ{ dq } MENVCFG_S ∗
+        misa ↦ᵣ□ MISA_C).
+  Proof.
+    rewrite /hreg_frame /hreg_frame_ro /cj_Drw /cj_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite cj_rs_nPC cj_rs_priv cj_rs_menv cj_rs_misa.
+    rewrite cj_Df_priv cj_Df_menv cj_Df_misa.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma swp_cj_update_elp (dq : dfrac) (ra : SailStdpp.Values.mword 5)
+      (npc0 : SailStdpp.Values.mword 64) :
+    gen_cert -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    menvcfg ↦ᵣ{ dq } MENVCFG_S -∗
+    misa ↦ᵣ□ MISA_C -∗
+    swp (update_elp_state (Regidx ra))
+      (fun _ => (R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+                cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                menvcfg ↦ᵣ{ dq } MENVCFG_S ∗
+                misa ↦ᵣ□ MISA_C).
+  Proof.
+    iIntros "#Hcert HnPC Hpriv Hmenv Hmisa".
+    iAssert (hreg_frame (cj_rs npc0) cj_Drw ∗
+             hreg_frame_ro (cj_Df dq) (cj_rs npc0) cj_Dro)%I
+      with "[HnPC Hpriv Hmenv Hmisa]" as "[Hrw Hro]".
+    { rewrite cj_frames. iFrame. }
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_span cj_Drw cj_Dro (cj_Df dq) (cj_rs npc0) (cj_rs npc0)
+                   (update_elp_state (Regidx ra)) tt cj_disj
+                   (hval_cj_update_elp (cj_Drw ∪ cj_Dro) cj_Drw
+                      (cj_rs npc0) ra cj_in_priv cj_in_menv cj_in_misa
+                      (cj_rs_priv npc0) (cj_rs_menv npc0) (cj_rs_misa npc0))
+                   with "Hcert Hrw Hro") ].
+    iIntros (u) "(_ & Hrw & Hro)".
+    iAssert ((R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+             cur_privilege ↦ᵣ{ dq } Supervisor ∗
+             menvcfg ↦ᵣ{ dq } MENVCFG_S ∗ misa ↦ᵣ□ MISA_C)%I
+      with "[Hrw Hro]" as "H".
+    { rewrite -cj_frames. iFrame. }
+    iExact "H".
+  Qed.
+
+  Lemma swp_cj_JAL (imm : SailStdpp.Values.mword 21)
+      (rd : SailStdpp.Values.mword 5) (m : regfile)
+      (pc npc0 : SailStdpp.Values.mword 64) :
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) sb_zerobit = true ->
+    gen_cert -∗ gpr_file m -∗
+    (R_bitvector_64 PC) ↦ᵣ pc -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    misa ↦ᵣ□ MISA_C -∗
+    swp (execute (JAL (imm, Regidx rd)))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                gpr_file (<[Regidx rd := regval_into_reg npc0]> m) ∗
+                (R_bitvector_64 PC) ↦ᵣ pc ∗
+                (R_bitvector_64 nextPC) ↦ᵣ (add_vec pc (sign_extend' 64 imm)) ∗
+                misa ↦ᵣ□ MISA_C).
+  Proof.
+    intros Hrd Halign. iIntros "#Hcert Hf HPC HnPC Hmisa".
+    change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
+    unfold execute_JAL. cbn match.
+    iApply (swp_bind_use (get_next_pc tt) _
+              (fun link => ⌜link = npc0⌝ ∗
+                 (R_bitvector_64 nextPC) ↦ᵣ npc0)%I _ with "[HnPC] [-]").
+    { unfold get_next_pc.
+      iApply (swp_read_reg_cell (R_bitvector_64 nextPC) npc0 with "Hcert HnPC"). }
+    iIntros (link) "[-> HnPC]".
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC)) _
+              (fun w => ⌜w = pc⌝ ∗ (R_bitvector_64 PC) ↦ᵣ pc)%I _
+              with "[HPC] [-]").
+    { iApply (swp_read_reg_cell (R_bitvector_64 PC) pc with "Hcert HPC"). }
+    iIntros (w0) "[-> HPC]".
+    iApply (swp_bind_use _ _ _ _ with "[HnPC Hmisa] [-]").
+    { iApply (swp_sb_jump _ npc0 Halign with "Hcert HnPC Hmisa"). }
+    iIntros (r) "(-> & HnPC & Hmisa)". cbn match.
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m npc0 Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma swp_cj_JALR_ret (dq : dfrac) (ra rdz : SailStdpp.Values.mword 5)
+      (m : regfile) (npc0 : SailStdpp.Values.mword 64) :
+    uint rdz = 0 ->
+    gen_cert -∗ gpr_file m -∗
+    (R_bitvector_64 nextPC) ↦ᵣ npc0 -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    menvcfg ↦ᵣ{ dq } MENVCFG_S -∗
+    misa ↦ᵣ□ MISA_C -∗
+    swp (execute (JALR (zeros' 12, Regidx ra, Regidx rdz)))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
+                (R_bitvector_64 nextPC) ↦ᵣ (ret_pc (m !!! Regidx ra)) ∗
+                cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                menvcfg ↦ᵣ{ dq } MENVCFG_S ∗
+                misa ↦ᵣ□ MISA_C).
+  Proof.
+    intros Hrdz.
+    (* the alignment side condition is [ret_pc]'s own construction, and it has
+       to be POSED rather than passed as an [ltac:] inside the application:
+       inside one, the goal still carries the application's evars. *)
+    assert (Halign : eq_vec (access_vec_dec
+              (update_vec_dec
+                 (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0
+                 sb_zerobit) 0) sb_zerobit = true)
+      by (rewrite ret_pc_jalr; apply ret_pc_aligned).
+    iIntros "#Hcert Hf HnPC Hpriv Hmenv Hmisa".
+    change (execute (JALR (zeros' 12, Regidx ra, Regidx rdz)))
+      with (execute_JALR (zeros' 12) (Regidx ra) (Regidx rdz)).
+    unfold execute_JALR. cbn match.
+    iApply (swp_bind_use
+              (Defs.bind0 (update_elp_state (Regidx ra)) (get_next_pc tt)) _
+              (fun link => ⌜link = npc0⌝ ∗
+                 (R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+                 cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                 menvcfg ↦ᵣ{ dq } MENVCFG_S ∗
+                 misa ↦ᵣ□ MISA_C)%I _
+              with "[HnPC Hpriv Hmenv Hmisa] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => (R_bitvector_64 nextPC) ↦ᵣ npc0 ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   menvcfg ↦ᵣ{ dq } MENVCFG_S ∗
+                   misa ↦ᵣ□ MISA_C)%I _
+                with "[HnPC Hpriv Hmenv Hmisa] [-]").
+      { iApply (swp_cj_update_elp dq ra npc0
+                  with "Hcert HnPC Hpriv Hmenv Hmisa"). }
+      iIntros (u) "(HnPC & Hpriv & Hmenv & Hmisa)".
+      unfold get_next_pc.
+      iApply (swp_mono with "[Hpriv Hmenv Hmisa] [-]");
+        [| iApply (swp_read_reg_cell (R_bitvector_64 nextPC) npc0
+                     with "Hcert HnPC") ].
+      iIntros (link) "[-> HnPC]". iSplitR; [done|]. iFrame. }
+    iIntros (link) "(-> & HnPC & Hpriv & Hmenv & Hmisa)".
+    iApply (swp_bind_use (rX_bits (Regidx ra)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file ra m with "Hcert Hf"). }
+    iIntros (w) "[-> Hf]".
+    iApply (swp_bind_use _ _ _ _ with "[HnPC Hmisa] [-]").
+    { iApply (swp_sb_jump _ npc0 Halign with "Hcert HnPC Hmisa"). }
+    iIntros (r) "(-> & HnPC & Hmisa)". cbn match.
+    iApply (swp_bind0_use _ _ (fun _ => gpr_file m)%I _ with "[Hf] [-]").
+    { iApply (swp_wX_zero rdz _ (gpr_file m) Hrdz with "Hf"). }
+    iIntros (u2) "Hf". iApply swp_ret. rewrite ret_pc_jalr.
+    iSplitR; [done|]. iFrame.
+  Qed.
+
+End CjCtl.
