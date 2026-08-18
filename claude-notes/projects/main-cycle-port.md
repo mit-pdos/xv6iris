@@ -897,6 +897,23 @@ joined into the frame), flips the SIE ghost, assembles `ihs_entry_of` and
 runs the handler contract exactly as today, then re-enters the Löb; the
 RETIRE arm hands the leaf's swp obligation the cells.
 
+### THE RIDER MUST BE KEYED ON THE POST-FILE (found 2026-08-18)
+
+`HartStepAny.swp_exec_step_any` / `HartMCycle.wp_loop_cycle` carry the body's
+non-register payload as a plain `Psi : iProp Σ`.  That is too weak for any
+S-mode cycle: the fetch's landing file is EXISTENTIAL (the walk may or may
+not fill the TLB, and an existential inside a `swp` post cannot be hoisted),
+and the regime residue (`sr_swp_res`, `tlb_snap_ok`) is keyed on the landing
+tlb value -- so it must ride as `Psi rs2`, beside the file it belongs to.
+`WpSFrames.s_cycle`'s `tlb_snap_ok tlbv'` premise has the same flaw (asks the
+caller to NAME the landing tlb before the body runs).  Fixed generically by
+the `_ex` twins `swp_tick_wrap_ex`, `wp_loop_cycle_ex`, `swp_try_step_any_ex`,
+`swp_exec_step_any_ex` (commit 5bcb34fc): continuation
+`∀ rs3 rs2 mi, ⌜Q rs2 ∧ agree rs3 (wrap_post rs2 mi)⌝ -∗ frames rs3 -∗ Psi rs2 -∗ WP Loop`.
+New cycle-level rules (`HartStepFull`, `spt_cycle`, the WpIntrInv engine) are
+stated with the indexed rider from the start; the plain form is the instance
+`Psi := fun _ => R`.
+
 ### The page-table proofs are BRIDGED, not rewritten
 
 The S-mode fetch needs the walk in FOOTPRINTED form.  The existing exec-side
