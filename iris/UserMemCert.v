@@ -485,7 +485,7 @@ Proof.
   assert (Hin : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
             is_Some (md' !! pa_add (u_walk_pa w va) j)).
   { intros j Hj.
-    rewrite (u_walk_pa_window_wf k w va j Hk Hdvd Hal ltac:(lia)).
+    rewrite (u_walk_pa_window_page w va k j Hk Hp ltac:(lia)).
     apply (proj1 (Hdm' _)).
     exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
   assert (Hnt : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
