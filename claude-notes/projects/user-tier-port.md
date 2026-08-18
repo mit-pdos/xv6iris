@@ -1166,3 +1166,29 @@ compiled.  The shape they must close is `UserClassifyAsm.base_post` /
 `mem_exec_lr_k`, `mem_exec_sc_k`, the AMO pair) become pure `Prop`s whose
 conclusion is exactly `base_post`'s execute-and-after half, and the
 composers' `user_pt_inv` absorption becomes `u_mem_wf` / `u_mem_step`.
+
+**THREE FOLD-BACKS `HartMemAsm` OWES, all deferred so P3's in-flight
+`PtWalkCert` is not moved under it:**
+
+1. `UserMemPt.read_bytes_ne_of_exec_read_ram` / `goodmb_read_ram_of_exec`
+   belong beside `goodmb_read_ram`.
+2. `PtWalkCert`'s `gm_cer_bind_nest2` / `gm_cer_liftR_nest2` / `gmm_lift2` /
+   `bindR_ret` / `bindm_ret` / `mcer_early_return_nest` / `gm_untilMT_1` are
+   general and duplicate (or extend) `HartMemAsm`'s family.
+3. **A NAMED COMBINATOR FOR A `returnR`-HEADED REGION.**  Every AMO twin
+   meets `returnR R v >> … >>= k` at a region's head two or three times, and
+   there is no name for it: the idiom is
+   `erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ]`
+   (or `gm_cer_bind` inside the wrapper), which works because `returnR` IS
+   `Interface.Ret` and the `bind0` prefix is convertible away.
+
+And two working notes the arm sweep produced: after a `gmxl`/`gmxlR` peel
+the residue is `F (Interface.Ret y)`, and `rewrite mbind_Ret` is what turns
+it back into something the next `erewrite` matches SYNTACTICALLY; and
+`assert_exp`'s certificate needs an explicit `: M unit` ascription, because
+`goodmb`'s error index `E` is otherwise uninferable.
+
+**A THROWING TAIL IS NOT THE `gm_shape` TRAP.**  Closing at the thrown tail
+with plain `reflexivity` is INSTANT (~0.5 s): the throw absorbs the tail, so
+there is nothing for the conversion checker to unfold.  The trap is only
+about a SHAPE obligation under an open `Phi`, where the tail is still there.
