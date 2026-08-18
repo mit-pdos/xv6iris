@@ -209,15 +209,35 @@ Section ord.
       label: a non-read event has no floor, hence generates no edges.
       (Without the guard [lfloor] would hand a store or a fence the
       list [l_vrNew ++ lcoh a], which has nothing to do with reading.) *)
+  (** D2: the ADDRESS-DEPENDENCY leaves come FIRST.  The machine's read
+      pre-view is [load_vpre_d = V(asrc) ⊔ load_vpre], so the floor's leaf
+      list is the operand leaves followed by the old floor's — and, by
+      [WeakRobustProv.lsrcs_view_leaf], every one of the new leaves is
+      already a leaf of the same [pre_lstate], so [rd_leaves_wf] and the
+      E-edge well-definedness ([pre_lstate_leaf_occurs]) are unchanged. *)
   Definition rd_leaves TS (r : gev) (a : Z) : list nat :=
     match gev_lb TS r with
     | Some l =>
         match l with
-        | LLoad _ _ _ _ | LRmw _ _ _ _ _ => lfloor (pre_lstate TS r) (lb_aq l) a
+        | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ =>
+            lsrcs_view (pre_lstate TS r) (lb_asrc l)
+            ++ lfloor (pre_lstate TS r) (lb_aq l) a
         | _ => []
         end
     | None => []
     end.
+
+  Lemma rd_leaves_leaf TS r a t :
+    t ∈ rd_leaves TS r a → lstate_leaf (pre_lstate TS r) t.
+  Proof.
+    rewrite /rd_leaves. destruct (gev_lb TS r) as [l|];
+      [|by intros ?%elem_of_nil].
+    destruct l; try by intros ?%elem_of_nil.
+    all: intros [Ht|Ht]%elem_of_app;
+      [by eapply lsrcs_view_leaf
+      |rewrite /lfloor in Ht; apply elem_of_app in Ht as [Ht|Ht];
+         [by eapply lload_vpre_leaf|by eapply lcoh_leaf]].
+  Qed.
 
   (** The behavior's OWN floor number at that read: the [id]-valuation
       of the leaf list.  ([lrel_floor] at σ = [id] is what identifies
@@ -1234,13 +1254,16 @@ Section ordwf.
     ptraces_wf pstep TS → ptraces_ws_init TS →
     pt_trs TS !! r.1 = Some T → at_ags T !! r.2 = Some ag →
     gev_lb TS r = Some l →
-    match l with LLoad _ _ _ _ | LRmw _ _ _ _ _ => True | _ => False end →
+    match l with LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True | _ => False end →
     rd_floor TS r a
-    = Nat.max (load_vpre (pa_ws ag) (lb_aq l)) (coh (pa_ws ag) a).
+    = Nat.max (load_vpre_d (pa_ws ag) (lb_aq l)
+                 (srcs_view (pa_ws ag) (lb_asrc l)))
+              (coh (pa_ws ag) a).
   Proof.
     intros Hwf Hinit HT Hag Hl Hrd.
     have Hrel : lrel id (pre_lstate TS r) (pa_ws ag) by eapply pre_lstate_lrel.
-    rewrite (lrel_floor id (pre_lstate TS r) (pa_ws ag) (lb_aq l) a Hrel).
+    rewrite (lrel_floor_d id (pre_lstate TS r) (pa_ws ag) (lb_aq l) a
+               (lb_asrc l) Hrel).
     rewrite /rd_floor /rd_leaves Hl.
     by destruct l.
   Qed.

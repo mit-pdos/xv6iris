@@ -110,8 +110,19 @@ Definition tvs_reads (base : Z) (tvs : list (nat * bv 8)) : list (Z * nat) :=
 
 Definition lb_reads (l : wlabel) : list (Z * nat) :=
   match l with
-  | LLoad _ _ base tvs => tvs_reads base tvs
-  | LRmw _ _ base tvs _ => tvs_reads base tvs
+  | LLoad _ _ base tvs _ => tvs_reads base tvs
+  | LRmw _ _ base tvs _ _ _ => tvs_reads base tvs
+  | _ => []
+  end.
+
+(** THE ADDRESS-OPERAND LIST of a label (D2).  [[]] on every label that
+    has none, so the dependency-free instance sees the old vocabulary
+    BY CONVERSION ([srcs_view _ [] = 0], [lsrcs_view _ [] = []]). *)
+Definition lb_asrc (l : wlabel) : list dsrc :=
+  match l with
+  | LLoad _ _ _ _ asrc => asrc
+  | LStore _ _ _ asrc _ => asrc
+  | LRmw _ _ _ _ _ asrc _ => asrc
   | _ => []
   end.
 
@@ -126,7 +137,8 @@ Qed.
 
 Lemma lb_reads_nil_silent : lb_reads LSilent = [].
 Proof. done. Qed.
-Lemma lb_reads_nil_store rl base data : lb_reads (LStore rl base data) = [].
+Lemma lb_reads_nil_store rl base data asrc vsrc :
+  lb_reads (LStore rl base data asrc vsrc) = [].
 Proof. done. Qed.
 Lemma lb_reads_nil_fence pr pw sr sw : lb_reads (LFence pr pw sr sw) = [].
 Proof. done. Qed.
@@ -148,15 +160,19 @@ Section astep.
   Lemma astep_ok_f_le img log i ag l f D :
     astep_ok img log i ag l f D → ∀ w, ws_le w (f w).
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - intros [-> _] w. reflexivity.
-    - intros (_ & -> & _) w. apply load_post_run_le.
-    - intros (ts & kc & _ & _ & _ & -> & _) w. apply store_post_run_le.
+    - intros (_ & -> & _) w. apply load_post_run_d_le.
+    - intros (ts & kc & _ & _ & _ & -> & _) w. apply store_post_run_d_le.
     - intros (ts & kc & _ & _ & _ & _ & _ & _ & -> & _) w.
-      etrans; [apply load_post_run_le|apply store_post_run_le].
+      etrans; [apply load_post_run_d_le|apply store_post_run_d_le].
     - intros [-> _] w. apply fence_post_le.
     - (* dev: [LSilent]'s twin *) intros [-> _] w. reflexivity.
+    - intros [-> _] w. apply regw_post_le.
+    - intros [-> _] w. apply ctrl_post_le.
+    - intros [-> _] w. apply instr_post_le.
   Qed.
 
   (** A fulfilled timestamp is nonzero: [fulfil_ok]'s EXT conjunct
@@ -174,6 +190,9 @@ Section astep.
       simplify_eq. lia.
     - by intros [_ ?].
     - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
   Qed.
 
   (** A read's timestamp names a real write of the byte it reads
@@ -182,7 +201,8 @@ Section astep.
     astep_ok img log i ag l f D → (a, ts) ∈ lb_reads l →
     is_Some (log_byte img log ts a).
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - intros _ Hin%elem_of_nil. done.
     - intros (Hro & _ & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
@@ -190,6 +210,9 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros (ts' & kc & _ & _ & _ & Hro & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
       destruct (Hro j ts v Hj) as (Hb & _ & _). by eexists.
+    - intros _ Hin%elem_of_nil. done.
+    - intros _ Hin%elem_of_nil. done.
+    - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
   Qed.
@@ -202,18 +225,23 @@ Section astep.
     astep_ok img log i ag l f D → (a, ts) ∈ lb_reads l →
     (ts ≤ coh (f (pa_ws ag)) a)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - intros _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
-      by apply (load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts).
+      by apply (load_post_run_d_coh (pa_ws ag) aq (srcs_view (pa_ws ag) asrc) base (tvs.*1) j ts Hts).
     - intros _ Hin%elem_of_nil. done.
     - intros (ts' & kc & _ & _ & _ & _ & _ & _ & -> & _)
              [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
-      etrans; [by apply (load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts)|].
-      apply ws_le_coh, store_post_run_le.
+      etrans;
+        [by apply (load_post_run_d_coh (pa_ws ag) aq (srcs_view (pa_ws ag) asrc) base (tvs.*1) j ts Hts)|].
+      apply ws_le_coh, store_post_run_d_le.
+    - intros _ Hin%elem_of_nil. done.
+    - intros _ Hin%elem_of_nil. done.
+    - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
   Qed.
@@ -232,6 +260,9 @@ Section astep.
       simplify_eq. by eexists _, _, _.
     - by intros [_ ?].
     - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
   Qed.
 
   Lemma astep_ok_fulfil_coh img log i ag l f ts m a :
@@ -239,7 +270,8 @@ Section astep.
     log !! (ts - 1)%nat = Some m → is_Some (msg_byte m a) →
     (coh (pa_ws ag) a < ts)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -250,7 +282,10 @@ Section astep.
       simplify_eq.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & ->). simpl in Hj |- *.
       eapply Nat.le_lt_trans; [|by apply Hcoh].
-      apply ws_le_coh, load_post_run_le.
+      apply ws_le_coh, load_post_run_d_le.
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.
@@ -263,7 +298,8 @@ Section astep.
   Lemma astep_ok_read_fulfil_same img log i ag l f ts a :
     astep_ok img log i ag l f (Some ts) → (a, ts) ∈ lb_reads l → False.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -274,8 +310,12 @@ Section astep.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       have Hjlt : (j < length data)%nat.
       { rewrite -Hlen. by eapply lookup_lt_Some. }
-      have Hge := load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts.
+      have Hge := load_post_run_d_coh (pa_ws ag) aq
+                    (srcs_view (pa_ws ag) asrc) base (tvs.*1) j ts Hts.
       have Hlt := Hcoh j Hjlt. rewrite /acc_addr in Hge. lia.
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.

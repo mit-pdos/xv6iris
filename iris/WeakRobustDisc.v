@@ -146,16 +146,20 @@ Section astep.
     log !! (ts - 1)%nat = Some m → is_Some (msg_byte m a) →
     (ts ≤ w_vwOld (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
     - intros (ts' & kc & _ & Hlog & _ & -> & Heq) Hm Hb.
       injection Heq as <-. rewrite Hlog in Hm. simplify_eq.
-      apply store_post_run_vwOld. by apply (msg_byte_len _ a Hb).
+      apply store_post_run_d_vwOld. by apply (msg_byte_len _ a Hb).
     - intros (ts' & kc & _ & _ & Hlog & _ & _ & _ & -> & Heq) Hm Hb.
       injection Heq as <-. rewrite Hlog in Hm. simplify_eq.
-      apply store_post_run_vwOld. by apply (msg_byte_len _ a Hb).
+      apply store_post_run_d_vwOld. by apply (msg_byte_len _ a Hb).
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.
@@ -166,7 +170,8 @@ Section astep.
     astep_ok img log i ag l f D → lb_fence_pwsw l →
     (w_vwOld (pa_ws ag) ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl; try (by intros _ []).
     intros [-> _] [-> ->]. apply fence_post_vwNew_w.
   Qed.
@@ -406,10 +411,10 @@ Section disc.
           [disciplined_covered] composed with [covered_fcov]. *)
 
   (** (a) THE ACQUIRING RMW COVERS WHAT ITS OWN READ HALF ACQUIRED. *)
-  Lemma fcov_of_aq_rmw i T k' ev rl base tvs data a ts_s ts :
+  Lemma fcov_of_aq_rmw i T k' ev rl base tvs data asrc vsrc a ts_s ts :
     pt_trs TS !! i = Some T →
     at_evs T !! k' = Some ev →
-    ae_lb ev = LRmw true rl base tvs data →
+    ae_lb ev = LRmw true rl base tvs data asrc vsrc →
     (a, ts_s) ∈ lb_reads (ae_lb ev) →
     (ts ≤ ts_s)%nat →
     fcov T k' ts.
@@ -417,13 +422,33 @@ Section disc.
     intros HT Hev Hlb Hin Hle.
     destruct (ag_at i T k' ev HT Hev) as (ag & Hag).
     exists ag, ev,
-      (fulfil_vpre (load_post_run (pa_ws ag) true base (tvs.*1)) rl).
+      (fulfil_vpre_d
+         (load_post_run_d (pa_ws ag) true (srcs_view (pa_ws ag) asrc)
+            base (tvs.*1)) rl
+         (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                           (srcs_view (pa_ws ag) vsrc))
+                  (ldv_of (pa_ws ag) true (srcs_view (pa_ws ag) asrc)
+                     base (tvs.*1)))).
     split_and!; [exact Hag|exact Hev|by rewrite /fulfil_vext Hlb|].
     rewrite Hlb /= in Hin.
     apply elem_of_tvs_reads in Hin as (j & v & Hj & _).
     have Hts : (tvs.*1) !! j = Some ts_s by rewrite list_lookup_fmap Hj.
     have Hge := load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts_s Hts.
-    rewrite /fulfil_vpre. lia.
+    have Hmn : (w_vwNew (load_post_run (pa_ws ag) true base (tvs.*1))
+                ≤ w_vwNew (load_post_run_d (pa_ws ag) true
+                             (srcs_view (pa_ws ag) asrc) base (tvs.*1)))%nat
+      by apply ws_le_vwNew, load_post_run_d_mono.
+    have Hfv : (w_vwNew (load_post_run_d (pa_ws ag) true
+                           (srcs_view (pa_ws ag) asrc) base (tvs.*1))
+                ≤ fulfil_vpre_d
+                    (load_post_run_d (pa_ws ag) true
+                       (srcs_view (pa_ws ag) asrc) base (tvs.*1)) rl
+                    (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                                      (srcs_view (pa_ws ag) vsrc))
+                             (ldv_of (pa_ws ag) true
+                                (srcs_view (pa_ws ag) asrc) base (tvs.*1))))%nat
+      by apply fulfil_vpre_d_vwNew.
+    lia.
   Qed.
 
   (** (b) AN ACQUIRE po-BEFORE THE FULFIL COVERS IT.  The read at [ka] is
@@ -872,12 +897,13 @@ Section disc.
       only "the label is an rmw", never a range calculation. *)
   Definition rmw_written (a : Z) : Prop :=
     ∀ e t, writes_b TS a e t →
-      ∃ aq rl base tvs data, gev_lb TS e = Some (LRmw aq rl base tvs data).
+      ∃ aq rl base tvs data asrc vsrc,
+        gev_lb TS e = Some (LRmw aq rl base tvs data asrc vsrc).
 
   Theorem excl_byte_of_rmw a : rmw_written a → excl_byte TS a.
   Proof.
     intros Hrmw e t Hw. right.
-    destruct (Hrmw e t Hw) as (aq & rl & base & tvs & data & Hlb).
+    destruct (Hrmw e t Hw) as (aq & rl & base & tvs & data & asrc & vsrc & Hlb).
     have Hw' := Hw. destruct Hw' as (Hts & m0 & Hm0 & Hb0).
     rewrite /gev_lb in Hlb.
     destruct (gev_ev TS e) as [ev|] eqn:Hev; simpl in Hlb; [|done].
@@ -896,7 +922,7 @@ Section disc.
     { rewrite Hlen. by eapply lookup_lt_Some. }
     have [[tr v'] Htv] : is_Some (tvs !! Z.to_nat (a - base))
       by apply lookup_lt_is_Some_2.
-    exists tr, (LRmw aq rl base tvs data).
+    exists tr, (LRmw aq rl base tvs data asrc vsrc).
     split; [by rewrite /gev_lb Hev /= Hlbe|].
     simpl. apply elem_of_tvs_reads.
     exists (Z.to_nat (a - base)), v'. split; [exact Htv|].

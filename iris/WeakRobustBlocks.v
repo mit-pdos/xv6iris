@@ -88,19 +88,19 @@ Local Open Scope Z_scope.
 
 (** A label that APPENDS a message — the two fulfil-carrying shapes. *)
 Definition lb_writes (l : wlabel) : bool :=
-  match l with LStore _ _ _ | LRmw _ _ _ _ _ => true | _ => false end.
+  match l with LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true | _ => false end.
 
 (** A label that READS. *)
 Definition lb_loads (l : wlabel) : bool :=
-  match l with LLoad _ _ _ _ | LRmw _ _ _ _ _ => true | _ => false end.
+  match l with LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true | _ => false end.
 
 (** The shape conditions the promise-free store/rmw rules impose on a
     label ([WeakPromiseBridge.PFStore] / [PFRmw]): a message is nonempty,
     and an rmw's halves have equal width. *)
 Definition lb_ok (l : wlabel) : Prop :=
   match l with
-  | LStore _ _ data => data ≠ []
-  | LRmw _ _ _ tvs data => data ≠ [] ∧ length tvs = length data
+  | LStore _ _ data _ _ => data ≠ []
+  | LRmw _ _ _ tvs data _ _ => data ≠ [] ∧ length tvs = length data
   | _ => True
   end.
 
@@ -143,7 +143,7 @@ Section shape.
     (** The A/D write-back is an [LRmw] (an exclusive-conditional pair). *)
     bs_ad_rmw : ∀ p d l p' d',
       pstep p d l p' d' → ad p l →
-      ∃ aq rl base tvs data, l = LRmw aq rl base tvs data;
+      ∃ aq rl base tvs data asrc vsrc, l = LRmw aq rl base tvs data asrc vsrc;
     (** …and it sits STRICTLY INSIDE its block: the translated data
         access still follows, so it does not retire the instruction. *)
     bs_ad_mid : ∀ p d l p' d', pstep p d l p' d' → ad p l → ¬ at_boundary p';
@@ -249,18 +249,29 @@ Proof.
       split; [done|apply latest_ts_top].
 Qed.
 
-Lemma read_latest_read_ok img log ws aq lat base tvs :
-  ws_bounded ws (length log) → read_latest img log base tvs →
-  read_ok img log ws aq lat base tvs.
+(** THE LATEST READ IS ADMISSIBLE AT ANY PRE-VIEW, dependency view
+    included: nothing above a latest timestamp writes the byte at all, so
+    the window's upper end is irrelevant as long as it is a real
+    timestamp — which [ws_bounded] and the operand bound supply. *)
+Lemma read_latest_read_ok_d img log ws aq lat base tvs va :
+  ws_bounded ws (length log) → (va ≤ length log)%nat →
+  read_latest img log base tvs →
+  read_ok_d img log ws aq lat base tvs va.
 Proof.
-  intros Hb Hrl j t v Hj. destruct (Hrl j t v Hj) as [Hlb Hnw].
+  intros Hb Hva Hrl j t v Hj. destruct (Hrl j t v Hj) as [Hlb Hnw].
   split_and!; [done| |by intros _].
   split; [by eexists|]. intros Hw. apply Hnw.
   eapply writes_in_mono_hi; [|exact Hw].
-  have Hvp : (load_vpre ws aq ≤ length log)%nat by apply load_vpre_bounded.
+  have Hvp : (load_vpre_d ws aq va ≤ length log)%nat
+    by apply load_vpre_d_bounded.
   destruct Hb as (_ & _ & _ & _ & _ & _ & Hcoh & _).
   pose proof (Hcoh (base + Z.of_nat j)). lia.
 Qed.
+
+Lemma read_latest_read_ok img log ws aq lat base tvs :
+  ws_bounded ws (length log) → read_latest img log base tvs →
+  read_ok img log ws aq lat base tvs.
+Proof. intros Hb. apply read_latest_read_ok_d; [done|lia]. Qed.
 
 Lemma read_latest_excl_ok img log i base tvs :
   read_latest img log base tvs → excl_ok log i base tvs (S (length log)).
@@ -294,13 +305,14 @@ Section complete.
       the shape the promise-free rules require. *)
   Record lts_enabled : Prop := LtsEnabled {
     le_lb_ok : ∀ p d l p' d', pstep p d l p' d' → lb_ok l;
-    le_load : ∀ p d aq lat base tvs tvs' p' d',
-      length tvs = length tvs' → pstep p d (LLoad aq lat base tvs) p' d' →
-      ∃ p'' d'', pstep p d (LLoad aq lat base tvs') p'' d'';
-    le_rmw : ∀ p d aq rl base tvs data tvs' p' d',
-      length tvs = length tvs' → pstep p d (LRmw aq rl base tvs data) p' d' →
+    le_load : ∀ p d aq lat base tvs tvs' asrc p' d',
+      length tvs = length tvs' → pstep p d (LLoad aq lat base tvs asrc) p' d' →
+      ∃ p'' d'', pstep p d (LLoad aq lat base tvs' asrc) p'' d'';
+    le_rmw : ∀ p d aq rl base tvs data tvs' asrc vsrc p' d',
+      length tvs = length tvs' →
+      pstep p d (LRmw aq rl base tvs data asrc vsrc) p' d' →
       ∃ data' p'' d'', length data' = length data ∧
-                   pstep p d (LRmw aq rl base tvs' data') p'' d'';
+                   pstep p d (LRmw aq rl base tvs' data' asrc vsrc) p'' d'';
   }.
 
   (** A BLOCK IS A FINITE, NEVER-STUCK RUN: off a boundary the program
@@ -342,22 +354,25 @@ Section complete.
     (∃ ms, pc_log c' = pc_log c ++ ms ∧ Forall (λ mq, wm_tid mq = Some i) ms).
   Proof.
     destruct 1 as [cfg ag st' dd Hag Hps
-                  |cfg ag aq lat base tvs st' dd Hag Hps Hro
-                  |cfg ag rl base data k st' dd Hag Hps Hdne
-                  |cfg ag aq rl base tvs data k st' dd Hag Hps Hdne Hlen Hro Hex
-                  |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps]; simpl.
+                  |cfg ag aq lat base tvs asrc st' dd Hag Hps Hro
+                  |cfg ag rl base data asrc vsrc k st' dd Hag Hps Hdne
+                  |cfg ag aq rl base tvs data asrc vsrc k st' dd
+                       Hag Hps Hdne Hlen Hro Hex
+                  |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps
+                  |cfg ag rdw wsrc st' dd Hag Hps|cfg ag csrc st' dd Hag Hps
+                  |cfg ag st' dd Hag Hps]; simpl.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
       exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)). split_and!; [done|done|].
       reflexivity.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
-      eexists ag, _. split_and!; [done|done|]. apply load_post_run_le.
+      eexists ag, _. split_and!; [done|done|]. apply load_post_run_d_le.
     - split_and!; [done| |].
-      + eexists ag, _. split_and!; [done|done|]. apply store_post_run_le.
+      + eexists ag, _. split_and!; [done|done|]. apply store_post_run_d_le.
       + exists [WMsg base data (Some i) k]. split; [done|].
         by apply list_relations.Forall_singleton.
     - split_and!; [done| |].
       + eexists ag, _. split_and!; [done|done|].
-        etrans; [apply load_post_run_le|apply store_post_run_le].
+        etrans; [apply load_post_run_d_le|apply store_post_run_d_le].
       + exists [WMsg base data (Some i) k]. split; [done|].
         by apply list_relations.Forall_singleton.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
@@ -365,6 +380,12 @@ Section complete.
     - (* dev *) split_and!; [done| |exists []; rewrite app_nil_r; by split].
       exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)). split_and!; [done|done|].
       reflexivity.
+    - split_and!; [done| |exists []; rewrite app_nil_r; by split].
+      eexists ag, _. split_and!; [done|done|]. apply regw_post_le.
+    - split_and!; [done| |exists []; rewrite app_nil_r; by split].
+      eexists ag, _. split_and!; [done|done|]. apply ctrl_post_le.
+    - split_and!; [done| |exists []; rewrite app_nil_r; by split].
+      eexists ag, _. split_and!; [done|done|]. apply instr_post_le.
   Qed.
 
   Lemma wp_pf_step_frame i l c c' j :
@@ -411,16 +432,16 @@ Section complete.
     destruct (ps !! j) as [p|]; simplify_eq/=. apply ws_bounded_init.
   Qed.
 
-  Lemma read_ok_ts_le img log ws aq lat base tvs j t v :
-    read_ok img log ws aq lat base tvs → tvs !! j = Some (t, v) →
+  Lemma read_ok_ts_le img log ws aq lat base tvs va j t v :
+    read_ok_d img log ws aq lat base tvs va → tvs !! j = Some (t, v) →
     (t ≤ length log)%nat.
   Proof.
     intros Hro Hj. destruct (Hro j t v Hj) as (Hlb & _ & _).
     eapply log_byte_bounded. by eexists.
   Qed.
 
-  Lemma read_ok_forall img log ws aq lat base tvs :
-    read_ok img log ws aq lat base tvs →
+  Lemma read_ok_forall img log ws aq lat base tvs va :
+    read_ok_d img log ws aq lat base tvs va →
     Forall (λ t, (t ≤ length log)%nat) (tvs.*1).
   Proof.
     intros Hro. apply list_relations.Forall_lookup_2. intros j t Hj.
@@ -433,10 +454,13 @@ Section complete.
     wp_pf_step pstep pcls i l c c' → cfg_bnd c → cfg_bnd c'.
   Proof.
     destruct 1 as [cfg ag st' dd Hag Hps
-                  |cfg ag aq lat base tvs st' dd Hag Hps Hro
-                  |cfg ag rl base data k st' dd Hag Hps Hdne
-                  |cfg ag aq rl base tvs data k st' dd Hag Hps Hdne Hlen Hro Hex
-                  |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps];
+                  |cfg ag aq lat base tvs asrc st' dd Hag Hps Hro
+                  |cfg ag rl base data asrc vsrc k st' dd Hag Hps Hdne
+                  |cfg ag aq rl base tvs data asrc vsrc k st' dd
+                       Hag Hps Hdne Hlen Hro Hex
+                  |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps
+                  |cfg ag rdw wsrc st' dd Hag Hps|cfg ag csrc st' dd Hag Hps
+                  |cfg ag st' dd Hag Hps];
       intros Hb j ag2 Hag2; simpl in Hag2 |- *.
     - destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
@@ -445,25 +469,37 @@ Section complete.
         by eapply Hb.
     - destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
-        simplify_eq/=. apply load_post_run_bounded; [by eapply Hb|].
-        by eapply read_ok_forall.
+        simplify_eq/=.
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        have Hva := srcs_view_bounded (pa_ws ag) _ asrc Hbag.
+        apply load_post_run_d_bounded;
+          [exact Hbag|exact Hva|by eapply read_ok_forall].
       + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
         by eapply Hb.
     - rewrite length_app /=.
       destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
         simplify_eq/=.
-        eapply (store_post_run_bounded _ _ _ _ _ (length (pc_log cfg)));
-          [by eapply Hb|lia|lia].
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        have Hva := srcs_view_bounded (pa_ws ag) _ asrc Hbag.
+        have Hvd := srcs_view_bounded (pa_ws ag) _ vsrc Hbag.
+        eapply (store_post_run_d_bounded _ _ _ _ _ _ _
+                  (length (pc_log cfg)));
+          [exact Hbag|lia|lia|lia|lia].
       + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
         eapply ws_bounded_mono; [by eapply Hb|lia].
     - rewrite length_app /=.
       destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
         simplify_eq/=.
-        eapply (store_post_run_bounded _ _ _ _ _ (length (pc_log cfg)));
-          [|lia|lia].
-        apply load_post_run_bounded; [by eapply Hb|by eapply read_ok_forall].
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        have Hva := srcs_view_bounded (pa_ws ag) _ asrc Hbag.
+        have Hvd := srcs_view_bounded (pa_ws ag) _ vsrc Hbag.
+        eapply (store_post_run_d_bounded _ _ _ _ _ _ _
+                  (length (pc_log cfg)));
+          [ |lia|lia|lia|lia].
+        apply load_post_run_d_bounded;
+          [exact Hbag|exact Hva|by eapply read_ok_forall].
       + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
         eapply ws_bounded_mono; [by eapply Hb|lia].
     - destruct (decide (j = i)) as [->|Hne].
@@ -474,6 +510,27 @@ Section complete.
     - (* dev *) destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
         simplify_eq/=. by eapply Hb.
+      + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
+        by eapply Hb.
+    - (* regw *) destruct (decide (j = i)) as [->|Hne].
+      + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
+        simplify_eq/=.
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        apply regw_post_bounded;
+          [exact Hbag|by apply (srcs_view_bounded _ _ _ Hbag)].
+      + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
+        by eapply Hb.
+    - (* ctrl *) destruct (decide (j = i)) as [->|Hne].
+      + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
+        simplify_eq/=.
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        apply ctrl_post_bounded;
+          [exact Hbag|by apply (srcs_view_bounded _ _ _ Hbag)].
+      + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
+        by eapply Hb.
+    - (* instr *) destruct (decide (j = i)) as [->|Hne].
+      + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
+        simplify_eq/=. apply instr_post_bounded. by eapply Hb.
       + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
         by eapply Hb.
   Qed.
@@ -494,8 +551,8 @@ Section complete.
   Proof.
     intros Hen Hi Hb Hag Hps.
     have Hlt : (i < length (pc_ags c))%nat by eapply lookup_lt_Some.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                  |pr pw sr sw|].
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
     - (* silent *)
       eexists _, (WPAgent p' (pa_ws ag) (pa_prom ag)). split_and!.
       + split; [eexists; by apply (PFSilent pstep pcls i c ag p' dd)|].
@@ -505,42 +562,52 @@ Section complete.
     - (* load: read every byte at its latest write *)
       destruct (read_latest_exists (pc_img c) (pc_log c) base (length tvs) Hi)
         as (tvs' & Hlen' & Hrl).
-      destruct (le_load Hen (pa_st ag) (pc_dev c) aq lat base tvs tvs' p' dd
+      destruct (le_load Hen (pa_st ag) (pc_dev c) aq lat base tvs tvs' asrc p' dd
                   (eq_sym Hlen') Hps) as (p'' & dd' & Hps').
-      have Hro : read_ok (pc_img c) (pc_log c) (pa_ws ag) aq lat base tvs'
-        by apply read_latest_read_ok.
-      eexists _, (WPAgent p'' (load_post_run (pa_ws ag) aq base (tvs'.*1))
+      have Hro : read_ok_d (pc_img c) (pc_log c) (pa_ws ag) aq lat base tvs'
+                   (srcs_view (pa_ws ag) asrc).
+      { apply read_latest_read_ok_d; [done|by apply srcs_view_bounded|done]. }
+      eexists _, (WPAgent p'' (load_post_run_d (pa_ws ag) aq
+                                 (srcs_view (pa_ws ag) asrc) base (tvs'.*1))
                     (pa_prom ag)).
       split_and!.
       + split; [eexists;
-                by apply (PFLoad pstep pcls i c ag aq lat base tvs' p'' dd')|].
+                by apply (PFLoad pstep pcls i c ag aq lat base tvs' asrc p''
+                            dd')|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LLoad aq lat base tvs'), dd'.
+      + simpl. by exists (LLoad aq lat base tvs' asrc), dd'.
     - (* store *)
       have Hne : data ≠ [] by apply (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps).
-      eexists _, (WPAgent p' (store_post_run (pa_ws ag) rl base (length data)
-                               (S (length (pc_log c)))) (pa_prom ag)).
+      eexists _, (WPAgent p' (store_post_run_d (pa_ws ag) rl
+                                (srcs_view (pa_ws ag) asrc)
+                                (srcs_view (pa_ws ag) vsrc)
+                                base (length data)
+                                (S (length (pc_log c)))) (pa_prom ag)).
       split_and!.
       + split.
         * eexists.
-          by apply (PFStore pstep pcls i c ag rl base data
-                      (pcls (pa_st ag) (LStore rl base data) (pa_ws ag)) p' dd).
+          by apply (PFStore pstep pcls i c ag rl base data asrc vsrc
+                      (pcls (pa_st ag) (LStore rl base data asrc vsrc)
+                         (pa_ws ag)) p' dd).
         * exists [WMsg base data (Some i)
-                    (pcls (pa_st ag) (LStore rl base data) (pa_ws ag))].
+                    (pcls (pa_st ag) (LStore rl base data asrc vsrc)
+                       (pa_ws ag))].
           split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LStore rl base data), dd.
+      + simpl. by exists (LStore rl base data asrc vsrc), dd.
     - (* rmw: the exclusive window is clean because the read half is
          LATEST — nothing above it writes the byte at all *)
       destruct (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps) as [Hnedata Hlend].
       destruct (read_latest_exists (pc_img c) (pc_log c) base (length tvs) Hi)
         as (tvs' & Hlen' & Hrl).
-      destruct (le_rmw Hen (pa_st ag) (pc_dev c) aq rl base tvs data tvs' p' dd
-                  (eq_sym Hlen') Hps) as (data' & p'' & dd' & Hlend' & Hps').
-      have Hro : read_ok (pc_img c) (pc_log c) (pa_ws ag) aq false base tvs'
-        by apply read_latest_read_ok.
+      destruct (le_rmw Hen (pa_st ag) (pc_dev c) aq rl base tvs data tvs'
+                  asrc vsrc p' dd (eq_sym Hlen') Hps)
+        as (data' & p'' & dd' & Hlend' & Hps').
+      have Hro : read_ok_d (pc_img c) (pc_log c) (pa_ws ag) aq false base tvs'
+                   (srcs_view (pa_ws ag) asrc).
+      { apply read_latest_read_ok_d; [done|by apply srcs_view_bounded|done]. }
       have Hex : excl_ok (pc_log c) i base tvs' (S (length (pc_log c)))
         by apply (read_latest_excl_ok (pc_img c) (pc_log c) i base tvs').
       have Hne' : data' ≠ [].
@@ -548,20 +615,26 @@ Section complete.
         apply Hnedata. by destruct data; simplify_eq/=. }
       have Hlen2 : length tvs' = length data' by lia.
       eexists _, (WPAgent p''
-                    (store_post_run (load_post_run (pa_ws ag) aq base (tvs'.*1))
-                       rl base (length data') (S (length (pc_log c))))
+                    (store_post_run_d
+                       (load_post_run_d (pa_ws ag) aq
+                          (srcs_view (pa_ws ag) asrc) base (tvs'.*1))
+                       rl (srcs_view (pa_ws ag) asrc)
+                          (srcs_view (pa_ws ag) vsrc)
+                       base (length data') (S (length (pc_log c))))
                     (pa_prom ag)).
       split_and!.
       + split.
         * eexists.
-          by apply (PFRmw pstep pcls i c ag aq rl base tvs' data'
-                      (pcls (pa_st ag) (LRmw aq rl base tvs' data') (pa_ws ag)) p'' dd').
+          by apply (PFRmw pstep pcls i c ag aq rl base tvs' data' asrc vsrc
+                      (pcls (pa_st ag) (LRmw aq rl base tvs' data' asrc vsrc)
+                         (pa_ws ag)) p'' dd').
         * exists [WMsg base data' (Some i)
-                    (pcls (pa_st ag) (LRmw aq rl base tvs' data') (pa_ws ag))].
+                    (pcls (pa_st ag) (LRmw aq rl base tvs' data' asrc vsrc)
+                       (pa_ws ag))].
           split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LRmw aq rl base tvs' data'), dd'.
+      + simpl. by exists (LRmw aq rl base tvs' data' asrc vsrc), dd'.
     - (* fence *)
       eexists _, (WPAgent p' (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)).
       split_and!.
@@ -576,6 +649,27 @@ Section complete.
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists LDev, dd.
+    - (* regw / ctrl / instr: the silent case with a [wstate]-only update *)
+      eexists _, (WPAgent p' (regw_post (pa_ws ag) rdw
+                                (srcs_view (pa_ws ag) wsrc)) (pa_prom ag)).
+      split_and!.
+      + split; [eexists; by apply (PFRegW pstep pcls i c ag rdw wsrc p' dd)|].
+        exists []. rewrite /= app_nil_r. by split.
+      + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
+      + simpl. by exists (LRegW rdw wsrc), dd.
+    - eexists _, (WPAgent p' (ctrl_post (pa_ws ag)
+                                (srcs_view (pa_ws ag) csrc)) (pa_prom ag)).
+      split_and!.
+      + split; [eexists; by apply (PFCtrl pstep pcls i c ag csrc p' dd)|].
+        exists []. rewrite /= app_nil_r. by split.
+      + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
+      + simpl. by exists (LCtrl csrc), dd.
+    - eexists _, (WPAgent p' (instr_post (pa_ws ag)) (pa_prom ag)).
+      split_and!.
+      + split; [eexists; by apply (PFInstr pstep pcls i c ag p' dd)|].
+        exists []. rewrite /= app_nil_r. by split.
+      + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
+      + simpl. by exists LInstr, dd.
   Qed.
 
   Lemma cstep_bnd i c c' : cstep i c c' → cfg_bnd c → cfg_bnd c'.
@@ -794,7 +888,8 @@ Section cone.
          nproc done j = S m ∧
          at_ags T !! m = Some ag ∧ at_evs T !! m = Some ev ∧
          (∃ ts, ae_ts ev = Some ts) ∧
-         (∃ aq rl base tvs data, ae_lb ev = LRmw aq rl base tvs data) ∧
+         (∃ aq rl base tvs data asrc vsrc,
+            ae_lb ev = LRmw aq rl base tvs data asrc vsrc) ∧
          ad (pa_st ag) (ae_lb ev)).
   Proof.
     intros Hwf Hbs Hinit Hq Hcone Hne HT Hagn.

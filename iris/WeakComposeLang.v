@@ -827,14 +827,12 @@ Section prj.
     intros (agx & qx & Hax & Hstx) (l & Hstep & _ & _).
     destruct Hstep as
       [cfg ag st' dv Hlk Hps
-
-      |cfg ag aq lat base tvs st' dv Hlk Hps Hr
-
-      |cfg ag rl base data kk st' dv Hlk Hps Hne Hkc
-
-      |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
-
-      |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps];
+      |cfg ag aq lat base tvs asrc st' dv Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk st' dv Hlk Hps Hne Hkc
+      |cfg ag aq rl base tvs data asrc vsrc kk st' dv Hlk Hps Hne Hlen Hr He Hkc
+      |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps
+      |cfg ag rdw wsrc st' dv Hlk Hps|cfg ag csrc st' dv Hlk Hps
+      |cfg ag st' dv Hlk Hps];
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
       rewrite Hstx /= in Hps;
       (destruct st' as [q'|dd pend]; [|done]);
@@ -856,14 +854,12 @@ Section prj.
     intros (agx & qx & Hax & Hstx) (l & Hstep & Hcls & Hrmw).
     destruct Hstep as
       [cfg ag st' dv Hlk Hps
-
-      |cfg ag aq lat base tvs st' dv Hlk Hps Hr
-
-      |cfg ag rl base data kk st' dv Hlk Hps Hne Hkc
-
-      |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
-
-      |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps]; destruct dv;
+      |cfg ag aq lat base tvs asrc st' dv Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk st' dv Hlk Hps Hne Hkc
+      |cfg ag aq rl base tvs data asrc vsrc kk st' dv Hlk Hps Hne Hlen Hr He Hkc
+      |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps
+      |cfg ag rdw wsrc st' dv Hlk Hps|cfg ag csrc st' dv Hlk Hps
+      |cfg ag st' dv Hlk Hps]; destruct dv;
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
       rewrite Hstx /= in Hps;
       (destruct st' as [q'|dd pend]; [|done]);
@@ -884,21 +880,21 @@ Section prj.
         by destruct (app_snoc_absurd _ _ Heq).
       + exact I.
     - split.
-      { exists (WPAgent (PHart q') (load_post_run (pa_ws ag) aq base tvs.*1)
-                  (pa_prom ag)), q'. simpl.
-        split; [by eapply lookup_insert_self|done]. }
-      exists (WeakPromise.LLoad aq lat base tvs). split_and!.
-      + apply (PFLoad (pstep_unit (sail_step_ni next)) lbl_class_p i (prj_cfg q0 cfg)
-                 (prj_ag q0 ag) aq lat base tvs q' tt Hlks);
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LLoad aq lat base tvs asrc). split_and!.
+      + apply (PFLoad (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) aq lat base tvs asrc q' tt
+                 Hlks);
           [rewrite /prj_ag /= Hstx; exact Hps|exact Hr].
       + intros ag2 msg Hag2 Heq. simpl in Heq.
         by destruct (app_snoc_absurd _ _ Heq).
       + exact I.
     - split.
       { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
-      exists (WeakPromise.LStore rl base data). split_and!.
-      + apply (PFStore (pstep_unit (sail_step_ni next)) lbl_class_p i (prj_cfg q0 cfg)
-                 (prj_ag q0 ag) rl base data kk q' tt Hlks);
+      exists (WeakPromise.LStore rl base data asrc vsrc). split_and!.
+      + apply (PFStore (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) rl base data asrc vsrc kk q'
+                 tt Hlks);
           [rewrite /prj_ag /= Hstx; exact Hps|exact Hne|exact Hkc].
       + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
         rewrite Hlks in Hag2. injection Hag2 as <-.
@@ -906,9 +902,10 @@ Section prj.
       + exact I.
     - split.
       { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
-      exists (WeakPromise.LRmw aq rl base tvs data). split_and!.
-      + apply (PFRmw (pstep_unit (sail_step_ni next)) lbl_class_p i (prj_cfg q0 cfg)
-                 (prj_ag q0 ag) aq rl base tvs data kk q' tt Hlks);
+      exists (WeakPromise.LRmw aq rl base tvs data asrc vsrc). split_and!.
+      + apply (PFRmw (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) aq rl base tvs data asrc vsrc
+                 kk q' tt Hlks);
           [rewrite /prj_ag /= Hstx; exact Hps|exact Hne|exact Hlen
           |exact Hr|exact He|exact Hkc].
       + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
@@ -932,6 +929,34 @@ Section prj.
       exists WeakPromise.LDev. split_and!.
       + apply (PFDev (pstep_unit (sail_step_ni next)) lbl_class_p i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) q' tt Hlks).
+        rewrite /prj_ag /= Hstx. exact Hps.
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - (* regw / ctrl / instr: the silent case with a [wstate]-only update *)
+      split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LRegW rdw wsrc). split_and!.
+      + apply (PFRegW (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) rdw wsrc q' tt Hlks).
+        rewrite /prj_ag /= Hstx. exact Hps.
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LCtrl csrc). split_and!.
+      + apply (PFCtrl (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) csrc q' tt Hlks).
+        rewrite /prj_ag /= Hstx. exact Hps.
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists WeakPromise.LInstr. split_and!.
+      + apply (PFInstr (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) q' tt Hlks).
         rewrite /prj_ag /= Hstx. exact Hps.
       + intros ag2 msg Hag2 Heq. simpl in Heq.
         by destruct (app_snoc_absurd _ _ Heq).

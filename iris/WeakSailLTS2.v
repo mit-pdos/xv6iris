@@ -211,11 +211,14 @@ Proof.
     destruct (dev_addr _).
     + by intros [_ ->].
     + intros [_ H].
-      destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                    |pr pw sr sw|]; try done.
-      * destruct lat; [done|].
+      destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
+                    |csrc|]; try done.
+      * destruct lat; [done|]. destruct asrc as [|x asrc']; [|done].
         by destruct H as (_ & _ & _ & w & _ & ->).
-      * by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
+      * destruct asrc as [|x asrc']; [|done].
+        destruct vsrc as [|y vsrc']; [|done].
+        by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite *)
     destruct (dev_addr _); [by intros [_ ->]|]. by intros (_ & _ & ->).
   - (* Choose *)
@@ -243,6 +246,53 @@ Proof.
           | by intros [] ].
 Qed.
 
+(** THE ARCHIVE NEVER EMITS A DEPENDENCY EITHER (D2).  Every label arm of
+    [sail_step_ni] pins its operand lists to [[]] and no arm emits
+    [LRegW]/[LCtrl]/[LInstr], so the archive route lives entirely inside
+    [WeakPromise.lb_depfree] — which is what lets its FIVE-shape inversions
+    survive both the operand fields and the three new arms. *)
+Lemma sail_step_ni_depfree next p l p' :
+  sail_step_ni next p l p' → lb_depfree l.
+Proof.
+  rewrite /sail_step_ni.
+  destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by intros [-> _]|].
+  destruct (sp_m p) as [m|]; [|by intros [-> _]].
+  rewrite /sail_mstep. destruct m as [y|T oc k]; [by intros [-> _]|].
+  destruct oc; simpl; try (destruct (dev_addr _)); try (destruct b);
+    try (by intros [-> _]); try (by intros (-> & _ & _)); try done.
+  (* the ONE arm that pins [l] through a label match: the RAM read *)
+  intros [_ H].
+  destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
+                |csrc|]; try done.
+  - destruct lat; [done|]. by destruct asrc as [|x asrc'].
+  - destruct asrc as [|x asrc']; [|done]. by destruct vsrc as [|y vsrc'].
+Qed.
+
+Lemma sail_step_ni_dep_free next p l p' :
+  sail_step_ni next p l p' →
+  match l with
+  | WeakPromise.LRegW _ _ | WeakPromise.LCtrl _ | WeakPromise.LInstr => False
+  | _ => True
+  end.
+Proof.
+  intros H%sail_step_ni_depfree. by destruct l.
+Qed.
+
+Lemma sail_step_ni_asrc_nil next p aq lat base tvs asrc p' :
+  sail_step_ni next p (WeakPromise.LLoad aq lat base tvs asrc) p' → asrc = [].
+Proof. by intros H%sail_step_ni_depfree. Qed.
+
+Lemma sail_step_ni_store_nil next p rl base data asrc vsrc p' :
+  sail_step_ni next p (WeakPromise.LStore rl base data asrc vsrc) p' →
+  asrc = [] ∧ vsrc = [].
+Proof. by intros H%sail_step_ni_depfree. Qed.
+
+Lemma sail_step_ni_rmw_nil next p aq rl base tvs data asrc vsrc p' :
+  sail_step_ni next p (WeakPromise.LRmw aq rl base tvs data asrc vsrc) p' →
+  asrc = [] ∧ vsrc = [].
+Proof. by intros H%sail_step_ni_depfree. Qed.
+
 Lemma sail_step_not_dev next p p' :
   ¬ sail_step next p WeakPromise.LDev p'.
 Proof.
@@ -265,19 +315,22 @@ Qed.
     arm's write half pins [ak_latest = true] ([wr_node]). *)
 Definition lbl_class (l : wlabel) (ws : wstate) : wm_class :=
   match l with
-  | WeakPromise.LStore rl _ _ => if (w_relp ws || rl)%bool then WCrel else WCplain
-  | WeakPromise.LRmw _ _ _ _ _ => WCexcl
+  | WeakPromise.LStore rl _ _ _ _ =>
+      if (w_relp ws || rl)%bool then WCrel else WCplain
+  | WeakPromise.LRmw _ _ _ _ _ _ _ => WCexcl
   | _ => WCplain
   end.
 
 Lemma lbl_class_store ak ws base data :
   ak_latest ak = false →
-  wm_class_of ak ws = lbl_class (WeakPromise.LStore (ak_sync ak) base data) ws.
+  wm_class_of ak ws
+  = lbl_class (WeakPromise.LStore (ak_sync ak) base data [] []) ws.
 Proof. intros H. by rewrite /wm_class_of /lbl_class H. Qed.
 
-Lemma lbl_class_rmw ak ws aq rl base tvs data :
+Lemma lbl_class_rmw ak ws aq rl base tvs data asrc vsrc :
   ak_latest ak = true →
-  wm_class_of ak ws = lbl_class (WeakPromise.LRmw aq rl base tvs data) ws.
+  wm_class_of ak ws
+  = lbl_class (WeakPromise.LRmw aq rl base tvs data asrc vsrc) ws.
 Proof. intros H. by rewrite /wm_class_of /lbl_class H. Qed.
 
 (** THE PROGRAM-BLIND WRAPPER (G6a follow-up).  [pcls] is now indexed by
@@ -302,9 +355,9 @@ Definition lbl_class_p {P : Type} (_ : P) (l : wlabel) (ws : wstate)
 Lemma lbl_class_obl {P : Type} : pcls_obl (P := P) lbl_class_p.
 Proof.
   split.
-  - intros p rl base data ws ws' Hrel.
+  - intros p rl base data asrc vsrc ws ws' Hrel.
     by rewrite /lbl_class_p /lbl_class Hrel.
-  - intros p aq rl base tvs tvs' data ws ws' _ _. reflexivity.
+  - intros p aq rl base tvs tvs' data asrc vsrc ws ws' _ _. reflexivity.
 Qed.
 
 (** (a) the class the step appends is the computed one. *)
@@ -316,7 +369,7 @@ Definition cls_canon (i : agent) (l : wlabel) (c c' : wpcfg psail unit) : Prop :
     (no write at all in the window, not merely no other agent's). *)
 Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail unit) : Prop :=
   match l with
-  | WeakPromise.LRmw aq _ base tvs _ =>
+  | WeakPromise.LRmw aq _ base tvs _ _ _ =>
       ∀ ag, pc_ags c !! i = Some ag →
         read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs
   | _ => True
@@ -336,16 +389,21 @@ Proof.
   intros (l & Hstep & _ & _). exists i, l.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
-    |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps];
+    |cfg ag aq lat base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
+    |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
+    |cfg ag st' dd Hlk Hps];
     [ by eapply PFSilent, sail_step_ni_step
     | by eapply PFLoad; [done|apply sail_step_ni_step|done]
     | by eapply PFStore; [done|apply sail_step_ni_step|done|done]
     | by eapply PFRmw; [done|apply sail_step_ni_step|done|done|done|done|done]
     | by eapply PFFence; [done|apply sail_step_ni_step]
-    | by eapply PFDev, sail_step_ni_step ].
+    | by eapply PFDev, sail_step_ni_step
+    | by eapply PFRegW, sail_step_ni_step
+    | by eapply PFCtrl, sail_step_ni_step
+    | by eapply PFInstr, sail_step_ni_step ].
 Qed.
 
 Lemma lookup_insert_at (l : list (wpagent psail)) (i : agent) a b :
@@ -359,10 +417,13 @@ Proof.
   intros (l & Hstep & _ & _) Hlk.
   destruct Hstep as
     [cfg ag0 st' dd H0 Hps
-    |cfg ag0 aq lat base tvs st' dd H0 Hps Hr
-    |cfg ag0 rl base data kk st' dd H0 Hps Hne Hkc
-    |cfg ag0 aq rl base tvs data kk st' dd H0 Hps Hne Hlen Hr He Hkc
-    |cfg ag0 pr pw sr sw st' dd H0 Hps|cfg ag0 st' dd H0 Hps];
+    |cfg ag0 aq lat base tvs asrc st' dd H0 Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk st' dd H0 Hps Hne Hkc
+    |cfg ag0 aq rl base tvs data asrc vsrc kk st' dd
+         H0 Hps Hne Hlen Hr He Hkc
+    |cfg ag0 pr pw sr sw st' dd H0 Hps|cfg ag0 st' dd H0 Hps
+    |cfg ag0 rdw wsrc st' dd H0 Hps|cfg ag0 csrc st' dd H0 Hps
+    |cfg ag0 st' dd H0 Hps];
     simpl in Hlk; rewrite Hlk in H0; injection H0 as <-;
     (eexists; (split;
       [ by eapply lookup_insert_at, Hlk
@@ -636,23 +697,27 @@ Section peel.
           c' = WPCfgU (pc_img c) (pc_log c)
                  (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags c)))
      ∨ (∃ aq lat base tvs st',
-          sail_step_ni next (pa_st ag) (WeakPromise.LLoad aq lat base tvs) st' ∧
+          sail_step_ni next (pa_st ag) (WeakPromise.LLoad aq lat base tvs [])
+            st' ∧
           read_ok (pc_img c) (pc_log c) (pa_ws ag) aq lat base tvs ∧
           c' = WPCfgU (pc_img c) (pc_log c)
                  (<[i := WPAgent st' (load_post_run (pa_ws ag) aq base tvs.*1)
                            (pa_prom ag)]> (pc_ags c)))
      ∨ (∃ rl base data st',
-          sail_step_ni next (pa_st ag) (WeakPromise.LStore rl base data) st' ∧
+          sail_step_ni next (pa_st ag) (WeakPromise.LStore rl base data [] [])
+            st' ∧
           data ≠ [] ∧
           c' = WPCfgU (pc_img c)
                  (pc_log c ++ [WMsg base data (Some i)
-                                 (lbl_class (WeakPromise.LStore rl base data)
+                                 (lbl_class
+                                    (WeakPromise.LStore rl base data [] [])
                                     (pa_ws ag))])
                  (<[i := WPAgent st'
                            (store_post_run (pa_ws ag) rl base (length data)
                               (S (length (pc_log c)))) (pa_prom ag)]> (pc_ags c)))
      ∨ (∃ aq rl base tvs data st',
-          sail_step_ni next (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) st' ∧
+          sail_step_ni next (pa_st ag)
+            (WeakPromise.LRmw aq rl base tvs data [] []) st' ∧
           data ≠ [] ∧ length tvs = length data ∧
           read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs ∧
           excl_ok (pc_log c) i base tvs (S (length (pc_log c))) ∧
@@ -672,19 +737,33 @@ Section peel.
     intros (l & Hstep & Hcls & Hrmw).
     destruct Hstep as
       [cfg ag st' dd Hlk Hps
-      |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-      |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
-      |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps]; destruct dd.
+      |cfg ag aq lat base tvs asrc st' dd Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk st' dd Hlk Hps Hne Hkc
+      |cfg ag aq rl base tvs data asrc vsrc kk st' dd
+           Hlk Hps Hne Hlen Hr He Hkc
+      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
+      |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
+      |cfg ag st' dd Hlk Hps]; destruct dd.
     - exists ag. split; [done|]. left. by exists st'.
-    - exists ag. split; [done|]. right; left. by exists aq, lat, base, tvs, st'.
+    - exists ag. split; [done|]. right; left.
+      pose proof (sail_step_ni_asrc_nil next (pa_st ag) _ _ _ _ _ _ Hps) as ->.
+      rewrite srcs_view_nil load_post_run_d_0.
+      by exists aq, lat, base, tvs, st'.
     - exists ag. split; [done|]. right; right; left.
-      have Hk : kk = lbl_class (WeakPromise.LStore rl base data) (pa_ws ag).
+      destruct (sail_step_ni_store_nil next (pa_st ag) _ _ _ _ _ _ Hps)
+        as [-> ->].
+      have Hk : kk = lbl_class (WeakPromise.LStore rl base data [] [])
+                       (pa_ws ag).
       { exact (Hcls ag (WMsg base data (Some i) kk) Hlk eq_refl). }
+      rewrite !srcs_view_nil store_post_run_d_0.
       exists rl, base, data, st'. split_and!; [done|done|]. by rewrite -Hk.
     - exists ag. split; [done|]. right; right; right; left.
-      have Hk : kk = lbl_class (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag).
+      destruct (sail_step_ni_rmw_nil next (pa_st ag) _ _ _ _ _ _ _ _ Hps)
+        as [-> ->].
+      have Hk : kk = lbl_class (WeakPromise.LRmw aq rl base tvs data [] [])
+                       (pa_ws ag).
       { exact (Hcls ag (WMsg base data (Some i) kk) Hlk eq_refl). }
+      rewrite !srcs_view_nil load_post_run_d_0 store_post_run_d_0.
       exists aq, rl, base, tvs, data, st'. split_and!; [done|done|done| |done|].
       + exact (Hrmw ag Hlk).
       + by rewrite Hk.
@@ -692,6 +771,10 @@ Section peel.
       by exists pr, pw, sr, sw, st'.
     - (* dev: unreachable — this LTS never emits the fabric marker *)
       by destruct (sail_step_ni_not_dev next (pa_st ag) st' Hps).
+    - (* the three dependency-only labels are unreachable too *)
+      by pose proof (sail_step_ni_dep_free next (pa_st ag) _ st' Hps).
+    - by destruct (sail_step_ni_dep_free next (pa_st ag) _ st' Hps).
+    - by destruct (sail_step_ni_dep_free next (pa_st ag) _ st' Hps).
   Qed.
 
   (** In the block ⟹ the run has not stopped: peel the first step. *)
@@ -1055,7 +1138,8 @@ Section unbracket.
           have Hcls : lbl_class (WeakPromise.LStore
                         (ak_sync (classify (Interface.WriteReq.access_kind req)))
                         (pa_z (Interface.WriteReq.pa req))
-                        (wbytes nn (Interface.WriteReq.value req))) (wm_ws s)
+                        (wbytes nn (Interface.WriteReq.value req)) [] [])
+                        (wm_ws s)
                       = wm_class_of
                           (classify (Interface.WriteReq.access_kind req)) (wm_ws s).
           { symmetry. by rewrite /wm_class_of /lbl_class Hnlat. }

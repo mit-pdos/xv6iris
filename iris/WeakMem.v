@@ -31,6 +31,34 @@ Local Open Scope Z_scope.
 (** Agents (harts, DMA engines).  Abstract in the spike. *)
 Notation agent := nat.
 
+(** REGISTERS.  Abstract exactly as [agent] is: nothing below inspects a
+    register name, it is only a [gmap] key ([w_regv]), so the event
+    language may instantiate it at whatever names its [RegWrite] nodes
+    carry (D2, deps design §2.1).  Only GPRs ever acquire a nonzero view,
+    by construction of the label vocabulary (deviation D-4).
+
+    ONLY PARSING, so that [nat] keeps printing as [agent] (the pre-existing
+    notation) rather than flipping to [wreg] in every goal.
+
+    IT IS SPELLED [wreg], NOT [register]: [Riscv.rv64d_types] exports its own
+    [register] type, and a [Notation register := nat] here would shadow it in
+    every Sail-importing consumer ([WeakInterp]'s [register_lookup] was the
+    first casualty). *)
+Notation wreg := nat (only parsing).
+
+(** THE DEPENDENCY SOURCE VOCABULARY (deps design §2.2).  A label names its
+    dependency SOURCES; the MACHINE looks the views up.  [pstep] therefore
+    stays VIEW-BLIND: it emits names, never timestamps, which is what keeps
+    [ts_oblivious]/[pcls_obl]/[lat_free_prog]/[pdev_ok] unaffected in shape.
+
+      [DReg r] — a general-purpose register (PARM's [rmap] entry);
+      [DLdRes]  — THIS INSTRUCTION'S LOAD RESULT (PARM's [res] of
+                  [step_load], banked in [w_ldv] and reset by [LInstr]). *)
+Inductive dsrc := DReg (r : wreg) | DLdRes.
+
+Global Instance dsrc_eq_dec : EqDecision dsrc.
+Proof. solve_decision. Defined.
+
 (** The era-initial image is a PARTIAL FUNCTION on [Z], not a [gmap Z _].
     M1's interpreter ([WeakInterp.v]) keeps the image in the tree's own
     [gmap Arch.pa (bv 8)] form and converts at the seam ([WeakInterp.img_z]),
@@ -329,30 +357,84 @@ Record wstate := WState {
                 it is deliberately absent from [ws_le]. *)
   w_pub   : nat;
   w_relp  : bool;
+  (* THE THREE DEPENDENCY COMPONENTS (D2, deps design §2.1).  Machine-owned
+     timestamps computed from the labels' NAMES, exactly like [w_vwNew] —
+     [ts_oblivious]-safe, because no label carries any of them.
+
+     [w_regv] — PARM's [rmap] views: the view of each register.  It is
+                ASSIGNED by [regw_post] (PARM's [step_assign] overwrites
+                [rmap[lhs]]), so it is NOT monotone and is deliberately
+                absent from [ws_le] — see the note there.
+     [w_vcap] — PARM's [vcap]: the control/address-capture view.  Only ever
+                JOINED, so it IS monotone and IS in [ws_le].
+     [w_ldv]  — the post-view of the current instruction's most recent load
+                (PARM's [res] view).  RESET by [instr_post] ([LInstr]), so
+                like [w_relp] it is not monotone and stays out of [ws_le]. *)
+  w_regv  : gmap wreg nat;
+  w_vcap  : nat;
+  w_ldv   : nat;
 }.
 Add Printing Constructor wstate.
 
 (** Coherence lookup with default 0. *)
 Definition coh (ws : wstate) (a : Z) : nat := default 0%nat (w_coh ws !! a).
 
+(** Register-view lookup with default 0 — the TOTAL accessor every rule
+    below uses ([w_regv] is a [gmap] so that [ws_init] is [∅]). *)
+Definition regv (ws : wstate) (r : wreg) : nat :=
+  default 0%nat (w_regv ws !! r).
+
+(** THE VIEW OF A DEPENDENCY SOURCE, and of a source LIST — PARM's
+    [sem_expr], whose view is the join of the views of the registers the
+    expression reads (deps design §2.3', row [step_assign]/[sem_expr]). *)
+Definition dsrc_view (ws : wstate) (s : dsrc) : nat :=
+  match s with DReg r => regv ws r | DLdRes => w_ldv ws end.
+
+Definition srcs_view (ws : wstate) (srcs : list dsrc) : nat :=
+  foldr (λ s v, Nat.max (dsrc_view ws s) v) 0%nat srcs.
+
+(** THE INSTANCE FACT.  A label with no operands has view [0] — and it holds
+    BY CONVERSION, which is what lets the D2 event language (whose labels all
+    carry [asrc = dsrc = []]) reuse every dependency-free step function
+    verbatim: [foo_d ws … (srcs_view ws []) … = foo ws …] by [reflexivity]. *)
+Lemma srcs_view_nil ws : srcs_view ws [] = 0%nat.
+Proof. done. Qed.
+
+Lemma srcs_view_cons ws s l :
+  srcs_view ws (s :: l) = Nat.max (dsrc_view ws s) (srcs_view ws l).
+Proof. done. Qed.
+
 Definition ws_init : wstate :=
   {| w_coh := ∅; w_vrOld := 0; w_vwOld := 0; w_vrNew := 0; w_vwNew := 0;
-     w_vRel := 0; w_fwd := ∅; w_pub := 0; w_relp := false |}.
+     w_vRel := 0; w_fwd := ∅; w_pub := 0; w_relp := false;
+     w_regv := ∅; w_vcap := 0; w_ldv := 0 |}.
+
+Lemma regv_init r : regv ws_init r = 0%nat.
+Proof. rewrite /regv /ws_init /= lookup_empty //. Qed.
+
+Lemma srcs_view_init l : srcs_view ws_init l = 0%nat.
+Proof.
+  induction l as [|s l IH]; [done|].
+  rewrite srcs_view_cons IH Nat.max_0_r.
+  destruct s as [r|]; [|done]. rewrite /dsrc_view regv_init //.
+Qed.
 
 Lemma coh_init a : coh ws_init a = 0%nat.
 Proof. done. Qed.
 
-Lemma coh_upd_eq m vrO vwO vrN vwN vR fwd pb rp a n :
+Lemma coh_upd_eq m vrO vwO vrN vwN vR fwd pb rp rg vc ld a n :
   coh {| w_coh := <[a := n]> m; w_vrOld := vrO; w_vwOld := vwO;
          w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
-         w_pub := pb; w_relp := rp |} a = n.
+         w_pub := pb; w_relp := rp;
+         w_regv := rg; w_vcap := vc; w_ldv := ld |} a = n.
 Proof. rewrite /coh /= lookup_insert //. Qed.
 
-Lemma coh_upd_ne m vrO vwO vrN vwN vR fwd pb rp a a' n :
+Lemma coh_upd_ne m vrO vwO vrN vwN vR fwd pb rp rg vc ld a a' n :
   a' ≠ a →
   coh {| w_coh := <[a := n]> m; w_vrOld := vrO; w_vwOld := vwO;
          w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
-         w_pub := pb; w_relp := rp |} a'
+         w_pub := pb; w_relp := rp;
+         w_regv := rg; w_vcap := vc; w_ldv := ld |} a'
   = default 0%nat (m !! a').
 Proof. intros ?. rewrite /coh /= lookup_insert_ne //. Qed.
 
@@ -552,6 +634,26 @@ Qed.
 Definition load_vpre (ws : wstate) (aq : bool) : nat :=
   Nat.max (w_vrNew ws) (if aq then w_vRel ws else 0%nat).
 
+(** PARM's full read [view_pre] (Promising.v:841):
+    [view(addr) ⊔ vrn ⊔ (ord ≥ acquire ? vrel)].  [vaddr] is the ADDRESS
+    dependency view [V(asrc)], supplied by the machine's read arm from the
+    label's operand names.
+
+    THE ARGUMENT IS FIRST INSIDE THE [Nat.max] ON PURPOSE: [Nat.max 0 x]
+    reduces to [x] by [iota], so [load_vpre_d ws aq 0 ≡ load_vpre ws aq] BY
+    CONVERSION.  Every [_d] function below follows the same discipline, which
+    is what makes the dependency-free names honest INSTANCES (and not merely
+    propositionally equal copies) — see [srcs_view_nil]. *)
+Definition load_vpre_d (ws : wstate) (aq : bool) (vaddr : nat) : nat :=
+  Nat.max vaddr (load_vpre ws aq).
+
+Lemma load_vpre_d_0 ws aq : load_vpre_d ws aq 0%nat = load_vpre ws aq.
+Proof. done. Qed.
+
+Lemma load_vpre_load_vpre_d ws aq vaddr :
+  (load_vpre ws aq ≤ load_vpre_d ws aq vaddr)%nat.
+Proof. rewrite /load_vpre_d. lia. Qed.
+
 (** THE FORWARD BANK, wired into the read view at M1 (design doc, Decision 3).
 
     A load that reads the timestamp the agent's own last store to [a] left in
@@ -574,16 +676,23 @@ Definition load_vpre (ws : wstate) (aq : bool) : nat :=
     forwarded read is the one place where the model deliberately declines to
     inherit ordering, and [0] is exactly PARM's dependency-free value.
 
-    Two notes on faithfulness to Promising-ARM's [read_view], which this
-    mirrors:
-    - Forwarding is DISABLED for an acquire load ([if aq then t]).  PARM does
-      the same: an acquire may not take the weaker forwarded view.  This is
-      the arm the kernel's [amoswap.w.aq] takes, so the kernel's acquires are
-      never forwarded.
-    - PARM additionally disables forwarding for an EXCLUSIVE read.  We do not,
-      which makes this machine weaker (more behaviours) — the sound direction
-      for adequacy; and since every exclusive read the kernel issues carries
-      [.aq], the arm above already covers it. *)
+    FAITHFULNESS TO PROMISING-ARM'S [read_view] — CORRECTED BY THE D2 D-5
+    AUDIT (deps design §2.3' D-5b).  PARM's [FwdItem.read_view]
+    (Promising.v:529) takes the banked view iff
+    [fwd.ts = t ∧ ¬(fwd.ex ∧ (arch = riscv ∨ ord ≥ acquire_pc))], which AT
+    [arch = riscv] is [fwd.ts = t ∧ ¬fwd.ex]: the READ ORDER plays NO role,
+    and what disables forwarding is that the BANKED STORE was the write half
+    of an exclusive.  Ours tests [aq] instead and records no [ex], so it
+    deviates in BOTH directions:
+    - STRONGER on an acquire load that would have forwarded a PLAIN store
+      (the banked view is below the banked timestamp — the store's own EXT —
+      so taking [t] raises the post-view);
+    - WEAKER on any load forwarding an EXCLUSIVE store.
+    Both are vacuous for xv6, whose only acquires are [amoswap.w.aq] (an
+    exclusive read, which would have to forward its own earlier exclusive
+    store).  Making the rule faithful means an [ex] flag in [w_fwd]'s payload
+    and dropping the [aq] test; D2 deliberately does neither, and the earlier
+    header claim that "PARM does the same" is retracted here. *)
 Definition fwd_view (ws : wstate) (aq : bool) (a : Z) (t : nat) : nat :=
   if aq then t
   else match w_fwd ws !! a with
@@ -614,6 +723,13 @@ Qed.
     forwarding weakens ordering, never coherence).  That split is what keeps
     every [coh] fact of the spike literally true while the vrOld/vrNew floors
     become forwarding-sensitive. *)
+(** THE PER-BYTE READ UPDATE.  It is UNCHANGED by D2 except for [w_ldv]:
+    the ADDRESS dependency view enters a load only through its PRE-VIEW
+    ([load_vpre_d], threaded by [load_post_bytes_d]) and through [w_vcap]
+    (raised once, by the run-level wrapper [load_post_run_d]) — never
+    per byte.  Keeping [vaddr] OUT of this function is what lets every
+    generic fold lemma below, all of which quantify over an arbitrary
+    [vpre], serve the dependency-carrying machine verbatim. *)
 Definition load_post_at (ws : wstate) (aq : bool) (vpre : nat) (a : Z) (t : nat)
     : wstate :=
   let vpost := Nat.max vpre (fwd_view ws aq a t) in
@@ -625,7 +741,15 @@ Definition load_post_at (ws : wstate) (aq : bool) (vpre : nat) (a : Z) (t : nat)
      w_vRel  := w_vRel ws;
      w_fwd   := w_fwd ws;
      w_pub   := w_pub ws;
-     w_relp  := w_relp ws |}.
+     w_relp  := w_relp ws;
+     w_regv  := w_regv ws;
+     w_vcap  := w_vcap ws;
+     (* PARM: [res := (val, view_post)] ([Local.read]'s [RES]).  JOINED, not
+        assigned, so that a MULTI-BYTE load (deviation D-1) banks the MAX
+        post-view over its bytes; [instr_post] ([LInstr]) resets it at every
+        instruction start, so nothing accumulates across instructions, and
+        [ldv_of] below computes it from a zeroed bank for the RMW. *)
+     w_ldv   := Nat.max (w_ldv ws) vpost |}.
 
 Definition load_post (ws : wstate) (aq : bool) (a : Z) (t : nat) : wstate :=
   load_post_at ws aq (load_vpre ws aq) a t.
@@ -642,7 +766,14 @@ Definition load_post (ws : wstate) (aq : bool) (a : Z) (t : nat) : wstate :=
     [w_pub] alone.  With [rl] the later bytes redo [Nat.max _ t], which is
     idempotent.  Net effect over a whole access: exactly one raise to [t] iff
     the access publishes — which is what [published p := S p ≤ w_pub] needs. *)
-Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
+(** THE PER-BYTE WRITE UPDATE, dependency-carrying.  [vf] is the view the
+    FORWARD BANK records — PARM's [FwdItem.mk ts (join view_loc view_val) ex]
+    (Promising.v:909), i.e. [V(asrc) ⊔ V(dsrc)]; deviation D-7 fixed the [0]
+    that stood here while the machine had no register views.  [w_vcap] is NOT
+    raised here: PARM raises it once per access ([vcap ⊔= view_loc]), which is
+    what the run-level wrapper [store_post_run_d] does. *)
+Definition store_post_d (ws : wstate) (rl : bool) (vf : nat)
+    (a : Z) (t : nat) : wstate :=
   {| w_coh   := <[a := Nat.max (coh ws a) t]> (w_coh ws);
      w_vrOld := w_vrOld ws;
      w_vwOld := Nat.max (w_vwOld ws) t;
@@ -656,10 +787,32 @@ Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
         It is deliberately NOT [w_vwNew ws] (the store's fence floor): that
         was the M1 choice and it is LARGER than PARM's, i.e. it REMOVES
         hardware behaviours (design doc deps §2.3′ D-7, fixed 2026-08-17). *)
+     w_fwd   := <[a := (t, vf)]> (w_fwd ws);
+     w_pub   := if (w_relp ws || rl)%bool then Nat.max (w_pub ws) t
+                else w_pub ws;
+     w_relp  := false;
+     w_regv  := w_regv ws;
+     w_vcap  := w_vcap ws;
+     w_ldv   := w_ldv ws |}.
+
+Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
+  {| w_coh   := <[a := Nat.max (coh ws a) t]> (w_coh ws);
+     w_vrOld := w_vrOld ws;
+     w_vwOld := Nat.max (w_vwOld ws) t;
+     w_vrNew := w_vrNew ws;
+     w_vwNew := w_vwNew ws;
+     w_vRel  := if rl then Nat.max (w_vRel ws) t else w_vRel ws;
      w_fwd   := <[a := (t, 0%nat)]> (w_fwd ws);
      w_pub   := if (w_relp ws || rl)%bool then Nat.max (w_pub ws) t
                 else w_pub ws;
-     w_relp  := false |}.
+     w_relp  := false;
+     w_regv  := w_regv ws;
+     w_vcap  := w_vcap ws;
+     w_ldv   := w_ldv ws |}.
+
+Lemma store_post_d_0 ws rl a t :
+  store_post_d ws rl 0%nat a t = store_post ws rl a t.
+Proof. done. Qed.
 
 (** FENCE pred,succ.  [pr]/[pw] are R/W ∈ pred; [sr]/[sw] are R/W ∈ succ.
     [fence.tso] = [fence r,r ; fence rw,w]. *)
@@ -676,43 +829,175 @@ Definition fence_post (ws : wstate) (pr pw sr sw : bool) : wstate :=
      w_pub   := w_pub ws;
      (* M6, inert: a [pw ∧ sw] fence ([fence rw,w]) ARMS the next store as the
         publication of everything it covers. *)
-     w_relp  := if (pw && sw)%bool then true else w_relp ws |}.
+     w_relp  := if (pw && sw)%bool then true else w_relp ws;
+     (* PARM's [Local.dmb] touches neither [rmap] nor [vcap]; [isb]
+        ([vrn ⊔= vcap]) has no RISC-V counterpart (deps design §2.3'). *)
+     w_regv  := w_regv ws;
+     w_vcap  := w_vcap ws;
+     w_ldv   := w_ldv ws |}.
+
+(* ------------------------------------------------------------------ *)
+(** ** The three DEPENDENCY-ONLY label effects (deps design §2.3)
+
+    None of them touches memory, the log or any memory view: they only move
+    the register/control/load-result bookkeeping, so every machine's arm for
+    them is [LSilent]'s arm with a different [wstate] update. *)
+
+(** [LRegW rd srcs]: PARM's [step_assign] — [rmap[lhs] := (val, view of the
+    expression)].  An ASSIGNMENT, not a join: a register that is overwritten
+    with a dependency-free value LOSES its view.  (This is why [w_regv] is
+    not in [ws_le]; see the note there.) *)
+Definition regw_post (ws : wstate) (rd : wreg) (v : nat) : wstate :=
+  {| w_coh   := w_coh ws;
+     w_vrOld := w_vrOld ws; w_vwOld := w_vwOld ws;
+     w_vrNew := w_vrNew ws; w_vwNew := w_vwNew ws;
+     w_vRel  := w_vRel ws;  w_fwd   := w_fwd ws;
+     w_pub   := w_pub ws;   w_relp  := w_relp ws;
+     w_regv  := <[rd := v]> (w_regv ws);
+     w_vcap  := w_vcap ws;  w_ldv   := w_ldv ws |}.
+
+(** [LCtrl srcs]: PARM's [Local.control] — [vcap ⊔= ctrl]. *)
+Definition ctrl_post (ws : wstate) (v : nat) : wstate :=
+  {| w_coh   := w_coh ws;
+     w_vrOld := w_vrOld ws; w_vwOld := w_vwOld ws;
+     w_vrNew := w_vrNew ws; w_vwNew := w_vwNew ws;
+     w_vRel  := w_vRel ws;  w_fwd   := w_fwd ws;
+     w_pub   := w_pub ws;   w_relp  := w_relp ws;
+     w_regv  := w_regv ws;
+     w_vcap  := Nat.max v (w_vcap ws);
+     w_ldv   := w_ldv ws |}.
+
+(** [LInstr]: instruction start.  Resets the load-result bank, which is what
+    scopes [DLdRes] to ONE instruction. *)
+Definition instr_post (ws : wstate) : wstate :=
+  {| w_coh   := w_coh ws;
+     w_vrOld := w_vrOld ws; w_vwOld := w_vwOld ws;
+     w_vrNew := w_vrNew ws; w_vwNew := w_vwNew ws;
+     w_vRel  := w_vRel ws;  w_fwd   := w_fwd ws;
+     w_pub   := w_pub ws;   w_relp  := w_relp ws;
+     w_regv  := w_regv ws;  w_vcap  := w_vcap ws;
+     w_ldv   := 0%nat |}.
+
+Lemma regv_regw_post_eq ws rd v : regv (regw_post ws rd v) rd = v.
+Proof. rewrite /regv /regw_post /= lookup_insert //. Qed.
+
+Lemma regv_regw_post_ne ws rd v r : r ≠ rd → regv (regw_post ws rd v) r = regv ws r.
+Proof. intros ?. rewrite /regv /regw_post /= lookup_insert_ne //. Qed.
 
 (** Multi-byte accesses are per-byte folds.  [vpre] is computed once from the
     PRE-load state, which is why [load_post_at] takes it explicitly: folding
     [load_post] itself would let an acquire load's own [vrNew] update raise the
     pre-view of its later bytes. *)
+Definition load_post_bytes_d (ws : wstate) (aq : bool) (vaddr : nat)
+    (ats : list (Z * nat)) : wstate :=
+  foldl (λ w at_, load_post_at w aq (load_vpre_d ws aq vaddr) at_.1 at_.2)
+        ws ats.
+
 Definition load_post_bytes (ws : wstate) (aq : bool) (ats : list (Z * nat))
     : wstate :=
   foldl (λ w at_, load_post_at w aq (load_vpre ws aq) at_.1 at_.2) ws ats.
+
+Lemma load_post_bytes_d_0 ws aq ats :
+  load_post_bytes_d ws aq 0%nat ats = load_post_bytes ws aq ats.
+Proof. done. Qed.
+
+Definition store_post_bytes_d (ws : wstate) (rl : bool) (vf : nat)
+    (as_ : list Z) (t : nat) : wstate :=
+  foldl (λ w a, store_post_d w rl vf a t) ws as_.
 
 Definition store_post_bytes (ws : wstate) (rl : bool) (as_ : list Z) (t : nat)
     : wstate :=
   foldl (λ w a, store_post w rl a t) ws as_.
 
+Lemma store_post_bytes_d_0 ws rl as_ t :
+  store_post_bytes_d ws rl 0%nat as_ t = store_post_bytes ws rl as_ t.
+Proof. done. Qed.
+
 (** The CONTIGUOUS instances the interpreter uses: byte [j] of an access whose
     base byte address is [base] lives at [base + j] (see [WeakInterp.acc_addr]
     for why the seam is spelled additively rather than through the model's own
     [pa_add]). *)
+Definition load_run_ats (base : Z) (ts : list nat) : list (Z * nat) :=
+  zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts.
+
+(** THE RUN-LEVEL READ.  [ctrl_post … vaddr] is PARM's [vcap ⊔= view(addr)],
+    applied ONCE per access rather than per byte (per-byte would be the same
+    join, but hoisting it keeps every per-byte lemma dependency-free). *)
+Definition load_post_run_d (ws : wstate) (aq : bool) (vaddr : nat) (base : Z)
+    (ts : list nat) : wstate :=
+  ctrl_post (load_post_bytes_d ws aq vaddr (load_run_ats base ts)) vaddr.
+
 Definition load_post_run (ws : wstate) (aq : bool) (base : Z) (ts : list nat)
     : wstate :=
   load_post_bytes ws aq
     (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts).
 
+Definition store_run_as (base : Z) (n : nat) : list Z :=
+  map (λ j : nat, base + Z.of_nat j) (seq 0 n).
+
+Definition store_post_run_d (ws : wstate) (rl : bool) (vaddr vdata : nat)
+    (base : Z) (n : nat) (t : nat) : wstate :=
+  ctrl_post
+    (store_post_bytes_d ws rl (Nat.max vaddr vdata) (store_run_as base n) t)
+    vaddr.
+
 Definition store_post_run (ws : wstate) (rl : bool) (base : Z) (n : nat)
     (t : nat) : wstate :=
   store_post_bytes ws rl (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t.
+
+(** The dependency-free names ARE the [_d] functions at operand view [0].
+    At the BYTE level this is conversion; at the RUN level the wrapper's
+    [ctrl_post _ 0] has to be peeled by [ctrl_post_0] (a record eta, hence
+    propositional and not definitional). *)
+Lemma ctrl_post_0 ws : ctrl_post ws 0%nat = ws.
+Proof. by destruct ws. Qed.
+
+Lemma load_post_run_d_0 ws aq base ts :
+  load_post_run_d ws aq 0%nat base ts = load_post_run ws aq base ts.
+Proof. rewrite /load_post_run_d ctrl_post_0 //. Qed.
+
+Lemma store_post_run_d_0 ws rl base n t :
+  store_post_run_d ws rl 0%nat 0%nat base n t = store_post_run ws rl base n t.
+Proof. rewrite /store_post_run_d ctrl_post_0 //. Qed.
+
+(** THE EXCLUSIVE-BANK VIEW (PARM's [Exbank.view], deviation D-2): the read
+    half's own [view_post], i.e. the max post-view over the bytes of a load
+    run — computed FROM A ZEROED [w_ldv] so that it is exactly this access's
+    result view and not a join with whatever the instruction loaded before. *)
+Definition ws_ldv0 (ws : wstate) : wstate := instr_post ws.
+
+Definition ldv_of (ws : wstate) (aq : bool) (vaddr : nat) (base : Z)
+    (ts : list nat) : nat :=
+  w_ldv (load_post_run_d (ws_ldv0 ws) aq vaddr base ts).
 
 (* ------------------------------------------------------------------ *)
 (** ** Monotonicity: every step function only raises views *)
 
 (** NOTE [w_relp] is NOT ordered: it TOGGLES (set by a fence, cleared by the
-    next store), so there is no conjunct for it.  [w_pub] only ever grows. *)
+    next store), so there is no conjunct for it.  [w_pub] only ever grows.
+
+    THE D2 FINDING (deps design §2.1, correcting the stage brief).  TWO of
+    the three new components are NOT monotone either, so they get no conjunct:
+
+      - [w_ldv] is RESET by [instr_post] ([LInstr], every instruction start);
+      - [w_regv] is ASSIGNED by [regw_post] ([LRegW rd srcs]) — PARM's
+        [step_assign] OVERWRITES [rmap[lhs]], so a register loaded from a
+        dependency-free expression LOSES the view it had.  A pointwise-[≤]
+        conjunct for [w_regv] would therefore be FALSE of the machine: the
+        program [r1 := ld x; r1 := 0] lowers [regv _ r1] from the load's
+        post-view to [0].  Monotonicity of the register views is not merely
+        unproven, it is refuted, and the stage brief's "regv-pointwise"
+        conjunct is dropped for that reason.
+
+    [w_vcap] IS monotone (both [load_post_at_d] and [store_post_d] JOIN into
+    it, and [ctrl_post] joins) and it IS a memory-ordering floor — it enters
+    [WeakPromise.fulfil_vpre] — so it is the one new conjunct. *)
 Definition ws_le (w1 w2 : wstate) : Prop :=
   (∀ a, (coh w1 a ≤ coh w2 a)%nat) ∧
   (w_vrOld w1 ≤ w_vrOld w2)%nat ∧ (w_vwOld w1 ≤ w_vwOld w2)%nat ∧
   (w_vrNew w1 ≤ w_vrNew w2)%nat ∧ (w_vwNew w1 ≤ w_vwNew w2)%nat ∧
-  (w_vRel  w1 ≤ w_vRel  w2)%nat ∧ (w_pub w1 ≤ w_pub w2)%nat.
+  (w_vRel  w1 ≤ w_vRel  w2)%nat ∧ (w_pub w1 ≤ w_pub w2)%nat ∧
+  (w_vcap  w1 ≤ w_vcap  w2)%nat.
 
 Global Instance ws_le_refl : Reflexive ws_le.
 Proof. intros w. rewrite /ws_le. split_and!; auto with lia. Qed.
@@ -743,8 +1028,11 @@ Proof. by intros (_ & _ & _ & _ & ? & _). Qed.
 Lemma ws_le_vRel w1 w2 : ws_le w1 w2 → (w_vRel w1 ≤ w_vRel w2)%nat.
 Proof. by intros (_ & _ & _ & _ & _ & ? & _). Qed.
 
+Lemma ws_le_vcap w1 w2 : ws_le w1 w2 → (w_vcap w1 ≤ w_vcap w2)%nat.
+Proof. by intros (_ & _ & _ & _ & _ & _ & _ & ?). Qed.
+
 Lemma ws_le_pub w1 w2 : ws_le w1 w2 → (w_pub w1 ≤ w_pub w2)%nat.
-Proof. by intros (_ & _ & _ & _ & _ & _ & ?). Qed.
+Proof. by intros (_ & _ & _ & _ & _ & _ & ? & _). Qed.
 
 Lemma load_post_at_le ws aq vpre a t : ws_le ws (load_post_at ws aq vpre a t).
 Proof.
@@ -1031,31 +1319,60 @@ Definition ws_bounded (ws : wstate) (n : nat) : Prop :=
   (w_vrNew ws ≤ n)%nat ∧ (w_vwNew ws ≤ n)%nat ∧ (w_vRel ws ≤ n)%nat ∧
   (w_pub ws ≤ n)%nat ∧
   (∀ a, (coh ws a ≤ n)%nat) ∧
-  (∀ a tv, w_fwd ws !! a = Some tv → (tv.1 ≤ n)%nat ∧ (tv.2 ≤ n)%nat).
+  (∀ a tv, w_fwd ws !! a = Some tv → (tv.1 ≤ n)%nat ∧ (tv.2 ≤ n)%nat) ∧
+  (* THE THREE D2 COMPONENTS.  All three ARE bounded (unlike [ws_le], which
+     only takes [w_vcap]): boundedness is about the VALUES being real
+     timestamps, and a reset or an overwrite by a smaller view preserves
+     that.  [w_regv] is bounded through the TOTAL accessor [regv], which is
+     [0] off the map's domain. *)
+  (∀ r, (regv ws r ≤ n)%nat) ∧ (w_vcap ws ≤ n)%nat ∧ (w_ldv ws ≤ n)%nat.
+
+Lemma ws_bounded_vcap ws n : ws_bounded ws n → (w_vcap ws ≤ n)%nat.
+Proof. by intros (_&_&_&_&_&_&_&_&_&?&_). Qed.
+
+Lemma ws_bounded_ldv ws n : ws_bounded ws n → (w_ldv ws ≤ n)%nat.
+Proof. by intros (_&_&_&_&_&_&_&_&_&_&?). Qed.
+
+Lemma ws_bounded_regv ws n r : ws_bounded ws n → (regv ws r ≤ n)%nat.
+Proof. by intros (_&_&_&_&_&_&_&_&H&_). Qed.
+
+(** A source list's view is bounded by any bound on the state — the fact the
+    machine's new arms need at every [srcs_view]. *)
+Lemma srcs_view_bounded ws n l : ws_bounded ws n → (srcs_view ws l ≤ n)%nat.
+Proof.
+  intros Hb. induction l as [|x l IH]; [simpl; lia|].
+  rewrite srcs_view_cons. destruct x as [r|]; simpl.
+  - pose proof (ws_bounded_regv ws n r Hb). lia.
+  - pose proof (ws_bounded_ldv ws n Hb). lia.
+Qed.
 
 Lemma ws_bounded_init n : ws_bounded ws_init n.
 Proof.
   rewrite /ws_bounded. split_and!; try (simpl; lia).
   - intros a. rewrite coh_init. lia.
   - intros a tv. rewrite /ws_init /= lookup_empty. done.
+  - intros r. rewrite regv_init. lia.
 Qed.
 
 Lemma ws_bounded_mono ws n n' :
   ws_bounded ws n → (n ≤ n')%nat → ws_bounded ws n'.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd) Hle.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+         Hle.
   rewrite /ws_bounded. split_and!; try lia.
   - intros a. pose proof (Hcoh a). lia.
   - intros a tv Ha. destruct (Hfwd a tv Ha). split; lia.
+  - intros r. move: (Hrg r). rewrite /regv /=. lia.
 Qed.
 
 (** The [coh] half of every preservation proof below: an insert stays bounded
     if the inserted value is. *)
-Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd pb rp a v n :
+Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd pb rp rg vc ld a v n :
   (∀ a', (coh ws a' ≤ n)%nat) → (v ≤ n)%nat →
   ∀ a', (coh {| w_coh := <[a := v]> (w_coh ws); w_vrOld := vrO; w_vwOld := vwO;
                 w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
-                w_pub := pb; w_relp := rp |} a'
+                w_pub := pb; w_relp := rp;
+                w_regv := rg; w_vcap := vc; w_ldv := ld |} a'
          ≤ n)%nat.
 Proof.
   intros Hm Hv a'. destruct (decide (a' = a)) as [->|Hne].
@@ -1065,14 +1382,21 @@ Qed.
 
 Lemma load_vpre_bounded ws aq n : ws_bounded ws n → (load_vpre ws aq ≤ n)%nat.
 Proof.
-  intros (_ & _ & Hrn & _ & Hrel & _ & _ & _).
+  intros (_ & _ & Hrn & _ & Hrel & _ & _ & _ & _).
   rewrite /load_vpre. destruct aq; lia.
+Qed.
+
+Lemma load_vpre_d_bounded ws aq vaddr n :
+  ws_bounded ws n → (vaddr ≤ n)%nat → (load_vpre_d ws aq vaddr ≤ n)%nat.
+Proof.
+  intros Hb Hv. pose proof (load_vpre_bounded ws aq n Hb).
+  rewrite /load_vpre_d. lia.
 Qed.
 
 Lemma fwd_view_bounded ws aq a t n :
   ws_bounded ws n → (t ≤ n)%nat → (fwd_view ws aq a t ≤ n)%nat.
 Proof.
-  intros (_ & _ & _ & _ & _ & _ & _ & Hfwd) Ht. rewrite /fwd_view.
+  intros (_ & _ & _ & _ & _ & _ & _ & Hfwd & _) Ht. rewrite /fwd_view.
   destruct aq; [exact Ht|].
   destruct (w_fwd ws !! a) as [[tf vf]|] eqn:Hf; [|exact Ht].
   case_bool_decide; [|exact Ht].
@@ -1085,19 +1409,22 @@ Lemma load_post_at_bounded ws aq vpre a t n :
 Proof.
   intros Hb Hvp Ht.
   pose proof (fwd_view_bounded ws aq a t n Hb Ht) as Hfv.
-  destruct Hb as (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd).
+  destruct Hb as (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd
+                  & Hrg & Hvc & Hld).
   rewrite /ws_bounded /load_post_at /=.
   split_and!; try (destruct aq; lia).
   - apply coh_upd_bounded; [exact Hcoh|]. pose proof (Hcoh a). lia.
   - exact Hfwd.
+  - exact Hrg.
 Qed.
 
-Lemma store_post_bounded ws rl a t n n' :
-  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
-  ws_bounded (store_post ws rl a t) n'.
+Lemma store_post_d_bounded ws rl vf a t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat → (vf ≤ n')%nat →
+  ws_bounded (store_post_d ws rl vf a t) n'.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd) Ht Hle.
-  rewrite /ws_bounded /store_post /=.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+         Ht Hle Hvf.
+  rewrite /ws_bounded /store_post_d /=.
   split_and!; try (destruct rl, (w_relp ws); simpl; lia).
   - apply coh_upd_bounded.
     + intros a'. pose proof (Hcoh a'). lia.
@@ -1106,16 +1433,65 @@ Proof.
     + rewrite lookup_insert. intros [= <-]. simpl. split; lia.
     + rewrite lookup_insert_ne //. intros Ha'.
       destruct (Hfwd a' tv Ha'). split; lia.
+  - intros r. move: (Hrg r). rewrite /regv /=. lia.
+Qed.
+
+Lemma store_post_bounded ws rl a t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
+  ws_bounded (store_post ws rl a t) n'.
+Proof.
+  intros Hb Ht Hle. rewrite -store_post_d_0.
+  eapply store_post_d_bounded; [exact Hb|done|done|lia].
 Qed.
 
 Lemma fence_post_bounded ws pr pw sr sw n :
   ws_bounded ws n → ws_bounded (fence_post ws pr pw sr sw) n.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd).
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld).
   rewrite /ws_bounded /fence_post /=.
   split_and!; try (destruct pr, pw, sr, sw; simpl; lia).
   - exact Hcoh.
   - exact Hfwd.
+  - exact Hrg.
+Qed.
+
+(** The three dependency-only effects preserve both orders. *)
+Lemma regw_post_le ws rd v : ws_le ws (regw_post ws rd v).
+Proof. rewrite /ws_le /regw_post /=. split_and!; auto with lia. Qed.
+
+Lemma ctrl_post_le ws v : ws_le ws (ctrl_post ws v).
+Proof. rewrite /ws_le /ctrl_post /=. split_and!; auto with lia. Qed.
+
+Lemma instr_post_le ws : ws_le ws (instr_post ws).
+Proof. rewrite /ws_le /instr_post /=. split_and!; auto with lia. Qed.
+
+Lemma regw_post_bounded ws rd v n :
+  ws_bounded ws n → (v ≤ n)%nat → ws_bounded (regw_post ws rd v) n.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+         Hv.
+  rewrite /ws_bounded /regw_post /=. split_and!; try lia.
+  - exact Hcoh.
+  - exact Hfwd.
+  - intros r. rewrite /regv /=. destruct (decide (r = rd)) as [->|Hne].
+    + rewrite lookup_insert //.
+    + rewrite lookup_insert_ne //. apply (Hrg r).
+Qed.
+
+Lemma ctrl_post_bounded ws v n :
+  ws_bounded ws n → (v ≤ n)%nat → ws_bounded (ctrl_post ws v) n.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+         Hv.
+  rewrite /ws_bounded /ctrl_post /=. split_and!; try lia;
+    [exact Hcoh|exact Hfwd|exact Hrg].
+Qed.
+
+Lemma instr_post_bounded ws n : ws_bounded ws n → ws_bounded (instr_post ws) n.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld).
+  rewrite /ws_bounded /instr_post /=. split_and!; try lia;
+    [exact Hcoh|exact Hfwd|exact Hrg].
 Qed.
 
 (** ... and the multi-byte folds the interpreter's read/write arms build. *)
@@ -1584,4 +1960,300 @@ Proof.
   apply maxcl_max; [done| |].
   - destruct pr; [by apply Hro|by apply maxcl_0].
   - destruct pw; [by apply Hwo|by apply maxcl_0].
+Qed.
+
+(* ================================================================== *)
+(** ** THE DEPENDENCY-CARRYING RUN FACTS (D2)
+
+    Everything the machines ([WeakPromise.wpstep],
+    [WeakPromiseBridge.wp_pf_step]) and the replay need about the [_d]
+    step functions.  The load side is nearly free: [vaddr] enters
+    [load_post_bytes_d] only through the PRE-VIEW, and every per-byte fold
+    lemma above already quantifies over an arbitrary [vpre]; only the
+    run-level [ctrl_post] wrapper is new.  The store side needs the fold
+    lemmas restated at [store_post_d], because the banked forward view sits
+    INSIDE the fold. *)
+
+(** *** [ctrl_post] is transparent to everything but [w_vcap] *)
+
+Lemma ctrl_post_coh ws v a : coh (ctrl_post ws v) a = coh ws a.
+Proof. done. Qed.
+Lemma ctrl_post_vrOld ws v : w_vrOld (ctrl_post ws v) = w_vrOld ws.
+Proof. done. Qed.
+Lemma ctrl_post_vwOld ws v : w_vwOld (ctrl_post ws v) = w_vwOld ws.
+Proof. done. Qed.
+Lemma ctrl_post_vrNew ws v : w_vrNew (ctrl_post ws v) = w_vrNew ws.
+Proof. done. Qed.
+Lemma ctrl_post_vwNew ws v : w_vwNew (ctrl_post ws v) = w_vwNew ws.
+Proof. done. Qed.
+Lemma ctrl_post_vRel ws v : w_vRel (ctrl_post ws v) = w_vRel ws.
+Proof. done. Qed.
+Lemma ctrl_post_fwd ws v : w_fwd (ctrl_post ws v) = w_fwd ws.
+Proof. done. Qed.
+Lemma ctrl_post_pub ws v : w_pub (ctrl_post ws v) = w_pub ws.
+Proof. done. Qed.
+Lemma ctrl_post_relp ws v : w_relp (ctrl_post ws v) = w_relp ws.
+Proof. done. Qed.
+Lemma ctrl_post_regv ws v r : regv (ctrl_post ws v) r = regv ws r.
+Proof. done. Qed.
+Lemma ctrl_post_ldv ws v : w_ldv (ctrl_post ws v) = w_ldv ws.
+Proof. done. Qed.
+Lemma ctrl_post_vcap ws v : w_vcap (ctrl_post ws v) = Nat.max v (w_vcap ws).
+Proof. done. Qed.
+
+(** *** The load run *)
+
+Lemma load_post_bytes_d_le ws aq vaddr ats :
+  ws_le ws (load_post_bytes_d ws aq vaddr ats).
+Proof. apply load_post_fold_le. Qed.
+
+Lemma load_post_run_d_le ws aq vaddr base ts :
+  ws_le ws (load_post_run_d ws aq vaddr base ts).
+Proof.
+  rewrite /load_post_run_d. etrans; [apply load_post_bytes_d_le|apply ctrl_post_le].
+Qed.
+
+Lemma load_post_bytes_d_bounded ws aq vaddr ats n :
+  ws_bounded ws n → (vaddr ≤ n)%nat →
+  Forall (λ p : Z * nat, (p.2 ≤ n)%nat) ats →
+  ws_bounded (load_post_bytes_d ws aq vaddr ats) n.
+Proof.
+  intros Hb Hva Hall. apply load_post_fold_bounded; [|exact Hb|exact Hall].
+  by apply load_vpre_d_bounded.
+Qed.
+
+Lemma load_post_run_d_bounded ws aq vaddr base ts n :
+  ws_bounded ws n → (vaddr ≤ n)%nat → Forall (λ t, (t ≤ n)%nat) ts →
+  ws_bounded (load_post_run_d ws aq vaddr base ts) n.
+Proof.
+  intros Hb Hva Hall. rewrite /load_post_run_d.
+  apply ctrl_post_bounded; [|exact Hva].
+  apply load_post_bytes_d_bounded; [exact Hb|exact Hva|].
+  rewrite /load_run_ats Forall_lookup. intros j p Hp.
+  rewrite lookup_zip_with in Hp.
+  destruct (seq 0 (length ts) !! j) as [i|] eqn:Hi; simpl in Hp; [|done].
+  destruct (ts !! j) as [t|] eqn:Ht; simpl in Hp; [|done]. simplify_eq/=.
+  rewrite Forall_lookup in Hall. by eapply Hall.
+Qed.
+
+Lemma load_post_run_d_fwd ws aq vaddr base ts :
+  w_fwd (load_post_run_d ws aq vaddr base ts) = w_fwd ws.
+Proof.
+  rewrite /load_post_run_d ctrl_post_fwd /load_post_bytes_d load_post_fold_fwd //.
+Qed.
+
+Lemma load_post_run_d_relp ws aq vaddr base ts :
+  w_relp (load_post_run_d ws aq vaddr base ts) = w_relp ws.
+Proof.
+  rewrite /load_post_run_d ctrl_post_relp /load_post_bytes_d.
+  generalize (load_run_ats base ts) => l. generalize ws at 2 3 => w.
+  revert w. induction l as [|x l IH]; intros w; [done|by rewrite /= IH].
+Qed.
+
+Lemma load_post_run_d_coh ws aq vaddr base ts (j : nat) t :
+  ts !! j = Some t →
+  (t ≤ coh (load_post_run_d ws aq vaddr base ts) (base + Z.of_nat j))%nat.
+Proof.
+  intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
+  rewrite /load_post_run_d ctrl_post_coh /load_post_bytes_d.
+  apply load_post_fold_coh, elem_of_list_lookup_2 with j.
+  rewrite /load_run_ats lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+Lemma load_post_run_d_vcap ws aq vaddr base ts :
+  (vaddr ≤ w_vcap (load_post_run_d ws aq vaddr base ts))%nat.
+Proof. rewrite /load_post_run_d ctrl_post_vcap. lia. Qed.
+
+(** The RMW's exclusive-bank view is bounded like every other view. *)
+Lemma ws_ldv0_bounded ws n : ws_bounded ws n → ws_bounded (ws_ldv0 ws) n.
+Proof. apply instr_post_bounded. Qed.
+
+Lemma ldv_of_bounded ws aq vaddr base ts n :
+  ws_bounded ws n → (vaddr ≤ n)%nat → Forall (λ t, (t ≤ n)%nat) ts →
+  (ldv_of ws aq vaddr base ts ≤ n)%nat.
+Proof.
+  intros Hb Hva Hall. rewrite /ldv_of.
+  apply ws_bounded_ldv, load_post_run_d_bounded;
+    [by apply ws_ldv0_bounded|exact Hva|exact Hall].
+Qed.
+
+(** *** The store run *)
+
+Lemma store_post_d_le ws rl vf a t : ws_le ws (store_post_d ws rl vf a t).
+Proof.
+  rewrite /ws_le /store_post_d /=.
+  split_and!; try (destruct rl, (w_relp ws); simpl; lia).
+  intros a'. destruct (decide (a' = a)) as [->|Hne].
+  - rewrite coh_upd_eq. lia.
+  - rewrite coh_upd_ne //.
+Qed.
+
+Lemma store_post_fold_d_le rl vf t as_ ws :
+  ws_le ws (foldl (λ w a, store_post_d w rl vf a t) ws as_).
+Proof.
+  revert ws. induction as_ as [|a l IH]; intros ws; [reflexivity|].
+  etrans; [apply store_post_d_le|apply IH].
+Qed.
+
+Lemma store_post_bytes_d_le ws rl vf as_ t :
+  ws_le ws (store_post_bytes_d ws rl vf as_ t).
+Proof. apply store_post_fold_d_le. Qed.
+
+Lemma store_post_run_d_le ws rl vaddr vdata base n t :
+  ws_le ws (store_post_run_d ws rl vaddr vdata base n t).
+Proof.
+  rewrite /store_post_run_d.
+  etrans; [apply store_post_bytes_d_le|apply ctrl_post_le].
+Qed.
+
+Local Lemma store_post_fold_d_bounded rl vf t as_ n' :
+  (vf ≤ n')%nat → (t ≤ n')%nat →
+  ∀ ws, ws_bounded ws n' →
+    ws_bounded (foldl (λ w a, store_post_d w rl vf a t) ws as_) n'.
+Proof.
+  intros Hvf Ht. induction as_ as [|a l IH]; intros ws Hb; [exact Hb|].
+  simpl. apply IH. eapply store_post_d_bounded; [exact Hb|exact Ht|lia|exact Hvf].
+Qed.
+
+Lemma store_post_bytes_d_bounded ws rl vf as_ t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat → (vf ≤ n')%nat →
+  ws_bounded (store_post_bytes_d ws rl vf as_ t) n'.
+Proof.
+  intros Hb Ht Hle Hvf. rewrite /store_post_bytes_d.
+  apply store_post_fold_d_bounded; [exact Hvf|exact Ht|].
+  eapply ws_bounded_mono; [exact Hb|exact Hle].
+Qed.
+
+Lemma store_post_run_d_bounded ws rl vaddr vdata base cnt t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
+  (vaddr ≤ n')%nat → (vdata ≤ n')%nat →
+  ws_bounded (store_post_run_d ws rl vaddr vdata base cnt t) n'.
+Proof.
+  intros Hb Ht Hle Hva Hvd. rewrite /store_post_run_d.
+  apply ctrl_post_bounded; [|exact Hva].
+  apply (store_post_bytes_d_bounded _ _ _ _ _ n n'); [exact Hb|exact Ht|exact Hle|lia].
+Qed.
+
+Local Lemma store_post_fold_d_coh rl vf t as_ ws a :
+  a ∈ as_ → (t ≤ coh (foldl (λ w a, store_post_d w rl vf a t) ws as_) a)%nat.
+Proof.
+  revert ws. induction as_ as [|b l IH]; intros ws Hin.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin]; [|by apply IH].
+  simpl. etrans; [|apply ws_le_coh, store_post_fold_d_le].
+  rewrite /store_post_d coh_upd_eq. lia.
+Qed.
+
+Lemma store_post_run_d_coh ws rl vaddr vdata base n t (j : nat) :
+  (j < n)%nat →
+  (t ≤ coh (store_post_run_d ws rl vaddr vdata base n t) (base + Z.of_nat j))%nat.
+Proof.
+  intros Hj. rewrite /store_post_run_d ctrl_post_coh /store_post_bytes_d.
+  apply store_post_fold_d_coh, elem_of_list_In, in_map_iff.
+  exists j. split; [reflexivity|]. apply in_seq. lia.
+Qed.
+
+Local Lemma store_post_fold_d_vwOld rl vf t as_ ws :
+  as_ ≠ [] → (t ≤ w_vwOld (foldl (λ w a, store_post_d w rl vf a t) ws as_))%nat.
+Proof.
+  destruct as_ as [|a l]; [done|]. intros _. simpl.
+  etrans; [|apply ws_le_vwOld, store_post_fold_d_le].
+  rewrite /store_post_d /=. lia.
+Qed.
+
+Lemma store_post_run_d_vwOld ws rl vaddr vdata base n t :
+  (0 < n)%nat →
+  (t ≤ w_vwOld (store_post_run_d ws rl vaddr vdata base n t))%nat.
+Proof.
+  intros Hn. rewrite /store_post_run_d ctrl_post_vwOld /store_post_bytes_d.
+  apply store_post_fold_d_vwOld. rewrite /store_run_as. by destruct n; [lia|].
+Qed.
+
+Local Lemma store_post_fold_d_relp rl vf t as_ ws :
+  as_ ≠ [] → w_relp (foldl (λ w a, store_post_d w rl vf a t) ws as_) = false.
+Proof.
+  revert ws. induction as_ as [|a l IH]; intros ws Hne; [done|].
+  simpl. destruct l as [|b l']; [done|]. by apply IH.
+Qed.
+
+Lemma store_post_run_d_relp ws rl vaddr vdata base n t :
+  (0 < n)%nat → w_relp (store_post_run_d ws rl vaddr vdata base n t) = false.
+Proof.
+  intros Hn. rewrite /store_post_run_d ctrl_post_relp /store_post_bytes_d.
+  apply store_post_fold_d_relp. rewrite /store_run_as. by destruct n; [lia|].
+Qed.
+
+Local Lemma store_post_fold_d_fwd rl vf t as_ ws a tf vfd :
+  w_fwd (foldl (λ w a, store_post_d w rl vf a t) ws as_) !! a = Some (tf, vfd) →
+  (tf = t ∧ vfd = vf) ∨ w_fwd ws !! a = Some (tf, vfd).
+Proof.
+  revert ws. induction as_ as [|b l IH]; intros ws Hlk; [by right|].
+  destruct (IH _ Hlk) as [Heq|Hlk']; [by left|].
+  rewrite /store_post_d /= in Hlk'.
+  destruct (decide (a = b)) as [->|Hne].
+  - rewrite lookup_insert in Hlk'. simplify_eq. by left.
+  - rewrite lookup_insert_ne in Hlk'; [done|]. by right.
+Qed.
+
+Lemma store_post_run_d_fwd_inv ws rl vaddr vdata base n t a tf vfd :
+  w_fwd (store_post_run_d ws rl vaddr vdata base n t) !! a = Some (tf, vfd) →
+  (tf = t ∧ vfd = Nat.max vaddr vdata) ∨ w_fwd ws !! a = Some (tf, vfd).
+Proof.
+  rewrite /store_post_run_d ctrl_post_fwd /store_post_bytes_d.
+  apply store_post_fold_d_fwd.
+Qed.
+
+Lemma store_post_run_d_vcap ws rl vaddr vdata base n t :
+  (vaddr ≤ w_vcap (store_post_run_d ws rl vaddr vdata base n t))%nat.
+Proof. rewrite /store_post_run_d ctrl_post_vcap. lia. Qed.
+
+(** *** THE DEPENDENCY-FREE RUN IS BELOW THE DEPENDENCY-CARRYING ONE
+
+    A bigger address view only raises the load's pre-view (and the control
+    view), so every component of the post-state grows.  This is the
+    behaviour-REMOVING direction the deps design predicts, and it is what
+    lets a consumer that proved a LOWER BOUND against the old
+    [load_post_run] keep it against [load_post_run_d]. *)
+
+Lemma load_post_at_mono ws1 ws2 aq vpre1 vpre2 a t :
+  ws_le ws1 ws2 → w_fwd ws1 = w_fwd ws2 → (vpre1 ≤ vpre2)%nat →
+  ws_le (load_post_at ws1 aq vpre1 a t) (load_post_at ws2 aq vpre2 a t).
+Proof.
+  intros Hle Hfw Hvp.
+  have Hfv : fwd_view ws1 aq a t = fwd_view ws2 aq a t
+    by rewrite /fwd_view Hfw.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HR & Hpub & Hvc).
+  rewrite /ws_le /load_post_at /=. split_and!; try (destruct aq; lia).
+  intros a'. destruct (decide (a' = a)) as [->|Hne].
+  - rewrite !coh_upd_eq. pose proof (Hcoh a). lia.
+  - rewrite !coh_upd_ne // -!/(coh ws1 a') -!/(coh ws2 a'). apply Hcoh.
+Qed.
+
+Local Lemma load_post_fold_mono aq vpre1 vpre2 ats :
+  (vpre1 ≤ vpre2)%nat →
+  ∀ w1 w2, ws_le w1 w2 → w_fwd w1 = w_fwd w2 →
+    ws_le (foldl (λ w at_, load_post_at w aq vpre1 at_.1 at_.2) w1 ats)
+          (foldl (λ w at_, load_post_at w aq vpre2 at_.1 at_.2) w2 ats).
+Proof.
+  intros Hvp. induction ats as [|x l IH]; intros w1 w2 Hle Hfw; [exact Hle|].
+  simpl. apply IH.
+  - by apply load_post_at_mono.
+  - by rewrite !load_post_at_fwd.
+Qed.
+
+(** The BYTE-fold form.  Stated separately because [simpl] peels the
+    run-level [ctrl_post] projection off a component accessor, leaving a
+    goal about [load_post_bytes_d] that the run-level lemma cannot see. *)
+Lemma load_post_bytes_d_mono ws aq vaddr ats :
+  ws_le (load_post_bytes ws aq ats) (load_post_bytes_d ws aq vaddr ats).
+Proof.
+  rewrite /load_post_bytes_d /load_post_bytes.
+  apply load_post_fold_mono; [rewrite /load_vpre_d; lia|reflexivity|done].
+Qed.
+
+Lemma load_post_run_d_mono ws aq vaddr base ts :
+  ws_le (load_post_run ws aq base ts) (load_post_run_d ws aq vaddr base ts).
+Proof.
+  rewrite /load_post_run_d.
+  etrans; [|apply ctrl_post_le]. apply load_post_bytes_d_mono.
 Qed.

@@ -156,8 +156,8 @@ Definition pnode_wclass (m : M unit) (ws : wstate) : wm_class :=
 
 Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
   match l with
-  | LRmw _ _ _ _ _ => WCexcl
-  | LStore _ _ _ =>
+  | LRmw _ _ _ _ _ _ _ => WCexcl
+  | LStore _ _ _ _ _ =>
       match p with
       | PHart _ m _ _ => pnode_wclass m ws
       (* M5: the device's stores are plain explicit stores, so their class
@@ -228,7 +228,7 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
                  (forall j : nat, (j < N.to_nat n)%nat ->
                     tvs.*2 !! j = Some (nth_byte w j)) /\
                  l = LLoad (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                       false (pa_z (Interface.ReadReq.pa req)) tvs /\
+                       false (pa_z (Interface.ReadReq.pa req)) tvs [] /\
                  m' = k (inl (w, None)) /\ ors = None /\ fn' = None /\ d' = d)
               \/
               (* THE FUSED RMW; NO [read_ok]/[excl_ok] here either *)
@@ -243,7 +243,7 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
                  esilent_run (k (inl (w, None)), rs) (m1, rs1) /\
                  ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2 /\
                  l = LRmw (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                       rl (pa_z (Interface.ReadReq.pa req)) tvs data /\
+                       rl (pa_z (Interface.ReadReq.pa req)) tvs data [] [] /\
                  m' = m2 /\ ors = Some rs1 /\ fn' = None /\ d' = d))
        | Interface.MemWrite n req => fun k =>
            if dev_addr (Interface.WriteReq.pa req)
@@ -255,7 +255,7 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
              n <> 0%N /\
              l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
                    (pa_z (Interface.WriteReq.pa req))
-                   (wbytes n (Interface.WriteReq.value req)) /\
+                   (wbytes n (Interface.WriteReq.value req)) [] [] /\
              m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d
        | Interface.Barrier b => fun k =>
            l = ebar_label b /\ m' = k tt /\ ors = None /\
@@ -337,12 +337,12 @@ Definition pdisk_prog (dp : option (DM dres)) (d : dev_state) (l : wlabel)
   (* DRead — a hart's plain RAM read, the continuation at the label's bytes *)
   (exists pa n aq k tvs,
      dp = Some (DRead pa n aq k) /\ length tvs = n /\
-     l = LLoad aq false (pa_z pa) tvs /\ dp' = Some (k tvs.*2) /\ d' = d)
+     l = LLoad aq false (pa_z pa) tvs [] /\ dp' = Some (k tvs.*2) /\ d' = d)
   \/
   (* DWrite — a hart's RAM write *)
   (exists pa bs k,
      dp = Some (DWrite pa bs k) /\ bs <> [] /\
-     l = LStore false (pa_z pa) bs /\ dp' = Some k /\ d' = d)
+     l = LStore false (pa_z pa) bs [] [] /\ dp' = Some k /\ d' = d)
   \/
   (* DFence — the device-side write barrier *)
   (exists k,
@@ -414,15 +414,20 @@ Definition pdev_ev (p : pexv6) (l : wlabel) (p' : pexv6) : bool :=
 Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
   match l with
   | LSilent => True
-  | LLoad aq lat base tvs =>
+  | LLoad aq lat base tvs asrc =>
+      asrc = [] /\
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq lat base tvs
-  | LStore _ _ data => data <> []
-  | LRmw aq rl base tvs data =>
+  | LStore _ _ data asrc vsrc => asrc = [] /\ vsrc = [] /\ data <> []
+  | LRmw aq rl base tvs data asrc vsrc =>
+      asrc = [] /\ vsrc = [] /\
       data <> [] /\ length tvs = length data /\
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ)))
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
+  (* D2: the language emits none of these; the slot is [True] so that
+     [WeakEvCapstone.pf_ok_hart] stays a conversion. *)
+  | LRegW _ _ | LCtrl _ | LInstr => True
   end.
 
 Definition eregs_apply (σ : wgstate) (c : CPU) (ors : option regstate)
@@ -435,24 +440,29 @@ Definition eregs_apply (σ : wgstate) (c : CPU) (ors : option regstate)
 Definition elab_ws (σ : wgstate) (c : CPU) (l : wlabel) : CPU -> wstate :=
   match l with
   | LSilent => wgws σ
-  | LLoad aq lat base tvs =>
+  | LLoad aq lat base tvs _ =>
       <[c := load_post_run (wgws σ c) aq base tvs.*1]> (wgws σ)
-  | LStore rl base data =>
+  | LStore rl base data _ _ =>
       <[c := store_post_run (wgws σ c) rl base (length data)
                (S (length (wglog σ)))]> (wgws σ)
-  | LRmw aq rl base tvs data =>
+  | LRmw aq rl base tvs data _ _ =>
       <[c := store_post_run (load_post_run (wgws σ c) aq base tvs.*1)
                rl base (length data) (S (length (wglog σ)))]> (wgws σ)
   | LFence pr pw sr sw => <[c := fence_post (wgws σ c) pr pw sr sw]> (wgws σ)
   | LDev => wgws σ              (* the fabric marker: [LSilent]'s twin *)
+  | LRegW rd srcs =>
+      <[c := regw_post (wgws σ c) rd (srcs_view (wgws σ c) srcs)]> (wgws σ)
+  | LCtrl srcs =>
+      <[c := ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)]> (wgws σ)
+  | LInstr => <[c := instr_post (wgws σ c)]> (wgws σ)
   end.
 
 Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
     : list wmsg :=
   match l with
-  | LStore _ base data =>
+  | LStore _ base data _ _ =>
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
-  | LRmw _ _ base _ data =>
+  | LRmw _ _ base _ data _ _ =>
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
   | _ => wglog σ
   end.
@@ -469,32 +479,36 @@ Definition elab_apply (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
 Definition edlab_ok (σ : wgstate) (dws : wstate) (l : wlabel) : Prop :=
   match l with
   | LSilent => True
-  | LLoad aq lat base tvs =>
-      read_ok (img_z (wgimg σ)) (wglog σ) dws aq lat base tvs
-  | LStore _ _ data => data <> []
+  | LLoad aq lat base tvs asrc =>
+      asrc = [] /\ read_ok (img_z (wgimg σ)) (wglog σ) dws aq lat base tvs
+  | LStore _ _ data asrc vsrc => asrc = [] /\ vsrc = [] /\ data <> []
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
   (* the device has no atomic read-modify-write *)
-  | LRmw _ _ _ _ _ => False
+  | LRmw _ _ _ _ _ _ _ => False
+  | LRegW _ _ | LCtrl _ | LInstr => True
   end.
 
 Definition edlab_ws (σ : wgstate) (dws : wstate) (l : wlabel) : wstate :=
   match l with
   | LSilent => dws
-  | LLoad aq lat base tvs => load_post_run dws aq base tvs.*1
-  | LStore rl base data =>
+  | LLoad aq lat base tvs _ => load_post_run dws aq base tvs.*1
+  | LStore rl base data _ _ =>
       store_post_run dws rl base (length data) (S (length (wglog σ)))
-  | LRmw aq rl base tvs data =>
+  | LRmw aq rl base tvs data _ _ =>
       store_post_run (load_post_run dws aq base tvs.*1) rl base (length data)
         (S (length (wglog σ)))
   | LFence pr pw sr sw => fence_post dws pr pw sr sw
   | LDev => dws                 (* the fabric marker: [LSilent]'s twin *)
+  | LRegW rd srcs => regw_post dws rd (srcs_view dws srcs)
+  | LCtrl srcs => ctrl_post dws (srcs_view dws srcs)
+  | LInstr => instr_post dws
   end.
 
 Definition edlab_log (σ : wgstate) (l : wlabel) (k : wm_class) : list wmsg :=
   match l with
-  | LStore _ base data => wglog σ ++ [WMsg base data (Some n_disk) k]
-  | LRmw _ _ base _ data => wglog σ ++ [WMsg base data (Some n_disk) k]
+  | LStore _ base data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
+  | LRmw _ _ base _ data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
   | _ => wglog σ
   end.
 
@@ -534,7 +548,7 @@ Lemma elab_apply_reg σ c k rs' :
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_load σ c k aq lat base tvs :
-  elab_apply σ c (LLoad aq lat base tvs) k None (wgdev σ)
+  elab_apply σ c (LLoad aq lat base tvs []) k None (wgdev σ)
   = ewg_ws σ c (load_post_run (wgws σ c) aq base tvs.*1).
 Proof. reflexivity. Qed.
 
@@ -544,14 +558,14 @@ Lemma elab_apply_fence σ c k pr pw sr sw :
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_store σ c k rl base data :
-  elab_apply σ c (LStore rl base data) k None (wgdev σ)
+  elab_apply σ c (LStore rl base data [] []) k None (wgdev σ)
   = ewg_store σ c
       (store_post_run (wgws σ c) rl base (length data) (S (length (wglog σ))))
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_rmw σ c k aq rl base tvs data rs1 :
-  elab_apply σ c (LRmw aq rl base tvs data) k (Some rs1) (wgdev σ)
+  elab_apply σ c (LRmw aq rl base tvs data [] []) k (Some rs1) (wgdev σ)
   = ewg_rmw σ c rs1
       (store_post_run (load_post_run (wgws σ c) aq base tvs.*1) rl base
          (length data) (S (length (wglog σ))))
@@ -575,7 +589,7 @@ Lemma edlab_apply_ldev_id σ k : edlab_apply σ LDev k (wgdev σ) = σ.
 Proof. rewrite /edlab_apply /=. by destruct σ. Qed.
 
 Lemma edlab_apply_load_id σ k aq lat base tvs :
-  edlab_apply σ (LLoad aq lat base tvs) k (wgdev σ) = σ.
+  edlab_apply σ (LLoad aq lat base tvs []) k (wgdev σ) = σ.
 Proof. rewrite /edlab_apply /=. by destruct σ. Qed.
 
 Lemma edlab_apply_fence_id σ k pr pw sr sw :
@@ -589,7 +603,7 @@ Lemma edlab_apply_ldev σ k d' : edlab_apply σ LDev k d' = ewg_dev σ d'.
 Proof. reflexivity. Qed.
 
 Lemma edlab_apply_store σ k rl base data :
-  edlab_apply σ (LStore rl base data) k (wgdev σ)
+  edlab_apply σ (LStore rl base data [] []) k (wgdev σ)
   = ewg_log σ (wglog σ ++ [WMsg base data (Some n_disk) k]).
 Proof. reflexivity. Qed.
 
@@ -679,7 +693,7 @@ Proof.
             [reflexivity
             |split; [exact Hcoh|]; left; split; [exact Hlat|];
              exists w, tvs; split_and!; [exact Hlen|exact Hby|reflexivity..]
-            |exact Hrd
+            |split; [reflexivity|exact Hrd]
             |by rewrite elab_apply_load]. }
         { (* the FUSED RMW *)
           do 5 eexists. efac4;
@@ -688,7 +702,9 @@ Proof.
              exists w, tvs, data, rl, m1, m2, rs1;
              split_and!; [exact Hlen|exact Hby|exact Hne|exact Hlend
                          |exact Hsil|exact Hwr|reflexivity..]
-            |split_and!; [exact Hne|exact Hlend|exact Hrd|exact Hex]
+            |split_and!;
+               [reflexivity|reflexivity|exact Hne|exact Hlend|exact Hrd
+               |exact Hex]
             |by rewrite elab_apply_rmw]. }
       * intros (l & m' & ors & fn' & d' & He &
                 (Hcoh & [(Hlat & w & tvs & Hlen & Hby & -> & -> & -> & -> & ->)
@@ -697,9 +713,9 @@ Proof.
                           & -> & ->)]) & Hok & Hs); subst.
         { split; [exact Hcoh|]. left. split; [exact Hlat|].
           exists w, tvs. split_and!;
-            [exact Hlen|exact Hby|exact Hok|reflexivity
+            [exact Hlen|exact Hby|by destruct Hok as (_ & Hrd)|reflexivity
             |by rewrite elab_apply_load]. }
-        { destruct Hok as (_ & _ & Hrd & Hex).
+        { destruct Hok as (_ & _ & _ & _ & Hrd & Hex).
           split; [exact Hcoh|]. right. split; [exact Hlat|].
           exists w, tvs, data, rl, m1, m2, rs1.
           split_and!; [exact Hlen|exact Hby|exact Hrd|exact Hex|exact Hne
@@ -719,7 +735,7 @@ Proof.
     + split.
       * intros (Hn & -> & ->). do 5 eexists. efac4;
           [reflexivity|split_and!; [exact Hn|reflexivity..]
-          |by apply wbytes_ne|].
+          |split_and!; [reflexivity|reflexivity|by apply wbytes_ne]|].
         rewrite elab_apply_store /= wbytes_length. reflexivity.
       * intros (l & m' & ors & fn' & d' & He & (Hn & -> & -> & -> & -> & ->)
                 & _ & Hs); subst.
@@ -811,13 +827,15 @@ Proof.
       split_and!; [reflexivity| |exact I|by rewrite edlab_apply_ldev_id].
       left. by split_and!.
     + (* DRead *)
-      eexists (LLoad aq false (pa_z pa) tvs), (Some (k tvs.*2)), (wgdev σ).
-      split_and!; [reflexivity| |exact Hrd
+      eexists (LLoad aq false (pa_z pa) tvs []), (Some (k tvs.*2)), (wgdev σ).
+      split_and!; [reflexivity| |split; [reflexivity|exact Hrd]
                   |by rewrite edlab_apply_load_id].
       right; left. exists pa, n, aq, k, tvs. by split_and!.
     + (* DWrite *)
-      exists (LStore false (pa_z pa) bs), (Some k), (wgdev σ).
-      split_and!; [reflexivity| |exact Hne|reflexivity].
+      exists (LStore false (pa_z pa) bs [] []), (Some k), (wgdev σ).
+      split_and!;
+        [reflexivity| |split_and!; [reflexivity|reflexivity|exact Hne]
+        |reflexivity].
       right; right; left. exists pa, bs, k. by split_and!.
     + (* DFence *)
       exists (LFence true true true true), (Some k), (wgdev σ).
@@ -852,10 +870,11 @@ Proof.
     + left. split_and!; [reflexivity|reflexivity
                         |by rewrite edlab_apply_ldev_id].
     + right; left. exists pa, (length tvs), aq, k, tvs.
-      split_and!; [reflexivity|reflexivity|exact Hok|reflexivity
-                  |by rewrite edlab_apply_load_id].
+      split_and!; [reflexivity|reflexivity|by destruct Hok as (_ & Hrd)
+                  |reflexivity|by rewrite edlab_apply_load_id].
     + right; right; left. exists pa, bs, k.
-      split_and!; [reflexivity|exact Hne|reflexivity|reflexivity].
+      split_and!; [reflexivity|by destruct Hok as (_ & _ & Hne')|reflexivity
+                  |reflexivity].
     + right; right; right; left. exists k.
       split_and!; [reflexivity|reflexivity|by rewrite edlab_apply_fence_id].
     + right; right; right; right; left. exists delta.
@@ -937,7 +956,7 @@ Qed.
     what lets the robustness replay re-time a run. *)
 
 Lemma pnode_step_lat_free m rs d aq base tvs m' ors fn' d' :
-  ~ pnode_step m rs d (LLoad aq true base tvs) m' ors fn' d'.
+  ~ pnode_step m rs d (LLoad aq true base tvs []) m' ors fn' d'.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -955,7 +974,7 @@ Proof.
 Qed.
 
 Lemma pstep_node_lat_free cpu m rs fn d aq base tvs m' ors fn' d' :
-  ~ pstep_node cpu m rs fn d (LLoad aq true base tvs) m' ors fn' d'.
+  ~ pstep_node cpu m rs fn d (LLoad aq true base tvs []) m' ors fn' d'.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
@@ -963,7 +982,7 @@ Proof.
 Qed.
 
 Lemma pstep_hart_lat_free cpu m rs fn d aq base tvs m' ors fn' d' :
-  ~ pstep_hart cpu m rs fn d (LLoad aq true base tvs) m' ors fn' d'.
+  ~ pstep_hart cpu m rs fn d (LLoad aq true base tvs []) m' ors fn' d'.
 Proof.
   intros [H|(H & _)]; [by eapply pstep_node_lat_free|done].
 Qed.
@@ -971,7 +990,7 @@ Qed.
 (** The disk DOES load since M5 — but, exactly like a hart, never with
     [lat = true]: the device has no coherent/latest read. *)
 Lemma pdisk_prog_lat_free dp d aq base tvs dp' d' :
-  ~ pdisk_prog dp d (LLoad aq true base tvs) dp' d'.
+  ~ pdisk_prog dp d (LLoad aq true base tvs []) dp' d'.
 Proof.
   intros [(_ & Hl & _)
          |[(pa & n & aq0 & k & tvs0 & _ & _ & Hl & _)
@@ -984,12 +1003,12 @@ Proof.
 Qed.
 
 Lemma pstep_disk_lat_free dp d aq base tvs dp' d' :
-  ~ pstep_disk dp d (LLoad aq true base tvs) dp' d'.
+  ~ pstep_disk dp d (LLoad aq true base tvs []) dp' d'.
 Proof. intros [H|(_ & Hl & _)]; [by eapply pdisk_prog_lat_free|done]. Qed.
 
 (** ... and no disk arm ever emits an [LRmw]. *)
 Lemma pstep_disk_no_rmw dp d aq rl base tvs data dp' d' :
-  ~ pstep_disk dp d (LRmw aq rl base tvs data) dp' d'.
+  ~ pstep_disk dp d (LRmw aq rl base tvs data [] []) dp' d'.
 Proof.
   intros [[(_ & Hl & _)
           |[(pa & n & aq0 & k & tvs0 & _ & _ & Hl & _)
@@ -1005,9 +1024,9 @@ Qed.
 (** THE TIMESTAMP-OBLIVIOUSNESS of the disk's own load: the continuation
     takes [tvs.*2] and nothing else. *)
 Lemma pdisk_prog_ts_load dp d aq base tvs tvs' dp' d' :
-  pdisk_prog dp d (LLoad aq false base tvs) dp' d' ->
+  pdisk_prog dp d (LLoad aq false base tvs []) dp' d' ->
   tvs'.*2 = tvs.*2 ->
-  pdisk_prog dp d (LLoad aq false base tvs') dp' d'.
+  pdisk_prog dp d (LLoad aq false base tvs' []) dp' d'.
 Proof.
   intros [(_ & Hl & _)
          |[(pa & n & aq0 & k & tvs0 & Hdp & Hlen & Hl & Hdp' & Hd)
@@ -1025,16 +1044,16 @@ Proof.
 Qed.
 
 Lemma pstep_disk_ts_load dp d aq base tvs tvs' dp' d' :
-  pstep_disk dp d (LLoad aq false base tvs) dp' d' ->
+  pstep_disk dp d (LLoad aq false base tvs []) dp' d' ->
   tvs'.*2 = tvs.*2 ->
-  pstep_disk dp d (LLoad aq false base tvs') dp' d'.
+  pstep_disk dp d (LLoad aq false base tvs' []) dp' d'.
 Proof.
   intros [H|(_ & Hl & _)] Hts; [|done].
   left. by eapply pdisk_prog_ts_load.
 Qed.
 
 Theorem pstep_ev_lat_free p d aq base tvs p' d' :
-  ~ pstep_ev p d (LLoad aq true base tvs) p' d'.
+  ~ pstep_ev p d (LLoad aq true base tvs []) p' d'.
 Proof.
   rewrite /pstep_ev.
   destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
@@ -1044,9 +1063,9 @@ Proof.
 Qed.
 
 Lemma pnode_step_ts_load m rs d aq base tvs tvs' m' ors fn' d' :
-  pnode_step m rs d (LLoad aq false base tvs) m' ors fn' d' ->
+  pnode_step m rs d (LLoad aq false base tvs []) m' ors fn' d' ->
   tvs'.*2 = tvs.*2 ->
-  pnode_step m rs d (LLoad aq false base tvs') m' ors fn' d'.
+  pnode_step m rs d (LLoad aq false base tvs' []) m' ors fn' d'.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -1070,9 +1089,9 @@ Proof.
 Qed.
 
 Lemma pnode_step_ts_rmw m rs d aq rl base tvs tvs' data m' ors fn' d' :
-  pnode_step m rs d (LRmw aq rl base tvs data) m' ors fn' d' ->
+  pnode_step m rs d (LRmw aq rl base tvs data [] []) m' ors fn' d' ->
   tvs'.*2 = tvs.*2 ->
-  pnode_step m rs d (LRmw aq rl base tvs' data) m' ors fn' d'.
+  pnode_step m rs d (LRmw aq rl base tvs' data [] []) m' ors fn' d'.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -1083,7 +1102,8 @@ Proof.
                      |(Hlat & w & tvs0 & data0 & rl0 & m1 & m2 & rs1 &
                        Hlen & Hby & Hne & Hlend & Hsil & Hwr & Hl & Hrest)])
               Hts; [by simplify_eq|].
-      simplify_eq/=. destruct Hrest as (-> & -> & -> & ->).
+      inversion Hl; subst; clear Hl.
+      destruct Hrest as (-> & -> & -> & ->).
       have Hlen' : length tvs' = length tvs0.
       { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
       split; [exact Hcoh|]. right. split; [exact Hlat|].
@@ -1098,9 +1118,9 @@ Proof.
 Qed.
 
 Lemma pstep_node_ts_load cpu m rs fn d aq base tvs tvs' m' ors fn' d' :
-  pstep_node cpu m rs fn d (LLoad aq false base tvs) m' ors fn' d' ->
+  pstep_node cpu m rs fn d (LLoad aq false base tvs []) m' ors fn' d' ->
   tvs'.*2 = tvs.*2 ->
-  pstep_node cpu m rs fn d (LLoad aq false base tvs') m' ors fn' d'.
+  pstep_node cpu m rs fn d (LLoad aq false base tvs' []) m' ors fn' d'.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
@@ -1108,9 +1128,9 @@ Proof.
 Qed.
 
 Lemma pstep_node_ts_rmw cpu m rs fn d aq rl base tvs tvs' data m' ors fn' d' :
-  pstep_node cpu m rs fn d (LRmw aq rl base tvs data) m' ors fn' d' ->
+  pstep_node cpu m rs fn d (LRmw aq rl base tvs data [] []) m' ors fn' d' ->
   tvs'.*2 = tvs.*2 ->
-  pstep_node cpu m rs fn d (LRmw aq rl base tvs' data) m' ors fn' d'.
+  pstep_node cpu m rs fn d (LRmw aq rl base tvs' data [] []) m' ors fn' d'.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
@@ -1118,9 +1138,9 @@ Proof.
 Qed.
 
 Theorem pstep_ev_ts_load p d aq base tvs tvs' p' d' :
-  pstep_ev p d (LLoad aq false base tvs) p' d' ->
+  pstep_ev p d (LLoad aq false base tvs []) p' d' ->
   tvs'.*2 = tvs.*2 ->
-  pstep_ev p d (LLoad aq false base tvs') p' d'.
+  pstep_ev p d (LLoad aq false base tvs' []) p' d'.
 Proof.
   rewrite /pstep_ev.
   destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
@@ -1132,9 +1152,9 @@ Proof.
 Qed.
 
 Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data p' d' :
-  pstep_ev p d (LRmw aq rl base tvs data) p' d' ->
+  pstep_ev p d (LRmw aq rl base tvs data [] []) p' d' ->
   tvs'.*2 = tvs.*2 ->
-  pstep_ev p d (LRmw aq rl base tvs' data) p' d'.
+  pstep_ev p d (LRmw aq rl base tvs' data [] []) p' d'.
 Proof.
   rewrite /pstep_ev.
   destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
@@ -1241,4 +1261,71 @@ Proof.
     exists ors. split; [reflexivity|]. left. apply Hall.
   - intros Hs. destruct (pstep_disk_dev_free _ _ _ _ _ Hs Hne) as (-> & Hall).
     split; [reflexivity|]. intros d0. apply Hall.
+Qed.
+
+(** THE D2 DEPENDENCY-FREEDOM OF THE INSTANCE.  Every label the event
+    language emits carries EMPTY operand lists, and none of the three
+    dependency-only labels is ever emitted — [deps_of_bits] (D3) is what
+    will change that.  This is the fact the capstone's uniform-shape
+    inversion ([WeakEvCapstone.wp_pf_step_inv]) takes as its premise, and
+    it is what makes every [_d] step function in the machine's arms collapse
+    to its dependency-free instance BY CONVERSION. *)
+Lemma pnode_step_depfree m rs d l m' ors fn' d' :
+  pnode_step m rs d l m' ors fn' d' -> lb_depfree l.
+Proof.
+  rewrite /pnode_step. destruct m as [y|T oc k].
+  { by intros (? & -> & _). }
+  destruct oc; simpl; try (by intros (-> & _)); try done.
+  - (* MemRead *)
+    destruct (dev_addr _); [by intros (? & _ & -> & _)|].
+    intros (_ & [(_ & w & tvs & _ & _ & -> & _)
+                |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
+                  _ & _ & _ & _ & _ & _ & -> & _)]); by split.
+  - (* MemWrite *)
+    destruct (dev_addr _); [by intros (_ & -> & _)|].
+    by intros (_ & -> & _).
+  - (* Barrier *) intros (-> & _). by destruct b.
+  - (* Choose *) by intros (ch & -> & _).
+Qed.
+
+Lemma pstep_node_depfree cpu m rs fn d l m' ors fn' d' :
+  pstep_node cpu m rs fn d l m' ors fn' d' -> lb_depfree l.
+Proof.
+  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
+  - by intros (-> & _).
+  - apply pnode_step_depfree.
+Qed.
+
+Lemma pstep_plic_depfree cpu m rs fn d l m' ors fn' d' :
+  pstep_plic cpu m rs fn d l m' ors fn' d' -> lb_depfree l.
+Proof. rewrite /pstep_plic. by intros (-> & _). Qed.
+
+Lemma pstep_hart_depfree cpu m rs fn d l m' ors fn' d' :
+  pstep_hart cpu m rs fn d l m' ors fn' d' -> lb_depfree l.
+Proof.
+  intros [H|H]; [by eapply pstep_node_depfree|by eapply pstep_plic_depfree].
+Qed.
+
+Lemma pstep_disk_depfree dp d l dp' d' :
+  pstep_disk dp d l dp' d' -> lb_depfree l.
+Proof.
+  rewrite /pstep_disk /pdisk_prog /pdisk_uart.
+  intros [[(_ & -> & _)
+          |[(pa & n & aq & k & tvs & _ & _ & -> & _)
+          |[(pa & bs & k & _ & _ & -> & _)
+          |[(k & _ & -> & _)
+          |[(dl & _ & -> & _)
+          |[(pg & _ & _ & -> & _)
+          |[(_ & -> & _)
+          |(p' & _ & _ & -> & _)]]]]]]]
+         |(_ & -> & _)]; by (exact I || split).
+Qed.
+
+Theorem pstep_ev_depfree p d l p' d' : pstep_ev p d l p' d' -> lb_depfree l.
+Proof.
+  rewrite /pstep_ev.
+  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
+    try (by intros []).
+  - intros (_ & ors & _ & H). by eapply pstep_hart_depfree.
+  - apply pstep_disk_depfree.
 Qed.

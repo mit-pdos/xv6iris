@@ -1216,7 +1216,7 @@ Proof. reflexivity. Qed.
 Lemma fence_post_mono ws1 ws2 pr pw sr sw :
   ws_le ws1 ws2 -> ws_le (fence_post ws1 pr pw sr sw) (fence_post ws2 pr pw sr sw).
 Proof.
-  intros (Hc & Hro & Hwo & Hrn & Hwn & Hrel & Hpub).
+  intros (Hc & Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hvcap).
   rewrite /ws_le /fence_post /=. split_and!.
   - intros a. exact (Hc a).
   - exact Hro.
@@ -1225,6 +1225,7 @@ Proof.
   - destruct sw; destruct pr; destruct pw; lia.
   - exact Hrel.
   - exact Hpub.
+  - exact Hvcap.
 Qed.
 
 Lemma barrier_post_mono ws1 ws2 b :

@@ -235,11 +235,11 @@ Lemma retag_readable_2 f img log ws vpre a t :
   readable img log ws vpre a t → readable img (retag_log f log) ws vpre a t.
 Proof. apply retag_readable. Qed.
 
-Lemma retag_read_ok f img log ws aq lat base tvs :
-  read_ok img (retag_log f log) ws aq lat base tvs ↔
-  read_ok img log ws aq lat base tvs.
+Lemma retag_read_ok_d f img log ws aq lat base tvs va :
+  read_ok_d img (retag_log f log) ws aq lat base tvs va ↔
+  read_ok_d img log ws aq lat base tvs va.
 Proof.
-  rewrite /read_ok. split.
+  rewrite /read_ok_d. split.
   - intros Hr j t v Htv. destruct (Hr j t v Htv) as (Hb & Hrd & Hlat).
     rewrite retag_log_byte in Hb. split_and!.
     + done.
@@ -254,15 +254,20 @@ Proof.
       apply (Hlat eq_refl). by eapply retag_writes_in_1.
 Qed.
 
-Lemma retag_read_ok_1 f img log ws aq lat base tvs :
-  read_ok img (retag_log f log) ws aq lat base tvs →
+Lemma retag_read_ok f img log ws aq lat base tvs :
+  read_ok img (retag_log f log) ws aq lat base tvs ↔
   read_ok img log ws aq lat base tvs.
-Proof. apply retag_read_ok. Qed.
+Proof. apply retag_read_ok_d. Qed.
 
-Lemma retag_read_ok_2 f img log ws aq lat base tvs :
-  read_ok img log ws aq lat base tvs →
-  read_ok img (retag_log f log) ws aq lat base tvs.
-Proof. apply retag_read_ok. Qed.
+Lemma retag_read_ok_1 f img log ws aq lat base tvs va :
+  read_ok_d img (retag_log f log) ws aq lat base tvs va →
+  read_ok_d img log ws aq lat base tvs va.
+Proof. apply retag_read_ok_d. Qed.
+
+Lemma retag_read_ok_2 f img log ws aq lat base tvs va :
+  read_ok_d img log ws aq lat base tvs va →
+  read_ok_d img (retag_log f log) ws aq lat base tvs va.
+Proof. apply retag_read_ok_d. Qed.
 
 Lemma retag_excl_ok f log i base tvs ts :
   excl_ok (retag_log f log) i base tvs ts ↔ excl_ok log i base tvs ts.
@@ -325,7 +330,8 @@ Section machine.
   Implicit Types f : nat → wm_class.
 
   (* ---------------------------------------------------------------- *)
-  (** ** THE STEP SIMULATION — all seven rules ([WPDev] since M5) *)
+  (** ** THE STEP SIMULATION — all ten rules ([WPDev] since M5, the three
+         dependency-only arms since D2) *)
 
   Lemma wpstep_retag f c c' :
     wpstep pstep c c' → wpstep pstep (retag_cfg f c) (retag_cfg f c').
@@ -334,10 +340,13 @@ Section machine.
     destruct Hstep as
       [ cfg i ag base data k Hlk Hne
       | cfg i ag st' d' Hlk Hps
-      | cfg i ag aq lat base tvs st' d' Hlk Hps Hr
-      | cfg i ag rl base data k ts st' d' Hlk Hps Hin Hm Hok
-      | cfg i ag aq rl base tvs data k ts st' d' Hlk Hps Hlen Hin Hm Hr He Hok
-      | cfg i ag pr pw sr sw st' d' Hlk Hps |cfg i ag st' d' Hlk Hps].
+      | cfg i ag aq lat base tvs asrc st' d' Hlk Hps Hr
+      | cfg i ag rl base data asrc vsrc k ts st' d' Hlk Hps Hin Hm Hok
+      | cfg i ag aq rl base tvs data asrc vsrc k ts st' d'
+            Hlk Hps Hlen Hin Hm Hr He Hok
+      | cfg i ag pr pw sr sw st' d' Hlk Hps |cfg i ag st' d' Hlk Hps
+      | cfg i ag rd srcs st' d' Hlk Hps | cfg i ag srcs st' d' Hlk Hps
+      | cfg i ag st' d' Hlk Hps].
     - (* WPPromise: the appended class is the rule's free binder — take
          [f] at the OLD log length *)
       pose proof (WPPromise (P:=P) (D:=D) pstep
@@ -352,18 +361,19 @@ Section machine.
     - (* WPLoad *)
       apply (WPLoad (P:=P) (D:=D) pstep
                (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
-               i ag aq lat base tvs st' d' Hlk Hps).
+               i ag aq lat base tvs asrc st' d' Hlk Hps).
       simpl. by apply retag_read_ok_2.
     - (* WPFulfil: the matched entry's class is the rule's free binder *)
       apply (WPFulfil (P:=P) (D:=D) pstep
                (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
-               i ag rl base data (f (ts - 1)%nat) ts st' d' Hlk Hps Hin);
+               i ag rl base data asrc vsrc (f (ts - 1)%nat) ts st' d'
+               Hlk Hps Hin);
         [|exact Hok].
       simpl. by rewrite retag_log_lookup Hm.
     - (* WPRmw *)
       apply (WPRmw (P:=P) (D:=D) pstep
                (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
-               i ag aq rl base tvs data (f (ts - 1)%nat) ts st' d'
+               i ag aq rl base tvs data asrc vsrc (f (ts - 1)%nat) ts st' d'
                Hlk Hps Hlen Hin); [| | |exact Hok].
       + simpl. by rewrite retag_log_lookup Hm.
       + simpl. by apply retag_read_ok_2.
@@ -374,6 +384,17 @@ Section machine.
                i ag pr pw sr sw st' d' Hlk Hps).
     - (* WPDev: [WPSilent]'s twin *)
       exact (WPDev (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag st' d' Hlk Hps).
+    - (* WPRegW / WPCtrl / WPInstr: the three dependency-only arms move no
+         message, so the retag is [WPSilent]'s argument verbatim. *)
+      exact (WPRegW (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag rd srcs st' d' Hlk Hps).
+    - exact (WPCtrl (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag srcs st' d' Hlk Hps).
+    - exact (WPInstr (P:=P) (D:=D) pstep
                (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
                i ag st' d' Hlk Hps).
   Qed.
@@ -497,7 +518,8 @@ Section machine.
   Lemma astep_ok_retag f img log i (ag : wpagent P) l g Dl :
     astep_ok img log i ag l g Dl ↔ astep_ok img (retag_log f log) i ag l g Dl.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - done.
     - split.
@@ -526,6 +548,9 @@ Section machine.
         exists ts, ak. split_and!; [done|done|done| | |done|done|done].
         * by eapply retag_read_ok_1.
         * by eapply retag_excl_ok_1.
+    - done.
+    - done.
+    - done.
     - done.
     - done.
   Qed.
@@ -673,7 +698,8 @@ Section machine.
       as (ag1 & ag1' & st1 & g1 & Hag1 & _ & _ & Hok & _).
     assert (ag1 = ag) as -> by congruence.
     have Htid : wm_tid m0 = Some i.
-    { destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data| |];
+    { destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
+                             |aq rl base tvs data asrc vsrc| | | | |];
         simpl in Hok.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as (_ & _ & HD). by rewrite HD in Hts.
@@ -685,6 +711,9 @@ Section machine.
         have Hq : ts' = ts by congruence. subst ts'.
         have Hm' : m0 = WMsg base data (Some i) k' by congruence.
         by rewrite Hm'.
+      - destruct Hok as [_ HD]. by rewrite HD in Hts.
+      - destruct Hok as [_ HD]. by rewrite HD in Hts.
+      - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as [_ HD]. by rewrite HD in Hts. }
     eapply (canon_f_spec clsf TS (ts - 1)%nat m0 i T k ev ag);

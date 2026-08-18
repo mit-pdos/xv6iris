@@ -113,8 +113,8 @@ Qed.
 (** Does the label's READ half carry [aq]? *)
 Definition lb_aq (l : wlabel) : bool :=
   match l with
-  | LLoad aq _ _ _ => aq
-  | LRmw aq _ _ _ _ => aq
+  | LLoad aq _ _ _ _ => aq
+  | LRmw aq _ _ _ _ _ _ => aq
   | _ => false
   end.
 
@@ -179,23 +179,27 @@ Section astep.
     astep_ok img log i ag l f D →
     ∀ w, fwd_own log i w → fwd_own log i (f w).
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - intros [-> _] w Hw. exact Hw.
-    - intros (_ & -> & _) w Hw a tf vf. rewrite load_post_run_fwd.
+    - intros (_ & -> & _) w Hw a tf vf. rewrite load_post_run_d_fwd.
       exact (Hw a tf vf).
     - intros (ts & kc & _ & Hlog & (_ & Hext) & -> & _) w Hw a tf vf Hlk.
-      apply store_post_run_fwd_inv in Hlk as [->|Hlk];
+      apply store_post_run_d_fwd_inv in Hlk as [[-> _]|Hlk];
         [|exact (Hw a tf vf Hlk)].
-      split; [rewrite /fulfil_vpre in Hext; lia|].
+      split; [rewrite /fulfil_vpre_d /fulfil_vpre in Hext; lia|].
       eexists. split; [exact Hlog|done].
     - intros (ts & kc & _ & _ & Hlog & _ & _ & (_ & Hext) & -> & _) w Hw a tf vf Hlk.
-      apply store_post_run_fwd_inv in Hlk as [->|Hlk].
-      + split; [rewrite /fulfil_vpre in Hext; lia|].
+      apply store_post_run_d_fwd_inv in Hlk as [[-> _]|Hlk].
+      + split; [rewrite /fulfil_vpre_d /fulfil_vpre in Hext; lia|].
         eexists. split; [exact Hlog|done].
-      + rewrite load_post_run_fwd in Hlk. exact (Hw a tf vf Hlk).
+      + rewrite load_post_run_d_fwd in Hlk. exact (Hw a tf vf Hlk).
     - intros [-> _] w Hw a tf vf. rewrite fence_post_fwd. exact (Hw a tf vf).
     - intros [-> _] w Hw. exact Hw.
+    - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
+    - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
+    - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
   Qed.
 
   (** EXT, in the form the measure wants: the fulfilling step's PRE-state
@@ -205,18 +209,23 @@ Section astep.
   Lemma astep_ok_fulfil_ext img log i ag l f ts :
     astep_ok img log i ag l f (Some ts) → (w_vwNew (pa_ws ag) < ts)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
     - intros (ts' & kc & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
-      rewrite /fulfil_vpre in Hext. lia.
+      rewrite /fulfil_vpre_d /fulfil_vpre in Hext. lia.
     - intros (ts' & kc & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
-      rewrite /fulfil_vpre in Hext.
+      rewrite /fulfil_vpre_d /fulfil_vpre in Hext.
       have Hle : (w_vwNew (pa_ws ag)
-                  ≤ w_vwNew (load_post_run (pa_ws ag) aq base (tvs.*1)))%nat
-        by apply ws_le_vwNew, load_post_run_le.
+                  ≤ w_vwNew (load_post_run_d (pa_ws ag) aq
+                               (srcs_view (pa_ws ag) asrc) base (tvs.*1)))%nat
+        by apply ws_le_vwNew, load_post_run_d_le.
       lia.
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.
@@ -231,7 +240,8 @@ Section astep.
     astep_ok img log i ag l f (Some ts') → (a, ts) ∈ lb_reads l →
     (ts < ts')%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -242,8 +252,12 @@ Section astep.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       have Hjlt : (j < length data)%nat.
       { rewrite -Hlen. by eapply lookup_lt_Some. }
-      have Hge := load_post_run_coh (pa_ws ag) aq base (tvs.*1) j ts Hts.
+      have Hge := load_post_run_d_coh (pa_ws ag) aq
+                    (srcs_view (pa_ws ag) asrc) base (tvs.*1) j ts Hts.
       have Hlt := Hcoh j Hjlt. rewrite /acc_addr in Hge. lia.
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.
@@ -255,18 +269,26 @@ Section astep.
     astep_ok img log i ag l f D → lb_aq l = true → (a, ts) ∈ lb_reads l →
     (ts ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) -> [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
-      by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts).
+      etrans;
+        [by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts)|].
+      apply ws_le_vwNew, load_post_bytes_d_mono.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (tsf & kc & _ & _ & _ & _ & _ & _ & -> & _) ->
              [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
-      etrans; [by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts)|].
-      apply ws_le_vwNew, store_post_run_le.
+      etrans;
+        [by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts)|].
+      etrans; [apply ws_le_vwNew, load_post_run_d_mono|].
+      apply ws_le_vwNew, store_post_bytes_d_le.
+    - intros _ _ Hin%elem_of_nil. done.
+    - intros _ _ Hin%elem_of_nil. done.
+    - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
   Qed.
@@ -279,20 +301,26 @@ Section astep.
     (a, ts) ∈ lb_reads l →
     (ts ≤ w_vrOld (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
+      etrans; [|apply ws_le_vrOld, load_post_bytes_d_mono].
       apply (load_post_run_vrOld' (pa_ws ag) aq base (tvs.*1) j ts Hts).
       rewrite /acc_addr. exact Hfv.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (tsf & kc & _ & _ & _ & _ & _ & _ & -> & _) Hfv
              [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
-      etrans; [|apply ws_le_vrOld, store_post_run_le].
+      etrans; [|apply ws_le_vrOld, store_post_bytes_d_le].
+      etrans; [|apply ws_le_vrOld, load_post_run_d_mono].
       apply (load_post_run_vrOld' (pa_ws ag) aq base (tvs.*1) j ts Hts).
       rewrite /acc_addr. exact Hfv.
+    - intros _ _ Hin%elem_of_nil. done.
+    - intros _ _ Hin%elem_of_nil. done.
+    - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
   Qed.
@@ -304,7 +332,8 @@ Section astep.
     astep_ok img log i ag l f D → lb_fence_prsw l →
     (w_vrOld (pa_ws ag) ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl; try (by intros _ []).
     intros [-> _] [-> ->]. apply fence_post_vwNew_r.
   Qed.
@@ -370,11 +399,22 @@ Proof. by right. Qed.
     [LStore], the POST-LOAD state [load_post_run (pa_ws ag) aq base
     tvs.*1] for an [LRmw] — reduced by [fulfil_vpre].  It is [None] on
     the non-fulfilling labels. *)
+(** D2 NOTE.  Both arms are now the DEPENDENCY-CARRYING pre-view — the
+    same expression [WeakPromiseFact.astep_ok] passes to [fulfil_ok_d].
+    That makes [fcov] (whose obligation is [ts ≤ v]) STRICTLY EASIER to
+    satisfy, i.e. the per-edge premise [edge_ok_f] gets WEAKER: exactly
+    the direction the deps design predicts ("S1 gets EASIER: EXT is
+    bigger"), and the reason the dependency track pays at Layer 2. *)
 Definition fulfil_vext (ws : wstate) (l : wlabel) : option nat :=
   match l with
-  | LStore rl _ _ => Some (fulfil_vpre ws rl)
-  | LRmw aq rl base tvs _ =>
-      Some (fulfil_vpre (load_post_run ws aq base (tvs.*1)) rl)
+  | LStore rl _ _ asrc vsrc =>
+      Some (fulfil_vpre_d ws rl
+              (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc)))
+  | LRmw aq rl base tvs _ asrc vsrc =>
+      Some (fulfil_vpre_d
+              (load_post_run_d ws aq (srcs_view ws asrc) base (tvs.*1)) rl
+              (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
+                       (ldv_of ws aq (srcs_view ws asrc) base (tvs.*1))))
   | _ => None
   end.
 
@@ -384,13 +424,16 @@ Definition fulfil_vext (ws : wstate) (l : wlabel) : option nat :=
 Lemma fulfil_vext_vwNew ws l v :
   fulfil_vext ws l = Some v → (w_vwNew ws ≤ v)%nat.
 Proof.
-  destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+  destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
     simpl; try done.
-  - intros [= <-]. rewrite /fulfil_vpre. lia.
+  - intros [= <-]. rewrite /fulfil_vpre_d /fulfil_vpre. lia.
   - intros [= <-].
-    have Hle : (w_vwNew ws ≤ w_vwNew (load_post_run ws aq base (tvs.*1)))%nat
-      by apply ws_le_vwNew, load_post_run_le.
-    rewrite /fulfil_vpre. lia.
+    have Hle : (w_vwNew ws
+                ≤ w_vwNew (load_post_run_d ws aq (srcs_view ws asrc) base
+                             (tvs.*1)))%nat
+      by apply ws_le_vwNew, load_post_run_d_le.
+    rewrite /fulfil_vpre_d /fulfil_vpre. lia.
 Qed.
 
 (** THE RELATIVIZED COVERAGE: the fulfil at [k'] checks EXT at a view
@@ -427,14 +470,17 @@ Lemma astep_ok_fulfil_vext {P : Type} img log i (ag : wpagent P) l f ts :
   astep_ok img log i ag l f (Some ts) →
   ∃ v, fulfil_vext (pa_ws ag) l = Some v ∧ (v < ts)%nat.
 Proof.
-  destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+  destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
     simpl.
   - by intros [_ ?].
   - by intros (_ & _ & ?).
-  - intros (ts' & kc & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
-    by exists (fulfil_vpre (pa_ws ag) rl).
+  - intros (ts' & kc & _ & _ & (_ & Hext) & _ & Heq). simplify_eq. by eexists.
   - intros (ts' & kc & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq). simplify_eq.
-    by exists (fulfil_vpre (load_post_run (pa_ws ag) aq base (tvs.*1)) rl).
+    by eexists.
+  - by intros [_ ?].
+  - by intros [_ ?].
+  - by intros [_ ?].
   - by intros [_ ?].
   - by intros [_ ?].
 Qed.

@@ -159,7 +159,7 @@ Definition pstep_xv6 (next : bool → M unit)
       (* emit: the head buffered message becomes this agent's own store *)
       (∃ (m : wmsg) (rest : list wmsg),
          pend = m :: rest ∧ pend' = rest ∧ d' = d ∧
-         l = WeakPromise.LStore false (wm_pa m) (wm_data m))
+         l = WeakPromise.LStore false (wm_pa m) (wm_data m) [] [])
   | _, _ => False
   end.
 
@@ -198,10 +198,10 @@ Proof. intros p d l p' d' Hs _. split; [by destruct d, d'|done]. Qed.
     factorization takes, and hence [robust_main]. *)
 Theorem xv6_lat_free next : lat_free_prog (pstep_unit (pstep_xv6 next)).
 Proof.
-  intros p d0 aq base tvs p' d0' H.
+  intros p d0 aq base tvs asrc p' d0' H.
   destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H;
     try (exfalso; exact H).
-  - exact (sail_lat_free next q d0 aq base tvs q' d0' H).
+  - exact (sail_lat_free next q d0 aq base tvs asrc q' d0' H).
   - destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 
@@ -213,15 +213,16 @@ Qed.
 Theorem xv6_ts_oblivious next : ts_oblivious (pstep_unit (pstep_xv6 next)).
 Proof.
   split.
-  - intros p dv aq lat base tvs tvs' p' dv' Heq H.
+  - intros p dv aq lat base tvs tvs' asrc p' dv' Heq H.
     destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
-    + exact (sail_ts_oblivious next q aq lat base tvs tvs' q' Heq H).
+    + exact (sail_ts_oblivious next q aq lat base tvs tvs' asrc q' Heq H).
     + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
-  - intros p dv aq rl base tvs tvs' data p' dv' Heq H.
+  - intros p dv aq rl base tvs tvs' data asrc vsrc p' dv' Heq H.
     destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
-    + exact (sail_ts_oblivious_rmw next q aq rl base tvs tvs' data q' Heq H).
+    + exact (sail_ts_oblivious_rmw next q aq rl base tvs tvs' data asrc vsrc
+               q' Heq H).
     + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 
@@ -411,10 +412,13 @@ Proof.
   intros Hst.
   destruct Hst as
     [cfg ag st' dd Hag Hps
-    |cfg ag aq lat base tvs st' dd Hag Hps Hok
-    |cfg ag rl base data k st' dd Hag Hps Hne Hkc
-    |cfg ag aq rl base tvs data k st' dd Hag Hps Hne Hlen Hok Hex Hkc
-    |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps]; destruct dd;
+    |cfg ag aq lat base tvs asrc st' dd Hag Hps Hok
+    |cfg ag rl base data asrc vsrc k st' dd Hag Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc k st' dd
+         Hag Hps Hne Hlen Hok Hex Hkc
+    |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps
+    |cfg ag rdw wsrc st' dd Hag Hps|cfg ag csrc st' dd Hag Hps
+    |cfg ag st' dd Hag Hps]; destruct dd;
     (have Hlt : (i < length (pc_ags cfg))%nat
        by exact (lookup_lt_Some _ _ _ Hag));
     (have Hlk := lift_ags_lookup dks (pc_ags cfg) i ag Hag);
@@ -425,13 +429,14 @@ Proof.
              (lift_ag ag) (PHart st') tt Hlk Hps).
   - exact (PFLoad (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) aq lat base tvs (PHart st') tt Hlk Hps Hok).
+             (lift_ag ag) aq lat base tvs asrc (PHart st') tt Hlk Hps Hok).
   - exact (PFStore (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) rl base data k (PHart st') tt Hlk Hps Hne Hkc).
+             (lift_ag ag) rl base data asrc vsrc k (PHart st') tt
+             Hlk Hps Hne Hkc).
   - exact (PFRmw (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) aq rl base tvs data k (PHart st') tt
+             (lift_ag ag) aq rl base tvs data asrc vsrc k (PHart st') tt
              Hlk Hps Hne Hlen Hok Hex Hkc).
   - exact (PFFence (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
@@ -439,6 +444,15 @@ Proof.
   - (* dev: [PFSilent]'s twin (unreachable for this LTS, but framed
        uniformly — nothing here inspects the label) *)
     exact (PFDev (pstep_unit (pstep_xv6 next)) lbl_class_p i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) (PHart st') tt Hlk Hps).
+  - exact (PFRegW (pstep_unit (pstep_xv6 next)) lbl_class_p i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) rdw wsrc (PHart st') tt Hlk Hps).
+  - exact (PFCtrl (pstep_unit (pstep_xv6 next)) lbl_class_p i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) csrc (PHart st') tt Hlk Hps).
+  - exact (PFInstr (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) (PHart st') tt Hlk Hps).
 Qed.

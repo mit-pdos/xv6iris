@@ -475,7 +475,7 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dev_state)
            else
              ak_coh (classify (Interface.ReadReq.access_kind req)) = false ∧
              match l with
-             | WeakPromise.LLoad aq false base tvs =>
+             | WeakPromise.LLoad aq false base tvs [] =>
                  (* ANY RAM read, exclusive or not (delta (e)): a BARE
                     exclusive read — one whose window is abandoned, or never
                     closed at all — has ordinary load semantics, so it takes
@@ -490,7 +490,7 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dev_state)
                    (∀ j : nat, (j < N.to_nat n)%nat →
                       tvs.*2 !! j = Some (nth_byte w j)) ∧
                    p' = PSail (Some (k (inl (w, None)))) rs d None iq
-             | WeakPromise.LRmw aq rl base tvs data =>
+             | WeakPromise.LRmw aq rl base tvs data [] [] =>
                  (* THE FUSED ARM: exclusive read, silent prefix, conditional
                     write — one label *)
                  ak_latest (classify (Interface.ReadReq.access_kind req)) = true ∧
@@ -517,7 +517,7 @@ Definition sail_mstep (m : M unit) (rs : regstate) (d : dev_state)
              l = WeakPromise.LStore
                    (ak_sync (classify (Interface.WriteReq.access_kind req)))
                    (pa_z (Interface.WriteReq.pa req))
-                   (wbytes n (Interface.WriteReq.value req)) ∧
+                   (wbytes n (Interface.WriteReq.value req)) [] [] ∧
              n ≠ 0%N ∧
              p' = PSail (Some (k (inl None))) rs d None iq
        | Interface.Barrier b => λ k,
@@ -605,7 +605,7 @@ Definition sail_step (next : bool → M unit)
     takes. *)
 Theorem sail_lat_free next : lat_free_prog (pstep_unit (sail_step next)).
 Proof.
-  intros p d aq base tvs p' d' H. rewrite /pstep_unit /sail_step in H.
+  intros p d aq base tvs asrc p' d' H. rewrite /pstep_unit /sail_step in H.
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
   destruct H as [Hirq|H]; [by destruct Hirq as [? _]|].
   destruct (sp_m p) as [m|]; [|by destruct H as [? _]].
@@ -626,10 +626,10 @@ Qed.
     computed from the VALUES alone.  Retiming a load is therefore free —
     which is exactly what Layer 1 needs when it re-times a read against a
     reordered log. *)
-Theorem sail_ts_oblivious next p aq lat base tvs tvs' p' :
+Theorem sail_ts_oblivious next p aq lat base tvs tvs' asrc p' :
   tvs.*2 = tvs'.*2 →
-  sail_step next p (WeakPromise.LLoad aq lat base tvs) p' →
-  sail_step next p (WeakPromise.LLoad aq lat base tvs') p'.
+  sail_step next p (WeakPromise.LLoad aq lat base tvs asrc) p' →
+  sail_step next p (WeakPromise.LLoad aq lat base tvs' asrc) p'.
 Proof.
   intros Heq H. rewrite /sail_step in H |- *.
   have Hlen : length tvs = length tvs'.
@@ -643,6 +643,7 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _); [by destruct H as [? _]|].
     destruct H as [Hcoh H]. destruct lat; [done|].
+    destruct asrc as [|x asrc']; [|done].
     split; [done|].
     destruct H as (Haq & Hbase & Hlt & w & Hw & Hp).
     split_and!; [done|done|by rewrite -Hlen|].
@@ -655,10 +656,10 @@ Qed.
 
 (** The [LRmw] analogue: the read half's timestamps are retimed, the values
     read and the data written are fixed. *)
-Theorem sail_ts_oblivious_rmw next p aq rl base tvs tvs' data p' :
+Theorem sail_ts_oblivious_rmw next p aq rl base tvs tvs' data asrc vsrc p' :
   tvs.*2 = tvs'.*2 →
-  sail_step next p (WeakPromise.LRmw aq rl base tvs data) p' →
-  sail_step next p (WeakPromise.LRmw aq rl base tvs' data) p'.
+  sail_step next p (WeakPromise.LRmw aq rl base tvs data asrc vsrc) p' →
+  sail_step next p (WeakPromise.LRmw aq rl base tvs' data asrc vsrc) p'.
 Proof.
   intros Heq H. rewrite /sail_step in H |- *.
   have Hlen : length tvs = length tvs'.
@@ -672,6 +673,8 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _); [by destruct H as [? _]|].
     destruct H as [Hcoh H].
+    destruct asrc as [|x asrc']; [|done].
+    destruct vsrc as [|y vsrc']; [|done].
     destruct H as (Hlat & Haq & Hbase & Hlt & Hld & w & m1 & m2 & rs1 & Hw & Hsil & Hwr & Hp).
     split; [done|]. split_and!; [done|done|done|by rewrite -Hlen|done|].
     exists w, m1, m2, rs1. split_and!; [|done|done|done].
@@ -876,7 +879,7 @@ Section bracket.
   Context (Hpcls : ∀ p ak ws base data,
               ak_latest ak = false →
               wm_class_of ak ws
-              = pcls p (WeakPromise.LStore (ak_sync ak) base data) ws).
+              = pcls p (WeakPromise.LStore (ak_sync ak) base data [] []) ws).
 
   Implicit Types ags : list (wpagent psail).
 
@@ -920,7 +923,7 @@ Section bracket.
 
   Lemma pf_load ags ag aq lat base tvs p1 img log img' log' fin :
     ags !! i = Some ag →
-    sail_step next (pa_st ag) (WeakPromise.LLoad aq lat base tvs) p1 →
+    sail_step next (pa_st ag) (WeakPromise.LLoad aq lat base tvs []) p1 →
     read_ok img log (pa_ws ag) aq lat base tvs →
     rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img log
@@ -935,14 +938,16 @@ Section bracket.
   Proof.
     intros Hlk Hst Hok Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
-    exists i, (WeakPromise.LLoad aq lat base tvs). by eapply PFLoad.
+    exists i, (WeakPromise.LLoad aq lat base tvs []).
+    rewrite -(load_post_run_d_0 (pa_ws ag) aq base (tvs.*1)).
+    by eapply PFLoad.
   Qed.
 
   Lemma pf_store ags ag rl base data k p1 img log img' log' fin :
     ags !! i = Some ag →
-    sail_step next (pa_st ag) (WeakPromise.LStore rl base data) p1 →
+    sail_step next (pa_st ag) (WeakPromise.LStore rl base data [] []) p1 →
     data ≠ [] →
-    k = pcls (pa_st ag) (WeakPromise.LStore rl base data) (pa_ws ag) →
+    k = pcls (pa_st ag) (WeakPromise.LStore rl base data [] []) (pa_ws ag) →
     rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
@@ -958,17 +963,21 @@ Section bracket.
   Proof.
     intros Hlk Hst Hne Hk Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
-    exists i, (WeakPromise.LStore rl base data). by eapply PFStore.
+    exists i, (WeakPromise.LStore rl base data [] []).
+    rewrite -(store_post_run_d_0 (pa_ws ag) rl base (length data)
+                (S (length log))).
+    by eapply PFStore.
   Qed.
 
   Lemma pf_rmw ags ag aq rl base tvs data k p1 img log img' log' fin :
     ags !! i = Some ag →
-    sail_step next (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) p1 →
+    sail_step next (pa_st ag) (WeakPromise.LRmw aq rl base tvs data [] []) p1 →
     data ≠ [] →
     length tvs = length data →
     read_ok img log (pa_ws ag) aq false base tvs →
     excl_ok log i base tvs (S (length log)) →
-    k = pcls (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
+    k = pcls (pa_st ag) (WeakPromise.LRmw aq rl base tvs data [] [])
+          (pa_ws ag) →
     rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
@@ -986,7 +995,12 @@ Section bracket.
   Proof.
     intros Hlk Hst Hne Hlen Hok Hex Hk Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
-    exists i, (WeakPromise.LRmw aq rl base tvs data). by eapply PFRmw.
+    exists i, (WeakPromise.LRmw aq rl base tvs data [] []).
+    rewrite -(load_post_run_d_0 (pa_ws ag) aq base (tvs.*1))
+            -(store_post_run_d_0
+                (load_post_run_d (pa_ws ag) aq 0%nat base (tvs.*1))
+                rl base (length data) (S (length log))).
+    by eapply PFRmw.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1204,7 +1218,7 @@ Section instr.
   Context (Hpcls : ∀ p ak ws base data,
               ak_latest ak = false →
               wm_class_of ak ws
-              = pcls p (WeakPromise.LStore (ak_sync ak) base data) ws).
+              = pcls p (WeakPromise.LStore (ak_sync ak) base data [] []) ws).
 
   Lemma pf_silent_last ags p0 p1 ws prom img log :
     (i < length ags)%nat →
@@ -1261,7 +1275,7 @@ Corollary sail_instr_bracket_single (pcls : psail → wlabel → wstate → wm_c
     (Hpcls : ∀ p ak ws base data,
         ak_latest ak = false →
         wm_class_of ak ws
-        = pcls p (WeakPromise.LStore (ak_sync ak) base data) ws)
+        = pcls p (WeakPromise.LStore (ak_sync ak) base data [] []) ws)
     (tick : bool) s x s' :
   sail_shaped (riscv_step tick) →
   wrun (Some 0%nat) (riscv_step tick) s x s' →

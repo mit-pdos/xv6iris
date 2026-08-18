@@ -297,8 +297,9 @@ Section stepout.
       left. eapply (read_ts_in_fl pstep TS Hwf Hwfl);
         [done|exact Hpre|exact Hr|lia]. }
     have Hokc := Hok.
-    destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                            |pr pw sr sw|] eqn:Hlbe.
+    destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
+                            |aq rl base tvs data asrc vsrc
+                            |pr pw sr sw| |rdw wsrc|csrc|] eqn:Hlbe.
     - (* ---- LSilent ---- *)
       destruct Hok as (Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -316,7 +317,7 @@ Section stepout.
     - (* ---- LLoad ---- *)
       have Hlat : lat = false.
       { destruct lat; [|done]. exfalso.
-        by destruct (Hlf _ _ _ _ _ _ _ Hpure). }
+        by destruct (Hlf _ _ _ _ _ _ _ _ Hpure). }
       subst lat.
       destruct Hok as (Hro & Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -330,22 +331,23 @@ Section stepout.
         split; [by rewrite /gev_lb Hgev|].
         rewrite Hlbe /=. apply elem_of_tvs_reads. by exists i, v. }
       eapply (qcfg_step_ex done e T ev ag2 cf
-                 (load_post_run (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) aq base
+                 (load_post_run_d (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) aq (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) asrc) base
                     ((tlabel_ts (pi TS done) tvs).*1))
-                 (LLoad aq false base (tlabel_ts (pi TS done) tvs)));
+                 (LLoad aq false base (tlabel_ts (pi TS done) tvs) asrc));
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe tlabel_ts_fst Hmap.
       + rewrite Hstpost Hlogq.
-        apply (PFLoad pstep pcls e.1 cf (WPAgent (pa_st ag)
-                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 aq false base (tlabel_ts (pi TS done) tvs) st' dnew);
+        apply (PFLoad pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 aq false base (tlabel_ts (pi TS done) tvs) asrc st' dnew);
           [done| |].
         * simpl. eapply (proj1 Hobl (pa_st ag) (pc_dev cf) aq false base tvs);
             [by rewrite tlabel_ts_snd|]. exact Hpure.
         * simpl. rewrite Hcimg Hclog.
           eapply (read_ok_pf pstep pdev TS img ps Hwf Hwsi Hco Hwfl Himg Hnag
-                    done e T ev ag (LLoad aq false base tvs) base tvs false);
-            [done|done|done|done|done|done|exact Hlbe|done|done|exact Hro|done].
+                    done e T ev ag (LLoad aq false base tvs asrc) base tvs
+                    false);
+            [done|done|done|done|done|done|exact Hlbe|done|done| |done].
+          exact Hro.
     - (* ---- LStore ---- *)
       destruct Hok as (ts & kc & _ & Hlog & _ & Hf & Hts).
       have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
@@ -361,14 +363,15 @@ Section stepout.
       have Hnedata : data ≠ []
         by exact (Hdata (ts - 1)%nat (WMsg base data (Some e.1) kc) Hlog).
       eapply (qcfg_step_ex done e T ev ag2 cf
-                 (store_post_run (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) rl base (length data)
+                 (store_post_run_d (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) rl (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) asrc)
+                    (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) vsrc) base (length data)
                     (S (length (pc_log cf))))
-                 (LStore rl base data)); [done|done|done|done|done|done| |exact Hfab'|].
+                 (LStore rl base data asrc vsrc));
+        [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe Hts Hpits.
       + rewrite Hstpost Hlogq.
-        apply (PFStore pstep pcls e.1 cf (WPAgent (pa_st ag)
-                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 rl base data kc st' dnew); [done| |done|].
+        apply (PFStore pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 rl base data asrc vsrc kc st' dnew); [done| |done|].
         * simpl. exact Hpure.
         * (* THE PINNED CLASS (G6a) — as in [WeakRobustSim.Qinv_step] *)
           have Hkc : kc = pcls (pa_st ag) (ae_lb ev) (pa_ws ag).
@@ -399,17 +402,17 @@ Section stepout.
         split; [by rewrite /gev_lb Hgev|].
         rewrite Hlbe /=. apply elem_of_tvs_reads. by exists i, v. }
       eapply (qcfg_step_ex done e T ev ag2 cf
-                 (store_post_run
-                    (load_post_run (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) aq base
+                 (store_post_run_d
+                    (load_post_run_d (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) aq (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) asrc) base
                        ((tlabel_ts (pi TS done) tvs).*1))
-                    rl base (length data) (S (length (pc_log cf))))
-                 (LRmw aq rl base (tlabel_ts (pi TS done) tvs) data));
+                    rl (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) asrc) (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) vsrc)
+                    base (length data) (S (length (pc_log cf))))
+                 (LRmw aq rl base (tlabel_ts (pi TS done) tvs) data asrc vsrc));
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe Hts tlabel_ts_fst Hmap Hpits.
       + rewrite Hstpost Hlogq.
-        apply (PFRmw pstep pcls e.1 cf (WPAgent (pa_st ag)
-                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 aq rl base (tlabel_ts (pi TS done) tvs) data kc st'
+        apply (PFRmw pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 aq rl base (tlabel_ts (pi TS done) tvs) data asrc vsrc kc st'
                  dnew);
           [done| |done| | | |].
         * simpl. eapply (proj2 Hobl (pa_st ag) (pc_dev cf) aq rl base tvs);
@@ -417,11 +420,13 @@ Section stepout.
         * by rewrite tlabel_ts_length.
         * simpl. rewrite Hcimg Hclog.
           eapply (read_ok_pf pstep pdev TS img ps Hwf Hwsi Hco Hwfl Himg Hnag
-                    done e T ev ag (LRmw aq rl base tvs data) base tvs false);
-            [done|done|done|done|done|done|exact Hlbe|done|done|exact Hro|done].
+                    done e T ev ag (LRmw aq rl base tvs data asrc vsrc) base
+                    tvs false);
+            [done|done|done|done|done|done|exact Hlbe|done|done| |done].
+          exact Hro.
         * simpl. rewrite Hclog.
           eapply (excl_ok_pf pstep pdev TS ps Hwf Hco Hwfl Hnag
-                    done e T ev ag f aq rl base tvs data ts);
+                    done e T ev ag f aq rl base tvs data asrc vsrc ts);
             [done|done|done|done|done|exact Hlbe|exact Hts|].
           by rewrite Hlbe.
         * (* THE PINNED CLASS (G6a) — as in [WeakRobustSim.Qinv_step] *)
@@ -455,8 +460,46 @@ Section stepout.
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe.
       + rewrite Hstpost Hlogq.
-        apply (PFDev pstep pcls e.1 cf (WPAgent (pa_st ag)
-                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
+        apply (PFDev pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
+                 dnew);
+          [done|]. simpl. exact Hpure.
+    - (* ---- LRegW ---- *)
+      destruct Hok as (Hf & Hts0).
+      have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
+      have Hlogq : pf_log TS (done ++ [e]) = pc_log cf.
+      { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
+      eapply (qcfg_step_ex done e T ev ag2 cf
+                 (regw_post (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) rdw (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) wsrc))
+                 (LRegW rdw wsrc));
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe.
+      + rewrite Hstpost Hlogq.
+        apply (PFRegW pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 rdw wsrc st' dnew);
+          [done|]. simpl. exact Hpure.
+    - (* ---- LCtrl ---- *)
+      destruct Hok as (Hf & Hts0).
+      have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
+      have Hlogq : pf_log TS (done ++ [e]) = pc_log cf.
+      { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
+      eapply (qcfg_step_ex done e T ev ag2 cf
+                 (ctrl_post (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) (srcs_view (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) csrc)) (LCtrl csrc));
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe.
+      + rewrite Hstpost Hlogq.
+        apply (PFCtrl pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 csrc st' dnew);
+          [done|]. simpl. exact Hpure.
+    - (* ---- LInstr ---- *)
+      destruct Hok as (Hf & Hts0).
+      have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
+      have Hlogq : pf_log TS (done ++ [e]) = pc_log cf.
+      { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
+      eapply (qcfg_step_ex done e T ev ag2 cf (instr_post (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init)) LInstr);
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe.
+      + rewrite Hstpost Hlogq.
+        apply (PFInstr pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
   Qed.
@@ -1587,29 +1630,36 @@ Section coneblocks.
       as (ag2 & ag2' & st2 & f2 & Hag2 & Hag2' & Hps2 & Hok2 & Hagn2).
     have Hshape : ∃ (base : Z) tvs (jb : nat) (v : bv 8),
         a = base + Z.of_nat jb ∧ tvs !! jb = Some (t, v) ∧
-        ((∃ aq lat, ae_lb ev2 = LLoad aq lat base tvs) ∨
-         (∃ aq rl data ts, ae_lb ev2 = LRmw aq rl base tvs data ∧
-                           ae_ts ev2 = Some ts)).
+        ((∃ aq lat asrc, ae_lb ev2 = LLoad aq lat base tvs asrc) ∨
+         (∃ aq rl data asrc vsrc ts,
+            ae_lb ev2 = LRmw aq rl base tvs data asrc vsrc ∧
+            ae_ts ev2 = Some ts)).
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
-      destruct l2 as [|aq lat base tvs|rl base data
-                     |aq rl base tvs data|pr pw sr sw|];
+      destruct l2 as [|aq lat base tvs asrc|rl base data asrc vsrc
+                     |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
+                     |csrc|];
         simpl in Hinrd;
         [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
-        | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd].
+        | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
+        |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
+        |by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
-        split_and!; [done|done|left; by exists aq, lat].
+        split_and!; [done|done|left; by exists aq, lat, asrc].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         destruct Hok2 as (ts2 & k2 & _ & _ & _ & _ & _ & _ & _ & Hts2).
         exists base, tvs, jb, v.
-        split_and!; [done|done|right; by exists aq, rl, data, ts2]. }
+        split_and!; [done|done|right; by exists aq, rl, data, asrc, vsrc, ts2]. }
     destruct Hshape as (base & tvs & jb & v & Ha & Htv & Hlbsh).
     have Hlbv : log_byte (pt_img TS) (pt_log TS) t (base + Z.of_nat jb)
                 = Some v.
     { eapply (astep_read_log_byte (pt_img TS) (pt_log TS) b2.1 ag2
                 (ae_lb ev2) f2 (ae_ts ev2) base tvs jb t v Hok2); [|exact Htv].
-      destruct Hlbsh as [(aq & lat & Hl)|(aq & rl & data & ts & Hl & _)];
-        [left; by exists aq, lat|right; by exists aq, rl, data]. }
+      destruct Hlbsh
+        as [(aq & lat & asrc & Hl)
+           |(aq & rl & data & asrc & vsrc & ts & Hl & _)];
+        [left; by exists aq, lat, asrc
+        |right; by exists aq, rl, data, asrc, vsrc]. }
     have Hbyte : is_Some (msg_byte m (base + Z.of_nat jb)).
     { rewrite (log_byte_pos (pt_img TS) (pt_log TS) t m _ Htpos Hlogm) in Hlbv.
       by exists v. }

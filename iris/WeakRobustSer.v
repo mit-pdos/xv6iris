@@ -125,7 +125,8 @@ Section astep.
     log !! (ts - 1)%nat = Some m → is_Some (msg_byte m a) →
     (ts ≤ coh (f (pa_ws ag)) a)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -135,14 +136,17 @@ Section astep.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & Ha).
       simpl in Hj, Ha. subst a.
       have Hacc : base + Z.of_nat j = acc_addr base j by rewrite /acc_addr.
-      rewrite Hacc. by apply store_post_run_coh.
+      rewrite Hacc. by apply store_post_run_d_coh.
     - intros (ts' & kc & _ & _ & Hlog & _ & _ & _ & -> & Heq) Hm Hb.
       injection Heq as Heq. subst ts'.
       rewrite Hlog in Hm. simplify_eq.
       destruct (msg_byte_in_range _ _ Hb) as (j & Hj & Ha).
       simpl in Hj, Ha. subst a.
       have Hacc : base + Z.of_nat j = acc_addr base j by rewrite /acc_addr.
-      rewrite Hacc. by apply store_post_run_coh.
+      rewrite Hacc. by apply store_post_run_d_coh.
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.
@@ -155,7 +159,8 @@ Section astep.
     astep_ok img log i ag l f (Some ts) → (a, tr) ∈ lb_reads l →
     (tr < ts)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -166,8 +171,12 @@ Section astep.
       have Hts : (tvs.*1) !! j = Some tr by rewrite list_lookup_fmap Hj.
       have Hjlt : (j < length data)%nat.
       { rewrite -Hlen. by eapply lookup_lt_Some. }
-      have Hge := load_post_run_coh (pa_ws ag) aq base (tvs.*1) j tr Hts.
+      have Hge := load_post_run_d_coh (pa_ws ag) aq
+                    (srcs_view (pa_ws ag) asrc) base (tvs.*1) j tr Hts.
       have Hlt := Hcoh j Hjlt. rewrite /acc_addr in Hge. lia.
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.
@@ -180,7 +189,8 @@ Section astep.
     astep_ok img log i ag l f (Some ts) → (a, tr) ∈ lb_reads l →
     ¬ writes_in_by log (λ tid, tid ≠ Some i) a tr (ts - 1)%nat.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -189,6 +199,9 @@ Section astep.
              [j [v [Hj ->]]]%elem_of_tvs_reads.
       injection Heq as Heq. subst tsf.
       exact (Hexcl j tr v Hj).
+    - by intros [_ ?].
+    - by intros [_ ?].
+    - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
   Qed.

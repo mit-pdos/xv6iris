@@ -241,17 +241,24 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
     : Prop :=
   match l with
   | LSilent => wglog σ' = wglog σ /\ wgws σ' c = wgws σ c
-  | LLoad aq lat base tvs =>
-      lat = false /\
+  (* D2: the event language emits EMPTY operand lists (D3 supplies
+     [deps_of_bits]), so every memory arm PINS them to [[]] and the σ-effect
+     stays the dependency-free step function verbatim.  [WeakEvInst] then
+     converts to the machine's [_d] form by [srcs_view_nil] +
+     [load_post_run_d_0] / [store_post_run_d_0]. *)
+  | LLoad aq lat base tvs asrc =>
+      lat = false /\ asrc = [] /\
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq lat base tvs /\
       wglog σ' = wglog σ /\
       wgws σ' c = load_post_run (wgws σ c) aq base tvs.*1
-  | LStore rl base data =>
+  | LStore rl base data asrc vsrc =>
+      asrc = [] /\ vsrc = [] /\
       (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]) /\
       data <> [] /\
       wgws σ' c = store_post_run (wgws σ c) rl base (length data)
                     (S (length (wglog σ)))
-  | LRmw aq rl base tvs data =>
+  | LRmw aq rl base tvs data asrc vsrc =>
+      asrc = [] /\ vsrc = [] /\
       data <> [] /\ length tvs = length data /\
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ))) /\
@@ -265,6 +272,8 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
      [pdev] can only see that in the label — so they will be relabelled
      [LDev].  The memory effect is the silent one, verbatim. *)
   | LDev => wglog σ' = wglog σ /\ wgws σ' c = wgws σ c
+  (* the three dependency-only labels: the D2 language emits none *)
+  | LRegW _ _ | LCtrl _ | LInstr => False
   end.
 
 (** The disk agent's version.  Since M5 the disk is an ORDINARY weak-memory
@@ -276,12 +285,13 @@ Definition edlabel_ok (P : epool) (σ : wgstate) (l : wlabel)
     (dws' : wstate) (σ' : wgstate) : Prop :=
   match l with
   | LSilent => wglog σ' = wglog σ /\ dws' = ep_dws P
-  | LLoad aq lat base tvs =>
-      lat = false /\
+  | LLoad aq lat base tvs asrc =>
+      lat = false /\ asrc = [] /\
       read_ok (img_z (wgimg σ)) (wglog σ) (ep_dws P) aq lat base tvs /\
       wglog σ' = wglog σ /\
       dws' = load_post_run (ep_dws P) aq base tvs.*1
-  | LStore rl base data =>
+  | LStore rl base data asrc vsrc =>
+      asrc = [] /\ vsrc = [] /\
       (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some n_disk) k]) /\
       data <> [] /\
       dws' = store_post_run (ep_dws P) rl base (length data)
@@ -291,7 +301,8 @@ Definition edlabel_ok (P : epool) (σ : wgstate) (l : wlabel)
   (* the fabric marker, [LSilent]'s twin: the disk's own fabric reads and
      writes are silent-effect steps that touch the fabric *)
   | LDev => wglog σ' = wglog σ /\ dws' = ep_dws P
-  | LRmw _ _ _ _ _ => False
+  | LRmw _ _ _ _ _ _ _ => False
+  | LRegW _ _ | LCtrl _ | LInstr => False
   end.
 
 Lemma wbytes_ne (n : N) {w : N} (v : bv w) : n <> 0%N -> wbytes n v <> [].
@@ -540,16 +551,21 @@ Proof.
     + intros (_ & [(_ & w & tvs & _ & _ & Hrd & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & Hrd & Hex & Hne & Hlend & _ & _ & _ & ->)]).
-      * eexists (LLoad _ false _ tvs).
-        split_and!; [reflexivity|exact Hrd|reflexivity|apply gws_insert_eq].
-      * eexists (LRmw _ rl _ tvs data).
-        split_and!; [exact Hne|exact Hlend|exact Hrd|exact Hex| |].
+      * eexists (LLoad _ false _ tvs []).
+        split_and!;
+          [reflexivity|reflexivity|exact Hrd|reflexivity|apply gws_insert_eq].
+      * eexists (LRmw _ rl _ tvs data [] []).
+        split_and!;
+          [reflexivity|reflexivity|exact Hne|exact Hlend|exact Hrd|exact Hex
+          | |].
         { exists WCexcl. reflexivity. }
         apply gws_insert_eq.
   - (* MemWrite *)
     destruct (dev_addr _).
     + intros (d' & _ & _ & ->). exists LDev. by split.
-    + intros (Hn & _ & ->). eexists (LStore _ _ _). split_and!.
+    + intros (Hn & _ & ->). eexists (LStore _ _ _ [] []). split_and!.
+      * reflexivity.
+      * reflexivity.
       * eexists. reflexivity.
       * by apply wbytes_ne.
       * rewrite wbytes_length. apply gws_insert_eq.
@@ -583,10 +599,10 @@ Proof.
          |[(_ & -> & ->)
          |(p' & _ & _ & -> & ->)]]]]]]].
   - exists LDev. do 2 eexists. split; [reflexivity|by split].
-  - eexists (LLoad _ false _ tvs). do 2 eexists. split; [reflexivity|].
+  - eexists (LLoad _ false _ tvs []). do 2 eexists. split; [reflexivity|].
     by split_and!.
-  - eexists (LStore false _ bs). do 2 eexists. split; [reflexivity|].
-    split_and!; [by eexists|exact Hne|reflexivity].
+  - eexists (LStore false _ bs [] []). do 2 eexists. split; [reflexivity|].
+    split_and!; [reflexivity|reflexivity|by eexists|exact Hne|reflexivity].
   - eexists (LFence _ _ _ _). do 2 eexists. split; [reflexivity|by split].
   - exists LDev. do 2 eexists. split; [reflexivity|by split].
   - exists LSilent. do 2 eexists. split; [reflexivity|by split].

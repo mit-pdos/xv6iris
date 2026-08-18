@@ -418,7 +418,7 @@ Definition xcls_canon (i : agent) (l : wlabel) (c c' : wpcfg pxv6 unit) : Prop :
 
 Definition xrmw_tight (i : agent) (l : wlabel) (c : wpcfg pxv6 unit) : Prop :=
   match l with
-  | WeakPromise.LRmw aq _ base tvs _ =>
+  | WeakPromise.LRmw aq _ base tvs _ _ _ =>
       ∀ ag, pc_ags c !! i = Some ag →
         read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs
   | _ => True
@@ -447,10 +447,12 @@ Lemma pf_xquiet_nolog next i l (c c' : wpcfg pxv6 unit) :
 Proof.
   intros Hq Hstep. destruct Hstep as
     [cfg ag st' Hlk Hps
-    |cfg ag aq lat base tvs st' Hlk Hps Hr
-    |cfg ag rl base data kk st' Hlk Hps Hne Hkc
-    |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps]; try done;
+    |cfg ag aq lat base tvs asrc st' Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk st' Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc kk st' Hlk Hps Hne Hlen Hr He Hkc
+    |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps
+    |cfg ag rdw wsrc st' Hlk Hps|cfg ag csrc st' Hlk Hps
+    |cfg ag st' Hlk Hps]; try done;
     by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx.
 Qed.
 
@@ -468,16 +470,21 @@ Proof.
   intros (l & Hstep & _ & _). exists i, l.
   destruct Hstep as
     [cfg ag st' Hlk Hps
-    |cfg ag aq lat base tvs st' Hlk Hps Hr
-    |cfg ag rl base data kk st' Hlk Hps Hne Hkc
-    |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps];
+    |cfg ag aq lat base tvs asrc st' Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk st' Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc kk st' Hlk Hps Hne Hlen Hr He Hkc
+    |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps
+    |cfg ag rdw wsrc st' Hlk Hps|cfg ag csrc st' Hlk Hps
+    |cfg ag st' Hlk Hps];
     [ by eapply PFSilent, pstep_ni_xv6_step
     | by eapply PFLoad; [done|apply pstep_ni_xv6_step|done]
     | by eapply PFStore; [done|apply pstep_ni_xv6_step|done|done]
     | by eapply PFRmw; [done|apply pstep_ni_xv6_step|done|done|done|done|done]
     | by eapply PFFence; [done|apply pstep_ni_xv6_step]
-    | by eapply PFDev, pstep_ni_xv6_step ].
+    | by eapply PFDev, pstep_ni_xv6_step
+    | by eapply PFRegW, pstep_ni_xv6_step
+    | by eapply PFCtrl, pstep_ni_xv6_step
+    | by eapply PFInstr, pstep_ni_xv6_step ].
 Qed.
 
 Lemma pf_xsolo_rtc_run next i c c' :
@@ -509,10 +516,12 @@ Section lift.
     intros Hstep Hcls Hrmw (Himg & Hlog & agx & ags & Hax & Has & Hst & Hws & Hpr).
     destruct Hstep as
       [cfg ag st' dd Hlk Hps
-      |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-      |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
-      |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps]; destruct dd;
+      |cfg ag aq lat base tvs asrc st' dd Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk st' dd Hlk Hps Hne Hkc
+      |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
+      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
+      |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
+      |cfg ag st' dd Hlk Hps]; destruct dd;
       simpl in Has, Himg, Hlog; rewrite Hlk in Has; injection Has as <-.
     - (* silent *)
       exists (WPCfgU (pc_img c) (pc_log c)
@@ -529,14 +538,17 @@ Section lift.
           |exact (lookup_insert_self _ _ _ _ Hlk)|done|exact Hws|exact Hpr].
       + intros j Hj. simpl. by apply lookup_insert_other.
     - (* load *)
-      have Hr' : read_ok (pc_img c) (pc_log c) (pa_ws agx) aq lat base tvs
+      have Hr' : read_ok_d (pc_img c) (pc_log c) (pa_ws agx) aq lat base tvs
+                   (srcs_view (pa_ws agx) asrc)
         by rewrite Himg Hlog Hws.
       exists (WPCfgU (pc_img c) (pc_log c)
                (<[i := WPAgent (PHart st')
-                         (load_post_run (pa_ws agx) aq base tvs.*1)
+                         (load_post_run_d (pa_ws agx) aq
+                            (srcs_view (pa_ws agx) asrc) base tvs.*1)
                          (pa_prom agx)]> (pc_ags c))).
       split_and!.
-      + apply (PFLoad (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx aq lat base tvs (PHart st') tt
+      + apply (PFLoad (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx aq
+                 lat base tvs asrc (PHart st') tt
                  Hax); [rewrite Hst /=; exact Hps|exact Hr'].
       + by apply xcls_canon_nolog.
       + exact I.
@@ -546,16 +558,19 @@ Section lift.
           |exact (lookup_insert_self _ _ _ _ Hlk)|done|by rewrite /= Hws|exact Hpr].
       + intros j Hj. simpl. by apply lookup_insert_other.
     - (* store *)
-      have Hkk : kk = lbl_class (WeakPromise.LStore rl base data) (pa_ws ag)
+      have Hkk : kk = lbl_class (WeakPromise.LStore rl base data asrc vsrc) (pa_ws ag)
         by exact (Hcls ag (WMsg base data (Some i) kk) Hlk eq_refl).
       exists (WPCfgU (pc_img c) (pc_log c ++ [WMsg base data (Some i) kk])
                (<[i := WPAgent (PHart st')
-                         (store_post_run (pa_ws agx) rl base (length data)
+                         (store_post_run_d (pa_ws agx) rl
+                            (srcs_view (pa_ws agx) asrc)
+                            (srcs_view (pa_ws agx) vsrc)
+                            base (length data)
                             (S (length (pc_log c)))) (pa_prom agx)]>
                   (pc_ags c))).
       split_and!.
-      + apply (PFStore (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx rl base data kk
-                 (PHart st') tt Hax);
+      + apply (PFStore (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx rl
+                 base data asrc vsrc kk (PHart st') tt Hax);
           [rewrite Hst /=; exact Hps|exact Hne|by rewrite Hws].
       + intros ag2 msg Hag2 Heq. simpl in Heq.
         apply app_inv_head in Heq. injection Heq as <-.
@@ -568,22 +583,26 @@ Section lift.
           |by rewrite /= Hws Hlog|exact Hpr].
       + intros j Hj. simpl. by apply lookup_insert_other.
     - (* rmw *)
-      have Hkk : kk = lbl_class (WeakPromise.LRmw aq rl base tvs data)
+      have Hkk : kk = lbl_class (WeakPromise.LRmw aq rl base tvs data asrc vsrc)
                         (pa_ws ag)
         by exact (Hcls ag (WMsg base data (Some i) kk) Hlk eq_refl).
-      have Hr' : read_ok (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
+      have Hr' : read_ok_d (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
+                   (srcs_view (pa_ws agx) asrc)
         by rewrite Himg Hlog Hws.
       have He' : excl_ok (pc_log c) i base tvs (S (length (pc_log c)))
         by rewrite Hlog.
       exists (WPCfgU (pc_img c) (pc_log c ++ [WMsg base data (Some i) kk])
                (<[i := WPAgent (PHart st')
-                         (store_post_run
-                            (load_post_run (pa_ws agx) aq base tvs.*1)
-                            rl base (length data) (S (length (pc_log c))))
+                         (store_post_run_d
+                            (load_post_run_d (pa_ws agx) aq
+                               (srcs_view (pa_ws agx) asrc) base tvs.*1)
+                            rl (srcs_view (pa_ws agx) asrc)
+                               (srcs_view (pa_ws agx) vsrc)
+                            base (length data) (S (length (pc_log c))))
                          (pa_prom agx)]> (pc_ags c))).
       split_and!.
-      + apply (PFRmw (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx aq rl base tvs data kk
-                 (PHart st') tt Hax);
+      + apply (PFRmw (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx aq rl
+                 base tvs data asrc vsrc kk (PHart st') tt Hax);
           [rewrite Hst /=; exact Hps|exact Hne|exact Hlen|exact Hr'|exact He'
           |by rewrite Hws].
       + intros ag2 msg Hag2 Heq. simpl in Heq.
@@ -625,6 +644,54 @@ Section lift.
         eexists _, _. split_and!;
           [exact (lookup_insert_self _ _ _ _ Hax)
           |exact (lookup_insert_self _ _ _ _ Hlk)|done|exact Hws|exact Hpr].
+      + intros j Hj. simpl. by apply lookup_insert_other.
+    - (* regw *)
+      exists (WPCfgU (pc_img c) (pc_log c)
+               (<[i := WPAgent (PHart st') (regw_post (pa_ws agx) rdw (srcs_view (pa_ws agx) wsrc)) (pa_prom agx)]>
+                  (pc_ags c))).
+      split_and!.
+      + apply (PFRegW (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx
+                 rdw wsrc (PHart st') tt Hax).
+        rewrite Hst /=. exact Hps.
+      + by apply xcls_canon_nolog.
+      + exact I.
+      + split_and!; [exact Himg|exact Hlog|].
+        eexists _, _. split_and!;
+          [exact (lookup_insert_self _ _ _ _ Hax)
+          |exact (lookup_insert_self _ _ _ _ Hlk)|done|by rewrite /= Hws
+          |exact Hpr].
+      + intros j Hj. simpl. by apply lookup_insert_other.
+    - (* ctrl *)
+      exists (WPCfgU (pc_img c) (pc_log c)
+               (<[i := WPAgent (PHart st') (ctrl_post (pa_ws agx) (srcs_view (pa_ws agx) csrc)) (pa_prom agx)]>
+                  (pc_ags c))).
+      split_and!.
+      + apply (PFCtrl (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx
+                 csrc (PHart st') tt Hax).
+        rewrite Hst /=. exact Hps.
+      + by apply xcls_canon_nolog.
+      + exact I.
+      + split_and!; [exact Himg|exact Hlog|].
+        eexists _, _. split_and!;
+          [exact (lookup_insert_self _ _ _ _ Hax)
+          |exact (lookup_insert_self _ _ _ _ Hlk)|done|by rewrite /= Hws
+          |exact Hpr].
+      + intros j Hj. simpl. by apply lookup_insert_other.
+    - (* instr *)
+      exists (WPCfgU (pc_img c) (pc_log c)
+               (<[i := WPAgent (PHart st') (instr_post (pa_ws agx)) (pa_prom agx)]>
+                  (pc_ags c))).
+      split_and!.
+      + apply (PFInstr (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx
+                 (PHart st') tt Hax).
+        rewrite Hst /=. exact Hps.
+      + by apply xcls_canon_nolog.
+      + exact I.
+      + split_and!; [exact Himg|exact Hlog|].
+        eexists _, _. split_and!;
+          [exact (lookup_insert_self _ _ _ _ Hax)
+          |exact (lookup_insert_self _ _ _ _ Hlk)|done|by rewrite /= Hws
+          |exact Hpr].
       + intros j Hj. simpl. by apply lookup_insert_other.
   Qed.
 
@@ -1280,14 +1347,9 @@ Proof. apply w_relp_store_post_bytes. Qed.
 Lemma w_relp_aev_post {D : Type} (σ σ' : nat → nat) (ev : aev D) w w' :
   w_relp w = w_relp w' → w_relp (aev_post σ ev w) = w_relp (aev_post σ' ev w').
 Proof.
-  intros Heq. rewrite /aev_post.
-  destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                         |pr pw sr sw|];
-    [done| | | |by rewrite /fence_post /= Heq|done].
-  - by rewrite !w_relp_load_post_run.
-  - destruct (ae_ts ev) as [ts|]; [|done]. by apply w_relp_store_post_run.
-  - destruct (ae_ts ev) as [ts|]; [|done].
-    apply w_relp_store_post_run. by rewrite !w_relp_load_post_run.
+  (* D2: this is [WeakRobustProv.w_relp_aev_post_indep] verbatim — the local
+     copy predates it and is kept only for the name. *)
+  apply w_relp_aev_post_indep.
 Qed.
 
 Lemma w_relp_aevs_post {D : Type} (σ σ' : nat → nat) (evs : list (aev D)) w w' :
@@ -1325,10 +1387,10 @@ Proof.
     destruct (dev_addr (Interface.ReadReq.pa req));
       [by intros [-> _] _ Hw1 _; simpl in Hw1|].
     intros [_ H1] [_ H2] Hw1 Hw2 w.
-    destruct l1 as [|aq1 lat1 base1 tvs1|rl1 base1 data1
-                   |aq1 rl1 base1 tvs1 data1|????|]; try done.
-    destruct l2 as [|aq2 lat2 base2 tvs2|rl2 base2 data2
-                   |aq2 rl2 base2 tvs2 data2|????|]; try done.
+    destruct l1 as [|aq1 lat1 base1 tvs1 as1|rl1 base1 data1 as1 vs1
+                   |aq1 rl1 base1 tvs1 data1 as1 vs1|????| |??|?|]; try done.
+    destruct l2 as [|aq2 lat2 base2 tvs2 as2|rl2 base2 data2 as2 vs2
+                   |aq2 rl2 base2 tvs2 data2 as2 vs2|????| |??|?|]; try done.
   - (* MemWrite *)
     revert H1 H2 Hw1 Hw2.
     destruct (dev_addr (Interface.WriteReq.pa req));
@@ -1364,15 +1426,21 @@ Proof.
   intros Hoc Hstep.
   destruct Hstep as
     [cfg ag0 st' dd Hlk0 Hps
-    |cfg ag0 aq0 lat0 base0 tvs0 st' dd Hlk0 Hps Hr
-    |cfg ag0 rl0 base0 data0 kk st' dd Hlk0 Hps Hne
-    |cfg ag0 aq0 rl0 base0 tvs0 data0 kk st' dd Hlk0 Hps Hne Hlen Hr He Hkc
+    |cfg ag0 aq0 lat0 base0 tvs0 asrc0 st' dd Hlk0 Hps Hr
+    |cfg ag0 rl0 base0 data0 asrc0 vsrc0 kk st' dd Hlk0 Hps Hne
+    |cfg ag0 aq0 rl0 base0 tvs0 data0 asrc0 vsrc0 kk st' dd
+         Hlk0 Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr0 pw0 sr0 sw0 st' dd Hlk0 Hps
+    |cfg ag0 st' dd Hlk0 Hps
+    |cfg ag0 rdw0 wsrc0 st' dd Hlk0 Hps|cfg ag0 csrc0 st' dd Hlk0 Hps
     |cfg ag0 st' dd Hlk0 Hps]; try exact I.
   simpl. intros ag Hlk. rewrite Hlk0 in Hlk. injection Hlk as <-.
-  have Hlat := pf_rmw_latest cfg i ag0 aq0 base0 tvs0 Hoc Hlk0 Hr He.
+  have Hlat := pf_rmw_latest cfg i ag0 aq0 base0 tvs0 (srcs_view (pa_ws ag0) asrc0) Hoc Hlk0 Hr He.
   intros j t v Htv. destruct (Hr j t v Htv) as (H1 & H2 & _).
-  split_and!; [exact H1|exact H2|intros _].
+  split_and!;
+    [exact H1
+    |eapply readable_anti_vpre; [apply load_vpre_load_vpre_d|exact H2]
+    |intros _].
   have Hj : tvs0.*1 !! j = Some t by rewrite list_lookup_fmap Htv.
   by destruct (Hlat j t Hj) as (_ & Hnw).
 Qed.
@@ -1743,10 +1811,12 @@ Lemma wp_pf_step_agent {P D : Type} (pstep : P → D → wlabel → P → D → 
 Proof.
   intros Hstep. destruct Hstep as
     [cfg ag st' Hlk Hps
-    |cfg ag aq lat base tvs st' Hlk Hps Hr
-    |cfg ag rl base data kk st' Hlk Hps Hne Hkc
-    |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps]; by exists ag.
+    |cfg ag aq lat base tvs asrc st' Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk st' Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc kk st' Hlk Hps Hne Hlen Hr He Hkc
+    |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps
+    |cfg ag rdw wsrc st' Hlk Hps|cfg ag csrc st' Hlk Hps
+    |cfg ag st' Hlk Hps]; by exists ag.
 Qed.
 
 (** THE BISIMULATION for a solo step: same label, same log growth, same
@@ -1928,11 +1998,13 @@ Proof.
     destruct (dev_addr _); try (by intros [_ ->] Hm).
   - (* MemRead, RAM *)
     intros [_ H].
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                  |pr pw sr sw|]; try done.
-    + destruct lat; [done|].
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+      try done.
+    + destruct lat; [done|]. destruct asrc as [|x asrc']; [|done].
       by destruct H as (_ & _ & _ & w & _ & ->).
-    + by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
+    + destruct asrc as [|x asrc']; [|done]. destruct vsrc as [|y vsrc']; [|done].
+      by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite, RAM *)
     by intros (_ & _ & ->).
 Qed.
@@ -2045,10 +2117,12 @@ Proof.
   intros Hstep.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
-    |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps]; destruct dd;
+    |cfg ag aq lat base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
+    |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
+    |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
+    |cfg ag st' dd Hlk Hps]; destruct dd;
     destruct (pstep_xv6_ni_or_irq next (pa_st ag) _ st' Hps)
       as [Hni|(q & q' & Hq & Hq' & Hf & Hirq)];
     try (by left; econstructor; eauto);
@@ -2241,6 +2315,12 @@ Lemma w_relp_ag_store (st' : pxv6) ws rl base n t pr :
   w_relp (pa_ws (WPAgent st' (store_post_run ws rl base n t) pr)) = false.
 Proof. apply w_relp_store_post_run_ne. Qed.
 
+Lemma w_relp_ag_store_d (st' : pxv6) ws rl va vd base n t pr :
+  (0 < n)%nat →
+  w_relp (pa_ws (WPAgent st' (store_post_run_d ws rl va vd base n t) pr))
+  = false.
+Proof. apply store_post_run_d_relp. Qed.
+
 Definition disk_relp (c : wpcfg pxv6 unit) : Prop :=
   ∀ j ag dd pend, pc_ags c !! j = Some ag → pa_st ag = PDisk dd pend →
     w_relp (pa_ws ag) = false.
@@ -2257,10 +2337,12 @@ Proof. destruct p as [q|d0 p0]; [by intros []|by eauto]. Qed.
 
 Lemma pstep_xv6_disk_lbl next d0 p0 l p' :
   pstep_xv6 next (PDisk d0 p0) l p' →
-  l = WeakPromise.LSilent ∨ ∃ rl base data, l = WeakPromise.LStore rl base data.
+  l = WeakPromise.LSilent ∨
+  ∃ rl base data, l = WeakPromise.LStore rl base data [] [].
 Proof.
   destruct p' as [?|d1 p1]; [by intros []|].
-  intros [(-> & _)|(m & r & _ & _ & _ & ->)]; [by left|by right; eauto].
+  intros [(-> & _)|(m & r & _ & _ & _ & ->)]; [by left|].
+  right. by eexists _, _, _.
 Qed.
 
 Lemma disk_relp_step next i l (c c' : wpcfg pxv6 unit) :
@@ -2269,10 +2351,12 @@ Proof.
   intros Hdr Hstep.
   destruct Hstep as
     [cfg ag st' dv Hlk Hps
-    |cfg ag aq lat base tvs st' dv Hlk Hps Hr
-    |cfg ag rl base data kk st' dv Hlk Hps Hne Hkc
-    |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
-    |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps];
+    |cfg ag aq lat base tvs asrc st' dv Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk st' dv Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data asrc vsrc kk st' dv Hlk Hps Hne Hlen Hr He Hkc
+    |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps
+    |cfg ag rdw wsrc st' dv Hlk Hps|cfg ag csrc st' dv Hlk Hps
+    |cfg ag st' dv Hlk Hps];
     intros j agj dd pend Hlkj Hstj; simpl in Hlkj;
     (destruct (decide (j = i)) as [->|Hne2];
      [rewrite (lookup_insert_self _ _ _ _ Hlk) in Hlkj;
@@ -2286,7 +2370,7 @@ Proof.
            as [Hc|(? & ? & ? & Hc)]).
   - (* silent *) simpl. by eapply Hdr.
   - (* store *)
-    apply w_relp_ag_store. destruct data; [done|]. simpl. lia.
+    apply w_relp_ag_store_d. destruct data; [done|]. simpl. lia.
 Qed.
 
 Lemma disk_relp_run next (c c' : wpcfg pxv6 unit) :
@@ -2329,10 +2413,12 @@ Proof.
   { intros ->. apply (Hnb ag' Hlk'). by rewrite Hst'. }
   destruct Hstep as
     [cfg ag0 st' dv Hlk0 Hps
-    |cfg ag0 aq lat base tvs st' dv Hlk0 Hps Hr
-    |cfg ag0 rl base data kk st' dv Hlk0 Hps Hne Hkc
-    |cfg ag0 aq rl base tvs data kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
-    |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps];
+    |cfg ag0 aq lat base tvs asrc st' dv Hlk0 Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk st' dv Hlk0 Hps Hne Hkc
+    |cfg ag0 aq rl base tvs data asrc vsrc kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
+    |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps
+    |cfg ag0 rdw wsrc st' dv Hlk0 Hps|cfg ag0 csrc st' dv Hlk0 Hps
+    |cfg ag0 st' dv Hlk0 Hps];
     rewrite Hlk' in Hlk0; injection Hlk0 as <-;
     (have Hpsx := pstep_ni_xv6_step _ _ _ _ Hps; rewrite Hst' in Hpsx);
     try (by destruct (pstep_xv6_disk_lbl riscv_step dd' pend _ _ Hpsx)
@@ -2461,10 +2547,12 @@ Proof.
   intros Hbd (l & Hstep & _ & _) ag dd Hlk Hst.
   destruct Hstep as
     [cfg ag0 st' dv Hlk0 Hps
-    |cfg ag0 aq lat base tvs st' dv Hlk0 Hps Hr
-    |cfg ag0 rl base data kk st' dv Hlk0 Hps Hne Hkc
-    |cfg ag0 aq rl base tvs data kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
-    |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps];
+    |cfg ag0 aq lat base tvs asrc st' dv Hlk0 Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk st' dv Hlk0 Hps Hne Hkc
+    |cfg ag0 aq rl base tvs data asrc vsrc kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
+    |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps
+    |cfg ag0 rdw wsrc st' dv Hlk0 Hps|cfg ag0 csrc st' dv Hlk0 Hps
+    |cfg ag0 st' dv Hlk0 Hps];
     rewrite Hlk in Hlk0; injection Hlk0 as <-;
     (have Hpsx := pstep_ni_xv6_step _ _ _ _ Hps; rewrite Hst in Hpsx);
     try (by destruct (pstep_xv6_disk_lbl riscv_step dd [] _ _ Hpsx)
@@ -2556,8 +2644,9 @@ Section package.
     have Hst : pa_st agn2 = st'.
     { have Hx : agn2 = ag' by congruence. by rewrite Hx Heq. }
     rewrite Hst -Hlv in Hps |- *.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
-                  |pr pw sr sw|]; simpl in Hin;
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+      simpl in Hin;
       try (by apply elem_of_nil in Hin);
       (destruct (pa_st ag) as [q|d pend]; destruct st' as [q'|d' pend'];
        simpl in Hps; try done; [by exists q'|]);
@@ -2808,10 +2897,12 @@ Section package.
     intros Hstep Hlog.
     destruct Hstep as
       [cfg ag st' dd Hlk Hps
-      |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-      |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
-      |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
-      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps]; destruct dd; try done;
+      |cfg ag aq lat base tvs asrc st' dd Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk st' dd Hlk Hps Hne Hkc
+      |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
+      |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
+      |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
+      |cfg ag st' dd Hlk Hps]; destruct dd; try done;
       by destruct (app_snoc_absurd _ _ Hlog).
   Qed.
 
@@ -2822,10 +2913,12 @@ Section package.
     intros Hstep Hlk.
     destruct Hstep as
       [cfg ag0 st' dv Hlk0 Hps
-      |cfg ag0 aq lat base tvs st' dv Hlk0 Hps Hr
-      |cfg ag0 rl base data kk st' dv Hlk0 Hps Hne Hkc
-      |cfg ag0 aq rl base tvs data kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
-      |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps];
+      |cfg ag0 aq lat base tvs asrc st' dv Hlk0 Hps Hr
+      |cfg ag0 rl base data asrc vsrc kk st' dv Hlk0 Hps Hne Hkc
+      |cfg ag0 aq rl base tvs data asrc vsrc kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
+      |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps
+      |cfg ag0 rdw wsrc st' dv Hlk0 Hps|cfg ag0 csrc st' dv Hlk0 Hps
+      |cfg ag0 st' dv Hlk0 Hps];
       rewrite Hlk0 in Hlk; injection Hlk as <-; by exists st'.
   Qed.
 
@@ -2872,10 +2965,13 @@ Section package.
         by rewrite /gev_ts Hgev /= in Hts.
       have Hm : ∃ m0, pt_log TS !! (ts - 1)%nat = Some m0 ∧ msg_at TS ts = m0.
       { rewrite /astep_ok Haets in Hok.
-        destruct (ae_lb ev) as [|aq lat base tvs|rl base data
-                               |aq rl base tvs data|pr pw sr sw|];
+        destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
+                               |aq rl base tvs data asrc vsrc|pr pw sr sw|
+                               |rdw wsrc|csrc|];
           [by destruct Hok as (_ & Hc)|by destruct Hok as (_ & _ & Hc)| | |
-           by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)].
+           by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)
+          |by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)
+          |by destruct Hok as (_ & Hc)].
         - destruct Hok as (ts' & kc & _ & Hlog0 & _ & _ & Hts').
           injection Hts' as <-. exists (WMsg base data (Some e.1) kc).
           split; [exact Hlog0|by rewrite /msg_at Hlog0].

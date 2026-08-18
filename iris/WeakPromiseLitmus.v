@@ -88,9 +88,9 @@ Proof. solve_decision. Defined.
     store may be PROMISED before its load has happened. *)
 Inductive lbstep : lbp → wlabel → lbp → Prop :=
 | LBSLoad ald ast t r :
-    lbstep (LBLoad ald ast) (LLoad false false ald [(t, r)]) (LBStore ast r)
+    lbstep (LBLoad ald ast) (LLoad false false ald [(t, r)] []) (LBStore ast r)
 | LBSStore ast r :
-    lbstep (LBStore ast r) (LStore false ast [b1]) (LBDone r).
+    lbstep (LBStore ast r) (LStore false ast [b1] [] []) (LBDone r).
 
 (** LB: hart 0 = [load x; y := 1]; hart 1 = [load y; x := 1]. *)
 Definition lb_p0 : lbp := LBLoad ax ay.
@@ -160,7 +160,7 @@ Proof.
   - intros j Hj. assert (ay + Z.of_nat j = ay) as -> by lia.
     rewrite /load_post_at /= coh_upd_ne; [done|].
     rewrite lookup_empty /=. lia.
-  - rewrite /fulfil_vpre /load_post_at /=. lia.
+  - rewrite /fulfil_vpre_d /fulfil_vpre /load_post_at /=. lia.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -201,20 +201,20 @@ Proof.
     { eapply (WPPromise lbstep' _ 0%nat _ ay [b1] WCplain); [reflexivity|done]. }
     (* 2. hart 1 LOADS y and reads that promise *)
     eapply rtc_l.
-    { eapply (WPLoad lbstep' _ 1%nat _ false false ay [(1%nat, b1)]);
+    { eapply (WPLoad lbstep' _ 1%nat _ false false ay [(1%nat, b1)] []);
         [reflexivity|split; [apply LBSLoad|reflexivity]|apply read_ok_h1]. }
     (* 3. hart 1 STORES x := 1 (promise + immediate fulfil at the fresh top) *)
     eapply rtc_transitive.
-    { eapply (wpstep_store_now lbstep' _ 1%nat _ false ax [b1] WCplain);
+    { eapply (wpstep_store_now lbstep' _ 1%nat _ false ax [b1] [] [] WCplain);
         [reflexivity|split; [apply LBSStore|reflexivity]|done
         |apply ws_bounded_h1|set_solver]. }
     (* 4. hart 0 LOADS x and reads hart 1's store *)
     eapply rtc_l.
-    { eapply (WPLoad lbstep' _ 0%nat _ false false ax [(2%nat, b1)]);
+    { eapply (WPLoad lbstep' _ 0%nat _ false false ax [(2%nat, b1)] []);
         [reflexivity|split; [apply LBSLoad|reflexivity]|apply read_ok_h0]. }
     (* 5. hart 0 FULFILS its ts = 1 promise of y := 1 *)
     eapply rtc_l; [|apply rtc_refl].
-    eapply (WPFulfil lbstep' _ 0%nat _ false ay [b1] WCplain 1%nat);
+    eapply (WPFulfil lbstep' _ 0%nat _ false ay [b1] [] [] WCplain 1%nat);
       [reflexivity|split; [apply LBSStore|reflexivity]|set_solver|reflexivity
       |apply fulfil_ok_h0]. }
   { (* ---- every promise discharged ---- *)

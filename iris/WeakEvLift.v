@@ -423,12 +423,13 @@ Section core.
     - iDestruct ("Hcl" $! (fence_post (wgws σ c) pr pw sr sw) (wglog σ)
                    with "[%] [%] [%] [%] [%] Hlog Hlat Hwsa") as "Hσ".
       + reflexivity.
-      + destruct (Hbnd c) as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+      + destruct (Hbnd c) as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
         rewrite /ws_bounded /fence_post /=. split_and!; try (simpl; lia).
         * destruct sr; [|lia]. destruct pr, pw; simpl; lia.
         * destruct sw; [|lia]. destruct pr, pw; simpl; lia.
         * intros a. exact (H7 a).
         * intros a tv Ha. exact (H8 a tv Ha).
+        * intros r. exact (H9 r).
       + apply (nv_hart_coh_step (wglog σ) c (wgws σ c));
           [exact (no_violation_hart _ _ c Hnv)|].
         intros a Hlt. exfalso. rewrite /fence_post /coh /= in Hlt. lia.
@@ -1236,7 +1237,7 @@ Section ram.
                         (coh (wgws σ c) (base + Z.of_nat j))).
     { intros j Hj Hw. destruct (Htext j Hj) as [_ Hno]. apply Hno.
       eapply writes_in_mono_hi; [|exact Hw].
-      destruct (Hbnd c) as (H1 & _ & H3 & _ & H5 & _ & H7 & _).
+      destruct (Hbnd c) as (H1 & _ & H3 & _ & H5 & _ & H7 & _ & _).
       rewrite /load_vpre.
       pose proof (H7 (base + Z.of_nat j)). destruct aq; lia. }
     have Hrd0 : read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs0.
@@ -1600,12 +1601,13 @@ Section adapter.
     ws_bounded ws n -> ws_bounded (efence_apply ws o) n.
   Proof.
     intros Hb. destruct o as [[[[pr pw] sr] sw]|]; [|exact Hb].
-    destruct Hb as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    destruct Hb as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
     rewrite /ws_bounded /fence_post /=. split_and!; try (simpl; lia).
     - destruct sr; [|lia]. destruct pr, pw; simpl; lia.
     - destruct sw; [|lia]. destruct pr, pw; simpl; lia.
     - intros a. exact (H7 a).
     - intros a tv Ha. exact (H8 a tv Ha).
+    - intros r. exact (H9 r).
   Qed.
 
   Lemma ewp_ev_barrier (gen : nat) (c : CPU) (b : barrier_kind)

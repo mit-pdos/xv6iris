@@ -139,8 +139,8 @@ Local Open Scope Z_scope.
 (** The [rl] bit of a store/rmw label; [false] for everything else. *)
 Definition lb_rl (l : wlabel) : bool :=
   match l with
-  | LStore rl _ _ => rl
-  | LRmw _ rl _ _ _ => rl
+  | LStore rl _ _ _ _ => rl
+  | LRmw _ rl _ _ _ _ _ => rl
   | _ => false
   end.
 
@@ -158,6 +158,13 @@ Proof. apply w_pub_foldl_load. Qed.
 Lemma w_pub_load_post_run ws aq base ts :
   w_pub (load_post_run ws aq base ts) = w_pub ws.
 Proof. apply w_pub_load_post_bytes. Qed.
+
+Lemma w_pub_load_post_run_d ws aq va base ts :
+  w_pub (load_post_run_d ws aq va base ts) = w_pub ws.
+Proof.
+  rewrite /load_post_run_d ctrl_post_pub /load_post_bytes_d.
+  apply w_pub_foldl_load.
+Qed.
 
 Lemma w_pub_foldl_store (rl : bool) as_ (t : nat) :
   ∀ w, (w_pub (foldl (λ w a, store_post w rl a t) w as_)
@@ -178,6 +185,43 @@ Proof.
   have Hrp' : w_relp (store_post w rl a t) = false by rewrite /store_post.
   simpl. rewrite (IH (store_post w rl a t) Hrp' Hrl).
   rewrite /store_post /= Hrp Hrl //.
+Qed.
+
+Lemma w_pub_foldl_store_d (rl : bool) vf as_ (t : nat) :
+  ∀ w, (w_pub (foldl (λ w a, store_post_d w rl vf a t) w as_)
+        ≤ Nat.max (w_pub w) t)%nat.
+Proof.
+  induction as_ as [|a as_ IH]; intros w; [simpl; lia|].
+  simpl. have H := IH (store_post_d w rl vf a t).
+  have Hp : (w_pub (store_post_d w rl vf a t) ≤ Nat.max (w_pub w) t)%nat.
+  { rewrite /store_post_d /=. destruct (w_relp w || rl)%bool; lia. }
+  lia.
+Qed.
+
+Lemma w_pub_foldl_store_d_eq (rl : bool) vf as_ (t : nat) :
+  ∀ w, w_relp w = false → rl = false →
+    w_pub (foldl (λ w a, store_post_d w rl vf a t) w as_) = w_pub w.
+Proof.
+  induction as_ as [|a as_ IH]; intros w Hrp Hrl; [done|].
+  have Hrp' : w_relp (store_post_d w rl vf a t) = false
+    by rewrite /store_post_d.
+  simpl. rewrite (IH (store_post_d w rl vf a t) Hrp' Hrl).
+  rewrite /store_post_d /= Hrp Hrl //.
+Qed.
+
+Lemma w_pub_store_post_run_d_le (rl : bool) va vd base n (t : nat) w :
+  (w_pub (store_post_run_d w rl va vd base n t) ≤ Nat.max (w_pub w) t)%nat.
+Proof.
+  rewrite /store_post_run_d ctrl_post_pub /store_post_bytes_d.
+  apply w_pub_foldl_store_d.
+Qed.
+
+Lemma w_pub_store_post_run_d_eq (rl : bool) va vd base n (t : nat) w :
+  w_relp w = false → rl = false →
+  w_pub (store_post_run_d w rl va vd base n t) = w_pub w.
+Proof.
+  intros ??. rewrite /store_post_run_d ctrl_post_pub /store_post_bytes_d.
+  by apply w_pub_foldl_store_d_eq.
 Qed.
 
 Lemma w_pub_store_post_bytes_le (rl : bool) as_ (t : nat) w :
@@ -210,32 +254,36 @@ Lemma w_pub_aev_post_lt {D : Type} σ (ev : aev D) w (N : nat) :
   (w_pub (aev_post σ ev w) < N)%nat.
 Proof.
   intros Hlt Hraise. rewrite /aev_post.
-  destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
-                          |pr pw sr sw|] eqn:Hlb; [done| | | | |done].
-  - by rewrite w_pub_load_post_run.
+  destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
+                          |aq rl base tvs data asrc vsrc
+                          |pr pw sr sw| |rdw wsrc|csrc|] eqn:Hlb;
+    [done| | | | |done|done|done|done].
+  - by rewrite w_pub_load_post_run_d.
   - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
     destruct (decide (w_relp w = true ∨ rl = true)) as [Hr|Hr].
     + have Hσ : (σ ts < N)%nat.
       { apply (Hraise ts eq_refl). simpl. tauto. }
-      have := w_pub_store_post_run_le rl base (length data) (σ ts) w. lia.
+      have := w_pub_store_post_run_d_le rl (srcs_view w asrc) (srcs_view w vsrc) base (length data) (σ ts) w. lia.
     + have Hrp : w_relp w = false.
       { destruct (w_relp w) eqn:E; [|done]. destruct Hr. by left. }
       have Hrl : rl = false.
       { destruct rl eqn:E; [|done]. destruct Hr. by right. }
-      by rewrite (w_pub_store_post_run_eq rl base (length data) (σ ts) w Hrp Hrl).
+      by rewrite (w_pub_store_post_run_d_eq rl (srcs_view w asrc)
+                    (srcs_view w vsrc) base (length data) (σ ts) w Hrp Hrl).
   - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
-    set w0 := load_post_run w aq base (σ <$> tvs.*1).
-    have Hp0 : w_pub w0 = w_pub w by apply w_pub_load_post_run.
-    have Hr0 : w_relp w0 = w_relp w by apply w_relp_load_post_run.
+    set w0 := load_post_run_d w aq (srcs_view w asrc) base (σ <$> tvs.*1).
+    have Hp0 : w_pub w0 = w_pub w by apply w_pub_load_post_run_d.
+    have Hr0 : w_relp w0 = w_relp w by apply load_post_run_d_relp.
     destruct (decide (w_relp w = true ∨ rl = true)) as [Hr|Hr].
     + have Hσ : (σ ts < N)%nat.
       { apply (Hraise ts eq_refl). simpl. tauto. }
-      have := w_pub_store_post_run_le rl base (length data) (σ ts) w0. lia.
+      have := w_pub_store_post_run_d_le rl (srcs_view w asrc) (srcs_view w vsrc) base (length data) (σ ts) w0. lia.
     + have Hrp : w_relp w0 = false.
       { rewrite Hr0. destruct (w_relp w) eqn:E; [|done]. destruct Hr. by left. }
       have Hrl : rl = false.
       { destruct rl eqn:E; [|done]. destruct Hr. by right. }
-      rewrite (w_pub_store_post_run_eq rl base (length data) (σ ts) w0 Hrp Hrl).
+      rewrite (w_pub_store_post_run_d_eq rl (srcs_view w asrc)
+                 (srcs_view w vsrc) base (length data) (σ ts) w0 Hrp Hrl).
       lia.
   - by rewrite /fence_post /=.
 Qed.
@@ -1038,31 +1086,35 @@ End cone.
 
 Lemma aev_post_coh_read {D : Type} σ (ev : aev D) w (base : Z) tvs (jb : nat) (t : nat) (v : bv 8) :
   tvs !! jb = Some (t, v) →
-  ((∃ aq lat, ae_lb ev = LLoad aq lat base tvs) ∨
-   (∃ aq rl data ts, ae_lb ev = LRmw aq rl base tvs data ∧
-                     ae_ts ev = Some ts)) →
+  ((∃ aq lat asrc, ae_lb ev = LLoad aq lat base tvs asrc) ∨
+   (∃ aq rl data asrc vsrc ts,
+      ae_lb ev = LRmw aq rl base tvs data asrc vsrc ∧
+      ae_ts ev = Some ts)) →
   (σ t ≤ coh (aev_post σ ev w) (base + Z.of_nat jb))%nat.
 Proof.
   intros Htv Hlb.
   have Hfm : (σ <$> tvs.*1) !! jb = Some (σ t)
     by rewrite !list_lookup_fmap Htv.
-  destruct Hlb as [(aq & lat & Hlb)|(aq & rl & data & ts & Hlb & Hts)];
+  destruct Hlb
+    as [(aq & lat & asrc & Hlb)
+       |(aq & rl & data & asrc & vsrc & ts & Hlb & Hts)];
     rewrite /aev_post Hlb.
-  - by apply load_post_run_coh.
-  - rewrite Hts. etrans; [by apply load_post_run_coh|].
-    apply ws_le_coh, store_post_run_le.
+  - by apply load_post_run_d_coh.
+  - rewrite Hts. etrans; [by apply load_post_run_d_coh|].
+    apply ws_le_coh, store_post_run_d_le.
 Qed.
 
 Lemma astep_read_log_byte {P : Type} (img : image) log i (ag : wpagent P)
     l f D (base : Z) tvs (jb : nat) (t : nat) (v : bv 8) :
   astep_ok img log i ag l f D →
-  ((∃ aq lat, l = LLoad aq lat base tvs) ∨
-   (∃ aq rl data, l = LRmw aq rl base tvs data)) →
+  ((∃ aq lat asrc, l = LLoad aq lat base tvs asrc) ∨
+   (∃ aq rl data asrc vsrc, l = LRmw aq rl base tvs data asrc vsrc)) →
   tvs !! jb = Some (t, v) →
   log_byte img log t (base + Z.of_nat jb) = Some v.
 Proof.
   intros Hok Hlb Htv.
-  destruct Hlb as [(aq & lat & ->)|(aq & rl & data & ->)]; simpl in Hok.
+  destruct Hlb as [(aq & lat & asrc & ->)|(aq & rl & data & asrc & vsrc & ->)];
+    simpl in Hok.
   - destruct Hok as (Hro & _ & _). by destruct (Hro jb t v Htv) as (Hv & _).
   - destruct Hok as (ts & k & _ & _ & _ & Hro & _).
     by destruct (Hro jb t v Htv) as (Hv & _).
@@ -1295,30 +1347,37 @@ Section exhibit.
       as (ag2 & ag2' & st2 & f2 & Hag2 & Hag2' & Hps2 & Hok2 & Hagn2).
     have Hshape : ∃ (base : Z) tvs (jb : nat) (v : bv 8),
         a = base + Z.of_nat jb ∧ tvs !! jb = Some (t, v) ∧
-        ((∃ aq lat, ae_lb ev2 = LLoad aq lat base tvs) ∨
-         (∃ aq rl data ts, ae_lb ev2 = LRmw aq rl base tvs data ∧
-                           ae_ts ev2 = Some ts)).
+        ((∃ aq lat asrc, ae_lb ev2 = LLoad aq lat base tvs asrc) ∨
+         (∃ aq rl data asrc vsrc ts,
+            ae_lb ev2 = LRmw aq rl base tvs data asrc vsrc ∧
+            ae_ts ev2 = Some ts)).
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
-      destruct l2 as [|aq lat base tvs|rl base data
-                     |aq rl base tvs data|pr pw sr sw|];
+      destruct l2 as [|aq lat base tvs asrc|rl base data asrc vsrc
+                     |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
+                     |csrc|];
         simpl in Hinrd;
         [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
-        | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd].
+        | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
+        |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
+        |by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
-        split_and!; [done|done|left; by exists aq, lat].
+        split_and!; [done|done|left; by exists aq, lat, asrc].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         destruct Hok2 as (ts2 & k2 & _ & _ & _ & _ & _ & _ & _ & Hts2).
         exists base, tvs, jb, v.
-        split_and!; [done|done|right; by exists aq, rl, data, ts2]. }
+        split_and!; [done|done|right; by exists aq, rl, data, asrc, vsrc, ts2]. }
     destruct Hshape as (base & tvs & jb & v & Ha & Htv & Hlbsh).
     (* the message really writes that byte *)
     have Hlbv : log_byte (pt_img TS) (pt_log TS) t (base + Z.of_nat jb)
                 = Some v.
     { eapply (astep_read_log_byte (pt_img TS) (pt_log TS) b2.1 ag2
                 (ae_lb ev2) f2 (ae_ts ev2) base tvs jb t v Hok2); [|exact Htv].
-      destruct Hlbsh as [(aq & lat & Hl)|(aq & rl & data & ts & Hl & _)];
-        [left; by exists aq, lat|right; by exists aq, rl, data]. }
+      destruct Hlbsh
+        as [(aq & lat & asrc & Hl)
+           |(aq & rl & data & asrc & vsrc & ts & Hl & _)];
+        [left; by exists aq, lat, asrc
+        |right; by exists aq, rl, data, asrc, vsrc]. }
     have Hbyte : is_Some (msg_byte m (base + Z.of_nat jb)).
     { rewrite (log_byte_pos (pt_img TS) (pt_log TS) t m _ Htpos Hlogm) in Hlbv.
       by exists v. }

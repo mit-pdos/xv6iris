@@ -56,9 +56,19 @@ Local Open Scope Z_scope.
     which is why the rmw — the walker's CAS, the kernel's AMOs — is
     lat-free; the only [lat] users are ifetch and read-only walks. *)
 Definition lat_free (l : wlabel) : Prop :=
-  match l with LLoad _ lat _ _ => lat = false | _ => True end.
+  match l with LLoad _ lat _ _ _ => lat = false | _ => True end.
 
-Lemma lat_free_rmw aq rl base tvs data : lat_free (LRmw aq rl base tvs data).
+Lemma lat_free_rmw aq rl base tvs data asrc vsrc :
+  lat_free (LRmw aq rl base tvs data asrc vsrc).
+Proof. done. Qed.
+
+(** The three dependency-only labels are lat-free by inspection — they are
+    not loads at all. *)
+Lemma lat_free_regw rd srcs : lat_free (LRegW rd srcs).
+Proof. done. Qed.
+Lemma lat_free_ctrl srcs : lat_free (LCtrl srcs).
+Proof. done. Qed.
+Lemma lat_free_instr : lat_free LInstr.
 Proof. done. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -107,27 +117,47 @@ Section fact.
       (f : wstate → wstate) (Dl : option nat) : Prop :=
     match l with
     | LSilent => f = id ∧ Dl = None
-    | LLoad aq lat base tvs =>
-        read_ok img log (pa_ws ag) aq lat base tvs ∧
-        f = (λ w, load_post_run w aq base (tvs.*1)) ∧ Dl = None
-    | LStore rl base data =>
+    | LLoad aq lat base tvs asrc =>
+        read_ok_d img log (pa_ws ag) aq lat base tvs
+                  (srcs_view (pa_ws ag) asrc) ∧
+        (* NOTE the [srcs_view w] under the binder: [f] is APPLIED to the
+           replayed [wstate] by [WeakRobustProv.astep_ok_aev_post], so the
+           operand views must be read off ITS argument, not off [pa_ws ag].
+           At [w = pa_ws ag] this is exactly [WPLoad]'s post-state. *)
+        f = (λ w, load_post_run_d w aq (srcs_view w asrc) base (tvs.*1)) ∧
+        Dl = None
+    | LStore rl base data asrc vsrc =>
         ∃ ts k, ts ∈ pa_prom ag ∧
           log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
-          fulfil_ok (pa_ws ag) rl base (length data) ts ∧
-          f = (λ w, store_post_run w rl base (length data) ts) ∧
+          fulfil_ok_d (pa_ws ag) rl base (length data) ts
+            (Nat.max (srcs_view (pa_ws ag) asrc)
+                     (srcs_view (pa_ws ag) vsrc)) ∧
+          f = (λ w, store_post_run_d w rl (srcs_view w asrc)
+                      (srcs_view w vsrc) base (length data) ts) ∧
           Dl = Some ts
-    | LRmw aq rl base tvs data =>
+    | LRmw aq rl base tvs data asrc vsrc =>
         ∃ ts k, length tvs = length data ∧ ts ∈ pa_prom ag ∧
           log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
-          read_ok img log (pa_ws ag) aq false base tvs ∧
+          read_ok_d img log (pa_ws ag) aq false base tvs
+                    (srcs_view (pa_ws ag) asrc) ∧
           excl_ok log i base tvs ts ∧
-          fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
-                    (length data) ts ∧
-          f = (λ w, store_post_run (load_post_run w aq base (tvs.*1))
-                      rl base (length data) ts) ∧
+          fulfil_ok_d (load_post_run_d (pa_ws ag) aq
+                         (srcs_view (pa_ws ag) asrc) base (tvs.*1))
+            rl base (length data) ts
+            (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                              (srcs_view (pa_ws ag) vsrc))
+                     (ldv_of (pa_ws ag) aq (srcs_view (pa_ws ag) asrc)
+                        base (tvs.*1))) ∧
+          f = (λ w, store_post_run_d
+                      (load_post_run_d w aq (srcs_view w asrc) base (tvs.*1))
+                      rl (srcs_view w asrc) (srcs_view w vsrc)
+                      base (length data) ts) ∧
           Dl = Some ts
     | LFence pr pw sr sw => f = (λ w, fence_post w pr pw sr sw) ∧ Dl = None
     | LDev => f = id ∧ Dl = None   (* [LSilent]'s twin *)
+    | LRegW rd srcs => f = (λ w, regw_post w rd (srcs_view w srcs)) ∧ Dl = None
+    | LCtrl srcs => f = (λ w, ctrl_post w (srcs_view w srcs)) ∧ Dl = None
+    | LInstr => f = instr_post ∧ Dl = None
     end.
 
   (** The five non-promise rules of [wpstep], as ONE relation indexed by
@@ -162,7 +192,7 @@ Section fact.
     wp_astep i l c c' → wpstep pstep c c'.
   Proof.
     destruct 1 as [cfg ag st' d' f Dl Hlk Hps Hok].
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl in Hok.
     - destruct Hok as [-> ->]. by apply WPSilent.
     - destruct Hok as (Hr & -> & ->). by eapply WPLoad.
@@ -170,6 +200,9 @@ Section fact.
     - destruct Hok as (ts & k & ? & ? & ? & ? & ? & ? & -> & ->). by eapply WPRmw.
     - destruct Hok as [-> ->]. by apply WPFence.
     - destruct Hok as [-> ->]. by apply WPDev.
+    - destruct Hok as [-> ->]. by apply WPRegW.
+    - destruct Hok as [-> ->]. by apply WPCtrl.
+    - destruct Hok as [-> ->]. by apply WPInstr.
   Qed.
 
   Lemma wp_state_step_wpstep c c' : wp_state_step c c' → wpstep pstep c c'.
@@ -196,22 +229,34 @@ Section fact.
     - left. by econstructor.
     - right. exists i, LSilent.
       by apply (WPAStep i LSilent cfg ag st' d' id None).
-    - right. exists i, (LLoad aq lat base tvs).
+    - right. exists i, (LLoad aq lat base tvs asrc).
       apply (WPAStep i _ cfg ag st' d'
-               (λ w, load_post_run w aq base (tvs.*1)) None); done.
-    - right. exists i, (LStore rl base data).
+               (λ w, load_post_run_d w aq (srcs_view w asrc) base (tvs.*1))
+               None); done.
+    - right. exists i, (LStore rl base data asrc vsrc).
       apply (WPAStep i _ cfg ag st' d'
-               (λ w, store_post_run w rl base (length data) ts) (Some ts));
+               (λ w, store_post_run_d w rl (srcs_view w asrc)
+                       (srcs_view w vsrc) base (length data) ts) (Some ts));
         [done|done|]. by exists ts, k.
-    - right. exists i, (LRmw aq rl base tvs data).
+    - right. exists i, (LRmw aq rl base tvs data asrc vsrc).
       apply (WPAStep i _ cfg ag st' d'
-               (λ w, store_post_run (load_post_run w aq base (tvs.*1))
-                       rl base (length data) ts) (Some ts));
+               (λ w, store_post_run_d
+                       (load_post_run_d w aq (srcs_view w asrc) base (tvs.*1))
+                       rl (srcs_view w asrc) (srcs_view w vsrc)
+                       base (length data) ts) (Some ts));
         [done|done|]. exists ts, k. done.
     - right. exists i, (LFence pr pw sr sw).
       by apply (WPAStep i _ cfg ag st' d' (λ w, fence_post w pr pw sr sw) None).
     - right. exists i, LDev.
       by apply (WPAStep i LDev cfg ag st' d' id None).
+    - right. exists i, (LRegW rd srcs).
+      by apply (WPAStep i _ cfg ag st' d'
+                  (λ w, regw_post w rd (srcs_view w srcs)) None).
+    - right. exists i, (LCtrl srcs).
+      by apply (WPAStep i _ cfg ag st' d'
+                  (λ w, ctrl_post w (srcs_view w srcs)) None).
+    - right. exists i, LInstr.
+      by apply (WPAStep i LInstr cfg ag st' d' instr_post None).
   Qed.
 
   (** A LAT-FREE PROGRAM never emits a latest-kind load.  For the kernel
@@ -222,7 +267,8 @@ Section fact.
       walks only — precisely the surface W2's violation-freedom premise
       takes over. *)
   Definition lat_free_prog : Prop :=
-    ∀ p d aq base tvs p' d', ¬ pstep p d (LLoad aq true base tvs) p' d'.
+    ∀ p d aq base tvs asrc p' d',
+      ¬ pstep p d (LLoad aq true base tvs asrc) p' d'.
 
   Lemma lat_free_prog_step c c' :
     lat_free_prog → wpstep pstep c c' → wp_lf_run c c'.
@@ -231,9 +277,9 @@ Section fact.
     apply wpstep_split in Hstep as [Hpr|(i & l & Hs)]; [by left|].
     right. exists i, l. split; [|done].
     destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok].
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
-      simpl; [done| |done|done|done|done].
-    destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ Hps).
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+      simpl; [done| |done|done|done|done|done|done|done].
+    destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ _ Hps).
   Qed.
 
   Lemma lat_free_prog_run c c' :
@@ -327,11 +373,11 @@ Section fact.
     astep_ok img (log ++ l') i ag lb f Dl.
   Proof.
     intros Hb Hlf.
-    destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl in Hlf |- *.
     - done.
     - subst lat. intros (Hr & -> & ->). split_and!; [|done|done].
-      by eapply read_ok_app.
+      eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
     - intros (ts & k & Hin & Hlog & Hful & -> & ->).
       exists ts, k. split_and!; [done| |done|done|done].
       rewrite lookup_app_l; [by eapply lookup_lt_Some|done].
@@ -339,8 +385,11 @@ Section fact.
       pose proof (lookup_lt_Some _ _ _ Hlog) as Hlt.
       exists ts, k. split_and!; [done|done| | | |done|done|done].
       + rewrite lookup_app_l; [done|done].
-      + by eapply read_ok_app.
+      + eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
       + eapply excl_ok_app; [lia|done].
+    - done.
+    - done.
+    - done.
     - done.
     - done.
   Qed.
@@ -393,8 +442,8 @@ Section fact.
     astep_ok img log i ag l f Dl → astep_ok img log i ag' l f Dl.
   Proof.
     intros Hws Hpr.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
-      simpl; rewrite ?Hws; [done|done| | |done|done].
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+      simpl; rewrite ?Hws; [done|done| | |done|done|done|done|done].
     - intros (ts & k & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [by eapply elem_of_weaken|done|done|done|done].
     - intros (ts & k & ? & ? & ? & ? & ? & ? & ? & ?). exists ts, k.
@@ -404,12 +453,15 @@ Section fact.
   Lemma astep_ok_del img log i ag l f Dl ts :
     astep_ok img log i ag l f Dl → Dl = Some ts → ts ∈ pa_prom ag.
   Proof.
-    destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
       simpl.
     - by intros [_ ->].
     - by intros (_ & _ & ->).
     - intros (ts' & k & ? & _ & _ & _ & ->). by intros [= <-].
     - intros (ts' & k & _ & ? & _ & _ & _ & _ & _ & ->). by intros [= <-].
+    - by intros [_ ->].
+    - by intros [_ ->].
+    - by intros [_ ->].
     - by intros [_ ->].
     - by intros [_ ->].
   Qed.

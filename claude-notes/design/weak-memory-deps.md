@@ -156,11 +156,61 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
   chains and PC are NOT dependencies (RVWMO's syntactic dependency is on
   the integer/FP source registers) — WEAKER or equal, free.  `x0` never
   gets a view.
-- **D-5 (`.aq`/`.rl` orders).** Keep today's mapping of the access kinds to
-  `aq`/`rl` (`WeakInterp.classify`); PARM's `acquire_pc` vs `acquire`
-  distinction (RCpc vs RCsc) is today's `aq` for the `vrn/vwn` raise and
-  the `vrel` join — re-audit `load_vpre`/`load_post` against the two `ifc`s
-  when D2 is written and record the outcome here.
+- **D-5 (`.aq`/`.rl` orders) — AUDIT PERFORMED IN D2; OUTCOME: NO CHANGE,
+  the single-bit conflation is EXACT for RISC-V.**
+  PARM's `OrdR.t = pln | acquire_pc | acquire` (`src/lib/Lang.v:63`) and
+  `OrdW.t = pln | release_pc | release` (`:82`) enter `Local.read` /
+  `Local.fulfill` at FOUR points; D2's single `aq`/`rl` bit was checked
+  against each:
+  1. `read`'s `view_pre = view(addr) ⊔ vrn ⊔ ifc (ord ≥ acquire) vrel`
+     (`Promising.v:841`) — the `vrel` join fires only at FULL `acquire`.
+     Ours: `load_vpre ws aq = vrNew ⊔ (aq ? vRel)`, fires at `aq`.
+  2. `read`'s post `vrn,vwn ⊔= ifc (ord ≥ acquire_pc) view_post`
+     (`:851–852`) — fires at `acquire_pc` AND `acquire`.
+     Ours: `load_post_at`'s `if aq then …`, fires at `aq`.
+  3. `fulfill`'s `view_pre ⊒ ifc (ord ≥ release_pc) (vro ⊔ vwo)`
+     (`:874–875`).  Ours: `fulfil_vpre ws rl`'s `(rl ? vrOld ⊔ vwOld)`.
+  4. `fulfill`'s post `vrel ⊔= ifc (ord ≥ release) ts` (`:911`) — full
+     `release` only.  Ours: `store_post`'s `if rl then …`.
+
+  (1) vs (2), and (4) vs (3), are the only places where PARM's two levels
+  could part company with our one bit — and they part company ONLY at
+  `acquire_pc` / `release_pc`.  **PARM's language has no decoder**: `ord`
+  is a program annotation and the `_pc` levels are ARM's RCpc forms
+  (`LDAPR`, and the `STLR` pairing); nothing in `snu-sf/promising-arm`
+  produces them for RISC-V, whose `.aq`/`.rl` are RCsc.  At
+  `ord ∈ {pln, acquire}`, `OrdR.ge acquire acquire_pc = true`, so (1) and
+  (2) fire together and the single bit is EXACTLY PARM-at-RISC-V; likewise
+  (3)/(4) at `ord ∈ {pln, release}`.  **No semantics changed in D2, and
+  none is proposed.**
+
+  TWO RESIDUES FOUND WHILE AUDITING, both recorded rather than fixed:
+  - **(D-5a) `WeakInterp.as_sync` maps `AS_acq_rcpc` to `aq = true`**, i.e.
+    Sail's RCpc strength is treated as full `acquire`, which joins `vRel`
+    into the pre-view where PARM's rule (1) would not: STRONGER (removes
+    behaviors).  The arm is DEAD for `rv64d` (Zalasr is not in the model,
+    and finding (3) of `WeakInterp`'s header records that a plain load with
+    `.aq` is an `internal_error`), so it is vacuous for every proof here.
+    If the model ever grows Zalasr, `load_vpre` needs a three-valued read
+    order.
+  - **(D-5b) `fwd_view`'s acquire arm is not PARM's.**  `WeakMem.fwd_view`
+    disables forwarding when `aq` is set; `FwdItem.read_view`
+    (`Promising.v:529`) disables it when
+    `fwd.ex ∧ (arch = riscv ∨ ord ≥ acquire_pc)`, which **at
+    `arch = riscv` reduces to `fwd.ex` alone** — the ORDER plays no role,
+    and what matters is whether the BANKED STORE was the write half of an
+    exclusive.  So ours is STRONGER on an acquire load that would have
+    forwarded a plain store (`fwd.view < fwd.ts` by that store's own EXT,
+    so forcing `t` raises the post-view) and WEAKER on any load forwarding
+    an exclusive store (we record no `ex` in the bank).  `WeakMem`'s header
+    prose ("PARM does the same: an acquire may not take the weaker
+    forwarded view") is therefore wrong for RISC-V and is corrected in
+    place.  Both directions are vacuous for xv6 (its only acquires are
+    `amoswap.w.aq`, whose read half is exclusive and whose forwarding
+    source would have to be its own earlier exclusive store), so D2 leaves
+    the rule alone; making it faithful means adding an `ex` flag to
+    `w_fwd`'s payload and dropping the `aq` test — a self-contained
+    follow-up, noted here so it is not rediscovered.
 - **D-7 (THE FORWARD BANK — was a genuine STRENGTHENING; FIXED 2026-08-17,
   found the same day while auditing containment).**
   **STATUS: FIXED.** `WeakMem.store_post` now records `w_fwd[a] := (t, 0)` —
@@ -192,6 +242,141 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
 - **D-6 (the disk agent).** `virtio_prog`'s events carry empty `srcs`; its
   ordering is aq/fence-based — WEAKER than a hart with the same accesses
   (free), and exact for what the driver relies on.
+
+### 2.3'' D2 LANDED (2026-08-17) — the final definitions
+
+Everything in §2.3'/§2.3 is built.  The shapes that differ from the plan
+above, and why:
+
+**State** (`WeakMem.wstate`, three appended fields).
+```coq
+Notation wreg := nat (only parsing).            (* NOT [register]: [Riscv.rv64d_types]
+                                                   exports its own [register] *)
+Inductive dsrc := DReg (r : wreg) | DLdRes.
+  w_regv  : gmap wreg nat;   w_vcap : nat;   w_ldv : nat;
+Definition regv ws r := default 0 (w_regv ws !! r).
+Definition dsrc_view ws x := match x with DReg r => regv ws r | DLdRes => w_ldv ws end.
+Definition srcs_view ws srcs := foldr (λ x v, Nat.max (dsrc_view ws x) v) 0 srcs.
+```
+`srcs_view ws [] = 0` HOLDS BY CONVERSION, and every `_d` step function puts
+its new argument FIRST inside a `Nat.max`, so `foo_d ws … 0 … ≡ foo ws …`
+definitionally.  That is what makes the D2 event language (all operand lists
+empty) reuse the dependency-free vocabulary without a single rewrite in the
+byte-level lemmas.
+
+**`ws_le` — FINDING, correcting the stage brief.**  Only `w_vcap` joins the
+order.  `w_ldv` is reset by `instr_post`, as expected; but `w_regv` is not
+monotone either, and not merely unprovably so — it is REFUTED: `regw_post`
+is PARM's `step_assign`, an OVERWRITE, so `r1 := ld x; r1 := 0` lowers
+`regv _ r1` from the load's post-view to `0`.  A pointwise-`≤` conjunct for
+`w_regv` would be false of the machine.  `ws_bounded` takes all three (a
+reset or a smaller overwrite still stores real timestamps).
+`WeakViewMono`'s monotone-ghost prototype gains a seventh `mono_nat` for
+`w_vcap` and nothing for the other two.
+
+**The `_d` layering.**  The address view enters a load ONLY through
+`load_vpre_d ws aq vaddr := Nat.max vaddr (load_vpre ws aq)` and through
+`w_vcap`, which the RUN-level wrapper raises once:
+```coq
+load_post_run_d ws aq vaddr base ts := ctrl_post (load_post_bytes_d ws aq vaddr …) vaddr
+store_post_run_d ws rl va vd base n t :=
+  ctrl_post (store_post_bytes_d ws rl (Nat.max va vd) … t) va
+```
+Hoisting `ctrl_post` out of the per-byte function is what keeps EVERY
+existing per-byte fold lemma (all of which quantify over an arbitrary
+`vpre`) usable verbatim; the price is that `foo_run_d … 0 … = foo_run …`
+is propositional (`ctrl_post_0`, a record eta) rather than definitional.
+`store_post_d` takes ONE banked-view parameter `vf` (= `V(asrc) ⊔ V(dsrc)`,
+closing D-7) because the bank entry is written per byte.
+`ldv_of ws aq vaddr base ts := w_ldv (load_post_run_d (ws_ldv0 ws) aq vaddr base ts)`
+is the RMW's exbank view (D-2): computed from a ZEROED `w_ldv` so that it is
+exactly this access's `view_post` and not a join with a previous load's.
+
+**Labels.**  `LLoad aq lat base tvs asrc`, `LStore rl base data asrc vsrc`,
+`LRmw aq rl base tvs data asrc vsrc`, and `LRegW rd srcs | LCtrl srcs |
+LInstr` appended AFTER `LDev` (a trailing constructor leaves every existing
+bulleted script's arm ORDER intact — the same argument that put `LDev`
+last).  The design's `dsrc` operand field is spelled `vsrc` because `dsrc`
+is the type of its elements.
+
+**`fulfil_vpre` gains `w_vcap` IN THE DEFINITION** (it is state, not label)
+and the label half arrives as `fulfil_vpre_d ws rl vd := Nat.max vd
+(fulfil_vpre ws rl)`.  Nothing downstream changed shape: every consumer of
+`fulfil_vpre _ _ < ts` goes through `fulfil_vpre_bounded`, which still holds
+because `ws_bounded` bounds `w_vcap`.
+
+### 2.3''' D2 LANDED — WHAT THE REPLAY NEEDED, AND THE RESIDUES
+
+**The replay extended with NO new hypothesis.**  `WeakRobustProv`'s leaf
+mirror `lstate` gained the three components (`l_regv : gmap wreg (list nat)`,
+`l_vcap`, `l_ldv`), `lrel` three appended conjuncts, `lstate_leaf` three
+appended disjuncts, and the mirrored step functions `lregw_post`/`lctrl_post`/
+`linstr_post` (+ `lstore_post_d`, `lload_post_bytes_d`, the two `_run_d`).
+The one genuinely new ingredient is
+```coq
+Lemma lrel_srcs_view σ S w srcs : lrel σ S w → srcs_view w srcs = lval σ (lsrcs_view S srcs).
+```
+— a label's operand list is a list of NAMES, so its view on the `wstate` side
+is a join of register views and its leaf list on the mirror side is their
+concatenation, and `lrel`'s two new pointwise conjuncts identify them one
+register at a time.  Everything else is three more folds, exactly as §3
+predicted.
+
+**`aev_ts_occurs` is UNCHANGED, and that is a theorem, not luck.**  The new
+components add no NEW leaf to the state: `lsrcs_view_leaf` says every leaf of
+an operand view is already a leaf of the same `lstate` (register views are
+populated only from a load's post-view, which is already a leaf).  So
+`laevs_leaves_occur` — "every leaf is a timestamp some event of the trace read
+or fulfilled", the well-definedness the E edges need — survives verbatim.
+
+**The read crux gained the operand view on BOTH sides.**
+`WeakRobustOrd.rd_leaves` now prefixes `lsrcs_view (pre_lstate TS r) (lb_asrc l)`
+to the floor's leaf list, `rd_floor_ws` reads
+`Nat.max (load_vpre_d … (srcs_view … (lb_asrc l))) (coh …)`, and
+`WeakRobustSim.read_ok_pf` produces `read_ok_d` at the REPLAYED state's own
+operand view.  The `lval_lt`/`pi_lt_of_tc` argument is unchanged: the extra
+leaves are leaves of the same `pre_lstate`, so `pre_lstate_leaf_occurs` covers
+them and the E edges they induce are ordinary E edges (`gE_ts_lt` is proved
+from membership in `rd_leaves` plus `lval_ge`, both of which still apply).
+
+**S1 got easier, as predicted.**  `WeakRobustAcyc.fulfil_vext` is now the
+DEPENDENCY-CARRYING pre-view (`fulfil_vpre_d` at the label's `V(asrc) ⊔
+V(dsrc)`, plus `ldv_of` at an rmw).  `fcov`'s obligation is `ts ≤ v`, so a
+BIGGER `v` makes the per-edge premise `edge_ok_f` strictly WEAKER — the
+direction §3's "S1 gets EASIER (EXT is bigger)" names, and the reason the
+dependency track pays at Layer 2.
+
+**THE ONE RESIDUE: the axiomatic projection is restricted to the
+dependency-free fragment.**  `WeakPromise.lb_depfree` (all operand lists `[]`,
+no `LRegW`/`LCtrl`/`LInstr`) is a new premise of `WeakPromiseBridge`'s part
+(D) — `wp_pf_step_mstep`, `bridge_step`, and (as `pstep_depfree`)
+`bridge_run` / `wp_pf_bridge` / `wp_pf_bridge_log`.  The reason is exact:
+`WeakAxiomatic.mstep` steps its `mstate` with the DEPENDENCY-FREE
+`load_post_run`/`store_post_run`, so a machine step that raises a view through
+an operand list has no `mstep` image with an EQUAL post-state, and
+`cfg_match` is an equality.  Closing the gap means giving the axiomatic side
+RVWMO's ppo 9–11 — §3's "`WeakAxiomatic*` gains ppo 9–11", deliberately not
+done in D2.  **The residue is VACUOUS for every instance in this tree**: the
+event language and the archived `sail_step` both emit only operand-free
+labels (`WeakEvInst.pstep_ev_depfree`, `WeakSailLTS2.sail_step_ni_depfree`),
+and no consumer of the projection exists outside `WeakPromiseBridge` itself.
+The REVERSE direction (axiomatic ⇒ machine, `mstep_wp_pf_step` /
+`exec_wf_pf_run`) is unchanged: `unproj_lbl` emits empty operand lists.
+
+**Two smaller premise additions, both discharged at every use.**
+`WeakEvCapstone.wp_pf_step_inv` takes `lb_depfree l` (its `pf_ok` pins the
+operand lists so that `pf_ok_hart` stays a conversion); the one call site
+discharges it with `WeakEvInst.pstep_ev_depfree`.
+`WeakRobustBlocks.lts_enabled`'s `le_load`/`le_rmw` quantify over the operand
+lists (the completion re-runs a block with retimed reads, and the operands are
+part of the label it must re-emit).
+
+**Capstone statements are BYTE-IDENTICAL to HEAD** — `WeakRobustMain.robust_main`,
+`WeakRobustMain.main_premises`, `WeakCompose.xv6_weak_robust`,
+`WeakComposeLang.xv6_weak_robust_lifted` / `xv6_weak_robust_adequate`,
+`WeakEvCapstone.xv6_ev_weak_robust` — and `Print Assumptions` is unchanged:
+`robust_main` and `xv6_weak_robust` closed, the three Sail-facing capstones on
+the five `rv64d` axioms.
 
 ### 2.4 Where the operand names come from — the ONE model change (LANDED 2026-08-17: `-D SYMBOLIC`)
 
@@ -338,8 +523,13 @@ until it is built.  Its shape is fixed enough to stage.
   (announce node), the label vocabulary, and the PARM-verbatim rule set.
 - **D1 model:** monadic `sail_instr_announce` in the fork; regen; rebuild;
   fix the spike node counts.  ½–1 day.
-- **D2 machine:** `WeakMem`/`WeakPromise`/`WeakPromiseFact`/`WeakPromiseBridge`
-  with §2 (state, labels, rules; `wp_swap` re-proved).  1–2 sessions.
+- **D2 machine (LANDED 2026-08-17/18):**
+  `WeakMem`/`WeakPromise`/`WeakPromiseFact`/`WeakPromiseBridge` with §2, and
+  — because Layer 1 is generic in the labels — the whole robustness tower
+  with it: the graph/acyclicity files, THE REPLAY
+  (`WeakRobustProv`/`Ord`/`Sim`/`Cone`), the language/instance/capstone and
+  the instruction-atomic tier.  See §2.3'' for the final definitions and
+  §2.3' D-5 for the audit.
 - **D3 language + instance + capstone:** `deps_of_bits`; `WeakEvLang` arms;
   `WeakEvInst`/`WeakEvPf`/`WeakEvCapstone` re-landed; `WeakEvLift`'s rules
   and the disk rules re-landed (`hart_ws` grows).  1–2 sessions.

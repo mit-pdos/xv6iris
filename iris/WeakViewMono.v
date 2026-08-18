@@ -21,10 +21,10 @@ From iris.proofmode Require Import proofmode.
 Require Import WeakMem.
 
 (* ====================================================================== *)
-(** ** 1. The six scalar floors.
+(** ** 1. The seven scalar floors.
 
-    [w_vrOld] / [w_vwOld] / [w_vrNew] / [w_vwNew] / [w_vRel] / [w_pub] are
-    plain [nat]s ordered by [≤], i.e. six [mono_nat]s.  This half is entirely
+    [w_vrOld] / [w_vwOld] / [w_vrNew] / [w_vwNew] / [w_vRel] / [w_pub] /
+    [w_vcap] are plain [nat]s ordered by [≤], i.e. seven [mono_nat]s.  This half is entirely
     standard and uses the same library the tree already uses in
     [VirtioProto] and [RiscvAdequacy].
 
@@ -32,7 +32,15 @@ Require Import WeakMem.
     the field sweep: it is a monotone component of [ws_le] exactly like the
     other five, so it rides the same pattern.  Its SIBLING [w_relp] does NOT
     appear here and must not: it toggles (set by a [pw ∧ sw] fence, cleared
-    by the next store), so it is deliberately absent from [ws_le]. *)
+    by the next store), so it is deliberately absent from [ws_le].
+
+    [w_vcap] (PARM's control view, D2) joined with the dependency track,
+    for the same reason: [load_post_run_d]/[store_post_run_d]/[ctrl_post]
+    only ever JOIN into it, so it is a conjunct of [ws_le].  Its two D2
+    siblings [w_regv] and [w_ldv] do NOT appear here and must not, exactly
+    as [w_relp] does not: [regw_post] OVERWRITES a register's view and
+    [instr_post] RESETS [w_ldv], so neither is monotone (see [WeakMem]'s
+    [ws_le] note, where the refutation is spelled out). *)
 
 Class weakViewScalarG (Σ : gFunctors) := {
   wvs_vrOld : mono_natG Σ;
@@ -41,14 +49,15 @@ Class weakViewScalarG (Σ : gFunctors) := {
   wvs_vwNew : mono_natG Σ;
   wvs_vRel  : mono_natG Σ;
   wvs_pub   : mono_natG Σ;
+  wvs_vcap  : mono_natG Σ;
 }.
 Global Existing Instances wvs_vrOld wvs_vwOld wvs_vrNew wvs_vwNew wvs_vRel
-  wvs_pub.
+  wvs_pub wvs_vcap.
 
 Record ws_names := WsNames {
   wsn_vrOld : gname; wsn_vwOld : gname;
   wsn_vrNew : gname; wsn_vwNew : gname; wsn_vRel : gname;
-  wsn_pub : gname;
+  wsn_pub : gname; wsn_vcap : gname;
 }.
 
 Section scalars.
@@ -61,7 +70,8 @@ Section scalars.
      mono_nat_auth_own (wsn_vrNew γ) 1 (w_vrNew w) ∗
      mono_nat_auth_own (wsn_vwNew γ) 1 (w_vwNew w) ∗
      mono_nat_auth_own (wsn_vRel  γ) 1 (w_vRel  w) ∗
-     mono_nat_auth_own (wsn_pub   γ) 1 (w_pub   w))%I.
+     mono_nat_auth_own (wsn_pub   γ) 1 (w_pub   w) ∗
+     mono_nat_auth_own (wsn_vcap  γ) 1 (w_vcap  w))%I.
 
   (** The persistent LOWER BOUND — duplicable, and (the whole point) it
       survives every intervening step for free, with no [vwp_hold_mono]. *)
@@ -71,21 +81,23 @@ Section scalars.
      mono_nat_lb_own (wsn_vrNew γ) (w_vrNew w) ∗
      mono_nat_lb_own (wsn_vwNew γ) (w_vwNew w) ∗
      mono_nat_lb_own (wsn_vRel  γ) (w_vRel  w) ∗
-     mono_nat_lb_own (wsn_pub   γ) (w_pub   w))%I.
+     mono_nat_lb_own (wsn_pub   γ) (w_pub   w) ∗
+     mono_nat_lb_own (wsn_vcap  γ) (w_vcap  w))%I.
 
   Global Instance ws_scal_lb_persistent γ w : Persistent (ws_scal_lb γ w).
   Proof. apply _. Qed.
 
   Lemma ws_scal_lb_get γ w : ws_scal_auth γ w -∗ ws_scal_lb γ w.
   Proof.
-    iIntros "(H1 & H2 & H3 & H4 & H5 & H6)".
+    iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7)".
     iDestruct (mono_nat_lb_own_get with "H1") as "#L1".
     iDestruct (mono_nat_lb_own_get with "H2") as "#L2".
     iDestruct (mono_nat_lb_own_get with "H3") as "#L3".
     iDestruct (mono_nat_lb_own_get with "H4") as "#L4".
     iDestruct (mono_nat_lb_own_get with "H5") as "#L5".
     iDestruct (mono_nat_lb_own_get with "H6") as "#L6".
-    by iFrame "L1 L2 L3 L4 L5 L6".
+    iDestruct (mono_nat_lb_own_get with "H7") as "#L7".
+    by iFrame "L1 L2 L3 L4 L5 L6 L7".
   Qed.
 
   (** THE UPDATE.  Note what it does NOT need: the caller does not name the
@@ -94,14 +106,15 @@ Section scalars.
   Lemma ws_scal_update γ w w' :
     ws_le w w' -> ws_scal_auth γ w ==∗ ws_scal_auth γ w'.
   Proof.
-    intros (_ & H1 & H2 & H3 & H4 & H5 & H6).
-    iIntros "(A1 & A2 & A3 & A4 & A5 & A6)".
+    intros (_ & H1 & H2 & H3 & H4 & H5 & H6 & H7).
+    iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7)".
     iMod (mono_nat_own_update _ H1 with "A1") as "[$ _]".
     iMod (mono_nat_own_update _ H2 with "A2") as "[$ _]".
     iMod (mono_nat_own_update _ H3 with "A3") as "[$ _]".
     iMod (mono_nat_own_update _ H4 with "A4") as "[$ _]".
     iMod (mono_nat_own_update _ H5 with "A5") as "[$ _]".
     iMod (mono_nat_own_update _ H6 with "A6") as "[$ _]".
+    iMod (mono_nat_own_update _ H7 with "A7") as "[$ _]".
     done.
   Qed.
 
@@ -112,15 +125,18 @@ Section scalars.
     ws_scal_auth γ w -∗ ws_scal_lb γ w0 -∗
     ⌜(w_vrOld w0 ≤ w_vrOld w)%nat /\ (w_vwOld w0 ≤ w_vwOld w)%nat /\
      (w_vrNew w0 ≤ w_vrNew w)%nat /\ (w_vwNew w0 ≤ w_vwNew w)%nat /\
-     (w_vRel  w0 ≤ w_vRel  w)%nat /\ (w_pub w0 ≤ w_pub w)%nat⌝.
+     (w_vRel  w0 ≤ w_vRel  w)%nat /\ (w_pub w0 ≤ w_pub w)%nat /\
+     (w_vcap w0 ≤ w_vcap w)%nat⌝.
   Proof.
-    iIntros "(A1 & A2 & A3 & A4 & A5 & A6) (L1 & L2 & L3 & L4 & L5 & L6)".
+    iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7)
+             (L1 & L2 & L3 & L4 & L5 & L6 & L7)".
     iDestruct (mono_nat_lb_own_valid with "A1 L1") as %[_ ?].
     iDestruct (mono_nat_lb_own_valid with "A2 L2") as %[_ ?].
     iDestruct (mono_nat_lb_own_valid with "A3 L3") as %[_ ?].
     iDestruct (mono_nat_lb_own_valid with "A4 L4") as %[_ ?].
     iDestruct (mono_nat_lb_own_valid with "A5 L5") as %[_ ?].
     iDestruct (mono_nat_lb_own_valid with "A6 L6") as %[_ ?].
+    iDestruct (mono_nat_lb_own_valid with "A7 L7") as %[_ ?].
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -359,7 +375,7 @@ Section view.
   Lemma ws_lb_valid γ w w0 : ws_auth γ w -∗ ws_lb γ w0 -∗ ⌜ws_le w0 w⌝.
   Proof.
     iIntros "[Hs Hc] [Ls Lc]".
-    iDestruct (ws_scal_lb_valid with "Hs Ls") as %(?&?&?&?&?&?).
+    iDestruct (ws_scal_lb_valid with "Hs Ls") as %(?&?&?&?&?&?&?).
     iDestruct (ws_coh_lb_valid with "Hc Lc") as %Hcoh.
     iPureIntro. by rewrite /ws_le.
   Qed.
@@ -368,13 +384,14 @@ Section view.
   Lemma ws_lb_mono γ w w' : ws_le w w' -> ws_lb γ w' -∗ ws_lb γ w.
   Proof.
     iIntros (Hle) "[Ls Lc]". iSplitL "Ls".
-    - destruct Hle as (_ & ? & ? & ? & ? & ? & ?).
-      iDestruct "Ls" as "(L1 & L2 & L3 & L4 & L5 & L6)".
+    - destruct Hle as (_ & ? & ? & ? & ? & ? & ? & ?).
+      iDestruct "Ls" as "(L1 & L2 & L3 & L4 & L5 & L6 & L7)".
       iSplitL "L1"; [by iApply mono_nat_lb_own_le|].
       iSplitL "L2"; [by iApply mono_nat_lb_own_le|].
       iSplitL "L3"; [by iApply mono_nat_lb_own_le|].
       iSplitL "L4"; [by iApply mono_nat_lb_own_le|].
       iSplitL "L5"; [by iApply mono_nat_lb_own_le|].
+      iSplitL "L6"; [by iApply mono_nat_lb_own_le|].
       by iApply mono_nat_lb_own_le.
     - iApply (own_mono with "Lc"). by apply auth_frag_mono, coh_fun_incl.
   Qed.
@@ -388,9 +405,10 @@ Section view.
     iMod (mono_nat_own_alloc (w_vwNew w)) as (g4) "[A4 _]".
     iMod (mono_nat_own_alloc (w_vRel  w)) as (g5) "[A5 _]".
     iMod (mono_nat_own_alloc (w_pub   w)) as (g6) "[A6 _]".
+    iMod (mono_nat_own_alloc (w_vcap  w)) as (g7) "[A7 _]".
     iMod (own_alloc (● coh_fun w ⋅ ◯ coh_fun w)) as (gc) "Ac".
     { apply auth_both_valid_discrete. split; [done|by intros a]. }
-    iModIntro. iExists (WvNames (WsNames g1 g2 g3 g4 g5 g6) gc). by iFrame.
+    iModIntro. iExists (WvNames (WsNames g1 g2 g3 g4 g5 g6 g7) gc). by iFrame.
   Qed.
 
 End view.
@@ -467,7 +485,7 @@ Lemma ws_alloc_cpus `{!weakViewG Σ} {A : Type} `{EqDecision A}
   ⊢ |==> ∃ f : A -> wview_names, [∗ list] c ∈ cs, ws_auth (f c) w.
 Proof.
   induction cs as [|c cs' IH]; intros Hnd.
-  - iModIntro. iExists (fun _ => WvNames (WsNames 1 1 1 1 1 1) 1)%positive. done.
+  - iModIntro. iExists (fun _ => WvNames (WsNames 1 1 1 1 1 1 1) 1)%positive. done.
   - apply NoDup_cons in Hnd as [Hc Hnd'].
     iMod (IH Hnd') as (fr) "Hrest".
     iMod (ws_alloc w) as (γ) "Hg".
