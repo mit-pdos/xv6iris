@@ -70,12 +70,29 @@ Section UserStepFull.
   (* ------------------------------------------------------------------- *)
   (* §1 [Q]: the two facts [swp_exec_step_full] asks of the landing file.  *)
   (* ------------------------------------------------------------------- *)
-  Definition u_land (rs1 : regstate) (_ : Step) (rs2 : regstate) : Prop :=
+  (* THE THIRD CONJUNCT IS NOT DECORATION.  [tsf_post] quantifies the step
+     EXISTENTIALLY, so a closer handed [tsf_post (u_land rs1) rs2 rsP] cannot
+     tell which arm ran unless [Q] says something that distinguishes them.
+     Without it, the two landing shapes -- [wrap_post rs2 mi] for the five
+     retiring/trapping arms and [register_set hart_state (HART_WAITING …) rs2]
+     for the enter-wait arm -- are both available at every arm, and the trap
+     closers (whose pc must be [stvec_base]) cannot rule the wait shape out.
+     Pinning [cur_privilege rs2 = User] on the wait arm rules it out at every
+     arm that TRAPPED (those land at Supervisor), and the [WaitReason] pin is
+     what [UserExec.user_hart_ok] needs to let the ACTIVE-at-User closer
+     cover the wait shape as well as the retiring one. *)
+  Definition u_land (rs1 : regstate) (st : Step) (rs2 : regstate) : Prop :=
     register_lookup hart_state rs2 = HART_ACTIVE tt /\
     register_lookup (R_bool minstret_increment) rs2
       = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
           (register_lookup (R_bitvector_64 minstretcfg) rs1)
-          (register_lookup cur_privilege rs1).
+          (register_lookup cur_privilege rs1) /\
+    match st with
+    | Step_Execute (Enter_Wait wr, _) =>
+        (wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO) /\
+        register_lookup cur_privilege rs2 = User
+    | _ => True
+    end.
 
   (* ------------------------------------------------------------------- *)
   (* §2 [Psi]: the payload, as a CLOSER.                                   *)
@@ -266,7 +283,7 @@ Section UserStepFull.
               u_w_PC u_in_PC u_in_nPC
               (eq_refl : register_lookup hart_state RS = HART_ACTIVE tt)
               ltac:(intros st rs2 H; exact (proj1 H))
-              ltac:(intros st rs2 H; exact (proj2 H))
+              ltac:(intros st rs2 H; exact (proj1 (proj2 H)))
               ltac:(intros r _; reflexivity)
               with "Hcert Hresv Hrw Hro [Hpmpi Hbytes Hclose Hrut] [Hk]").
     - (* the classification, with everything the machine owns beside the frame *)

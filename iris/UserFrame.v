@@ -791,6 +791,97 @@ Section UFrames.
                Hpma Hhtif Help Hsenv".
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* THE SUPERVISOR TWIN OF [u_frames_elim].                               *)
+  (*                                                                       *)
+  (* A cycle that TRAPS lands with [cur_privilege = Supervisor], and        *)
+  (* [UserExec.user_trap_frame] asks for the cell at that value -- but      *)
+  (* [u_pins_regs] pins the privilege to [User] (that is what makes it the  *)
+  (* USER machine's pin bundle), so the eliminator above cannot open a      *)
+  (* trapped file.  This twin is the same lemma with the privilege as a     *)
+  (* parameter.  It is a COPY rather than a generalisation of the original  *)
+  (* on purpose: [u_pins_regs] is destructed by [split_and!] at every call  *)
+  (* site in the tier, so turning it into a specialisation of a             *)
+  (* privilege-indexed definition would break all of them for nothing.      *)
+  (* ------------------------------------------------------------------- *)
+  Definition u_pins_regs_at (p : Privilege) (rs : regstate) (hs : HartState)
+      (ms sc stv sep va va' : mword 64) (g : regfile) : Prop :=
+    register_lookup hart_state rs = hs /\
+    register_lookup cur_privilege rs = p /\
+    register_lookup (R_bitvector_64 mstatus) rs = ms /\
+    register_lookup (R_bitvector_64 scause) rs = sc /\
+    register_lookup (R_bitvector_64 stval) rs = stv /\
+    register_lookup (R_bitvector_64 sepc) rs = sep /\
+    register_lookup (R_bitvector_64 PC) rs = va /\
+    register_lookup (R_bitvector_64 nextPC) rs = va' /\
+    u_gpr_agree g rs.
+
+  Lemma u_frames_elim_at (p : Privilege) (rs : regstate) (dqc : dfrac)
+      (hs : HartState) (ms sc stv sep va va' : mword 64)
+      (mst : mword 64) (mi : bool) (mc : mword 32) (micfg cy ti ip : mword 64)
+      (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (misav mseccfgv senvv : mword 64) (pmar : list PMA_Region)
+      (htifv : type_of_register htif_tohost_base) (elpv : mword 1)
+      (satpv : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    u_pins_regs_at p rs hs ms sc stv sep va va' (u_regfile rs) ->
+    u_pins_tick rs mst mi mc micfg cy ti ip ->
+    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv mcenv scenv hpm ->
+    u_pins_hw rs misav mseccfgv senvv pmar htifv elpv ->
+    u_pins_pt rs satpv pcfg paddr tlbv ->
+    hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dqc) rs u_Dro -∗
+    (hart_state ↦ᵣ hs ∗ cur_privilege ↦ᵣ p ∗ mstatus ↦ᵣ ms ∗
+     scause ↦ᵣ sc ∗ stval ↦ᵣ stv ∗ sepc ↦ᵣ sep ∗
+     PC ↦ᵣ va ∗ nextPC ↦ᵣ va' ∗ gpr_file (u_regfile rs) ∗
+     minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi ∗
+     (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc ∗
+     (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg ∗
+     mcycle ↦ᵣ cy ∗ mtime ↦ᵣ ti ∗ mip ↦ᵣ ip ∗
+     stvec ↦ᵣ{dqc} stvecv ∗ mie ↦ᵣ{dqc} miev ∗ mideleg ↦ᵣ{dqc} mdlv ∗
+     medeleg ↦ᵣ□ medv ∗ menvcfg ↦ᵣ{dqc} menvv ∗
+     mstateen0 ↦ᵣ□ mstenv ∗ (R_bitvector_32 sstateen0) ↦ᵣ□ sstenv ∗
+     (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv ∗
+     (R_bitvector_32 scounteren) ↦ᵣ□ scenv ∗ mhpmcounter ↦ᵣ□ hpm ∗
+     misa ↦ᵣ□ misav ∗ mseccfg ↦ᵣ□ mseccfgv ∗ pma_regions ↦ᵣ□ pmar ∗
+     htif_tohost_base ↦ᵣ□ htifv ∗ (R_bitvector_1 elp) ↦ᵣ□ elpv ∗
+     senvcfg ↦ᵣ□ senvv ∗
+     satp ↦ᵣ satpv ∗ tlb ↦ᵣ tlbv ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr).
+  Proof.
+    intros (Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & Hpc & Hnpc & _)
+           (Hmst & Hmi & Hmc & Hmicfg & Hcy & Hti & Hip)
+           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste & Hmcen &
+            Hscen & Hhpm)
+           (Hmisa & Hsec & Hsenv & Hpma & Hhtif & Help)
+           (Hsatp & Hpcfg & Hpaddr & Htlb).
+    iIntros "Hrw Hro".
+    rewrite /hreg_frame /u_Drw (big_sepS_list_to_set _ _ u_rw_nodup).
+    rewrite /u_rw_list big_sepL_app.
+    iDestruct "Hrw" as "[Hn Hg]".
+    rewrite /u_rw_named /=.
+    rewrite Hhs Hpriv Hms Hsc Hstv Hsep Hpc Hnpc Hmst Hmi Hcy Hti Hip Htlb.
+    iDestruct "Hn" as "(HPC & HnPC & Hhs & Hpriv & Hmstatus & Hscause &
+                        Hstval & Hsepc & Hminstret & Hmincr & Hmcycle &
+                        Hmtime & Hmip & Htlbc & _)".
+    iAssert (hreg_frame rs u_Dgpr) with "[Hg]" as "Hgf".
+    { rewrite u_gpr_frame_list. iExact "Hg". }
+    iDestruct (u_frame_gpr_file rs with "Hgf") as "Hgpr".
+    rewrite /hreg_frame_ro /u_Dro (big_sepS_list_to_set _ _ u_ro_nodup).
+    rewrite /u_ro_list /=.
+    rewrite Hmisa Hsec Hpma Hhtif Help Hsenv Hmc Hmicfg Hstvec Hmie Hmdl
+            Hmedl Hmenv Hmste Hsste Hmcen Hscen Hhpm Hsatp Hpcfg Hpaddr.
+    iDestruct "Hro" as "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv &
+                         #Hmcnt & #Hmicfg & Hstvec & Hmie & Hmdl & #Hmedl &
+                         Hmenv & #Hmste & #Hsste & #Hmcen & #Hscen & #Hhpm &
+                         Hsatp & Hpcfg & Hpaddr & _)".
+    iFrame "HPC HnPC Hhs Hpriv Hmstatus Hscause Hstval Hsepc Hgpr Hminstret
+            Hmincr Hmcycle Hmtime Hmip Hstvec Hmie Hmdl Hmenv Hsatp Htlbc
+            Hpcfg Hpaddr".
+    by iFrame "Hmcnt Hmicfg Hmedl Hmste Hsste Hmcen Hscen Hhpm Hmisa Hmseccfg
+               Hpma Hhtif Help Hsenv".
+  Qed.
+
 End UFrames.
 
 (* ===================================================================== *)
