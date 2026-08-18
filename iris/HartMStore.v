@@ -267,6 +267,67 @@ Proof.
   cbn [hwrite_resume]. reflexivity.
 Qed.
 
+
+(* ...and the CONDITIONAL 8-byte write, the one the page walk's A/D
+   write-back actually issues.  [write_kind_of_flags false false true] is
+   [Write_RISCV_conditional], which the model maps to an AV_exclusive access
+   kind -- that is the whole difference from the plain request. *)
+Definition mwrite_req8_con (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 64) : Interface.WriteReq.t 8 :=
+  {| Interface.WriteReq.pa := pa;
+     Interface.WriteReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_explicit
+         {| SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety
+              := SailStdpp.ConcurrencyInterfaceTypes.AV_exclusive;
+            SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_strength
+              := SailStdpp.ConcurrencyInterfaceTypes.AS_normal |};
+     Interface.WriteReq.value :=
+       TypeCasts.cast_N v (Defs.sail_mem_write_subproof 8);
+     Interface.WriteReq.va := None;
+     Interface.WriteReq.translation := tt;
+     Interface.WriteReq.tag := None |}.
+
+Lemma hwrite_req_at_write_ram8_con (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 64) :
+  hwrite_req_at 8 (write_ram Write_RISCV_conditional (Physaddr pa) 8 v tt)
+  = Some (mwrite_req8_con pa v).
+Proof.
+  unfold write_ram, Defs.sail_mem_write.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_size
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_value].
+  cbn [hwrite_req_at].
+  destruct (decide (8%N = 8%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hwrite_resume_write_ram8_con (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 64) :
+  hwrite_resume (write_ram Write_RISCV_conditional (Physaddr pa) 8 v tt)
+  = Interface.Ret true.
+Proof.
+  unfold write_ram, Defs.sail_mem_write.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_size
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_value].
+  cbn [hwrite_resume]. reflexivity.
+Qed.
+
 (* the Bare translation at a STORE: HartMFetch's generic walk, with the two
    access-dependent premises discharged.  [effectivePrivilege] is the one
    that needs work -- a store consults MPRV where a fetch short-circuits. *)
