@@ -2612,6 +2612,67 @@ Each line is a ROOT: every file that merely depends on one is skipped by
    Htlb & Htcsr)"` over-destructs into `trap_csrs_raw`; and `mn_grp_kvm`
    drops its own `tlb ↦ᵣ tlbvec0` premise with the spec.
 
+### THE ROOT CAUSE UNDER THE KVMINITHART LANE (found 2026-08-18, session 2)
+
+**The `tlb` cell had two owners, and the reason is a premise in the wrong
+place.**  `SRegime.sr_swp_translate` / `_wit` demanded `(tlb : register) ∈
+Drw` in the FIELD TYPE — a blanket requirement on every regime.  At Bare that
+premise is DEAD: the model's `translateAddr` returns before the TLB is
+consulted at all when `mode = Bare` (rv64d.v — the `Bare` arm is a bare
+`returnR`; **neither read nor write**), and `HWtlb` occurred exactly once in
+`bare_swp_translate`, in its `intros` line, never used.
+
+That blanket premise is what made `6b5d1eb2` put `∃ tlbv, tlb ↦ᵣ tlbv` into
+`bare_inv` ("every S-mode translation slot must fund it … this is the Bare arm
+catching up"), which made kvminithart's `tlb ↦ᵣ tlbvec0` precondition a SECOND
+owner — the unsatisfiability recorded above under "BLOCKED (1)".  **Ruling 1
+and "BLOCKED (1)" are symptoms of this, not the disease.**
+
+**HOW THE PRE-PORT PROOF WORKED, and it is the shape to keep.**  The cell is
+NEVER in the slot: `ProofKvminithart` takes `tlb ↦ᵣ tlbvec0` (an ARBITRARY
+value — the precondition says nothing about contents) and holds it in hand
+from entry to exit.  The +0x08 sfence produces `tlbz1` **and** `Hnone1`; six
+instructions later +0x1c consumes them as
+`tlb_res_pt_intro root … tlbz1 t0 … (tlb_ok_pt_empty … Hnone1)`, dissolving
+`bare_inv` for **satp and pmp only**.  The flush survives because the cell it
+names is the caller's.  `SpecKvminithart`'s header says this in one line:
+"both sfence.vma's leave the TLB empty, so `tlb_ok_pt_empty` holds at any
+tree".  **Do not re-seal the flushed cell into `bare_inv`** — that arm is
+existential in the value and forgets it.  (Two arm-specific sfence leaves that
+did exactly that were written and reverted; see `WpSconfSfence.v`'s comment.)
+
+**STEP (1) IS LANDED** (commit "SRegime: the TLB frame requirement is the
+WALKING regime's"): the premise moved off `sr_swp_translate`/`_wit` into
+`kpt_swp_side`, entering through `sr_swp_side_ok` — the introduction a LEAF
+calls, and a leaf knows its own `Drw`.  `bare_swp_side` ignores it, and
+`strans_swp_side` needs nothing special because it is literally
+`bare_swp_side ∨ kpt_swp_side`.  Regression-free (failing set unchanged at the
+eight roots).
+
+**STEP (2) IS SCOPED BUT NOT STARTED**, and its cost is the frame set:
+* `sr_swp_open` / `sr_swp_close` hand out `tlb ↦ᵣ tlbv` in a signature SHARED
+  by all three regimes, and `HartSFrame.s_Drw` contains `tlb` unconditionally.
+* The tlb cannot simply move into the regime's residue: `kpt_swp_res` is
+  `tlb_snap_ok (register_lookup tlb rs) ∗ kpt_inv root_ppn` — it is INDEXED by
+  the frame's tlb value and does not own the cell, and the KPT walk WRITES the
+  cell (`CommonWalk`: `vec_update_dec (register_lookup tlb rs) …`, the fill).
+  So the walking regime genuinely needs it in `Drw`.
+* Therefore the frame set has to become regime-dependent — `sr_Drw R` rather
+  than the global `s_Drw` — so that Bare's frame simply has no tlb and
+  `bare_inv` need not fund it.  **Measured footprint: `s_Drw` is mentioned 319
+  times across 10 files** (WpSFrames 98, HartSFrame 75, SmodeCorePt 53,
+  TrampStepPt 32, WpSmodeWfi 28, WpIntrInv 21, WpSmodeIntr 4, UptWalkPt 4,
+  WpSmodePtFetch 2, SRegime 2).
+
+**AFTER (2)**, the lane is straight: revert `6b5d1eb2`'s `bare_inv` conjunct
+and `52f89133`'s BootBridge/SpecMain routing, keep kvminithart's precondition
+(ruling 1 becomes unnecessary), and port the three raw blocks onto the
+cell-premise leaves that already exist — `WpSconfSfence.wp_sfence_vma_s_sconf`
+plus a `csrw satp` switch leaf whose composer half is already landed
+(`WpSconfCsr.swp_write_CSR_satp_S` and the write-side satp legality check).
+The switch leaf must take the `tlb` cell as a caller argument and take only
+satp/pmp from `strans_inv_acc_bare`.
+
 ### WHY `ProofKvminithart` WAS RED, AND WHY IT IS NOT RULING 1 ALONE
 
 The file's first error is one missing `b'` argument to
