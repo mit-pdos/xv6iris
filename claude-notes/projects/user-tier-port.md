@@ -1838,3 +1838,48 @@ that was green went red.  **Rename the newcomer** (here to
 `u_walk_pa_window_wf`) rather than qualifying at the use site: the
 shadowing is a landmine for every later file that imports both.  Grep
 the name before adding a lemma to a widely-imported file.
+
+### THE ARMS: 2 of 19 PROVED, and the engine they left behind
+
+`arm_LOAD_u` and `arm_STORE_u` are proved (`UserMemArmsBase.v`), and the
+contract was verified MECHANICALLY rather than by eye: a scratch file
+states `UserTotalU`'s section `Variable` body copied verbatim as the type
+of a `Definition` and defines it as `arm_LOAD_u pt`.  **Do that for every
+remaining arm** — the signatures are long and a silent mismatch would
+surface only at `ProofUser`'s instantiation.
+
+The reusable half is `u_vmem_read_pure` / `u_vmem_write_pure`: the full
+trichotomy (`in_one_page_dec` crossed with `data_classify` at EACH page
+the access touches — four retiring cases, three faulting), concluding a
+disjunction of "retires with a value" and "delegates a User trap", each
+with its certificate, the `u_tlb_only` landing, `tlb_ok_pt` at the new
+tree and `u_mem_step`.  Every other data arm is that lemma plus its own
+execute step.
+
+**Three things had no producer anywhere and had to be built:**
+
+* **`goodb_get_pmlen_u`** (with the `currentlyEnabled_S` / `senvcfg` /
+  `is_pmm_applicable` / `get_pmm` chain, packaged as `u_pmlen_pure`).
+  The pointer-masking-length probe is a premise of
+  `goodmb_vmem_read_u` / `_write_u` and only its `exec` half existed.
+* **`goodmb_vmem_write_addr_intra_terr`** — the ONE `vmem_write_addr`
+  certificate P4a missed; that region throws, so the
+  `catch_early_return` wrapper stays on and it is
+  `goodmb_vmem_write_addr_split2_err1`'s peel at `q = 0`.
+* the fault glue `u_fault_pair` / `u_texc_load` / `u_texc_store` /
+  `u_tarv_fault` / `u_tawv_fault` — `UserFaultCert.u_translate_fault_pure`
+  plus the `memory_exception` that turns it into the delegated User trap.
+
+**AND ONE SHAPE FIX WORTH COPYING: `exec/goodmb_execute_LOAD_u_retire`,
+the LOAD's execute step at a SYMBOLIC `rd`.**  `UserMemArms`' pair splits
+on `uint rd <> 0`; `UserExecFacts.gpr_write_state` already carries the x0
+case, so ONE pair replaces the split and the certificate's footprint
+obligation becomes the CONDITIONAL `Du_gpr_of_Z`, which is what
+`goodmb_wX_bits_gpr` wants anyway.  Without it every arm would have owed
+an `rd = x0` duplicate of its whole case tree.
+
+Also: the execute-level closers lost their landing DISJUNCTION premise
+(`rs' = rs \/ ∃ tv, rs' = register_set tlb tv rs`) in favour of the
+`reg_agree_on u_Dfix` it was only ever used to produce — **the
+disjunction does not compose across the two walks a straddling access
+runs**, so it was the wrong premise from the start.
