@@ -424,14 +424,59 @@ Section smem.
   Local Lemma w_le8 : width <= 8.
   Proof. exact (vmem_width_le width Hvw). Qed.
 
+  (* THE ADDRESS CLASS.  RAM and MMIO run the SAME chain and differ in
+     exactly four facts, so those are the section's parameters rather than a
+     second copy of the tower: what the PMA table must grant ([Pma]), which
+     addresses this engine serves ([Acls]), and -- derived from those -- the
+     PMA walk, the [within_mmio_*] answer, the PMP range match and the node.
+     The RAM and device instances are at the bottom of the file. *)
+  Variable Acls : SailStdpp.Values.mword 64 -> Prop.
+  Variable Pma : list PMA_Region -> Prop.
+
+  Hypothesis Hpma_load :
+    forall (D Drw : gset register) (rs : regstate)
+           (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region),
+      (pma_regions : register) ∈ D ->
+      register_lookup pma_regions rs = pmar0 ->
+      Pma pmar0 -> Acls pa ->
+      is_aligned_paddr (Physaddr pa) width = true ->
+      hfrun 6 D Drw rs
+        (check_pma_with_pmp_priority (Load Data) PBMT_PMA Supervisor
+           (Physaddr pa) width false)
+      = Some (Values.Ok
+                {| Phys_Mem_Access_Info_splittable := CannotSplit;
+                   Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+
+  Hypothesis Hmmio_r :
+    forall (D Drw : gset register) (rs : regstate)
+           (pa : SailStdpp.Values.mword 64),
+      (htif_tohost_base : register) ∈ D ->
+      register_lookup htif_tohost_base rs = None ->
+      Acls pa ->
+      hfrun 12 D Drw rs (within_mmio_readable (Physaddr pa) width)
+      = Some (false, rs).
+
+  Hypothesis Hpmprange :
+    forall (pa paddr0 : SailStdpp.Values.mword 64),
+      Acls pa -> is_aligned_paddr (Physaddr pa) width = true ->
+      (ram_base + ram_size <= uint paddr0 * 4)%Z ->
+      pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+        (Z.mul (uint paddr0) 4) (uint pa) (uint (to_bits 64 width))
+      = PMP_Match.
+
+  (* THE MEMORY OBLIGATION IS ABSTRACT TOO.  A RAM read hands the state back
+     unchanged and pins the bytes; a DEVICE read hands back a NEW device state
+     and pins the word the device answered.  The chain above never looks
+     inside, so it is one parameter and the two instances differ only in it. *)
+  Variable Mobl : SailStdpp.Values.mword 64 ->
+                  SailStdpp.Values.mword (8 * width) -> iProp Σ -> iProp Σ.
+
   Hypothesis Hread_node :
     forall (pa : SailStdpp.Values.mword 64)
            (bytes : SailStdpp.Values.mword (8 * width)) (R : iProp Σ),
-      dev_addr pa = false ->
+      Acls pa ->
       gen_cert -∗
-      (∀ σ, mstate_interp σ ={⊤,∅}=∗
-          ⌜mem_bytes_at σ pa width bytes⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+      Mobl pa bytes R -∗
       swp (read_ram Read_plain (Physaddr pa) width false)
         (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
 
@@ -462,15 +507,13 @@ Section smem.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa width bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    Mobl pa bytes R -∗
     swp (checked_mem_read (Load Data) PBMT_PMA Supervisor
            (Physaddr pa) width false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -479,13 +522,7 @@ Section smem.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
       HA Hord HR Hcov Hpallow Hram Hpa.
     pose proof w_pos as Hw0. pose proof w_le8 as Hw8.
-    assert (Hacc : pma_ram_access pa width)
-      by (apply (pma_ram_access_w pa width Hw0 ltac:(lia) Hdvd Hram Hpa)).
-    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-                       (Z.mul (uint (vec_access_dec paddr 0)) 4)
-                       (uint pa) (uint (to_bits 64 width)) = PMP_Match).
-    { apply (ram_pmp_match_w pa (vec_access_dec paddr 0) width Hw0 Huintw);
-        [ exact (proj1 Hram) | exact (proj2 (proj2 Hacc)) | exact Hcov ]. }
+    pose proof (Hpmprange pa (vec_access_dec paddr 0) Hram Hpa Hcov) as Hrange.
     iIntros "#Hcert Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold checked_mem_read.
@@ -494,8 +531,8 @@ Section smem.
                  Supervisor (Physaddr pa) width false) _ _ C HC
               with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_check_pma_load_S (Drw ∪ Dro) Drw rs pa pmar0 width
-                   Hw0 ltac:(lia) Hdvd HDpma Hpma Hpallow Hram Hpa)
+                (Hpma_load (Drw ∪ Dro) Drw rs pa pmar0
+                   HDpma Hpma Hpallow Hram Hpa)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite mbind_ret. cbn beta iota zeta.
@@ -523,8 +560,7 @@ Section smem.
     iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) width)
               _ _ _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa width
-                   ltac:(lia) HDhtif Hhtif Hram)
+                (Hmmio_r (Drw ∪ Dro) Drw rs pa HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) width false)
@@ -535,8 +571,7 @@ Section smem.
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗ R)%I)
                 with "[Hrw Hro] [Hmem]").
       - iIntros (r) "(-> & HR)". by iFrame.
-      - iApply (Hread_node pa bytes R (addr_is_ram_not_dev pa Hram)
-                  with "Hcert Hmem"). }
+      - iApply (Hread_node pa bytes R Hram with "Hcert Hmem"). }
     iIntros (v) "(-> & Hrw & Hro & HR)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
@@ -642,8 +677,8 @@ Section smem.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
@@ -658,9 +693,7 @@ Section smem.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa width bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    Mobl pa bytes R -∗
     swp (translate_and_read_value (Virtaddr ea) width (Load Data)
            false false false)
       (fun r => ⌜r = Values.Ok (Physaddr pa, bytes)⌝ ∗
@@ -743,8 +776,8 @@ Section smem.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_vaddr (Virtaddr ea) width = true ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
@@ -760,9 +793,7 @@ Section smem.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa width bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    Mobl pa bytes R -∗
     swp (vmem_read_addr (Virtaddr ea) width (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗
                 ∃ rsf : regstate,
@@ -921,8 +952,8 @@ Section smem.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_vaddr (Virtaddr ea) width = true ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
@@ -939,9 +970,7 @@ Section smem.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa width bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    Mobl pa bytes R -∗
     swp (vmem_read (Regidx i) offset width (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗ gpr_file m ∗
                 ∃ rsf : regstate,
@@ -1011,8 +1040,8 @@ Section smem.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_vaddr (Virtaddr ea) width = true ->
     is_aligned_paddr (Physaddr pa) width = true ->
     uint rd <> 0 ->
@@ -1030,9 +1059,7 @@ Section smem.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜mem_bytes_at σ pa width bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    Mobl pa bytes R -∗
     swp (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned width)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                 gpr_file (<[Regidx rd
@@ -1228,17 +1255,53 @@ Section smem_w.
   Local Lemma ww_le8 : width <= 8.
   Proof. exact (vmem_width_le width Hvw). Qed.
 
+  (* the store side's copy of the load section's address-class parameters *)
+  Variable Acls : SailStdpp.Values.mword 64 -> Prop.
+  Variable Pma : list PMA_Region -> Prop.
+
+  Hypothesis Hpma_store :
+    forall (D Drw : gset register) (rs : regstate)
+           (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region),
+      (pma_regions : register) ∈ D ->
+      register_lookup pma_regions rs = pmar0 ->
+      Pma pmar0 -> Acls pa ->
+      is_aligned_paddr (Physaddr pa) width = true ->
+      hfrun 6 D Drw rs
+        (check_pma_with_pmp_priority (Store Data) PBMT_PMA Supervisor
+           (Physaddr pa) width false)
+      = Some (Values.Ok
+                {| Phys_Mem_Access_Info_splittable := CannotSplit;
+                   Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+
+  Hypothesis Hmmio_w :
+    forall (D Drw : gset register) (rs : regstate)
+           (pa : SailStdpp.Values.mword 64),
+      (htif_tohost_base : register) ∈ D ->
+      register_lookup htif_tohost_base rs = None ->
+      Acls pa ->
+      hfrun 12 D Drw rs (within_mmio_writable (Physaddr pa) width)
+      = Some (false, rs).
+
+  Hypothesis Hpmprange :
+    forall (pa paddr0 : SailStdpp.Values.mword 64),
+      Acls pa -> is_aligned_paddr (Physaddr pa) width = true ->
+      (ram_base + ram_size <= uint paddr0 * 4)%Z ->
+      pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+        (Z.mul (uint paddr0) 4) (uint pa) (uint (to_bits 64 width))
+      = PMP_Match.
+
+  (* the store side's abstract memory obligation (see the load section) *)
+  Variable Wobl : SailStdpp.Values.mword 64 ->
+                  SailStdpp.Values.mword (8 * width) -> iProp Σ -> iProp Σ.
+
   Hypothesis Hwrite_node :
     forall (pa : SailStdpp.Values.mword 64)
            (v : SailStdpp.Values.mword (8 * width)) (R : iProp Σ)
            (rr : option resv),
-      dev_addr pa = false ->
+      Acls pa ->
       gen_cert -∗
       resv_frag cpu_id rr -∗
-      (∀ σ, mstate_interp σ ={⊤,∅}=∗
-          ▷ (|={∅,⊤}=> mstate_interp
-               (MState σ.(sregs)
-                  (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R)) -∗
+      Wobl pa v R -∗
       swp (write_ram Write_plain (Physaddr pa) width v tt)
         (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
 
@@ -1266,8 +1329,8 @@ Section smem_w.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
     hreg_frame rs Drw -∗
@@ -1280,13 +1343,7 @@ Section smem_w.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDaddr Hpriv Hpma Hpcfg Hpaddr
       Hep HA Hord HW Hcov Hpallow Hram Hpa.
     pose proof ww_pos as Hw0. pose proof ww_le8 as Hw8.
-    assert (Hacc : pma_ram_access pa width)
-      by (apply (pma_ram_access_w pa width Hw0 ltac:(lia) Hdvd Hram Hpa)).
-    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-                       (Z.mul (uint (vec_access_dec paddr 0)) 4)
-                       (uint pa) (uint (to_bits 64 width)) = PMP_Match).
-    { apply (ram_pmp_match_w pa (vec_access_dec paddr 0) width Hw0 Huintw);
-        [ exact (proj1 Hram) | exact (proj2 (proj2 Hacc)) | exact Hcov ]. }
+    pose proof (Hpmprange pa (vec_access_dec paddr 0) Hram Hpa Hcov) as Hrange.
     iIntros "#Hcert Hrw Hro".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold mem_write_ea.
@@ -1306,8 +1363,8 @@ Section smem_w.
               (check_pma_with_pmp_priority (Store Data) PBMT_PMA Supervisor
                  (Physaddr pa) width false) _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_check_pma_store_S (Drw ∪ Dro) Drw rs pa pmar0 width
-                   Hw0 ltac:(lia) Hdvd HDpma Hpma Hpallow Hram Hpa)
+                (Hpma_store (Drw ∪ Dro) Drw rs pa pmar0
+                   HDpma Hpma Hpallow Hram Hpa)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". sm_glue.
     rewrite mbindR_ret. sm_glue.
@@ -1357,17 +1414,14 @@ Section smem_w.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R)) -∗
+    Wobl pa v R -∗
     swp (checked_mem_write (Physaddr pa) width v (Store Data) PBMT_PMA
            Supervisor tt false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -1377,13 +1431,7 @@ Section smem_w.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hpma Hpcfg Hpaddr Hhtif
       HA Hord HW Hcov Hpallow Hram Hpa.
     pose proof ww_pos as Hw0. pose proof ww_le8 as Hw8.
-    assert (Hacc : pma_ram_access pa width)
-      by (apply (pma_ram_access_w pa width Hw0 ltac:(lia) Hdvd Hram Hpa)).
-    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-                       (Z.mul (uint (vec_access_dec paddr 0)) 4)
-                       (uint pa) (uint (to_bits 64 width)) = PMP_Match).
-    { apply (ram_pmp_match_w pa (vec_access_dec paddr 0) width Hw0 Huintw);
-        [ exact (proj1 Hram) | exact (proj2 (proj2 Hacc)) | exact Hcov ]. }
+    pose proof (Hpmprange pa (vec_access_dec paddr 0) Hram Hpa Hcov) as Hrange.
     iIntros "#Hcert Hfrag Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold checked_mem_write.
@@ -1391,8 +1439,8 @@ Section smem_w.
               (check_pma_with_pmp_priority (Store Data) PBMT_PMA Supervisor
                  (Physaddr pa) width false) _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_check_pma_store_S (Drw ∪ Dro) Drw rs pa pmar0 width
-                   Hw0 ltac:(lia) Hdvd HDpma Hpma Hpallow Hram Hpa)
+                (Hpma_store (Drw ∪ Dro) Drw rs pa pmar0
+                   HDpma Hpma Hpallow Hram Hpa)
                 with "Hcert Hrw Hro"). }
     iIntros (v0) "(-> & Hrw & Hro)". sm_glue.
     rewrite mbindR_ret. sm_glue.
@@ -1418,8 +1466,8 @@ Section smem_w.
     iApply (swp_use_cer3 (within_mmio_writable (Physaddr pa) width)
               _ _ _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_within_mmio_w_ram (Drw ∪ Dro) Drw rs pa width
-                   ltac:(lia) HDhtif Hhtif Hram) with "Hcert Hrw Hro"). }
+                (Hmmio_w (Drw ∪ Dro) Drw rs pa HDhtif Hhtif Hram)
+                with "Hcert Hrw Hro"). }
     iIntros (v0) "(-> & Hrw & Hro)". sm_glue.
     change (autocast (T := mword)
               (subrange_vec_dec v (8 * (0 + 1) * width - 1) (8 * 0 * width))
@@ -1436,8 +1484,7 @@ Section smem_w.
                 (fun r => (⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None)%I)
                 with "[Hrw Hro] [Hmem Hfrag]").
       - iIntros (r) "(-> & HR & Hfrag)". by iFrame.
-      - iApply (Hwrite_node pa v R rr (addr_is_ram_not_dev pa Hram)
-                  with "Hcert Hfrag Hmem"). }
+      - iApply (Hwrite_node pa v R rr Hram with "Hcert Hfrag Hmem"). }
     iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". sm_glue.
     change (0 =? 1 - 1) with true. sm_glue.
     rewrite mbindR_ret. sm_glue.
@@ -1471,17 +1518,14 @@ Section smem_w.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R)) -∗
+    Wobl pa v R -∗
     swp (mem_write_value (Physaddr pa) width v (Store Data) PBMT_PMA
            false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -1554,8 +1598,8 @@ Section smem_w.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_vaddr (Virtaddr ea) width = true ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
@@ -1571,10 +1615,7 @@ Section smem_w.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R)) -∗
+    Wobl pa v R -∗
     swp (vmem_write_addr (Virtaddr ea) width v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
                 ∃ rsf : regstate,
@@ -1698,8 +1739,8 @@ Section smem_w.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_vaddr (Virtaddr ea) width = true ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
@@ -1716,10 +1757,7 @@ Section smem_w.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R)) -∗
+    Wobl pa v R -∗
     swp (vmem_write (Regidx i) offset width v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗ gpr_file m ∗
                 ∃ rsf : regstate,
@@ -1793,8 +1831,8 @@ Section smem_w.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
+    Pma pmar0 ->
+    Acls pa ->
     is_aligned_vaddr (Virtaddr ea) width = true ->
     is_aligned_paddr (Physaddr pa) width = true ->
     gen_cert -∗
@@ -1811,10 +1849,7 @@ Section smem_w.
                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                      Rt rsf ∗ resv_any cpu_id)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa (Z.to_N width) v) σ.(mdev)) ∗ R)) -∗
+    Wobl pa v R -∗
     swp (execute_STORE imm (Regidx rs2) (Regidx rs1) width)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗
                 ∃ rsf : regstate,
@@ -2046,3 +2081,395 @@ Section swnodes.
   Qed.
 
 End swnodes.
+
+(* ====================================================================== *)
+(* 9. THE TWO ADDRESS CLASSES.                                             *)
+(*                                                                        *)
+(* Each is five facts: the PMA walk at a load, the PMA walk at a store,     *)
+(* the [within_mmio_readable]/[_writable] answer, and the PMP range match.  *)
+(* Instantiating the sections above with one of them and the matching node  *)
+(* gives the engine for that class; nothing else differs.                   *)
+(* ====================================================================== *)
+
+(* ---- the RAM class ---- *)
+Section ram_class.
+  Variable width : Z.
+  Hypothesis Hvw : vmem_width width.
+  Hypothesis Hdvd : (width | 4096).
+  Hypothesis Huintw : uint (to_bits 64 width) = width.
+
+  Lemma ram_pma_load (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) :
+    (pma_regions : register) ∈ D ->
+    register_lookup pma_regions rs = pmar0 ->
+    pma_allows_ram pmar0 -> addr_is_ram pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    hfrun 6 D Drw rs
+      (check_pma_with_pmp_priority (Load Data) PBMT_PMA Supervisor
+         (Physaddr pa) width false)
+    = Some (Values.Ok
+              {| Phys_Mem_Access_Info_splittable := CannotSplit;
+                 Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+  Proof.
+    pose proof (vmem_width_pos width Hvw) as Hw0.
+    pose proof (vmem_width_le width Hvw) as Hw8.
+    exact (hfrun_check_pma_load_S D Drw rs pa pmar0 width Hw0
+             ltac:(lia) Hdvd).
+  Qed.
+
+  Lemma ram_pma_store (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) :
+    (pma_regions : register) ∈ D ->
+    register_lookup pma_regions rs = pmar0 ->
+    pma_allows_ram pmar0 -> addr_is_ram pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    hfrun 6 D Drw rs
+      (check_pma_with_pmp_priority (Store Data) PBMT_PMA Supervisor
+         (Physaddr pa) width false)
+    = Some (Values.Ok
+              {| Phys_Mem_Access_Info_splittable := CannotSplit;
+                 Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+  Proof.
+    pose proof (vmem_width_pos width Hvw) as Hw0.
+    pose proof (vmem_width_le width Hvw) as Hw8.
+    exact (hfrun_check_pma_store_S D Drw rs pa pmar0 width Hw0
+             ltac:(lia) Hdvd).
+  Qed.
+
+  Lemma ram_mmio_r (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) :
+    (htif_tohost_base : register) ∈ D ->
+    register_lookup htif_tohost_base rs = None ->
+    addr_is_ram pa ->
+    hfrun 12 D Drw rs (within_mmio_readable (Physaddr pa) width)
+    = Some (false, rs).
+  Proof.
+    pose proof (vmem_width_pos width Hvw) as Hw0.
+    exact (hfrun_within_mmio_ram D Drw rs pa width ltac:(lia)).
+  Qed.
+
+  Lemma ram_mmio_w (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) :
+    (htif_tohost_base : register) ∈ D ->
+    register_lookup htif_tohost_base rs = None ->
+    addr_is_ram pa ->
+    hfrun 12 D Drw rs (within_mmio_writable (Physaddr pa) width)
+    = Some (false, rs).
+  Proof.
+    pose proof (vmem_width_pos width Hvw) as Hw0.
+    exact (hfrun_within_mmio_w_ram D Drw rs pa width ltac:(lia)).
+  Qed.
+
+  Lemma ram_pmprange (pa paddr0 : SailStdpp.Values.mword 64) :
+    addr_is_ram pa -> is_aligned_paddr (Physaddr pa) width = true ->
+    (ram_base + ram_size <= uint paddr0 * 4)%Z ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint paddr0) 4) (uint pa) (uint (to_bits 64 width))
+    = PMP_Match.
+  Proof.
+    intros Hram Hpa Hcov.
+    pose proof (vmem_width_pos width Hvw) as Hw0.
+    pose proof (vmem_width_le width Hvw) as Hw8.
+    pose proof (pma_ram_access_w pa width Hw0 ltac:(lia) Hdvd Hram Hpa) as Hacc.
+    apply (ram_pmp_match_w pa paddr0 width Hw0 Huintw);
+      [ exact (proj1 Hram) | exact (proj2 (proj2 Hacc)) | exact Hcov ].
+  Qed.
+End ram_class.
+
+(* ---- the DEVICE class: the UART / PLIC / virtio-mmio band. ---- *)
+(* [dev_addr] is "below DRAM", which includes the CLINT, and a CLINT access
+   is served by [mmio_read]/[mmio_write] rather than by the device thread --
+   so the class explicitly excludes it.  [pma_io_access] pins the band, and
+   with it the PMP range (the whole band is below [ram_base]). *)
+Definition dev_cls (width : Z) (pa : SailStdpp.Values.mword 64) : Prop :=
+  dev_addr pa = true /\ not_in_clint pa /\ pma_io_access pa width.
+
+Lemma hfrun_check_pma_load_io (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (width : Z) :
+  (pma_regions : register) ∈ D ->
+  register_lookup pma_regions rs = pmar0 ->
+  pma_allows_io pmar0 ->
+  pma_io_access pa width ->
+  is_aligned_paddr (Physaddr pa) width = true ->
+  hfrun 6 D Drw rs
+    (check_pma_with_pmp_priority (Load Data) PBMT_PMA Supervisor
+       (Physaddr pa) width false)
+  = Some (Values.Ok
+            {| Phys_Mem_Access_Info_splittable := CannotSplit;
+               Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+Proof.
+  intros HD Hpma Hpallow Hacc Hpa.
+  unfold check_pma_with_pmp_priority. sm_cbn.
+  sm_read. rewrite Hpma. sm_cbn.
+  destruct (Hpallow pa width Hacc) as (region & Hmatch & Hgrant).
+  destruct region as [rbase rsize rattr rdtree].
+  destruct Hgrant as (Hx & _).
+  cbn [PMA_Region_attributes] in Hx.
+  rewrite Hmatch. sm_cbn.
+  rewrite Hx. sm_cbn.
+  rewrite Hpa. sm_cbn.
+  apply hfrun_ret.
+Qed.
+
+Lemma hfrun_check_pma_store_io (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (width : Z) :
+  (pma_regions : register) ∈ D ->
+  register_lookup pma_regions rs = pmar0 ->
+  pma_allows_io pmar0 ->
+  pma_io_access pa width ->
+  is_aligned_paddr (Physaddr pa) width = true ->
+  hfrun 6 D Drw rs
+    (check_pma_with_pmp_priority (Store Data) PBMT_PMA Supervisor
+       (Physaddr pa) width false)
+  = Some (Values.Ok
+            {| Phys_Mem_Access_Info_splittable := CannotSplit;
+               Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+Proof.
+  intros HD Hpma Hpallow Hacc Hpa.
+  unfold check_pma_with_pmp_priority. sm_cbn.
+  sm_read. rewrite Hpma. sm_cbn.
+  destruct (Hpallow pa width Hacc) as (region & Hmatch & Hgrant).
+  destruct region as [rbase rsize rattr rdtree].
+  destruct Hgrant as (_ & Hx).
+  cbn [PMA_Region_attributes] in Hx.
+  rewrite Hmatch. sm_cbn.
+  rewrite Hx. sm_cbn.
+  rewrite Hpa. sm_cbn.
+  apply hfrun_ret.
+Qed.
+
+Local Lemma clint_false_dev (a : SailStdpp.Values.mword 64) (n : Z) :
+  0 < n -> not_in_clint a ->
+  andb (Z.leb (uint plat_clint_base) (uint a))
+       (Z.leb (Z.add (uint a) (__id n))
+              (Z.add (uint plat_clint_base) (uint plat_clint_size)))
+  = false.
+Proof.
+  intros Hn Hnc. unfold __id.
+  destruct Hnc as [H|H];
+    [ apply andb_false_intro1 | apply andb_false_intro2 ];
+    apply Z.leb_gt; lia.
+Qed.
+
+Local Ltac dmr_cbn :=
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.liftR Defs.try_catch
+     Defs.catch_early_return Defs.returnm returnM returnR
+     Defs.returnR Riscv.rv64d_types.returnR
+     Defs.read_reg Defs.early_return Defs.throw
+     Defs.assert_exp Defs.assert_exp'
+     Defs.and_boolM Defs.or_boolM andb orb negb not
+     within_clint within_sig within_htif_readable within_htif_writable
+     __id get_config_rvfi plat_have_clint plat_have_sig].
+
+Lemma hfrun_within_mmio_dev_r (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (n : Z) :
+  0 < n ->
+  (htif_tohost_base : register) ∈ D ->
+  register_lookup htif_tohost_base rs = None ->
+  not_in_clint pa ->
+  hfrun 12 D Drw rs (within_mmio_readable (Physaddr pa) n) = Some (false, rs).
+Proof.
+  intros Hn HD Hhtif Hnc.
+  unfold within_mmio_readable. dmr_cbn.
+  rewrite (clint_false_dev pa n Hn Hnc). dmr_cbn.
+  sm_read. rewrite Hhtif. dmr_cbn.
+  apply hfrun_ret.
+Qed.
+
+Lemma hfrun_within_mmio_dev_w (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (n : Z) :
+  0 < n ->
+  (htif_tohost_base : register) ∈ D ->
+  register_lookup htif_tohost_base rs = None ->
+  not_in_clint pa ->
+  hfrun 12 D Drw rs (within_mmio_writable (Physaddr pa) n) = Some (false, rs).
+Proof.
+  intros Hn HD Hhtif Hnc.
+  unfold within_mmio_writable. dmr_cbn.
+  rewrite (clint_false_dev pa n Hn Hnc). dmr_cbn.
+  sm_read. rewrite Hhtif. dmr_cbn.
+  apply hfrun_ret.
+Qed.
+
+Section dev_class.
+  Variable width : Z.
+  Hypothesis Hvw : vmem_width width.
+  Hypothesis Huintw : uint (to_bits 64 width) = width.
+
+  Lemma dev_pma_load (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) :
+    (pma_regions : register) ∈ D ->
+    register_lookup pma_regions rs = pmar0 ->
+    pma_allows_io pmar0 -> dev_cls width pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    hfrun 6 D Drw rs
+      (check_pma_with_pmp_priority (Load Data) PBMT_PMA Supervisor
+         (Physaddr pa) width false)
+    = Some (Values.Ok
+              {| Phys_Mem_Access_Info_splittable := CannotSplit;
+                 Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+  Proof.
+    intros HD Hpma Hpallow (Hdev & Hnc & Hacc) Hpa.
+    exact (hfrun_check_pma_load_io D Drw rs pa pmar0 width HD Hpma Hpallow
+             Hacc Hpa).
+  Qed.
+
+  Lemma dev_pma_store (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) :
+    (pma_regions : register) ∈ D ->
+    register_lookup pma_regions rs = pmar0 ->
+    pma_allows_io pmar0 -> dev_cls width pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    hfrun 6 D Drw rs
+      (check_pma_with_pmp_priority (Store Data) PBMT_PMA Supervisor
+         (Physaddr pa) width false)
+    = Some (Values.Ok
+              {| Phys_Mem_Access_Info_splittable := CannotSplit;
+                 Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+  Proof.
+    intros HD Hpma Hpallow (Hdev & Hnc & Hacc) Hpa.
+    exact (hfrun_check_pma_store_io D Drw rs pa pmar0 width HD Hpma Hpallow
+             Hacc Hpa).
+  Qed.
+
+  Lemma dev_mmio_r (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) :
+    (htif_tohost_base : register) ∈ D ->
+    register_lookup htif_tohost_base rs = None ->
+    dev_cls width pa ->
+    hfrun 12 D Drw rs (within_mmio_readable (Physaddr pa) width)
+    = Some (false, rs).
+  Proof.
+    intros HD Hhtif (Hdev & Hnc & Hacc).
+    exact (hfrun_within_mmio_dev_r D Drw rs pa width
+             (vmem_width_pos width Hvw) HD Hhtif Hnc).
+  Qed.
+
+  Lemma dev_mmio_w (D Drw : gset register) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) :
+    (htif_tohost_base : register) ∈ D ->
+    register_lookup htif_tohost_base rs = None ->
+    dev_cls width pa ->
+    hfrun 12 D Drw rs (within_mmio_writable (Physaddr pa) width)
+    = Some (false, rs).
+  Proof.
+    intros HD Hhtif (Hdev & Hnc & Hacc).
+    exact (hfrun_within_mmio_dev_w D Drw rs pa width
+             (vmem_width_pos width Hvw) HD Hhtif Hnc).
+  Qed.
+
+  Lemma dev_pmprange (pa paddr0 : SailStdpp.Values.mword 64) :
+    dev_cls width pa -> is_aligned_paddr (Physaddr pa) width = true ->
+    (ram_base + ram_size <= uint paddr0 * 4)%Z ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint paddr0) 4) (uint pa) (uint (to_bits 64 width))
+    = PMP_Match.
+  Proof.
+    intros (Hdev & Hnc & Hacc) Hpa Hcov.
+    pose proof (vmem_width_pos width Hvw) as Hw0.
+    destruct Hacc as (Hwr & Hlo & Hhi).
+    assert (Hz : uint (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
+    rewrite Hz Huintw. rewrite Z.mul_0_l.
+    apply pmpRangeMatch_full;
+      unfold ram_base, ram_size, mmio_base, mmio_size in *; lia.
+  Qed.
+End dev_class.
+
+(* ====================================================================== *)
+(* 10. THE DEVICE NODES (widths 1 and 4 -- what the MMIO leaves use).       *)
+(*                                                                        *)
+(* At a device address the model still calls [read_ram]/[write_ram] --      *)
+(* [within_mmio_readable] is FALSE outside the CLINT -- and the MemRead /   *)
+(* MemWrite outcome is serviced by the device arm of the step relation.     *)
+(* So these are the same two nodes with [HartEvents.swp_hart_dev_read] /    *)
+(* [_dev_write] instead of the RAM rules, and the obligation names          *)
+(* [dev_read]/[dev_write] instead of [read_bytes]/[write_bytes].            *)
+(* ====================================================================== *)
+Section sdevnodes.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma swp_dev_read_node1 (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) :
+    dev_addr pa = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_read σ.(mdev) pa 1 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 1 false)
+      (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hmem".
+    iApply (swp_hart_dev_read 1 (mread_req1 pa) _ _
+              (hread_req_at_read_ram1 pa) Hdev with "Hcert [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (d0) "[%Hdr Hcl]".
+    iModIntro. iExists bytes, d0. iSplitR; [ done | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    rewrite hread_resume_read_ram1. iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_dev_read_node4 (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) :
+    dev_addr pa = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_read σ.(mdev) pa 4 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 4 false)
+      (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hmem".
+    iApply (swp_hart_dev_read 4 (mread_req pa) _ _
+              (hread_req_at_read_ram pa) Hdev with "Hcert [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (d0) "[%Hdr Hcl]".
+    iModIntro. iExists bytes, d0. iSplitR; [ done | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    rewrite hread_resume_read_ram. iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_dev_write_node1 (pa : SailStdpp.Values.mword 64)
+      (v : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) (rr : option resv) :
+    dev_addr pa = true ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_write σ.(mdev) pa 1 v = Some d'⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R)) -∗
+    swp (write_ram Write_plain (Physaddr pa) 1 v tt)
+      (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hfrag Hmem".
+    iApply (swp_hart_dev_write 1 (mwrite_req1 pa v) _ _ rr
+              (hwrite_req_at_write_ram1 pa v) Hdev
+              with "Hcert Hfrag [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (d0) "[%Hdw Hcl]".
+    iModIntro. iExists d0. rewrite mwrite_req1_value. iSplitR; [ done | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    iIntros "Hfrag". rewrite hwrite_resume_write_ram1.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_dev_write_node4 (pa : SailStdpp.Values.mword 64)
+      (v : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) (rr : option resv) :
+    dev_addr pa = true ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗ ∃ d' : dev_state,
+        ⌜dev_write σ.(mdev) pa 4 v = Some d'⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ R)) -∗
+    swp (write_ram Write_plain (Physaddr pa) 4 v tt)
+      (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hfrag Hmem".
+    iApply (swp_hart_dev_write 4 (mwrite_req pa v) _ _ rr
+              (hwrite_req_at_write_ram pa v) Hdev
+              with "Hcert Hfrag [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (d0) "[%Hdw Hcl]".
+    iModIntro. iExists d0. rewrite mwrite_req4_value. iSplitR; [ done | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    iIntros "Hfrag". rewrite hwrite_resume_write_ram.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+End sdevnodes.
