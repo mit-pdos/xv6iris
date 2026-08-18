@@ -106,7 +106,6 @@ Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.
 Require Import WpSmodeHalf WpSmodeIntr.
-Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.

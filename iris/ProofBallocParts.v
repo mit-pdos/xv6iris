@@ -1,22 +1,14 @@
 (* ProofBallocParts.v -- the pieces balloc's whole-function proof needs and
-   the shared layers do not yet have.
+   the shared layers do not have: the BIT ARITHMETIC of its inner scan.
 
-   Two S-mode ALU leaves are missing from [WpSconfAlu.v] and both are used
-   by balloc (and [sllw] also by bfree):
-
-     [sraiw rd,rs1,shamt]  -- balloc +0x9c (b / BPB), +0xc2 and +0xcc (the
-                              two halves of C's SIGNED divide of [bi] by 8)
-     [sllw  rd,rs1,rs2]    -- balloc +0xbe (the mask [1 << (bi % 8)]);
-                              bfree +0x26 is the same instruction
-
-   [WpSconfSrliw.v] is the precedent for exactly this situation, and its
-   header records the reason such a leaf lands in a leaf file rather than
-   in [WpSconfAlu.v] / [WpMmodeShiftiop.v]: both of those sit near the
-   BOTTOM of the build, so editing either invalidates the whole downstream
-   .vo tree and no single-file check loop survives it
-   (claude-notes/durable-notes.md, "Editing a file near the BOTTOM of the
-   tree").  Merging these two into their proper homes on a build that can
-   afford a full rebuild is owed, exactly as it is for [wp_srliw_s_sconf]. *)
+   The two S-mode ALU leaves that used to live here -- [sraiw rd,rs1,shamt]
+   (balloc +0x9c, +0xc2, +0xcc: the two halves of C's SIGNED divide of [bi]
+   by 8) and [sllw rd,rs1,rs2] (balloc +0xbe, the mask [1 << (bi % 8)];
+   bfree +0x26 is the same instruction) -- are in [WpSconfAlu.v] now, beside
+   the rest of the S-mode ALU family, together with their exec bridges.
+   They were parked here only because editing that file used to invalidate
+   the whole downstream .vo tree; the per-node port pays for a full rebuild
+   anyway. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -35,145 +27,12 @@ Require Import FsCrash.
 Require Import BitmapEnc BitmapInv.
 Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeShiftiop.
 Require Import SmodeCore.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs WpSmodeIntr WpSconfAlu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.
 
 Set Printing Depth 40.
-
-(* ===================================================================== *)
-(*  SRAIW -- the third branch of [execute_SHIFTIWOP]'s match.             *)
-(* ===================================================================== *)
-
-Lemma exec_execute_SHIFTIWOP_SRAIW (shamt : mword 5) (rs1 rd : regidx)
-    (a : mword 64) s s' :
-  exec (rX_bits rs1) s = Some (a, s) ->
-  exec (wX_bits rd (sign_extend' 64
-          (shift_bits_right_arith (subrange_vec_dec a 31 0 : mword 32) shamt)))
-       s = Some (tt, s') ->
-  exec (execute (SHIFTIWOP (shamt, rs1, rd, SRAIW))) s
-  = Some (RETIRE_SUCCESS, s').
-Proof.
-  intros Ha Hw.
-  change (execute (SHIFTIWOP (shamt, rs1, rd, SRAIW)))
-    with (execute_SHIFTIWOP shamt rs1 rd SRAIW).
-  unfold execute_SHIFTIWOP. cbn match.
-  rewrite (exec_bind_Some _ _ _ a s Ha).
-  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm.
-Qed.
-
-Definition gpr_sraiw_val (rs1 : mword 5) (shamt : mword 5) (s : mstate) : mword 64 :=
-  sign_extend' 64
-    (shift_bits_right_arith (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32) shamt).
-
-Lemma exec_execute_SHIFTIWOP_SRAIW_gpr (rs1 rd : mword 5) (shamt : mword 5) s :
-  exec (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW))) s
-  = Some (RETIRE_SUCCESS,
-          if Z.eqb (uint rd) 0 then s
-          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (gpr_sraiw_val rs1 shamt s))).
-Proof.
-  unfold gpr_sraiw_val, gpr_src.
-  eapply exec_execute_SHIFTIWOP_SRAIW.
-  - apply (exec_rX_bits_gpr rs1 s).
-  - apply (exec_wX_bits_gpr rd _ s).
-Qed.
-
-(* ===================================================================== *)
-(*  SLLW -- the register-shift branch of [execute_RTYPEW]'s match.        *)
-(* ===================================================================== *)
-
-Definition gpr_sllw_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
-  sign_extend' 64
-    (shift_bits_left (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32)
-       (subrange_vec_dec (subrange_vec_dec (gpr_src rs2 s) 31 0 : mword 32) 4 0)).
-
-Lemma exec_execute_RTYPEW_SLLW_gpr (rs2 rs1 rd : mword 5) s :
-  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW))) s
-  = Some (RETIRE_SUCCESS,
-          if Z.eqb (uint rd) 0 then s
-          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (gpr_sllw_val rs2 rs1 s))).
-Proof.
-  unfold gpr_sllw_val, gpr_src.
-  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)))
-    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) SLLW).
-  unfold execute_RTYPEW. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
-  apply exec_returnm.
-Qed.
-
-Section BallocLeaves.
-  Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  (* SRAIW: shift the source's low 32 bits RIGHT ARITHMETICALLY by a 5-bit
-     shamt and sign-extend the 32-bit result back.  The [wp_srliw_s_sconf]
-     twin, verbatim. *)
-  Lemma wp_sraiw_s_sconf
-      (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
-      (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 ->
-    ops_ok b rd rs1 rs1 ->
-    sign_extend' 64
-      (shift_bits_right_arith (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt)
-      = wval ->
-    sie_cap_gpr KT1 m n b p -∗
-    pc_is pc -∗ instr pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
-              (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW)) wval m n b
-              Hrd Hops _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva _.
-      rewrite (exec_execute_SHIFTIWOP_SRAIW_gpr rs1 rd shamt s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_sraiw_val, gpr_src. rewrite Hva Hwval. reflexivity.
-  Qed.
-
-  (* SLLW: shift the first source's low 32 bits LEFT by the second's low
-     FIVE bits, sign-extending the 32-bit result back.  This is C's
-     [(int)x << (y & 31)] and is how both allocators form the bit mask
-     [1 << (bi % 8)]. *)
-  Lemma wp_sllw_s_sconf
-      (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
-    let wval :=
-      sign_extend' 64
-        (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
-           (subrange_vec_dec (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) in
-    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
-    sie_cap_gpr KT1 m n b p -∗
-    pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros wval.
-    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
-              (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW))
-              wval m n b Hrd Hops _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva Hvb.
-      rewrite (exec_execute_RTYPEW_SLLW_gpr rs2 rs1 rd s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_sllw_val, gpr_src. rewrite Hva Hvb. reflexivity.
-  Qed.
-
-End BallocLeaves.
 
 
 (* ===================================================================== *)
