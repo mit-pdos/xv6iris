@@ -65,6 +65,8 @@ Require Import SpecUserret SpecUser SpecUservec SpecUserretClosed.
 Require Import UserretUser.
 Require Import TfPage36.
 From Kernel Require KernelSyms.
+Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
+Require Import UserFrame.  (* [u_regs_pc_is]: the pc_is bundle in u_regs *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -97,7 +99,8 @@ Section UserretClosed.
     □ (∀ (h : CpuId) (C : ucfg) (pt : uptd),
          ⌜loop_ok C pt⌝ -∗
          hw_config (CID := h) -∗
-         minstret_inv (CID := h) -∗
+         (* [minstret_inv] is [emp] post-port: no hart index left *)
+         minstret_inv -∗
          user_trap_frame (CID := h) C pt (Rut_at h) -∗
          WP (Loop : expr riscv_lang)).
   Proof.
@@ -110,18 +113,29 @@ Section UserretClosed.
            it twice (see the header) ---- *)
     iDestruct (user_trap_frame_open C pt (Rut_at h) with "Hframe") as
       (ms_v sc_v stval_v sepc_v g)
-      "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hgpr &
+      "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr &
         Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmiec & Hmdlc & #Hmedlc & Hmenvc &
         #Hsenvc & #Hmsec & #Hssec & Hrut)".
     iDestruct "Hrut" as (ksp) "Hures".
+    (* the three counter-permission cells [user_cfg] carries.  The opener
+       does not hand them back (they are [box] and the builder keeps its own
+       copies), so each rebuild re-takes them: scounteren / mhpmcounter from
+       [hw_config], mcounteren from the residue's own timer capability -- see
+       [UsertrapRes.ut_res_bare_sstc] for why the third cannot ride
+       [hw_config] too. *)
+    iDestruct (hw_config_counters with "Hhw") as (scen hpm) "[#Hscen #Hhpm]".
+    iDestruct (UV.usertrap_res_sstc pt ksp with "Hures") as "[Hsstc Hures]".
+    iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
     (* ---- and rebuild it for uservec at the EMPTY residue ---- *)
     iDestruct (user_trap_frame_intro C pt (fun _ : uptd => emp%I)
                  ms_v sc_v stval_v sepc_v g Hmsok
-                 with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr
+                 with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
                        [Hutlb Hdata] [Hstvec Hmiec Hmdlc Hmenvc] []") as "Hframe".
     { rewrite /user_pt_inv. iFrame "Hutlb Hdata".
       iPureIntro. split; [exact Hcov | exact Hacc]. }
-    { rewrite /user_cfg. iFrame "Hstvec Hmiec Hmdlc Hmenvc Hmedlc Hsenvc Hmsec Hssec". }
+    { rewrite /user_cfg.
+      iFrame "Hstvec Hmiec Hmdlc Hmenvc Hmedlc Hsenvc Hmsec Hssec".
+      iSplitR; [iExists mcen, scen; iFrame "Hmcen Hscen" | iExists hpm; iFrame "Hhpm"]. }
     { done. }
     (* ---- one round ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) kroot j ksp
@@ -140,10 +154,16 @@ Section UserretClosed.
     iDestruct "Hcsrs" as "(Hssc' & #Hmedl' & #Hmse' & #Hsse')".
     iDestruct ("Hcback" with "[Hssc']") as "Hures'".
     { iFrame "Hssc' Hmedl' Hmse' Hsse'". }
-    iDestruct "Hpc'" as "[Hpcc' Hnpc']".
+    (* the same three, at the hart the round LANDED on *)
+    iDestruct (hw_config_counters with "Hhw'") as (scen' hpm') "[#Hscen' #Hhpm']".
+    iDestruct (UV.usertrap_res_sstc pt' ksp with "Hures'") as "[Hsstc' Hures']".
+    iDestruct "Hsstc'" as (mcen') "[#Hmcen' _]".
+    (* [pc_is] is ONE resource post-port -- it carries [minstret_res],
+       [clock_res] and [resv_any] beside the two cells, so splitting it off
+       into PC/nextPC drops the riders on the floor (worklist 13.2). *)
     iApply (US.wp_user_exec_closed (loop_ucfg mdv0 Hmm) pt' (Rut_at CID')
               with "Hhw' Hmin' Hwire
-                    [Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpcc' Hnpc' Hgpr'
+                    [Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpc' Hgpr'
                      Hupt' Hstvec' Hmie' Hmdl' Hmenv' Hures'] []").
     - (* [user_inv] at the rebuilt config record *)
       iExists (HART_ACTIVE tt), (sret_ms5 ms'), sc', stval', uepc,
@@ -153,13 +173,17 @@ Section UserretClosed.
       iSplitR; [iPureIntro;
                 exact (user_mstatus_ok_sret_ms5 ms' HSXL HMXR HFS HVS HTVM HTSR) |].
       iSplitR; [iPureIntro; intros u _; reflexivity |].
-      iSplitL "Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpcc' Hnpc' Hgpr'".
-      { rewrite /user_regs.
-        iFrame "Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpcc' Hnpc' Hgpr'". }
+      iSplitL "Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpc' Hgpr'".
+      { (* [u_regs] spells PC / nextPC / the three riders out; the round's
+           [pc_is] is exactly their bundle at va' = va ([u_regs_pc_is]). *)
+        rewrite /user_regs u_regs_pc_is.
+        iFrame "Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpc' Hgpr'". }
       iFrame "Hupt'".
       iSplitL "Hstvec' Hmie' Hmdl' Hmenv'".
       { rewrite /user_cfg /=.
-        iFrame "Hstvec' Hmie' Hmdl' Hmenv' Hmedl' Hsenv' Hmse' Hsse'". }
+        iFrame "Hstvec' Hmie' Hmdl' Hmenv' Hmedl' Hsenv' Hmse' Hsse'".
+        iSplitR; [iExists mcen', scen'; iFrame "Hmcen' Hscen'"
+                 | iExists hpm'; iFrame "Hhpm'"]. }
       iExists ksp. iExact "Hures'".
     - (* the next round's handler contract, under the later the user WP takes
          it at -- which is exactly the shape of the Löb hypothesis *)
@@ -196,6 +220,7 @@ Section Res.
   Definition usertrap_res_pt_open := UV.usertrap_res_pt_open.
   Definition usertrap_res_bare_norm := UV.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := UV.usertrap_res_csrs_open.
+  Definition usertrap_res_sstc := UV.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := UV.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UV.usertrap_res_tf_open.
 
@@ -230,6 +255,15 @@ End Res.
        what makes the bundle whole again before user mode -- the same
        open/close every LOOP round already performs inside
        [wp_uservec_pt]. *)
+    (* THE THREE COUNTER-PERMISSION CELLS the user invariant now carries.
+       scounteren and mhpmcounter are frozen into [hw_config] at boot (nothing
+       ever writes them); mcounteren cannot be -- timerinit writes it after
+       that bundle exists -- so it comes out of the residue's own timer
+       capability.  All three are [↦ᵣ□], so nothing is spent and nothing has
+       to come back. *)
+    iDestruct (hw_config_counters with "Hhw") as (scen hpm) "[#Hscen #Hhpm]".
+    iDestruct (usertrap_res_sstc pt ksp with "Hures") as "[Hsstc Hures]".
+    iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
     iDestruct (usertrap_res_tf_open pt ksp kroot
                  (fun ws Hl => Hkw CID ksp ws Hl) with "Hures")
       as (ws) "(%Hokws & Htfp & Hclose)".
@@ -239,12 +273,13 @@ End Res.
     iApply (RU.wp_userret_user C pt (LP.Rut_at CID) kroot m usatp
               mstatus0 sepc0 sc_v stval_v
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
+              mcen scen hpm
               HSIE HMPRV HSXL HTVM HMXR (uc_mm C) Hwf HTSR Hsup Ha0
               HuMode Huasid Huppn HFS HVS Hdqc Hcov Hacc
               with "Hkt Hhw Hmin Hwire Hhs Hpriv Hms Hmiec Hmdlc Hmenvc Hsenvc
                     Hsepc Hclaim Hktlb Hufr Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112
-                    Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hdata
+                    Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hmcen Hscen Hhpm Hdata
                     [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] [-]").
     - (* [Rut] at this hart, as a CLOSER: the residue minus the save slots,
          completed by the words userret gives back *)
