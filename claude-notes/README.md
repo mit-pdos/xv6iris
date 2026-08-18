@@ -178,6 +178,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   it — the stack as a splittable BUDGET, `uM_only` as the image
   postcondition of a call, the `mword_of_int` calculus, and the one generic
   branch leaf that replaces an op cross-product.
+- **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
+  `sh` on one fixed input: the design of record for scoping a program by its
+  input, the `xv6_io_protocol` at I/O depth, and the code-catalog generator.
+- **[`user-init.md`](projects/user-init.md)** — the Umode tier's FOURTH
+  program, `init`: the first that NEVER TERMINATES (two nested `iLöb` loops
+  and the `▷`-exposing branch leaves that close them), the first whose
+  theorem assumes nothing about what the kernel returns (every branch of
+  every syscall test is proved), and the first verified xv6 `printf`.
 
 ## `completed/` — finished projects, archived for reference
 

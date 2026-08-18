@@ -202,6 +202,11 @@ UmodeStub.v
 UProofShLib.v
 UProofShMem.v
 UCodeInit.v
+UmodeInitIo.v
+USpecInit.v
+UProofInitLib.v
+UProofInitPrintf.v
+UProofInit.v
 UProofEchoA.v
 UProofEcho.v
 UserMemArms.v
