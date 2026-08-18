@@ -385,6 +385,14 @@ Section WpStoreGpr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* [instr]/[mmode_config]-formulated register-generic 8-byte STORE WP -- the
+     write-dual of [wp_ld_gpr].  STORE reads TWO sources: rs1 (base address) and
+     rs2 (data), each borrowed off [gpr_file] independently (so rs1 = rs2 is
+     fine), and WRITES the 8 target bytes from their old contents [vold] to rs2's
+     bytes.  The caller supplies the OLD (full-owned) target bytes and the store's
+     alignment; the config the translation / PMP checks read is recovered from the
+     KEPT half of [mmode_config] + [hw_config].  No register is written ([gpr_file]
+     is handed back UNCHANGED). *)
   Lemma wp_store_gpr (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
       (imm : mword 12) (m : regfile) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
