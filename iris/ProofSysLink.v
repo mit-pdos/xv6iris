@@ -163,6 +163,17 @@ Local Ltac sl_xne N :=
   intro Hq; apply N;
   first [ exact (regidx_inj _ _ Hq) | symmetry; exact (regidx_inj _ _ Hq) ].
 
+(* Keep [wp_next_chain] out of [cpu_own_transport]'s argument list.  At the
+   deep call sites below, elaborating that inline tactic re-walks the entire
+   accumulated context; a named equality has a fixed type and is cheap to
+   pass to the Iris lemma. *)
+Local Ltac sl_own_transport CIDa CIDb eb0 pj0 b0 :=
+  let Htr := fresh "Htr" in
+  assert (Htr : b0 = false \/ pj0 = zero_reg ->
+                  (CIDb : CPU) = (CIDa : CPU)) by wp_next_chain;
+  iDestruct (cpu_own_transport CIDa CIDb 0 eb0 pj0 b0 Htr
+               with "Hown") as "Hown".
+
 Notation Rra := (mword_of_int 1 : mword 5).
 Notation Rs0 := (mword_of_int 8 : mword 5).
 Notation Rs1 := (mword_of_int 9 : mword 5).
@@ -928,8 +939,7 @@ Section ProofSysLinkBody.
                         (m !!! Regidx Rs2 : mword 64) M6)
       by (rewrite /M6; apply sl_regs_caller; [exact Hcsra | exact HM5regs]).
     iDestruct (sl_bytes_name (pa_stk sp0 38) 128 with "HbO") as (bo0) "HbO".
-    iDestruct (cpu_own_transport CID0 CID8 0 eb pj b ltac:(wp_next_chain)
-                 with "Hown") as "Hown".
+    sl_own_transport CID0 CID8 eb pj b.
     iApply (Argstr.wp_argstr_sconf (CID := CID8) γa γf M6 (K - 38)%nat 0%nat eb
               pj 0%nat v0 pid V 128%nat bo0 b lks
               sl_arg0_lt HM6a0 Harg0 sl_noff0 ltac:(exact Kar) HM6a2
@@ -1061,8 +1071,7 @@ Section ProofSysLinkBody.
                           (m !!! Regidx Rs2 : mword 64) N3)
         by (rewrite /N3; apply sl_regs_caller; [exact Hcsra | exact HN2regs]).
       iDestruct (sl_bytes_name (pa_stk sp0 22) 128 with "HbW") as (bw0) "HbW".
-      iDestruct (cpu_own_transport CID9 CID15 0 eb pj b ltac:(wp_next_chain)
-                   with "Hown") as "Hown".
+      sl_own_transport CID9 CID15 eb pj b.
       iApply (Argstr.wp_argstr_sconf (CID := CID15) γa γf N3 (K - 38)%nat 0%nat
                 eb pj 1%nat v1 pid (upd_upt V P1) 128%nat bw0 b lks
                 sl_arg1_lt HN3a0 Harg1 sl_noff0 ltac:(exact Kar) HN3a2
@@ -1174,8 +1183,7 @@ Section ProofSysLinkBody.
         assert (HQ0regs : sl_regs m sp0 (m !!! Regidx Rs1 : mword 64)
                             (m !!! Regidx Rs2 : mword 64) Q0)
           by (rewrite /Q0; apply sl_regs_caller; [exact Hcsra | exact HN4regs]).
-        iDestruct (cpu_own_transport CID16 CID20 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
+        sl_own_transport CID16 CID20 eb pj b.
         iApply (BeginOp.wp_begin_op_sconf (CID := CID20) gs j gl bn g gfs cov
                   logstart dev pid (DfracOwn (1/4)) Q0 (K - 38)%nat eb b lks
                   ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
@@ -1229,8 +1237,7 @@ Section ProofSysLinkBody.
         iDestruct "Hop" as (Sb0) "HopS".
         iDestruct (sl_buf_split (pa_stk sp0 38) bo1 pk1 Hpk1 with "HbO")
           as "[Hbufk Hbufrest]".
-        iDestruct (cpu_own_transport CID21 CID23 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
+        sl_own_transport CID21 CID23 eb pj b.
         iApply (Namei.wp_namei_gen (CID := CID23) gs j gl gu gd gk pd pav pu bn
                   g gfs gi cn gtl γa γf cov logstart bmapstart inodestart nib
                   size dev used (pv_cwd V) pk1 bo1 MAXOPBLOCKS Sb0
@@ -1345,8 +1352,7 @@ Section ProofSysLinkBody.
           assert (HR0regs : sl_regs m sp0 (ientry kk)
                               (m !!! Regidx Rs2 : mword 64) R0)
             by (rewrite /R0; apply sl_regs_caller; [exact Hcsra | exact HQ3regs]).
-          iDestruct (cpu_own_transport CID24 CID27 0 eb pj b
-                       ltac:(wp_next_chain) with "Hown") as "Hown".
+          sl_own_transport CID24 CID27 eb pj b.
           iApply (Ilock.wp_ilock_sconf (CID := CID27) gs j gl gu gd gk pd pav pu
                     bn gfs gi cn gil gisl cov logstart inodestart nib
                     kk (qq/2)%Qp gsh dev inum pid (DfracOwn (1/4)) dqs
@@ -1451,8 +1457,7 @@ Section ProofSysLinkBody.
              iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
              iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID31)
                           ltac:(wp_next_chain) with "Hcont") as "Hcont".
-             iDestruct (cpu_own_transport CID28 CID31 0 eb pj b
-                          ltac:(wp_next_chain) with "Hown") as "Hown".
+             sl_own_transport CID28 CID31 eb pj b.
              iApply (Tails.sl_tail_c (CID0 := CID31) gs j gl gu gd gk pd pav pu
                        bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                        inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh
@@ -1604,8 +1609,7 @@ Section ProofSysLinkBody.
                 iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                              (CIDb := CID35) ltac:(wp_next_chain)
                              with "Hcont") as "Hcont".
-                iDestruct (cpu_own_transport CID28 CID35 0 eb pj b
-                             ltac:(wp_next_chain) with "Hown") as "Hown".
+                sl_own_transport CID28 CID35 eb pj b.
                 iApply (Tails.sl_tail_d (CID0 := CID35) gs j gl gu gd gk pd pav pu
                           bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                           inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh
@@ -1782,8 +1786,7 @@ Section ProofSysLinkBody.
                   by exact (proj1 (proj2 (proj2 Hiok))).
                 assert (Hdirlen : length (bm_dir bm) = NDIRECT)
                   by exact (blkmap_wf_dir_len cov logstart bm (proj1 Hiok)).
-                iDestruct (cpu_own_transport CID28 CID40 0 eb pj b
-                             ltac:(wp_next_chain) with "Hown") as "Hown".
+                sl_own_transport CID28 CID40 eb pj b.
                 iApply (Iupdate.wp_iupdate_link (CID := CID40) gs j gl gu gd gk
                           pd pav pu bn g gfs gi cov logstart inodestart nib dev
                           (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None pid
@@ -1893,8 +1896,7 @@ Section ProofSysLinkBody.
                                     (m !!! Regidx Rs2 : mword 64) S4)
                   by (rewrite /S4; apply sl_regs_caller;
                       [exact Hcsra | exact HS3regs]).
-                iDestruct (cpu_own_transport CID41 CID43 0 eb pj b
-                             ltac:(wp_next_chain) with "Hown") as "Hown".
+                sl_own_transport CID41 CID43 eb pj b.
                 iApply (Iunlock.wp_iunlock_sconf (CID := CID43) gs gfs gi cn gil
                           gisl cov logstart kk (qq/2)%Qp gsh dev inum
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
@@ -1985,8 +1987,7 @@ Section ProofSysLinkBody.
                 iDestruct (iref_slots_combine 1 1 with "Hir1b Hir1") as "Hir2".
                 iDestruct (sl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
                   [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-                iDestruct (cpu_own_transport CID44 CID47 0 eb pj b
-                             ltac:(wp_next_chain) with "Hown") as "Hown".
+                sl_own_transport CID44 CID47 eb pj b.
                 iApply (Nameiparent.wp_nameiparent_gen (CID := CID47) gs j gl gu
                           gd gk pd pav pu bn g gfs gi cn gtl γa γf cov logstart
                           bmapstart inodestart nib size dev used1 (pv_cwd V)
@@ -2138,8 +2139,7 @@ Section ProofSysLinkBody.
                    assert (HU0regs : sl_regs m sp0 (ientry kk) (ientry kd) U0)
                      by (rewrite /U0; apply sl_regs_caller;
                          [exact Hcsra | exact HT3regs]).
-                   iDestruct (cpu_own_transport CID48 CID51 0 eb pj b
-                                ltac:(wp_next_chain) with "Hown") as "Hown".
+                   sl_own_transport CID48 CID51 eb pj b.
                    iApply (Ilock.wp_ilock_sconf (CID := CID51) gs j gl gu gd gk pd
                              pav pu bn gfs gi cn gild gisld cov logstart inodestart
                              nib kd (qd/2)%Qp gyd dev dinum pid (DfracOwn (1/4)) dqs
@@ -2270,8 +2270,7 @@ Section ProofSysLinkBody.
                      iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                   (CIDb := CIDg1) ltac:(wp_next_chain)
                                   with "Hcont") as "Hcont".
-                     iDestruct (cpu_own_transport CID52 CIDg1 0 eb pj b
-                                  ltac:(wp_next_chain) with "Hown") as "Hown".
+                     sl_own_transport CID52 CIDg1 eb pj b.
                      iApply (Tails.sl_tail_e2 (CID0 := CIDg1) gs j gl gu gd gk pd
                                pav pu bn g gfs gi cn gtl gil gisl gild gisld cov
                                logstart bmapstart inodestart nib size dev used2
@@ -2509,8 +2508,7 @@ Section ProofSysLinkBody.
                    assert (Hlow16i : bv_unsigned (sl_low16 inum)
                                      < 16 * Z.of_nat icfg_nib)
                      by (rewrite -Hcnib; exact Hlow16).
-                   iDestruct (cpu_own_transport CID52 CID59 0 eb pj b
-                                ltac:(wp_next_chain) with "Hown") as "Hown".
+                   sl_own_transport CID52 CID59 eb pj b.
                    iApply (Dirlink.wp_dirlink_gen (CID := CID59) gs j gl gu gd gk pd
                              pav pu bn g gfs gi cn gtl γa γf γpr cov logstart
                              inodestart nib bmapstart size dev used2 (ientry kd)
@@ -2639,8 +2637,7 @@ Section ProofSysLinkBody.
                        iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                     (CIDb := CID61) ltac:(wp_next_chain)
                                     with "Hcont") as "Hcont".
-                       iDestruct (cpu_own_transport CID60 CID61 0 eb pj b
-                                    ltac:(wp_next_chain) with "Hown") as "Hown".
+                       sl_own_transport CID60 CID61 eb pj b.
                        iApply (Tails.sl_tail_f (CID0 := CID61) gs j gl gu gd gk pd
                                  pav pu bn g gfs gi cn gtl gil gisl gild gisld cov
                                  logstart bmapstart inodestart nib size dev used3
@@ -2902,8 +2899,7 @@ Section ProofSysLinkBody.
                                           n2 n3 n3 Hcrok2 Hu3 Hspend
                                           (sl_sub_le _ _))).
                             iDestruct (log_opS_named with "HopS") as (e0) "HopE".
-                            iDestruct (cpu_own_transport CID60 CID63 0 eb pj b
-                                         ltac:(wp_next_chain) with "Hown") as "Hown".
+                            sl_own_transport CID60 CID63 eb pj b.
                             iApply (Iunlockput.wp_iunlockput_gen (CID := CID63) gs j
                                       gl gu gd gk pd pav pu bn g gfs gi cn gtl gild
                                       gisld cov logstart bmapstart inodestart nib
@@ -2991,8 +2987,7 @@ Section ProofSysLinkBody.
                             iDestruct (inode_shr_gen_forget with "Hshr")
                               as "Hshr".
                             iDestruct (inode_ref_gather with "Hkeep Hshr") as "Hrefip".
-                            iDestruct (cpu_own_transport CID64 CID66 0 eb pj b
-                                         ltac:(wp_next_chain) with "Hown") as "Hown".
+                            sl_own_transport CID64 CID66 eb pj b.
                             iApply (Iput.wp_iput_sconf (CID := CID66) gs j gl gu gd gk
                                       pd pav pu bn g gfs gi cn gtl gil gisl cov
                                       logstart bmapstart inodestart nib size dev
@@ -3042,8 +3037,7 @@ Section ProofSysLinkBody.
                             assert (HW4regs : sl_regs m sp0 (ientry kk) (ientry kd) W4)
                               by (rewrite /W4; apply sl_regs_caller;
                                   [exact Hcsra | exact Hipregs]).
-                            iDestruct (cpu_own_transport CID67 CID68 0 eb pj b
-                                         ltac:(wp_next_chain) with "Hown") as "Hown".
+                            sl_own_transport CID67 CID68 eb pj b.
                             iApply (EndOp.wp_end_op_sconf (CID := CID68) gs j gl gu gd
                                       gk pd pav pu bn g gfs cov logstart dev n5 pid
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
@@ -3167,8 +3161,7 @@ Section ProofSysLinkBody.
                             iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                          (CIDb := CID73) ltac:(wp_next_chain)
                                          with "Hcont") as "Hcont".
-                            iDestruct (cpu_own_transport CID69 CID73 0 eb pj b
-                                         ltac:(wp_next_chain) with "Hown") as "Hown".
+                            sl_own_transport CID69 CID73 eb pj b.
                             iApply (sl_epilogue (CID0 := CID73) m W7 sp0 K b pj
                                       (m !!! Regidx Rs1 : mword 64)
                                       (m !!! Regidx Rs2 : mword 64) bn1 bw2 bo2
@@ -3183,8 +3176,7 @@ Section ProofSysLinkBody.
                                              Hpidq Hcont]").
                             iEval (rewrite /wp_next).
                             iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
-                            iDestruct (cpu_own_transport CID73 CIDy 0 eb pj b
-                                         ltac:(wp_next_chain) with "Hown") as "Hown".
+                            sl_own_transport CID73 CIDy eb pj b.
                             iSpecialize ("Hcont" $! CIDy with "[%]");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
@@ -3266,8 +3258,7 @@ Section ProofSysLinkBody.
                             iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                          (CIDb := CID61) ltac:(wp_next_chain)
                                          with "Hcont") as "Hcont".
-                            iDestruct (cpu_own_transport CID60 CID61 0 eb pj b
-                                         ltac:(wp_next_chain) with "Hown") as "Hown".
+                            sl_own_transport CID60 CID61 eb pj b.
                             iApply (Tails.sl_tail_f (CID0 := CID61) gs j gl gu gd gk
                                       pd pav pu bn g gfs gi cn gtl gil gisl gild
                                       gisld cov logstart bmapstart inodestart nib
@@ -3354,8 +3345,7 @@ Section ProofSysLinkBody.
                    iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                 (CIDb := CID50) ltac:(wp_next_chain)
                                 with "Hcont") as "Hcont".
-                   iDestruct (cpu_own_transport CID48 CID50 0 eb pj b
-                                ltac:(wp_next_chain) with "Hown") as "Hown".
+                   sl_own_transport CID48 CID50 eb pj b.
                    assert (Hu3f : (sl_u3f w1 w2 <= n2)%nat)
                      by exact (sl_cnt_u3f w1 w2 c1 n2 Hu2 (proj1 Hn2)).
                    assert (Hiu2 : (iput_units <= n2)%nat)
@@ -3418,8 +3408,7 @@ Section ProofSysLinkBody.
           iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
           iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID26)
                        ltac:(wp_next_chain) with "Hcont") as "Hcont".
-          iDestruct (cpu_own_transport CID24 CID26 0 eb pj b
-                       ltac:(wp_next_chain) with "Hown") as "Hown".
+          sl_own_transport CID24 CID26 eb pj b.
           iApply (Tails.sl_tail_b (CID0 := CID26) gs j gl gu gd gk pd pav pu bn
                     g gfs cov logstart dev n1 pid (DfracOwn (1/4)) m Q3 sp0 K eb
  b lks u4 bn0 bw1 bo2
@@ -3471,8 +3460,7 @@ Section ProofSysLinkBody.
                         [Hown Hbsl Hsbb Hsbi Hsbs Hbmres Hir Hpriv Hcont]").
         iEval (rewrite /wp_next).
         iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
-        iDestruct (cpu_own_transport CID16 CIDy 0 eb pj b
-                     ltac:(wp_next_chain) with "Hown") as "Hown".
+        sl_own_transport CID16 CIDy eb pj b.
         iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf used P2 with "[%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hsbs Hbmres Hir Hpriv [%]").
@@ -3502,8 +3490,7 @@ Section ProofSysLinkBody.
                       [Hown Hbsl Hsbb Hsbi Hsbs Hbmres Hir Hpriv Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
-      iDestruct (cpu_own_transport CID9 CIDy 0 eb pj b
-                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      sl_own_transport CID9 CIDy eb pj b.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf used P1 with "[%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbb Hsbi Hsbs Hbmres Hir Hpriv [%]").
