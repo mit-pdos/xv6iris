@@ -28,7 +28,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartLift.
+Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartSwp.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -189,6 +189,89 @@ Qed.
 (* 2. The ghost transport: update the register bridge and the caller's      *)
 (*    frame along the walk, in one bupd.                                    *)
 (* ====================================================================== *)
+
+
+(* ====================================================================== *)
+(* 0. THE CONTEXT COMMUTATION, which is what lets the fused rule be used    *)
+(*    under [swp].                                                         *)
+(*                                                                        *)
+(* [swp]'s context [C] is ∀-bound and opaque, so the fused rule's window    *)
+(* premise -- stated about [hsil … (C m)] -- has to be discharged from a    *)
+(* fact about the inner [m].  [mctx C] commutes with the head node and      *)
+(* [hsil_node] looks ONLY at the head node, so the two line up exactly;     *)
+(* what made this unstateable before was [hsil] being pinned at [M unit],   *)
+(* which [HartLift] now generalizes.                                       *)
+(* ====================================================================== *)
+
+(* the terms a context is NOT constrained on: [mctx] says nothing about
+   [C (Ret x)] (deliberately -- that is the continuation) and nothing about
+   an [ExtraOutcome] (a [catch_early_return] context genuinely transforms
+   one).  A window that passes through neither commutes. *)
+Definition hsil_opaque {X : Type} (m : M X) : bool :=
+  match m with
+  | Interface.Ret _ => true
+  | Interface.Next oc _ => is_extra oc
+  end.
+
+Lemma hsil_node_mctx {X : Type} (C : M X -> M unit) (D : gset register)
+    (rs rs' : regstate) (m m' : M X) :
+  mctx C ->
+  hsil_node D rs m = Some (rs', m') ->
+  hsil_node D rs (C m) = Some (rs', C m').
+Proof.
+  intros HC Hnode. destruct m as [y | T oc k]; [by simpl in Hnode|].
+  assert (Hx : is_extra oc = false)
+    by (destruct oc; cbn in Hnode |- *; try reflexivity; discriminate Hnode).
+  rewrite (HC T oc k Hx).
+  destruct oc; cbn in Hnode |- *; try discriminate Hnode;
+    repeat (case_decide; [|discriminate Hnode]);
+    injection Hnode as <- <-; reflexivity.
+Qed.
+
+(* a STUCK inner node stays stuck under the context, provided it is one of
+   the nodes [mctx] speaks about *)
+Lemma hsil_node_mctx_none {X : Type} (C : M X -> M unit) (D : gset register)
+    (rs : regstate) (m : M X) :
+  mctx C ->
+  hsil_opaque m = false ->
+  hsil_node D rs m = None ->
+  hsil_node D rs (C m) = None.
+Proof.
+  intros HC Hop Hnode. destruct m as [y | T oc k]; [by cbn in Hop|].
+  cbn in Hop. rewrite (HC T oc k Hop).
+  destruct oc; cbn in Hnode |- *;
+    first [ discriminate Hop
+          | (case_decide; [discriminate Hnode | reflexivity])
+          | discriminate Hnode
+          | reflexivity ].
+Qed.
+
+(* ...and the iteration.  The side condition is the honest one and it is met
+   by the A/D write-back's window, which passes through register reads and
+   ends on the conditional write node -- never a [Ret], never an early
+   return. *)
+Lemma hsil_mctx {X : Type} (C : M X -> M unit) (D : gset register)
+    (k : nat) (rs : regstate) (m : M X) :
+  mctx C ->
+  (forall j : nat, (j < k)%nat -> hsil_opaque ((hsil j D (rs, m)).2) = false) ->
+  hsil k D (rs, C m) = ((hsil k D (rs, m)).1, C ((hsil k D (rs, m)).2)).
+Proof.
+  intros HC. revert rs m. induction k as [|k IH]; intros rs m Hnr.
+  - reflexivity.
+  - assert (Hop0 : hsil_opaque m = false)
+      by (specialize (Hnr 0%nat ltac:(lia)); cbn in Hnr; exact Hnr).
+    cbn [hsil hrun_silent] in *.
+    destruct (hsil_node D rs m) as [[rs1 m1]|] eqn:Hnode.
+    + cbn [fst snd] in *. rewrite Hnode.
+      rewrite (hsil_node_mctx C D rs rs1 m m1 HC Hnode).
+      change (hrun_silent k D rs1 (C m1)) with (hsil k D (rs1, C m1)).
+      change (hrun_silent k D rs1 m1) with (hsil k D (rs1, m1)).
+      apply (IH rs1 m1).
+      intros j Hj. specialize (Hnr (S j) ltac:(lia)).
+      cbn [hsil hrun_silent] in Hnr. rewrite Hnode in Hnr. exact Hnr.
+    + cbn [fst snd] in *. rewrite Hnode.
+      rewrite (hsil_node_mctx_none C D rs m HC Hop0 Hnode). reflexivity.
+Qed.
 
 Section amo.
   Context `{!riscvGS Σ}.

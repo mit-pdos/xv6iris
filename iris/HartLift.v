@@ -57,13 +57,18 @@ Local Open Scope Z_scope.
 (* 1. The computable silent stepper.                                       *)
 (* ====================================================================== *)
 
-Definition hsil_node (D : gset register) (rs : regstate) (m : M unit)
-    : option (regstate * M unit) :=
+(* X-GENERIC (the swp layer needs it so): nothing in the body uses unit-ness,
+   and every pre-existing use instantiates at [X := unit].  What needs the
+   generality is [HartAmo]'s fused window under a [swp] context -- the inner
+   monad there is an [M X], and without this the commutation with [mctx]
+   cannot even be STATED. *)
+Definition hsil_node {X : Type} (D : gset register) (rs : regstate) (m : M X)
+    : option (regstate * M X) :=
   match m with
   | Interface.Ret _ => None
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T
-             return (T -> M unit) -> option (regstate * M unit) with
+             return (T -> M X) -> option (regstate * M X) with
        | Interface.RegRead r _ => fun k =>
            if decide (r ∈ D) then Some (rs, k (register_lookup r rs)) else None
        | Interface.RegWrite r _ v => fun k =>
@@ -84,8 +89,8 @@ Definition hsil_node (D : gset register) (rs : regstate) (m : M unit)
        end) k
   end.
 
-Fixpoint hrun_silent (n : nat) (D : gset register) (rs : regstate)
-    (m : M unit) : regstate * M unit :=
+Fixpoint hrun_silent {X : Type} (n : nat) (D : gset register) (rs : regstate)
+    (m : M X) : regstate * M X :=
   match n with
   | 0%nat => (rs, m)
   | S n' =>
@@ -147,10 +152,12 @@ Qed.
 (*    projections, once-proven inversions.                                  *)
 (* ====================================================================== *)
 
-Definition hcur : Type := (regstate * M unit)%type.
+Definition hcurX (X : Type) : Type := (regstate * M X)%type.
+Definition hcur : Type := hcurX unit.
 
 (* ONE SILENT STRETCH, as a total function of cursors. *)
-Definition hsil (n : nat) (D : gset register) (x : hcur) : hcur :=
+Definition hsil {X : Type} (n : nat) (D : gset register) (x : hcurX X)
+    : hcurX X :=
   hrun_silent n D x.1 x.2.
 
 (* The TOTAL RESUME functions -- "the certification's answer at this event".
@@ -327,7 +334,7 @@ Section batch.
      COMPUTED at its own register file is the stretch the machine takes,
      because the only register values a silent node consults lie in [D] and
      the frame pins those. *)
-  Lemma hsil_node_agree D rs1 rs2 m m1 rs1' :
+  Lemma hsil_node_agree {X : Type} D rs1 rs2 (m m1 : M X) rs1' :
     reg_agree_on D rs1 rs2 -> hsil_node D rs1 m = Some (rs1', m1) ->
     exists rs2', hsil_node D rs2 m = Some (rs2', m1) /\ reg_agree_on D rs1' rs2'.
   Proof.
