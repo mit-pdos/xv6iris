@@ -46,6 +46,13 @@
      step instantiate it constantly) and it is also what lets a caller tell
      a retire from a trap without decoding the post-file.
 
+   The rider is INDEXED on the body's post-file ([R rs2] / [Psi rs2]),
+   per the [_ex] convention of [HartMCycle.wp_loop_cycle_ex] /
+   [HartStepAny.swp_try_step_any_ex]; the plain rider is the instance
+   [R := fun _ => R0].  The WAITING rules keep a plain rider: they have no
+   body obligation, so their rider is a resource the caller hands in BEFORE
+   the step and there is no post-file for it to be keyed on.
+
    The waiting rule [swp_try_step_waiting] has no body obligation at all:
    [run_hart_waiting] is a register-only stretch over mip / mie /
    hart_state, all owned, so it is ONE [HartMemRun.swp_hmrun_of_exec] at
@@ -58,7 +65,23 @@
    The three [exec_run_hart_waiting_*] facts and their [goodmb] twins are
    proved HERE rather than imported from [UserStep.v]: they are facts about
    the model, with no user-tier content, and this file sits below the tier.
-   [UserStep.v]'s copies become redundant when the tier lands.
+   [UserStep.v]'s copies become redundant when the tier lands -- and its
+   [_stay] is stated too strongly: at [exit_wait = false] the only reachable
+   wake patterns are [(WAIT_WRS_STO|WAIT_WRS_NTO, false, _)], so a
+   [WAIT_WFI] hart stays waiting whatever [valid_reservation] answers.  The
+   version here takes the disjunction, which is what makes the case split in
+   [swp_try_step_waiting] EXHAUSTIVE.
+
+   TWO THINGS THAT COST TIME AND WILL COST IT AGAIN:
+   - [bytes_own ∅] is [emp], hence PERSISTENT: [iAssert … as "H"] files it
+     in the intuitionistic context, where it is never consumed, and the next
+     [iDestruct] that wants the name fails with "not fresh".  Introduce it as
+     [#Hemp] and never re-use the name.
+   - the shared tail of the four non-retiring arms is written out four times
+     on purpose.  An [Ltac] abbreviation does NOT work here: a tactic
+     notation's [constr] argument inside an [Ltac] body is elaborated at
+     DEFINITION time, so [iApply (… Drw …)] fails with "The reference Drw was
+     not found" before the proof is ever run.
 
    THIS FILE IS ADDITIVE TO [HartStepAny] AND BELONGS IN IT (which in turn
    belongs in [HartMCycle]); it is separate only so that iterating does not
@@ -177,19 +200,26 @@ Proof.
      apply exec_returnm).
 Qed.
 
+(* STAY.  Note the disjunction: at [exit_wait = false] the match's only
+   reachable wake patterns are [(WAIT_WRS_STO|WAIT_WRS_NTO, false, _)], so a
+   [WAIT_WFI] hart stays waiting whatever [valid_reservation] answers --
+   [UserStep.exec_run_hart_waiting_stay]'s [valid_reservation tt = true]
+   premise is stronger than the model needs, and the case split in
+   [swp_try_step_waiting] needs the weaker one to be exhaustive. *)
 Lemma exec_run_hart_waiting_stay (wr : WaitReason) (ib : SailStdpp.Values.mword 32)
     (s : mstate) :
   neq_vec (and_vec (register_lookup mip s.(sregs))
                    (register_lookup mie s.(sregs))) (zeros' 64) = false ->
-  valid_reservation tt = true ->
+  valid_reservation tt = true \/ wr = WAIT_WFI ->
   exec (run_hart_waiting 0 wr ib false) s = Some (Step_Waiting wr, s).
 Proof.
   intros Hw Hvr.
   unfold run_hart_waiting.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
   rewrite Hw. cbn match.
-  rewrite Hvr.
-  destruct wr; cbn match;
+  destruct Hvr as [Hvr | ->]; [rewrite Hvr; destruct wr
+                              | destruct (valid_reservation tt)];
+    cbn match;
     (change (get_config_print_instr tt) with false; cbn match;
      erewrite exec_bind0_Some; [| apply exec_returnm];
      apply exec_returnm).
@@ -772,7 +802,214 @@ Section stepfull.
                   hreg_frame rs3 Drw ∗ hreg_frame_ro Df rs3 Dro ∗
                   resv_any cpu_id ∗ R)%I.
   Proof.
-  Admitted.
+    intros Hdisj HDr HDw Hip Hie Hhs HDpriv HDhart HDmc HDcfg HWmi HDmi
+      HWms HDms HWpc HDpc HDnpc Hhart.
+    iIntros "#Hcert Hany Hrw Hro HR".
+    unfold try_step. cbn beta iota zeta delta [ext_pre_step_hook].
+    (* ---- the prelude, verbatim from [swp_try_step_full] ---- *)
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (should_inc_minstret (register_lookup cur_privilege rs))
+              _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_should_inc_minstret Drw Dro Df rs _ Hdisj HDmc HDcfg
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_bind0_use
+                (Defs.write_reg (R_bool minstret_increment)
+                   (minstret_inc_flag
+                      (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                      (register_lookup (R_bitvector_64 minstretcfg) rs)
+                      (register_lookup cur_privilege rs)))
+                _ _ _ with "[Hrw Hro] [-]").
+      { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HWmi
+                  with "Hcert Hrw Hro"). }
+      iIntros (u) "[Hrw Hro]".
+      iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    i_peel. rewrite Hhart. fold (wrap_pre rs).
+    (* ---- THE WAITING STEP.  [run_hart_waiting] is register-only, so it is
+       ONE [swp_hmrun_of_exec] at [mm := ∅] off the reference state
+       [MState (wrap_pre rs) ∅ dev0_state], where the rule's two hard-looking
+       premises are [reg_agree_refl] and [∅ ⊆ _].  WHICH outcome the machine
+       takes is not the caller's to know -- the wake test reads mip, which no
+       continuation carries across a cycle, and [valid_reservation] is an
+       opaque platform axiom -- so the three exec facts collapse into ONE
+       pure disjunction here and the rule has exactly two Iris arms. ---- *)
+    assert (Hempty : (∅ : gmap Arch.pa (bv 8))
+                     ⊆ (MState (wrap_pre rs) ∅ dev0_state).(mem))
+      by apply map_empty_subseteq.
+    (* [bytes_own ∅] is [emp], hence PERSISTENT -- it lands in the □ context
+       and is never consumed, so nothing below may reuse the name *)
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    assert (Hcase :
+      exec (run_hart_waiting 0 wr ib false) (MState (wrap_pre rs) ∅ dev0_state)
+        = Some (Step_Execute (Retire_Success tt, ib),
+                set_reg (MState (wrap_pre rs) ∅ dev0_state) hart_state
+                  (HART_ACTIVE tt))
+      \/ exec (run_hart_waiting 0 wr ib false)
+              (MState (wrap_pre rs) ∅ dev0_state)
+         = Some (Step_Waiting wr, MState (wrap_pre rs) ∅ dev0_state)).
+    { destruct (neq_vec (and_vec (register_lookup mip (wrap_pre rs))
+                                 (register_lookup mie (wrap_pre rs)))
+                        (zeros' 64)) eqn:Hwake.
+      - left. by apply exec_run_hart_waiting_wake.
+      - destruct (valid_reservation tt) eqn:Hvr.
+        + right. apply exec_run_hart_waiting_stay; [exact Hwake | by left].
+        + destruct wr.
+          * right. apply exec_run_hart_waiting_stay; [exact Hwake | by right].
+          * left. apply exec_run_hart_waiting_wake_resv;
+              [exact Hwake | exact Hvr | by left].
+          * left. apply exec_run_hart_waiting_wake_resv;
+              [exact Hwake | exact Hvr | by right]. }
+    destruct Hcase as [Hex | Hex].
+    - (* ---- WAKE: hart_state := ACTIVE, then the ORDINARY retiring tail ---- *)
+      iApply (swp_bind_use (run_hart_waiting 0 wr ib false) _ _ _
+                with "[Hany Hrw Hro] [-]").
+      { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                  (run_hart_waiting 0 wr ib false)
+                  (MState (wrap_pre rs) ∅ dev0_state) _ _ (wrap_pre rs) ∅
+                  Hdisj HDr HDw (reg_agree_refl _ _) Hempty
+                  (goodmb_run_hart_waiting Dr Dw wr ib _ ∅ Hip Hie Hhs) Hex
+                  with "Hcert Hany Hrw Hro Hemp"). }
+      iIntros (stv) "(-> & Hpost)".
+      iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+      rewrite sregs_set_reg in Hag.
+      assert (Hha : register_lookup hart_state rs' = HART_ACTIVE tt).
+      { rewrite (Hag _ HDhart). apply register_lookup_set. }
+      assert (Hmi2 : register_lookup (R_bool minstret_increment) rs'
+                     = minstret_inc_flag
+                         (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                         (register_lookup (R_bitvector_64 minstretcfg) rs)
+                         (register_lookup cur_privilege rs)).
+      { rewrite (Hag _ HDmi).
+        rewrite (irrelevant_register_set (R_bool minstret_increment) hart_state);
+          [ apply wrap_pre_mi | vm_compute; reflexivity ]. }
+      i_glue.
+      iApply (swp_bind_use _ _
+                (fun w => ⌜w = HART_ACTIVE tt⌝ ∗ hreg_frame rs' Drw ∗
+                          hreg_frame_ro Df rs' Dro ∗ resv_any cpu_id ∗ R)%I _
+                with "[Hrw Hro Hany HR] [-]").
+      { iApply (swp_bind0_use _ _
+                  (fun _ => (hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗
+                             resv_any cpu_id ∗ R)%I) _
+                  with "[Hrw Hro Hany HR] [-]").
+        { iApply (swp_bind_use (Defs.read_reg hart_state) _ _ _
+                    with "[Hrw Hro] [-]").
+          { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
+                      with "Hcert Hrw Hro"). }
+          iIntros (w) "(-> & Hrw & Hro)". rewrite Hha.
+          cbn beta iota zeta delta [hart_is_active Defs.assert_exp].
+          iApply swp_ret. iFrame. }
+        iIntros (u) "(Hrw & Hro & Hany & HR)".
+        iApply (swp_mono with "[Hany HR] [-]");
+          [| iApply (swp_read_reg_pinned Drw Dro Df rs' hart_state Hdisj HDhart
+                       with "Hcert Hrw Hro") ].
+        iIntros (w) "(-> & Hrw & Hro)". rewrite Hha.
+        iSplitR; [done|]. iFrame. }
+      iIntros (v0) "(-> & Hrw & Hro & Hany & HR)". i_glue.
+      iApply (swp_bind0_use (tick_pc tt) _
+                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I)
+                _ with "[Hrw Hro] [-]").
+      { iApply (swp_tick_pc Drw Dro Df _ Hdisj HDnpc HWpc HDpc
+                  with "Hcert Hrw Hro"). }
+      iIntros (u2) "[Hrw Hro]".
+      unfold Defs.and_boolM. rewrite /returnM mbind_ret. i_glue.
+      iApply (swp_bind_use (Defs.read_reg (R_bool minstret_increment))
+                _ _ _ with "[Hrw Hro] [-]").
+      { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDmi
+                  with "Hcert Hrw Hro"). }
+      iIntros (w) "(-> & Hrw & Hro)". i_peel. rewrite Hmi2. i_glue.
+      destruct (minstret_inc_flag
+                  (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                  (register_lookup (R_bitvector_64 minstretcfg) rs)
+                  (register_lookup cur_privilege rs)) eqn:Hmi.
+      + iApply (swp_bind0_use _ _
+                  (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_bind0_use _ _
+                    (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                    with "[Hrw Hro] [-]").
+          { iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 minstret))
+                      _ _ _ with "[Hrw Hro] [-]").
+            { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDms
+                        with "Hcert Hrw Hro"). }
+            iIntros (v1) "(-> & Hrw & Hro)".
+            iApply (swp_write_reg_owned Drw Dro Df _ _ _ Hdisj HWms
+                      with "Hcert Hrw Hro"). }
+          iIntros (u0) "[Hrw Hro]". i_glue. iApply swp_ret. iFrame. }
+        iIntros (u1) "[Hrw Hro]".
+        iApply swp_ret. iExists _. iSplitR.
+        { iPureIntro. unfold wait_post. right. eexists rs', _.
+          split; [exact Hag | reflexivity]. }
+        unfold wrap_post. iFrame.
+      + iApply (swp_bind0_use _ _
+                  (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_bind0_use _ _
+                    (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                    with "[Hrw Hro] [-]").
+          { iApply swp_ret. iFrame. }
+          iIntros (u2') "[Hrw Hro]". i_glue. iApply swp_ret. iFrame. }
+        iIntros (u3) "[Hrw Hro]".
+        iApply swp_ret.
+        iExists (wrap_post rs' (register_lookup (R_bitvector_64 minstret)
+                   (register_set (R_bitvector_64 PC)
+                      (register_lookup (R_bitvector_64 nextPC) rs') rs'))).
+        iSplitR.
+        { iPureIntro. unfold wait_post. right. eexists rs', _.
+          split; [exact Hag | reflexivity]. }
+        unfold wrap_post.
+        rewrite (hreg_frame_ext _ _ Drw (reg_set_id_agree_local Drw _ _)).
+        rewrite (hreg_frame_ro_ext Df _ _ Dro (reg_set_id_agree_local Dro _ _)).
+        iFrame.
+    - (* ---- STAY: the whole cycle is the prelude's write; no tick, no bump ---- *)
+      iApply (swp_bind_use (run_hart_waiting 0 wr ib false) _ _ _
+                with "[Hany Hrw Hro] [-]").
+      { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                  (run_hart_waiting 0 wr ib false)
+                  (MState (wrap_pre rs) ∅ dev0_state) _ _ (wrap_pre rs) ∅
+                  Hdisj HDr HDw (reg_agree_refl _ _) Hempty
+                  (goodmb_run_hart_waiting Dr Dw wr ib _ ∅ Hip Hie Hhs) Hex
+                  with "Hcert Hany Hrw Hro Hemp"). }
+      iIntros (stv) "(-> & Hpost)".
+      iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+      cbn [sregs] in Hag.
+      assert (Hhw : register_lookup hart_state rs' = HART_WAITING (wr, ib)).
+      { rewrite (Hag _ HDhart).
+        rewrite (wrap_pre_other hart_state rs);
+          [ exact Hhart | vm_compute; reflexivity ]. }
+      i_glue.
+      iApply (swp_bind_use _ _
+                (fun w => ⌜w = HART_WAITING (wr, ib)⌝ ∗ hreg_frame rs' Drw ∗
+                          hreg_frame_ro Df rs' Dro)%I _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_bind0_use _ _
+                  (fun _ => (hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I) _
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_bind_use (Defs.read_reg hart_state) _ _ _
+                    with "[Hrw Hro] [-]").
+          { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
+                      with "Hcert Hrw Hro"). }
+          iIntros (w) "(-> & Hrw & Hro)". rewrite Hhw.
+          cbn beta iota zeta delta [hart_is_waiting Defs.assert_exp].
+          iApply swp_ret. iFrame. }
+        iIntros (u) "[Hrw Hro]".
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_read_reg_pinned Drw Dro Df rs' hart_state Hdisj HDhart
+                       with "Hcert Hrw Hro") ].
+        iIntros (w) "(-> & Hrw & Hro)". rewrite Hhw.
+        iSplitR; [done|]. iFrame. }
+      iIntros (v0) "(-> & Hrw & Hro)". i_glue.
+      iApply swp_ret. iExists rs'. iSplitR.
+      { iPureIntro. unfold wait_post. by left. }
+      iFrame.
+  Qed.
 
   Lemma swp_exec_step_waiting (Dr Dw : register -> bool)
       (Drw Dro : gset register) (Df : register -> dfrac) (rs : regstate)
@@ -802,7 +1039,7 @@ Section stepfull.
     resv_any cpu_id -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    ▷ Psi -∗
+    Psi -∗
     ▷ (∀ rs3 : regstate,
          ⌜∃ rsP : regstate, wait_post (Drw ∪ Dro) rs rsP /\
             reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3 rsP⌝ -∗
@@ -811,6 +1048,22 @@ Section stepfull.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-  Admitted.
+    intros Hdisj HDr HDw Hip Hie Hhs HWcy HWti HWip HDpriv HDhart HDmc HDcfg
+      HWmi HDmi HWms HDms HWpc HDpc HDnpc Hhart.
+    iIntros "#Hcert Hany Hrw Hro HPsi Hcont".
+    (* the plain [wp_loop_cycle], not the [_ex] twin: this rule has no body
+       obligation, so the rider is a resource the CALLER hands in before the
+       step and there is no post-file for it to be keyed on *)
+    iApply (wp_loop_cycle Drw Dro Df (wait_post (Drw ∪ Dro) rs)
+              (resv_any cpu_id ∗ Psi)%I Hdisj HWcy HWti HWip
+              with "Hcert Hany [Hrw Hro HPsi] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [Hany HPsi]".
+        iApply ("Hcont" with "[%] Hrw Hro Hany HPsi"). exact Hag. }
+    iNext. iIntros "Hfr".
+    iDestruct (resv_any_intro cpu_id None with "Hfr") as "Hany".
+    iApply (swp_try_step_waiting Dr Dw Drw Dro Df rs wr ib Psi Hdisj HDr HDw
+              Hip Hie Hhs HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc
+              HDpc HDnpc Hhart with "Hcert Hany Hrw Hro HPsi").
+  Qed.
 
 End stepfull.
