@@ -1723,31 +1723,33 @@ Lemma upt_pt2_base (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
   forall t, upt_tree_spec uroot tfp um t -> pt_base t = uroot.
 Proof. intros t Hspec. exact (proj1 Hspec). Qed.
 
-(* the instantiated switch-window trampoline fetch + step engine *)
-Section Pt2TrampEngines.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+(* THE INSTANTIATED SWITCH-WINDOW STEP ENGINES ARE GONE, and here is what
+   replaces them.
 
+   [wp_instr_pt2_tramp] / [_kcur] / [_kprev] were partial applications
+   [wp_instr_tramp_pt INV Habs] over the whole-cycle [Habs] -- a
+   [translateAddr] fupd over a whole sigma, which per-node stepping makes
+   unsound (other harts run between the walk's nodes).  [Habs] is gone; the
+   engine's obligation is now [TrampStepPt.tramp_fetch_tr], which is
+   [SRegime.sr_swp_translate]'s shape at [InstructionFetch tt], and a caller
+   applies [TrampStepPt.wp_instr_tramp_pt] directly with the residue [Res]
+   and that obligation.
 
-  Definition wp_instr_pt2_tramp (rc : mword 44) (Sp Sc : ptree -> Prop)
-      (HSp : pt2_tramp_spec Sp) (HSc : pt2_tramp_spec Sc)
-      (Hbc : forall t, Sc t -> pt_base t = rc) :=
-    wp_instr_tramp_pt (tlb_inv_pt2 rc Sp Sc) (pt2_tramp_fetch_habs rc Sp Sc HSp HSc Hbc).
-
-  (* the SHARED-KERNEL mirror: the kernel side needs only its persistent
-     [kmap_at] claim + [tlb_inv_pt2_kcur], no [pt2_tramp_spec]/[pt_base]
-     obligation of its own (both fold out of [kpt_inv]'s own invariant). *)
-  Definition wp_instr_pt2_tramp_kcur (rc : mword 44) (Sp : ptree -> Prop)
-      (HSp : pt2_tramp_spec Sp) :=
-    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp)
-      (pt2_tramp_fetch_habs_kcur rc Sp HSp).
-
-  (* userret's mirror: the shared side is now [Sp] (the KERNEL table, the
-     PREVIOUS slot); [Sc] (the USER table, CURRENT) keeps its own
-     [pt2_tramp_spec]/[pt_base] obligations, exactly as [Sp] does above. *)
-  Definition wp_instr_pt2_tramp_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
-      (HSc : pt2_tramp_spec Sc) (Hbc : forall t, Sc t -> pt_base t = rc) :=
-    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc)
-      (pt2_tramp_fetch_habs_kprev rc kroot Sc HSc Hbc).
-
-End Pt2TrampEngines.
+   WHAT A PER-NODE INSTANCE OVER THE WINDOW'S TWO-TABLE INVARIANTS TAKES.
+   The satp / tlb / pmpcfg_n / pmpaddr_n cells [tlb_inv_pt2_kcur] /
+   [tlb_inv_pt2_kprev] own must come OUT (the engine's frame holds them,
+   because the walk reads and writes them), leaving a tlb-keyed residue
+   [Res : type_of_register tlb -> iProp Sigma] -- exactly the split
+   [SRegime.kpt_swp_open] / [_close] makes for [tlb_res_pt].  The
+   translation itself needs the swp assembly
+   [HartSKpt.swp_translate_kpt] is for the shared kernel table: the front
+   end ([PtTreeAdue.swp_translateAddr_pt_front]), the hit/miss split
+   ([HartSTrans.swp_translate_hit] / [CommonWalk.swp_translate_TLB_miss_user])
+   and the three [read_pte] nodes over the window's own page-table bytes.
+   The exec-level statements it must reproduce are
+   [pt2_tramp_fetch_habs_kcur] / [_kprev] above, and their geometry
+   plumbing carries over verbatim; only the interpreter changes.  Once it
+   exists, [TrampStepPt.tramp_tr_obl_of_regime] gives the producer for free
+   if the window is packaged as an [s_regime] (its [sr_kwit] is what the
+   trampoline claim's non-identity ppn needs), and
+   [TrampStepPt.ktramp_fetch_tr_share] is the worked instance. *)
