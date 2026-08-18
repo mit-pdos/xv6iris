@@ -1737,3 +1737,22 @@ it here.  What is left is the rest:
 - Background builds must `cd` into `iris/` themselves: `make -f CoqMakefile`
   from the repo root fails with "No rule to make target 'CoqMakefile'", and
   a shell whose cwd drifted between commands is the usual cause.
+- **NEVER CLOSE A TOWER LOOKUP WITH A `rewrite ?s_rs_a ?s_rs_b … ?s_rs_z`
+  CHAIN.**  Measured on the S-mode tower: **>100 s for ONE goal**, against
+  ~1 s for the single `s_rs_x` the goal actually needs.  Every FAILING arm
+  of the chain unfolds the tower hunting for its pattern, and the tower is
+  itself 25 `register_set`s over `cold_regs`.  A 25-goal `apply s_rs_agree`
+  closed that way does not finish; closed with a positional
+  `[ lkp s_rs_PC | lkp0 | lkp s_rs_ms | … ]` it is seconds.  The same
+  unfolding is why `repeat first [ rewrite register_lookup_set | rewrite
+  irrelevant_register_set; … ]` must NEVER be a `repeat`: it peels straight
+  THROUGH the tower down to `cold_regs`, and the `reflexivity` after it then
+  grinds on the cold image.  Bound the peel to the number of
+  `register_set`s you actually wrote (two, typically) and mark the tower
+  `#[local] Opaque`.
+- **A `ltac:(tac)` PROOF TERM THAT DOES NOT CLOSE ITS GOAL *SHELVES* IT, AND
+  THE ERROR SURFACES AT `Qed` AS "the proof term is not complete".**
+  `ltac:(srs)` leaves `v = v`; the lemma then applies, the whole proof
+  script runs green, and only `Qed` fails -- with no location and nothing to
+  bisect.  `Unshelve` before `Qed` prints the leftovers and names the
+  culprit in one run.  Write `ltac:(by srs)`.
