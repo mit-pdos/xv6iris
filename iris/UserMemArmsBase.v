@@ -550,4 +550,263 @@ Section UserMemArmsBase.
                (u_state rs mm) (u_state rs mm) mm Htrg Htr Hmeg Hme).
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE LOAD'S CASE TREE, at the [vmem_read_addr] level.                  *)
+  (*                                                                     *)
+  (* The effective address is an ARBITRARY 64-bit word, so this is a       *)
+  (* TRICHOTOMY crossed with the page-straddle decision, not a             *)
+  (* composition: [UserMemClassify.in_one_page_dec] picks the geometry and *)
+  (* [data_classify] picks mapped-vs-faulting at EACH page the access      *)
+  (* touches.  Four arms retire (one page, or two), three fault.           *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_vmem_read_pure (t : ptree) (mm : PtBytes.pamap) (rs : regstate)
+      (k : Z) (va : mword 64) :
+    0 < k -> k <= 8 ->
+    u_data_cfg rs -> u_exec_pins pt t rs -> u_mem_wf pt t mm ->
+    (exists (dv : mword (8 * k)) (rs' : regstate) (mm' : PtBytes.pamap)
+            (t' : ptree),
+        exec (vmem_read_addr (Virtaddr va) k (Load Data) false false false)
+          (u_state rs mm) = Some (Ok dv, u_state rs' mm')
+        /\ goodmb Du_r Du_w
+             (vmem_read_addr (Virtaddr va) k (Load Data) false false false)
+             (u_state rs mm) mm = true
+        /\ u_tlb_only rs rs'
+        /\ tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs')
+        /\ u_mem_step pt t t' mm mm')
+    \/ (exists (rs' : regstate) (mm' : PtBytes.pamap) (t' : ptree)
+               (e : ExceptionType) (xv pcx : mword 64),
+        exec (vmem_read_addr (Virtaddr va) k (Load Data) false false false)
+          (u_state rs mm)
+          = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)),
+                  u_state rs' mm')
+        /\ goodmb Du_r Du_w
+             (vmem_read_addr (Virtaddr va) k (Load Data) false false false)
+             (u_state rs mm) mm = true
+        /\ user_exc e = true
+        /\ u_tlb_only rs rs'
+        /\ tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs')
+        /\ u_mem_step pt t t' mm mm').
+  Proof.
+    intros Hk Hk8 Hcfg Hpins Hwf.
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hpins as (_ & _ & _ & Htlb0).
+    assert (Hpm : plat_misaligned_exception (Load Data) false = None)
+      by (apply plat_misaligned_loadstore_none; vm_compute; reflexivity).
+    pose proof (u_effectivePrivilege_pure (Load Data) rs mm Hcfg) as Heff.
+    pose proof (u_goodmb_effectivePrivilege_pure (Load Data) rs mm mm Hcfg) as Heffg.
+    pose proof (u_translationMode_pure pt t rs mm Hcfg Hpins) as Htm.
+    pose proof (u_goodmb_translationMode_pure pt t rs mm mm Hcfg Hpins) as Htmg.
+    destruct (in_one_page_dec va k) as [Hin | Hout].
+    - (* ONE PAGE: one classification, one walk, whatever the alignment *)
+      pose proof (exec_split_on_page_boundary_intra va k (u_state rs mm) Hk Hin)
+        as Hsp.
+      pose proof (goodmb_split_on_page_boundary Du_r Du_w va k
+                    (u_state rs mm) (u_state rs mm) (k, 0) mm Hsp) as Hspg.
+      destruct (data_classify (Load Data) (ud_tfp pt) (ud_um pt) va
+                  (or_intror (or_introl eq_refl)) Hacc)
+        as [ (w & Hum & Hok & Hcanon) | Hfault ].
+      + destruct (u_tarv_page pt t mm rs k w va Hk Hk8 Hin Hum Hok Hcanon
+                    Hcfg Hpins Hwf)
+          as (dv & rs' & mm' & t' & Htrv & Htrvg & Honly & Htlbok & Hstep & _).
+        left. exists dv, rs', mm', t'. split_and!;
+          [ exact (exec_vmem_read_addr_intra k va (u_walk_pa w va) dv (Load Data)
+                     false false false User Sv39 (u_state rs mm) (u_state rs' mm')
+                     Hk Hsp (or_intror Hpm) Heff Htm Htrv ltac:(discriminate))
+          | exact (goodmb_vmem_read_addr_intra Du_r Du_w k va (u_walk_pa w va) dv
+                     (Load Data) false false false User Sv39
+                     (u_state rs mm) (u_state rs' mm') mm
+                     ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                     Hk Hsp Hspg (or_intror Hpm) Heff Heffg Htm Htmg Htrv Htrvg)
+          | exact Honly | exact Htlbok | exact Hstep ].
+      + destruct (u_tarv_fault t mm rs k va Hfault Hcfg Hpins Hwf) as (Htrv & Htrvg).
+        right. exists rs, mm, t, (E_Load_Page_Fault tt), va, (register_lookup PC rs).
+        split_and!;
+          [ exact (exec_vmem_read_addr_intra_err k va _ (Load Data)
+                     false false false User Sv39 (u_state rs mm) (u_state rs mm)
+                     Hk Hsp (or_intror Hpm) Heff Htm Htrv)
+          | exact (goodmb_vmem_read_addr_intra_err Du_r Du_w k va _ (Load Data)
+                     false false false User Sv39 (u_state rs mm) (u_state rs mm) mm
+                     ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                     Hk Hsp Hspg (or_intror Hpm) Heff Heffg Htm Htmg Htrv Htrvg)
+          | vm_compute; reflexivity
+          | exact (u_tlb_only_refl rs) | exact Htlb0
+          | exact (u_mem_step_refl pt t mm Hwf) ].
+    - (* TWO PAGES: the access ends one page and starts the next *)
+      destruct (straddle_bounds va k Hk Hk8 Hout) as (Hp0 & Hq0 & Hp8 & Hq8).
+      pose proof (exec_split_on_page_boundary_straddle va k (u_state rs mm)
+                    Hk Hk8 Hout) as Hsp.
+      pose proof (goodmb_split_on_page_boundary Du_r Du_w va k
+                    (u_state rs mm) (u_state rs mm) _ mm Hsp) as Hspg.
+      set (pp := 4096 - bv_unsigned va mod 4096) in *.
+      destruct (data_classify (Load Data) (ud_tfp pt) (ud_um pt) va
+                  (or_intror (or_introl eq_refl)) Hacc)
+        as [ Hok1 | Hf1 ].
+      + destruct Hok1 as (w1 & Hum1 & Hleaf1 & Hcanon1).
+        destruct (data_classify (Load Data) (ud_tfp pt) (ud_um pt)
+                    (add_vec_int va pp) (or_intror (or_introl eq_refl)) Hacc)
+          as [ Hok2 | Hf2 ].
+        * destruct Hok2 as (w2 & Hum2 & Hleaf2 & Hcanon2).
+          destruct (u_load_pure_two pt t mm rs pp (k - pp) w1 w2 va
+                      Hp0 Hp8 (straddle_part1_in_page va k)
+                      Hq0 Hq8 (straddle_part2_in_page va k Hk Hk8 Hout)
+                      Hum1 Hum2 Hleaf1 Hleaf2 Hcanon1 Hcanon2 Hcfg Hpins Hwf)
+            as (v1 & v2 & rs1 & mm1 & t1 & rs2 & mm2 & t2
+                & H1 & H1g & H2 & H2g & Honly & Htlb2 & Hst2 & _).
+          destruct (exec_vmem_read_addr_split2 k pp (k - pp) va
+                      (u_walk_pa w1 va) (u_walk_pa w2 (add_vec_int va pp))
+                      v1 v2 (Load Data) false false User Sv39
+                      (u_state rs mm) (u_state rs1 mm1) (u_state rs2 mm2)
+                      Hp0 Hq0 Hsp Hpm Heff Htm
+                      ltac:(vm_compute; reflexivity) H1 H2) as (dvv & Hvr).
+          left. exists dvv, rs2, mm2, t2. split_and!;
+            [ exact Hvr
+            | exact (goodmb_vmem_read_addr_split2 Du_r Du_w k pp (k - pp) va
+                       (u_walk_pa w1 va) (u_walk_pa w2 (add_vec_int va pp))
+                       v1 v2 (Load Data) false false User Sv39
+                       (u_state rs mm) (u_state rs1 mm1) (u_state rs2 mm2) mm
+                       ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                       Hp0 Hq0 Hspg Hsp Hpm Heffg Heff Htmg Htm
+                       ltac:(vm_compute; reflexivity) H1g H1 H2g H2)
+            | exact Honly | exact Htlb2 | exact Hst2 ].
+        * (* the FIRST page lands, the SECOND faults *)
+          destruct (u_tarv_page pt t mm rs pp w1 va Hp0 Hp8
+                      (straddle_part1_in_page va k) Hum1 Hleaf1 Hcanon1
+                      Hcfg Hpins Hwf)
+            as (v1 & rs1 & mm1 & t1 & H1 & H1g & Ho1 & Htlb1 & Hst1
+                & Hcfg1 & Hpins1 & Hwf1).
+          destruct (u_tarv_fault t1 mm1 rs1 (k - pp) (add_vec_int va pp)
+                      Hf2 Hcfg1 Hpins1 Hwf1) as (H2 & H2g0).
+          assert (H2g : goodmb Du_r Du_w
+                    (translate_and_read_value (Virtaddr (add_vec_int va pp))
+                       (k - pp) (Load Data) false false false)
+                    (u_state rs1 mm1) mm = true)
+            by (rewrite <- (u_goodmb_step t t1 mm mm1 _ _ Hwf Hst1); exact H2g0).
+          right. exists rs1, mm1, t1, (E_Load_Page_Fault tt),
+            (add_vec_int va pp), (register_lookup PC rs1).
+          split_and!;
+            [ exact (exec_vmem_read_addr_split2_err2 k pp (k - pp) va
+                       (u_walk_pa w1 va) v1 _ (Load Data) false false User Sv39
+                       (u_state rs mm) (u_state rs1 mm1) (u_state rs1 mm1)
+                       Hp0 Hq0 Hsp Hpm Heff Htm
+                       ltac:(vm_compute; reflexivity) H1 H2)
+            | exact (goodmb_vmem_read_addr_split2_err2 Du_r Du_w k pp (k - pp) va
+                       (u_walk_pa w1 va) v1 _ (Load Data) false false User Sv39
+                       (u_state rs mm) (u_state rs1 mm1) (u_state rs1 mm1) mm
+                       ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                       Hp0 Hq0 Hspg Hsp Hpm Heffg Heff Htmg Htm
+                       ltac:(vm_compute; reflexivity) H1g H1 H2g H2)
+            | vm_compute; reflexivity
+            | exact Ho1 | exact Htlb1 | exact Hst1 ].
+      + (* the FIRST page faults: the model never reaches the second *)
+        destruct (u_tarv_fault t mm rs pp va Hf1 Hcfg Hpins Hwf) as (H1 & H1g).
+        right. exists rs, mm, t, (E_Load_Page_Fault tt), va, (register_lookup PC rs).
+        split_and!;
+          [ exact (exec_vmem_read_addr_split2_err1 k pp (k - pp) va _ (Load Data)
+                     false false User Sv39 (u_state rs mm) (u_state rs mm)
+                     Hp0 Hq0 Hsp Hpm Heff Htm
+                     ltac:(vm_compute; reflexivity) H1)
+          | exact (goodmb_vmem_read_addr_split2_err1 Du_r Du_w k pp (k - pp) va
+                     _ (Load Data) false false User Sv39
+                     (u_state rs mm) (u_state rs mm) mm
+                     ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                     Hp0 Hq0 Hspg Hsp Hpm Heffg Heff Htmg Htm
+                     ltac:(vm_compute; reflexivity) H1g H1)
+          | vm_compute; reflexivity
+          | exact (u_tlb_only_refl rs) | exact Htlb0
+          | exact (u_mem_step_refl pt t mm Hwf) ].
+  Qed.
+
+  (* the data-access config rides the nextPC tick (the twin of
+     [UserTotalU.u_pins_tick]: none of its three cells is nextPC) *)
+  Lemma u_data_cfg_tick (rsf : regstate) (va : mword 64) (n : Z) :
+    u_data_cfg rsf ->
+    u_data_cfg (register_set nextPC (add_vec_int va n) rsf).
+  Proof.
+    intros (Lcp & Lms & Lmenv). split_and!;
+      [ rewrite (u_tick_reg cur_privilege rsf va n eq_refl); exact Lcp
+      | rewrite (u_tick_reg (R_bitvector_64 mstatus) rsf va n eq_refl); exact Lms
+      | rewrite (u_tick_reg (R_bitvector_64 menvcfg) rsf va n eq_refl);
+        exact Lmenv ].
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE ARM.  [UserTotalU]'s frozen [arm_LOAD_u], proved.                 *)
+  (* ------------------------------------------------------------------- *)
+  Lemma arm_LOAD_u (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (w : mword 32)
+      (imm : bits 12) (rs1 rd : regidx) (is_unsigned : bool)
+      (width : word_width) :
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    (width = 1 \/ width = 2 \/ width = 4 \/ width = 8) ->
+    exec (ext_decode w) (u_state rsf mm)
+      = Some (LOAD (imm, rs1, rd, is_unsigned, width), u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w)
+      (LOAD (imm, rs1, rd, is_unsigned, width)) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    base_post pt t mm rsf va w.
+  Proof.
+    intros Hpfc Hag Hwid Hdec Hhv Hpins Hwf.
+    destruct rs1 as [ir1]. destruct rd as [ird].
+    assert (Hk : 0 < width) by (destruct Hwid as [-> | [-> | [-> | ->]]]; lia).
+    assert (Hk8 : width <= 8) by (destruct Hwid as [-> | [-> | [-> | ->]]]; lia).
+    assert (Hwok : (width <=? xlen_bytes) = true)
+      by (destruct Hwid as [-> | [-> | [-> | ->]]]; vm_compute; reflexivity).
+    (* everything runs at the TICKED file *)
+    pose proof (u_data_cfg_tick rsf va 4
+                  (u_data_cfg_of_post_fetch rsf mm va mi Hpfc)) as Hcfg.
+    pose proof (u_pins_tick pt t rsf va 4 Hpins) as Hpins'.
+    pose proof Hcfg as (Lcp & Lms & Lmenv).
+    destruct Lms as (_ & Lmprv & _).
+    assert (Heff : exec (effectivePrivilege (Load Data)
+                     (register_lookup mstatus (s0 rsf mm va).(sregs)) User)
+                     (s0 rsf mm va) = Some (User, s0 rsf mm va))
+      by exact (exec_effectivePrivilege_mprv0 (Load Data) _ User (s0 rsf mm va) Lmprv).
+    assert (Heffg : goodmb Du_r Du_w (effectivePrivilege (Load Data)
+                      (register_lookup mstatus (s0 rsf mm va).(sregs)) User)
+                      (s0 rsf mm va) mm = true)
+      by exact (goodmb_effectivePrivilege_mprv0 Du_r Du_w (Load Data) _ User
+                  (s0 rsf mm va) mm Lmprv).
+    destruct (u_pmlen_pure t mm mm (s0r rsf va) (Load Data)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) Hcfg Hpins') as (Hpml & Hpmlg).
+    pose proof (u_translationMode_pure pt t (s0r rsf va) mm Hcfg Hpins') as Htm.
+    pose proof (u_goodmb_translationMode_pure pt t (s0r rsf va) mm mm Hcfg Hpins')
+      as Htmg.
+    destruct (u_vmem_read_pure t mm (s0r rsf va) width
+                (add_vec (if Z.eqb (uint ir1) 0 then zero_reg
+                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint ir1)))
+                                 (s0 rsf mm va).(sregs))
+                         (sign_extend' 64 imm))
+                Hk Hk8 Hcfg Hpins' Hwf)
+      as [ (dv & rs' & mm' & t' & Hvr & Hvrg & Honly & Htlbok & Hstep)
+         | (rs' & mm' & t' & e & xv & pcx & Hvr & Hvrg & Hue & Honly & Htlbok & Hstep) ].
+    - apply (arm_load_retire t t' mm mm' rsf rs' va w imm ir1 ird is_unsigned
+               width dv Hdec Hhv Hwok);
+        [ exact (exec_vmem_read_u ir1 (sign_extend' 64 imm) width (Load Data)
+                   false false false Sv39 (Ok dv) (s0 rsf mm va) (u_state rs' mm')
+                   Lcp Heff Hpml Htm Hvr)
+        | exact (goodmb_vmem_read_u Du_r Du_w ir1 (sign_extend' 64 imm) width
+                   (Load Data) false false false Sv39 (Ok dv)
+                   (s0 rsf mm va) (u_state rs' mm') mm
+                   (fun H => Du_gpr_of_Z_r ir1 H)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Lcp Heff Heffg Hpml Hpmlg Htm Htmg Hvr Hvrg)
+        | exact (u_fix_of_tlb_only _ _ Honly)
+        | exact Htlbok | exact Hstep ].
+    - apply (arm_load_trap t t' mm mm' rsf rs' va w imm ir1 ird is_unsigned
+               width e xv pcx Hdec Hhv Hwok Hue);
+        [ exact (exec_vmem_read_u ir1 (sign_extend' 64 imm) width (Load Data)
+                   false false false Sv39 (Err _) (s0 rsf mm va) (u_state rs' mm')
+                   Lcp Heff Hpml Htm Hvr)
+        | exact (goodmb_vmem_read_u Du_r Du_w ir1 (sign_extend' 64 imm) width
+                   (Load Data) false false false Sv39 (Err _)
+                   (s0 rsf mm va) (u_state rs' mm') mm
+                   (fun H => Du_gpr_of_Z_r ir1 H)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Lcp Heff Heffg Hpml Hpmlg Htm Htmg Hvr Hvrg)
+        | exact (u_fix_of_tlb_only _ _ Honly)
+        | exact Htlbok | exact Hstep ].
+  Qed.
+
 End UserMemArmsBase.
