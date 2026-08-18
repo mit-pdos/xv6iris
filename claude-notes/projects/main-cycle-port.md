@@ -1957,6 +1957,77 @@ default -- those are equivalent facts, but not the principle; the two
 producers that took that shortcut (`spt_tr_obl_of_regime`,
 `TrampStepPt.tramp_phys_id`) are to be restated on `instr`'s claim.
 
+## CHECKPOINT 2026-08-18 (late) -- HANDOFF STATE (read this first when resuming)
+
+**Everything below is on branch `hart-node-port`, LOCAL ONLY (not pushed);
+HEAD ≈ 893801d3.**  Working tree at handoff: `iris/TrampStepPt.v` modified
+(trampoline lane, in flight), `iris/ZZWfi.v` untracked (the verified WFI
+wait loop, to be folded into WpSmodeWfi.v).  Whole-tree build log of the
+last GCP run: scratchpad `gcp-build-1.log` (34 red roots at that snapshot;
+most since fixed or in flight -- see below).  Rerun with
+`./gcp-rocq/run-on-gcp make -k -j36 proofs` from the repo root.
+
+### Landed, green, admit-free (per-file coqc; no new axioms beyond the 5
+platform ones + `functional_extensionality_dep` where inherited)
+- Semantics + logic (reservation, per-node rules, `_ex` indexed-rider cycle
+  rules, `HartStepFull` six arms + waiting, `HartRunFull`).
+- S-mode: `SRegime` fold (swp face + `sr_swp_translate_wit`, `sr_swp_mode`,
+  producers `sr_adm_of_pin`/`sr_swp_side_ok`), `KptGoodb`, `SmodeCorePt`
+  wrappers on `sr_inv R` (final obligation shape; `spt_tr_obl_of_regime`;
+  result-generic run rule), `HartSMem` (mode-generic data engines, AMO ex),
+  `HartSCsr`, `WpSconfEngine`, `WpSmodePtEngine`/`WpSmodePtFetch`,
+  `WpIntrInv`+`WpSmodeIntr` (hole-free; rider `R : CpuId -> …`, b'/ms').
+- S-mode leaves ALL converted, statements byte-identical except the
+  user-approved ones: WpSconfAlu(50)/Btype(28)/Ctl(8)/Csr(16)/Sret/Timer/
+  Mem(29)/Lock(9)/PLIC/Virtio/UART, WpSmodePt* (30), parked leaves folded
+  into WpSconfAlu (WpSconfSrliw.v deleted).  WFI: wait loop verified in
+  ZZWfi.v; enter step + fold into WpSmodeWfi.v IN FLIGHT.
+- User tier: P0-P6 done; UserExec/KernelBridge/Step/StepFull/ActiveClass
+  §1-4/TotalU/ClassifyAsm green; `u_fetch_pure` (4-byte) + fault composer
+  `u_fetch_fault_pure` landed; UserMemCert/UserMemArmsBase (P4b part 1)
+  landed; P4b arms + UserActiveClass §5 assembly IN FLIGHT.
+- Trampoline: `TrampStepPt.wp_instr_tramp_pt` per node + `TransPt` green;
+  user-table per-node translation + UservecPt/UserretPt/UserretEntryPt/
+  UservecExitPt leaves IN FLIGHT.
+- Bridge: `WpSconfMem.mem_claim`/`mem_pointsto_claim` (THE lemma;
+  `wordw_claim := aligned ∗ mem_claim`).
+
+### User rulings in force
+- NO caller-visible leaf/spec statement change without the user's approval.
+- APPROVED: `wordw_claim` premise on `wp_load/store_s_sconf_au` (and the
+  thin WpAu4 width-4 wrappers -- flagged, not yet explicitly approved);
+  (A) three `↦ᵣ□` counter premises on `userret_to_user_inv` (not handed
+  back); (B) `pc_is` on `user_trap_frame_open/_intro`.
+- RULE: every address claim (`wordw_claim`) is derived ONLY from the
+  accessed bytes' `mem_pointsto` (`mem_pointsto_claim`/`wordw_claim_of`),
+  never from static bundles / ambient tier defaults.  The tail lane was
+  told to DELETE its static-map derivations (`ProofIget.ig_wordw_claim_u`,
+  `ProofIunlock.iul_wordw_claim_u`, `ProofVirtioDiskRwD.vdrwd_wordw_claim_static`,
+  ProofBread/ProofMain*/ProofVirtioDiskIntr) and redo from points-to; the
+  fetch producers `SmodeCorePt.spt_tr_obl_of_regime` and
+  `TrampStepPt.tramp_phys_id` still take the shortcut and are to be restated
+  on `instr`'s text-byte claim.
+- >5 min per file is a bug; no pkill of coqc; commit by explicit path only.
+
+### In flight at handoff (agents; all resumable from their transcripts)
+- tail-1: hw_config-tail (`#Hkmapb` binds `kmap_static_claims ∗ gen_cert`)
+  fixes across ~22 Proof*.v + BootBridge/WpStartNew/UserretUser/ProofMain*;
+  then the wordw_claim redo above.
+- trampoline: user-table per-node translation (via `swp_hmrun_of_exec` +
+  PtWalkCert/UserBytes) + the four uservec/userret files + the two
+  `user_trap_frame_open` ipattern edits.
+- P4b: UserMemClassify(+Amo) arms onto the pure pair; then P7's
+  UserActiveClass §5 assembly (interface written in user-tier-port.md §14).
+- WFI helper: enter step on `swp_run_hart_active_gen_exf_res`, fold ZZWfi.
+
+### Not started
+- `u_fetch_pure_2` (2-aligned/straddle fetch: width-2 goodmb twins,
+  `u_mem_step` transitivity); §8 `udata_own` Countable fix (UserPtTree);
+  WpUmodeStep (verified U-mode tier); notes fold-backs owed at the milestone
+  (WpSconfEngine/WpSmodePtEngine clones, HartMemAsm/PtWalkCert §0 into
+  their homes, UserFrame copies into WpGpr); premise-removal commit
+  (`minstret_inv`, `wire_inv`); full GCP build to green; PUSH.
+
 ## CHECKPOINT 2026-08-18 (evening) -- where the fan-out stands
 
 Landed, admit-free: reservation semantics+logic; M-mode leaves; S-mode
