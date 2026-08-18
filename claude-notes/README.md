@@ -118,6 +118,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   **The tree now has no admitted statements.**
 - **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
   monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
+- **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto
+  per-node semantics (sub-plan of the above: `swp_hmrun_of_exec` + `goodmb` twins).
   **Live, on branch `hart-node-port`, and the tree is RED from `MinstretInv.v`
   up by design** — open its CHECKPOINT before any work under `iris/`, and its
   trap list before writing a proof over the new language.

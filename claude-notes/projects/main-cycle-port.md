@@ -732,6 +732,16 @@ traps recorded in its §6: `dom (mm_after …) = dom mm` does NOT vm_compute
 a concrete state does not vm_compute either (the successor mstate's
 register file is a record of functions) -- `goodmb` does, in ~0.1 s.
 
+**THE PLAN for the tier itself is in [`user-tier-port.md`](user-tier-port.md)
+(2026-08-18): chop the cycle at the dispatch, everything else is one
+`swp_hmrun_of_exec` per model call at the reference state
+`s := MState rs mm dev0_state`; LR/SC's opaque model axioms are replaced by
+TERM-level ones (`load_reservation a n = returnm tt`) because per-node
+stepping cannot step an opaque constant; a six-armed cycle rule
+`HartStepFull` (trap / illegal / enter-wait / fetch-failure / waiting arms)
+is on the critical path; the tier's `user_inv`, obligations and
+`wp_user_exec` keep their statements byte-identical.
+
 Then the U-mode engine ports mechanically: `wp_exec_step_minstret` σ-callback
 sites become `swp_hmrun` at the user frame's own resources; the exec-total
 lemmas stay as they are and gain a `goodmb` twin each.  This is the largest
