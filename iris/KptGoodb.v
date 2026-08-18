@@ -44,6 +44,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
         SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import RiscvTryStep ExecCommon.
 Require Import SmodePte PtAdBits Pt4kWalk PtTree KptPt KMap KptTree.
 Require Import WpDecodeBridge.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -183,3 +184,81 @@ Qed.
 Lemma goodb_is_shadow_stack_fetch (D : register -> bool) (s : mstate) :
   goodb D (is_shadow_stack_access (InstructionFetch tt)) s = true.
 Proof. reflexivity. Qed.
+
+(* ===================================================================== *)
+(* §5 THE TWO S-MODE CONFIG PROBES THE DATA ACCESSES ALSO RUN.           *)
+(*                                                                       *)
+(*    [effectivePrivilege] is a bare [returnM] at ANY access once MPRV is *)
+(*    clear (the kernel never sets it), which is a TERM equation and so   *)
+(*    settles the exec and the [goodb] halves at once; the fetch's own    *)
+(*    instance (§4) does not even need that premise.                      *)
+(*                                                                       *)
+(*    [translationMode Supervisor] is not: it runs through               *)
+(*    [architecture Supervisor] (which reads mstatus.SXL) and then reads  *)
+(*    satp, so its footprint certificate is assembled along the same      *)
+(*    chain [SmodePte.exec_translationMode_S_sv39] walks -- NOT by        *)
+(*    [vm_compute], which gets stuck on both symbolic values.  The read   *)
+(*    set is exactly {mstatus, satp}.                                     *)
+(* ===================================================================== *)
+
+Lemma effectivePrivilege_mprv0 (acc : MemoryAccessType mem_payload)
+    (m : mword 64) (p : Privilege) :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1") = false ->
+  effectivePrivilege acc m p = returnM p.
+Proof.
+  intros HM. unfold effectivePrivilege. rewrite HM, andb_false_r. reflexivity.
+Qed.
+
+Lemma goodb_architecture_S (D : register -> bool) (s : mstate) :
+  D mstatus = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  goodb D (architecture Supervisor) s = true.
+Proof.
+  intros HDm HSXL. unfold architecture. cbn match.
+  match goal with |- goodb D (Defs.bind ?L _) s = true =>
+    assert (Hin : exec L s
+                  = Some (_get_Mstatus_SXL (register_lookup mstatus s.(sregs)), s));
+    [ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)); apply exec_returnM | ];
+    assert (Hing : goodb D L s = true) end.
+  { unfold read_reg. cbn [goodb Defs.bind Interface.iMon_bind].
+    rewrite HDm. reflexivity. }
+  rewrite (goodb_bind D _ _ s _ Hing Hin).
+  unfold architecture_bits_backwards. rewrite HSXL.
+  replace (eq_vec ('b"10") ('b"01")) with false by (vm_compute; reflexivity).
+  cbn match. reflexivity.
+Qed.
+
+Lemma goodb_translationMode_S_sv39 (D : register -> bool) (satp0 : mword 64)
+    (s : mstate) :
+  D mstatus = true -> D satp = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  register_lookup satp s.(sregs) = satp0 ->
+  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+  goodb D (translationMode Supervisor) s = true.
+Proof.
+  intros HDm HDs HSXL Hsatp Hmode.
+  unfold translationMode.
+  replace (generic_eq Supervisor Machine) with false by (vm_compute; reflexivity).
+  rewrite (goodb_bind D _ _ s RV64 (goodb_architecture_S D s HDm HSXL)
+             (exec_architecture_Supervisor s HSXL)).
+  cbn match.
+  change (xlen >=? 64) with true.
+  match goal with |- goodb D (Defs.bind ?ARM _) s = true =>
+    assert (HARMe : exec ARM s = Some (_get_Satp64_Mode (Mk_Satp64 satp0), s));
+    [ | assert (HARMg : goodb D ARM s = true) ] end.
+  { assert (Hae : exec (Defs.assert_exp' true "sys/vmem.sail:254.25-254.26") s
+                  = Some (eq_refl, s)).
+    { unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hae).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+    rewrite Hsatp. apply exec_returnm. }
+  { unfold assert_exp'. cbn match.
+    change (goodb D (Defs.bind (Defs.returnm eq_refl) ?k) s) with (goodb D (k eq_refl) s).
+    unfold read_reg. cbn [goodb Defs.bind Interface.iMon_bind].
+    rewrite HDs. reflexivity. }
+  rewrite (goodb_bind D _ _ s _ HARMg HARMe).
+  rewrite Hmode.
+  replace (satpMode_of_bits RV64 ('b"1000" : mword 4)) with (Some Sv39)
+    by (vm_compute; reflexivity).
+  cbn match. reflexivity.
+Qed.

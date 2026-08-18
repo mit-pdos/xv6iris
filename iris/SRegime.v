@@ -42,7 +42,7 @@ Require Import KptGhost.   (* kptN: the shared kernel table's namespace, named i
 Require Import KptShare.   (* the SHARED-table regime instance (§3) *)
 Require Import WpDecodeBridge CommonWalk PtTree PtTreeAdue PtAdBits Pt4kWalk.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb HartEvents.
-Require Import HartSTrans HartSKpt.
+Require Import HartSTrans HartSKpt KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -844,6 +844,40 @@ Definition pmp_ent0_ok (pcfg : type_of_register pmpcfg_n)
   /\ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true
   /\ (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z.
 
+(* ---------------------------------------------------------------------- *)
+(* THE FOUR PROBE PREMISES EVERY [sr_swp_translate] CALL TAKES, discharged  *)
+(* once for the whole S-mode tier.  Both probes are TERM equations at an     *)
+(* S-mode access -- [is_shadow_stack_access] because [s_acc_ok] names only   *)
+(* Data / fetch payloads (the other payloads are [internal_error] arms, not  *)
+(* [Ret]s), and [effectivePrivilege] because MPRV is clear, which the kernel *)
+(* never changes.  A term equation settles the [exec] half and the [goodb]   *)
+(* half at once, which is why none of the four needs a footprint argument.   *)
+(* ---------------------------------------------------------------------- *)
+Lemma s_acc_ssa_ret (acc : MemoryAccessType mem_payload) :
+  s_acc_ok acc -> is_shadow_stack_access acc = returnM false.
+Proof. intros [-> | [-> | [-> | (aq & rl & ->)]]]; reflexivity. Qed.
+
+Lemma s_acc_ssa_exec (acc : MemoryAccessType mem_payload) (dst : mstate) :
+  s_acc_ok acc -> exec (is_shadow_stack_access acc) dst = Some (false, dst).
+Proof. intros H. rewrite (s_acc_ssa_ret acc H). apply exec_returnM. Qed.
+
+Lemma s_acc_ssa_goodb (acc : MemoryAccessType mem_payload)
+    (Db : register -> bool) (dst : mstate) :
+  s_acc_ok acc -> goodb Db (is_shadow_stack_access acc) dst = true.
+Proof. intros H. rewrite (s_acc_ssa_ret acc H). reflexivity. Qed.
+
+Lemma s_eff_exec (acc : MemoryAccessType mem_payload) (m : mword 64)
+    (p : Privilege) (dst : mstate) :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1") = false ->
+  exec (effectivePrivilege acc m p) dst = Some (p, dst).
+Proof. intros H. rewrite (effectivePrivilege_mprv0 acc m p H). apply exec_returnM. Qed.
+
+Lemma s_eff_goodb (acc : MemoryAccessType mem_payload) (m : mword 64)
+    (p : Privilege) (Db : register -> bool) (dst : mstate) :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1") = false ->
+  goodb Db (effectivePrivilege acc m p) dst = true.
+Proof. intros H. rewrite (effectivePrivilege_mprv0 acc m p H). reflexivity. Qed.
+
 Section SRegimeSwp.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -1285,5 +1319,66 @@ Section SRegimeSwp.
       (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
       (kpt_swp_res_agree root_ppn) (kpt_swp_open root_ppn)
       (kpt_swp_close root_ppn).
+
+  (* -------------------------------------------------------------------- *)
+  (* THE SIDE CONDITIONS, INTRODUCED FROM THE PURE CONFIG FACTS A LEAF HAS. *)
+  (*                                                                       *)
+  (* [sr_swp_side] is where each regime names what its own arm needs, and   *)
+  (* every leaf that drives a translation -- the fetch through              *)
+  (* [SmodeCorePt.spt_tr_obl_of_regime], the loads/stores/AMOs directly --   *)
+  (* has to discharge it.  What it actually has is the bundle's own pure     *)
+  (* facts, and these two lemmas are exactly that conversion, so no leaf     *)
+  (* ever unfolds a side condition.  Both are ACCESS-GENERIC: nothing below  *)
+  (* mentions [acc] except Bare's shadow-stack conjunct, which [s_acc_ok]    *)
+  (* settles for the fetch and for all three data accesses at once.          *)
+  (*                                                                       *)
+  (* The reference state [dst] enters only through the two facts             *)
+  (* [translationMode] reads (mstatus.SXL and satp); at the swp layer the    *)
+  (* caller takes [dst] to be THIS HART'S OWN FILE, and both are then         *)
+  (* [reflexivity] against the tower.                                        *)
+  (* -------------------------------------------------------------------- *)
+  Lemma bare_swp_side_intro (acc : MemoryAccessType mem_payload)
+      (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+      (Drw Dro : gset register) (rs : regstate) (dst : mstate) :
+    s_acc_ok acc ->
+    bare_satp_ok (register_lookup satp rs) ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    bare_swp_side acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros Hacc Hmode HMPRV. rewrite /bare_swp_side. split_and!.
+    - exact Hmode.
+    - exact (effectivePrivilege_mprv0 acc _ Supervisor HMPRV).
+    - exact (s_acc_ssa_ret acc Hacc).
+  Qed.
+
+  Lemma kpt_swp_side_intro (root_ppn : mword 44)
+      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
+      (kp : kperm) (Db : register -> bool) (Drw Dro : gset register)
+      (rs : regstate) (dst : mstate) :
+    kpt_satp_ok root_ppn (register_lookup satp rs) ->
+    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+    pma_allows_ram (register_lookup pma_regions rs) ->
+    Db mstatus = true -> Db satp = true ->
+    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+    register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov) Hpma
+      HDm HDs HSXL Hsatp.
+    rewrite /kpt_swp_side. split_and!.
+    - exact Hmode.
+    - exact Hasid.
+    - exact Hppn.
+    - exact (exec_translationMode_S_sv39 (register_lookup satp rs) dst
+               HSXL Hsatp Hmode).
+    - exact (goodb_translationMode_S_sv39 Db (register_lookup satp rs) dst
+               HDm HDs HSXL Hsatp Hmode).
+    - exact HA.
+    - exact Hord.
+    - exact HR.
+    - exact HW.
+    - exact Hcov.
+    - exact Hpma.
+  Qed.
 
 End SRegimeSwp.

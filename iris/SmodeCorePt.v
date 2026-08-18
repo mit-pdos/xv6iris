@@ -102,6 +102,7 @@ Require Import SmodeCore.
 Require Import KptPt UserBits.
 Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import KptShare.   (* tlb_res_pt: the shared-table residue *)
+Require Import KptGoodb.  (* the fetch probes' footprint certificates *)
 Require Import SRegime.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
 Require Import HartEvents HartRegNode HartMCycle HartStepAny HartRunGen.
@@ -2866,6 +2867,183 @@ Section SmodeCorePt.
        (elp0 : type_of_register elp),
        spt_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
          mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res)%I.
+
+  (* ==================================================================== *)
+  (* THE FETCH-TRANSLATION PRODUCER.                                       *)
+  (*                                                                      *)
+  (* [spt_tr_obl] is [SRegime.sr_swp_translate] at [InstructionFetch tt],  *)
+  (* instantiated at THIS wrapper's tower and re-shaped: the walk's        *)
+  (* landing file comes back as [rsf = rs \/ exists tv, rsf = register_set *)
+  (* tlb tv rs] and the obligation wants it AS A TOWER, at the tlb value   *)
+  (* the walk chose.  Three things make the instantiation go through:      *)
+  (*                                                                      *)
+  (*   - THE REFERENCE STATE IS THIS HART'S OWN FILE                       *)
+  (*     ([MState (srs tv) empty dev0_state]), so every agreement premise  *)
+  (*     of [sr_swp_translate] -- the [Db] one, the [D_leafchk] one and    *)
+  (*     the mstatus one -- is [eq_refl].  This is [spt_dispatch_none]'s   *)
+  (*     trick, and it is why the producer needs no agreement hypothesis   *)
+  (*     at all;                                                           *)
+  (*   - THE RESIDUE CONVERTS BY [sr_swp_res_agree], twice: once at        *)
+  (*     [rs := srs tv] on the way in, once at the landing file on the way *)
+  (*     out.  Both are two tower lookups ([s_rs_satp], [s_rs_tlb]) --     *)
+  (*     satp is unchanged because the walk's ONLY write is the TLB fill;  *)
+  (*   - THE LANDING FILE MOVES ONTO THE TOWER by [s_rs_agree] +           *)
+  (*     [s_rw_ext] / [s_ro_ext_gen].  [register_set tlb tv' (srs tv)] is  *)
+  (*     not syntactically [srs tv'], but it agrees with it on all 25      *)
+  (*     footprint cells, which is all a frame can tell.                   *)
+  (*                                                                      *)
+  (* What is left to the caller is exactly the regime's own side condition *)
+  (* [sr_swp_side] and its admissibility [sr_adm], both of which are pure  *)
+  (* and both of which the caller can name because it knows which arm it   *)
+  (* is on.                                                               *)
+  (* ==================================================================== *)
+
+  (* one tower lookup through the walk's TLB write-back *)
+  Local Ltac tlbpeel := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
+
+  Lemma spt_tr_obl_of_regime
+      (R : s_regime) (RS : s_regime_swp R)
+      (Df : register -> dfrac) (Db : register -> bool)
+      (pc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64) :
+    misa0 = MISA_C ->
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    (forall r : register, Db r = true -> r ∈ s_Drw ∪ s_Dro) ->
+    (forall r : register, D_leafchk r = true -> r ∈ s_Drw ∪ s_Dro) ->
+    (forall (va : mword 64) (ppn : mword 44),
+       ktier_pin cur_ktier ppn va -> sr_adm R va ppn) ->
+    (forall (va : mword 64) (ppn : mword 44) (tv : type_of_register tlb),
+       (uint va < 274877906944)%Z -> ktier_pin cur_ktier ppn va ->
+       sr_swp_side R RS (InstructionFetch tt) va ppn KP_rx Db s_Drw s_Dro
+         (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+            senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+         (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+            ∅ dev0_state)) ->
+    gen_cert -∗
+    spt_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+      senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 (sr_swp_res_at R RS satp0).
+  Proof.
+    intros Hmisa Hmenv HSXL HDb HDlc Hadm Hside.
+    iIntros "#Hcert". rewrite /spt_tr_obl. iModIntro.
+    iIntros (va ppn tv rr) "%Hlt %Hpin #Hat Hfrag HRes Hrw Hro".
+    (* the reference state's three pure pins, read off the tower *)
+    assert (Lmisa : register_lookup misa
+              (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+                 misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                 ∅ dev0_state).(sregs) = MISA_C).
+    { cbn [sregs]. rewrite s_rs_misa. exact Hmisa. }
+    assert (Lmenv : register_lookup menvcfg
+              (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+                 misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                 ∅ dev0_state).(sregs) = MENVCFG_S).
+    { cbn [sregs]. rewrite s_rs_menv. exact Hmenv. }
+    assert (LSXL : _get_Mstatus_SXL (register_lookup mstatus
+              (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+              = 'b"10").
+    { rewrite s_rs_mst. exact HSXL. }
+    (* the residue at the PRE-file *)
+    iAssert (sr_swp_res R RS
+               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+      with "[HRes]" as "HRes'".
+    { rewrite -(sr_swp_res_agree R RS
+                  (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)).
+      rewrite s_rs_satp s_rs_tlb. iExact "HRes". }
+    iApply (swp_mono with "[] [-]").
+    2:{ iApply (sr_swp_translate R RS (InstructionFetch tt) s_Drw s_Dro Df
+                  (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                  (MState (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                     ∅ dev0_state)
+                  Db va (pa_of ppn va) ppn KP_rx rr
+                  s_disj (or_introl eq_refl) eq_refl
+                  s_in_mst s_in_priv s_in_satp s_w_tlb s_in_pma s_in_pcfg
+                  s_in_paddr s_in_htif
+                  HDb (fun r _ => eq_refl) HDlc (fun r _ => eq_refl)
+                  ltac:(by apply s_rs_priv) ltac:(by apply s_rs_htif) eq_refl
+                  Lmisa Lmenv LSXL
+                  (exec_effectivePrivilege_fetch _ Supervisor _)
+                  (goodb_effectivePrivilege_fetch Db _ Supervisor _)
+                  (exec_is_shadow_stack_fetch _)
+                  (goodb_is_shadow_stack_fetch Db _)
+                  (lo_canonical va Hlt) eq_refl
+                  (Hadm va ppn Hpin) (Hside va ppn tv Hlt Hpin)
+                  with "Hat Hcert Hfrag HRes' Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+    iSplitR; [done |].
+    destruct Hshape as [-> | (tvx & ->)].
+    - (* the TLB hit: the file did not move *)
+      iExists tv. iFrame "Hany Hrw Hro".
+      iEval (rewrite -(sr_swp_res_agree R RS
+                (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+             s_rs_satp s_rs_tlb) in "HRes".
+      iExact "HRes".
+    - (* the walk FILLED the tlb: move the landing file onto the tower *)
+      assert (Lsatp : register_lookup satp
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                = satp0).
+      { tlbpeel; apply s_rs_satp. }
+      assert (Ltlbv : register_lookup tlb
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                = tvx)
+        by apply register_lookup_set.
+      assert (Hag : reg_agree_on (s_Drw ∪ s_Dro)
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tvx)).
+      { apply (s_rs_agree pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tvx);
+          [ tlbpeel; apply s_rs_PC
+          | tlbpeel; apply s_rs_nPC
+          | tlbpeel; apply s_rs_ms
+          | tlbpeel; apply s_rs_mi
+          | tlbpeel; apply s_rs_cy
+          | tlbpeel; apply s_rs_ti
+          | tlbpeel; apply s_rs_ip
+          | exact Ltlbv
+          | tlbpeel; apply s_rs_priv
+          | tlbpeel; apply s_rs_mst
+          | tlbpeel; apply s_rs_hart
+          | tlbpeel; apply s_rs_pcfg
+          | tlbpeel; apply s_rs_paddr
+          | tlbpeel; apply s_rs_mc
+          | tlbpeel; apply s_rs_micfg
+          | tlbpeel; apply s_rs_misa
+          | tlbpeel; apply s_rs_sec
+          | tlbpeel; apply s_rs_pma
+          | tlbpeel; apply s_rs_htif
+          | tlbpeel; apply s_rs_elp
+          | tlbpeel; apply s_rs_senv
+          | exact Lsatp
+          | tlbpeel; apply s_rs_mie
+          | tlbpeel; apply s_rs_mdl
+          | tlbpeel; apply s_rs_menv ]. }
+      iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
+      iExists tvx. iFrame "Hany Hrw Hro".
+      iEval (rewrite -(sr_swp_res_agree R RS
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)))
+             Lsatp Ltlbv) in "HRes".
+      iExact "HRes".
+  Qed.
 
   (* ==================================================================== *)
   (* wp_instr_s_config_regime -- THE RAW-CELL S-MODE WRAPPER.              *)
