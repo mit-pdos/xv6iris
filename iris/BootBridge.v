@@ -264,9 +264,9 @@ Section BootBridge.
   Proof.
     (* [minstret_inv] is [emp] now (MinstretInv.v): the counter facts moved
        into [pc_is]'s [minstret_res], and the bundle no longer carries it *)
-    rewrite /mmode_config. iIntros "(#Hhw & Hrest)".
+    rewrite /mmode_config /minstret_inv. iIntros "(#Hhw & Hrest)".
     iSplitR "Hrest".
-    - iFrame "Hhw". rewrite /minstret_inv. done.
+    - iFrame "Hhw".
     - iFrame "Hhw Hrest".
   Qed.
 
