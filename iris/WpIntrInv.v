@@ -1135,13 +1135,13 @@ Section IntrEngine.
     (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
        senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv).
 
-  Lemma swp_run_hart_active_instr_S
+  Lemma swp_run_hart_active_instr_S_res
       (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
       (satp0 mdv0 : mword 64) (tlbv : type_of_register tlb)
-      (root_ppn : mword 44) (is_rvc : bool) (i : instruction)
+      (is_rvc : bool) (i : instruction)
       (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) (W : iProp Σ)
       (Qi : InterruptType -> Privilege -> iProp Σ) :
     misa0 = MISA_C ->
@@ -1150,11 +1150,11 @@ Section IntrEngine.
     and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     pma_allows_ram pmar0 ->
-    satp_facts satp0 root_ppn ->
-    pmp_facts pcfg paddr ->
+    strans_satp_ok satp0 ->
+    pmp_ent0_ok pcfg paddr ->
     gen_cert -∗
     instr pc0 is_rvc i -∗
-    strans_kpt -∗ kpt_inv root_ppn -∗ tlb_snap_ok tlbv -∗
+    strans_res_at satp0 tlbv -∗
     resv_frag cpu_id None -∗
     W -∗
     hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -1166,7 +1166,7 @@ Section IntrEngine.
     (∀ (ii : InterruptType) (pr : Privilege),
        ⌜ ∃ meip seip : mword 1,
            s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
-       W -∗ strans_kpt -∗ tlb_snap_ok tlbv -∗ resv_frag cpu_id None -∗
+       W -∗ strans_res_at satp0 tlbv -∗ resv_frag cpu_id None -∗
        hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                      mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drw -∗
        hreg_frame_ro (s_Df (DfracOwn 1))
@@ -1176,7 +1176,7 @@ Section IntrEngine.
     (* the instruction: at the fetch's landing file, nextPC committed, and
        it hands the frames back at the file it lands on *)
     (∀ tv' : type_of_register tlb,
-       W -∗ strans_kpt -∗ tlb_snap_ok tv' -∗ resv_any cpu_id -∗
+       W -∗ strans_res_at satp0 tv' -∗ resv_any cpu_id -∗
        hreg_frame (register_set (R_bitvector_64 nextPC)
            (add_vec_int pc0 (if is_rvc then 2 else 4))
            (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -1200,26 +1200,15 @@ Section IntrEngine.
                         hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗
                         Rr rs2)).
   Proof.
-    intros Hmisa HSXL HMPRV Hmm Help Hpma Hsatpf Hpmpf.
-    pose proof Hsatpf as Hsf'. destruct Hsf' as (Hmode & Hasid & Hppn).
-    pose proof Hpmpf as Hpf'. destruct Hpf' as (HA & Hord & HX & HW & HR & Hcov).
-    assert (Hroot : strans_root_of satp0 = root_ppn) by exact Hppn.
-    assert (Hsok : strans_satp_ok satp0).
-    { right. rewrite /kpt_satp_ok Hroot. split_and!; assumption. }
-    assert (Hpok : pmp_ent0_ok pcfg paddr)
-      by (rewrite /pmp_ent0_ok; split_and!; assumption).
-    (* the KPT arm of the regime's residue, at the cells the bundle held *)
-    iIntros "#Hcert Hinstr Hbit #Hkinv Hsnap Hfrag HW Hrw Hro Hqi Hex".
+    intros Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok.
+    pose proof Hpok as Hpf'. destruct Hpf' as (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "#Hcert Hinstr Hres Hfrag HW Hrw Hro Hqi Hex".
     iApply (spt_run_hart_active_instr_S (s_Df (DfracOwn 1))
               pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
               senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
               (strans_res_at satp0) tlbv is_rvc i Q Rr W Qi
               Hmisa eq_refl Help Hpma HA Hord HX Hcov
-              with "Hcert Hinstr HW Hfrag [Hbit Hsnap] Hrw Hro [Hqi] [] [Hex]").
-    - (* the residue, at the tlb value the bundle held *)
-      rewrite /strans_res_at. iRight. iFrame "Hbit".
-      iSplitR; [iPureIntro; exact Hmode |].
-      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv".
+              with "Hcert Hinstr HW Hfrag Hres Hrw Hro [Hqi] [] [Hex]").
     - (* ---- THE DISPATCH.  SIE is SYMBOLIC here, so both arms are live:
            [Some] is the caller's trap payload, [None] gives everything
            back.  The reference state is this hart's own file, which is
@@ -1249,10 +1238,7 @@ Section IntrEngine.
       iIntros (o). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
       destruct (s_dispatch ip meip seip MIE_S mdv0 mst0)
         as [[ii pr] |] eqn:Ed.
-      + iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
-        { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
-          vm_compute in Hbad. discriminate. }
-        iApply ("Hqi" $! ii pr with "[%] HW Hbit Hsnap Hfrag Hrw Hro").
+      + iApply ("Hqi" $! ii pr with "[%] HW HRes Hfrag Hrw Hro").
         exists meip, seip. exact Ed.
       + iFrame "HW HRes Hfrag Hrw Hro".
     - (* ---- THE FETCH TRANSLATION, from the regime's own swp face ---- *)
@@ -1269,11 +1255,103 @@ Section IntrEngine.
                 Hsok Hpok Hpma with "Hcert").
     - (* ---- THE INSTRUCTION, with the residue unpacked ---- *)
       rewrite /spt_ex_obl. iIntros (tv') "HW HRes Hany Hrw Hro".
+      iApply ("Hex" $! tv' with "HW HRes Hany Hrw Hro").
+  Qed.
+
+  (* ...and the KPT reading, which is what the SIE=1 engine below holds: the
+     residue is built from the bundle's own three pieces and taken apart
+     again on both ways out.  The Bare arm is refuted by the satp MODE. *)
+  Lemma swp_run_hart_active_instr_S
+      (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mdv0 : mword 64) (tlbv : type_of_register tlb)
+      (root_ppn : mword 44) (is_rvc : bool) (i : instruction)
+      (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) (W : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    misa0 = MISA_C ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    pma_allows_ram pmar0 ->
+    satp_facts satp0 root_ppn ->
+    pmp_facts pcfg paddr ->
+    gen_cert -∗
+    instr pc0 is_rvc i -∗
+    strans_kpt -∗ kpt_inv root_ppn -∗ tlb_snap_ok tlbv -∗
+    resv_frag cpu_id None -∗
+    W -∗
+    hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drw -∗
+    hreg_frame_ro (s_Df (DfracOwn 1))
+      (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
+    (∀ (ii : InterruptType) (pr : Privilege),
+       ⌜ ∃ meip seip : mword 1,
+           s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
+       W -∗ strans_kpt -∗ tlb_snap_ok tlbv -∗ resv_frag cpu_id None -∗
+       hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drw -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
+       Qi ii pr) -∗
+    (∀ tv' : type_of_register tlb,
+       W -∗ strans_kpt -∗ tlb_snap_ok tv' -∗ resv_any cpu_id -∗
+       hreg_frame (register_set (R_bitvector_64 nextPC)
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Drw -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (register_set (R_bitvector_64 nextPC)
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Dro -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                     hreg_frame rs2 s_Drw ∗
+                     hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Rr rs2)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (∃ w : mword 32,
+                      ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                      ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                        hreg_frame rs2 s_Drw ∗
+                        hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗
+                        Rr rs2)).
+  Proof.
+    intros Hmisa HSXL HMPRV Hmm Help Hpma Hsatpf Hpmpf.
+    pose proof Hsatpf as Hsf'. destruct Hsf' as (Hmode & Hasid & Hppn).
+    assert (Hroot : strans_root_of satp0 = root_ppn) by exact Hppn.
+    assert (Hsok : strans_satp_ok satp0).
+    { right. rewrite /kpt_satp_ok Hroot. split_and!; assumption. }
+    assert (Hpok : pmp_ent0_ok pcfg paddr)
+      by (rewrite /pmp_ent0_ok; split_and!; apply Hpmpf).
+    iIntros "#Hcert Hinstr Hbit #Hkinv Hsnap Hfrag HW Hrw Hro Hqi Hex".
+    iApply (swp_run_hart_active_instr_S_res pc0 msr bmi cy ti ip mst0 pcfg
+              paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv
+              is_rvc i Q Rr W Qi
+              Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok
+              with "Hcert Hinstr [Hbit Hsnap] Hfrag HW Hrw Hro [Hqi] [Hex]").
+    - rewrite /strans_res_at. iRight. iFrame "Hbit".
+      iSplitR; [iPureIntro; exact Hmode |].
+      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv".
+    - iIntros (ii pr) "%Hd HW HRes Hfrag Hrw Hro".
+      iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
+      { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
+        vm_compute in Hbad. discriminate. }
+      iApply ("Hqi" $! ii pr with "[%] HW Hbit Hsnap Hfrag Hrw Hro").
+      exact Hd.
+    - iIntros (tv') "HW HRes Hany Hrw Hro".
       iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
       { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
         vm_compute in Hbad. discriminate. }
       iApply ("Hex" $! tv' with "HW Hbit Hsnap Hany Hrw Hro").
   Qed.
+
 
 
   (* ------------------------------------------------------------------ *)
