@@ -378,6 +378,55 @@ invariant.  The one real difference in the peel: `pmpaddr_n` must be peeled
 D-PINNED rather than value-dead, because at Supervisor the match's outcome is
 load-bearing.
 
+
+#### `wp_hart_step_resv`: the exact edit (§3a item (b), second bullet)
+
+`wp_hart_step` (the reservation-AGNOSTIC form) is proved at `RiscvExec:283-381`
+(98 lines).  `wp_hart_step_resv` is that lemma with three touch points; write it
+as a sibling, do NOT generalise one rule to cover both (the preserving form's
+side condition is what makes its auth step free, and the frag form has no use
+for it).
+
+**Statement delta** — two changes only, the `∀ σ oth r` callback keeps its
+shape:
+- add `resv_frag cpu_id rr -∗` after `gen_cert -∗`, with `rr : option resv` a
+  new binder;
+- drop the `(forall oth σ r m' σ' r', mnode_step … -> r' = r)` premise;
+- in the callback's continuation, replace
+  `WP (HartE gen_id cpu_id m' …)` with
+  `(resv_frag cpu_id r' -∗ WP (HartE gen_id cpu_id m' …))`.
+
+**Proof touch points**, in order:
+1. after destructuring `era_interp` (the `(Hgr & Hmem & Hdev & Hdur & Hresv &
+   %Hrok)` pattern the preserving form already uses), add
+   `iDestruct (resv_frag_agree _ cpu_id rr with "Hresv Hfrag") as %Hrr` — this
+   is what pins `g.(gresv) cpu_id = rr`, and the callback is applied at
+   `r := g.(gresv) cpu_id`, so `rr` and the callback's `r` coincide from here.
+2. at the re-establishment, replace the preserving form's
+   `resv_map_insert_id` rewrite with
+   `iMod (resv_frag_update g.(gresv) cpu_id rr r2 with "Hresv Hfrag") as
+   "[Hresv Hfrag]"` — that lands the auth at `<[cpu_id := r2]> g.(gresv)`,
+   exactly the post-state's `gresv`, so NO rewrite is needed at all.  Give
+   `Hfrag` to the continuation.
+   `resv_ok` still comes from `prim_step_resv_ok … Hstep Hrok` (see
+   `ffeb8bf5` for why NOT to reconstruct a `hart_node_step` witness).
+3. **the DEAD branch needs looking at.**  It proves the corpse self-loop's WP
+   with `e' = e`, so it never reaches the continuation and the frag is simply
+   framed — but check how that branch closes before assuming it, since the
+   frag is now an extra resource the branch must not drop.
+
+**Then** the three remaining `era_interp` re-establishment sites in `RiscvExec`
+(the UART, PLIC and disk rules at ~464/554/622): those steps do not change
+`gresv` at all, so each takes the preserving treatment — `resv_map_insert_id`
+is not even needed, the auth is framed unchanged.
+
+**Which rules take which form** (settled, from the arms in `RiscvLang`):
+- preserving (`wp_hart_step`): register nodes, announces, `Choose`, plain RAM
+  read, MMIO read, and the UART/PLIC/disk device rules.
+- frag (`wp_hart_step_resv`): every RAM write, MMIO write, the exclusive read,
+  and the `Ret` boundary.  The boundary is the one that first forced the
+  split -- its arm sets `r' = None`, so it fails the preserving premise.
+
 #### The `kptN` seam is BUILT (`HartSKpt.v`), and it exposed the real remaining shape
 
 `kpt_maps_across` / `kpt_open_slots` / `kpt_slot_node` / `kpt_pte2_node` /
