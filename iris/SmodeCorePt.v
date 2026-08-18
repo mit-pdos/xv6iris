@@ -106,7 +106,7 @@ Require Import SRegime.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
 Require Import HartEvents HartRegNode HartMCycle HartStepAny HartRunGen.
 Require Import HartMFetch HartSTrans PtTreeAdue.
-Require Import WpDecodeBridge WpIntrCore.
+Require Import WpDecodeBridge WpIntrCore CommonWalk HartGoodb.
 Require Import WpInstrRun WpSFrames.
 Require Import SmodePte RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -181,6 +181,13 @@ Local Ltac spt_read :=
   | |- context [ bool_decide ?P ] =>
       rewrite (bool_decide_eq_true_2 P ltac:(assumption))
   end.
+
+Local Ltac spt_srs :=
+  by rewrite ?s_rs_PC ?s_rs_nPC ?s_rs_ms ?s_rs_mi ?s_rs_cy ?s_rs_ti
+     ?s_rs_ip ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+     ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec ?s_rs_pma
+     ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp ?s_rs_mie ?s_rs_mdl
+     ?s_rs_menv.
 
 Local Ltac rg_glue :=
   cbn beta iota zeta delta
@@ -1064,7 +1071,7 @@ Section SmodeCorePt.
       (Df : register -> dfrac) (rs : regstate)
       (Qf Q : regstate -> Prop) (Rf : regstate -> iProp Σ) (p : Privilege)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
-      (i : instruction) (nl : nat) (Rr : iProp Σ)
+      (i : instruction) (nl : nat) (Rr : regstate -> iProp Σ)
       (Qi : InterruptType -> Privilege -> iProp Σ) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -1098,12 +1105,12 @@ Section SmodeCorePt.
      swp (execute i)
        (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                  ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr)) -∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr rs2)) -∗
     swp (run_hart_active 0)
       (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                  ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w)⌝ ∗
                     ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr)).
+                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr rs2)).
   Proof.
     intros Hdisj HDpriv HDpc HDnpc Hpriv Hpcf Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hdisp Hfet Hex".
@@ -1168,7 +1175,7 @@ Section SmodeCorePt.
       (Df : register -> dfrac) (rs : regstate)
       (Qf Q : regstate -> Prop) (Rf : regstate -> iProp Σ) (p : Privilege)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
-      (i other : instruction) (nl : nat) (Rr : iProp Σ)
+      (i other : instruction) (nl : nat) (Rr : regstate -> iProp Σ)
       (Qi : InterruptType -> Privilege -> iProp Σ) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -1218,12 +1225,12 @@ Section SmodeCorePt.
      swp (execute other)
        (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                  ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr)) -∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr rs2)) -∗
     swp (run_hart_active 0)
       (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                  ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 h)⌝ ∗
                     ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr)).
+                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Rr rs2)).
   Proof.
     intros Hdisj HDpriv HDmisa HDpc HDnpc Hpriv Hpcf HmisaCf Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hdisp Hfet Hexp Hex".
@@ -1886,6 +1893,51 @@ Section SmodeCorePt.
   Qed.
 
 
+
+  (* ------------------------------------------------------------------ *)
+  (* THE DISPATCH, PINNED TO [None].  [smode_config] (and this wrapper's  *)
+  (* SIE premise) says interrupts are OFF, so the S-mode dispatch -- which *)
+  (* does read the PLIC wires -- cannot fire whatever they hold:           *)
+  (* [WpIntrCore.s_dispatch]'s guard is exactly [_get_Mstatus_SIE ms].     *)
+  (* The reference state is THIS HART'S OWN FILE, so the agreement premise *)
+  (* is [reflexivity] and the only real fact is misa.S.                    *)
+  (* ------------------------------------------------------------------ *)
+  Definition spt_Db (r : register) : bool :=
+    orb (register_beq r (R_bitvector_64 misa))
+        (register_beq r (R_bitvector_64 mstatus)).
+
+  Lemma spt_Db_in (r : register) : spt_Db r = true -> r ∈ s_Drw ∪ s_Dro.
+  Proof.
+    unfold spt_Db. intros Hr.
+    apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
+      [exact s_in_misa | exact s_in_mst].
+  Qed.
+
+  Lemma spt_exec_cE_S (s : mstate) :
+    register_lookup misa s.(sregs) = MISA_C ->
+    exec (currentlyEnabled Ext_S) s = Some (true, s).
+  Proof.
+    intro Hmisa.
+    apply (decode_state_bridge D_misa _ dstateM).
+    - intros r Hr. unfold D_misa in Hr. apply register_beq_eq in Hr. subst r.
+      rewrite Hmisa. vm_compute; reflexivity.
+    - vm_compute; reflexivity.
+    - vm_compute; reflexivity.
+  Qed.
+
+  Lemma spt_goodb_cE_S (s : mstate) :
+    register_lookup misa s.(sregs) = MISA_C ->
+    goodb spt_Db (currentlyEnabled Ext_S) s = true.
+  Proof.
+    intro Hmisa.
+    apply (goodb_mono D_misa spt_Db).
+    - intros r Hr. unfold D_misa in Hr. unfold spt_Db. by rewrite Hr.
+    - apply (goodb_congr D_misa (currentlyEnabled Ext_S) dstateM s).
+      + intros r Hr. unfold D_misa in Hr. apply register_beq_eq in Hr. subst r.
+        rewrite Hmisa. vm_compute; reflexivity.
+      + vm_compute; reflexivity.
+  Qed.
+
   (* =================================================================== *)
   (* PART G -- THE S-MODE FETCH-SHAPE DISPATCH.                          *)
   (*                                                                     *)
@@ -1986,7 +2038,7 @@ Section SmodeCorePt.
                           hreg_frame_ro Df (srs tv') s_Dro)))%I.
 
     Definition spt_ex_obl (is_rvc : bool) (i : instruction)
-        (Q : regstate -> Prop) (Rr : iProp Σ) : iProp Σ :=
+        (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) : iProp Σ :=
       (∀ tv' : type_of_register tlb,
          Res tv' -∗ resv_any cpu_id -∗
          hreg_frame (register_set (R_bitvector_64 nextPC)
@@ -1996,26 +2048,26 @@ Section SmodeCorePt.
          swp (execute i)
            (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                      ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                     hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr))%I.
+                     hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr rs2))%I.
 
-    Definition spt_run_post (Q : regstate -> Prop) (Rr : iProp Σ)
+    Definition spt_run_post (Q : regstate -> Prop) (Rr : regstate -> iProp Σ)
         (Qi : InterruptType -> Privilege -> iProp Σ) : Step -> iProp Σ :=
       (fun st => ((∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                   ∨ (∃ w : SailStdpp.Values.mword 32,
                        ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
                        ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                       hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr))%I).
+                       hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr rs2))%I).
 
     (* the [_exf] rules land at a NAMED word; the dispatch's four arms each
        know their own and no caller does *)
-    Local Lemma spt_ex_w (Q : regstate -> Prop) (Rr : iProp Σ)
+    Local Lemma spt_ex_w (Q : regstate -> Prop) (Rr : regstate -> iProp Σ)
         (Qi : InterruptType -> Privilege -> iProp Σ)
         (w : SailStdpp.Values.mword 32) :
       swp (run_hart_active 0)
         (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                    ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
                       ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                      hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr))
+                      hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr rs2))
       -∗ swp (run_hart_active 0) (spt_run_post Q Rr Qi).
     Proof.
       iIntros "H". iApply (swp_mono with "[] H").
@@ -2026,7 +2078,7 @@ Section SmodeCorePt.
 
     (* the execute obligation, adapted to the [_exf] rules' shape *)
     Local Lemma spt_ex_adapt (is_rvc : bool) (i : instruction)
-        (Q : regstate -> Prop) (Rr : iProp Σ) :
+        (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) :
       spt_ex_obl is_rvc i Q Rr -∗
       (∀ rsf : regstate, ⌜Qtow rsf⌝ -∗ Rtow rsf -∗
        hreg_frame (register_set (R_bitvector_64 nextPC)
@@ -2036,18 +2088,51 @@ Section SmodeCorePt.
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
-                   hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr)).
+                   hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Rr rs2)).
     Proof.
       iIntros "Hex" (rsf) "%HQ [HRes Hany] Hrw Hro".
       destruct HQ as (tv & ->). rewrite s_rs_tlb.
       iApply ("Hex" $! tv with "HRes Hany Hrw Hro").
     Qed.
 
+
+    (* the dispatch obligation, discharged: SIE clear makes [s_dispatch]
+       [None] whatever the PLIC wires hold. *)
+    Lemma spt_dispatch_none (tv : type_of_register tlb)
+        (Qi : InterruptType -> Privilege -> iProp Σ) :
+      misa0 = MISA_C ->
+      eq_vec (_get_Mstatus_SIE mst0) ('b"1") = false ->
+      and_vec mie0 (not_vec mdv0) = zeros' 64 ->
+      gen_cert -∗ spt_disp_obl tv Qi.
+    Proof.
+      intros Hmisa HSIE Hmm.
+      assert (Lmisa : register_lookup misa
+                        (MState (srs tv) ∅ dev0_state).(sregs) = MISA_C).
+      { change ((MState (srs tv) ∅ dev0_state).(sregs)) with (srs tv).
+        rewrite s_rs_misa. exact Hmisa. }
+      assert (Lmst : register_lookup mstatus
+                       (MState (srs tv) ∅ dev0_state).(sregs) = mst0).
+      { change ((MState (srs tv) ∅ dev0_state).(sregs)) with (srs tv).
+        apply s_rs_mst. }
+      iIntros "#Hcert Hrw Hro".
+      iApply (swp_mono with "[] [-]");
+        [| iApply (swp_dispatchInterrupt_S s_Drw s_Dro Df (srs tv)
+                     (MState (srs tv) ∅ dev0_state) spt_Db ip mie0 mdv0 mst0
+                     s_disj s_in_ip s_in_mie s_in_mdl eq_refl
+                     ltac:(spt_srs) ltac:(spt_srs) ltac:(spt_srs) Lmst Hmm
+                     spt_Db_in (fun r _ => eq_refl)
+                     (spt_exec_cE_S (MState (srs tv) ∅ dev0_state) Lmisa)
+                     (spt_goodb_cE_S (MState (srs tv) ∅ dev0_state) Lmisa)
+                     with "Hcert Hrw Hro") ].
+      iIntros (o). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+      unfold s_dispatch. rewrite HSIE. cbn [andb]. iFrame.
+    Qed.
+
     (* THE DISPATCH.  Four arms: F_Base / F_RVC crossed with pc's
        4-alignment, exactly the four the physical fetch has. *)
     Lemma spt_run_hart_active_instr_S (tlbv : type_of_register tlb)
         (is_rvc : bool) (i : instruction) (Q : regstate -> Prop)
-        (Rr : iProp Σ) (Qi : InterruptType -> Privilege -> iProp Σ) :
+        (Rr : regstate -> iProp Σ) (Qi : InterruptType -> Privilege -> iProp Σ) :
       misa0 = MISA_C ->
       menv0 = MENVCFG_S ->
       eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -2464,15 +2549,44 @@ Section SmodeCorePt.
             | _ => False
             end)) -∗
     ▷ (∀ (rs3 rs2 : regstate) (mi : mword 64),
-         ⌜Q rs2⌝ -∗
-         ⌜reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3 (wrap_post rs2 mi)⌝ -∗
+         ⌜Q rs2 /\
+           reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
+             (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
          hreg_frame_ro Df rs3 s_Dro -∗ Psi rs2 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-  Admitted.
+    intros HQhart HQmi.
+    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iApply (swp_exec_step_any_ex s_Drw s_Dro Df
+              (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+              (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+                 cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) Q Psi
+              s_disj s_w_cy s_w_ti s_w_ip s_in_priv s_in_hart s_in_mc
+              s_in_micfg s_w_mi s_in_mi s_w_ms s_in_ms s_w_PC s_in_PC
+              s_in_nPC ltac:(spt_srs) HQhart
+              ltac:(intros rs2 HQ; rewrite (HQmi rs2 HQ);
+                    by rewrite s_rs_mc s_rs_micfg s_rs_priv)
+              (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+              with "Hcert Hfrag Hrw Hro Hbody Hcont").
+  Qed.
 
+
+
+  (* [HartSFrame.s_ro_ext] is stated at [s_Df dq]; this wrapper's frame is at
+     [s_Df_mix dq] (satp and the two PMP cells at full ownership), so the
+     transport is restated at an arbitrary [Df].  Belongs beside its twin. *)
+  Lemma s_ro_ext_gen (Df : register -> dfrac) (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' ->
+    hreg_frame_ro Df rs s_Dro -∗ (hreg_frame_ro Df rs' s_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext _ _ _ s_Dro (s_agree_ro _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
 
   (* the raw-cell <-> frame bridge, [WpSFrames.sm_frames_intro]'s twin with
      the config arriving as CELLS (so no [smode_config] is built) and the
@@ -2702,7 +2816,7 @@ Section SmodeCorePt.
        tlb ↦ᵣ tv' -∗ Res tv' -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-       resv_frag cpu_id None -∗
+       resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
@@ -2729,7 +2843,111 @@ Section SmodeCorePt.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-  Admitted.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov.
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
+             Htlbc HRes Hpc Hinstr Htr Hex Hcont".
+    iDestruct (spt_frames_intro dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
+                 paddr tlbv
+                 with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
+                       Htlbc Hpc") as "[Hfrag Hfr]".
+    iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0)
+      "(%Hmisaval & %Hpmaall & %Helpnp & Hrw & Hro)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof ("Htr" $! ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mc
+                  micfg misa0 mseccfg0 senv0 pmar0 elp0) as "#Htr0".
+    iApply (spt_cycle (s_Df_mix dq) pc
+              (fun rs2 => (Res (register_lookup tlb rs2) ∗ resv_any cpu_id
+                           ∗ Rl)%I)
+              (fun rs2 => exists (npc : mword 64) (tv : type_of_register tlb),
+                 rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+              ms bmi cy ti ip mstatus0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+              satp0 mie_v mdv0 menvcfg0 pcfg paddr tlbv
+              ltac:(intros rs2 (npc & tv & ->); apply s_rs_hart)
+              ltac:(intros rs2 (npc & tv & ->); apply s_rs_mi)
+              with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr] [Hcont]").
+    2:{ (* ---- the continuation ---- *)
+        iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl)".
+        destruct HQ as (npc & tv & ->).
+        iEval (rewrite s_rs_tlb) in "HRes".
+        pose proof (s_tick_agree pc npc ms
+                      (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1
+                      pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+                      satp1 mie1 mdv1 menvcfg1 tv mi rs3 Hag) as Hag'.
+        iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+        iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hag' with "Hro") as "Hro".
+        iDestruct (spt_frames_elim dq npc mi
+                     (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
+                     misa0 mseccfg0 senv0 pmar0 elp0 mstatus1 satp1 mie1 mdv1
+                     menvcfg1 pcfg1 paddr1 tv with "Hfrag Hrw Hro")
+          as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
+               Hpaddr & Htlbc & Hpc)".
+        iApply ("Hcont" $! npc tv with "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp
+                  Hpcfg Hpaddr Htlbc HRes Hpc HRl"). }
+    (* ---- the body ---- *)
+    iIntros "Hfrag Hrw Hro".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (spt_run_hart_active_instr_S (s_Df_mix dq) pc ms
+                   (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
+                   pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
+                   mie_v mdv0 menvcfg0 Res tlbv is_rvc i
+                   (fun rs2 => exists (npc : mword 64)
+                                 (tv : type_of_register tlb),
+                      rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+                   (fun rs2 => (Res (register_lookup tlb rs2)
+                                ∗ resv_any cpu_id ∗ Rl)%I)
+                   (fun _ _ => False%I)
+                   Hmisaval Hmenvval Helpnp (pma_all_ram Hpmaall)
+                   HA Hord HX Hcov
+                   with "Hcert Hinstr [Hfrag] HRes Hrw Hro [] Htr0
+                         [Hex]") ].
+    - iIntros (st) "[Hi | Hr]".
+      + iDestruct "Hi" as (ii pr) "(_ & Hf)". iDestruct "Hf" as %[].
+      + iDestruct "Hr" as (w) "(-> & Hr)".
+        iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HPsi)".
+        iExists rs2. iSplitR; [done|]. iFrame.
+    - iApply (resv_any_intro with "Hfrag").
+    - iApply (spt_dispatch_none (s_Df_mix dq) pc ms
+                (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0 pcfg
+                paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0
+                menvcfg0 tlbv (fun _ _ => False%I) Hmisaval HSIE Hmm
+                with "Hcert").
+    - (* THE LEAF, at the file the fetch landed on *)
+      iIntros (tv') "HRes' Hany Hrw Hro".
+      pose proof (s_npc_agree pc pc
+                    (add_vec_int pc (if is_rvc then 2 else 4)) ms
+                    (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
+                    pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
+                    mie_v mdv0 menvcfg0 tv') as Hnp.
+      iDestruct (s_rw_ext _ _ Hnp with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hnp with "Hro") as "Hro".
+      rewrite s_rw_split s_ro_split_mix.
+      rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
+        s_rs_tlb s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+        s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+        s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+      iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc)".
+      iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg
+                           & #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv
+                           & Hsatp & Hmie & Hmdl & Hmenv)".
+      iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hhs] [-]");
+        [| iApply ("Hex" $! tv' with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
+                     Hpaddr Htlbc HRes' HPC HnPC Hany") ].
+      iIntros (e) "(-> & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
+                    Hpaddr & Htlbc & HRes' & Hpcs & Hany & HRl)".
+      iDestruct "Hpcs" as (npc) "(HPC & HnPC)".
+      iSplitR; [done|].
+      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv').
+      iSplitR; [iPureIntro; by exists npc, tv' |].
+      rewrite s_rw_split s_ro_split_mix.
+      rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
+        s_rs_tlb s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+        s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+        s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+      iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg Hpaddr
+              Hsatp Hmie Hmdl Hmenv".
+      iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv".
+      iFrame "HRes' Hany HRl".
+  Qed.
 
   (* ==================================================================== *)
   (* wp_instr_s_regime -- the same engine on the BUNDLE.                   *)
@@ -2777,7 +2995,7 @@ Section SmodeCorePt.
        tlb ↦ᵣ tv' -∗ Res tv' -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-       resv_frag cpu_id None -∗
+       resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
@@ -2888,7 +3106,7 @@ Section SmodeCorePt.
        tlb ↦ᵣ tv' -∗ spt_res_pt root_ppn tv' -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-       resv_frag cpu_id None -∗
+       resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
