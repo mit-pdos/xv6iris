@@ -1355,6 +1355,31 @@ Evidence:
    `match` on the call's result that the next `>>=` consumes, the `untilMT`
    body.
 
+4. **AN ATOMIC WINDOW CANNOT HOLD AN INVARIANT OPEN, SO THE LOADED WORD HAS
+   TO BE EXISTENTIAL (`HartSMem`'s four `_ex` engines, 2026-08-18).**  Every
+   consumer of `swp_execute_AMOSWAP_S` is a lock leaf, and a lock leaf learns
+   the word it is swapping by opening `lock_inv` -- but the exclusive read is
+   a STEP OF ITS OWN and the mask is back at `⊤` between it and the
+   conditional write, so the invariant is opened at the read, closed, and
+   opened again at the write.  The word therefore cannot be a PARAMETER of the
+   engine: it is chosen inside the read node's callback.  What makes the
+   window atomic is not a held invariant but the RESERVATION (design §3a) --
+   the conditional write's callback learns `read_bytes σ.(mem) pa 4 = Some
+   bytes` from `resv_ok`, which is exactly the fact an acquire needs to know
+   the word it overwrites is still the one it read, and it is the ONLY thing
+   that closes the gap the two opens leave.  So the read's rider and the
+   write's are both INDEXED BY the loaded word and the conclusion
+   existentially quantifies it:
+   `swp_read_ram_node4_racq_ex`, `swp_checked_mem_read_amo_S_ex`,
+   `swp_mem_read_amo_S_ex`, `swp_execute_AMOSWAP_S_ex` (commit `6c61e265`,
+   additive; the value-known forms are untouched and stay the instance for a
+   caller that already knows the word).  `swp_hart_ram_read_excl` already
+   chose the word inside its own existential, so the `_ex` chain costs only
+   the four statements.  **THE SAME SHAPE IS OWED ON THE DEVICE SIDE**: an
+   MMIO read's value comes from the device, not from a points-to, so
+   `WpPlic` / `WpVirtioDev` / `ProofUart` will want
+   `swp_execute_LOAD_dev_S{1,4}_ex` written the same way.
+
 **THE RULE THAT DECIDES EVERY REMAINING CASE — ask whether the stretch WRITES:**
 - **read-only, any depth → `goodb`** at `dstateM`, transported by agreement.
   Free.  Made `currentlyEnabled Ext_Zicfilp` and `check_CSR_result` (both four
@@ -1380,6 +1405,62 @@ Evidence:
    pieces), a plain `destruct` of the scrutinee when it is a branch (then each
    arm is closed).  Measured on mstatus: naive `vm_compute` does not finish in
    5 minutes, the assembled proof takes 7 seconds.
+
+### THE S-MODE LEAF SWEEP IS GATED ON *ONE* MISSING LEMMA, AND IT IS THE SAME ONE THE FETCH NEEDS (measured 2026-08-18)
+
+Surveyed while trying to convert `WpSconfLock`/`WpSconfMem`.  Two findings,
+both about the state of the tree rather than about any leaf:
+
+1. **NOBODY IN THE TREE DISCHARGES `SRegime.sr_swp_translate` AT A CONCRETE
+   FOOTPRINT YET.**  It is an obligation at every layer that mentions it:
+   `HartSTrans.swp_fetch_S` takes it, `WpSFrames.wp_instr_s` passes it on, and
+   `SmodeCorePt`'s wrappers take it as `spt_fetch_tr`.  A DATA leaf needs the
+   very same lemma at its own access instead of `InstructionFetch tt`, so the
+   S-mode memory/MMIO leaf sweep and the S-mode fetch are blocked on ONE piece
+   of work, not two.  What that piece costs, itemised from
+   `WpIntrInv.strans_swp_translate`'s premise list and `SRegime.kpt_swp_side`:
+   - the leaf footprint (`Drw = {tlb}`, `Dro =` cur_privilege / mstatus /
+     menvcfg / satp / pmpcfg_n / pmpaddr_n / misa / mseccfg / pma_regions /
+     htif_tohost_base) and its reference file — the CLOCK and minstret cells
+     of `HartSFrame.s_Drw`/`s_Dro` must NOT be in it, because a leaf gets
+     `sconf` + `sie_cap` + the PC/nextPC cells and never `pc_is`;
+   - the frames bridge from those bundles.  `sie_cap`'s satp/tlb/pmp cells now
+     come out cleanly: `sr_inv strans_regime` IS `strans_inv`
+     (`IntrDefs.strans_regime_inv`) and `WpIntrInv.strans_swp_open` /
+     `_close` hand over the four cells plus `strans_res_at satp0 tlbv`;
+   - a reference `mstate` and read set `Db`.  `Db` MUST contain satp (the
+     translate reads it), so the reference's satp is the caller's SYMBOLIC
+     `satp0` and `WpDecodeBridge.dstateS` cannot be used unchanged;
+   - `exec`/`goodb` pairs for `translationMode Supervisor`,
+     `effectivePrivilege acc …` and `is_shadow_stack_access acc` at that
+     reference.  The `exec` halves exist (`exec_translationMode_S_sv39`); the
+     `goodb` halves do not, and they are NOT `vm_compute`able as stated —
+     control flow runs through `architecture`(SXL) and the satp MODE, both
+     symbolic, so each needs the `HSXL` / mode facts rewritten in first (the
+     standard symbolic-data `goodb` fix, durable-notes' two-fix rule);
+   - `kpt_swp_side`'s three PTE-test `goodb` certificates, which
+     `HartSKpt`'s closing note already says belong beside `KptTree`'s
+     `kperm_variant_*` family.  **MEASURED: they are cheap.**  The
+     `pte_is_invalid` one is `intros; destruct pc; destruct ad as [a d];
+     destruct a, d; vm_compute; reflexivity` and compiles in 3 s — the
+     `goodb` twin of `KptPt.kperm_inv_red`, same script.  The
+     `check_PTE_permission` one needs the access's `mem_payload` destructed
+     as well (the shadow-stack test `match m with ShadowStack => …` is what
+     leaves `vm_compute` stuck, and the error names it).
+
+2. **`WpSmodePtLeaves.v` DOES NOT COMPILE, AND IT IS ON THE CRITICAL PATH.**
+   `SmodeCorePt.wp_instr_s_config_regime` changed shape (it takes the
+   residue family `Res : type_of_register tlb -> iProp Σ`, not `R :
+   s_regime`), and `WpSmodePtLeaves` still calls it the old way and still
+   consumes the old σ-callback.  `WpSconfMem.v` Requires it, so
+   `WpSconfLock` / `WpPlic` / `WpVirtioDev` / `ProofUart` /
+   `ProofKvminithart` are all behind it.  **THE ROUTE OUT IS TO DELETE THE
+   REQUIRE, NOT TO FIX THE FILE**: everything `WpSconfMem` uses from
+   `WpSmodePtLeaves`/`WpSmodePtMem` is an EXEC-layer fact
+   (`exec_execute_STORE_{1,4,8}_gpr_S_walk_pt`, `exec_write_ram_plain_4`)
+   that the `swp` conversion removes outright, plus two one-line arithmetic
+   helpers (`avi0_mul4`, `data2_id_4`) already duplicated locally in
+   `WpSconfLock.v`.  Checked by name against both files' global lists.
 
 ## THE LEAF SWEEP: state, and the rule that makes it cheap
 
