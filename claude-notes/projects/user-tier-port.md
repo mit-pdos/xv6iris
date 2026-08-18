@@ -1722,3 +1722,64 @@ STILL OPEN, §5 (the fetch-DEPENDENT half), in dependency order:
   `u_mem_step_refl` and `u_mem_step_wf`.  The missing ingredient is
   transitivity of `pt_same_shape 2` (the other three conjuncts come from
   the second step).
+
+## 15. P4b IN PROGRESS — the memory arms, and the 5 700 lines that had to go
+
+### `UserMemClassify` / `UserMemClassifyAmo` ARE PURE NOW, AND GREEN
+
+Both were RED roots of the tier.  What broke is not repairable and
+should not be repaired: ~4 400 lines of the first and ~1 300 of the second
+are Iris composers (`mem_read_total`, `mem_exec_load_k`, the LR/SC and AMO
+engines, `rvc_finish_mem`, …) that consume `mstate_interp` /
+`gen_heap_interp` / `utlb_inv_pt` / `udata_own` **only to learn what memory
+held**.  Under per-node stepping the hart HOLDS those bytes, the arms'
+frozen contract (`UserTotalU`'s nineteen section `Variable`s) is a pure
+`Prop`, and **an arm has no interpretation authority to hand such a
+composer** — so the apparatus is not redundant, it is unusable.  Its
+content survives, strictly more general, in the P4a certificates
+(`UserMemPt`/`UserMemAccess`/`UserMemMis`/`UserMemArms`), in the pure
+composers (`UserMemCert`, `UserFaultCert`) and in `UserMemTotal`'s closers.
+
+KEPT verbatim and compiling: every PURE declaration.  `UserMemClassify` is
+263 lines — the runtime-address classification (`u_data_ok` /
+`data_classify`), the page-straddle decision (`in_one_page_dec`), the two
+translate-fault vmem reductions, the U-mode pointer-masking probes,
+`cfg_okR`, the two cregidx facts.  `UserMemClassifyAmo` is 739 — the whole
+16-byte AMO exec layer and the entire ZICBOP classification
+(`uacc_of`, `uleaf_ok_ca` / `uleaf_denied_ca`, `ca_classify`, the pmp/pma
+grants).
+
+### `UserMemTotal.v` — the two closers, and why `UserTotalU`'s do not serve
+
+`UserTotalU`'s `finish_*` family ends in `u_post_id` / `_gpr` / `_npc` /
+`_npc_gpr`, every one of which pins `t' := t` and `mm' := mm`.  A memory
+arm cannot use any of them, **and not because of the value it writes**: a
+user load runs a page WALK, and a walk may fill the TLB and write back an
+A/D bit, so the post state carries a NEW tree and a NEW map — which is
+exactly what `base_post`'s existential `t'` and its `u_mem_step` conjunct
+are for.  `finish_mem_base` / `_redirect` / `finish_mem_rvc` are those two
+handed in rather than derived, and they are the only place a memory arm
+counts the nine conjuncts.
+
+### The pieces, and the order they unblock each other
+
+1. **`UserBytes.u_mem_wf_owned_data` / `u_mem_wf_not_dev_data`** (landed) —
+   the DATA-page counterpart of `u_mem_wf_owned`: a `k`-byte access at an
+   aligned `va` whose vpn is MAPPED is owned and is not a device, straight
+   from `udata_cov` and `u_walk_pa_window`.  Every memory twin's two pure
+   obligations now come from one `u_mem_wf` and one `udata_cov` hit.
+2. **`UserMemCert.v`** — the pure twins of `UserMemPt.user_pt_load_data_g` /
+   `user_pt_store_data_g` and their LR/SC/AMO siblings, in `u_fetch_pure`'s
+   shape.
+3. **`UserFaultCert.v`** — `u_translate_fault_pure` (acc-generic; the fault
+   walk moves nothing, so there is no `u_mem_step` conjunct) and
+   `u_fetch_fault_pure`, the `F_Error` producer §14.3 item 2 asks for.
+4. the nineteen arms, on top of 2+3 and `UserMemTotal`'s closers.
+
+**THE ARMS ARE A TRICHOTOMY, NOT A COMPOSITION.**  An arm's effective
+address is `rX rs1 + imm`, an arbitrary word the arm cannot constrain, so
+every arm case-splits with `data_classify` (mapped-and-permitted vs a
+fault flavour) and `in_one_page_dec` (intra-page vs straddle) before it
+can use any composer — which is why `mem_read_total` was called TOTAL and
+why the pure arms will not be much shorter than the case tree, only than
+the Iris plumbing around it.
