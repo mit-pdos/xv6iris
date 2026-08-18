@@ -1038,6 +1038,45 @@ Section SyscallVocab.
      iref_slots IREFSPARE ∗
      proc_priv γf pj pid V)%I.
 
+  (* Build the arm bundle structurally, while its proof context contains only
+     the twelve resources being assembled.  In the capstone below, even a
+     named [iFrame] searches the goal's conjuncts; its final [proc_priv]
+     contains the 4096-word trapframe page, making that search seconds long. *)
+  Lemma sysc_arm_pre_intro `{CIDh : CpuId}
+      (γf : gname) (pj : mword 64) (γs : list gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
+      (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
+      (tgt : mword 64) (us : gset Z) :
+    pc_is tgt -∗
+    sie_cap_gpr KT1 M av true pj -∗
+    cpu_own 0%nat true pj true lks -∗
+    kernel_text -∗
+    procs_inv γs -∗
+    syscall_env γf pj bn fn -∗
+    bslots bn 3 -∗
+    fileclose_bm fn us -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+    fd_slots FDSPARE -∗
+    iref_slots IREFSPARE -∗
+    proc_priv γf pj pid V -∗
+    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks av M tgt us.
+  Proof.
+    iIntros "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv".
+    rewrite /sysc_arm_pre.
+    iSplitL "Hpc"; [iExact "Hpc" |].
+    iSplitL "Hcg"; [iExact "Hcg" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" |].
+    iSplitL "Htext"; [iExact "Htext" |].
+    iSplitL "Hprocs"; [iExact "Hprocs" |].
+    iSplitL "HR"; [iExact "HR" |].
+    iSplitL "Hbs"; [iExact "Hbs" |].
+    iSplitL "Hfc"; [iExact "Hfc" |].
+    iSplitL "Hip"; [iExact "Hip" |].
+    iSplitL "Hfd"; [iExact "Hfd" |].
+    iSplitL "Hir"; [iExact "Hir" |].
+    iExact "Hpriv".
+  Qed.
+
   (* the OUTER [wp_syscall_sconf_body]'s own continuation, named so every
      arm/the epilogue can take it as an explicit parameter rather than
      restate it -- [V]/[m] here are the WHOLE FUNCTION's entry values,
@@ -3268,8 +3307,8 @@ Section SyscallMain.
       iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl bn fn dqi ip pid V lks av m D0 us Hk
                 Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
-      { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv". }
+      { iApply (sysc_arm_pre_intro with
+          "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv"). }
     - (* ---------------- OUT OF RANGE: the printk fallback ---------------- *)
       (* [a3num]'s value fits in [mword 32]'s signed range by construction
          (it IS a sign-extended 32-bit value), so [sysc_bltu_taken]'s extra
@@ -3348,8 +3387,8 @@ Section SyscallMain.
       iApply (sysc_fallback (CID := CID15) γf pj γs j bn fn dqi ip pid V lks av m B5 us
                 Hj eq_refl HB5armsp HB5s1 HB5other HB5avb
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
-      { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv". }
+      { iApply (sysc_arm_pre_intro with
+          "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv"). }
   Qed.
 
 End SyscallMain.
