@@ -1161,6 +1161,282 @@ Section SWrites.
     - exact (exec_check_CSR_result_csrr_satp_S (MState rs ∅ dev0_state) HTVM).
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE SATP LEGALITY CHECK ON THE WRITE SIDE.                            *)
+  (*                                                                      *)
+  (* [exec_is_CSR_accessible_satp_S] was written access-type generic        *)
+  (* precisely so the read above and this write share it (see the header    *)
+  (* note); these are the read's three lemmas at [CSRWrite], and only the   *)
+  (* [check_CSR] chain differs, because the write path is the [and_boolM]   *)
+  (* chain rather than [exec_check_CSR_read_p].                             *)
+  (* ------------------------------------------------------------------- *)
+  Local Lemma exec_check_CSR_satp_S_w (st : mstate) :
+    eq_vec (_get_Mstatus_TVM (register_lookup mstatus st.(sregs))) ('b"1")
+      = false ->
+    exec (check_CSR csr_satp Supervisor CSRWrite) st = Some (true, st).
+  Proof.
+    intro HTVM. unfold check_CSR.
+    assert (Hpriv : exec (check_CSR_priv csr_satp Supervisor) st
+                    = Some (true, st)) by (vm_compute; reflexivity).
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hpriv). cbn match.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (HB : exec A st = Some (true, st)) end.
+    { vm_compute (check_CSR_access _ _). apply exec_returnM. }
+    rewrite (exec_and_boolM_Some _ _ _ _ _ HB). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _
+               (exec_is_CSR_accessible_satp_S CSRWrite st HTVM)). cbn match.
+    vm_compute (stateen_allows_CSR_access csr_satp Supervisor CSRWrite).
+    apply exec_returnM.
+  Qed.
+
+  Local Lemma goodb_check_CSR_satp_S_w (st : mstate) :
+    eq_vec (_get_Mstatus_TVM (register_lookup mstatus st.(sregs))) ('b"1")
+      = false ->
+    goodb D_ms (check_CSR csr_satp Supervisor CSRWrite) st = true.
+  Proof.
+    intro HTVM. unfold check_CSR, Defs.and_boolM.
+    erewrite goodb_bind; [ | vm_compute; reflexivity | vm_compute; reflexivity ].
+    cbn match.
+    erewrite goodb_bind; [ | vm_compute; reflexivity | vm_compute; reflexivity ].
+    cbn match.
+    erewrite goodb_bind;
+      [ | vm_compute; reflexivity
+        | exact (exec_is_CSR_accessible_satp_S CSRWrite st HTVM) ].
+    cbn match.
+    vm_compute; reflexivity.
+  Qed.
+
+  Local Lemma goodb_check_CSR_result_satp_S_w (st : mstate) :
+    eq_vec (_get_Mstatus_TVM (register_lookup mstatus st.(sregs))) ('b"1")
+      = false ->
+    goodb D_ms (check_CSR_result csr_satp Supervisor CSRWrite) st = true.
+  Proof.
+    intro HTVM. unfold check_CSR_result.
+    erewrite goodb_bind;
+      [ | exact (goodb_check_CSR_satp_S_w st HTVM)
+        | exact (exec_check_CSR_satp_S_w st HTVM) ].
+    cbn match. reflexivity.
+  Qed.
+
+  Local Lemma exec_check_CSR_result_satp_S_w (st : mstate) :
+    eq_vec (_get_Mstatus_TVM (register_lookup mstatus st.(sregs))) ('b"1")
+      = false ->
+    exec (check_CSR_result csr_satp Supervisor CSRWrite) st
+      = Some (CSR_Check_OK tt, st).
+  Proof.
+    intro HTVM. unfold check_CSR_result.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_satp_S_w st HTVM)).
+    cbn match. apply exec_returnm.
+  Qed.
+
+  Local Lemma hval_check_CSR_result_satp_S_w (D Drw : gset register)
+      (rs : regstate) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D -> (mstatus : register) ∈ D ->
+    eq_vec (_get_Mstatus_TVM (register_lookup mstatus rs)) ('b"1") = false ->
+    hval D Drw rs (check_CSR_result csr_satp Supervisor CSRWrite)
+      (CSR_Check_OK tt) rs.
+  Proof.
+    intros HD1 HD2 HD3 HD4 HTVM.
+    apply (hval_of_goodb D_ms D Drw _ (MState rs ∅ dev0_state) rs
+             (CSR_Check_OK tt) (dms_sub D HD1 HD2 HD3 HD4)
+             (fun r _ => eq_refl)).
+    - exact (goodb_check_CSR_result_satp_S_w (MState rs ∅ dev0_state) HTVM).
+    - exact (exec_check_CSR_result_satp_S_w (MState rs ∅ dev0_state) HTVM).
+  Qed.
+
+  (* [goodb] DOES read the state (its RegRead case indexes the continuation
+     by what the register holds), so this is not [goodb_legalize_satp_rv64]
+     re-used at another state -- it is the same script at the OTHER concrete
+     reference state.  Both compute. *)
+  Local Lemma goodb_legalize_satp_rv64_S (prev value : mword 64) :
+    goodb D_m (legalize_satp RV64 prev value) dstateS = true.
+  Proof.
+    unfold legalize_satp. cbn zeta. rewrite satp_ppn_mask_id.
+    destruct (satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 value)))
+      as [sv|]; [destruct sv|]; vm_compute; reflexivity.
+  Qed.
+
+  (* [legalize_satp]'s [hval] at Supervisor: [WpGprCsrwB.hval_legalize_satp_p]
+     is the parameterised transport and this is its [dstateS] instance, exactly
+     as [hval_legalize_satp] is its [dstateM] one. *)
+  Local Lemma hval_legalize_satp_S (D Drw : gset register) (rs : regstate)
+      (o v : mword 64) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = Values.mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    hval D Drw rs (legalize_satp RV64 o v) (satp_legalized o v) rs.
+  Proof.
+    intros HD1 HD2 HD3 Hp Hs Hm.
+    exact (hval_legalize_satp_p D_m dstateS D Drw rs o v
+             (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm)
+             (exec_legalize_satp_rv64 o v dstateS
+                ltac:(vm_compute; reflexivity))
+             (goodb_legalize_satp_rv64_S o v)).
+  Qed.
+
+  (* the [pw2] twin of [WpMmodeCsrSwp.cw2_set_agree] -- the only tower fact
+     of that family HartSCsr's [pw2_*] block does not already carry.  It
+     BELONGS there, beside [pw2_frames_in]/[pw2_frames_out]; it is here only
+     to keep this change off [HartSCsr]'s cone, and should move at a
+     fold-back. *)
+  Local Lemma pw2_set_agree (pr : Privilege) (r : register)
+      (v0 vnew : type_of_register r) (r2 : register)
+      (v2 : type_of_register r2) :
+    cw2_ok r r2 ->
+    reg_agree_on (cw_Drw r ∪ cw2_Dro r2)
+      (register_set r vnew (pw2_rs pr r v0 r2 v2)) (pw2_rs pr r vnew r2 v2).
+  Proof.
+    intros Hok. pose proof Hok as (Hfr & Hfr2 & Hne).
+    pose proof Hfr as (H1 & H2 & H3).
+    destruct (cw_fresh_ne r2 Hfr2) as (N1 & N2 & N3).
+    intros q Hq. rewrite /cw_Drw /cw2_Dro /cw_Dro in Hq.
+    repeat (apply elem_of_union in Hq as [Hq|Hq]);
+      apply elem_of_singleton in Hq; subst q.
+    - etransitivity; [apply register_lookup_set|].
+      symmetry. apply (pw2_rs_r pr r vnew r2 v2 Hok).
+    - etransitivity;
+        [apply irrelevant_register_set;
+         exact (register_beq_false r2 r (fun H => Hne (eq_sym H)))|].
+      etransitivity; [apply (pw2_rs_r2 pr r v0 r2 v2)|].
+      symmetry. apply (pw2_rs_r2 pr r vnew r2 v2).
+    - etransitivity; [apply irrelevant_register_set; exact H3|].
+      etransitivity; [apply (pw2_rs_priv pr r v0 r2 v2 Hok)|].
+      symmetry. apply (pw2_rs_priv pr r vnew r2 v2 Hok).
+    - etransitivity; [apply irrelevant_register_set; exact H2|].
+      etransitivity; [apply (pw2_rs_sec pr r v0 r2 v2 Hok)|].
+      symmetry. apply (pw2_rs_sec pr r vnew r2 v2 Hok).
+    - etransitivity; [apply irrelevant_register_set; exact H1|].
+      etransitivity; [apply (pw2_rs_misa pr r v0 r2 v2 Hok)|].
+      symmetry. apply (pw2_rs_misa pr r vnew r2 v2 Hok).
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE SATP WRITE AT SUPERVISOR.                                        *)
+  (*                                                                      *)
+  (* [WpGprCsrwB.swp_write_CSR_satp] is this at Machine, and the two differ *)
+  (* in exactly two places: the reference tower is [HartSCsr.pw2_rs] at    *)
+  (* [Supervisor] instead of [WpMmodeCsrSwp.cw2_rs] (which pins Machine),  *)
+  (* and [legalize_satp]'s [hval] is transported off [dstateS] instead of  *)
+  (* [dstateM].  The generic form cannot live beside the Machine one --    *)
+  (* [pw2_*] is in [HartSCsr], which sits ABOVE [WpGprCsrwB] -- so the two  *)
+  (* statements stand side by side, sharing                                *)
+  (* [WpGprCsrwB.hval_legalize_satp_p], the parameterised transport.        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma swp_write_CSR_satp_S (dq dq2 : dfrac) (satp0 ms0 v : mword 64) :
+    cw2_ok satp mstatus ->
+    _get_Mstatus_SXL ms0 = 'b"10" ->
+    gen_cert -∗
+    (hreg_frame (pw2_rs Supervisor satp satp0 mstatus ms0) (cw_Drw satp) -∗
+     hreg_frame_ro (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0)
+       (cw2_Dro mstatus) -∗
+     swp (write_CSR csr_satp v)
+       (fun x => ⌜x = Ok (satp_legalized satp0 v)⌝ ∗
+          hreg_frame (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+            (cw_Drw satp) ∗
+          hreg_frame_ro (cw2_Df dq dq2 mstatus)
+            (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+            (cw2_Dro mstatus))).
+  Proof.
+    intros Hok HSXL. iIntros "#Hcert Hrw Hro".
+    rewrite write_CSR_satp_red.
+    (* 1. the architecture read, walked *)
+    iApply (swp_bind_use (architecture Supervisor) _
+              (fun a => ⌜a = RV64⌝ ∗
+                 hreg_frame (pw2_rs Supervisor satp satp0 mstatus ms0) (cw_Drw satp) ∗
+                 hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                   (pw2_rs Supervisor satp satp0 mstatus ms0) (cw2_Dro mstatus))%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 4 (cw_Drw satp) (cw2_Dro mstatus)
+                (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0) _ _ _
+                (cw2_disj satp mstatus Hok)
+                (hfrun_architecture_Supervisor
+                   (cw_Drw satp ∪ cw2_Dro mstatus) (cw_Drw satp)
+                   (pw2_rs Supervisor satp satp0 mstatus ms0)
+                   (cw2_in_r2 satp mstatus)
+                   ltac:(rewrite (pw2_rs_r2 Supervisor satp satp0 mstatus ms0);
+                         exact HSXL))
+                with "Hcert Hrw Hro"). }
+    iIntros (a) "(-> & Hrw & Hro)".
+    (* 2. the satp read, at the frame *)
+    iApply (swp_bind_use (Defs.read_reg satp) _
+              (fun o => ⌜o = satp0⌝ ∗
+                 hreg_frame (pw2_rs Supervisor satp satp0 mstatus ms0) (cw_Drw satp) ∗
+                 hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                   (pw2_rs Supervisor satp satp0 mstatus ms0) (cw2_Dro mstatus))%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_mono with "[] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw satp) (cw2_Dro mstatus)
+                     (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0)
+                     satp (cw2_disj satp mstatus Hok)
+                     (cw2_in_r satp mstatus) with "Hcert Hrw Hro") ].
+      iIntros (o) "(-> & Hrw & Hro)".
+      rewrite (pw2_rs_r Supervisor satp satp0 mstatus ms0 Hok). by iFrame. }
+    iIntros (o) "(-> & Hrw & Hro)".
+    (* 3. the legalization, goodb-transported *)
+    iApply (swp_bind_use (legalize_satp RV64 satp0 v) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span (cw_Drw satp) (cw2_Dro mstatus)
+                (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0)
+                (pw2_rs Supervisor satp satp0 mstatus ms0) _ _
+                (cw2_disj satp mstatus Hok)
+                (hval_legalize_satp_S (cw_Drw satp ∪ cw2_Dro mstatus)
+                   (cw_Drw satp) (pw2_rs Supervisor satp satp0 mstatus ms0) satp0 v
+                   (cw2_in_priv satp mstatus) (cw2_in_sec satp mstatus)
+                   (cw2_in_misa satp mstatus)
+                   (pw2_rs_priv Supervisor satp satp0 mstatus ms0 Hok)
+                   (pw2_rs_sec Supervisor satp satp0 mstatus ms0 Hok)
+                   (pw2_rs_misa Supervisor satp satp0 mstatus ms0 Hok))
+                with "Hcert Hrw Hro"). }
+    iIntros (c) "(-> & Hrw & Hro)".
+    (* 4. the write and the readback *)
+    iApply (swp_bind_use _ _
+              (fun c2 => ⌜c2 = satp_legalized satp0 v⌝ ∗
+                 hreg_frame (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                   (cw_Drw satp) ∗
+                 hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                   (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                   (cw2_Dro mstatus))%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => hreg_frame
+                   (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                   (cw_Drw satp) ∗
+                   hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                     (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                     (cw2_Dro mstatus))%I _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_reg_owned (cw_Drw satp) (cw2_Dro mstatus)
+                       (cw2_Df dq dq2 mstatus)
+                       (pw2_rs Supervisor satp satp0 mstatus ms0) satp _
+                       (cw2_disj satp mstatus Hok) (cw2_w_r satp mstatus)
+                       with "Hcert Hrw Hro") ].
+        iIntros (u) "[Hrw Hro]".
+        iDestruct (cw2_rw_ext satp _ _
+                     (reg_agree_l _ _ _ _
+                        (pw2_set_agree Supervisor satp satp0 _ mstatus ms0 Hok))
+                     with "Hrw") as "Hrw".
+        iDestruct (cw2_ro_ext dq dq2 mstatus _ _
+                     (reg_agree_r _ _ _ _
+                        (pw2_set_agree Supervisor satp satp0 _ mstatus ms0 Hok))
+                     with "Hro") as "Hro".
+        by iFrame. }
+      iIntros (u) "[Hrw Hro]".
+      iApply (swp_mono with "[] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw satp) (cw2_Dro mstatus)
+                     (cw2_Df dq dq2 mstatus)
+                     (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0) satp
+                     (cw2_disj satp mstatus Hok) (cw2_in_r satp mstatus)
+                     with "Hcert Hrw Hro") ].
+      iIntros (c2) "(-> & Hrw & Hro)".
+      rewrite (pw2_rs_r Supervisor satp (satp_legalized satp0 v) mstatus ms0 Hok).
+      by iFrame. }
+    iIntros (c2) "(-> & Hrw & Hro)".
+    iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
 End SWrites.
 
 Section WpSconfCsr.

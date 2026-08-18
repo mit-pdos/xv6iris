@@ -1283,6 +1283,25 @@ Section WpCsrwGprNewB.
   (* leaf already holds) instead of goodb-transported.  The legalization     *)
   (* reads only misa and so IS transported.                                 *)
   (* ------------------------------------------------------------------ *)
+  (* PRIVILEGE-GENERIC by parameterisation, exactly as [HartSCsr]'s header
+     prescribes for this family: [hval_of_goodb] already takes the read set
+     and the reference state, and the Machine statement below simply
+     instantiates them.  [legalize_satp] reads only the three [D_m] cells, so
+     the S instance ([WpSconfCsr.hval_legalize_satp_S]) differs from this in
+     nothing but [dstateS] and [HartSCsr.agree_dm_S]. *)
+  Lemma hval_legalize_satp_p (Db : register -> bool) (dst : mstate)
+      (D Drw : gset register) (rs : regstate) (o v : mword 64) :
+    (forall r : register, Db r = true -> r ∈ D) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (legalize_satp RV64 o v) dst = Some (satp_legalized o v, dst) ->
+    goodb Db (legalize_satp RV64 o v) dst = true ->
+    hval D Drw rs (legalize_satp RV64 o v) (satp_legalized o v) rs.
+  Proof.
+    intros Hsub Hag Hex Hgb.
+    exact (hval_of_goodb Db D Drw _ dst rs (satp_legalized o v) Hsub Hag Hgb Hex).
+  Qed.
+
   Lemma hval_legalize_satp (D Drw : gset register) (rs : regstate)
       (o v : mword 64) :
     (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
@@ -1300,7 +1319,10 @@ Section WpCsrwGprNewB.
              (exec_legalize_satp_rv64 o v dstateM
                 ltac:(vm_compute; reflexivity))).
   Qed.
-
+  (* PRIVILEGE: this composer is Machine-only, and deliberately stays here.
+     The S-mode twin is [WpSconfCsr.swp_write_CSR_satp_S]: [pw2_*], the
+     privilege-parametric tower it needs, lives in [HartSCsr], which sits
+     ABOVE this file, so the generic form cannot be stated here. *)
   Lemma swp_write_CSR_satp (dq dq2 : dfrac) (satp0 ms0 v : mword 64) :
     cw2_ok satp mstatus ->
     _get_Mstatus_SXL ms0 = 'b"10" ->
