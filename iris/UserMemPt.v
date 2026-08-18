@@ -37,8 +37,99 @@ Require Import UserBits.
 Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
+Require Import HartMemRun HartMemAsm PtWalkCert.
 Local Open Scope Z_scope.
 Import Defs.
+
+
+(* ===================================================================== *)
+(* section 0  THE [goodmb] TWINS (the <exec, goodmb> pair convention,     *)
+(*            claude-notes/projects/user-tier-port.md section 9).          *)
+(*                                                                        *)
+(* Every [exec_X] below has a [goodmb_X] immediately after it with the     *)
+(* SAME binders and hypotheses, plus the FOOTPRINT ones -- one            *)
+(* [Dr r = true] per register the stretch READS, one [Dw r = true] per     *)
+(* register it WRITES, and, for a memory node, the two pure obligations    *)
+(* [dev_addr pa = false] and [bytes_owned mm pa n = true] (both            *)
+(* projections of [UserBytes.u_mem_wf] at the caller).  [Dr]/[Dw] are      *)
+(* abstract, so nothing here depends on the tier's frame sets              *)
+(* ([HartMemRun.goodmb_mono] specialises them), and [mm] is ARBITRARY --   *)
+(* a data access really does touch memory, so the register-only [mm := 0]  *)
+(* shortcut of [HartMemRun] section 4b is not available and                *)
+(* [HartMemAsm]'s general-map combinators are what carry it.               *)
+(*                                                                        *)
+(* THE ASSEMBLY IS THE EXEC PROOF, NODE FOR NODE, with [exec_bind_Some] /  *)
+(* [execR_liftR_seq] / [execR_untilMT_1] replaced by [HartMemAsm]'s        *)
+(* [gm_bind] / [gm_liftR_seq] / [PtWalkCert.gm_untilMT_1] and each head's  *)
+(* [exec] fact PAIRED with its own certificate.  The bricks the walk       *)
+(* layer already proved ([PtWalkCert]: the privilege-generic PMP grant,    *)
+(* [check_pma_with_pmp_priority], the MMIO window tests, the one-          *)
+(* iteration split loop) are REUSED, not restated.                        *)
+(*                                                                        *)
+(* Three of the twins below are the twins of lemmas that live one file     *)
+(* DOWN ([UserPtTree.exec_effectivePrivilege_mprv0],                       *)
+(* [MemAccessGen.exec_mem_write_ea_g] and the two RAM bricks); they are    *)
+(* here rather than there because an additive change to those files costs  *)
+(* their rebuild cone.  FOLD THEM BACK beside their exec twins at the      *)
+(* milestone.                                                             *)
+(* ===================================================================== *)
+(* --- 0. the RAM read brick, keyed on the EXEC fact.  [HartMemAsm.
+   goodmb_read_ram] asks for [read_bytes <> None]; every caller in this tier
+   holds the read's own [exec] fact instead, and at a SYMBOLIC width the two
+   are not interchangeable by hand -- [read_bytes]' value index is
+   [8 * Z.to_N k] while the model's is [MachineWord.Z_idx (8 * k)], the same
+   number spelled two ways.  Reading the non-[None] out of the exec fact
+   sidesteps the index entirely. --- *)
+Lemma read_bytes_ne_of_exec_read_ram (rk : read_kind) (width : Z)
+    (addr : SailStdpp.Values.mword 64) (meta : bool)
+    (r : (SailStdpp.Values.mword (8 * width) * unit)%type) (s s' : mstate) :
+  rk_ram_ok rk = true ->
+  dev_addr addr = false ->
+  exec (read_ram rk (Physaddr addr) width meta) s = Some (r, s') ->
+  read_bytes s.(mem) addr (Z.to_N width) <> None.
+Proof.
+  intros Hrk Hdev He Hnone.
+  unfold read_ram in He. cbn match in He.
+  destruct rk; try discriminate Hrk;
+    (rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)) in He;
+     cbn beta zeta in He;
+     unfold Defs.sail_mem_read in He; cbn beta zeta in He;
+     unfold Defs.bind in He; cbn [Interface.iMon_bind] in He;
+     erewrite exec_MemRead in He; [ | exact Hdev ];
+     match type of He with
+     | context [ read_bytes ?m ?a ?n ] =>
+         replace (read_bytes m a n) with (@None (bv (8 * n))) in He
+           by (symmetry; exact Hnone)
+     end;
+     cbn match in He; discriminate He).
+Qed.
+
+Lemma goodmb_read_ram_of_exec (Dr Dw : register -> bool) (rk : read_kind)
+    (width : Z) (addr : SailStdpp.Values.mword 64) (meta : bool)
+    (r : (SailStdpp.Values.mword (8 * width) * unit)%type) (s s' : mstate) mm :
+  rk_ram_ok rk = true ->
+  dev_addr addr = false ->
+  bytes_owned mm addr (Z.to_N width) = true ->
+  exec (read_ram rk (Physaddr addr) width meta) s = Some (r, s') ->
+  goodmb Dr Dw (read_ram rk (Physaddr addr) width meta) s mm = true.
+Proof.
+  intros Hrk Hdev Hfp He.
+  exact (goodmb_read_ram Dr Dw rk width addr meta s mm Hrk Hdev Hfp
+           (read_bytes_ne_of_exec_read_ram rk width addr meta r s s' Hrk Hdev He)).
+Qed.
+
+
+(* --- 0b. the privilege brick (twin of [UserPtTree.exec_effectivePrivilege_
+   mprv0]; FOLD BACK beside it at the milestone) --- *)
+Lemma goodmb_effectivePrivilege_mprv0 (Dr Dw : register -> bool)
+    (acc : MemoryAccessType mem_payload) (m : mword 64) (pr : Privilege) s mm :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1") = false ->
+  goodmb Dr Dw (effectivePrivilege acc m pr) s mm = true.
+Proof.
+  intro H. unfold effectivePrivilege. rewrite H. rewrite andb_false_r.
+  apply goodmb_returnm.
+Qed.
+
 
 (* ===================================================================== *)
 (* §1 The width-generic page window (bounds in UserBits.v).                *)
@@ -137,9 +228,140 @@ Proof.
   rewrite Hfe. cbn match. reflexivity.
 Qed.
 
+(* --- 1. the two PMP grants, off PtWalkCert's privilege-generic core --- *)
+Lemma goodmb_pmpCheck_user_grant_load (Dr Dw : register -> bool)
+    (a : mword 64) (width : Z) s mm :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  goodmb Dr Dw (pmpCheck (Physaddr a) width (Load Data) User) s mm = true.
+Proof.
+  intros HDc HDa HA Hord Hrange HR.
+  apply (goodmb_pmpCheck_grant Dr Dw a width (Load Data) User s mm
+           HDc HDa HA Hord Hrange).
+  - unfold pmpCheckRWX. cbn match. rewrite HR. apply exec_returnm.
+  - unfold pmpCheckRWX. cbn match. apply goodmb_returnm.
+Qed.
+
+Lemma goodmb_pmpCheck_user_grant_store (Dr Dw : register -> bool)
+    (a : mword 64) (width : Z) s mm :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  goodmb Dr Dw (pmpCheck (Physaddr a) width (Store Data) User) s mm = true.
+Proof.
+  intros HDc HDa HA Hord Hrange HW.
+  apply (goodmb_pmpCheck_grant Dr Dw a width (Store Data) User s mm
+           HDc HDa HA Hord Hrange).
+  - unfold pmpCheckRWX. cbn match. rewrite HW. apply exec_returnm.
+  - unfold pmpCheckRWX. cbn match. apply goodmb_returnm.
+Qed.
+
+
 (* ===================================================================== *)
 (* §3 The width-generic pma checks (the width is never scrutinized).       *)
 (* ===================================================================== *)
+
+(* --- 2. the two data PMA checks, width-generic --- *)
+Lemma goodmb_pmaCheck_ram_load_g (Dr Dw : register -> bool) (k : Z)
+    (addr : mword 64) (pbmt : page_based_mem_type) (region : PMA_Region) s mm :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) k (Load Data) pbmt false) s mm = true.
+Proof.
+  intros HD Hmatch Halign Hfield.
+  destruct region as [rbase rsize rattr rdtree].
+  assert (Hrg : goodmb Dr Dw (Defs.read_reg pma_regions : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HD).
+  unfold pmaCheck. apply goodmb_cer.
+  gmm_lift Hrg (exec_read_reg pma_regions s).
+  rewrite Hmatch. cbn [PMA_Region_attributes] in Hfield |- *. cbn match.
+  erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+  cbn match beta.
+  erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+  rewrite Hfield. cbn [Riscv.rv64d.not negb].
+  gmm_lift (goodmb_mag_pma_check_aligned Dr Dw (override_PMA rattr pbmt)
+              (Load Data) (Physaddr addr) k (Z.leb k xlen_bytes) s mm
+              (goodmb_returnm Dr Dw (Z.leb k xlen_bytes) s mm)
+              (exec_is_mag_applicable_load_data k s) Halign)
+           (exec_mag_pma_check_aligned (override_PMA rattr pbmt)
+              (Load Data) (Physaddr addr) k (Z.leb k xlen_bytes) s
+              (exec_is_mag_applicable_load_data k s) Halign).
+  cbn match beta. reflexivity.
+Qed.
+
+Lemma goodmb_pmaCheck_ram_store_g (Dr Dw : register -> bool) (k : Z)
+    (addr : mword 64) (pbmt : page_based_mem_type) (region : PMA_Region) s mm :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) k (Store Data) pbmt false) s mm = true.
+Proof.
+  intros HD Hmatch Halign Hfield.
+  destruct region as [rbase rsize rattr rdtree].
+  assert (Hrg : goodmb Dr Dw (Defs.read_reg pma_regions : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HD).
+  unfold pmaCheck. apply goodmb_cer.
+  gmm_lift Hrg (exec_read_reg pma_regions s).
+  rewrite Hmatch. cbn [PMA_Region_attributes] in Hfield |- *. cbn match.
+  erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+  cbn match beta.
+  erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+  rewrite Hfield. cbn [Riscv.rv64d.not negb].
+  gmm_lift (goodmb_mag_pma_check_aligned Dr Dw (override_PMA rattr pbmt)
+              (Store Data) (Physaddr addr) k (Z.leb k xlen_bytes) s mm
+              (goodmb_returnm Dr Dw (Z.leb k xlen_bytes) s mm)
+              (exec_is_mag_applicable_store_data k s) Halign)
+           (exec_mag_pma_check_aligned (override_PMA rattr pbmt)
+              (Store Data) (Physaddr addr) k (Z.leb k xlen_bytes) s
+              (exec_is_mag_applicable_store_data k s) Halign).
+  cbn match beta. reflexivity.
+Qed.
+
+
+(* --- 3. the writable MMIO window tests (PtWalkCert has the readable pair) --- *)
+Lemma goodmb_within_htif_writable (Dr Dw : register -> bool) (a : Arch.pa)
+    (w : Z) s mm :
+  Dr htif_tohost_base = true ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  goodmb Dr Dw (within_htif_writable (Physaddr a) w) s mm = true.
+Proof.
+  intros HD Hn. unfold within_htif_writable.
+  gmm_rr htif_tohost_base HD. rewrite Hn. cbn match. apply goodmb_returnm.
+Qed.
+
+Lemma goodmb_within_mmio_writable (Dr Dw : register -> bool) (a : Arch.pa)
+    (w : Z) s mm :
+  Dr htif_tohost_base = true ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  exec (within_clint (Physaddr a) w) s = Some (false, s) ->
+  exec (within_sig (Physaddr a) w) s = Some (false, s) ->
+  goodmb Dr Dw (within_mmio_writable (Physaddr a) w) s mm = true.
+Proof.
+  intros HD Hn Hc Hsig. unfold within_mmio_writable. cbn [get_config_rvfi].
+  erewrite gm_or_boolM; [ | apply goodmb_within_clint | exact Hc ]. cbn match.
+  erewrite gm_or_boolM; [ | apply goodmb_within_sig | exact Hsig ]. cbn match.
+  erewrite gm_and_boolM;
+    [ | exact (goodmb_within_htif_writable Dr Dw a w s mm HD Hn)
+      | exact (within_htif_writable_false a w s Hn) ].
+  cbn match. reflexivity.
+Qed.
+
 
 
 
@@ -195,6 +417,22 @@ Proof.
     change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
     change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
     exact (Hbytes j Hj).
+Qed.
+
+(* its twin: the certificate does not scrutinise the value, so it is the
+   width-generic [HartMemAsm.goodmb_read_ram_of_exec] at [width := 1]. *)
+Lemma goodmb_read_ram_plain_1 (Dr Dw : register -> bool) (addr : mword 64)
+    (w : bv 8) s mm :
+  dev_addr addr = false ->
+  bytes_owned mm addr 1 = true ->
+  (forall j : nat, (N.of_nat j < 1)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  goodmb Dr Dw (read_ram Read_plain (Physaddr addr) 1 false) s mm = true.
+Proof.
+  intros Hdev Hown Hbytes.
+  exact (goodmb_read_ram_of_exec Dr Dw Read_plain 1 addr false
+           (w, default_meta) s s mm eq_refl Hdev Hown
+           (exec_read_ram_plain_1 addr w s Hdev Hbytes)).
 Qed.
 
 
@@ -778,6 +1016,520 @@ Section UserMemPtGeneric.
     Qed.
 
 End UserMemPtGeneric.
+
+(* ===================================================================== *)
+(* section 5b  THE [goodmb] TWINS OF section 5's FOUR PHYSICAL COMPOSERS. *)
+(*                                                                        *)
+(* Their own section rather than section 5's, for two reasons: they need   *)
+(* their own [Dr]/[Dw] and footprint context, and they must NOT be         *)
+(* generalised over the two width-TYPED RAM bricks section 5 closes over   *)
+(* -- the certificate never scrutinises the value, so                      *)
+(* [HartMemAsm.goodmb_read_ram] / [goodmb_write_ram] serve every width at  *)
+(* once and the bricks are not needed here at all.                        *)
+(* ===================================================================== *)
+(* --- 4. the checked physical read, width-generic --- *)
+Section GenRead.
+  Context (Dr Dw : register -> bool).
+  Context (k : Z) (Hk : 0 < k) (Hk8 : k <= 8).
+  Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
+  Context (w : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
+
+  Hypothesis HDc : Dr pmpcfg_n = true.
+  Hypothesis HDa : Dr pmpaddr_n = true.
+  Hypothesis HDp : Dr pma_regions = true.
+  Hypothesis HDh : Dr htif_tohost_base = true.
+  Hypothesis HA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
+  Hypothesis Hord : zopz0zKzJ_u (zeros' 64)
+    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.
+  Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 k)) = PMP_Match.
+  Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
+  Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
+    (Physaddr addr) k = Some region.
+  Hypothesis Halign : is_aligned_paddr (Physaddr addr) k = true.
+  Hypothesis Hread : (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true.
+  Hypothesis Hc : exec (within_clint (Physaddr addr) k) s = Some (false, s).
+  Hypothesis Hsig : exec (within_sig (Physaddr addr) k) s = Some (false, s).
+  Hypothesis Hh : register_lookup htif_tohost_base s.(sregs) = None.
+  Hypothesis Hdev : dev_addr addr = false.
+  Hypothesis Hown : bytes_owned mm addr (Z.to_N k) = true.
+  Hypothesis Hbytes : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
+    s.(mem) !! (pa_add addr j) = Some (nth_byte w j).
+  Hypothesis Hread_plain :
+    exec (read_ram Read_plain (Physaddr addr) k false) s = Some ((w, default_meta), s).
+
+  Lemma gr_mmio : exec (within_mmio_readable (Physaddr addr) k) s = Some (false, s).
+  Proof.
+    unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (within_htif_false addr k s Hh)).
+    cbn match. reflexivity.
+  Qed.
+
+  Lemma gr_exec_cp : exec (check_pma_with_pmp_priority (Load Data) pbmt User
+                             (Physaddr addr) k false) s = Some (Ok pma_ok_aligned, s).
+  Proof.
+    unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_load_g k addr pbmt region s Hmatch Halign Hread)).
+    cbn match. apply exec_returnM.
+  Qed.
+
+  Lemma gr_good_cp : goodmb Dr Dw (check_pma_with_pmp_priority (Load Data) pbmt User
+                             (Physaddr addr) k false) s mm = true.
+  Proof.
+    exact (goodmb_check_pma_with_pmp_priority Dr Dw _ _ User _ _ false _ s mm
+             (goodmb_pmaCheck_ram_load_g Dr Dw k addr pbmt region s mm
+                HDp Hmatch Halign Hread)
+             (exec_pmaCheck_ram_load_g k addr pbmt region s Hmatch Halign Hread)).
+  Qed.
+
+  Lemma goodmb_checked_mem_read_ram_U :
+    goodmb Dr Dw (checked_mem_read (Load Data) pbmt User (Physaddr addr) k
+                    false false false false) s mm = true.
+  Proof.
+    unfold checked_mem_read. apply goodmb_cer.
+    erewrite gm_liftR_seq; [ | apply gr_good_cp | apply gr_exec_cp ].
+    cbn beta. cbn match.
+    erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    cbn match beta.
+    rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
+    gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr k 0 s mm)
+             (exec_split_misaligned_unsplit addr k 0 s). cbn beta.
+    cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
+    assert (Hrkf : exec (read_kind_of_flags false false false) s
+                   = Some (rv64d_types.Read_plain, s))
+      by (unfold read_kind_of_flags; apply exec_returnM).
+    assert (Hrkg : goodmb Dr Dw (read_kind_of_flags false false false) s mm = true)
+      by (unfold read_kind_of_flags; apply goodmb_returnm).
+    gmm_lift Hrkg Hrkf. cbn beta.
+    assert (Havi : add_vec_int addr (0 * k) = addr)
+      by (assert (H0 : (0 * k)%Z = 0) by lia; rewrite H0; apply avi0).
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+      assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (w, true, 0), s));
+      [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ] end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      rewrite Havi.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_user_grant_load addr k s HA Hord Hrange HR)).
+      cbn beta. cbn match.
+      match goal with |- context[Defs.bind (Defs.bind0 ?aa ?bb) _] =>
+        assert (Hseq : execR (Defs.bind0 aa bb) s = Some (inr false, s)) end.
+      { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+        rewrite execR_liftR. rewrite gr_mmio. reflexivity. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
+        assert (Hrdr : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
+                       = Some (inr w, s)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
+        cbn beta match. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hrdr). cbn beta zeta.
+      change (update_subrange_vec_dec (zeros' (8 * 1 * k))
+                (8 * (0 + 1) * k - 1) (8 * 0 * k) (autocast w))
+        with (update_subrange_vec_dec (zeros' (8 * k)) (8 * k - 1) 0
+                (autocast (T := mword) w)).
+      rewrite (usvd_zeros_full_gen (8 * k) w ltac:(lia)).
+      apply execR_returnR_fwd. }
+    { eapply gm_untilMT_1; [ reflexivity | | | | ].
+      - gmm_liftT ltac:(apply goodmb_assert_exp'_true)
+                  ltac:(apply exec_assert_exp'_true). cbn beta.
+        change (bits_of_physaddr (Physaddr addr)) with addr.
+        rewrite Havi.
+        gmm_lift (goodmb_pmpCheck_user_grant_load Dr Dw addr k s mm
+                    HDc HDa HA Hord Hrange HR)
+                 (exec_pmpCheck_user_grant_load addr k s HA Hord Hrange HR).
+        cbn beta. cbn match.
+        match goal with |- context[Defs.bind (Defs.bind0 ?aa ?bb) _] =>
+          assert (Hseqg : goodmb Dr Dw (Defs.bind0 aa bb) s mm = true);
+          [ | assert (Hseq : execR (Defs.bind0 aa bb) s = Some (inr false, s)) ] end.
+        { erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+          apply goodmb_liftR.
+          exact (goodmb_within_mmio_readable Dr Dw addr k s mm HDh Hh Hc Hsig). }
+        { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+          rewrite execR_liftR. rewrite gr_mmio. reflexivity. }
+        erewrite (gm_bindR Dr Dw _ _ s s mm false Hseqg Hseq). cbn beta. cbn match.
+        match goal with
+          |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
+          assert (Hrdg : goodmb Dr Dw
+                    (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s mm = true);
+          [ | assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
+                            = Some (inr w, s)) ] end.
+        { erewrite gm_liftR_seq;
+            [ | exact (goodmb_read_ram_of_exec Dr Dw Read_plain k addr false
+                         (w, default_meta) s s mm eq_refl Hdev Hown Hread_plain)
+              | exact Hread_plain ].
+          cbn beta match. apply goodmb_returnm. }
+        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
+          cbn beta match. apply execR_returnR_fwd. }
+        erewrite (gm_bindR Dr Dw _ _ s s mm w Hrdg Hrd). cbn beta zeta.
+        change (update_subrange_vec_dec (zeros' (8 * 1 * k))
+                  (8 * (0 + 1) * k - 1) (8 * 0 * k) (autocast w))
+          with (update_subrange_vec_dec (zeros' (8 * k)) (8 * k - 1) 0
+                  (autocast (T := mword) w)).
+        rewrite (usvd_zeros_full_gen (8 * k) w ltac:(lia)).
+        apply goodmb_returnm.
+      - rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+        change (bits_of_physaddr (Physaddr addr)) with addr.
+        rewrite Havi.
+        rewrite (execR_liftR_seq _ _ _ _ _
+                   (exec_pmpCheck_user_grant_load addr k s HA Hord Hrange HR)).
+        cbn beta. cbn match.
+        match goal with |- context[Defs.bind (Defs.bind0 ?aa ?bb) _] =>
+          assert (Hseq : execR (Defs.bind0 aa bb) s = Some (inr false, s)) end.
+        { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+          rewrite execR_liftR. rewrite gr_mmio. reflexivity. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+        match goal with
+          |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
+          assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
+                        = Some (inr w, s)) end.
+        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
+          cbn beta match. apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+        change (update_subrange_vec_dec (zeros' (8 * 1 * k))
+                  (8 * (0 + 1) * k - 1) (8 * 0 * k) (autocast w))
+          with (update_subrange_vec_dec (zeros' (8 * k)) (8 * k - 1) 0
+                  (autocast (T := mword) w)).
+        rewrite (usvd_zeros_full_gen (8 * k) w ltac:(lia)).
+        apply execR_returnR_fwd.
+      - reflexivity.
+      - apply execR_returnR_fwd. }
+    erewrite (gm_bindR Dr Dw _ _ s s mm (w, true, 0) Hug Hu).
+    cbn beta zeta. kill_autocast. apply goodmb_returnm.
+  Qed.
+
+End GenRead.
+
+
+(* --- 5. the U-mode data read, one level up --- *)
+Section GenRead2.
+  Context (Dr Dw : register -> bool).
+  Context (k : Z) (pbmt : page_based_mem_type) (addr : mword 64)
+          (w : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
+
+  Lemma goodmb_mem_read_data_U :
+    Dr mstatus = true -> Dr cur_privilege = true ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+    register_lookup cur_privilege s.(sregs) = User ->
+    goodmb Dr Dw (checked_mem_read (Load Data) pbmt User (Physaddr addr) k
+                    false false false false) s mm = true ->
+    exec (checked_mem_read (Load Data) pbmt User (Physaddr addr) k
+            false false false false) s = Some (Ok (w, default_meta), s) ->
+    goodmb Dr Dw (mem_read (Load Data) pbmt (Physaddr addr) k false false false)
+      s mm = true.
+  Proof.
+    intros HDm HDp Hmprv Hpriv Hchkg Hchke.
+    unfold mem_read.
+    gmm_rr mstatus HDm.
+    gmm_rr cur_privilege HDp.
+    erewrite gm_bind;
+      [ | exact (goodmb_effectivePrivilege_mprv0 Dr Dw (Load Data)
+                   (register_lookup mstatus s.(sregs))
+                   (register_lookup cur_privilege s.(sregs)) s mm Hmprv)
+        | exact (exec_effectivePrivilege_mprv0 (Load Data)
+                   (register_lookup mstatus s.(sregs))
+                   (register_lookup cur_privilege s.(sregs)) s Hmprv) ].
+    rewrite Hpriv.
+    unfold mem_read_priv, mem_read_priv_meta. cbn [orb andb].
+    gmm_peel Hchkg Hchke. cbn match.
+    unfold mem_read_callback. cbn [MemoryOpResult_drop_meta].
+    apply goodmb_returnm.
+  Qed.
+
+End GenRead2.
+
+
+(* --- 6. the checked physical write, width-generic --- *)
+Section GenWrite.
+  Context (Dr Dw : register -> bool).
+  Context (k : Z) (Hk : 0 < k) (Hk8 : k <= 8).
+  Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
+  Context (data : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
+
+  Hypothesis HDc : Dr pmpcfg_n = true.
+  Hypothesis HDa : Dr pmpaddr_n = true.
+  Hypothesis HDp : Dr pma_regions = true.
+  Hypothesis HDh : Dr htif_tohost_base = true.
+  Hypothesis HA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
+  Hypothesis Hord : zopz0zKzJ_u (zeros' 64)
+    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.
+  Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 k)) = PMP_Match.
+  Hypothesis HW : eq_vec (_get_Pmpcfg_ent_W
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
+  Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
+    (Physaddr addr) k = Some region.
+  Hypothesis Halign : is_aligned_paddr (Physaddr addr) k = true.
+  Hypothesis Hwrite : (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true.
+  Hypothesis Hc : exec (within_clint (Physaddr addr) k) s = Some (false, s).
+  Hypothesis Hsig : exec (within_sig (Physaddr addr) k) s = Some (false, s).
+  Hypothesis Hh : register_lookup htif_tohost_base s.(sregs) = None.
+  Hypothesis Hdev : dev_addr addr = false.
+  Hypothesis Hown : bytes_owned mm addr (Z.to_N k) = true.
+  Hypothesis Hwrite_plain : forall (d : mword (8 * k)),
+    exec (write_ram rv64d_types.Write_plain (Physaddr addr) k d tt) s
+    = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) d) s.(mdev)).
+
+  Lemma gw_mmio : exec (within_mmio_writable (Physaddr addr) k) s = Some (false, s).
+  Proof.
+    unfold within_mmio_writable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (within_htif_writable_false addr k s Hh)).
+    cbn match. reflexivity.
+  Qed.
+
+  Lemma gw_exec_cp : exec (check_pma_with_pmp_priority (Store Data) pbmt User
+                             (Physaddr addr) k false) s = Some (Ok pma_ok_aligned, s).
+  Proof.
+    unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_store_g k addr pbmt region s Hmatch Halign Hwrite)).
+    cbn match. apply exec_returnM.
+  Qed.
+
+  Lemma gw_good_cp : goodmb Dr Dw (check_pma_with_pmp_priority (Store Data) pbmt User
+                             (Physaddr addr) k false) s mm = true.
+  Proof.
+    exact (goodmb_check_pma_with_pmp_priority Dr Dw _ _ User _ _ false _ s mm
+             (goodmb_pmaCheck_ram_store_g Dr Dw k addr pbmt region s mm
+                HDp Hmatch Halign Hwrite)
+             (exec_pmaCheck_ram_store_g k addr pbmt region s Hmatch Halign Hwrite)).
+  Qed.
+
+  Lemma goodmb_checked_mem_write_ram_U :
+    goodmb Dr Dw (checked_mem_write (Physaddr addr) k data (Store Data) pbmt User
+                    tt false false false) s mm = true.
+  Proof.
+    set (sw := MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev)).
+    unfold checked_mem_write. apply goodmb_cer.
+    erewrite gm_liftR_seq; [ | apply gw_good_cp | apply gw_exec_cp ].
+    cbn beta. cbn match.
+    erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    cbn match beta.
+    rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
+    gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr k 0 s mm)
+             (exec_split_misaligned_unsplit addr k 0 s). cbn beta.
+    cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
+    assert (Hwkf : exec (write_kind_of_flags false false false) s
+                   = Some (rv64d_types.Write_plain, s))
+      by (unfold write_kind_of_flags; cbn match; apply exec_returnM).
+    assert (Hwkg : goodmb Dr Dw (write_kind_of_flags false false false) s mm = true)
+      by (unfold write_kind_of_flags; cbn match; apply goodmb_returnm).
+    gmm_lift Hwkg Hwkf. cbn beta.
+    assert (Havi : add_vec_int addr (0 * k) = addr)
+      by (assert (H0 : (0 * k)%Z = 0) by lia; rewrite H0; apply avi0).
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+      assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (true, 0, true), sw));
+      [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ] end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      rewrite Havi.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_user_grant_store addr k s HA Hord Hrange HW)).
+      cbn beta. cbn match.
+      rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+      rewrite (execR_liftR_seq _ _ _ _ _ gw_mmio). cbn beta. cbn match.
+      change (autocast (T := mword)
+                (subrange_vec_dec data (8 * (0 + 1) * k - 1) (8 * 0 * k))
+              : mword (8 * k))
+        with (autocast (T := mword) (subrange_vec_dec data (8 * k - 1) 0)
+              : mword (8 * k)).
+      rewrite (subrange_full_gen_cast (8 * k) data ltac:(lia)).
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?ad ?wd ?dt ?mt)) ?k1) _] =>
+        assert (Hwrr : execR (Defs.bind (Defs.liftR (write_ram wk ad wd dt mt)) k1) s
+                       = Some (inr true, sw)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ (Hwrite_plain data)).
+        cbn beta. cbn [andb]. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hwrr). cbn beta zeta.
+      apply execR_returnR_fwd. }
+    { eapply gm_untilMT_1; [ reflexivity | | | | ].
+      - gmm_liftT ltac:(apply goodmb_assert_exp'_true)
+                  ltac:(apply exec_assert_exp'_true). cbn beta.
+        change (bits_of_physaddr (Physaddr addr)) with addr.
+        rewrite Havi.
+        gmm_lift (goodmb_pmpCheck_user_grant_store Dr Dw addr k s mm
+                    HDc HDa HA Hord Hrange HW)
+                 (exec_pmpCheck_user_grant_store addr k s HA Hord Hrange HW).
+        cbn beta. cbn match.
+        erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+        cbn match zeta.
+        gmm_lift (goodmb_within_mmio_writable Dr Dw addr k s mm HDh Hh Hc Hsig)
+                 gw_mmio. cbn beta. cbn match.
+        change (autocast (T := mword)
+                  (subrange_vec_dec data (8 * (0 + 1) * k - 1) (8 * 0 * k))
+                : mword (8 * k))
+          with (autocast (T := mword) (subrange_vec_dec data (8 * k - 1) 0)
+                : mword (8 * k)).
+        rewrite (subrange_full_gen_cast (8 * k) data ltac:(lia)).
+        match goal with
+          |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?ad ?wd ?dt ?mt)) ?k1) _] =>
+          assert (Hwrg : goodmb Dr Dw
+                    (Defs.bind (Defs.liftR (write_ram wk ad wd dt mt)) k1) s mm = true);
+          [ | assert (Hwrr : execR (Defs.bind (Defs.liftR (write_ram wk ad wd dt mt)) k1) s
+                             = Some (inr true, sw)) ] end.
+        { erewrite gm_liftR_seq;
+            [ | exact (goodmb_write_ram Dr Dw rv64d_types.Write_plain k addr data
+                         s mm eq_refl Hdev Hown)
+              | exact (Hwrite_plain data) ].
+          cbn beta. cbn [andb]. apply goodmb_returnm. }
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hwrite_plain data)).
+          cbn beta. cbn [andb]. apply execR_returnR_fwd. }
+        erewrite (gm_bindR Dr Dw _ _ s sw mm true Hwrg Hwrr). cbn beta zeta.
+        apply goodmb_returnm.
+      - rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+        change (bits_of_physaddr (Physaddr addr)) with addr.
+        rewrite Havi.
+        rewrite (execR_liftR_seq _ _ _ _ _
+                   (exec_pmpCheck_user_grant_store addr k s HA Hord Hrange HW)).
+        cbn beta. cbn match.
+        rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+        rewrite (execR_liftR_seq _ _ _ _ _ gw_mmio). cbn beta. cbn match.
+        change (autocast (T := mword)
+                  (subrange_vec_dec data (8 * (0 + 1) * k - 1) (8 * 0 * k))
+                : mword (8 * k))
+          with (autocast (T := mword) (subrange_vec_dec data (8 * k - 1) 0)
+                : mword (8 * k)).
+        rewrite (subrange_full_gen_cast (8 * k) data ltac:(lia)).
+        match goal with
+          |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?ad ?wd ?dt ?mt)) ?k1) _] =>
+          assert (Hwrr : execR (Defs.bind (Defs.liftR (write_ram wk ad wd dt mt)) k1) s
+                         = Some (inr true, sw)) end.
+        { rewrite (execR_liftR_seq _ _ _ _ _ (Hwrite_plain data)).
+          cbn beta. cbn [andb]. apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hwrr). cbn beta zeta.
+        apply execR_returnR_fwd.
+      - reflexivity.
+      - apply execR_returnR_fwd. }
+    erewrite (gm_bindR Dr Dw _ _ s sw mm (true, 0, true) Hug Hu).
+    cbn beta zeta. apply goodmb_returnm.
+  Qed.
+
+End GenWrite.
+
+
+(* --- 7. the effective-address announcement (twin of
+   [MemAccessGen.exec_mem_write_ea_g]; FOLD BACK beside it) --- *)
+Lemma goodmb_mem_write_ea_g (Dr Dw : register -> bool) (width : Z)
+    (addr : mword 64) (acc : MemoryAccessType mem_payload)
+    (pbmt : page_based_mem_type) (ep : Privilege) s mm :
+  0 < width ->
+  Dr mstatus = true -> Dr cur_privilege = true ->
+  goodmb Dr Dw (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+                  (register_lookup cur_privilege s.(sregs))) s mm = true ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  goodmb Dr Dw (check_pma_with_pmp_priority acc pbmt ep (Physaddr addr) width false)
+    s mm = true ->
+  exec (check_pma_with_pmp_priority acc pbmt ep (Physaddr addr) width false) s
+    = Some (Ok pma_ok_aligned, s) ->
+  goodmb Dr Dw (pmpCheck (Physaddr addr) width acc ep) s mm = true ->
+  exec (pmpCheck (Physaddr addr) width acc ep) s = Some (None, s) ->
+  goodmb Dr Dw (mem_write_ea (Physaddr addr) width acc pbmt false false false)
+    s mm = true.
+Proof.
+  intros Hw HDm HDp Heffg Heff Hcpg Hcp Hpmpg Hpmpchk.
+  assert (Hms : goodmb Dr Dw (Defs.read_reg mstatus : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HDm).
+  assert (Hpv : goodmb Dr Dw (Defs.read_reg cur_privilege : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HDp).
+  assert (Hwkf : exec (write_kind_of_flags false false false) s
+                 = Some (rv64d_types.Write_plain, s))
+    by (unfold write_kind_of_flags; cbn match; apply exec_returnM).
+  assert (Hwkg : goodmb Dr Dw (write_kind_of_flags false false false) s mm = true)
+    by (unfold write_kind_of_flags; cbn match; apply goodmb_returnm).
+  assert (Havi : add_vec_int addr (0 * width) = addr)
+    by (assert (H0 : (0 * width)%Z = 0) by lia; rewrite H0; apply avi0).
+  unfold mem_write_ea. apply goodmb_cer.
+  gmm_lift Hms (exec_read_reg mstatus s). cbn beta.
+  gmm_lift Hpv (exec_read_reg cur_privilege s). cbn beta.
+  gmm_lift Heffg Heff. cbn beta.
+  gmm_lift Hcpg Hcp. cbn beta. cbn match.
+  erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+  cbn match beta.
+  rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
+  gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr width 0 s mm)
+           (exec_split_misaligned_unsplit addr width 0 s). cbn beta.
+  cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
+  gmm_lift Hwkg Hwkf. cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+    assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (true, 0), s));
+    [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ] end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    rewrite Havi.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hpmpchk). cbn beta. cbn match.
+    rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+    apply execR_returnR_fwd. }
+  { eapply gm_untilMT_1; [ reflexivity | | | | ].
+    - gmm_liftT ltac:(apply goodmb_assert_exp'_true)
+                ltac:(apply exec_assert_exp'_true). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      rewrite Havi.
+      gmm_lift Hpmpg Hpmpchk. cbn beta. cbn match.
+      erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+      cbn match zeta. apply goodmb_returnm.
+    - rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      rewrite Havi.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hpmpchk). cbn beta. cbn match.
+      rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+      apply execR_returnR_fwd.
+    - reflexivity.
+    - apply execR_returnR_fwd. }
+  erewrite (gm_bindR Dr Dw _ _ s s mm (true, 0) Hug Hu).
+  cbn beta zeta. apply goodmb_returnm.
+Qed.
+
+
+(* --- 8. the U-mode data write, one level up --- *)
+Section GenWrite2.
+  Context (Dr Dw : register -> bool).
+  Context (k : Z) (pbmt : page_based_mem_type) (addr : mword 64)
+          (data : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
+
+  Lemma goodmb_mem_write_value_U :
+    Dr mstatus = true -> Dr cur_privilege = true ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+    register_lookup cur_privilege s.(sregs) = User ->
+    goodmb Dr Dw (checked_mem_write (Physaddr addr) k data (Store Data) pbmt User
+                    tt false false false) s mm = true ->
+    exec (checked_mem_write (Physaddr addr) k data (Store Data) pbmt User
+            tt false false false) s
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev)) ->
+    goodmb Dr Dw (mem_write_value (Physaddr addr) k data (Store Data) pbmt
+                    false false false) s mm = true.
+  Proof.
+    intros HDm HDp Hmprv Hpriv Hchkg Hchke.
+    unfold mem_write_value, mem_write_value_meta.
+    gmm_rr mstatus HDm.
+    gmm_rr cur_privilege HDp.
+    erewrite gm_bind;
+      [ | exact (goodmb_effectivePrivilege_mprv0 Dr Dw (Store Data)
+                   (register_lookup mstatus s.(sregs))
+                   (register_lookup cur_privilege s.(sregs)) s mm Hmprv)
+        | exact (exec_effectivePrivilege_mprv0 (Store Data)
+                   (register_lookup mstatus s.(sregs))
+                   (register_lookup cur_privilege s.(sregs)) s Hmprv) ].
+    rewrite Hpriv.
+    unfold mem_write_value_priv_meta. cbn [orb andb].
+    gmm_peel Hchkg Hchke. cbn match.
+    unfold mem_write_callback. apply goodmb_returnm.
+  Qed.
+
+End GenWrite2.
 
 (* ===================================================================== *)
 (* §6 The width instances -- the names the memory arms consume.            *)
