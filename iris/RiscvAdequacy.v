@@ -946,7 +946,7 @@ Section power.
         do 4 right. split_and!; auto. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct Hstep as
-        [ (gen2 & cpu2 & Hc & _)
+        [ (gen2 & cpu2 & m2 & Hc & _)
         | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
         | (_ & -> & -> & [ (_ & -> & ->) | (Hpw' & _) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
@@ -988,7 +988,7 @@ Section power.
         apply boot_shape_boot_gstate. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct Hstep as
-        [ (gen2 & cpu2 & Hc & _)
+        [ (gen2 & cpu2 & m2 & Hc & _)
         | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
         | (_ & -> & -> & [ (Hpw' & _) | (_ & -> & Hbs) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
@@ -1184,7 +1184,7 @@ Proof.
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
   set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-              _ _ γtie (Pc γswap γreg γstart) γswap).
+              _ _ _ γtie (Pc γswap γreg γstart) γswap).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
