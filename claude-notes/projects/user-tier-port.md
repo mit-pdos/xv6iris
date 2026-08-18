@@ -828,3 +828,104 @@ of re-shaped tier glue, and ~4 500 lines that do not move at all.**
    it is about *computing* `hfrun`, not about `goodmb`, which is assembled and
    discharges `bool_decide (r ∈ D)` by proof.  The user tier puts all 31 GPRs in
    its footprint because of this.
+
+---
+
+## 8. P0 STATUS (landed 2026-08-18) — I1, I2, I3 and what they corrected
+
+**P0 is DONE and admit-free.**  Five files compile against the current tree:
+`ResvAxioms.v` (new), `UserMemAccess.v` (edited), `UserFrame.v` (new),
+`PtBytes.v` (new), `UserBytes.v` (new).  Everything is `Closed under the
+global context` except `UserMemAccess.exec_load_reservation` /
+`_cancel_reservation`, which close at the two new term-level axioms — the
+net axiom count is unchanged, as §1.1 predicted.
+
+### What deviated from the plan, and why
+
+1. **§1.2 / R3 IS WRONG: `udata_own` IS NOT `bytes_own`, and the reason is
+   invisible.**  The two byte maps are at DIFFERENT `Countable Arch.pa`
+   INSTANCES.  `RiscvModelBytes`/`HartMemRun` — and hence `read_bytes`,
+   `bytes_own`, `gen_heap_interp`, `hmrun`, `goodmb` — elaborate
+   `gmap Arch.pa (bv 8)` with stdpp's `bv_countable`; `UserPtTree` imports
+   `SailStdpp.Base`/`Values`, where `Instances.Countable_mword` wins.  The
+   two `Countable` records differ in their `decode_encode` PROOF field, so
+   the resulting `gmap` types are **not convertible** — `exact` refuses
+   them — while both print as `gmap Arch.pa (bv 8)` and the error message
+   is a bare "has type X while it is expected to have type X".
+   * **THE REAL FIX, and it belongs to P7 (or whoever touches
+     `UserPtTree.v`): pin `udata_own`'s map and `uptd.ud_data` to the
+     canonical instance** (`PtBytes.pamap` / a `gset` at the same
+     instance).  Until then `UserBytes.udata_own_bytes` /
+     `udata_own_of_bytes` cross the divide by `list_to_map (map_to_list _)`
+     — the identity on lookups, transported by one `Permutation` of
+     `map_to_list`s.  ~40 lines, and they should be DELETED by that fix.
+   * **Anything that names the byte-map type must spell it `PtBytes.pamap`**,
+     never re-elaborate `gmap Arch.pa (bv 8)` under its own import set.
+     Mirror `HartMemRun`'s import list; do NOT import `SailStdpp.Base`
+     or `SailStdpp.Values` into a file that mentions byte maps.
+2. **`ptree_bytes` landed as a list-then-union, not a `Definition` union.**
+   `pt_maps lvl t : list pamap` is the per-slot maps node by node;
+   `ptree_bytes lvl t := ⋃ (pt_maps lvl t)`.  The DISJOINTNESS the union
+   needs is **derived from the ownership** (`PtBytes.bytes_own_list_disj`),
+   not assumed, so no caller ever states it — which is R7 discharged by
+   construction rather than by hypothesis.
+3. **The frames bridge is over RAW CELLS, not over `user_regs`/`user_cfg`.**
+   `UserExec.v` is red and belongs to P7, so `UserFrame.u_frames_intro` /
+   `_elim` take the 33 points-to's directly.  `u_regs` (the post-port
+   `user_regs`, with the three new riders) and `u_regs_pc_is` /
+   `u_regs_open` ARE in `UserFrame.v` — they mention neither `ucfg` nor
+   `uptd`, so P7's `UserExec.user_regs` can be *defined as* `u_regs` and
+   the two boundary lemmas come for free.
+4. **`Du_r`/`Du_w` are `bool_decide (r ∈ <the list>)`, not a `match`.**  The
+   footprints are spelled as LISTS (`BootConfig.boot_D`'s reason:
+   `big_sepS_list_to_set` takes the frame apart in one step off a decidable
+   `NoDup`, where a set literal would owe 45 `∉` side conditions), and then
+   `swp_hmrun_of_exec`'s two side conditions `Du_r_sub` / `Du_w_sub` are one
+   line each instead of a register-wide case analysis.
+5. **§1.3's `Du_gpr` 32-way `lia` split is not needed.**  Spelling
+   `u_gpr_list` as `(fun i => R_bitvector_64 (gpr_of_Z i)) <$> seqZ 1 31`
+   makes `Du_gpr_of_Z` one `elem_of_seqZ`.
+6. **`PtBytes.v` is a fourth new file** (the plan's §1.2 sanctions it): the
+   `↦ₚ₈ ⟷ bytes_own` view lemma and the `bytes_own` algebra are
+   privilege- and tier-neutral, and putting them in `PtTree.v` would have
+   cost that file's rebuild cone.
+
+### THE ONE THING P0 DID NOT ANSWER: where the first `rs` comes from
+
+Every frame is `hreg_frame rs D`, and `u_frames_intro` takes `rs`
+∀-quantified with the values as `u_pins_*` side conditions — which is right
+for every cycle after the first, because the step rules hand back
+`∃ rs2, ⌜Q rs2⌝ ∗ frames rs2`.  At the ENTRY (userret → `user_inv`) somebody
+must PRODUCE one.  Two routes, and the tower is not one of them:
+* build it as a `Build_regstate` with explicit per-family field FUNCTIONS
+  (`fun r => match r with PC => va | … end`).  Every `register_lookup` is
+  then ONE iota step — this is *not* the `register_set` tower the durable
+  notes warn about, and `u_mword5_eq` (in `UserFrame.v`) is what the GPR
+  family needs to connect `gpr_of_Z (uint i)` back to `g (Regidx i)`;
+* or take the machine's own file `σ.(sregs)` where one is in scope.
+Decide it in P7, at `UserKernelBridge.userret_to_user_inv`.
+
+### Measured traps this package added (all reproduced, all recorded in the files)
+
+* **Never `cbn` / `try done` / `by` on a goal mentioning `pt_maps` or
+  `pt_claims`**: their bodies mention `seqZ 0 512` and a whitelisted `cbn`
+  still fires the beta/iota that computes the 512-element list.  `done`
+  does it too, from inside `split_and!; try done`.  Both were killed at 2
+  min.  The reduction equations are spelled out as `reflexivity` lemmas
+  (`pt_maps_O`/`_S`, `pt_claims_O`/`_S`) and every `split_and!` is bulleted.
+* **`(A ∗ B) ∗ (C ∗ D) ⊣⊢ (A ∗ C) ∗ (B ∗ D)` must be done in the
+  proofmode.**  The `assoc`/`comm` setoid rewrites at that shape — big ops
+  on both sides — do not terminate.  `apply bi.equiv_entails_2` + two
+  `iIntros`/`iFrame` is instant.
+* **In the proofmode, plain `rewrite` sees the CONTEXT**, and will happily
+  rewrite a hypothesis instead of the goal (and then report that the next
+  rewrite's LHS "does not match any subterm of the goal").  `iEval (…)`
+  without `in` targets the goal.
+* **A `Permutation` whose left-hand side lives at the OTHER `Countable`
+  instance cannot be stated as a hypothesis at all** — applied inline
+  (`rewrite (map_to_list_to_map _ (NoDup_fst_map_to_list md))`), `rewrite`
+  takes the instance from the goal.
+* `BootConfig.v` §4 already had `uint_mword5`, `enum_regidx_eq` and
+  `gpr_file_of_enum`; `UserFrame.v` carries byte-identical copies because
+  their real home is `WpGpr.v` and paying that cone now buys nothing.
+  **Fold both copies into `WpGpr.v` at the milestone.**
