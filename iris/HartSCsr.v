@@ -699,6 +699,80 @@ Section HartSCsr.
       symmetry. apply (pw_rs_misa pr r vnew Hfr).
   Qed.
 
+  (* the directed forms, which is what a leaf uses (a [⊣⊢] rewrite in a
+     proofmode goal is the expensive shape -- HartMFrame's note). *)
+  Lemma pw_frames_in (pr : Privilege) (dq : dfrac) (r : register)
+      (v0 : type_of_register r) :
+    cw_fresh r ->
+    reg_pointsto r (DfracOwn 1) v0 -∗
+    reg_pointsto cur_privilege dq pr -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (pw_rs pr r v0) (cw_Drw r) ∗
+     hreg_frame_ro (cw_Df dq) (pw_rs pr r v0) cw_Dro : iProp Σ).
+  Proof.
+    intros Hfr. iIntros "H1 H2 H3 H4".
+    rewrite (pw_frames pr dq r v0 Hfr). iFrame.
+  Qed.
+
+  Lemma pw_frames_out (pr : Privilege) (dq : dfrac) (r : register)
+      (v0 : type_of_register r) :
+    cw_fresh r ->
+    (hreg_frame (pw_rs pr r v0) (cw_Drw r) ∗
+     hreg_frame_ro (cw_Df dq) (pw_rs pr r v0) cw_Dro : iProp Σ) -∗
+    (reg_pointsto r (DfracOwn 1) v0 ∗
+     reg_pointsto cur_privilege dq pr ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hfr. rewrite (pw_frames pr dq r v0 Hfr). iIntros "H". iExact "H".
+  Qed.
+
+  Lemma pr_frames_in (pr : Privilege) (dqp dqc : dfrac) (r : register)
+      (v0 : type_of_register r) :
+    cw_fresh r ->
+    reg_pointsto r dqc v0 -∗
+    reg_pointsto cur_privilege dqp pr -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (pw_rs pr r v0) ∅ ∗
+     hreg_frame_ro (cr_Df dqp dqc r) (pw_rs pr r v0) (cr_Dro r) : iProp Σ).
+  Proof.
+    intros Hfr. iIntros "H1 H2 H3 H4".
+    iSplitR; [iApply hreg_frame_empty|].
+    rewrite (pr_frames pr dqp dqc r v0 Hfr). iFrame.
+  Qed.
+
+  Lemma pr_frames_out (pr : Privilege) (dqp dqc : dfrac) (r : register)
+      (v0 : type_of_register r) :
+    cw_fresh r ->
+    (hreg_frame_ro (cr_Df dqp dqc r) (pw_rs pr r v0) (cr_Dro r) : iProp Σ) -∗
+    (reg_pointsto r dqc v0 ∗
+     reg_pointsto cur_privilege dqp pr ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hfr. rewrite (pr_frames pr dqp dqc r v0 Hfr). iIntros "H". iExact "H".
+  Qed.
+
+  Lemma pr0_frames_in (pr : Privilege) (dqp : dfrac) :
+    reg_pointsto cur_privilege dqp pr -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (pw0_rs pr) ∅ ∗
+     hreg_frame_ro (cw_Df dqp) (pw0_rs pr) cw_Dro : iProp Σ).
+  Proof.
+    iIntros "H1 H2 H3". iSplitR; [iApply hreg_frame_empty|].
+    rewrite (pr0_frames pr dqp). iFrame.
+  Qed.
+
+  Lemma pr0_frames_out (pr : Privilege) (dqp : dfrac) :
+    (hreg_frame_ro (cw_Df dqp) (pw0_rs pr) cw_Dro : iProp Σ) -∗
+    (reg_pointsto cur_privilege dqp pr ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof. rewrite (pr0_frames pr dqp). iIntros "H". iExact "H". Qed.
+
   (* ================================================================== *)
   (* §7 THE LEGALITY CHECK AT SUPERVISOR.                                 *)
   (*                                                                     *)
