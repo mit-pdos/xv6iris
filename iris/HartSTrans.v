@@ -747,6 +747,27 @@ Section strans.
 End strans.
 
 
+
+(* THE PURE CONVERSE of [read_bytes_spec], which the tree does not have.
+   [HartLift2.text_read_bytes] and [HartPilot.phys_read_bytes] both END here
+   but each bundles the step with its own resource, so neither is reusable
+   for a slot whose bytes arrive as a [pt_slot_mem] conjunct rather than as a
+   points-to.  The proof is exactly their shared tail.  (Belongs with the
+   [read_bytes] family in [RiscvFetchExec]; it is here because that file sits
+   under most of the tree and this is its only consumer so far.) *)
+Lemma read_bytes_of_bytes mm pa n (w : bv (8 * n)) :
+  (forall j : nat, (N.of_nat j < n)%N -> mm !! pa_add pa j = Some (nth_byte w j)) ->
+  read_bytes mm pa n = Some w.
+Proof.
+  intros Hbytes.
+  destruct (read_bytes mm pa n) as [w'|] eqn:Hrb.
+  - f_equal. apply bv_eq_of_bytes. intros j Hj.
+    pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
+    pose proof (Hbytes j Hj) as H1.
+    rewrite H0 in H1. apply Some_inj in H1. exact H1.
+  - exfalso. exact (read_bytes_ne mm pa n w Hbytes Hrb).
+Qed.
+
 (* ====================================================================== *)
 (* THE PTE READ, as a node.                                                *)
 (*                                                                        *)
