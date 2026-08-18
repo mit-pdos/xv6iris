@@ -1,37 +1,94 @@
-(* SmodeCorePt.v -- the S-mode instruction-step ENGINE over the
-   generalized page-table-tree invariant (KptTree.v).  The [_pt] family
-   here is the RESTATEMENT layer of the regime-generic engines at the
-   Sv39-kernel instance, and that instance is now the SHARED table's
-   per-hart residue [KptShare.tlb_res_pt] ([kpt_share_regime]) -- the
-   names keep their [_pt] suffix, which reads "over the page-table
-   regime".
+(* SmodeCorePt.v -- the S-mode instruction-step ENGINE, at the PER-NODE
+   (swp) layer, over the generalized page-table-tree invariant.
 
-   The successor of [wp_instr_s_tlbinv]/[wp_instr_s_tlbinv_ad]
-   (SmodeCore.v): the fetch's per-chunk translation goes through the
-   invariant-ABSORPTION theorem [tlb_inv_pt_translateAddr_fetch] instead
-   of the pure [kpt_mem]-based walk, so
+   THE SHAPE.  A cycle is no longer one language step against one sigma:
+   it is a walk over the Sail monad's nodes, so the wrappers here do NOT
+   hand a caller [mstate_interp σ] and ask for a successor.  They hand it
+   CELLS and ask for one [swp (execute i) ..] -- exactly what
+   [WpInstr.wp_instr] and [WpInstrConfig.wp_instr_config] do for M-mode,
+   one privilege over.  What is genuinely S-mode is the FETCH: it
+   TRANSLATES, which means a page walk that may read three PTEs and FILL
+   THE TLB while other harts run.
 
-     - there is NO A-bit premise (the `_ad` engines' ∀-over-RAM
-       [fst (adf (svpn_of a)) = true] residue is gone): a fetch touching
-       a clear-A page takes the Svadu write-back instead of faulting,
-       and the invariant absorbs the page-table write;
-     - the fetch may CHANGE MEMORY (the written leaf slot); instruction
-       bytes are re-derived per chunk from the persistent [↦ₘ□] window
-       against the post-chunk heap interpretation -- ownership
-       separation guarantees the PT write missed the text, no pure
-       memory relation is needed.
+   WHAT THE WRAPPERS TAKE, and the one interface decision this conversion
+   had to make:
 
-   Layers:
-     - [pt_regs_preserved]: the absorption theorem's sregs-shape
-       disjunct gives every non-tlb register lookup unchanged;
-     - [tlb_inv_pt_fetch]: the unified S-mode fetch as a [==∗]: for any
-       geometry (4-aligned Base / 2-aligned 2+2 Base / RVC at either
-       alignment), [exec (fetch tt) σ = Some (r, σf)] with the state
-       interpretation and [tlb_res_pt] re-established at [σf], reusing
-       SmodeCore's state-generic fetch drivers [exec_fetch_*_S_gen];
-     - [wp_instr_s_tlbinv_pt]: the step engine, same interface as
-       [wp_instr_s_tlbinv] with [tlb_res_pt] threaded in place of
-       [tlb_inv].                                                        *)
+     - the config cells (cur_privilege / mstatus / mie / mideleg /
+       menvcfg) at a caller-chosen fraction, as before, plus [hw_config],
+       [minstret_inv], [hart_state], [pc_is pc] and [instr pc is_rvc i];
+     - the four cells the regime used to hide inside [SRegime.sr_inv R]
+       (satp, tlb, pmpcfg_n, pmpaddr_n) RAW -- they must be in the frame,
+       because the walk reads and writes them;
+     - the regime's non-cell RESIDUE as a family
+       [Res : type_of_register tlb -> iProp Σ] ([SRegime.sr_swp_res] at
+       the tlb value the cell carries -- [tlb_snap_ok tv ∗ kpt_inv] at
+       [kpt_share_regime_swp], [True] at [bare_regime_swp]);
+     - the regime's FETCH TRANSLATION as a persistent obligation
+       ([spt_fetch_tr], which is [SRegime.sr_swp_translate] at
+       [InstructionFetch tt] instantiated at the wrapper's tower).
+
+   THE WRAPPER IS NOT PARAMETERISED BY [(R : s_regime) (RS :
+   s_regime_swp R)], and the reason is structural: [sr_swp_res] is a
+   function of the FILE and [sr_swp_side] mentions the file and a
+   reference [mstate], while the wrapper's file is a tower whose
+   components come out of [pc_is] and [hw_config] EXISTENTIALLY.  No
+   premise of the wrapper can name that tower, so "the residue at the
+   tower" is not statable.  Taking the residue family and the translate
+   obligation instead costs a caller nothing -- [sr_swp_translate] is
+   itself ∀-over-files -- and puts [sr_swp_side] where it was designed to
+   be discharged: at the caller, which knows which arm it is on.
+
+   THE LAYERS, bottom up (each names the file it belongs in; they are
+   here so that this conversion costs no rebuild of the M-mode cone):
+
+     - [s_fetch_chunk] / [s_mem_chunk] / [s_win_write] and the two
+       claim-keyed word writes: the WINDOW COLLAPSE lemmas, unchanged --
+       a non-straddling chunk of a claim-carrying va window reads and
+       writes at the TRANSLATED pa [pa_of ppn b];
+     - [s_regime_fetch] and [tlb_inv_pt_fetch]: the exec-shaped unified
+       S-mode fetch, kept for the callers that still consume it;
+     - PART A [hfrun_check_pma_ifetch_S], [swp_checked_mem_read_ifetch4_S]
+       / [_2_S]: the instruction-fetch RAM read at SUPERVISOR, where the
+       PMP fall-through is DENY so entry 0 must actually match;
+     - PART B [s_text_obl] and [s_chunk_ram]: the persistent text window
+       as a per-node memory obligation at the translated pa, and its two
+       RAM endpoints off the bytes' own claims;
+     - PART C [swp_run_hart_active_gen_exf] / [_rvc_exf]: [HartRunGen]'s
+       rules with the FETCH-LANDING FILE a predicate and a landing-file-
+       indexed rider.  A walking fetch cannot NAME the landing file --
+       [sr_swp_translate]'s post is existential precisely because no
+       caller knows whether the TLB hits -- and an existential inside a
+       [swp] postcondition cannot be hoisted out;
+     - PARTS D-F [spt_fetch_P] / [_rvc2_P] / [_base2_P] and the S-mode
+       chain over them: [HartMFetch]'s fetch shapes with the
+       [fetch_bytes] post ABSTRACT (the landing file never occurs in
+       their proofs, only in that post);
+     - PART G [spt_run_hart_active_instr_S]: the four-arm dispatch on the
+       [instr] resource (F_Base / F_RVC x pc's 4-alignment), which is
+       [WpInstrRun.swp_run_hart_active_instr_ex]'s twin;
+     - PARTS H-K [spt_cycle], [spt_frames_intro] / [_elim], [s_npc_agree]
+       and the three wrappers.
+
+   WHAT IS NOT PROVED, and it is one thing.  [spt_cycle] is
+   [WpSFrames.s_cycle_any] with the body's rider INDEXED BY THE POST
+   FILE, and that indexing is what the S-mode cycle needs and does not
+   have.  The walk lands the frames on the tower at a tlb value it
+   CHOOSES; the regime's residue comes back at that value; the
+   continuation needs it paired with the tlb CELL, which arrives inside
+   the post-cycle frames.  With [HartStepAny.swp_exec_step_any]'s rider a
+   plain [iProp Σ] the pairing cannot be expressed -- the rider cannot
+   mention the post file and the pure [Q] cannot mention a resource.
+   [WpSFrames.s_cycle]'s [tlb_snap_ok tlbv'] premise is the same gap one
+   level up: it asks the caller to NAME the landing tlb value before the
+   body runs.  Indexing the rider ([swp_exec_step_any], and
+   [wp_loop_cycle] under it) closes both.  The three wrappers are stated
+   and admitted on top of it; each carries the list of assembly steps it
+   still owes.
+
+   ONE INTERFACE NARROWING, recorded because a call site depends on it:
+   [wp_instr_s_config_regime] returns cur_privilege at Supervisor.  A leaf
+   that WRITES cur_privilege (SRET) needs the privilege-parametric S tower
+   -- [WpInstrConfig.mc_rs]'s S twin -- which is not built here.          *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -2317,6 +2374,433 @@ Section SmodeCorePt.
 
   End SPtDispatch.
 
+
+  (* =================================================================== *)
+  (* PART H -- THE THREE WRAPPERS.                                        *)
+  (*                                                                     *)
+  (* WHAT THEY ARE PARAMETERISED BY, and why it is not [(R : s_regime)    *)
+  (* (RS : s_regime_swp R)] (the choice this conversion had to make, and  *)
+  (* the reason, recorded so it is not re-litigated):                     *)
+  (*                                                                     *)
+  (*   [SRegime.sr_swp_res] is a function of the FILE, and                *)
+  (*   [sr_swp_side] mentions the file and a reference [mstate] as well.  *)
+  (*   The wrapper's file is a TOWER whose components ([ms], [bmi], the   *)
+  (*   clock cells, the [hw_config] pins) come out of [pc_is] and         *)
+  (*   [hw_config] EXISTENTIALLY, so no premise of the wrapper can name   *)
+  (*   it -- a bundle "the residue at the tower" is not statable.  So the *)
+  (*   wrapper takes                                                     *)
+  (*     - [Res : type_of_register tlb -> iProp Σ], the residue as a      *)
+  (*       function of the one component of the file it actually depends  *)
+  (*       on (it is [KptShare.tlb_snap_ok tv ∗ kpt_inv] at               *)
+  (*       [kpt_share_regime_swp], [True] at [bare_regime_swp]), and      *)
+  (*     - the regime's FETCH TRANSLATION as a persistent obligation      *)
+  (*       ([spt_tr_obl], which is [sr_swp_translate] at                  *)
+  (*       [InstructionFetch tt] instantiated at the tower).              *)
+  (*   A caller discharges the obligation from [RS.(sr_swp_translate)] --  *)
+  (*   that field is ∀-over-files, so instantiating it at a tower is      *)
+  (*   free, and its side condition is discharged by the caller, which is *)
+  (*   where [sr_swp_side] was designed to be discharged.                 *)
+  (* =================================================================== *)
+
+  (* the cycle rule the wrappers sit on: [WpSFrames.s_cycle_any] with the
+     body's rider INDEXED BY THE POST FILE.
+
+     THIS IS THE ONE PIECE THIS CONVERSION COULD NOT BUILD, and the reason
+     is exact.  A walking fetch lands the frames on the tower at a tlb
+     value the walk CHOOSES ([spt_run_hart_active_instr_S]'s conclusion is
+     existential in it, because no caller knows whether the TLB hits).  The
+     regime's residue comes back at THAT value, and the continuation needs
+     it paired with the tlb CELL, which arrives inside the post-cycle
+     frames.  With [HartStepAny.swp_exec_step_any]'s rider a plain
+     [iProp Σ] the pairing cannot be expressed: the rider cannot mention
+     the post file, and the pure [Q] cannot mention a resource.  Indexing
+     the rider by the post file -- which is what this statement does, and
+     what [swp_exec_step_any] (and [wp_loop_cycle] under it) must be
+     generalized to -- makes it immediate: the continuation receives
+     [Psi rs2] for the SAME [rs2] the agreement names, and [tlb ∉
+     tk_clock3], so [register_lookup tlb rs3 = register_lookup tlb rs2].
+
+     [WpSFrames.s_cycle]'s [tlb_snap_ok tlbv'] premise has the same
+     problem one level up: it asks the CALLER to name the landing tlb
+     value before the body runs.  Both are the same gap. *)
+  Lemma spt_cycle (Df : register -> dfrac) (pc : mword 64)
+      (Psi : regstate -> iProp Σ) (Q : regstate -> Prop)
+      (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv : type_of_register tlb) :
+    (forall rs2, Q rs2 -> register_lookup hart_state rs2 = HART_ACTIVE tt) ->
+    (forall rs2, Q rs2 ->
+       register_lookup (R_bool minstret_increment) rs2
+       = minstret_inc_flag mc micfg Supervisor) ->
+    gen_cert -∗
+    resv_any cpu_id -∗
+    hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+      s_Drw -∗
+    hreg_frame_ro Df
+      (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+    (resv_frag cpu_id None -∗
+     hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+                   cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                   pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
+     hreg_frame_ro Df
+       (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+          cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+          pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+       swp (run_hart_active 0)
+         (fun st => ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
+            match st with
+            | Step_Execute (Retire_Success tt, _) =>
+                hreg_frame rs2 s_Drw ∗
+                hreg_frame_ro Df rs2 s_Dro ∗ Psi rs2
+            | Step_Pending_Interrupt (i, p) =>
+                swp (handle_interrupt i p)
+                  (fun _ => hreg_frame rs2 s_Drw ∗
+                            hreg_frame_ro Df rs2 s_Dro ∗ Psi rs2)
+            | _ => False
+            end)) -∗
+    ▷ (∀ (rs3 rs2 : regstate) (mi : mword 64),
+         ⌜Q rs2⌝ -∗
+         ⌜reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3 (wrap_post rs2 mi)⌝ -∗
+         hreg_frame rs3 s_Drw -∗
+         hreg_frame_ro Df rs3 s_Dro -∗ Psi rs2 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+  Admitted.
+
+
+  (* the raw-cell <-> frame bridge, [WpSFrames.sm_frames_intro]'s twin with
+     the config arriving as CELLS (so no [smode_config] is built) and the
+     regime's four cells likewise raw.  [s_Df_mix dq] is exactly this
+     split: the config cells at the caller's fraction, satp and the two PMP
+     cells at full ownership. *)
+  Lemma spt_frames_intro (dq : dfrac) (pc : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv : type_of_register tlb) :
+    hw_config -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    tlb ↦ᵣ tlbv -∗
+    pc_is pc -∗
+    resv_any cpu_id ∗
+    ∃ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp),
+      ⌜ misa0 = MISA_C ⌝ ∗
+      ⌜ pma_allows_all pmar0 ⌝ ∗
+      ⌜ eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
+      hreg_frame (s_rs pc pc ms bmi cy ti ip mstatus0 pcfg paddr mc micfg
+                    misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0
+                    menvcfg0 tlbv) s_Drw ∗
+      hreg_frame_ro (s_Df_mix dq)
+        (s_rs pc pc ms bmi cy ti ip mstatus0 pcfg paddr mc micfg misa0
+           mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0 menvcfg0 tlbv) s_Dro.
+  Proof.
+    iIntros "#Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc Hpc".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)". iFrame "Hresv".
+    iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
+    iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
+        %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
+        %Hmisaval & %Hsecval & _)".
+    iExists ms, bmi, cy, ti, ip, mc, micfg, misa0, mseccfg0,
+            (mword_of_int 0 : mword 64), pmar0, elp0.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc".
+    - rewrite s_rw_split.
+      rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
+        s_rs_tlb. iFrame.
+    - rewrite s_ro_split_mix.
+      rewrite s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+        s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp
+        s_rs_senv s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+      iFrame "Hpriv Hmst Hhs Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenv".
+      by iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv".
+  Qed.
+
+
+  (* the tower transport the execute obligation needs: the fetch committed
+     nextPC by a [register_set], and the cells are read off a tower.
+     [HartMFrame.mm_npc_agree]'s S twin. *)
+  Lemma s_npc_agree (pc npc npc' ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+      (tlbv : type_of_register tlb) :
+    reg_agree_on (s_Drw ∪ s_Dro)
+      (register_set (R_bitvector_64 nextPC) npc'
+         (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv))
+      (s_rs pc npc' ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+  Proof.
+    (* no generic [rewrite]: [s_rs]'s body IS a [register_set] tower, so an
+       ssreflect rewrite with [register_lookup_set]'s pattern searches inside
+       it and detonates the record-update conversion bomb ([mm_npc_agree]'s
+       note).  Goal 2 is the nextPC cell; every other goal is apply-directed. *)
+    apply s_rs_agree.
+    2:{ apply register_lookup_set. }
+    all: (etransitivity;
+          [ apply irrelevant_register_set; vm_compute; reflexivity | ]).
+    all: by rewrite ?s_rs_PC ?s_rs_ms ?s_rs_mi ?s_rs_cy ?s_rs_ti ?s_rs_ip
+              ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+              ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec
+              ?s_rs_pma ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp
+              ?s_rs_mie ?s_rs_mdl ?s_rs_menv.
+  Qed.
+
+  (* ...and back: the frames at a tower ARE the cells the caller handed in. *)
+  Lemma spt_frames_elim (dq : dfrac) (npc ms : mword 64) (bmi : bool)
+      (cy ti ip : mword 64) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp)
+      (mstatus1 satp1 mie1 mdv1 menvcfg1 : mword 64)
+      (pcfg1 : type_of_register pmpcfg_n)
+      (paddr1 : type_of_register pmpaddr_n) (tv : type_of_register tlb) :
+    resv_any cpu_id -∗
+    hreg_frame (s_rs npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg
+                  misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+      s_Drw -∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv) s_Dro -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗ cur_privilege ↦ᵣ{ dq } Supervisor ∗
+    mstatus ↦ᵣ{ dq } mstatus1 ∗ mie ↦ᵣ{ dq } mie1 ∗
+    mideleg ↦ᵣ{ dq } mdv1 ∗ menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pmpaddr_n ↦ᵣ paddr1 ∗
+    tlb ↦ᵣ tv ∗ pc_is npc.
+  Proof.
+    iIntros "Hresv Hrw Hro".
+    rewrite s_rw_split s_ro_split_mix.
+    rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
+      s_rs_tlb.
+    rewrite s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+      s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+      s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+    iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc)".
+    iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg &
+                         #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv &
+                         Hsatp & Hmie & Hmdl & Hmenv)".
+    iFrame "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc".
+    rewrite /pc_is /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv".
+    iSplitL "Hms Hmi".
+    - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
+    - iExists cy, ti, ip. by iFrame.
+  Qed.
+
+
+  (* the regime's fetch translation as the wrapper must ask for it: the
+     tower components the wrapper cannot name ([pc_is]'s and [hw_config]'s
+     existentials) are ∀-BOUND, which costs a caller nothing --
+     [SRegime.sr_swp_translate] is itself ∀-over-files. *)
+  Definition spt_fetch_tr (Df : register -> dfrac)
+      (Res : type_of_register tlb -> iProp Σ) (pc : mword 64)
+      (mst0 satp0 mie0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) : iProp Σ :=
+    (∀ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
+       (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+       (elp0 : type_of_register elp),
+       spt_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res)%I.
+
+  (* ==================================================================== *)
+  (* wp_instr_s_config_regime -- THE RAW-CELL S-MODE WRAPPER.              *)
+  (*                                                                      *)
+  (* [WpInstrConfig.wp_instr_config]'s S twin.  Same surface as the        *)
+  (* exec-based rule it replaces on the CONFIG side (the five cells at a   *)
+  (* caller-chosen fraction, only the SIE fact required -- it is what      *)
+  (* pins the dispatch to [None]), and the four cells the regime used to   *)
+  (* hide inside [sr_inv R] now handed over raw, beside the regime's       *)
+  (* non-cell RESIDUE [Res] at the tlb value the cell carries.             *)
+  (*                                                                      *)
+  (* The obligation is a [swp] over [execute i] instead of a fupd handing  *)
+  (* back a whole successor sigma -- the one difference per-node stepping  *)
+  (* forces, exactly as in [wp_instr_config] -- and it is quantified over  *)
+  (* the tlb value the FETCH landed on, because the fetch walks.           *)
+  (* ==================================================================== *)
+  (* NOT PROVED.  What is left is assembly, and it is listed here so the
+     next agent does not have to re-derive it:
+       1. [spt_frames_intro], then [spt_cycle] at
+          [Q rs2 := ∃ npc tv', rs2 = <the post tower>] and
+          [Psi rs2 := Res (register_lookup tlb rs2) ∗ Rl];
+       2. the body: [spt_run_hart_active_instr_S] (PROVED above), with
+          - the DISPATCH pinned to [None] by
+            [WpIntrCore.swp_dispatchInterrupt_S] at [dst := MState (srs tv)
+            ∅ dev0_state] (so its agreement premise is [reflexivity]) and
+            [Db := misa ∪ mstatus]; [s_dispatch]'s guard is
+            [eq_vec (_get_Mstatus_SIE mst0) ('b"1")], which the first
+            premise makes [false];
+          - the EXECUTE obligation: [s_npc_agree] + [s_rw_ext]/[s_ro_ext]
+            to move the frames off the [register_set nextPC] onto the
+            tower, then [s_rw_split]/[s_ro_split_mix] to hand the leaf its
+            cells and take them back;
+       3. the continuation: [WpSFrames.s_tick_agree] + the two frame
+          extensions + [spt_frames_elim].
+     Step 1 is what [spt_cycle] is admitted for; steps 2 and 3 are
+     mechanical over lemmas that are proved above. *)
+  Lemma wp_instr_s_config_regime
+      (Res : type_of_register tlb -> iProp Σ)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
+      (mstatus1 mie1 mdv1 menvcfg1 satp1 : mword 64)
+      (pcfg1 : type_of_register pmpcfg_n)
+      (paddr1 : type_of_register pmpaddr_n)
+      (Rl : iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    (* the PMP grant, off the cells the wrapper now takes raw -- it used to
+       ride inside [SmodePte.pmp_config] within [sr_inv R] *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    tlb ↦ᵣ tlbv -∗ Res tlbv -∗
+    pc_is pc -∗
+    instr pc is_rvc i -∗
+    spt_fetch_tr (s_Df_mix dq) Res pc mstatus0 satp0 mie_v mdv0 menvcfg0
+      pcfg paddr -∗
+    (* THE LEAF'S OBLIGATION *)
+    (∀ tv' : type_of_register tlb,
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ Res tv' -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_frag cpu_id None -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mstatus ↦ᵣ{ dq } mstatus1 ∗
+                   mie ↦ᵣ{ dq } mie1 ∗
+                   mideleg ↦ᵣ{ dq } mdv1 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+                   satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗
+                   pmpaddr_n ↦ᵣ paddr1 ∗ tlb ↦ᵣ tv' ∗ Res tv' ∗
+                   (∃ npc : mword 64,
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
+                   resv_any cpu_id ∗ Rl)) -∗
+    ▷ (∀ (npc : mword 64) (tv1 : type_of_register tlb),
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } mstatus1 -∗
+         mie ↦ᵣ{ dq } mie1 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg1 -∗
+         satp ↦ᵣ satp1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pmpaddr_n ↦ᵣ paddr1 -∗
+         tlb ↦ᵣ tv1 -∗ Res tv1 -∗
+         pc_is npc -∗ Rl -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+  Admitted.
+
+  (* ==================================================================== *)
+  (* wp_instr_s_regime -- the same engine on the BUNDLE.                   *)
+  (*                                                                      *)
+  (* [WpInstr.wp_instr]'s S twin: [SmodeCore.smode_config] in and the same *)
+  (* bundle back, so the leaf never sees the cells' values (the bundle     *)
+  (* quantifies them) -- which is why its obligation is ∀ over them and    *)
+  (* returns them UNCHANGED.  A leaf that WRITES a config cell takes       *)
+  (* [wp_instr_s_config_regime] instead, exactly as M-mode splits          *)
+  (* [wp_instr] from [wp_instr_config].                                    *)
+  (* ==================================================================== *)
+  (* NOT PROVED: [wp_instr_s_config_regime] plus
+     [SmodeCore.smode_config_unbundle] / [_rebuild] on both sides. *)
+  Lemma wp_instr_s_regime
+      (Res : type_of_register tlb -> iProp Σ) (γ : gname)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
+      (Rl : iProp Σ) {dq : dfrac} :
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    smode_config γ dq -∗
+    satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    tlb ↦ᵣ tlbv -∗ Res tlbv -∗
+    pc_is pc -∗
+    instr pc is_rvc i -∗
+    (∀ (mstatus0 mie_v mdv0 menvcfg0 : mword 64),
+       ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ -∗
+       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ -∗
+       ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
+       ⌜ menvcfg0 = MENVCFG_S ⌝ -∗
+       spt_fetch_tr (s_Df_mix dq) Res pc mstatus0 satp0 mie_v mdv0 menvcfg0
+         pcfg paddr) -∗
+    (∀ (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+       (tv' : type_of_register tlb),
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ Res tv' -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_frag cpu_id None -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mstatus ↦ᵣ{ dq } mstatus0 ∗
+                   mie ↦ᵣ{ dq } mie_v ∗
+                   mideleg ↦ᵣ{ dq } mdv0 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg0 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗ Res tv' ∗
+                   (∃ npc : mword 64,
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
+                   resv_any cpu_id ∗ Rl)) -∗
+    ▷ (∀ (npc : mword 64) (tv1 : type_of_register tlb),
+         smode_config γ dq -∗
+         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         tlb ↦ᵣ tv1 -∗ Res tv1 -∗
+         pc_is npc -∗ Rl -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+  Admitted.
+
   (* =================================================================== *)
   (* Sv39-kernel instances under the ORIGINAL names/signatures: nothing   *)
   (* downstream moves.  [sr_inv (kpt_share_regime root_ppn)] IS            *)
@@ -2354,5 +2838,83 @@ Section SmodeCorePt.
               with "[] Hsi Hinv Hb").
     iApply sr_ktier_wit_kpt_share.
   Qed.
+
+  (* the Sv39-kernel regime's residue as a function of the tlb value:
+     [SRegime.kpt_swp_res root_ppn rs] with the file's [tlb] read off. *)
+  Definition spt_res_pt (root_ppn : mword 44) (tv : type_of_register tlb)
+    : iProp Σ := (tlb_snap_ok tv ∗ kpt_inv root_ppn)%I.
+
+  (* ==================================================================== *)
+  (* wp_instr_s_config_tlbinv_pt -- the Sv39-kernel instance, on the       *)
+  (* SHARED table's per-hart residue [KptShare.tlb_res_pt].  The bundle's  *)
+  (* satp / pmp values are its own existentials, so the leaf's obligation  *)
+  (* is ∀ over them; the continuation gets the bundle back.                *)
+  (* ==================================================================== *)
+  (* NOT PROVED: [tlb_res_pt_intro] / its destructuring around
+     [wp_instr_s_config_regime] at [Res := spt_res_pt root_ppn]. *)
+  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (Rl : iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_res_pt root_ppn -∗
+    pc_is pc -∗
+    instr pc is_rvc i -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n),
+       spt_fetch_tr (s_Df_mix dq) (spt_res_pt root_ppn) pc mstatus0 satp0
+         mie_v mdv0 menvcfg0 pcfg paddr) -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ spt_res_pt root_ppn tv' -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_frag cpu_id None -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mstatus ↦ᵣ{ dq } mstatus0 ∗
+                   mie ↦ᵣ{ dq } mie_v ∗
+                   mideleg ↦ᵣ{ dq } mdv0 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg0 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
+                   spt_res_pt root_ppn tv' ∗
+                   (∃ npc : mword 64,
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
+                   resv_any cpu_id ∗ Rl)) -∗
+    ▷ (∀ npc : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } mstatus0 -∗
+         mie ↦ᵣ{ dq } mie_v -∗
+         mideleg ↦ᵣ{ dq } mdv0 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+         tlb_res_pt root_ppn -∗
+         pc_is npc -∗ Rl -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+  Admitted.
 
 End SmodeCorePt.
