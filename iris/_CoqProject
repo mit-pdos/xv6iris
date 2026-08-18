@@ -27,6 +27,7 @@ HartRegNode.v
 HartSpan.v
 HartSpanChar.v
 HartRunGen.v
+HartSFrame.v
 HartMCycle.v
 HartStepAny.v
 HartMPmp.v
