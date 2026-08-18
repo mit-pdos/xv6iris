@@ -253,6 +253,59 @@ Section STower.
   Lemma s_rs_menv : register_lookup menvcfg s_rs = menv0.
   Proof. lk. Qed.
 
+
+  (* the tower transport the cycle rule needs: a file that AGREES with the
+     tower on the footprint IS the tower, as far as any frame can tell.
+     [HartMFrame.mm_rs_agree] one for one, 25 cells wide. *)
+  Lemma s_rs_agree (rs : regstate) :
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup (R_bitvector_64 nextPC) rs = npc ->
+    register_lookup (R_bitvector_64 minstret) rs = ms ->
+    register_lookup (R_bool minstret_increment) rs = bmi ->
+    register_lookup (R_bitvector_64 mcycle) rs = cy ->
+    register_lookup (R_bitvector_64 mtime) rs = ti ->
+    register_lookup (R_bitvector_64 mip) rs = ip ->
+    register_lookup tlb rs = tlbv ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mstatus rs = mst0 ->
+    register_lookup hart_state rs = HART_ACTIVE tt ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    register_lookup (R_bitvector_32 mcountinhibit) rs = mc ->
+    register_lookup (R_bitvector_64 minstretcfg) rs = micfg ->
+    register_lookup misa rs = misa0 ->
+    register_lookup mseccfg rs = mseccfg0 ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup elp rs = elp0 ->
+    register_lookup senvcfg rs = senv0 ->
+    register_lookup satp rs = satp0 ->
+    register_lookup mie rs = mie0 ->
+    register_lookup mideleg rs = mdv0 ->
+    register_lookup menvcfg rs = menv0 ->
+    reg_agree_on (s_Drw ∪ s_Dro) rs s_rs.
+  Proof.
+    intros H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
+      H18 H19 H20 H21 H22 H23 H24 H25.
+    intros r Hr. rewrite /s_Drw /s_Dro in Hr.
+    repeat (apply elem_of_union in Hr as [Hr|Hr]);
+      apply elem_of_singleton in Hr; subst r.
+    all: first
+      [ by rewrite H1 s_rs_PC | by rewrite H2 s_rs_nPC
+      | by rewrite H3 s_rs_ms | by rewrite H4 s_rs_mi
+      | by rewrite H5 s_rs_cy | by rewrite H6 s_rs_ti
+      | by rewrite H7 s_rs_ip | by rewrite H8 s_rs_tlb
+      | by rewrite H9 s_rs_priv | by rewrite H10 s_rs_mst
+      | by rewrite H11 s_rs_hart | by rewrite H12 s_rs_pcfg
+      | by rewrite H13 s_rs_paddr | by rewrite H14 s_rs_mc
+      | by rewrite H15 s_rs_micfg | by rewrite H16 s_rs_misa
+      | by rewrite H17 s_rs_sec | by rewrite H18 s_rs_pma
+      | by rewrite H19 s_rs_htif | by rewrite H20 s_rs_elp
+      | by rewrite H21 s_rs_senv | by rewrite H22 s_rs_satp
+      | by rewrite H23 s_rs_mie | by rewrite H24 s_rs_mdl
+      | by rewrite H25 s_rs_menv ].
+  Qed.
+
 End STower.
 
 (* SEALED, for [mm_rs]'s reason: a caller that unfolds a tower pays for a

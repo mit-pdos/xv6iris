@@ -36,6 +36,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
+Require Import HartMCycle.
 Require Import SmodeCore.
 Require Import InstrBytes IntrDefs KptShare SmodePte.
 Local Open Scope Z_scope.
@@ -193,6 +194,76 @@ Section sframes.
     iExists satp0, tlbv. iFrame "Hsatp Htlbc Hsnap Hkpt".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iExists pcfg, paddr. by iFrame "Hpcfg Hpaddr".
+  Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* The two tower transports the cycle rule consumes, [InstrBytes]'s      *)
+  (* [mm_tick_agree] / [mm_pre_agree] one for one.  Each is ONE            *)
+  (* [s_rs_agree] application, so the 25-way set reasoning is paid here     *)
+  (* rather than inside the wrapper's arms.                                *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the tail: [wrap_post] commits nextPC into PC and sets minstret, then the
+     tick moves mcycle/mtime/mip -- which is exactly what the [∖ tk_clock3]
+     in the incoming agreement leaves unpinned *)
+  Lemma s_tick_agree (pc npc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64) (tlbv : type_of_register tlb)
+      (mi : mword 64) (rs : regstate) :
+    reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs
+      (wrap_post (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                    mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) mi) ->
+    reg_agree_on (s_Drw ∪ s_Dro) rs
+      (s_rs npc npc mi bmi
+         (register_lookup (R_bitvector_64 mcycle) rs)
+         (register_lookup (R_bitvector_64 mtime) rs)
+         (register_lookup (R_bitvector_64 mip) rs)
+         mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+         satp0 mie0 mdv0 menv0 tlbv).
+  Proof.
+    intros Hag. apply s_rs_agree.
+    all: try reflexivity.
+    all: (etransitivity;
+          [ apply Hag; rewrite /s_Drw /s_Dro /tk_clock3; set_solver | ]).
+    all: try (by rewrite wrap_post_PC s_rs_nPC).
+    all: try (by rewrite wrap_post_ms).
+    all: rewrite wrap_post_other;
+      [| vm_compute; reflexivity | vm_compute; reflexivity ].
+    all: by rewrite ?s_rs_PC ?s_rs_nPC ?s_rs_ms ?s_rs_mi ?s_rs_cy ?s_rs_ti
+              ?s_rs_ip ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+              ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec
+              ?s_rs_pma ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp
+              ?s_rs_mie ?s_rs_mdl ?s_rs_menv.
+  Qed.
+
+  (* the head: [wrap_pre] overwrites minstret_increment and nothing else *)
+  Lemma s_pre_agree (pc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64) (tlbv : type_of_register tlb) :
+    reg_agree_on (s_Drw ∪ s_Dro)
+      (wrap_pre (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv))
+      (s_rs pc pc ms
+         (minstret_inc_flag mc micfg Supervisor)
+         cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+         satp0 mie0 mdv0 menv0 tlbv).
+  Proof.
+    apply s_rs_agree.
+    all: try (rewrite wrap_pre_mi;
+              by rewrite s_rs_mc s_rs_micfg s_rs_priv).
+    all: try (rewrite wrap_pre_other; [| vm_compute; reflexivity ]).
+    all: by rewrite ?s_rs_PC ?s_rs_nPC ?s_rs_ms ?s_rs_cy ?s_rs_ti ?s_rs_ip
+              ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+              ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec
+              ?s_rs_pma ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp
+              ?s_rs_mie ?s_rs_mdl ?s_rs_menv.
   Qed.
 
 
