@@ -15,7 +15,7 @@
    so it covers exactly the word and end-of-input cases, which is what
    `sh_is_sym b = false' says.  The four parse* functions are stated at the
    shape the input actually has (a whitespace-separated list of word tokens,
-   no redirections, no pipe, no list, no block); [parseblock], [redircmd],
+   no redirections, no pipe, no list) (no block); [parseblock], [redircmd],
    [pipecmd], [listcmd] and [backcmd] are not reached and are not even in
    the code catalog. *)
 From Stdlib Require Import ZArith Bool Lia List.
@@ -83,12 +83,25 @@ Section USpecShParse.
 
   (* the premises every lexer/parser contract shares: the buffer, the two
      static tables, the image and the layout *)
-  Definition sh_parse_pre (M : gmap Z (bv 8)) (s0 : Z) (bs : list (bv 8)) : Prop :=
+  Definition sh_parse_pre (M : gmap Z (bv 8)) (s0 : Z) (bs : list (bv 8))
+      (sp0 : mword 64) (n : Z) : Prop :=
     sh_layout pt hbase hlen /\ sh_img_sub M /\ sh_tables_ok M /\
     sh_buf_ok M s0 bs /\ sh_no_symbols bs /\
     uv_rd pt M s0 (Z.of_nat (length bs) + 1) /\
     uv_wr pt M s0 (Z.of_nat (length bs) + 1) /\
-    0 < s0 /\ s0 + Z.of_nat (length bs) + 1 <= 2 ^ 38.
+    0 < s0 /\ s0 + Z.of_nat (length bs) + 1 <= 2 ^ 38 /\
+    (* the frame misses the program image and the heap ... *)
+    sh_frame_ok hbase hlen sp0 n /\
+    (* ... and the command buffer misses the frame *)
+    s0 + Z.of_nat (length bs) + 1 <= uint sp0 - n.
+
+  (* A `char **' cell a caller passes down.  The code LOADS through it
+     (`s = *ps'), so a store-permitting leaf is not enough; it is 8-aligned
+     and it is a caller LOCAL, hence at or above the callee's entry sp. *)
+  Definition sh_ptr_cell (M : gmap Z (bv 8)) (a v : Z) (sp0 : mword 64) : Prop :=
+    uM_bytes M a 8 (mword_of_int v : mword 64) /\
+    uv_rd pt M a 8 /\ uv_wr pt M a 8 /\
+    a mod 8 = 0 /\ uint sp0 <= a /\ a + 8 <= 2 ^ 38.
 
   (* ------------------------------------------------------------------- *)
   (* §2 peek(ps, es, toks).                                                *)
@@ -109,19 +122,24 @@ Section USpecShParse.
   Definition wp_sh_peek_body (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (psaddr s0 : Z) (bs : list (bv 8)) (off : nat)
       (toks : Z) (tbs : list (bv 8)) :=
-    forall (Hpre : sh_parse_pre M s0 bs)
+    forall (Hpre : sh_parse_pre M s0 bs sp0 80)      (* own 64 + strchr 16 *)
       (Hsp : m !!! Regidx sp_idx = sp0)
-      (Hst : uv_stack pt M sp0 (64 + 16))            (* own + strchr *)
+      (Hst : uv_stack pt M sp0 80)
       (Hps : m !!! Regidx a0_idx = (mword_of_int psaddr : mword 64))
       (Hes : m !!! Regidx a1_idx
                = (mword_of_int (s0 + Z.of_nat (length bs)) : mword 64))
-      (Htoks : m !!! Regidx a2_idx = (mword_of_int toks : mword 64))
-      (Hcell : uM_bytes M psaddr 8 (mword_of_int (s0 + Z.of_nat off) : mword 64))
-      (Hcellw : uv_wr pt M psaddr 8)
+      (Htoksr : m !!! Regidx a2_idx = (mword_of_int toks : mword 64))
+      (Hcell : sh_ptr_cell M psaddr (s0 + Z.of_nat off) sp0)
       (Hoff : (off <= length bs)%nat)
+      (* the token table: a real, non-NULL, NUL-terminated string that misses
+         the frame.  [0 < toks] is not decoration -- with toks = 0 the code's
+         [strchr(0, *s)] returns 0 and peek returns 0 while [sh_peek_ret]
+         says 1, so the postcondition would be FALSE. *)
+      (Htnn : 0 < toks)
       (Htbs : ustr_at M toks tbs)
       (Htnz : forall (j : nat) (b : bv 8), tbs !! j = Some b -> b <> ubyte0)
       (Htrd : uv_rd pt M toks (Z.of_nat (length tbs) + 1))
+      (Uthi : toks + Z.of_nat (length tbs) + 1 <= uint sp0 - 80)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.peek) -∗
@@ -132,7 +150,9 @@ Section USpecShParse.
        ⌜uM_bytes M' psaddr 8
           (mword_of_int (s0 + Z.of_nat (off + sh_skipws (drop off bs)))
            : mword 64)⌝ -∗
-       ⌜uM_only M M' psaddr 8 \/ True⌝ -∗
+       (* peek disturbs the [ps] cell AND its own frame (plus strchr's) --
+          naming either alone would be wrong, not weak *)
+       ⌜uM_only_in M M' [sh_win (psaddr) (8); sh_win (uint sp0 - 80) (80)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -152,18 +172,27 @@ Section USpecShParse.
   Definition wp_sh_gettoken_body (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (psaddr qaddr eqaddr s0 : Z) (bs : list (bv 8))
       (off : nat) :=
-    forall (Hpre : sh_parse_pre M s0 bs)
+    forall (Hpre : sh_parse_pre M s0 bs sp0 80)      (* own 64 + strchr 16 *)
       (Hsp : m !!! Regidx sp_idx = sp0)
-      (Hst : uv_stack pt M sp0 (64 + 16))
+      (Hst : uv_stack pt M sp0 80)
       (Hps : m !!! Regidx a0_idx = (mword_of_int psaddr : mword 64))
       (Hes : m !!! Regidx a1_idx
                = (mword_of_int (s0 + Z.of_nat (length bs)) : mword 64))
       (Hq : m !!! Regidx a2_idx = (mword_of_int qaddr : mword 64))
       (Heq : m !!! Regidx a3_idx = (mword_of_int eqaddr : mword 64))
-      (Hcell : uM_bytes M psaddr 8 (mword_of_int (s0 + Z.of_nat off) : mword 64))
-      (Hcellw : uv_wr pt M psaddr 8)
-      (Hqw : qaddr = 0 \/ uv_wr pt M qaddr 8)
-      (Heqw : eqaddr = 0 \/ uv_wr pt M eqaddr 8)
+      (Hcell : sh_ptr_cell M psaddr (s0 + Z.of_nat off) sp0)
+      (* [q] and [eq] may be NULL: parseredirs and parseline call
+         gettoken(ps, es, 0, 0).  They are written, never read. *)
+      (Hqw : qaddr = 0 \/ (uv_wr pt M qaddr 8 /\ qaddr mod 8 = 0 /\
+                           uint sp0 <= qaddr /\ qaddr + 8 <= 2 ^ 38))
+      (Heqw : eqaddr = 0 \/ (uv_wr pt M eqaddr 8 /\ eqaddr mod 8 = 0 /\
+                             uint sp0 <= eqaddr /\ eqaddr + 8 <= 2 ^ 38))
+      (* the three cells are written in turn and the postcondition asserts
+         all three AT ONCE, so any aliasing would make it false *)
+      (Hdis1 : qaddr = 0 \/ qaddr + 8 <= psaddr \/ psaddr + 8 <= qaddr)
+      (Hdis2 : eqaddr = 0 \/ eqaddr + 8 <= psaddr \/ psaddr + 8 <= eqaddr)
+      (Hdis3 : qaddr = 0 \/ eqaddr = 0 \/
+               qaddr + 8 <= eqaddr \/ eqaddr + 8 <= qaddr)
       (Hoff : (off <= length bs)%nat)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -184,6 +213,12 @@ Section USpecShParse.
             (mword_of_int (s0 + Z.of_nat (off + k + n)) : mword 64)⌝ -∗
        ⌜uM_bytes M' psaddr 8
           (mword_of_int (s0 + Z.of_nat (off + k + n + k2)) : mword 64)⌝ -∗
+       (* WITHOUT this the caller cannot carry anything at all across a
+          gettoken call -- not the command buffer, not the execcmd node,
+          not the heap.  Claiming (0,8) for a NULL pointer is a harmless
+          weakening of the window list. *)
+       ⌜uM_only_in M M' [sh_win (psaddr) (8); sh_win (qaddr) (8); sh_win (eqaddr) (8);
+                         sh_win (uint sp0 - 80) (80)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -201,7 +236,7 @@ Section USpecShParse.
   (* parseredirs(cmd, ps, es): the loop never runs. *)
   Definition wp_sh_parseredirs_body (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (cmd psaddr s0 : Z) (bs : list (bv 8)) (off : nat) :=
-    forall (Hpre : sh_parse_pre M s0 bs)
+    forall (Hpre : sh_parse_pre M s0 bs sp0 (112 + 64 + 16))
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 (112 + 64 + 16))
       (Hcmd : m !!! Regidx a0_idx = (mword_of_int cmd : mword 64))
@@ -249,7 +284,7 @@ Section USpecShParse.
       (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (psaddr s0 : Z) (bs : list (bv 8)) (off : nat)
       (toks : list (nat * nat)) :=
-    forall (Hpre : sh_parse_pre M s0 bs)
+    forall (Hpre : sh_parse_pre M s0 bs sp0 budget)
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 budget)
       (Hps : m !!! Regidx a0_idx = (mword_of_int psaddr : mword 64))
@@ -292,7 +327,7 @@ Section USpecShParse.
   Definition wp_sh_nulterminate_body (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (cmd s0 : Z) (bs : list (bv 8))
       (toks : list (nat * nat)) :=
-    forall (Hpre : sh_parse_pre M s0 bs)
+    forall (Hpre : sh_parse_pre M s0 bs sp0 32)
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 32)
       (Hcmd : m !!! Regidx a0_idx = (mword_of_int cmd : mword 64))
@@ -322,7 +357,7 @@ Section USpecShParse.
   Definition wp_sh_parsecmd_body (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (s0 : Z) (bs : list (bv 8))
       (toks : list (nat * nat)) :=
-    forall (Hpre : sh_parse_pre M s0 bs)
+    forall (Hpre : sh_parse_pre M s0 bs sp0 (64 + 48 + 48 + 128 + 112 + 64 + 16))
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 (64 + 48 + 48 + 128 + 112 + 64 + 16))
       (Hs : m !!! Regidx a0_idx = (mword_of_int s0 : mword 64))

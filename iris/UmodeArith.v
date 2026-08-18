@@ -424,3 +424,22 @@ Qed.
    literal's [mword_of_int] *)
 Lemma moi_of_uint_eq (a : mword 64) (z : Z) : uint a = z -> a = mword_of_int z.
 Proof. intro H. rewrite <- H. symmetry. apply moi_of_uint. Qed.
+
+(* the UNSIGNED twins of [moi_ge_s] / [moi_lt_s].  Every pointer comparison
+   is unsigned (`bltu' / `bgeu'), so these are what a scan over a data
+   structure actually needs -- the signed pair only fits counts. *)
+Lemma moi_lt_u (x y : Z) :
+  0 <= x < Z64 -> 0 <= y < Z64 ->
+  zopz0zI_u (mword_of_int x : mword 64) (mword_of_int y) = Z.ltb x y.
+Proof.
+  intros Hx Hy. unfold zopz0zI_u.
+  rewrite (uint_moi x Hx) (uint_moi y Hy). reflexivity.
+Qed.
+
+Lemma moi_ge_u (x y : Z) :
+  0 <= x < Z64 -> 0 <= y < Z64 ->
+  zopz0zKzJ_u (mword_of_int x : mword 64) (mword_of_int y) = Z.geb x y.
+Proof.
+  intros Hx Hy. unfold zopz0zKzJ_u.
+  rewrite (uint_moi x Hx) (uint_moi y Hy). reflexivity.
+Qed.

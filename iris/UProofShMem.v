@@ -221,21 +221,7 @@ Qed.
    HOIST CANDIDATE: the exact twins of [moi_lt_s] / [moi_ge_s]
    (UmodeArith.v §3); free's scan branches on POINTERS, so it needs the
    unsigned pair. *)
-Lemma moi_lt_u (x y : Z) :
-  0 <= x < Z64 -> 0 <= y < Z64 ->
-  zopz0zI_u (mword_of_int x : mword 64) (mword_of_int y) = Z.ltb x y.
-Proof.
-  intros Hx Hy. unfold zopz0zI_u.
-  rewrite (uint_moi x Hx) (uint_moi y Hy). reflexivity.
-Qed.
 
-Lemma moi_ge_u (x y : Z) :
-  0 <= x < Z64 -> 0 <= y < Z64 ->
-  zopz0zKzJ_u (mword_of_int x : mword 64) (mword_of_int y) = Z.geb x y.
-Proof.
-  intros Hx Hy. unfold zopz0zKzJ_u.
-  rewrite (uint_moi x Hx) (uint_moi y Hy). reflexivity.
-Qed.
 
 (* ---- gcc's `zero-extend a uint field and scale by 16' idiom ----------- *)
 Local Lemma moi_scale16 (z : Z) :
@@ -264,30 +250,6 @@ Section UProofShMem.
   (* the 4-byte twin of UmodeAbi's [uv_slot8_facts]: every side condition a
      WORD access at a closed 4-aligned address needs.
      HOIST CANDIDATE: it belongs beside [uv_slot8_facts] (UmodeAbi §9). *)
-  Local Lemma slot4_facts (a : Z) (va : mword 64) :
-    0 <= a -> a mod 4 = 0 -> a + 4 <= 2 ^ 38 ->
-    va = (mword_of_int a : mword 64) ->
-    uint va = a /\
-    uva_canon va /\
-    Z.rem (uint va) 4096 <= 4092 /\
-    is_aligned_vaddr (Virtaddr va) 4 = true.
-  Proof.
-    intros Ha0 Ha4 Hahi Hva.
-    change (2 ^ 38) with 274877906944 in Hahi.
-    assert (Hu : uint va = a) by (rewrite Hva; apply uint_moi; unfold Z64; lia).
-    assert (Hm : a mod 4096 <= 4092).
-    { assert (Hd : (4 | 4096)) by (exists 1024; reflexivity).
-      pose proof (Znumtheory.Zmod_div_mod 4 4096 a ltac:(lia) ltac:(lia) Hd) as Hq.
-      pose proof (Z.mod_pos_bound a 4096 ltac:(lia)) as Hb.
-      pose proof (Z.div_mod (a mod 4096) 4 ltac:(lia)) as Hdm.
-      rewrite <- Hq in Hdm. rewrite Ha4 in Hdm. lia. }
-    split_and!.
-    - exact Hu.
-    - apply uva_canon_small. rewrite <- uint_unsigned. rewrite Hu. lia.
-    - rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Hm | lia | lia ].
-    - unfold is_aligned_vaddr. apply Z.eqb_eq. cbn [bits_of_virtaddr].
-      rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Ha4 | lia | lia ].
-  Qed.
 
   (* everything an 8-byte LOAD at a closed 8-aligned address needs, off ONE
      [uM_bytes] premise *)
@@ -1260,7 +1222,7 @@ Section UProofShMem.
     assert (Hbpsz2 : uM_bytes M2 (bp + 8) 8 (mword_of_int nu : mword 64))
       by (intros j Hj; rewrite (HeqM2 (bp + 8 + Z.of_nat j) ltac:(lia));
           exact (Hbpsz j Hj)).
-    destruct (slot4_facts (bp + 8) (mword_of_int (bp + 8)) ltac:(lia) ltac:(lia)
+    destruct (uv_slot4_facts (bp + 8) (mword_of_int (bp + 8)) ltac:(lia) ltac:(lia)
                 ltac:(lia) eq_refl) as (Hu3 & Hcn3 & Hpg3 & Hal3).
     assert (Hbw3 : uM_bytes M2 (uint (mword_of_int (bp + 8) : mword 64)) 4
                      (mword_of_int nu : mword 32))
@@ -1507,7 +1469,7 @@ Section UProofShMem.
       rewrite (HeqM2 (8336 + Z.of_nat j) ltac:(lia)).
       replace (8336 + Z.of_nat j) with (8328 + 8 + Z.of_nat j) by lia.
       exact (Hbasesz j Hj). }
-    destruct (slot4_facts 8336 (mword_of_int 8336) ltac:(lia)
+    destruct (uv_slot4_facts 8336 (mword_of_int 8336) ltac:(lia)
                 ltac:(vm_compute; reflexivity) ltac:(lia) eq_refl)
       as (Hu4 & Hcn4 & Hpg4 & Hal4).
     assert (Hbw4 : uM_bytes M3 (uint (mword_of_int 8336 : mword 64)) 4

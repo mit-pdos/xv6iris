@@ -162,6 +162,32 @@ state it as `gset_disjUR (mword 64) (EqDecision0 := @…Decidable_eq_mword 64)
 unpinned functor field takes stdpp's instances and then fails to unify at
 every use site, with an error naming neither.
 
+## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
+
+**"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal
+is not a printing illusion and not a scope problem** — it is ssreflect's
+keyed matching declining a term that is only CONVERTIBLE, not syntactically
+equal, to the pattern. Printing both with `idtac` confirms they are
+identical and gets you no further. (Seen rewriting `m !!! Regidx ra_idx`
+inside `uM_bytes … 8 (m !!! Regidx ra_idx)` against a hypothesis
+`mA !!! Regidx ra_idx = m !!! Regidx ra_idx`.)
+
+The fix is not to rewrite at all: state a one-line CONGRUENCE lemma for the
+predicate (`uM_bytes_val : w1 = w2 -> uM_bytes M a 8 w1 -> uM_bytes M a 8 w2`)
+and `apply` it, so the equation is discharged by unification and conversion
+instead of by syntactic matching. Same family as the `regval_into_reg`
+`f_equal` paper cut above.
+
+Two smaller ones from the same proof:
+
+- **`unfold c in H1, H2` unfolds only in `H1`.** The failure surfaces as a
+  `lia` two lines later that has every fact it needs — except that the second
+  hypothesis was never unfolded. Write two `unfold`s.
+- **An inline `ltac:(lia)` inside `rewrite (lem _ _ _ ltac:(lia))` fails when
+  an earlier `_` is still an evar at splice time.** Spell out the argument the
+  side condition mentions. (Same root cause as the `Qp.div_2` and
+  `co_license` traps: a hole whose expected type is still an evar.)
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a

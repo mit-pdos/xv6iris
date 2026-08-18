@@ -101,6 +101,12 @@ Definition sh_execs_echo `{!riscvGS Σ}
 Definition sh_frame_ok (hbase hlen : Z) (sp0 : mword 64) (n : Z) : Prop :=
   hbase + hlen <= uint sp0 - n.
 
+(* A disturbed window, as [uM_only_in] takes them.  Named because a bare
+   pair inside [⌜ ⌝] parses in the bi scope as a product TYPE, and the error
+   ("has type Z while it is expected to have type Type") names neither the
+   scope nor the pair. *)
+Definition sh_win (a n : Z) : Z * Z := (a, n).
+
 Section USpecSh.
   Context `{!riscvGS Σ} `{!uioG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -380,7 +386,7 @@ Section USpecSh.
           moved.  Stating only the destination would be wrong, not weak:
           the prologue spills ra and s0 into the frame and never restores
           those bytes. *)
-       ⌜uM_only_in M M' [(dst, n); (uint sp0 - 16, 16)]⌝ -∗
+       ⌜uM_only_in M M' [sh_win (dst) (n); sh_win (uint sp0 - 16) (16)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -443,7 +449,7 @@ Section USpecSh.
        ⌜uM_bytes M' bp 8 (mword_of_int SH_BASE : mword 64)⌝ -∗
        ⌜uM_bytes M' (bp + 8) 8 (mword_of_int nu : mword 64)⌝ -∗
        ⌜uM_bytes M' SH_FREEP 8 (mword_of_int SH_BASE : mword 64)⌝ -∗
-       ⌜uM_only_in M M' [(uint sp0 - 16, 16); (SH_FREEP, 8); (SH_BASE, 16); (bp, 16)]⌝ -∗
+       ⌜uM_only_in M M' [sh_win (uint sp0 - 16) (16); sh_win (SH_FREEP) (8); sh_win (SH_BASE) (16); sh_win (bp) (16)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -473,8 +479,8 @@ Section USpecSh.
        (* the returned block is writable and disjoint from image and stack *)
        ⌜uv_wr pt M' (hbase + 65536 - 16 * (sh_nunits nbytes - 1))
                     (16 * (sh_nunits nbytes - 1))⌝ -∗
-       ⌜uM_only_in M M' [(hbase, 65536); (SH_FREEP, 8); (SH_BASE, 16);
-                         (uint sp0 - 96, 96)]⌝ -∗
+       ⌜uM_only_in M M' [sh_win (hbase) (65536); sh_win (SH_FREEP) (8); sh_win (SH_BASE) (16);
+                         sh_win (uint sp0 - 96) (96)]⌝ -∗
        ubrk gbrk (hbase + 65536) -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -565,6 +571,12 @@ Section USpecSh.
       (Htk : sh_gets_taken taken rest)
       (Hfit : Z.of_nat (length taken) + 1 < max /\ max < 2 ^ 31)
       (Hwr : uv_wr pt M buf max)
+      (* the frame must miss image and heap: gets' one-byte read slot is at
+         sp0-81, and [wp_sh_read_body]'s [Hbufhi] wants it above the text *)
+      (Hfr : sh_frame_ok hbase hlen sp0 96)
+      (* and the caller's buffer must miss the text, or the loop's own
+         [ui_sh_*] facts do not survive its first [sb] *)
+      (Hbufhi : 8192 <= buf)
       (Hdisj : buf + max <= uint sp0 - 96 \/ uint sp0 <= buf)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -573,7 +585,13 @@ Section USpecSh.
     (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int buf : mword 64)⌝ -∗
-       ⌜uM_written M M' buf (taken ++ [ubyte0])⌝ -∗
+       (* the line, NUL-terminated ... *)
+       ⌜ustr_at M' buf taken⌝ -∗
+       (* ... and nothing outside the buffer and gets' own 96-byte frame.
+          A bare [uM_written] here is FALSE, not weak: the prologue spills
+          ra and s0..s8 and [read] writes the byte slot at sp0-81. *)
+       ⌜uM_only_in M M' [sh_win buf (Z.of_nat (length taken) + 1);
+                         sh_win (uint sp0 - 96) 96]⌝ -∗
        ustdin gin rest -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -592,6 +610,15 @@ Section USpecSh.
       (Htk : sh_gets_taken taken rest)
       (Hfit : Z.of_nat (length taken) + 1 < nbuf /\ nbuf < 2 ^ 31)
       (Hwr : uv_wr pt M buf nbuf)
+      (* getcmd does not only WRITE the buffer: [lbu a0,0(s1)] reads buf[0]
+         for the EOF test, and a store leaf does not give a load leaf *)
+      (Hrd : uv_rd pt M buf nbuf)
+      (Hfr : sh_frame_ok hbase hlen sp0 128)
+      (Hbufhi : 8192 <= buf)
+      (* getcmd returns -1 exactly when buf[0] = 0, and [sh_gets_taken] does
+         NOT exclude a NUL inside the line -- on input "\000abc\n" the
+         return value would be -1 with [taken] non-empty *)
+      (Hnul : forall b : bv 8, taken !! 0%nat = Some b -> b <> ubyte0)
       (Hdisj : buf + nbuf <= uint sp0 - 128 \/ uint sp0 <= buf)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -603,7 +630,9 @@ Section USpecSh.
        ⌜m' !!! Regidx a0_idx
           = (mword_of_int (if bool_decide (taken = []) then (-1) else 0)
              : mword 64)⌝ -∗
-       ⌜uM_written M M' buf (taken ++ replicate (Z.to_nat nbuf - length taken) ubyte0)⌝ -∗
+       ⌜ustr_at M' buf taken⌝ -∗
+       ⌜sh_zeroed M' buf (Z.of_nat (length taken) + 1) nbuf⌝ -∗
+       ⌜uM_only_in M M' [sh_win (buf) (nbuf); sh_win (uint sp0 - 128) (128)]⌝ -∗
        ustdin gin rest -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
