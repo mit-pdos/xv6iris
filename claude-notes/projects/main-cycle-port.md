@@ -33,21 +33,26 @@ instruction this kernel executes except `csrw stimecmp`.
 RED ROOTS, with what each needs and what it GATES (dependent counts off
 `.CoqMakefile.d`; rerun the count, do not trust it):
 
-| file | dependents | needs |
-|---|---|---|
-| `WpIntrCore` | 711 | THE INTERRUPT-ENTRY ENGINE.  Fails at line 602 on `wp_exec_step_minstret`, one of the three `wp_exec_step_*` rules deleted in `c1b82ebc`.  Its cycle rule now EXISTS (`HartStepAny.swp_exec_step_any`); what is left is the S-mode `run_hart_active` with a DISJUNCTIVE conclusion — see §"the arm nobody can pick".  Also blocks `WpSmodeWfi` (needs the `Enter_Wait` arm too) and `UserStepFull` |
-| `SmodeCorePt` | 464 | fails at line 667 on `SmodeCore.wp_exec_step_decode_execute_inv_priv` (deleted — the swp replacement needs the S-mode fetch).  So: the S-MODE FETCH (Sv39 + TLB), then `wp_instr_s` / `s_cycle` on it.  `TrampStepPt` (19) is the same story |
-| `WpMmodeLoad` | 8 | width-8 sweep of `HartMStore` |
-| `WpMmodeStore` | 7 | ditto |
-| `WpGprCsrwStimecmp` | 7 | the cycle rule's post-file as a PREDICATE, so a leaf may write mip — see §"the two cells a leaf cannot have" |
-| `WpMmodeMret` | 6 | the MRET walk plus a value-preserving write rule for elp — same § |
-| `RiscvAdequacy` | 2 | one `discriminate` over the language's step relation ("No primitive equality found" at line 907) |
+| file | needs |
+|---|---|
+| `WpIntrInv` | THE NEW ROOT.  It inlines the interrupt reasoning `wp_exec_step_interrupt_inv` used to package (its own comment says "verbatim"), so it must be rewritten against `HartStepAny.swp_exec_step_any` + `WpIntrCore.swp_run_hart_active_S`.  Everything it needs is proved |
+| `BootBridge`, `UserExec` | the same story, one level out |
+| `SmodeCorePt` | `wp_exec_step_decode_execute_inv_priv`'s callers; the swp side is `HartMCycle.swp_exec_step_decode_execute` and the S-mode fetch now exists |
+| `WpMmodeLoad` / `WpMmodeStore` | width-8 sweep of `HartMStore` |
+| `WpMmodeMret` | the MRET walk plus `HartRegNode.swp_write_reg_same` for elp |
+| `WpGprCsrwStimecmp` | the cycle rule's post-file as a PREDICATE, so a leaf may write mip |
+| `RiscvAdequacy` | one `discriminate` over the language's step relation |
 
-**TWO ENGINES GATE THE TREE; THE LEAVES DO NOT.**  The four M-mode leaf roots
-are worth 6–8 files each.  `WpIntrCore` is worth 711 and `SmodeCorePt` 464.
-**Do not judge the remaining work by the number of red roots** — it is three
-ENGINES (fetch/execute, done; interrupt entry; the S-mode fetch) and then
-everything else follows.
+**WHERE THE TREE STANDS: 685 of 1186 files compile**, up from ~445 before the
+711-file root fell.  The remaining roots are SHALLOW — no single one gates
+half the tree the way `WpIntrCore` did.
+
+**THE THREE ENGINES ARE DONE.**  Fetch/execute (`wp_instr` and the
+`run_hart_active` family), interrupt entry (`swp_exec_step_any` →
+`swp_run_hart_active_S` → `swp_dispatchInterrupt_S`), and the S-mode fetch
+(`swp_fetch_S` over the converted page walk).  What is left is CALLERS: files
+that still spell out the old whole-cycle reasoning inline and must be pointed
+at the new rules.  That is volume, not design.
 
 `SmodeCore.v` itself is green now: its blocker was the dead engine
 `wp_exec_step_decode_execute_inv_priv`, deleted for the reason the M-mode one
