@@ -1,29 +1,22 @@
-(* WpSmodePtEngine.v -- the REGIME-GENERIC S-mode instruction engines at the
-   per-node ([swp]) layer, and the one thing the [sr_inv R] wrappers still
-   owe their callers.
+(* WpSmodePtEngine.v -- the S-mode instruction ENGINES the leaf sweep was
+   missing, at the per-node ([swp]) layer.
 
-   WHY THIS FILE EXISTS.  [SmodeCorePt]'s wrappers
-   ([wp_instr_s_config_sr] / [wp_instr_s_sr]) take the FETCH TRANSLATION
-   ([SmodeCorePt.spt_fetch_tr]) as a premise and hand it straight up.  A
-   regime-generic LEAF carries only [SRegime.sr_inv R], so it has nothing to
-   pay that premise with -- and it cannot be produced from
-   [SRegime.sr_swp_translate] alone either, because that field's last two
-   premises are REGIME-SPECIFIC:
+   Every register-only S-mode instruction already has a node shape
+   ([WpMmodeSwpBase]), every branch/jump/fence one has a walk
+   ([WpSconfEngine]), and the data accesses have theirs ([HartSMem]).  SRET
+   had only the exec-side reduction ([WpSmodeSret.exec_execute_SRET_menv]),
+   so [WpSmodePtCtl.wp_sret_gpr_r] and [WpSconfSret.wp_sret_s_sconf] had
+   nothing to stand on.  [swp_execute_SRET_S] below is that walk --
+   [WpMmodeMret.swp_execute_MRET] one privilege over, node by node along the
+   model's own binds.
 
-     - [sr_adm R va ppn], the regime's admissibility of the claim, and
-     - [sr_swp_side R RS acc va ppn kp Db Drw Dro rs dst], the regime's own
-       side condition (13 conjuncts for the shared kernel table).
+   Also here: [s_va_canon_of_lo], the Sv39 canonicality premise every
+   translate lemma asks for, derived from the [uint va < 2^38] bound the
+   fetch obligation hands its caller.
 
-   [SRegimeFetch] below is exactly those two, specialised to a FETCH
-   ([acc = InstructionFetch tt], [kp = KP_rx], the S-mode frame footprints)
-   and stated over the pins a wrapper's tower actually provides.  It is a
-   CLASS, so a leaf takes it as an inferred implicit binder and every call
-   site keeps its positional argument list.
-
-   [s_regime_swp] is likewise made a class here (it is declared as a plain
-   [Record] in SRegime.v, which this file does not edit), with the two
-   instances registered, so that a leaf quantified over [R : s_regime] can
-   find the swp face of its own regime. *)
+   NOTHING HERE IS REGIME-AWARE.  The regime layer ([SRegime] /
+   [SmodeCorePt]) is a sibling effort; this file deliberately does not
+   depend on it, so it stays green while that interface moves. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -647,3 +640,5 @@ Section SretSwp.
   Qed.
 
 End SretSwp.
+
+
