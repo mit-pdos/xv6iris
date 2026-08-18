@@ -3089,7 +3089,7 @@ Section SmodeCorePt.
       (mstatus1 mie1 mdv1 menvcfg1 satp1 : mword 64)
       (pcfg1 : type_of_register pmpcfg_n)
       (paddr1 : type_of_register pmpaddr_n)
-      (Rl : iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3140,8 +3140,8 @@ Section SmodeCorePt.
                    pmpaddr_n ↦ᵣ paddr1 ∗ tlb ↦ᵣ tv' ∗ Res tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
-                   resv_any cpu_id ∗ Rl)) -∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                   resv_any cpu_id)) -∗
     ▷ (∀ (npc : mword 64) (tv1 : type_of_register tlb),
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
          cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -3151,7 +3151,7 @@ Section SmodeCorePt.
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          satp ↦ᵣ satp1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pmpaddr_n ↦ᵣ paddr1 -∗
          tlb ↦ᵣ tv1 -∗ Res tv1 -∗
-         pc_is npc -∗ Rl -∗
+         pc_is npc -∗ Rl npc -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3169,7 +3169,7 @@ Section SmodeCorePt.
                   micfg misa0 mseccfg0 senv0 pmar0 elp0) as "#Htr0".
     iApply (spt_cycle (s_Df_mix dq) pc
               (fun rs2 => (Res (register_lookup tlb rs2) ∗ resv_any cpu_id
-                           ∗ Rl)%I)
+                           ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2))%I)
               (fun rs2 => exists (npc : mword 64) (tv : type_of_register tlb),
                  rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
               ms bmi cy ti ip mstatus0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
@@ -3181,6 +3181,7 @@ Section SmodeCorePt.
         iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl)".
         destruct HQ as (npc & tv & ->).
         iEval (rewrite s_rs_tlb) in "HRes".
+        iEval (rewrite s_rs_nPC) in "HRl".
         pose proof (s_tick_agree pc npc ms
                       (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1
                       pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
@@ -3206,7 +3207,8 @@ Section SmodeCorePt.
                                  (tv : type_of_register tlb),
                       rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
                    (fun rs2 => (Res (register_lookup tlb rs2)
-                                ∗ resv_any cpu_id ∗ Rl)%I)
+                                ∗ resv_any cpu_id
+                                ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2))%I)
                    emp%I (fun _ _ => False%I)
                    Hmisaval Hmenvval Helpnp (pma_all_ram Hpmaall)
                    HA Hord HX Hcov
@@ -3244,8 +3246,8 @@ Section SmodeCorePt.
         [| iApply ("Hex" $! tv' with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
                      Hpaddr Htlbc HRes' HPC HnPC Hany") ].
       iIntros (e) "(-> & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
-                    Hpaddr & Htlbc & HRes' & Hpcs & Hany & HRl)".
-      iDestruct "Hpcs" as (npc) "(HPC & HnPC)".
+                    Hpaddr & Htlbc & HRes' & Hpcs & Hany)".
+      iDestruct "Hpcs" as (npc) "(HPC & HnPC & HRl)".
       iSplitR; [done|].
       iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv').
       iSplitR; [iPureIntro; by exists npc, tv' |].
@@ -3259,7 +3261,7 @@ Section SmodeCorePt.
       { iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg
                 Hpaddr Hsatp Hmie Hmdl Hmenv".
         by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv". }
-      rewrite s_rs_tlb. iFrame "Hrw Hro HRes' Hany HRl".
+      rewrite s_rs_tlb s_rs_nPC. iFrame "Hrw Hro HRes' Hany HRl".
   Qed.
 
   (* ==================================================================== *)
@@ -3279,7 +3281,7 @@ Section SmodeCorePt.
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
-      (Rl : iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
     pmpAddrMatchType_encdec_backwards
       (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
     zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
@@ -3320,13 +3322,13 @@ Section SmodeCorePt.
                    pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗ Res tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
-                   resv_any cpu_id ∗ Rl)) -∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                   resv_any cpu_id)) -∗
     ▷ (∀ (npc : mword 64) (tv1 : type_of_register tlb),
          smode_config γ dq -∗
          satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
          tlb ↦ᵣ tv1 -∗ Res tv1 -∗
-         pc_is npc -∗ Rl -∗
+         pc_is npc -∗ Rl npc -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3414,7 +3416,7 @@ Section SmodeCorePt.
   Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (Rl : iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3460,8 +3462,8 @@ Section SmodeCorePt.
                    spt_res_pt root_ppn tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
-                   resv_any cpu_id ∗ Rl)) -∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                   resv_any cpu_id)) -∗
     ▷ (∀ npc : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
          cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -3470,7 +3472,7 @@ Section SmodeCorePt.
          mideleg ↦ᵣ{ dq } mdv0 -∗
          menvcfg ↦ᵣ{ dq } menvcfg0 -∗
          tlb_res_pt root_ppn -∗
-         pc_is npc -∗ Rl -∗
+         pc_is npc -∗ Rl npc -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3525,7 +3527,7 @@ Section SmodeCorePt.
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (mstatus1 mie1 mdv1 menvcfg1 : mword 64)
-      (Rl : iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3576,8 +3578,8 @@ Section SmodeCorePt.
                    sr_swp_res_at R RS satp0 tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
-                   resv_any cpu_id ∗ Rl)) -∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                   resv_any cpu_id)) -∗
     ▷ (∀ npc : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
          cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -3586,7 +3588,7 @@ Section SmodeCorePt.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          sr_inv R -∗
-         pc_is npc -∗ Rl -∗
+         pc_is npc -∗ Rl npc -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3622,7 +3624,7 @@ Section SmodeCorePt.
      [smode_config] quantifies them, exactly as [wp_instr_s_regime] does. *)
   Lemma wp_instr_s_sr (R : s_regime) (RS : s_regime_swp R) (γ : gname)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (Rl : iProp Σ) {dq : dfrac} :
+      (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
     smode_config γ dq -∗
     sr_inv R -∗
     pc_is pc -∗
@@ -3662,10 +3664,10 @@ Section SmodeCorePt.
                    sr_swp_res_at R RS satp0 tv' ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
-                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
-                   resv_any cpu_id ∗ Rl)) -∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
+                   resv_any cpu_id)) -∗
     ▷ (∀ npc : mword 64,
-         smode_config γ dq -∗ sr_inv R -∗ pc_is npc -∗ Rl -∗
+         smode_config γ dq -∗ sr_inv R -∗ pc_is npc -∗ Rl npc -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
