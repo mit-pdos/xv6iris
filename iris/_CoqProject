@@ -172,6 +172,7 @@ SmodePte.v
 UserFrame.v
 PtBytes.v
 UserBytes.v
+PtWalkCert.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
