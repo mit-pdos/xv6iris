@@ -1,38 +1,29 @@
 (* ===================================================================== *)
-(* THE PER-NODE PORT: WHERE THIS FILE STANDS (2026-08-18).                *)
+(* THE PER-NODE PORT: THIS FILE IS DONE (2026-08-18).                     *)
 (*                                                                        *)
-(* FOURTEEN OF THE SIXTEEN LEAVES are converted to                        *)
-(* [WpSmodeIntr.sconf_step_obl] and verified, all of them running on       *)
-(* [HartSCsr]'s privilege-generic CSR engines.  EVERY STATEMENT IS         *)
+(* All SIXTEEN leaves are converted to [WpSmodeIntr.sconf_step_obl] and    *)
+(* run on [HartSCsr]'s privilege-generic CSR engines.  EVERY STATEMENT IS  *)
 (* BYTE-IDENTICAL except [wp_csrr_ro_s_sconf]'s, whose whole-[execute]     *)
-(* [exec] premise had to become an [swp] obligation (an [exec] fact        *)
+(* [exec] premise had to become an [swp] obligation -- an [exec] fact      *)
 (* constrains the START state only, and a per-node walk may be interfered  *)
-(* with between nodes -- the same forced change                            *)
-(* [WpSmodeIntr.wp_gpr_write_s_sconf] made).  Its three instances are      *)
-(* untouched.                                                             *)
+(* with between nodes, so nothing bridges the two.  That is the same       *)
+(* forced change [WpSmodeIntr.wp_gpr_write_s_sconf] made; its three        *)
+(* instances are untouched.                                               *)
 (*                                                                        *)
-(* THE TWO THAT ARE LEFT ARE THE csrci DISABLE FLIPS                       *)
-(* ([wp_csrci_sstatus_s_sconf], [wp_csrci_sstatus_x0_s_sconf]), and they   *)
-(* wait on ONE more turn of the wrapper's interface.  Both hand their      *)
-(* continuation the payload the ENABLED arm was holding -- the trap CSRs,  *)
-(* the count token, the running claim, the per-cpu cells -- and every one  *)
-(* of those is HART-INDEXED.  The obligation produces them at the hart the *)
-(* callback bound and the continuation consumes them there, but the only   *)
-(* channel between the two is the rider [R], which is a parameter of       *)
-(* [wp_instr_s_sconf] and is therefore elaborated at the ENTRY hart.  [R]  *)
-(* has to become [CpuId]-indexed -- [R CID npc ms' m' n'], at              *)
-(* [sconf_step_obl]'s own CID -- before either can be written.  A rider    *)
-(* that is PURE is unaffected, which is why the ENABLE flips               *)
-(* ([wp_csrsi_sstatus_x0_s_sconf] and its [_enable_] wrapper) and          *)
-(* [WpSconfSret.wp_sret_s_sconf] are not blocked: their case split refutes *)
-(* the already-enabled arm ABOVE the funnel, leaving [b = false], where    *)
-(* [wp_next_off_intro] retires the hart question outright.                 *)
-(*                                                                        *)
-(* Both keep their PRE-PORT proofs and sit at the END of the section, so   *)
-(* this file is RED from the first of them down and everything ABOVE is    *)
-(* machine-checked in the committed form.  NOTHING here is [Admitted]: a   *)
-(* leaf-level admit would make the whole interrupts-off tier vacuous while *)
-(* compiling.                                                             *)
+(* THREE THINGS IN THE WRAPPER'S OBLIGATION ARE LOAD-BEARING HERE, and     *)
+(* each was added for a leaf in this file:                                 *)
+(*   - the SECOND arm index [b']: the four sstatus flips MOVE the SIE arm, *)
+(*     and before it the flip could not be stated at all ([sconf]'s ghost  *)
+(*     half at the new bit and [sie_arm true]'s quarter at the old one are *)
+(*     contradictory, so the obligation's post was FALSE, not merely       *)
+(*     unreachable);                                                       *)
+(*   - the mstatus witness [ms']: [wp_csrr_sstatus_s_sconf] NAMES the word *)
+(*     it read, so its [sconf_at ms] and the [sstatus_read ms] that landed *)
+(*     in rd are about the same word by construction;                      *)
+(*   - the rider's HART [R CID …]: the two csrci disable flips hand their  *)
+(*     continuation the enabled arm's payload -- trap CSRs, count token,   *)
+(*     running claim, per-cpu cells -- and every one of those is           *)
+(*     hart-indexed, so a rider fixed at the entry hart cannot carry them. *)
 (* ===================================================================== *)
 (* WpSconfCsr.v -- the S-mode CSR leaves over [sconf]+[sie_cap]: the
    sstatus reads/flips, [wp_csrw_stvec_s_sconf] (the trap-vector
@@ -1644,7 +1635,7 @@ Section WpSconfCsr.
       by (split_and!; vm_compute; reflexivity).
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  stvec ↦ᵣ wval)%I
               with "Hcg Hpc Hinstr [Hstv Hcont]").
@@ -1797,7 +1788,7 @@ Section WpSconfCsr.
       by (split_and!; vm_compute; reflexivity).
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  sepc ↦ᵣ mepc_val wval)%I
               with "Hcg Hpc Hinstr [Hsepc Hcont]").
@@ -1968,7 +1959,7 @@ Section WpSconfCsr.
       by (symmetry; apply upd_ne; congruence).
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csrn, zreg, Regidx rd, CSRRS))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗
                  ⌜m' = <[Regidx rd := regval_into_reg (f v)]> m⌝ ∗
                  ⌜n' = n⌝ ∗ R_bitvector_64 rg ↦ᵣ{dq} v)%I
@@ -2232,7 +2223,7 @@ Section WpSconfCsr.
       by (vm_compute; reflexivity).
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
@@ -2364,7 +2355,7 @@ Section WpSconfCsr.
       by (vm_compute; reflexivity).
     iApply (wp_instr_s_sconf m n true true pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
@@ -2535,7 +2526,7 @@ Section WpSconfCsr.
        the rider as pure side conditions. *)
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜_get_Mstatus_SIE  ms' = sie_bit false⌝ ∗
                  ⌜_get_Mstatus_SPP  ms' = _get_Sstatus_SPP  wval⌝ ∗
@@ -2732,7 +2723,7 @@ Section WpSconfCsr.
       by (split_and!; vm_compute; reflexivity).
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csr_satp, zreg, Regidx rd, CSRRS))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ (sp0 : mword 64) (root : mword 44),
                     m' = <[Regidx rd := regval_into_reg sp0]> m /\
@@ -2882,7 +2873,7 @@ Section WpSconfCsr.
     (* THE ARM MOVES the other way: [false] in, [true] out. *)
     iApply (wp_instr_s_sconf m (trap_res true + n)%nat false true pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗
                  ⌜n' = (trap_res false + n)%nat⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
@@ -3104,7 +3095,7 @@ Section WpSconfCsr.
        rd are about the SAME word. *)
     iApply (wp_instr_s_sconf m n b b pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗
                  ⌜m' = <[Regidx rd := regval_into_reg (sstatus_read ms')]> m⌝ ∗
                  ⌜n' = n⌝)%I
@@ -3229,221 +3220,6 @@ Section WpSconfCsr.
       { iFrame "Hstk Harm Hwit". iPureIntro. exact Hb. }
   Qed.
 
-  (* =================================================================== *)
-  (* THE TWO csrci DISABLE FLIPS THE SWEEP HAS NOT REACHED.  They are at  *)
-  (* the                                                                  *)
-  (* END of the section ON PURPOSE: they still carry their PRE-PORT       *)
-  (* proofs, so this file is red from here down and everything ABOVE --   *)
-  (* the engines and the six converted leaves -- is machine-checked in    *)
-  (* the committed form.  Five of the ten are BLOCKED on the wrapper (see *)
-  (* the file header); the other five want the sstatus write's assembled  *)
-  (* goodb certificate, and satp's the mstatus.TVM one.  Their STATEMENTS *)
-  (* are byte-identical to the pre-sweep ones and must stay that way.     *)
-  (* (Each one's own doc comment stays where it was, above the place it   *)
-  (* used to sit.)                                                       *)
-  (* =================================================================== *)
-
-  Lemma wp_csrci_sstatus_s_sconf
-      (pc : mword 64) (rd : mword 5) (k : nat) (eb : bool)
-      (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    sie_cap_gpr kt m n b p -∗
-    intr_count_pre b k eb -∗
-    pc_is pc -∗
-    instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      ∀ ms : mword 64,
-      ⌜ sconf_ms_facts ms ⌝ -∗
-      ⌜ k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb ⌝ -∗
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)
-                  (trap_res b + n)%nat false p -∗
-      intr_count (S k) eb -∗
-      trap_csrs_pay kt k eb -∗
-      cpu_claim_pay k eb p -∗
-      cpu_priv_pay b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hrdok) "Hcg Hcnt Hpc Hinstr Hcont".
-    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
-    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b pc false
-              (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
-    pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
-        %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms0)
-      by (unfold s_pc; tmig; exact Lms).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
-      by (vm_compute; reflexivity).
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
-    assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
-                  = m !!! Regidx csp_rs1)
-      by (apply upd_ne; congruence).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
-    destruct b.
-    - (* ---- b = true: the real flip.  The caller holds NEITHER eighth here
-           (both are in the arm); what it hands over is the pure fact, and
-           the arm itself is dismantled for the rest. ---- *)
-      iDestruct (intr_count_pre_on with "Hcnt") as %Hke.
-      destruct Hke as [-> ->].
-      iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
-      iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-      iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hc1)".
-      destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
-      set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
-      (* THE HANDLER RESOURCE: read the quarter out, flip, re-form at '0'.
-         This was an [inv_acc] on [intrN] plus a re-seal; owning [intr_res]
-         turns it into an accessor and a constructor, and the mask side
-         condition ([solve_ndisj]) disappears with the invariant. *)
-      iEval (rewrite /intr_res) in "Hhx".
-      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
-      iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hc1 Hqi") as "(Hhalf & Hq & Htok & Hqi)".
-      iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
-      (* the machine write: mstatus := ms1, rd := old S-view *)
-      iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-      iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
-      rewrite (gpr_pt_nz rd _ Hrd).
-      iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-              (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-      iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-      { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-      iModIntro.
-      iExists (set_reg (set_reg s_pc mstatus ms1)
-                 (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (sstatus_read ms0))).
-      iSplitR.
-      { iPureIntro. rewrite Hpceq. fold s_pc.
-        apply (exec_execute_csrrci_sstatus_gen (mword_of_int 2) rd ms0 s_pc
-                 Lpriv_spc Lms_spc
-                 ltac:(rewrite Lmisa_spc; exact HmisaS)
-                 ltac:(rewrite Lmisa_spc; exact HmisaU)
-                 Himm2 Hrd). }
-      iSplitL "Hreg Hmem".
-      { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-      iIntros "Hhs' Hpc'".
-      assert (Lnpc : register_lookup nextPC
-               (set_reg (set_reg s_pc mstatus ms1)
-                  (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (sstatus_read ms0))).(sregs)
-               = add_vec_int pc 4).
-      { unfold set_reg at 1; cbn [sregs]. tmig.
-        unfold set_reg at 1; cbn [sregs]. tmig.
-        unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-      iEval (rewrite Lnpc) in "Hpc'".
-      iEval (rewrite -Hsie') in "Hhalf".
-      (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
-         re-expressing at the new mstatus -- no ghost movement. *)
-      iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
-      tp_refold Hrdtp "Hfmap".
-      iAssert (sie_cap kt (CID := CID) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
-                       (trap_res true + n)%nat false p)
-        with "[Hstk Htr Hq]" as "Hcap".
-      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iFrame "Htr Hwit". iExact "Hq". }
-      iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
-      { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-        iExists ms1. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
-      iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-      iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
-      iApply ("Hcont" $! ms0 with "[%] [%] Hcg
-                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
-      { exact Hmsf. }
-      { intros _. cbn [sie_bit]. exact Hb1. }
-      (* the level-S token is now JUST the eighth: the handler resource it
-         used to carry goes out with the trap CSRs below, where the client
-         needs it and where its matching pop_off takes it back. *)
-      { iApply (intr_count_pack_S_on with "Htok"). }
-      { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
-      { rewrite /cpu_claim_pay. iExact "Hclmx". }
-      { rewrite /cpu_priv_pay. iExact "Hcells". }
-    - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
-      (* THE GUARD COLLAPSES THE HARTS HERE, and this arm cannot do without
-         it: at [b = false] the statement's [intr_count_pre] is a REAL
-         per-hart resource, held at the ENTRY hart, and the post owes
-         [intr_count (S k) eb] at the CALLBACK's.  Nothing transports a count
-         between harts -- but the guard says there is nothing to transport,
-         because an SIE-off step cannot migrate.  (The [b = true] arm needs
-         no collapse: there [intr_count_pre] is a pure fact and every
-         resource in the post comes out of the arm, which the callback
-         already delivers at the rebound hart.) *)
-      assert (Hcc : CID = CID0) by exact (Hs (or_introl eq_refl)).
-      subst CID.
-      iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
-      iDestruct "Harm" as "Hq0".
-      iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
-      assert (Hcollapse : legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2)) = ms0)
-        by (apply WpGprCsrwC.legalize_sie_clear_idem; assumption).
-      iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
-      rewrite (gpr_pt_nz rd _ Hrd).
-      iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-              (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-      iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-      { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-      iModIntro.
-      iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (sstatus_read ms0))).
-      iSplitR.
-      { iPureIntro. rewrite Hpceq. fold s_pc.
-        apply (exec_execute_csrrci_sstatus (mword_of_int 2) rd ms0 s_pc
-                 Lpriv_spc Lms_spc
-                 ltac:(rewrite Lmisa_spc; exact HmisaS)
-                 ltac:(rewrite Lmisa_spc; exact HmisaU)
-                 Himm2 Hrd Hcollapse). }
-      iSplitL "Hreg Hmem".
-      { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-      iIntros "Hhs' Hpc'".
-      assert (Lnpc : register_lookup nextPC
-               (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (sstatus_read ms0))).(sregs)
-               = add_vec_int pc 4).
-      { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-      iEval (rewrite Lnpc) in "Hpc'".
-      tp_refold Hrdtp "Hfmap".
-      iDestruct (intr_count_push_off k eb with "Hq0 Hcnt") as "(%Heb0 & Hq0 & Hcnt)".
-      iAssert (sie_cap kt (CID := CID0) (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m)
-                       (trap_res false + n)%nat false p)
-        with "[Hstk Htr Hq0]" as "Hcap".
-      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iFrame "Htr Hwit". iExact "Hq0". }
-      iAssert (sconf (CID := CID0)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
-      { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-        iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
-      iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-      iSpecialize ("Hcont" $! CID0 with "[]"); [iPureIntro; done|].
-      iApply ("Hcont" $! ms0 with "[%] [%] Hcg Hcnt [] [] [] [$Hpc' $Hnpc]").
-      { exact Hmsf. }
-      { intros Hk. rewrite (Heb0 Hk). cbn [sie_bit]. exact Hb0. }
-      { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
-      { rewrite /cpu_claim_pay. destruct k; [rewrite (Heb0 eq_refl) |]; done. }
-      { rewrite /cpu_priv_pay. done. }
-  Qed.
-
   Lemma wp_csrci_sstatus_x0_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr kt m n b p -∗
@@ -3473,6 +3249,10 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 mstatus))
+      by (split_and!; vm_compute; reflexivity).
+    assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
+      by (vm_compute; reflexivity).
     (* REFUTE THE ALREADY-DISABLED CASE ABOVE THE FUNNEL: the count eighth at
        '1' contradicts the capability's '0' eighth, and both eighths are the
        ENTRY hart's while the caller still holds them.  Inside the callback the
@@ -3485,90 +3265,501 @@ Section WpSconfCsr.
          iDestruct (ghost_var_agree with "Hcnt Harm") as %Hbad.
          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
          vm_compute in Hbad. discriminate. }
-    iApply (wp_instr_s_sconf m n true pc false
+    iClear "Hcnt".
+    (* THE ARM MOVES ([true] in, [false] out) AND THE PAYLOAD IS HART-INDEXED,
+       so the rider is taken at the callback's own hart -- both halves of the
+       obligation's generalization are used here. *)
+    iApply (wp_instr_s_sconf m n true false pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
+              (fun (CIDr : CpuId) npc ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗
+                 ⌜n' = (trap_res true + n)%nat⌝ ∗
+                 ⌜∃ ms : mword 64, sconf_ms_facts ms⌝ ∗
+                 intr_count (CID := CIDr) 0 false ∗
+                 trap_csrs (CID := CIDr) kt ∗ cpu_claim (CID := CIDr) p ∗
+                 cpu_priv_pay (CID := CIDr) true p)%I
+              with "Hcg Hpc Hinstr [Hcont]").
+    iNext.
     rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
-        %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms0)
-      by (unfold s_pc; tmig; exact Lms).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
+    iIntros (CID Hs). rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - (* ---- the instruction, and the four-piece ghost flip ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      (* the only reachable arm: interrupts were ON -- the flip is real, and
+         both eighths are in the arm (its own, and the one inside
+         [cpu_hart 0 true p]), which the callback delivers at the rebound
+         hart. *)
+      iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx &
+                            Hsppc & Hclmx & (Hcells & Hc1))".
+      iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
+      destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
+      (* the handler resource: take the quarter out, flip, re-form.  This used
+         to open [intrN] across the step and re-seal it. *)
+      iEval (rewrite /intr_res) in "Hhx".
+      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+      iDestruct (pw_frames_in (CID := CID) Supervisor (DfracOwn 1)
+                   (R_bitvector_64 mstatus) ms0 Hfresh
+                   with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRImm (csr_sstatus, mword_of_int 2,
+                               Regidx (mword_of_int 0), CSRRC)))
+        with (execute_CSRImm csr_sstatus (mword_of_int 2)
+                (Regidx (mword_of_int 0)) CSRRC).
+      iApply (swp_fupd_post (CID := CID)).
+      iApply (swp_mono (CID := CID) with
+                "[Hstk Htr Hq1 Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx Hscausex
+                  Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                 [Hrw Hro Hfile]");
+        [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
+                     (cw_Drw (R_bitvector_64 mstatus))
+                     cw_Dro (cw_Df (DfracOwn 1))
+                     (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                     (pw_rs Supervisor (R_bitvector_64 mstatus)
+                        (legalize_sstatus_val ms0
+                           (sstatus_write_val ms0 (mword_of_int 2))))
+                     (tp_pin (CID := CID) m) (tp_pin (CID := CID) m)
+                     csr_sstatus Supervisor
+                     (mword_of_int 2) (mword_of_int 0) CSRRC
+                     (sstatus_read ms0) (sstatus_write_val ms0 (mword_of_int 2))
+                     (subrange_vec_dec
+                        (lower_mstatus (legalize_sstatus_val ms0
+                           (sstatus_write_val ms0 (mword_of_int 2))))
+                        (Z.sub xlen 1) 0)
+                     (cw_disj _ Hfresh) (cw_in_priv _)
+                     (pw_rs_priv Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                     Himm2 ltac:(intros bb; reflexivity)
+                     ltac:(by vm_compute)
+                     (hval_check_CSR_result_S _ _ _ csr_sstatus CSRReadWrite
+                        (cw_in_priv _) (cw_in_sec _) (cw_in_misa _)
+                        (pw_rs_priv Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                        (pw_rs_sec Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                        (pw_rs_misa Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                        ltac:(by vm_compute)
+                        (exec_check_CSR_result_sstatus_S dstateS
+                           ltac:(by vm_compute)))
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     eq_refl ltac:(by vm_compute)
+                     with "Hcert Hfile Hrw Hro [] [] []") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (pw_frames_out (CID := CID) Supervisor (DfracOwn 1)
+                     (R_bitvector_64 mstatus) _ Hfresh with "[$Hrw $Hro]")
+          as "(Hms & Hpriv & _ & _)".
+        iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt2 Hqi")
+          as "(Hhalf & Hq & Htok & Hqi)".
+        iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+          as "Hintr".
+        iEval (rewrite -Hsie') in "Hhalf".
+        (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
+           re-expressing at the new mstatus -- no ghost movement. *)
+        iDestruct (sret_tie_congr (CID := CID) ms0 _ Hspp' Hspie' with "Hspp")
+          as "Hspp".
+        iModIntro.
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4),
+                (legalize_sstatus_val ms0
+                   (sstatus_write_val ms0 (mword_of_int 2))), m,
+                (trap_res true + n)%nat.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        { rewrite /sconf_at_priv. iExists mdv0.
+          iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          iPureIntro. split; [exact Hmsf' | exact Hmm]. }
+        iSplitL "Hstk Htr Hq".
+        { iSplitL "Hstk"; [iExact "Hstk"|].
+          iFrame "Htr Hwit". iExact "Hq". }
+        iSplitL "Hf". { iExact "Hf". }
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+        iSplitR. { iPureIntro. exists ms0. exact Hmsf. }
+        iSplitL "Htok". { rewrite /intr_count /sie_bit. iExact "Htok". }
+        iSplitL "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr".
+        { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
+        iSplitL "Hclmx". { iExact "Hclmx". }
+        rewrite /cpu_priv_pay. iExact "Hcells".
+      + (* the CSR read *)
+        iIntros "Hrw Hro". rewrite read_CSR_sstatus_red.
+        iApply (swp_bind_use (CID := CID) _ _
+                  (fun o : mword 64 => ⌜o = ms0⌝ ∗
+                     hreg_frame (CID := CID)
+                       (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                       (cw_Drw (R_bitvector_64 mstatus)) ∗
+                     hreg_frame_ro (CID := CID) (cw_Df (DfracOwn 1))
+                       (pw_rs Supervisor (R_bitvector_64 mstatus) ms0) cw_Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_mono (CID := CID) with "[] [-]");
+            [| iApply (swp_read_reg_pinned (CID := CID)
+                         (cw_Drw (R_bitvector_64 mstatus))
+                         cw_Dro (cw_Df (DfracOwn 1))
+                         (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                         (R_bitvector_64 mstatus) (cw_disj _ Hfresh)
+                         (cw_in_r _) with "Hcert Hrw Hro") ].
+          iIntros (o) "(-> & Hrw & Hro)".
+          rewrite (pw_rs_r Supervisor (R_bitvector_64 mstatus) ms0). by iFrame. }
+        iIntros (o) "(-> & Hrw & Hro)". iApply (swp_ret (CID := CID)).
+        by iFrame.
+      + (* the CSR write *)
+        iIntros "Hrw Hro".
+        iApply (swp_write_CSR_sstatus_S (CID := CID) (DfracOwn 1) ms0 _
+                  with "Hcert Hrw Hro").
+      + (* the rd write, at x0: a no-op *)
+        iIntros "Hf". iApply (swp_wX_zero (CID := CID) (mword_of_int 0) _ _
+                                ltac:(by vm_compute) with "Hf").
+    - (* ---- the continuation ---- *)
+      iIntros (npc ms' m' n')
+        "Hcg' Hpc' (-> & -> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
+      destruct Hex as (ms & Hmsf).
+      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
+      iApply ("Hcont" $! ms with "[%] Hcg' Hcnt Htr Hclm Hcells Hpc'").
+      exact Hmsf.
+  Qed.
+
+  Lemma wp_csrci_sstatus_s_sconf
+      (pc : mword 64) (rd : mword 5) (k : nat) (eb : bool)
+      (m : regfile) (n : nat) (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr kt m n b p -∗
+    intr_count_pre b k eb -∗
+    pc_is pc -∗
+    instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
+      ⌜ sconf_ms_facts ms ⌝ -∗
+      ⌜ k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb ⌝ -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)
+                  (trap_res b + n)%nat false p -∗
+      intr_count (S k) eb -∗
+      trap_csrs_pay kt k eb -∗
+      cpu_claim_pay k eb p -∗
+      cpu_priv_pay b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok) "Hcg Hcnt Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    assert (Hfresh : cw_fresh (R_bitvector_64 mstatus))
+      by (split_and!; vm_compute; reflexivity).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
-    (* the only reachable arm: interrupts were ON ---- the flip is real, and
-       both eighths are in the arm (its own, and the one inside [cpu_hart 0
-       true p]), which the callback delivers at the rebound hart. *)
-    iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
-    iClear "Hcnt".
-    iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt)".
-    destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
-    set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
-    (* the handler resource: take the quarter out, flip, re-form.  This used
-       to open [intrN] across the step and re-seal it. *)
-    iEval (rewrite /intr_res) in "Hhx".
-    iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
-    iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt Hqi")
-      as "(Hhalf & Hq & Htok & Hqi)".
-    iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
-    iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-    iModIntro.
-    iExists (set_reg s_pc mstatus ms1).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_csrrci_sstatus_x0 (mword_of_int 2) ms0 s_pc
-               Lpriv_spc Lms_spc
-               ltac:(rewrite Lmisa_spc; exact HmisaS)
-               ltac:(rewrite Lmisa_spc; exact HmisaU)
-               Himm2). }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
-                   = add_vec_int pc 4).
-    { unfold set_reg at 1; cbn [sregs]. tmig.
-      unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iEval (rewrite -Hsie') in "Hhalf".
-    (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
-       re-expressing at the new mstatus -- no ghost movement. *)
-    iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
-    iAssert (sie_cap kt (CID := CID) m (trap_res true + n)%nat false p) with "[Hstk Htr Hq]" as "Hcap".
-    { iSplitL "Hstk"; [iExact "Hstk" |].
-      iFrame "Htr Hwit". iExact "Hq". }
-    iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-      iExists ms1. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-    iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
-    iApply ("Hcont" $! ms0 with "[%] Hcg [Htok]
-                          [Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
-    { exact Hmsf. }
-    { iExact "Htok". }
-    { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
-    { iExact "Hclmx". }
-    { rewrite /cpu_priv_pay. iExact "Hcells". }
+    destruct b.
+    - (* ================= b = true: the REAL flip ================= *)
+      iDestruct (intr_count_pre_on with "Hcnt") as %Hke.
+      destruct Hke as [-> ->].
+      iApply (wp_instr_s_sconf m n true false pc false
+                (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
+                (fun (CIDr : CpuId) npc ms' m' n' =>
+                   ⌜npc = add_vec_int pc 4⌝ ∗
+                   ⌜n' = (trap_res true + n)%nat⌝ ∗
+                   (∃ ms : mword 64,
+                      ⌜m' = <[Regidx rd := regval_into_reg (sstatus_read ms)]> m⌝ ∗
+                      ⌜sconf_ms_facts ms⌝ ∗
+                      ⌜0%nat = 0%nat -> _get_Mstatus_SIE ms = sie_bit true⌝) ∗
+                   intr_count (CID := CIDr) 1 true ∗
+                   trap_csrs_pay (CID := CIDr) kt 0 true ∗
+                   cpu_claim_pay (CID := CIDr) 0 true p ∗
+                   cpu_priv_pay (CID := CIDr) true p)%I
+                with "Hcg Hpc Hinstr [Hcont]").
+      iNext.
+      rename CID into CID0.
+      iIntros (CID Hs). rewrite /sconf_step_obl.
+      iSplitR "Hcont".
+      + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+        iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
+          "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+            Hmdl & Hmenv)".
+        iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+        iPoseProof "Hhw" as "#Hhwc".
+        iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+          "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+            %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        subst misa0 mseccfg0.
+        assert (Hsp : m !!! Regidx csp_rs1
+                      = <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
+                          !!! Regidx csp_rs1)
+          by (symmetry; apply upd_ne; congruence).
+        iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+        iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx &
+                              Hsppc & Hclmx & (Hcells & Hc1))".
+        iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
+        iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
+        destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
+        iEval (rewrite /intr_res) in "Hhx".
+        iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+        iDestruct (pw_frames_in (CID := CID) Supervisor (DfracOwn 1)
+                     (R_bitvector_64 mstatus) ms0 Hfresh
+                     with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+        change (execute (CSRImm (csr_sstatus, mword_of_int 2,
+                                 Regidx rd, CSRRC)))
+          with (execute_CSRImm csr_sstatus (mword_of_int 2) (Regidx rd) CSRRC).
+        iApply (swp_fupd_post (CID := CID)).
+        iApply (swp_mono (CID := CID) with
+                  "[Hstk Htr Hq1 Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx Hscausex
+                    Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                   [Hrw Hro Hfile]");
+          [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
+                       (cw_Drw (R_bitvector_64 mstatus))
+                       cw_Dro (cw_Df (DfracOwn 1))
+                       (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                       (pw_rs Supervisor (R_bitvector_64 mstatus)
+                          (legalize_sstatus_val ms0
+                             (sstatus_write_val ms0 (mword_of_int 2))))
+                       (tp_pin (CID := CID) m)
+                       (<[Regidx rd := regval_into_reg (sstatus_read ms0)]>
+                          (tp_pin (CID := CID) m))
+                       csr_sstatus Supervisor
+                       (mword_of_int 2) rd CSRRC
+                       (sstatus_read ms0) (sstatus_write_val ms0 (mword_of_int 2))
+                       (subrange_vec_dec
+                          (lower_mstatus (legalize_sstatus_val ms0
+                             (sstatus_write_val ms0 (mword_of_int 2))))
+                          (Z.sub xlen 1) 0)
+                       (cw_disj _ Hfresh) (cw_in_priv _)
+                       (pw_rs_priv Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                       Himm2 ltac:(intros bb; reflexivity)
+                       ltac:(by vm_compute)
+                       (hval_check_CSR_result_S _ _ _ csr_sstatus CSRReadWrite
+                          (cw_in_priv _) (cw_in_sec _) (cw_in_misa _)
+                          (pw_rs_priv Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                          (pw_rs_sec Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                          (pw_rs_misa Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                          ltac:(by vm_compute)
+                          (exec_check_CSR_result_sstatus_S dstateS
+                             ltac:(by vm_compute)))
+                       ltac:(by vm_compute) ltac:(by vm_compute)
+                       eq_refl ltac:(by vm_compute)
+                       with "Hcert Hfile Hrw Hro [] [] []") ].
+        * iIntros (e) "(-> & Hf & Hrw & Hro)".
+          iDestruct (pw_frames_out (CID := CID) Supervisor (DfracOwn 1)
+                       (R_bitvector_64 mstatus) _ Hfresh with "[$Hrw $Hro]")
+            as "(Hms & Hpriv & _ & _)".
+          iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt2 Hqi")
+            as "(Hhalf & Hq & Htok & Hqi)".
+          iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+            as "Hintr".
+          iEval (rewrite -Hsie') in "Hhalf".
+          iDestruct (sret_tie_congr (CID := CID) ms0 _ Hspp' Hspie' with "Hspp")
+            as "Hspp".
+          iModIntro.
+          iSplitR; [done|].
+          iExists (add_vec_int pc 4),
+                  (legalize_sstatus_val ms0
+                     (sstatus_write_val ms0 (mword_of_int 2))),
+                  (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m),
+                  (trap_res true + n)%nat.
+          iFrame "HPC HnPC Hresv".
+          iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          { rewrite /sconf_at_priv. iExists mdv0.
+            iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+            iPureIntro. split; [exact Hmsf' | exact Hmm]. }
+          iSplitL "Hstk Htr Hq".
+          { iSplitL "Hstk". { rewrite -Hsp. iExact "Hstk". }
+            iFrame "Htr Hwit". iExact "Hq". }
+          iSplitL "Hf".
+          { iEval (rewrite (tp_pin_upd (CID := CID) m rd
+                              (regval_into_reg (sstatus_read ms0)) Hrdtp)) in "Hf".
+            iExact "Hf". }
+          iSplitR; [done|]. iSplitR; [done|].
+          iSplitR.
+          { iPureIntro. exists ms0. split_and!;
+              [ reflexivity | exact Hmsf | intros _; cbn [sie_bit]; exact Hb1 ]. }
+          iSplitL "Htok". { iApply (intr_count_pack_S_on with "Htok"). }
+          iSplitL "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr".
+          { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
+          iSplitL "Hclmx". { rewrite /cpu_claim_pay. iExact "Hclmx". }
+          rewrite /cpu_priv_pay. iExact "Hcells".
+        * iIntros "Hrw Hro". rewrite read_CSR_sstatus_red.
+          iApply (swp_bind_use (CID := CID) _ _
+                    (fun o : mword 64 => ⌜o = ms0⌝ ∗
+                       hreg_frame (CID := CID)
+                         (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                         (cw_Drw (R_bitvector_64 mstatus)) ∗
+                       hreg_frame_ro (CID := CID) (cw_Df (DfracOwn 1))
+                         (pw_rs Supervisor (R_bitvector_64 mstatus) ms0) cw_Dro)%I
+                    _ with "[Hrw Hro] [-]").
+          { iApply (swp_mono (CID := CID) with "[] [-]");
+              [| iApply (swp_read_reg_pinned (CID := CID)
+                           (cw_Drw (R_bitvector_64 mstatus))
+                           cw_Dro (cw_Df (DfracOwn 1))
+                           (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                           (R_bitvector_64 mstatus) (cw_disj _ Hfresh)
+                           (cw_in_r _) with "Hcert Hrw Hro") ].
+            iIntros (o) "(-> & Hrw & Hro)".
+            rewrite (pw_rs_r Supervisor (R_bitvector_64 mstatus) ms0). by iFrame. }
+          iIntros (o) "(-> & Hrw & Hro)". iApply (swp_ret (CID := CID)).
+          by iFrame.
+        * iIntros "Hrw Hro".
+          iApply (swp_write_CSR_sstatus_S (CID := CID) (DfracOwn 1) ms0 _
+                    with "Hcert Hrw Hro").
+        * iIntros "Hf".
+          iApply (swp_wX_file (CID := CID) rd (tp_pin (CID := CID) m)
+                    (sstatus_read ms0) Hrd with "Hcert Hf").
+      + iIntros (npc ms' m' n')
+          "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
+        iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
+        destruct Hex as (ms & -> & Hmsf & Hsie).
+        iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
+        iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
+          [ exact Hmsf | exact Hsie ].
+    - (* ================= b = false: the IDEMPOTENT write ================= *)
+      iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
+      iApply (wp_instr_s_sconf m n false false pc false
+                (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
+                (fun (CIDr : CpuId) npc ms' m' n' =>
+                   ⌜npc = add_vec_int pc 4⌝ ∗
+                   ⌜n' = (trap_res false + n)%nat⌝ ∗
+                   (∃ ms : mword 64,
+                      ⌜m' = <[Regidx rd := regval_into_reg (sstatus_read ms)]> m⌝ ∗
+                      ⌜sconf_ms_facts ms⌝ ∗
+                      ⌜k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb⌝) ∗
+                   intr_count (CID := CIDr) (S k) eb ∗
+                   trap_csrs_pay (CID := CIDr) kt k eb ∗
+                   cpu_claim_pay (CID := CIDr) k eb p ∗
+                   cpu_priv_pay (CID := CIDr) false p)%I
+                with "Hcg Hpc Hinstr [Hcnt Hcont]").
+      iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+      iSplitR "Hcont".
+      + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+        iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+          "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+            Hmdl & Hmenv)".
+        iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+        iPoseProof "Hhw" as "#Hhwc".
+        iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+          "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+            %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        subst misa0 mseccfg0.
+        assert (Hsp : m !!! Regidx csp_rs1
+                      = <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
+                          !!! Regidx csp_rs1)
+          by (symmetry; apply upd_ne; congruence).
+        iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+        iDestruct (ghost_var_agree with "Hhalf Harm") as %Hb0.
+        destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
+        iDestruct (intr_count_push_off k eb with "Harm Hcnt")
+          as "(%Heb0 & Harm & Hcnt)".
+        iDestruct (pw_frames_in Supervisor (DfracOwn 1)
+                     (R_bitvector_64 mstatus) ms0 Hfresh
+                     with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+        change (execute (CSRImm (csr_sstatus, mword_of_int 2,
+                                 Regidx rd, CSRRC)))
+          with (execute_CSRImm csr_sstatus (mword_of_int 2) (Regidx rd) CSRRC).
+        iApply (swp_mono with
+                  "[Hstk Htr Harm Hcnt Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
+                   [Hrw Hro Hfile]");
+          [| iApply (swp_execute_CSRImm_rw_p
+                       (cw_Drw (R_bitvector_64 mstatus))
+                       cw_Dro (cw_Df (DfracOwn 1))
+                       (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                       (pw_rs Supervisor (R_bitvector_64 mstatus)
+                          (legalize_sstatus_val ms0
+                             (sstatus_write_val ms0 (mword_of_int 2))))
+                       (tp_pin m)
+                       (<[Regidx rd := regval_into_reg (sstatus_read ms0)]>
+                          (tp_pin m))
+                       csr_sstatus Supervisor
+                       (mword_of_int 2) rd CSRRC
+                       (sstatus_read ms0) (sstatus_write_val ms0 (mword_of_int 2))
+                       (subrange_vec_dec
+                          (lower_mstatus (legalize_sstatus_val ms0
+                             (sstatus_write_val ms0 (mword_of_int 2))))
+                          (Z.sub xlen 1) 0)
+                       (cw_disj _ Hfresh) (cw_in_priv _)
+                       (pw_rs_priv Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                       Himm2 ltac:(intros bb; reflexivity)
+                       ltac:(by vm_compute)
+                       (hval_check_CSR_result_S _ _ _ csr_sstatus CSRReadWrite
+                          (cw_in_priv _) (cw_in_sec _) (cw_in_misa _)
+                          (pw_rs_priv Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                          (pw_rs_sec Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                          (pw_rs_misa Supervisor (R_bitvector_64 mstatus) ms0 Hfresh)
+                          ltac:(by vm_compute)
+                          (exec_check_CSR_result_sstatus_S dstateS
+                             ltac:(by vm_compute)))
+                       ltac:(by vm_compute) ltac:(by vm_compute)
+                       eq_refl ltac:(by vm_compute)
+                       with "Hcert Hfile Hrw Hro [] [] []") ].
+        * iIntros (e) "(-> & Hf & Hrw & Hro)".
+          iDestruct (pw_frames_out Supervisor (DfracOwn 1)
+                       (R_bitvector_64 mstatus) _ Hfresh with "[$Hrw $Hro]")
+            as "(Hms & Hpriv & _ & _)".
+          iEval (rewrite Hb0) in "Hhalf". iEval (rewrite -Hsie') in "Hhalf".
+          iDestruct (sret_tie_congr ms0 _ Hspp' Hspie' with "Hspp") as "Hspp".
+          iSplitR; [done|].
+          iExists (add_vec_int pc 4),
+                  (legalize_sstatus_val ms0
+                     (sstatus_write_val ms0 (mword_of_int 2))),
+                  (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m),
+                  (trap_res false + n)%nat.
+          iFrame "HPC HnPC Hresv".
+          iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          { rewrite /sconf_at_priv. iExists mdv0.
+            iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+            iPureIntro. split; [exact Hmsf' | exact Hmm]. }
+          iSplitL "Hstk Htr Harm".
+          { iSplitL "Hstk". { rewrite -Hsp. iExact "Hstk". }
+            iFrame "Htr Hwit". iExact "Harm". }
+          iSplitL "Hf".
+          { iEval (rewrite (tp_pin_upd m rd
+                              (regval_into_reg (sstatus_read ms0)) Hrdtp)) in "Hf".
+            iExact "Hf". }
+          iSplitR; [done|]. iSplitR; [done|].
+          iSplitR.
+          { iPureIntro. exists ms0. split_and!;
+              [ reflexivity | exact Hmsf
+              | intros Hk; rewrite (Heb0 Hk); cbn [sie_bit]; exact Hb0 ]. }
+          iSplitL "Hcnt". { iExact "Hcnt". }
+          iSplitR. { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
+          iSplitR. { rewrite /cpu_claim_pay.
+                     destruct k; [rewrite (Heb0 eq_refl) |]; done. }
+          rewrite /cpu_priv_pay. done.
+        * iIntros "Hrw Hro". rewrite read_CSR_sstatus_red.
+          iApply (swp_bind_use _ _
+                    (fun o : mword 64 => ⌜o = ms0⌝ ∗
+                       hreg_frame (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                         (cw_Drw (R_bitvector_64 mstatus)) ∗
+                       hreg_frame_ro (cw_Df (DfracOwn 1))
+                         (pw_rs Supervisor (R_bitvector_64 mstatus) ms0) cw_Dro)%I
+                    _ with "[Hrw Hro] [-]").
+          { iApply (swp_mono with "[] [-]");
+              [| iApply (swp_read_reg_pinned
+                           (cw_Drw (R_bitvector_64 mstatus))
+                           cw_Dro (cw_Df (DfracOwn 1))
+                           (pw_rs Supervisor (R_bitvector_64 mstatus) ms0)
+                           (R_bitvector_64 mstatus) (cw_disj _ Hfresh)
+                           (cw_in_r _) with "Hcert Hrw Hro") ].
+            iIntros (o) "(-> & Hrw & Hro)".
+            rewrite (pw_rs_r Supervisor (R_bitvector_64 mstatus) ms0). by iFrame. }
+          iIntros (o) "(-> & Hrw & Hro)". iApply swp_ret. by iFrame.
+        * iIntros "Hrw Hro".
+          iApply (swp_write_CSR_sstatus_S (DfracOwn 1) ms0 _
+                    with "Hcert Hrw Hro").
+        * iIntros "Hf".
+          iApply (swp_wX_file rd (tp_pin m) (sstatus_read ms0) Hrd
+                    with "Hcert Hf").
+      + iIntros (npc ms' m' n')
+          "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
+        iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+        destruct Hex as (ms & -> & Hmsf & Hsie).
+        iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
+        iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
+          [ exact Hmsf | exact Hsie ].
   Qed.
+
+
+
 
 End WpSconfCsr.

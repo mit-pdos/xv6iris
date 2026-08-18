@@ -77,7 +77,11 @@ Require Import WpSmodeSret.
    (The dead-import sweep removed WpNext while the leaf did not yet consume
    the funnel through [wp_next]; it does now.) *)
 Require Import WpNext.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs WpIntrInv WpSmodeIntr.
+(* the SRET execute walk at the node layer (sweep D) and the S-mode CSR
+   frame kit it shares with the rest of the sconf tier *)
+Require Import WpSmodePtEngine HartSCsr HartSwp HartMFrame HartLift HartSpan
+        HartSpanChar HartRegNode HartMCycle HartGoodb WpDecodeBridge.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -130,158 +134,110 @@ Section WpSconfSret.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg Hmir Htok Hsepc Hscausex Hstvalx Hhx Hkptr Hcells Hclm Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m (trap_res true + n)%nat false pc false (SRET tt)
-              with "Hcg Hpc Hinstr").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
-       obligation is discharged by [wp_next]'s OWN introduction rule at the
-       ambient hart -- the same [wp_next_off_intro] every b = false leaf
-       already uses for its own conclusion.  Nothing is renamed and nothing
-       is substituted: the body below is the pre-move proof VERBATIM. *)
-    iApply wp_next_off_intro.
-    iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %Hpbmte & %Hpmm & %Hlpeb & %Hfiom & %Hmenvval)".
-    subst menvcfg0.
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
-        %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    pose proof (mword1_not_lp elp0 Help_np) as Help0.
-    (* ---- THE TWO sret BITS, read off the bundle by ghost agreement.  The
-         funnel's [∃ ms] named the live mstatus [ms0]; the travelling half is
-         about the same two fields, so this is where ('1','1') becomes a fact
-         about [ms0]. ---- *)
-    iDestruct (sret_bits_agree _ _ _ _ with "Hspp Hmir") as %[Hspp0 Hspie0].
-    destruct (sret_sconf_flip ms0 Hmsf Hspie0) as (Hsie' & Hsppf & Hspief & Hmsf').
-    (* re-state the stationary tie at the LITERALS, so the joint update below
-       has something to match -- see [IntrDefs.sret_tie_vals] for why this is a
-       lemma and not a rewrite. *)
-    iDestruct (sret_tie_vals ms0 _ _ Hspp0 Hspie0 with "Hspp") as "Hspp".
-    (* SPP = '1' decodes the privilege to Supervisor, so the cur_privilege
-       write is value-preserving and needs no premise of its own. *)
-    assert (Hsup : sret_newpriv ms0 = Supervisor).
-    { unfold sret_newpriv. rewrite sret_ms2_SPP Hspp0. vm_compute. reflexivity. }
-    assert (Hlpe0 : _get_MEnvcfg_LPE MENVCFG_S = ('b"0"))
-      by (apply bv_eq; vm_compute; reflexivity).
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
-    iDestruct (reg_valid    with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid    with "Hreg Hsepc") as %Lsepc.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Help")  as %Lelp.
-    (* tick nextPC := pc+4 (SRET is a 4-byte instruction) *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms0)
-      by (unfold s_pc; tmig; exact Lms).
-    assert (Lmenv_spc : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S)
-      by (unfold s_pc; tmig; exact Lmenv).
-    assert (Lsepc_spc : register_lookup sepc s_pc.(sregs) = sepc0)
-      by (unfold s_pc; tmig; exact Lsepc).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    (* ---- the SRET execute reduction at [s_pc], with lpe = false ---- *)
-    assert (Hxlpe : forall sz : mstate,
-              register_lookup menvcfg sz.(sregs) = MENVCFG_S ->
-              exec (get_xLPE (sret_newpriv ms0)) sz = Some (false, sz)).
-    { intros sz Hm. rewrite Hsup. apply exec_get_xLPE_S. rewrite Hm. exact Hlpe0. }
-    pose proof (exec_execute_SRET_menv s_pc false MENVCFG_S
-                  Lpriv_spc
-                  ltac:(rewrite Lmisa_spc; exact HmisaS)
-                  ltac:(rewrite Lms_spc;
-                        exact (proj1 (proj2 (proj2 (proj2 Hmsf)))))
-                  ltac:(rewrite Lmisa_spc; exact HmisaC)
-                  Lmenv_spc
-                  ltac:(intros sz Hm;
-                        pose proof (Hxlpe sz Hm) as Hx;
-                        unfold sret_newpriv, sret_ms2, sret_ms1 in Hx;
-                        rewrite Lms_spc; exact Hx)) as HexecC0.
-    pose (sX := set_reg (set_reg (set_reg (set_reg (set_reg
-                  (set_reg (set_reg (set_reg s_pc mstatus (sret_ms1 ms0)) mstatus (sret_ms2 ms0))
-                           cur_privilege Supervisor) mstatus (sret_ms3 ms0)) mstatus (sret_ms4 ms0))
-                  mstatus (sret_ms5 ms0)) elp (landing_pad_bits_backwards NO_LP_EXPECTED))
-                  nextPC (ret_pc sepc0)).
-    assert (HexecC : exec (execute (SRET tt)) s_pc = Some (RETIRE_SUCCESS, sX)).
-    { rewrite HexecC0. unfold sX.
-      rewrite !Lms_spc Lsepc_spc.
-      unfold sret_newpriv, sret_ms2, sret_ms1 in Hsup.
-      unfold sret_ms1, sret_ms2, sret_ms3, sret_ms4, sret_ms5, ret_pc.
-      rewrite Hsup. reflexivity. }
-    (* ---- THE FOUR-PIECE FLIP.  Identical to the csrsi restore: the bundle's
-         tied half, the capability eighth (the whole of [sie_arm false]), the
-         count eighth the caller brought, and the invariant quarter. ---- *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
-    iEval (rewrite /intr_res) in "Hhx".
-    iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
-    iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi") as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-    iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
-    (* ---- THE TIE MOVES: ('1','1') -> ('0','1') on BOTH halves at once. ---- *)
-    iMod (sret_bits_update ('b"1") ('b"1") ('b"1") ('b"1") ('b"0") ('b"1")
-            with "Hspp Hmir") as "[Hspp Hmir]".
-    (* ---- mirror the physical set_regs on the ghost cells ---- *)
-    iMod (reg_update _ mstatus _ (sret_ms1 ms0) with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (sret_ms2 ms0) with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-    iMod (reg_update _ mstatus _ (sret_ms3 ms0) with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (sret_ms4 ms0) with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (sret_ms5 ms0) with "Hreg Hms") as "[Hreg Hms]".
-    (* elp's write is VALUE-PRESERVING ([hw_config] pins it persistently at
-       NO_LP_EXPECTED), so it is absorbed with no ghost update. *)
-    assert (Lelp_now : register_lookup elp
-              (register_set mstatus (sret_ms5 ms0) (register_set mstatus (sret_ms4 ms0)
-                (register_set mstatus (sret_ms3 ms0) (register_set cur_privilege Supervisor
-                  (register_set mstatus (sret_ms2 ms0) (register_set mstatus (sret_ms1 ms0)
-                    (register_set nextPC (add_vec_int pc 4) σ.(sregs))))))))
-            = landing_pad_bits_backwards NO_LP_EXPECTED).
-    { repeat tmig. rewrite Lelp Help0. reflexivity. }
-    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
-                 Lelp_now with "Hreg") as "Hreg".
-    iMod (reg_update _ nextPC _ (ret_pc sepc0) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro.
-    iExists sX.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc. exact HexecC. }
-    iSplitL "Hreg Hmem".
-    { unfold sX, s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC sX.(sregs) = ret_pc sepc0)
-      by (unfold sX; rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iEval (rewrite -Hsie') in "Hhalf".
-    (* the new tie sits at exactly the two constants SRET wrote *)
-    iAssert (sret_tie (sret_ms5 ms0)) with "[Hspp]" as "Hspp".
-    { rewrite /sret_tie Hsppf Hspief. iExact "Hspp". }
-    (* ... and the arm holds the travelling half at an EXISTENTIAL value, so
-       pack the three named cells before rebuilding the capability. *)
-    iAssert (∃ v : mword 64, sepc ↦ᵣ v)%I with "[Hsepc]" as "Hsepcx".
-    { iExists sepc0. iExact "Hsepc". }
-    iAssert (∃ a b : mword 1, sret_bits a b)%I with "[Hmir]" as "Hsppc".
-    { iExists ('b"0"), ('b"1"). iExact "Hmir". }
-    (* ---- rebuild the ENABLED capability.  The carve is identical on both
-         sides -- [trap_res false + (trap_res true + n)] going in,
-         [trap_res true + n] coming out, both [kv_frame_slots + n] by
-         conversion -- so [iExact] closes the stack with no arithmetic. ---- *)
-    iAssert (sie_cap kt m n true p)
-      with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
-    { iSplitL "Hstk". { iExact "Hstk". }
-      iFrame "Htr Hwit".
-      iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
-      (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the count
-         eighth the flip just produced at '1'. *)
-      iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
-    iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf Hspp".
-      { iExists (sret_ms5 ms0). iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
-      iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
-      split; [exact Hpbmte |]. split; [exact Hpmm |]. split; [exact Hlpeb |].
-      split; [exact Hfiom | reflexivity]. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iIntros "Hcg Hmir Htok Hsepc Hscausex Hstvalx Hhx Hkptr Hcells Hclm Hpc
+             Hinstr Hcont".
+    (* THE ARM MOVES, [false] in and [true] out -- the generalized obligation's
+       second index -- and the landing mstatus is NAMED ([sret_ms5 ms0]), which
+       is the other half of the same generalization. *)
+    iApply (wp_instr_s_sconf m (trap_res true + n)%nat false true pc false
+              (SRET tt)
+              (fun (_ : CpuId) npc ms' m' n' =>
+                 ⌜npc = ret_pc sepc0⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
+              with "Hcg Hpc Hinstr
+                    [Hmir Htok Hsepc Hscausex Hstvalx Hhx Hkptr Hcells Hclm
+                     Hcont]").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic callback
+       is discharged at the ambient hart and nothing is renamed. *)
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - (* ---- the instruction ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      pose proof (mword1_not_lp elp0 Help_np) as Help0. subst elp0.
+      (* ---- THE TWO sret BITS, read off the bundle by ghost agreement.  The
+           obligation's [∃ ms] named the live mstatus [ms0]; the travelling
+           half is about the same two fields, so this is where ('1','1')
+           becomes a fact about [ms0]. ---- *)
+      iDestruct (sret_bits_agree _ _ _ _ with "Hspp Hmir") as %[Hspp0 Hspie0].
+      destruct (sret_sconf_flip ms0 Hmsf Hspie0)
+        as (Hsie' & Hsppf & Hspief & Hmsf').
+      (* re-state the stationary tie at the LITERALS, so the joint update below
+         has something to match -- [IntrDefs.sret_tie_vals]. *)
+      iDestruct (sret_tie_vals ms0 _ _ Hspp0 Hspie0 with "Hspp") as "Hspp".
+      (* SPP = '1' decodes the privilege to Supervisor, so the cur_privilege
+         write is value-preserving and needs no premise of its own. *)
+      assert (Hsup : sret_newpriv ms0 = Supervisor).
+      { unfold sret_newpriv. rewrite sret_ms2_SPP Hspp0. vm_compute. reflexivity. }
+      assert (Hlpe0 : _get_MEnvcfg_LPE MENVCFG_S = ('b"0"))
+        by (apply bv_eq; vm_compute; reflexivity).
+      pose proof Hmsf as (_ & _ & _ & HTSR & _).
+      iDestruct (sret_frames_in ms0 Supervisor (add_vec_int pc 4) MENVCFG_S
+                   sepc0 with "Hms Hpriv HnPC Hmisa Hmenv Hsepc") as "[Hrw Hro]".
+      (* ---- THE FOUR-PIECE FLIP happens in the swp's POST, where the new
+           mstatus is already installed; the ghost updates are [bupd]s, and
+           [HartSwp.swp_fupd_post] is what lets them run there. ---- *)
+      iApply swp_fupd_post.
+      iApply (swp_mono with
+                "[Hcap Hmir Htok Hhalf Hspp Hhx Hkptr Hscausex Hstvalx Hcells
+                  Hclm Hmie Hmdl HPC Hresv Hfile] [Hrw Hro]");
+        [| iApply (swp_execute_SRET_S ms0 (add_vec_int pc 4) MENVCFG_S sepc0
+                     HTSR Hsup Hlpe0 with "Hcert Help Hrw Hro") ].
+      iIntros (e) "(-> & Hrw & Hro)".
+      iDestruct (sret_frames_out (sret_ms5 ms0) Supervisor (ret_pc sepc0)
+                   MENVCFG_S sepc0 with "[$Hrw $Hro]")
+        as "(Hms & Hpriv & HnPC & _ & Hmenv & Hsepc)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      iEval (rewrite /intr_res) in "Hhx".
+      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+      iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi")
+        as "(Hhalf & Hqcap & Hqcnt & Hqi)".
+      iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+        as "Hintr".
+      (* ---- THE TIE MOVES: ('1','1') -> ('0','1') on BOTH halves at once. *)
+      iMod (sret_bits_update ('b"1") ('b"1") ('b"1") ('b"1") ('b"0") ('b"1")
+              with "Hspp Hmir") as "[Hspp Hmir]".
+      iModIntro.
+      iEval (rewrite -Hsie') in "Hhalf".
+      (* the new tie sits at exactly the two constants SRET wrote *)
+      iAssert (sret_tie (sret_ms5 ms0)) with "[Hspp]" as "Hspp".
+      { rewrite /sret_tie Hsppf Hspief. iExact "Hspp". }
+      (* the arm holds the travelling half and sepc at EXISTENTIAL values *)
+      iAssert (∃ v : mword 64, sepc ↦ᵣ v)%I with "[Hsepc]" as "Hsepcx".
+      { iExists sepc0. iExact "Hsepc". }
+      iAssert (∃ a b : mword 1, sret_bits a b)%I with "[Hmir]" as "Hsppc".
+      { iExists ('b"0"), ('b"1"). iExact "Hmir". }
+      iSplitR; [done|].
+      iExists (ret_pc sepc0), (sret_ms5 ms0), m, n.
+      iFrame "HPC HnPC Hresv".
+      iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+      { rewrite /sconf_at_priv. iExists mdv0.
+        iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        iPureIntro. split; [exact Hmsf' | exact Hmm]. }
+      (* ---- rebuild the ENABLED capability.  The carve is identical on both
+           sides -- [trap_res false + (trap_res true + n)] going in,
+           [trap_res true + n] coming out, both [kv_frame_slots + n] by
+           conversion -- so [iExact] closes the stack with no arithmetic. *)
+      iSplitL "Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm
+               Hstk Htr Hcells".
+      { iSplitL "Hstk". { iExact "Hstk". }
+        iFrame "Htr Hwit".
+        iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
+        iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
+      iSplitL "Hfile". { iExact "Hfile". }
+      iSplitR; [done|]. iSplitR; [done|]. done.
+    - (* ---- the continuation ---- *)
+      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" with "Hcg' Hpc'").
   Qed.
 
 End WpSconfSret.

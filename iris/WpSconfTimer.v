@@ -405,7 +405,7 @@ Section WpSconfTimer.
        the Q-carrying wrapper and the caller's own ∀ is instantiated at it. *)
     iApply (wp_instr_s_sconf m n false false pc false
               (CSRReg (csr_time, zreg, Regidx rd, CSRRS))
-              (fun npc ms' m' n' =>
+              (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ tv : mword 64,
                     m' = <[Regidx rd := regval_into_reg tv]> m⌝)%I
