@@ -169,8 +169,9 @@ Section IregBox.
               ⌜bv_unsigned inum = z⌝ -∗ dinode_at gi inum dn -∗ False)).
   Proof.
     iIntros (Hnz)
-      "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt &
-         %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+      "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla &
+         %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm &
+         %Hfrz & Hfdisj & Harm) Hep]".
     iDestruct "Harm" as "[[Harm _] | Hpend]"; [|iDestruct "Hpend" as "(%Ht0p & _ & _)"; exfalso; exact (Hnz Ht0p)].
     iDestruct "Harm" as "[[%Hin Hfrg] | [%Ht2 Hmk]]"; last first.
     { iLeft. iExact "Hmk". }

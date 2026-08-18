@@ -338,6 +338,65 @@ Lemma fresh_shape_nlink (d : dinode) :
   fresh_shape d -> bv_unsigned (di_nlink d) = 0.
 Proof. intros (_ & _ & _ & Hnl). exact Hnl. Qed.
 
+(* ---- THE TWO IN-TRANSITION PINS (iclaim-ledger.md §2.3/§2.4) ---------
+
+   THE CLAIM PIN (§2.4).  A claimed slot's record IS the claim box ialloc
+   wrote -- [fresh_shape], hence [di_nlink = 0] and a nonzero type.  Two
+   things read it: [ireg_claim_au] refutes a STANDING claim with it (its
+   caller's buffer showed [di_type = 0], and [fresh_shape]'s first conjunct
+   says otherwise), which is what makes the c-mint's [c = None] side
+   condition dischargeable at all; and the create_fresh_ty payout (§2.8
+   item 7) withdraws the pinned shape at the fill.
+
+   IT IS THE ARM THAT KEEPS IT TRUE, not the byte movers.  §2.4's "writes
+   cannot dent the pin" is the observation that every byte-writing mover
+   consumes the caller's [dinode_at] and therefore runs at the MARKED arm,
+   where the slot's own clause ([ireg_marked_ok] below) says [c = None] --
+   so [ireg_write_au], [ireg_free_au] and the two link movers re-establish
+   the pin vacuously and none of them grows a premise.  The one mover that
+   moves a slot from the claimed (IN) arm to the marked one is
+   [ireg_withdraw], and that is exactly §2.4's spend site: it CONSUMES an
+   [iclaim] and retires the column. *)
+Definition ireg_claim_ok (c : option (excl unit)) (d : dinode) : Prop :=
+  match c with
+  | None   => True
+  | Some _ => fresh_shape d
+  end.
+
+Lemma ireg_claim_ok_none (d : dinode) : ireg_claim_ok None d.
+Proof. exact I. Qed.
+
+(* the MARKED arm's pure content, widened by the claim's other half: a slot
+   whose record is checked out of the region carries no claim. *)
+Definition ireg_marked_ok (c : option (excl unit)) (d : dinode) : Prop :=
+  bv_unsigned (di_type d) <> 0 /\ c = None.
+
+(* THE FREEZE PIN (§2.3, as AMENDED by the ZZProbeIcnt probe).  Phased:
+   [FrzPre] is the window before iput+0x8a's last close and pins the
+   in-core count at ONE (that is §1.1's B1 payout -- the [cnt2 >= 2] arm at
+   [IputFreeLockedDev.v:1034] dies on a pin read); [FrzPost] is after it and
+   pins the count at ZERO.  [FrzOff] is the unfrozen state and pins nothing.
+
+   WHAT IS *NOT* HERE, AND WHY (deviation from §2.3, recorded).  §2.3 also
+   wants [di_nlink d = 0 /\ di_type d <> 0] at both phases.  Neither
+   conjunct survives a landed mover: [ireg_free_au] writes [di_type = 0]
+   over a frozen slot (it IS the free the freeze exists to protect) and
+   [ireg_write_link_fl] raises [di_nlink] off zero.  Both would have to be
+   REFUTED at a frozen box, and the refutation the design gives is §2.6's
+   LICENCE table -- an iget-side fact, increment 4 -- not a region clause;
+   spelling them here would instead force a freeze-retire premise on both
+   movers and red-line [ProofIupdate] and its cone, which this increment
+   does not own.  The count conjunct, which is the one §1.1 and the probe
+   actually consume, lands in full. *)
+Definition ireg_frz_ok (f : frzUR) (n : nat) : Prop :=
+  match f with
+  | Some (Excl FrzOff)  => True
+  | Some (Excl FrzPre)  => n = 1%nat
+  | Some (Excl FrzPost) => n = 0%nat
+  | Some _              => False   (* [ExclBot]: never valid *)
+  | None                => True
+  end.
+
 (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  "A flush
    either CLEARS an inode's type or leaves it exactly where it was" -- the
    premise [ireg_write_au] gained so that §19.1(i)'s retype is refuted by
@@ -1260,10 +1319,17 @@ Section InodeRegion.
      produced by the reordered-iput deposit and refuted/redeemed pool-locally;
      the old [offlock_enabled]=[False] placeholder is gone. *)
 
+  (* THE ARM MOVED INSIDE THE LEDGER's [∃] (iclaim-ledger.md §2.4), and that
+     is the whole mechanism of the claim pin: the MARKED sub-arm can now say
+     [c = None] ([ireg_marked_ok]), which is what lets every byte-writing
+     mover -- each of which refutes the IN arm with the caller's own
+     [dinode_at] -- re-establish [ireg_claim_ok] for free.  [ireg_ep] stays
+     outside, so the destructuring pattern is [(ledger…arm) Hep] rather than
+     the old [(ledger) [Hep arm]]. *)
   Definition ireg_slot (γi : gname) (z : Z) (d : dinode) : iProp Σ :=
     ((∃ (wl wdu wdt g r : nat) (c : option (excl unit))
-        (p : option (dfrac_agreeR (leibnizO Z))),
-        link_auth z wl wdu wdt g c r p
+        (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat),
+        link_auth z wl wdu wdt g c r p f
         ∗ ⌜ireg_link_ok d (wl + wdu + wdt)⌝
         ∗ ⌜ireg_root_ok z d (wl + wdu + wdt)⌝
         ∗ ⌜ireg_dir_ok d (wdu + wdt)⌝
@@ -1275,8 +1341,24 @@ Section InodeRegion.
            every slot it reaches is unclaimed.  DISJUNCTIVE, not an
            implication, so it stays timeless ([ireg_slot_timeless]); both arms
            are timeless AND persistent. *)
-        ∗ (⌜c = None⌝ ∨ ireg_open))
-     ∗ ireg_ep z d
+        ∗ (⌜c = None⌝ ∨ ireg_open)
+        (* THE COUNT COUPLING's REGION HALF (§2.2).  The other half rides
+           under the itable lock -- [islot2]'s cached arm at
+           [Pos.to_nat n], [islot_empty] at 0 (increment 3) -- so every
+           count move needs BOTH and therefore an [↑iregN] open, which is
+           the probe's structural mask verdict. *)
+        ∗ icnt_half z n
+        (* the two in-transition pins (§2.3/§2.4), stated over the record
+           and the count this slot is carrying *)
+        ∗ ⌜ireg_claim_ok c d⌝
+        ∗ ⌜ireg_frz_ok f n⌝
+        (* THE FREEZE's BOOT-SHELTER CLAUSE (§2.3's last conjunct), the
+           f-column twin of the [c] clause above: a RUNTIME freezer
+           exhibits the persistent [ireg_open]; ireclaim, the only boot
+           freezer, PARKS its exclusive [ireg_boot] here for the freeze's
+           duration and takes it back at the deposit.  Disjunctive rather
+           than an implication so the slot stays timeless. *)
+        ∗ (⌜f = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot)
      (* OPTION A (walk reg-fold): the per-inum registry element rides INSIDE
         the arm, coupled to pending-ness.  A NON-pending slot (in/marked)
         carries the whole [reg_full]; the PENDING arm carries a [reg_half]
@@ -1286,11 +1368,12 @@ Section InodeRegion.
         recombines the pending arm's two halves back to [reg_full] with no
         registry lookup.  The registry conjunct in [ireg_body] is now the bare
         [icfg_reg] auth. *)
-     ∗ ((((⌜ireg_in d⌝ ∗ z ↪[γi] d)
-          ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z))
-         ∗ (∃ ge gr, reg_full z ge gr))
-        ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d
-           ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z)))%I.
+        ∗ ((((⌜ireg_in d⌝ ∗ z ↪[γi] d)
+             ∨ (⌜ireg_marked_ok c d⌝ ∗ imark γi z))
+            ∗ (∃ ge gr, reg_full z ge gr))
+           ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d
+              ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z)))
+     ∗ ireg_ep z d)%I.
 
   Global Instance ireg_slot_timeless γi z d : Timeless (ireg_slot γi z d).
   Proof. rewrite /ireg_slot. apply _. Qed.
@@ -1299,31 +1382,41 @@ Section InodeRegion.
      ordinary flush and the free re-park the arm unchanged in SHAPE and
      move only the record, so every arm move below is stated by giving the
      new record and the new authority separately. *)
-  Lemma ireg_slot_intro γi z d wl wdu wdt g c r p :
+  Lemma ireg_slot_intro γi z d wl wdu wdt g c r p f n :
     ireg_link_ok d (wl + wdu + wdt) ->
     ireg_root_ok z d (wl + wdu + wdt) ->
     ireg_dir_ok d (wdu + wdt) ->
     ireg_dir_wl0 d wl ->
     ireg_par_ok wdt p ->
-    link_auth z wl wdu wdt g c r p -∗
+    ireg_claim_ok c d ->
+    ireg_frz_ok f n ->
+    link_auth z wl wdu wdt g c r p f -∗
     ireg_ep z d -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
+    icnt_half z n -∗
+    (⌜f = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot) -∗
     ((((⌜ireg_in d⌝ ∗ z ↪[γi] d)
-       ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z))
+       ∨ (⌜ireg_marked_ok c d⌝ ∗ imark γi z))
       ∗ (∃ ge gr, reg_full z ge gr))
      ∨ (⌜bv_unsigned (di_type d) = 0⌝ ∗ z ↪[γi] d
         ∗ (∃ ge gr, reg_half z ge gr) ∗ region_pending z)) -∗
     ireg_slot γi z d.
   Proof.
-    intros Hok Hrt Hdir Hwl0 Hpar. iIntros "Hla Hep Hdisj Harm".
+    intros Hok Hrt Hdir Hwl0 Hpar Hclm Hfrz.
+    iIntros "Hla Hep Hdisj Hcnt Hfdisj Harm".
     rewrite /ireg_slot.
-    iFrame "Hep Harm".
-    iExists wl, wdu, wdt, g, r, c, p. iSplitL "Hla"; [iExact "Hla" |].
+    iFrame "Hep".
+    iExists wl, wdu, wdt, g, r, c, p, f, n. iSplitL "Hla"; [iExact "Hla" |].
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hrt |].
     iSplitR; [iPureIntro; exact Hdir |].
     iSplitR; [iPureIntro; exact Hwl0 |].
-    iSplitR "Hdisj"; [iPureIntro; exact Hpar | iExact "Hdisj"].
+    iSplitR; [iPureIntro; exact Hpar |].
+    iSplitL "Hdisj"; [iExact "Hdisj" |].
+    iSplitL "Hcnt"; [iExact "Hcnt" |].
+    iSplitR; [iPureIntro; exact Hclm |].
+    iSplitR; [iPureIntro; exact Hfrz |].
+    iSplitL "Hfdisj"; [iExact "Hfdisj" | iExact "Harm"].
   Qed.
 
   Definition ireg_blk (γi : gname) (γfs : fs_names) (inodestart : Z)
@@ -1565,22 +1658,22 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iEval (rewrite Hdeq) in "Hep".
     iMod (ireg_ep_mint (bv_unsigned inum) dn icfg_log e0 eq_refl Hnz
             with "Hep Hlb0") as "[Hep #Hobs]".
     iEval (rewrite -Hdeq) in "Hep".
-    iMod ("Hclose" with "[Ha Hreg Hfsb Hla Hep Harm Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Hla Hep Harm Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Hla Hep Harm Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Hla Hep Harm Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Hla Hep Harm]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Hla Hep Harm Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn". iExact "Hobs".
   Qed.
 
@@ -1629,22 +1722,22 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iEval (rewrite Hdeq) in "Hep".
     iDestruct (ireg_ep_use (bv_unsigned inum) dn icfg_log e0 eq_refl Hz He0
                  with "Hep Hobs") as "[Hep #Hwit]".
     iEval (rewrite -Hdeq) in "Hep".
-    iMod ("Hclose" with "[Ha Hreg Hfsb Hla Hep Harm Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Hla Hep Harm Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Hla Hep Harm Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Hla Hep Harm Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Hla Hep Harm]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Hla Hep Harm Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn". iExact "Hwit".
   Qed.
 
@@ -1776,7 +1869,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     (* THE ARM IS THE OUT ONE: the region cannot also hold this inum's
        fragment, because the caller does ([dinode_at_excl]). *)
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
@@ -1810,6 +1903,13 @@ Section InodeRegion.
        (its comment above), read once more at the root. *)
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
       by exact (ireg_root_ok_stable _ dn dn' _ (proj1 Hnl) Hrt).
+    (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4).  The caller's
+       own [dinode_at] put this open on the MARKED arm, whose clause says
+       [cl = None] -- so a byte-writing mover owes the pin nothing, and its
+       premise list does not move. *)
+    assert (Hclm' : ireg_claim_ok cl dn')
+      by (rewrite (proj2 Ht2); exact I).
+
     (* (T1) RIDES ON [di_type_stable] PLUS [Hnz]: the ordinary flush's LEFT
        disjunct (the type going to zero) is dead here, so the type is
        literally the same halfword and the clause is carried, not re-proved.
@@ -1832,9 +1932,9 @@ Section InodeRegion.
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
     set (m' := <[bv_unsigned inum := dn']> m).
     (* re-park the block at the flushed bytes, re-coupled at m' *)
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hmk Hla Hep Hslback Hback Hrf]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb' Hmk Hla Hep Hslback Hback Hrf Hcnt Hfdisj]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hmk Hla Hep Hslback Hrf]").
+      iApply ("Hback" $! m' with "[%] [Hfsb' Hmk Hla Hep Hslback Hrf Hcnt Hfdisj]").
       { (* other blocks' keys never collide with this inum's *)
         intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
@@ -1857,12 +1957,12 @@ Section InodeRegion.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hmk Hla Hep Hrf]").
+      iApply ("Hslback" $! dn' with "[Hmk Hla Hep Hrf Hcnt Hfdisj]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
-                Hlok' Hrt' Hdir' Hwl0' Hpar
-                with "Hla Hep Hdisj").
-      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"] | iExact "Hrf"]. }
+      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl fz cn
+                Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj").
+      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | exact (proj2 Ht2)] | iExact "Hmk"] | iExact "Hrf"]. }
     iModIntro. iExact "Hdn".
   Qed.
 
@@ -1896,14 +1996,25 @@ Section InodeRegion.
        ([Hreg], carried out of the open below): read this inum's [reg_full] and
        collide it with the arm's [reg_half] (fraction overflow).  No premise. *)
     ireg_inv γi γfs inodestart nib -∗
+    (* THE SEALED REGIME, and it is what the landed boot clause costs the
+       c-mint (iclaim-ledger.md §2.4): a claimed slot must exhibit
+       [ireg_open], so every RUNTIME claimant carries it -- persistent, so
+       it is borrowed and never spent.  A holder of [ireg_boot] therefore
+       still proves every slot unclaimed ([IregLinkNz.ireg_boot_no_claim]),
+       which is the whole point of the clause. *)
+    ireg_open -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
       fsblock γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
        fsblock γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
-       ={E ∖ ↑iregN, E}=∗ True).
+       (* THE CLAIM (§2.4): the c column goes [None -> Some] in the same
+          ghost step that writes the box, and the exclusive fragment is
+          ialloc's receipt.  It is spent at create's fill
+          ([ireg_withdraw]). *)
+       ={E ∖ ↑iregN, E}=∗ iclaim (bv_unsigned inum)).
   Proof.
-    iIntros (HE Hin Hwf Ht0 Hfr) "#Hinv".
+    iIntros (HE Hin Hwf Ht0 Hfr) "#Hinv #Hopen".
     pose proof (islot_lt inum) as Hsl.
     pose proof (fresh_shape_wf dn' Hfr) as Hdn'.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
@@ -1925,7 +2036,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     (* OPTION A (walk registry-split): the claimed slot's fragment [Hfrg]
        reaches the tail from EITHER the live IN arm (unchanged) OR the type=0
        PENDING arm.  A pending arm no longer collides by fractions -- the
@@ -1945,7 +2056,7 @@ Section InodeRegion.
            a type-0 record refutes the marked sub-arm ([Ht2 Ht0]). *)
         iDestruct "Harm" as "[[_ Hfrg] | [%Ht2 _]]".
         + iFrame "Hfrg Hrf".
-        + iExFalso. iPureIntro. exact (Ht2 Ht0).
+        + iExFalso. iPureIntro. exact (proj1 Ht2 Ht0).
       - (* PENDING: recombine the arm's structural [reg_half] with
            [region_pending]'s half back into [reg_full] -- the coordinate, now
            entirely from the slot's own arm (no registry lookup). *)
@@ -1988,6 +2099,18 @@ Section InodeRegion.
                   (proj1 (proj2 Hlok) Ht0)).
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
       by exact (ireg_root_ok_nonroot _ dn' _ Hnr).
+    (* A STANDING CLAIM IS REFUTED BY THE PIN (iclaim-ledger.md §2.4), which
+       is what makes [link_mint_claim]'s [c = None] side condition
+       dischargeable: [ireg_claim_ok] says a claimed slot's record is
+       [fresh_shape], hence has a NONZERO type, and the caller's buffer
+       showed [di_type = 0] at exactly that record. *)
+    assert (Hcl0 : cl = None).
+    { destruct cl as [x |]; [| reflexivity].
+      exfalso. exact (proj1 Hclm Ht0). }
+    subst cl.
+    iMod (link_mint_claim with "Hla") as "[Hla Hcl]".
+    (* the new pin: the claim box IS the [fresh_shape] record just written *)
+    assert (Hclm' : ireg_claim_ok (Some (Excl tt)) dn') by exact Hfr.
     (* the claimed slot's old record is type-0, so (L3) already gives it
        [nlink = 0] and the receipt carries unconditionally *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
@@ -1999,9 +2122,10 @@ Section InodeRegion.
     iDestruct (ghost_map_lookup with "Ha Hfrg") as %Hm.
     iMod (ghost_map_update dn' with "Ha Hfrg") as "[Ha Hfrg]".
     set (m' := <[bv_unsigned inum := dn']> m).
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hfrg Hla Hep Hslback Hback Hrf]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb' Hfrg Hla Hep Hslback Hback Hrf Hcnt Hfdisj]") as "_"; last first.
+    { iModIntro. iExact "Hcl". }
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hfrg Hla Hep Hslback Hrf]").
+      iApply ("Hback" $! m' with "[%] [Hfsb' Hfrg Hla Hep Hslback Hrf Hcnt Hfdisj]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -2023,13 +2147,93 @@ Section InodeRegion.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hfrg Hla Hep Hrf]").
+      iApply ("Hslback" $! dn' with "[Hfrg Hla Hep Hrf Hcnt Hfdisj]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
-                Hlok' Hrt' Hdir' Hwl0' Hpar
-                with "Hla Hep Hdisj").
+      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl
+                (Some (Excl tt)) rl pl fz cn
+                Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz
+                with "Hla Hep [] Hcnt Hfdisj").
+      { iRight. iExact "Hopen". }
       iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; right; exact Hfr | iExact "Hfrg"] | iExact "Hrf"]. }
-    iModIntro. done.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  iput's FREEZE -- the f column's mint (iclaim-ledger.md §1.4/§2.3)   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHERE IT FIRES.  In [ip_free_entry]'s span, on the [nlink == 0] arm at
+     iput+0x50, still under the FIRST itable-lock hold -- which is where
+     [Mt !! k = Some (q, 1)] is a live fact and where §2.2's [icnt] SLOT half
+     therefore reads ONE.  Between this mint and the deposit's retire the
+     freeze-pin is the walk's working capital: §1.1's B1 payout reads it at
+     iput+0x82 and gets [cnt2 = 1] with no arithmetic side condition, and
+     +0x8a steps the phase [FrzPre -> FrzPost] fragment-side, inside the
+     region open it already takes for the count.
+
+     WHY IT IS A SWAP AND NOT AN ALLOCATION, i.e. why the caller brings
+     [ifreeze FrzOff] rather than nothing.  The mint must be EXCLUSIVE -- two
+     threads must not both hold a freeze at one inum -- and a [None -> Some]
+     allocation cannot be: nothing a RUNTIME freezer holds refutes a standing
+     [FrzPre] (the boot arm's [ireg_boot] does, by [ity_pending_excl]; the
+     persistent [ireg_open] does not), and the region has no other handle on
+     it.  With the unfrozen state spelled as [FrzOff] the right to freeze IS
+     the exclusive fragment, it rides under the itable lock beside the count
+     half, and double-freeze dies on [Excl] alone -- see [IcacheRef.frz]'s
+     header for the same argument from the algebra's side.
+
+     THE BOOT-SHELTER SIDE (§2.3's last conjunct) is the caller's
+     [ireg_open ∨ ireg_boot]: a runtime freezer hands in the persistent
+     sealed regime, ireclaim PARKS its exclusive boot token for the window
+     and takes it back at the deposit. *)
+  Lemma ireg_freeze_au (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    (ireg_open ∨ ireg_boot) -∗
+    ifreeze FrzOff (bv_unsigned inum) -∗
+    icnt_half (bv_unsigned inum) 1%nat ={E}=∗
+    ifreeze_pre (bv_unsigned inum) ∗ icnt_half (bv_unsigned inum) 1%nat.
+  Proof.
+    iIntros (HE Hin) "#Hinv Hsh Hoff Hhalf".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
+    (* the OFF token pins the column -- this is the exclusivity *)
+    iDestruct (link_freeze_agree with "Hla Hoff") as %->.
+    (* ...and the two halves pin the count the new pin will carry *)
+    iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
+    iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzOff FrzPre with "Hla Hoff")
+      as "[Hla Hpre]".
+    assert (Hfrz' : ireg_frz_ok (Some (Excl FrzPre)) 1%nat) by reflexivity.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hsh]") as "_".
+    { iNext. iExists m. iFrame "Ha Hreg".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hsh]");
+        [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hsh]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl (Some (Excl FrzPre)) 1%nat
+                Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz'
+                with "Hla Hep Hdisj Hcnt [Hsh] Harm").
+      iRight. iExact "Hsh". }
+    iModIntro. rewrite /ifreeze_pre. iFrame "Hpre Hhalf".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -2109,7 +2313,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
@@ -2159,6 +2363,11 @@ Section InodeRegion.
       by exact (ireg_root_ok_ne _ dn _ Hrt Hnl0).
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
       by exact (ireg_root_ok_nonroot _ dn' _ Hnr).
+    (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's
+       own [dinode_at] put this open on the MARKED arm, whose clause says
+       [cl = None]. *)
+    assert (Hclm' : ireg_claim_ok cl dn')
+      by (rewrite (proj2 Ht2); exact I).
     (* the free writes a zero over a zero: [Hnl0] above IS the receipt's
        antecedent already discharged at the old record (fs-log.md §G.17) *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
@@ -2168,9 +2377,9 @@ Section InodeRegion.
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
     set (m' := <[bv_unsigned inum := dn']> m).
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrf]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrf Hcnt Hfdisj]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrf]").
+      iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrf Hcnt Hfdisj]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -2192,11 +2401,11 @@ Section InodeRegion.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrf]").
+      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrf Hcnt Hfdisj]").
       rewrite Hkey.
-      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
-                Hlok' Hrt' Hdir' Hwl0' Hpar
-                with "Hla Hep Hdisj").
+      iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl fz cn
+                Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj").
       iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hz | iExact "Hdn"] | iExact "Hrf"]. }
     iModIntro. iExact "Hmk".
   Qed.
@@ -2227,12 +2436,22 @@ Section InodeRegion.
     bv_unsigned (di_type (ds !!! islot inum)) <> 0 ->
     ireg_inv γi γfs inodestart nib -∗
     imark γi (bv_unsigned inum) -∗
+    (* THE CLAIM, SPENT (iclaim-ledger.md §2.4: "c retires Some -> None
+       there").  The withdrawal is the ONE mover that carries a claimed slot
+       from the region's IN arm to the MARKED one, so it is the one place the
+       c column HAS to be retired: the marked arm's clause says [c = None]
+       (that is what lets every byte-writing mover re-establish the claim pin
+       for free), and the retire is not frame-preserving while the
+       claimant's fragment is outstanding.  The premise is landed one
+       increment early for that reason -- §2.8 item 7 owns its discharge in
+       [ProofIlock], where create's [iclaim] arrives from [ireg_claim_au]. *)
+    iclaim (bv_unsigned inum) -∗
     (b ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
     ⌜fresh_shape (ds !!! islot inum)⌝ ∗
     dinode_at γi inum (ds !!! islot inum) ∗
     (b ↪[fs_L γfs]{#(1/2)} bsl).
   Proof.
-    iIntros (HE Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hhalf".
+    iIntros (HE Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -2251,7 +2470,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     (* the marker in the caller's hand refutes the OUT arm *)
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(%Ht0p & _ & _)"; exfalso; exact (Hnz Ht0p)].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk']]"; last first.
@@ -2260,19 +2479,26 @@ Section InodeRegion.
       by (destruct Hin1 as [H0 | Hf]; [exfalso; exact (Hnz H0) | exact Hf]).
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Hmk Hla Hep Hslback Hback Hrf]") as "_".
+    (* THE RETIRE.  [link_spend_claim] pins [cl = Some (Excl tt)] off the
+       fragment and drops the column; the slot is re-parked at [None], which
+       is what the MARKED arm the withdrawal moves it to demands. *)
+    iMod (link_spend_claim with "Hla Hcl") as "Hla".
+    assert (Hclm0 : ireg_claim_ok None (ds !!! islot inum))
+      by exact (ireg_claim_ok_none _).
+    iMod ("Hclose" with "[Ha Hreg Hfsb Hmk Hla Hep Hslback Hback Hrf Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Hmk Hla Hep Hslback Hrf]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Hmk Hla Hep Hslback Hrf Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       rewrite /fsblock (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Hmk Hla Hep Hrf]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Hmk Hla Hep Hrf Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj").
-      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"] | iExact "Hrf"]. }
+                wl wdu wdt gl None rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm0 Hfrz
+                with "Hla Hep [] Hcnt Hfdisj").
+      { iLeft. iPureIntro. reflexivity. }
+      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | reflexivity] | iExact "Hmk"] | iExact "Hrf"]. }
     iModIntro. iFrame "Hfr Hhalf". iPureIntro. exact Hfresh.
   Qed.
 
@@ -2374,7 +2600,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
@@ -2415,7 +2641,7 @@ Section InodeRegion.
                ⌜ireg_dir_ok dn' (wdu' + wdt')⌝ ∗
                ⌜ireg_dir_wl0 dn' wl'⌝ ∗
                ⌜ireg_par_ok wdt' p'⌝ ∗
-               link_auth (bv_unsigned inum) wl' wdu' wdt' gl cl rl p' ∗
+               link_auth (bv_unsigned inum) wl' wdu' wdt' gl cl rl p' fz ∗
                ilink_fl fl (bv_unsigned inum))%I
       with "[Hla]" as ">(%wl' & %wdu' & %wdt' & %p' & %Hsum & %Hdir' & %Hwl0' & %Hpar' & Hla & Hfrag)".
     { destruct fl as [[pv |] |].
@@ -2469,6 +2695,13 @@ Section InodeRegion.
        is.  mkdir's [dp->nlink++] at the root is exactly this case. *)
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl' + wdu' + wdt')).
     { rewrite Hsum. exact (ireg_root_ok_bump _ dn dn' _ Hnl Hrt). }
+    (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4).  The caller's
+       own [dinode_at] put this open on the MARKED arm, whose clause says
+       [cl = None] -- so a byte-writing mover owes the pin nothing, and its
+       premise list does not move. *)
+    assert (Hclm' : ireg_claim_ok cl dn')
+      by (rewrite (proj2 Ht2); exact I).
+
     (* nlink GROWS here, so the receipt's antecedent is absurd at [dn'] *)
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
                   bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
@@ -2477,9 +2710,9 @@ Section InodeRegion.
                  with "Hep") as "Hep".
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
     set (m' := <[bv_unsigned inum := dn']> m).
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hmk Hla Hep Hslback Hback Hrf]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb' Hmk Hla Hep Hslback Hback Hrf Hcnt Hfdisj]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hmk Hla Hep Hslback Hrf]").
+      iApply ("Hback" $! m' with "[%] [Hfsb' Hmk Hla Hep Hslback Hrf Hcnt Hfdisj]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -2501,11 +2734,11 @@ Section InodeRegion.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hmk Hla Hep Hrf]").
+      iApply ("Hslback" $! dn' with "[Hmk Hla Hep Hrf Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl' wdu' wdt' gl cl rl
-                p' Hlok' Hrt' Hdir' Hwl0' Hpar' with "Hla Hep Hdisj").
-      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"] | iExact "Hrf"]. }
+                p' fz cn Hlok' Hrt' Hdir' Hwl0' Hpar' Hclm' Hfrz with "Hla Hep Hdisj Hcnt Hfdisj").
+      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | exact (proj2 Ht2)] | iExact "Hmk"] | iExact "Hrf"]. }
     iModIntro. iFrame "Hdn Hfrag".
   Qed.
 
@@ -2694,7 +2927,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds0 (islot inum) Hsl Hlen0
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iDestruct (ireg_ep_open with "Hep") as (v) "[#Hvlb Hepback]".
     iModIntro.
     rewrite (ireg_bi_iblock inum inodestart).
@@ -2731,7 +2964,7 @@ Section InodeRegion.
                ⌜ireg_dir_ok dn' (wdu' + wdt')⌝ ∗
                ⌜ireg_dir_wl0 dn' wl'⌝ ∗
                ⌜ireg_par_ok wdt' p'⌝ ∗
-               link_auth (bv_unsigned inum) wl' wdu' wdt' gl cl rl p')%I
+               link_auth (bv_unsigned inum) wl' wdu' wdt' gl cl rl p' fz)%I
       with "[Hla Hfrag]" as ">(%wl' & %wdu' & %wdt' & %p' & %Hsum & %Hdir' & %Hwl0' & %Hpar' & Hla)".
     { destruct fl as [[pv |] |]; cbn.
       - (* the TAGGED spend: both halves in, register reset (V5') *)
@@ -2806,11 +3039,17 @@ Section InodeRegion.
       by (rewrite Hsum; exact Hrt).
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl' + wdu' + wdt'))
       by exact (ireg_root_ok_drop _ dn dn' _ Hnl Hrt0).
+    (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's
+       own [dinode_at] put this open on the MARKED arm, whose clause says
+       [cl = None]. *)
+    assert (Hclm' : ireg_claim_ok cl dn')
+      by (rewrite (proj2 Ht2); exact I).
+
     iMod (ghost_map_update dn' with "Ha Hdn") as "[Ha Hdn]".
     set (m' := <[bv_unsigned inum := dn']> m).
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hmk Hla Hep Hslback Hback Hrf]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb' Hmk Hla Hep Hslback Hback Hrf Hcnt Hfdisj]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hmk Hla Hep Hslback Hrf]").
+      iApply ("Hback" $! m' with "[%] [Hfsb' Hmk Hla Hep Hslback Hrf Hcnt Hfdisj]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -2832,11 +3071,11 @@ Section InodeRegion.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hmk Hla Hep Hrf]").
+      iApply ("Hslback" $! dn' with "[Hmk Hla Hep Hrf Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl' wdu' wdt' gl cl rl
-                p' Hlok' Hrt' Hdir' Hwl0' Hpar' with "Hla Hep Hdisj").
-      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Hnz | iExact "Hmk"] | iExact "Hrf"]. }
+                p' fz cn Hlok' Hrt' Hdir' Hwl0' Hpar' Hclm' Hfrz with "Hla Hep Hdisj Hcnt Hfdisj").
+      iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hnz | exact (proj2 Ht2)] | iExact "Hmk"] | iExact "Hrf"]. }
     iModIntro. iExact "Hdn".
   Qed.
 
@@ -2986,25 +3225,25 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iDestruct (link_w_ge with "Hla Hfrag") as %Hw1.
     assert (Hws : (1 <= wl + wdu + wdt)%nat) by lia.
     assert (Hnz : bv_unsigned (di_type (ds !!! islot inum)) <> 0)
       by exact (ireg_link_ok_alloc (ds !!! islot inum) _ Hlok Hws).
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       rewrite /fsblock (ireg_bi_iblock inum inodestart) in Hb.
       rewrite Hb. iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iFrame "Hfrag Hhalf". iPureIntro.
     exists ds. split; [exact Hwf | split; [exact Hbytes | exact Hnz]].
   Qed.
@@ -3053,7 +3292,7 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -3065,17 +3304,17 @@ Section InodeRegion.
     rewrite -Hdeq in Hrt.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn". iPureIntro. exact Hne.
   Qed.
 
@@ -3129,23 +3368,23 @@ Section InodeRegion.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     (* the ONE ghost step: [g] moves, and no clause of [ireg_link_ok]
        mentions it, so the slot is re-parked at the SAME record *)
     iMod (link_mint_grey with "Hla") as "[Hla Hfrag]".
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt (S gl) cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt (S gl) cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iExact "Hfrag".
   Qed.
 

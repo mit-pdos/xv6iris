@@ -76,13 +76,7 @@ Local Open Scope Z_scope.
                       type.  This is the allocatedness witness §20 exists
                       for, and it is the licence every [dirlookup] delivers
                       at a record that is not the home's own.
-      [GreyL]    (b)  §20.8's orphaned [".."] -- the one record in xv6 whose
-                      target's link count does not account for it.  It
-                      concludes NOTHING, by construction (§20.18 ruling 2),
-                      and THE STANDING AUDIT IS THAT NO SITE INSTANTIATES
-                      IT: [grep -n "GreyL" iris/Proof*.v] must be empty.
-                      Kept as a constructor so the enumeration is §20.4's
-                      and the box is a grep rather than a paragraph.
+      [GreyL]    (b)  DELETED -- see the tombstone below.
       [HeldL]    (c)  the caller already holds the record, exclusively.  A
                       lookup of ["."] is the worked instance: it returns the
                       inum of the directory the caller has locked, whose own
@@ -108,7 +102,8 @@ Local Open Scope Z_scope.
                       ([InodeRegion.ireg_root_ok], (L1) MADE STRICT at
                       [ireg_root]) is what makes this a licence rather than
                       an assumption, and this is its first consumer.
-      [SpanL]         see the R14 header below.                            *)
+      (the two deleted licences, [GreyL] and [SpanL], are tombstoned
+      below.)                                                             *)
 
 (*  THREE CONSTRUCTORS CARRY DATA, AND THAT IS FORCED BY "THE SAME [l]".
     §7.1.1 wrote (a), (c) and (e) with the licence's content hidden behind a
@@ -122,40 +117,37 @@ Local Open Scope Z_scope.
     and the two standing greps are unaffected. *)
 Inductive ilic :=
   | LinkedL (fl : option (option Z))
-  | GreyL
   | HeldL (d : dinode)
   | ClaimL
   | BufL (bno : Z) (ds : list dinode)
-  | RootL
-  | SpanL.
+  | RootL.
 
 (*  ===================================================================== *)
-(*  R14: [SpanL] -- THE create_fresh_ty SPAN LICENCE, ONE PERMITTED SITE   *)
+(*  TWO TOMBSTONES: [SpanL] and [GreyL] ARE DELETED                        *)
 (*  ===================================================================== *)
 (*
-    [SpanL]'s [iname] is [⌜True⌝].  It is a licence that licenses nothing,
-    and that is deliberate: it is the ONE place in the tree where an [iget]
-    presents no evidence, and naming it is what turns "the axiom's
-    delivery-side perimeter" from a paragraph into a grep line.
+    [SpanL] IS GONE, DELETED PER ITS OWN SCHEDULE.  The R14 header that
+    stood here said in as many words: "IT DELETES.  [SpanL] goes away when
+    F1.5c mints an [iclaim] (the site becomes [ClaimL], no signature moves
+    -- that is why (d) is kept)".  F1.5c is
+    claude-notes/projects/iclaim-ledger.md, whose §2.4 executes exactly that
+    -- [InodeRegion.ireg_claim_au] now mints [iclaim] -- so the one
+    permitted site ([ProofIalloc.v]'s iget, §7.1.7's window) becomes a
+    [ClaimL] site and the transitional [⌜True⌝] licence has nothing left to
+    license.  The standing audit [grep -n "SpanL" iris/Proof*.v] is
+    satisfied by construction from here: the constructor does not exist.
 
-    THE SITE IS [ProofIalloc.v]'s [iget], AND ONLY THAT ONE.  ialloc's
-    [iget] runs in the window §7.1.7 describes: [ialloc] has claimed the
-    inum, written [dip->type = ty], logged it and BRELSE'd, so at the [iget]
-    it holds nothing revocable at all -- no buffer half (that is why licence
-    (e) is not available here, and §7.2's CURRENCY GAP is why no epoch
-    repair recovers it), no reference, no fragment.  Licence (d) is what
-    the record deserves and licence (d) is foreclosed by §7.1.5's theorem.
-    The span is exactly the gap [create_fresh_ty] axiomatizes.
-
-    THE STANDING AUDIT: [grep -n "SpanL" iris/Proof*.v] must name EXACTLY
-    [ProofIalloc.v]'s iget and nothing else.  A second site would be a
-    silent widening of the axiom's perimeter, which is the thing this
-    constructor exists to make impossible to do quietly.
-
-    IT DELETES.  [SpanL] goes away when F1.5c mints an [iclaim] (the site
-    becomes [ClaimL], no signature moves -- that is why (d) is kept) or when
-    [create_fresh_ty] retires.  It is a transitional constructor and it is
-    the only permitted [⌜True⌝] in this enumeration.                       *)
+    [GreyL] IS GONE TOO, AND ITS DELETION IS REQUIRED RATHER THAN
+    HOUSEKEEPING (iclaim-ledger.md §2.6's licence table).  Its audit
+    ("[grep -n "GreyL" iris/Proof*.v] must be empty") had held on the lane
+    since R14, so no site moves.  What forces the deletion is the free-side
+    wall: at an in-transition box (f = Some or c = Some) EVERY licence must
+    be refutable, and [GreyL] is not -- a grave-[".."] grey legitimately
+    survives the free ([IcacheRef.igrey]'s charter: "it carries no
+    allocatedness, and that is the point").  With the new mint obligation an
+    undeletable [GreyL] would make iget's own proof unclosable.  The [g]
+    column and the [igrey] FRAGMENT both stay: the ledger's grave-[".."]
+    state is untouched, only the LICENCE dies.                             *)
 
 Section IgetLic.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
@@ -293,8 +285,8 @@ Section IgetLic.
   (* ...and (L1) reads off it: one unit at ANY flavour bounds the sum *)
   Lemma link_paid_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
       (r : nat) (p : option (dfrac_agreeR (leibnizO Z)))
-      (fl : option (option Z)) :
-    link_auth z wl wdu wdt g c r p -∗ ipaid fl z -∗
+      (fl : option (option Z)) (f : frzUR) :
+    link_auth z wl wdu wdt g c r p f -∗ ipaid fl z -∗
     ⌜(1 <= wl + wdu + wdt)%nat⌝.
   Proof.
     iIntros "Ha Hb". rewrite /ipaid. destruct fl as [[pv |] |].
@@ -312,16 +304,33 @@ Section IgetLic.
     : iProp Σ :=
     match l with
     | LinkedL fl => ipaid fl (bv_unsigned inum)                      (* a *)
-    | GreyL   => igrey (bv_unsigned inum)                            (* b *)
+    (* (c) STRENGTHENED BY iclaim-ledger.md §2.6: the held record's link
+       count is NONZERO.  That is what makes [HeldL] refutable at an
+       in-transition box -- both pins carry [di_nlink = 0], and
+       fragment-auth agreement pins [d] to the arm's record.  VERIFY(2.6a)
+       audited on the lane: the one worked instance is the ["."] lookup at a
+       caller-locked LIVE directory ([ProofDirlookup.v:2074]), which is at
+       [1 <= nlink] already; no site presents a torn-down dir. *)
     | HeldL d => (dinode_at γi inum d ∗
-                  ⌜bv_unsigned (di_type d) <> 0⌝)                    (* c *)
+                  ⌜bv_unsigned (di_type d) <> 0⌝ ∗
+                  ⌜bv_unsigned (di_nlink d) <> 0⌝)                   (* c *)
     | ClaimL  => iclaim (bv_unsigned inum)                           (* d *)
+    (* (e) BOOT-GATED BY §2.6: the presenter also LENDS [ireg_boot].
+       Runtime: nobody has it after the seal fires, so licence (e) is
+       unpresentable at all and the free-side table has nothing to refute.
+       Boot: the presenter's pending token doubles against the freeze arm's
+       parked pending ([ity_pending_excl]) or meets a runtime claim's
+       [ireg_open] ([ireg_boot_open_excl]).  BORROWED, like the rest of the
+       licence -- it is simply part of the [iname] resource the caller
+       lends, and [ProofIreclaim.v:1302] (the only site in the tree) is a
+       boot-thread proof that holds one; it re-proves in a later
+       increment. *)
     | BufL bno ds =>
                  (fsblock γfs bno (diblk_bytes ds) ∗                  (* e *)
                   ⌜diblk_wf ds⌝ ∗
-                  ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝)
+                  ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝ ∗
+                  ireg_boot)
     | RootL   => ⌜bv_unsigned inum = ireg_root⌝                      (* f *)
-    | SpanL   => ⌜True⌝                                       (* R14, above *)
     end%I.
 
   (* Timeless throughout -- which is what lets [SpecIget]'s premise sit
@@ -345,11 +354,8 @@ Section IgetLic.
       about, verbatim -- it says something about a record nobody has tied to
       the licence.  Write it in the accessor shape or not at all.
 
-      NONE OF THESE HAS A CONSUMER IN THIS INCREMENT.  They are the payoff
-      the enumeration exists to make available, and stating them now is what
-      proves the constructors are not vacuous.  [ClaimL] has no reading and
-      may not get one before F1.5c ((L5) is what it would need); [GreyL] has
-      none by construction.                                                *)
+      [ClaimL] has no reading yet; F1.5c's payout increment (§2.8 item 7) is
+      what gives it one, at create's fill.                                 *)
 
   (* ---- (a) [LinkedL] ⇒ allocated ------------------------------------- *)
 
@@ -384,7 +390,7 @@ Section IgetLic.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     iDestruct (link_paid_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -400,17 +406,17 @@ Section IgetLic.
       rewrite Hz0 in Hle. lia. }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
   Qed.
 
@@ -433,15 +439,21 @@ Section IgetLic.
   Lemma iname_held_alloc (γi : gname) (γfs : fs_names) (inum : bv 32)
       (d : dinode) :
     iname γi γfs inum (HeldL d) -∗
-    ⌜bv_unsigned (di_type d) <> 0⌝ ∗ dinode_at γi inum d.
-  Proof. rewrite /iname. iIntros "[Hd %Hnz]". by iFrame "Hd". Qed.
+    ⌜bv_unsigned (di_type d) <> 0⌝ ∗ ⌜bv_unsigned (di_nlink d) <> 0⌝
+    ∗ dinode_at γi inum d.
+  Proof.
+    rewrite /iname. iIntros "(Hd & %Hnz & %Hnl)". by iFrame "Hd".
+  Qed.
 
-  (* ...and back in, which is all the round trip costs at the ["."] site *)
+  (* ...and back in, which is all the round trip costs at the ["."] site.
+     The [nlink] premise is §2.6's strengthening: the ["."] site holds a
+     LIVE directory, so it is discharged where the licence is built. *)
   Lemma iname_held_intro (γi : gname) (γfs : fs_names) (inum : bv 32)
       (d : dinode) :
     bv_unsigned (di_type d) <> 0 ->
+    bv_unsigned (di_nlink d) <> 0 ->
     dinode_at γi inum d -∗ iname γi γfs inum (HeldL d).
-  Proof. intros Hnz. rewrite /iname. iIntros "Hd". by iFrame "Hd". Qed.
+  Proof. intros Hnz Hnl. rewrite /iname. iIntros "Hd". by iFrame "Hd". Qed.
 
   (* ---- (f) [RootL] ⇒ allocated --------------------------------------- *)
 
@@ -476,7 +488,7 @@ Section IgetLic.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -490,17 +502,17 @@ Section IgetLic.
       rewrite (Hl3 Hty) in Halive. lia. }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj]") as "_".
     { iNext. iExists m. iFrame "Ha Hreg".
-      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj]"); [done |].
       iExists ds. iSplitR; [done |]. iSplitR; [done |].
       iSplitL "Hfsb"; [iExact "Hfsb" |].
       iEval (rewrite -Hins).
-      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep Hdisj"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl fz cn Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz
+                with "Hla Hep Hdisj Hcnt Hfdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn". iSplitR; [iPureIntro; exact Hnz | done].
   Qed.
 
@@ -532,7 +544,7 @@ Section IgetLic.
     dinode_at γi inum dn ∗ iname γi γfs inum (BufL bno ds).
   Proof.
     iIntros (HE Hin Hb) "#Hinv Hdn Hbuf". rewrite /iname.
-    iDestruct "Hbuf" as "(Hhalf & %Hwf & %Hnz)".
+    iDestruct "Hbuf" as "(Hhalf & %Hwf & %Hnz & Hboot)".
     rewrite /fsblock.
     iMod (ireg_read E γi γfs inodestart nib inum dn
             bno (diblk_bytes ds) HE Hin Hb
@@ -543,7 +555,7 @@ Section IgetLic.
     subst ds'.
     iModIntro. iSplitR.
     { iPureIntro. rewrite -Hslot. exact Hnz. }
-    iFrame "Hdn Hhalf".
+    iFrame "Hdn Hhalf Hboot".
     iPureIntro. split; [exact Hwf | exact Hnz].
   Qed.
 

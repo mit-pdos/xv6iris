@@ -88,7 +88,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac.
+From iris.algebra Require Import auth gmap frac excl.
 From iris.base_logic.lib Require Import invariants own ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -572,7 +572,14 @@ Section IcacheBootRegion.
        arm; mkfs's records are handed to the region unflavoured, and the
        root's own [nlink = 1] is still [image_root_alive]'s business and
        nobody else's. *)
-    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 0 0 None 0 None) -∗
+    ([∗ set] z ∈ region_inums nib,
+       link_auth z 0 0 0 0 None 0 None (Some (Excl FrzOff))) -∗
+    (* THE COUNT COUPLING's REGION HALVES (iclaim-ledger.md §2.2), one per
+       inum and all at ZERO -- boot caches no inode.  A PREMISE for the
+       ledger's own reason: the gname is the ambient class's, so only the
+       [own_alloc] that minted it can hand the halves over
+       ([IcacheRef.icfg_alloc] + [IcacheRef.icnt_split]). *)
+    ([∗ set] z ∈ region_inums nib, icnt_half z 0) -∗
     (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
        zero: nobody has ever observed a nonzero nlink, which is exactly the
        [⌜v = 0⌝] disjunct that carries the receipt over the mkfs image's
@@ -599,7 +606,7 @@ Section IcacheBootRegion.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0).
-    iIntros "Hlk Hepa Hblks Hboot Hrauth".
+    iIntros "Hlk Hcnts Hepa Hblks Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -624,6 +631,8 @@ Section IcacheBootRegion.
       iIntros "Ha". iApply (ireg_ep_intro z (image_dinode dss z) with "Ha"). }
     iDestruct (big_sepS_sep_2 with "Hall Hep") as "Hall".
     iDestruct (big_sepS_sep_2 with "Hall Hfulls") as "Hall".
+    (* the count coupling's region halves ride in beside the rest (§2.2) *)
+    iDestruct (big_sepS_sep_2 with "Hall Hcnts") as "Hall".
     (* per inum: one of the two ghost entries stays in the region's arm and
        the other one is the payout; the ledger authority stays with the
        slot on BOTH arms (design §20.2) *)
@@ -632,7 +641,7 @@ Section IcacheBootRegion.
                 ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
-      iIntros "[[[[Hfrag Hmk] Hla] Hep] Hrf]".
+      iIntros "[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt]".
       assert (Hok : ireg_link_ok (image_dinode dss z) 0).
       { split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
       (* the root clause at the EMPTY ledger, i.e. §20.4's own words *)
@@ -642,22 +651,32 @@ Section IcacheBootRegion.
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
+                  (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
-                  ireg_par_ok_none
-                  with "Hla Hep").
+                  ireg_par_ok_none (ireg_claim_ok_none _) I
+                  with "Hla Hep [] Hcnt []").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
+        { iLeft; iPureIntro; reflexivity. }
+        (* ...and the FREEZE's clause takes its own left disjunct for the
+           same reason: boot's f column is the UNFROZEN token everywhere
+           (iclaim-ledger.md §2.3) *)
         { iLeft; iPureIntro; reflexivity. }
         iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
+                  (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
-                  ireg_par_ok_none
-                  with "Hla Hep").
+                  ireg_par_ok_none (ireg_claim_ok_none _) I
+                  with "Hla Hep [] Hcnt []").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Hty | iExact "Hmk"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"]. }
+        (* ...and the FREEZE's clause takes its own left disjunct for the
+           same reason: boot's f column is the UNFROZEN token everywhere
+           (iclaim-ledger.md §2.3) *)
+        { iLeft; iPureIntro; reflexivity. }
+        iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hty | reflexivity] | iExact "Hmk"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
     iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
