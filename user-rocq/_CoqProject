@@ -8,3 +8,6 @@ EchoSyms.v
 ShInstrs.v
 ShData.v
 ShSyms.v
+InitInstrs.v
+InitData.v
+InitSyms.v

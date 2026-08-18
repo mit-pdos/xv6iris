@@ -201,6 +201,7 @@ UmodeFrame.v
 UmodeStub.v
 UProofShLib.v
 UProofShMem.v
+UCodeInit.v
 UProofEchoA.v
 UProofEcho.v
 UserMemArms.v
