@@ -3152,7 +3152,8 @@ Section SmodeCorePt.
                    mideleg ↦ᵣ{ dq } mdv1 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗
-                   pmpaddr_n ↦ᵣ paddr1 ∗ tlb ↦ᵣ tv' ∗ Res tv' ∗
+                   pmpaddr_n ↦ᵣ paddr1 ∗
+                   (∃ tv2 : type_of_register tlb, tlb ↦ᵣ tv2 ∗ Res tv2) ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3261,15 +3262,19 @@ Section SmodeCorePt.
         [| iApply ("Hex" $! tv' with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
                      Hpaddr Htlbc HRes' HPC HnPC Hany") ].
       iIntros (e) "(-> & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
-                    Hpaddr & Htlbc & HRes' & Hpcs & Hany)".
+                    Hpaddr & Htlbr & Hpcs & Hany)".
+      (* the leaf may have FILLED THE TLB (a data access walks too), so the
+         cell and the regime residue come back at the leaf's own landing
+         value, not at the one the fetch handed it *)
+      iDestruct "Htlbr" as (tv2) "(Htlbc & HRes')".
       iDestruct "Hpcs" as (npc) "(HPC & HnPC & HRl)".
       iSplitR; [done|].
-      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv').
-      iSplitR; [iPureIntro; by exists npc, tv' |].
+      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv2).
+      iSplitR; [iPureIntro; by exists npc, tv2 |].
       iDestruct (spt_frames_close dq pc npc ms
                    (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1
                    pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1
-                   mie1 mdv1 menvcfg1 tv'
+                   mie1 mdv1 menvcfg1 tv2
                    with "[HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs
                           Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenv]")
         as "[Hrw Hro]".
@@ -3334,7 +3339,8 @@ Section SmodeCorePt.
                    mideleg ↦ᵣ{ dq } mdv0 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg0 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
-                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗ Res tv' ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb, tlb ↦ᵣ tv2 ∗ Res tv2) ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3473,8 +3479,9 @@ Section SmodeCorePt.
                    mideleg ↦ᵣ{ dq } mdv0 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg0 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
-                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
-                   spt_res_pt root_ppn tv' ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ spt_res_pt root_ppn tv2) ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3589,8 +3596,9 @@ Section SmodeCorePt.
                    mideleg ↦ᵣ{ dq } mdv1 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
-                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
-                   sr_swp_res_at R satp0 tv' ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ sr_swp_res_at R satp0 tv2) ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
@@ -3675,8 +3683,9 @@ Section SmodeCorePt.
                    mideleg ↦ᵣ{ dq } mdv0 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg0 ∗
                    satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
-                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
-                   sr_swp_res_at R satp0 tv' ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ sr_swp_res_at R satp0 tv2) ∗
                    (∃ npc : mword 64,
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc) ∗
