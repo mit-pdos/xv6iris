@@ -826,6 +826,55 @@ So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
 Only then do `wp_exec_step_retire_or_intr` and `wp_exec_step_intr` convert,
 and `WpSmodeIntr`'s call site with them.
 
+### THE S-MODE WRAPPER SHAPES (decided 2026-08-18; both bundle wrappers use it)
+
+The M-mode wrappers (`WpInstr.wp_instr*`, `WpInstrConfig.wp_instr_config`)
+keep the LEAF INTERFACE in cells: the leaf receives the cells it may touch,
+returns `swp (execute i)` with those cells (possibly rewritten) in the post,
+and the wrapper does frames-intro/elim around it.  The S-mode wrappers do the
+SAME thing, so that every S-mode leaf STATEMENT (on `sie_cap_gpr` / `pc_is` /
+`instr` / `wp_next`) stays byte-identical and only its proof changes.
+
+`WpSmodeIntr.wp_instr_s_sconf` (68 sites) and `wp_instr_s_intr` (its b=true
+engine): the σ-callback under `wp_next b p` becomes
+
+```
+wp_next b p (fun (CID : CpuId) =>
+  sconf -∗ sie_cap kt m n b p -∗ gpr_file (tp_pin m) -∗
+  PC ↦ᵣ pc -∗ nextPC ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+  resv_frag cpu_id None -∗
+  swp (execute i)
+    (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+       ∃ npc : mword 64,
+         PC ↦ᵣ pc ∗ nextPC ↦ᵣ npc ∗ resv_any cpu_id ∗
+         (hart_state ↦ᵣ HART_ACTIVE tt -∗ pc_is npc -∗ ▷ WP (Loop : expr riscv_lang))))
+```
+
+The leaf keeps `sconf`/`sie_cap`/`gpr_file` (rebuilt or not) inside its
+continuation exactly as today; the wrapper hands back `pc_is npc` (it owns
+`minstret_res` / `clock_res` and re-forms them at the tick).  A leaf that
+needs a CLOCK cell (mip for `csrr sip`, mtime for `csrr time`) uses a
+`_clock` variant that hands the mip/mtime cells at existential values and
+takes them back — the S-mode twin of `WpInstrMip.wp_instr_mip`.
+
+`SmodeCorePt.wp_instr_s_config_regime` (16 sites) / `wp_instr_s_regime` (2)
+/ `wp_instr_s_config_tlbinv_pt`: same idea on raw cells (cur_privilege,
+mstatus, mie, mideleg, menvcfg cells in, `swp (execute i)` returning them,
+plus `sr_swp_res R` (the regime's residue) instead of `sr_inv R`, and
+`resv_frag cpu_id None` in / `resv_any cpu_id` out).  Fetch translation is
+`SRegime.sr_swp_translate` at `InstructionFetch`; data translation inside a
+leaf is the same field at the data access.
+
+`WpIntrInv.wp_exec_step_intr`: Löb over `s_cycle_any` (`s_frames_intro` on
+`sconf`+`pc_is`+`sie_cap`'s `tlb_res_pt`), dispatch by
+`WpIntrCore.swp_dispatchInterrupt_S`; the PENDING arm runs
+`swp (handle_interrupt ii Supervisor)` from an `hval_of_goodb` engine over
+`WpIntrCore.exec_handle_interrupt_S` (register-only: needs sepc/scause/
+stval/stvec/mstatus/cur_privilege/nextPC cells from `sie_cap`'s enabled arm
+joined into the frame), flips the SIE ghost, assembles `ihs_entry_of` and
+runs the handler contract exactly as today, then re-enters the Löb; the
+RETIRE arm hands the leaf's swp obligation the cells.
+
 ### The page-table proofs are BRIDGED, not rewritten
 
 The S-mode fetch needs the walk in FOOTPRINTED form.  The existing exec-side
