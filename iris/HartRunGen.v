@@ -106,8 +106,9 @@ Section rungen.
        Instances.generic_eq Instances.generic_neq get_config_rvfi
        get_config_print_instr].
 
-  Lemma swp_run_hart_active_gen (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs rsf rs2 : regstate) (p : Privilege)
+  Lemma swp_run_hart_active_gen_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rsf : regstate)
+      (Q : regstate -> Prop) (p : Privilege)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (i : instruction) (nl : nat) (R : iProp Σ)
       (Qi : InterruptType -> Privilege -> iProp Σ) :
@@ -141,10 +142,12 @@ Section rungen.
                    (add_vec_int pc 4) rsf) Dro -∗
      swp (execute i)
        (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                  hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
     swp (run_hart_active 0)
       (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                  ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w)⌝ ∗
+                    ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                     hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)).
   Proof.
     intros Hdisj HDpriv HDpc HDnpc Hpriv Hpc Hdec Hlpad.
@@ -197,10 +200,71 @@ Section rungen.
       iIntros (u) "[Hrw Hro]".
       iApply (swp_use_cer (execute i) _ _ C HC with "[Hrw Hro Hex] [-]").
       { iApply ("Hex" with "Hrw Hro"). }
-      iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
+      iIntros (v) "(-> & HEx)".
+      iDestruct "HEx" as (rs2) "(%HQ & Hrw & Hro & HR)". r_glue.
       rewrite mcer_ret.
       iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w))).
-      iRight. by iFrame.
+      iRight. iSplitR "Hrw Hro HR"; [ by iPureIntro | ].
+      iExists rs2. by iFrame.
+  Qed.
+
+  (* the fixed-post-file reading: the [_ex] rule at [Q := (= rs2)].  Every
+     caller that knows its post file up front uses this one. *)
+  Lemma swp_run_hart_active_gen (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rsf rs2 : regstate) (p : Privilege)
+      (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
+      (i : instruction) (nl : nat) (R : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    register_lookup cur_privilege rs = p ->
+    register_lookup (R_bitvector_64 PC) rsf = pc ->
+    hval (Drw ∪ Dro) Drw rsf (ext_decode w) i rsf ->
+    hfrun nl (Drw ∪ Dro) Drw rsf (is_landing_pad_expected tt)
+      = Some (false, rsf) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (* THE DISPATCH, abstract: the machine picks the arm *)
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (dispatchInterrupt p)
+         (fun o => match o with
+                   | Some (ii, pr) => Qi ii pr
+                   | None => hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro
+                   end)) -∗
+    (* THE FETCH, abstract: this is the ONLY thing that differs by mode *)
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch tt)
+         (fun r => ⌜r = F_Base w⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 4) rsf) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 4) rsf) Dro -∗
+     swp (execute i)
+       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w)⌝ ∗
+                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)).
+  Proof.
+    intros Hdisj HDpriv HDpc HDnpc Hpriv Hpc Hdec Hlpad.
+    iIntros "#Hcert Hrw Hro Hdisp Hfet Hex".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_gen_ex Drw Dro Df rs rsf
+                   (fun r => r = rs2) p pc w i nl R Qi
+                   Hdisj HDpriv HDpc HDnpc Hpriv Hpc Hdec Hlpad
+                   with "Hcert Hrw Hro Hdisp Hfet [Hex]") ].
+    - iIntros (st) "[Hi | (-> & Hr)]".
+      { iLeft. iApply "Hi". }
+      iDestruct "Hr" as (r2) "(-> & Hrw & Hro & HR)". iRight. by iFrame.
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [-]"); [| iApply ("Hex" with "Hrw Hro") ].
+      iIntros (e) "(-> & Hrw & Hro & HR)".
+      iSplitR "Hrw Hro HR"; [ by iPureIntro | ]. iExists rs2. by iFrame.
   Qed.
 
   (* ==================================================================== *)
@@ -208,8 +272,9 @@ Section rungen.
   (* compressed decode, the [Ext_Zca] gate, nextPC+2, and the [ExecuteAs]  *)
   (* second execute.                                                      *)
   (* ==================================================================== *)
-  Lemma swp_run_hart_active_gen_rvc (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs rsf rs2 : regstate) (p : Privilege)
+  Lemma swp_run_hart_active_gen_rvc_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rsf : regstate)
+      (Q : regstate -> Prop) (p : Privilege)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (i other : instruction) (nl : nat) (R : iProp Σ)
       (Qi : InterruptType -> Privilege -> iProp Σ) :
@@ -254,10 +319,12 @@ Section rungen.
                    (add_vec_int pc 2) rsf) Dro -∗
      swp (execute other)
        (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                  hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
     swp (run_hart_active 0)
       (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                  ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 h)⌝ ∗
+                    ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                     hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)).
   Proof.
     intros Hdisj HDpriv HDmisa HDpc HDnpc Hpriv Hpc HmisaC Hdec Hlpad.
@@ -318,10 +385,81 @@ Section rungen.
       iIntros (v) "(-> & Hrw & Hro)". r_glue.
       iApply (swp_use_cer (execute other) _ _ C HC with "[Hrw Hro Hex] [-]").
       { iApply ("Hex" with "Hrw Hro"). }
-      iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
+      iIntros (v) "(-> & HEx)".
+      iDestruct "HEx" as (rs2) "(%HQ & Hrw & Hro & HR)". r_glue.
       rewrite mcer_ret.
       iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 h))).
-      iRight. by iFrame.
+      iRight. iSplitR "Hrw Hro HR"; [ by iPureIntro | ].
+      iExists rs2. by iFrame.
+  Qed.
+
+  (* the fixed-post-file reading: the [_ex] rule at [Q := (= rs2)]. *)
+  Lemma swp_run_hart_active_gen_rvc (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rsf rs2 : regstate) (p : Privilege)
+      (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
+      (i other : instruction) (nl : nat) (R : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    register_lookup cur_privilege rs = p ->
+    register_lookup (R_bitvector_64 PC) rsf = pc ->
+    eq_vec (_get_Misa_C (register_lookup misa rsf))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    hval (Drw ∪ Dro) Drw rsf (ext_decode_compressed h) i rsf ->
+    hfrun nl (Drw ∪ Dro) Drw rsf (is_landing_pad_expected tt)
+      = Some (false, rsf) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (dispatchInterrupt p)
+         (fun o => match o with
+                   | Some (ii, pr) => Qi ii pr
+                   | None => hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro
+                   end)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch tt)
+         (fun r => ⌜r = F_RVC h⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 2) rsf) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 2) rsf) Dro -∗
+     swp (execute i)
+       (fun e => ⌜e = ExecuteAs other⌝ ∗
+                 hreg_frame (register_set (R_bitvector_64 nextPC)
+                               (add_vec_int pc 2) rsf) Drw ∗
+                 hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                                     (add_vec_int pc 2) rsf) Dro)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 2) rsf) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 2) rsf) Dro -∗
+     swp (execute other)
+       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 h)⌝ ∗
+                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)).
+  Proof.
+    intros Hdisj HDpriv HDmisa HDpc HDnpc Hpriv Hpc HmisaC Hdec Hlpad.
+    iIntros "#Hcert Hrw Hro Hdisp Hfet Hexp Hex".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_gen_rvc_ex Drw Dro Df rs rsf
+                   (fun r => r = rs2) p pc h i other nl R Qi
+                   Hdisj HDpriv HDmisa HDpc HDnpc Hpriv Hpc HmisaC Hdec Hlpad
+                   with "Hcert Hrw Hro Hdisp Hfet Hexp [Hex]") ].
+    - iIntros (st) "[Hi | (-> & Hr)]".
+      { iLeft. iApply "Hi". }
+      iDestruct "Hr" as (r2) "(-> & Hrw & Hro & HR)". iRight. by iFrame.
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [-]"); [| iApply ("Hex" with "Hrw Hro") ].
+      iIntros (e) "(-> & Hrw & Hro & HR)".
+      iSplitR "Hrw Hro HR"; [ by iPureIntro | ]. iExists rs2. by iFrame.
   Qed.
 
   (* ==================================================================== *)
@@ -329,6 +467,44 @@ Section rungen.
   (* that knows the dispatch traps has no instruction to fetch, so it owes *)
   (* neither the fetch nor the execute.                                    *)
   (* ==================================================================== *)
+  Lemma swp_run_hart_active_intr_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (Q : regstate -> Prop) (p : Privilege)
+      (ii : InterruptType) (pr : Privilege) (R : iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = p ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (dispatchInterrupt p)
+         (fun o => ⌜o = Some (ii, pr)⌝ ∗ ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
+                   hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
+    swp (run_hart_active 0)
+      (fun st => ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗
+                 ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R).
+  Proof.
+    intros Hdisj HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Hdisp".
+    unfold run_hart_active.
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
+    iApply (swp_use_cer (dispatchInterrupt p) _ _ C HC
+              with "[Hrw Hro Hdisp] [-]").
+    { iApply ("Hdisp" with "Hrw Hro"). }
+    iIntros (v) "(-> & HEx)". cbn beta iota.
+    rewrite mcer_early_return.
+    iApply ("Hcont" $! (Step_Pending_Interrupt (ii, pr))).
+    iSplitR "HEx"; [ by iPureIntro | ]. iExact "HEx".
+  Qed.
+
+  (* the fixed-post-file reading: the [_ex] rule at [Q := (= rs2)]. *)
   Lemma swp_run_hart_active_intr (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate) (p : Privilege)
       (ii : InterruptType) (pr : Privilege) (R : iProp Σ) :
@@ -348,20 +524,16 @@ Section rungen.
   Proof.
     intros Hdisj HDpriv Hpriv.
     iIntros "#Hcert Hrw Hro Hdisp".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt p) _ _ C HC
-              with "[Hrw Hro Hdisp] [-]").
-    { iApply ("Hdisp" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". cbn beta iota.
-    rewrite mcer_early_return.
-    iApply ("Hcont" $! (Step_Pending_Interrupt (ii, pr))).
-    by iFrame.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_run_hart_active_intr_ex Drw Dro Df rs (fun r => r = rs)
+                   p ii pr R Hdisj HDpriv Hpriv
+                   with "Hcert Hrw Hro [Hdisp]") ].
+    - iIntros (st) "(-> & Hr)".
+      iDestruct "Hr" as (r2) "(-> & Hrw & Hro & HR)". by iFrame.
+    - iIntros "Hrw Hro".
+      iApply (swp_mono with "[] [-]"); [| iApply ("Hdisp" with "Hrw Hro") ].
+      iIntros (o) "(-> & Hrw & Hro & HR)".
+      iSplitR "Hrw Hro HR"; [ by iPureIntro | ]. iExists rs. by iFrame.
   Qed.
 
 End rungen.
