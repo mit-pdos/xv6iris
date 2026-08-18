@@ -608,17 +608,21 @@ a conditional write is a plain store, as before.
      the frag unchanged (a blocked write keeps `r`), so no disjointness is
      ever needed.  The exclusive-read rule with frag: `iLöb … forall r0`
      (its blocked arm releases).
-   - (d) the acquire; (e) the write-back twin: `swp_update_and_write_pte_S`
-     in `PtTreeAdue` = `swp_read_pte_S`-style wrapper over
-     `swp_checked_mem_read_pte8_excl` → `swp_span` over
-     `CommonWalk.hval_check_leaf_pte_leaf0` at the RE-READ word → pure
-     `update_PTE_Bits` → `swp_write_pte_conditional_S` over
-     `swp_checked_mem_write_pte8_cond` (returns `Ok (Some pte', tt)`), then
-     `swp_translate_hit_upd` / `swp_translate_miss_upd` in `HartSTrans`
-     mirroring `exec_translate_TLB_hit_pt_upd` (the `Hu` assert there is
-     the same region, inlined) -- and the `kptN` seam for the write, which
-     the worklist item 2 below describes.  The frontier of the swp port is
-     exactly here.
+   - **(e) LANDED (2026-08-18)**: `PtTreeAdue.swp_update_and_write_pte_upd`
+     (the Svadu/ADUE gate as `hfrun_adue_gate`, `swp_read_pte_exclusive_S`
+     over `swp_checked_mem_read_pte8_excl`, `swp_span` over
+     `CommonWalk.hval_check_leaf_pte_leaf0` AT THE RE-READ WORD, the pure
+     `update_PTE_Bits`, `swp_write_pte_conditional_S` over
+     `swp_checked_mem_write_pte8_cond`), and in `HartSTrans`
+     `swp_translate_hit_upd` / `swp_translate_miss_upd` (with
+     `hfrun_write_TLB`, `hfrun_uwe_pbmt`, `hfrun_add_to_TLB_pt`), mirroring
+     the exec-side `_upd` twins.  Both take the hart's `resv_frag` at any
+     value and return it at `None`, plus the two memory callbacks (the
+     re-read's witness; the write, TOLD memory still holds the re-read
+     word).  What is NOT done: the `kptN` seam that supplies those two
+     callbacks from the page-table invariant (worklist item 2 below), and
+     the `sr_swp_translate` regime field's `_upd` instances.
+   - (d) the acquire.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
