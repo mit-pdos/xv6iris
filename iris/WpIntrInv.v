@@ -102,6 +102,9 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
         WpGprMret.
 Require Import SmodeCore WpSFrames KptShare KptPt KMap SRegime StackOwn.
 Require Import MstatusBits WpIntrCore.
+(* the S-mode per-node cycle body: [spt_run_hart_active_instr_S] and the
+   regime's fetch-translation producer [spt_tr_obl_of_regime] *)
+Require Import SmodeCorePt.
 Require Export IntrDefs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -281,6 +284,9 @@ Ltac peel1 :=
 Ltac peelset := try peel1; try peel1.
 Ltac lkp L := peelset; rewrite L; reflexivity.
 Ltac lkp0 := peelset; reflexivity.
+(* the ONE-set readings, for a transport with a single [register_set] on top *)
+Ltac lkp1 L := peel1; rewrite L; reflexivity.
+Ltac lkp10 := peel1; reflexivity.
 
 (* the ONE file transport the engine needs: the cycle commits nextPC and the
    fetch may have filled the tlb, and the result is the tower again. *)
@@ -305,6 +311,31 @@ Proof.
     | lkp s_rs_micfg | lkp s_rs_misa | lkp s_rs_sec | lkp s_rs_pma
     | lkp s_rs_htif | lkp s_rs_elp | lkp s_rs_senv | lkp s_rs_satp
     | lkp s_rs_mie | lkp s_rs_mdl | lkp s_rs_menv ].
+Qed.
+
+(* ...and the same transport with the tlb ALREADY at the landing value: the
+   per-node cycle body hands its frames back at the tower it walked to, so
+   only the nextPC commit is left to move. *)
+Lemma s_rs_set_nPC (pc npc npc' ms : mword 64) (bmi : bool)
+    (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+    (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+    (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+    (tlbv : type_of_register tlb) :
+  reg_agree_on (s_Drw ∪ s_Dro)
+    (register_set (R_bitvector_64 nextPC) npc'
+       (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+          senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv))
+    (s_rs pc npc' ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+       senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+Proof.
+  apply s_rs_agree;
+    [ lkp1 s_rs_PC | lkp10 | lkp1 s_rs_ms | lkp1 s_rs_mi | lkp1 s_rs_cy
+    | lkp1 s_rs_ti | lkp1 s_rs_ip | lkp1 s_rs_tlb | lkp1 s_rs_priv
+    | lkp1 s_rs_mst | lkp1 s_rs_hart | lkp1 s_rs_pcfg | lkp1 s_rs_paddr
+    | lkp1 s_rs_mc | lkp1 s_rs_micfg | lkp1 s_rs_misa | lkp1 s_rs_sec
+    | lkp1 s_rs_pma | lkp1 s_rs_htif | lkp1 s_rs_elp | lkp1 s_rs_senv
+    | lkp1 s_rs_satp | lkp1 s_rs_mie | lkp1 s_rs_mdl | lkp1 s_rs_menv ].
 Qed.
 
 (* ===================================================================== *)
@@ -1038,94 +1069,211 @@ Section IntrEngine.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) : Prop :=
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR /\
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false /\
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true /\
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true /\
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true /\
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z.
+
+  Definition satp_facts (satp0 : mword 64) (root_ppn : mword 44) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) /\
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
+      = (mword_of_int 0 : mword 16) /\
+    autocast (T := mword)
+      (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn.
+
+  (* THE WALK'S READ SET.  [SmodeCorePt.spt_Db] is the DISPATCH's (misa,
+     mstatus); the fetch translation reads satp as well, and the producer
+     asks for [Db mstatus] and [Db satp] by name. *)
+  Definition i_Db (r : register) : bool :=
+    orb (orb (register_beq r (R_bitvector_64 misa))
+             (register_beq r (R_bitvector_64 mstatus)))
+        (register_beq r (R_bitvector_64 satp)).
+
+  Lemma i_Db_in (r : register) : i_Db r = true -> r ∈ s_Drw ∪ s_Dro.
+  Proof.
+    unfold i_Db. intros Hr.
+    apply orb_true_elim in Hr as [Hr | Hr];
+      [ apply orb_true_elim in Hr as [Hr | Hr] | ];
+      apply register_beq_eq in Hr; subst r;
+      [exact s_in_misa | exact s_in_mst | exact s_in_satp].
+  Qed.
+
   (* ==================================================================== *)
   (* §3 THE S-MODE CYCLE BODY: [run_hart_active] FROM THE [instr] BUNDLE.  *)
   (*                                                                      *)
-  (* [WpInstrRun.swp_run_hart_active_instr_ex]'s S-mode twin: the fetch    *)
-  (* shape is read off [instr] and the fetch obligation is discharged by   *)
-  (* [HartSTrans.swp_fetch_S] / [_S_rvc2] / [_S_base2] over the walking    *)
-  (* translation ([SRegime.kpt_swp_translate]) and the text window         *)
-  (* ([InstrBytes.text_fetch_obl] at the TRANSLATED pa).  The dispatch is  *)
-  (* [WpIntrCore.swp_dispatchInterrupt_S], so the conclusion is the        *)
-  (* disjunction the machine picks between.                               *)
+  (* [SmodeCorePt.spt_run_hart_active_instr_S] does the machine work -- the *)
+  (* four fetch shapes, the dispatch, the walking translation -- at a      *)
+  (* TOWER and a regime RESIDUE.  This is that lemma at the S-mode tier's  *)
+  (* own regime [IntrDefs.strans_regime], with two things supplied here    *)
+  (* rather than by the caller:                                           *)
   (*                                                                      *)
-  (* THE LANDING FILE IS EXISTENTIAL: a walking fetch may FILL the TLB, so *)
-  (* the file the execute runs at is [rs] or [rs] with [tlb] rewritten,    *)
-  (* and the [tlb_snap_ok] the caller gets back is at the landing file's   *)
-  (* tlb -- which is exactly what the fill's own rule re-establishes.      *)
+  (*   - THE RESIDUE IS [strans_res_at satp0], and at the engine's arm     *)
+  (*     that is the KPT one: the ghost bit, the table invariant and the   *)
+  (*     TLB snapshot.  The walk may FILL the TLB, so the snapshot comes   *)
+  (*     back at the landing tlb value, which is exactly what the fill's   *)
+  (*     own rule re-establishes;                                          *)
+  (*   - THE FETCH TRANSLATION comes from the regime's own swp face        *)
+  (*     ([SmodeCorePt.spt_tr_obl_of_regime], whose side conditions are    *)
+  (*     now all pure), and THE DISPATCH is discharged here: the caller    *)
+  (*     only says what it wants to happen when [s_dispatch] answers       *)
+  (*     [Some], which is the [Qi] wand -- with the pure witness that a    *)
+  (*     cause really was deliverable, so the trap arm can name its        *)
+  (*     scause.                                                          *)
+  (*                                                                      *)
+  (* THE INSTRUCTION HANDS THE FRAMES BACK AT ITS LANDING FILE [rs2], and  *)
+  (* that is [spt_ex_obl]'s shape rather than a choice: the cycle above    *)
+  (* needs a frame at the file it commits and only the instruction knows   *)
+  (* which file that is.  [Q] is the caller's pure handle on it.          *)
   (* ==================================================================== *)
-  Lemma swp_run_hart_active_instr_S (rs : regstate) (root_ppn : mword 44)
-      (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (mip_v mdv_v ms_v : mword 64) (W Rr : iProp Σ)
+  Local Notation STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+      mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv :=
+    (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+       senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv).
+
+  Lemma swp_run_hart_active_instr_S
+      (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mdv0 : mword 64) (tlbv : type_of_register tlb)
+      (root_ppn : mword 44) (is_rvc : bool) (i : instruction)
+      (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) (W : iProp Σ)
       (Qi : InterruptType -> Privilege -> iProp Σ) :
-    register_lookup cur_privilege rs = Supervisor ->
-    register_lookup (R_bitvector_64 PC) rs = pc ->
-    register_lookup misa rs = MISA_C ->
-    register_lookup mseccfg rs = mword_of_int 0 ->
-    register_lookup menvcfg rs = MENVCFG_S ->
-    register_lookup htif_tohost_base rs = None ->
-    register_lookup mstatus rs = ms_v ->
-    _get_Mstatus_SXL ms_v = 'b"10" ->
-    register_lookup mip rs = mip_v ->
-    register_lookup mie rs = MIE_S ->
-    register_lookup mideleg rs = mdv_v ->
-    and_vec MIE_S (not_vec mdv_v) = zeros' 64 ->
-    register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED ->
-    pma_allows_all (register_lookup pma_regions rs) ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
-    zero_extend' 16 (satp_to_asid
-      (autocast (T := mword) (register_lookup satp rs) : mword 64))
-      = (mword_of_int 0 : mword 16) ->
-    autocast (T := mword) (satp_to_ppn
-      (autocast (T := mword) (register_lookup satp rs) : mword 64)) = root_ppn ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rs) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n rs) 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n rs) 0))
-      ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n rs) 0))
-      ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n rs) 0))
-      ('b"1") = true ->
-    (ram_base + ram_size
-       <= uint (vec_access_dec (register_lookup pmpaddr_n rs) 0) * 4)%Z ->
+    misa0 = MISA_C ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    pma_allows_ram pmar0 ->
+    satp_facts satp0 root_ppn ->
+    pmp_facts pcfg paddr ->
     gen_cert -∗
-    kmap_static_claims -∗
-    instr pc is_rvc i -∗
-    kpt_inv root_ppn -∗
-    tlb_snap_ok (register_lookup tlb rs) -∗
+    instr pc0 is_rvc i -∗
+    strans_kpt -∗ kpt_inv root_ppn -∗ tlb_snap_ok tlbv -∗
     resv_frag cpu_id None -∗
     W -∗
-    hreg_frame rs s_Drw -∗
-    hreg_frame_ro (s_Df (DfracOwn 1)) rs s_Dro -∗
+    hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drw -∗
+    hreg_frame_ro (s_Df (DfracOwn 1))
+      (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
     (* the trap payload: the dispatch answered [Some], nothing has run *)
-    (∀ ii pr,
-       ⌜∃ meip seip : mword 1,
-          s_dispatch mip_v meip seip MIE_S mdv_v ms_v = Some (ii, pr)⌝ -∗
-       W -∗
-       hreg_frame rs s_Drw -∗ hreg_frame_ro (s_Df (DfracOwn 1)) rs s_Dro -∗
-       tlb_snap_ok (register_lookup tlb rs) -∗ resv_frag cpu_id None -∗
+    (∀ (ii : InterruptType) (pr : Privilege),
+       ⌜ ∃ meip seip : mword 1,
+           s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
+       W -∗ strans_kpt -∗ tlb_snap_ok tlbv -∗ resv_frag cpu_id None -∗
+       hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drw -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
        Qi ii pr) -∗
-    (* the instruction: at the fetch's landing file, nextPC committed *)
-    (∀ tlbf : type_of_register tlb,
-       W -∗
+    (* the instruction: at the fetch's landing file, nextPC committed, and
+       it hands the frames back at the file it lands on *)
+    (∀ tv' : type_of_register tlb,
+       W -∗ strans_kpt -∗ tlb_snap_ok tv' -∗ resv_any cpu_id -∗
        hreg_frame (register_set (R_bitvector_64 nextPC)
-                     (add_vec_int pc (if is_rvc then 2 else 4))
-                     (register_set tlb tlbf rs)) s_Drw -∗
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Drw -∗
        hreg_frame_ro (s_Df (DfracOwn 1))
          (register_set (R_bitvector_64 nextPC)
-            (add_vec_int pc (if is_rvc then 2 else 4))
-            (register_set tlb tlbf rs)) s_Dro -∗
-       tlb_snap_ok tlbf -∗
-       resv_any cpu_id -∗
-       swp (execute i) (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Rr)) -∗
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Dro -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                     hreg_frame rs2 s_Drw ∗
+                     hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Rr rs2)) -∗
     swp (run_hart_active 0)
       (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
                  ∨ (∃ w : mword 32,
-                      ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗ Rr)).
+                      ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                      ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                        hreg_frame rs2 s_Drw ∗
+                        hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗
+                        Rr rs2)).
   Proof.
-  Admitted.
+    intros Hmisa HSXL HMPRV Hmm Help Hpma Hsatpf Hpmpf.
+    pose proof Hsatpf as Hsf'. destruct Hsf' as (Hmode & Hasid & Hppn).
+    pose proof Hpmpf as Hpf'. destruct Hpf' as (HA & Hord & HX & HW & HR & Hcov).
+    assert (Hroot : strans_root_of satp0 = root_ppn) by exact Hppn.
+    assert (Hsok : strans_satp_ok satp0).
+    { right. rewrite /kpt_satp_ok Hroot. split_and!; assumption. }
+    assert (Hpok : pmp_ent0_ok pcfg paddr)
+      by (rewrite /pmp_ent0_ok; split_and!; assumption).
+    (* the KPT arm of the regime's residue, at the cells the bundle held *)
+    iIntros "#Hcert Hinstr Hbit #Hkinv Hsnap Hfrag HW Hrw Hro Hqi Hex".
+    iApply (spt_run_hart_active_instr_S (s_Df (DfracOwn 1))
+              pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+              senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
+              (strans_res_at satp0) tlbv is_rvc i Q Rr W Qi
+              Hmisa eq_refl Help Hpma HA Hord HX Hcov
+              with "Hcert Hinstr HW Hfrag [Hbit Hsnap] Hrw Hro [Hqi] [] [Hex]").
+    - (* the residue, at the tlb value the bundle held *)
+      rewrite /strans_res_at. iRight. iFrame "Hbit".
+      iSplitR; [iPureIntro; exact Hmode |].
+      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv".
+    - (* ---- THE DISPATCH.  SIE is SYMBOLIC here, so both arms are live:
+           [Some] is the caller's trap payload, [None] gives everything
+           back.  The reference state is this hart's own file, which is
+           what makes every agreement premise [eq_refl]. ---- *)
+      rewrite /spt_disp_obl. iIntros "HW HRes Hfrag Hrw Hro".
+      assert (Lmisa : register_lookup misa
+                (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                   misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
+                   ∅ dev0_state).(sregs) = MISA_C).
+      { cbn [sregs]. srs. exact Hmisa. }
+      iApply (swp_mono with "[HW HRes Hfrag Hqi] [-]");
+        [| iApply (swp_dispatchInterrupt_S s_Drw s_Dro (s_Df (DfracOwn 1))
+                     (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                        mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
+                     (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc
+                        micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
+                        ∅ dev0_state)
+                     spt_Db ip MIE_S mdv0 mst0
+                     s_disj s_in_ip s_in_mie s_in_mdl
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(by srs) ltac:(by srs) ltac:(by srs)
+                     ltac:(by srs) Hmm
+                     spt_Db_in (fun r _ => eq_refl)
+                     (spt_exec_cE_S _ Lmisa)
+                     (spt_goodb_cE_S _ Lmisa)
+                     with "Hcert Hrw Hro") ].
+      iIntros (o). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+      destruct (s_dispatch ip meip seip MIE_S mdv0 mst0)
+        as [[ii pr] |] eqn:Ed.
+      + iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
+        { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
+          vm_compute in Hbad. discriminate. }
+        iApply ("Hqi" $! ii pr with "[%] HW Hbit Hsnap Hfrag Hrw Hro").
+        exists meip, seip. exact Ed.
+      + iFrame "HW HRes Hfrag Hrw Hro".
+    - (* ---- THE FETCH TRANSLATION, from the regime's own swp face ---- *)
+      iApply (spt_tr_obl_of_regime strans_regime (s_Df (DfracOwn 1)) i_Db
+                pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+                senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
+                Hmisa eq_refl HSXL HMPRV i_Db_in
+                ltac:(intros r Hr; unfold D_leafchk in Hr;
+                      apply orb_true_elim in Hr as [Hr | Hr];
+                      apply register_beq_eq in Hr; subst r;
+                      [exact s_in_misa | exact s_in_menv])
+                ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                Hsok Hpok Hpma with "Hcert").
+    - (* ---- THE INSTRUCTION, with the residue unpacked ---- *)
+      rewrite /spt_ex_obl. iIntros (tv') "HW HRes Hany Hrw Hro".
+      iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
+      { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
+        vm_compute in Hbad. discriminate. }
+      iApply ("Hex" $! tv' with "HW Hbit Hsnap Hany Hrw Hro").
+  Qed.
 
 
   (* ------------------------------------------------------------------ *)
@@ -1226,50 +1374,80 @@ Section IntrEngine.
 
 
   (* ------------------------------------------------------------------ *)
-  (* THE PINNED-mstatus BUNDLE, WITH cur_privilege STILL IN HAND.          *)
+  (* THE PINNED-mstatus BUNDLE, AS CELLS.                                  *)
   (*                                                                      *)
   (* [IntrDefs.sconf_at ms] is the accessor a leaf wants -- the mstatus     *)
-  (* triple at a NAMED value plus a closer -- but the closer swallows       *)
-  (* [cur_privilege], and the cycle's own frame has to hold that cell       *)
-  (* across the tick ([i_Dro]; the prelude reads it).  So the engine takes  *)
-  (* the leaf's bundle back in the form [sconf_priv_open] already produces: *)
-  (* the same three pieces with the privilege cell OUT.  It is strictly     *)
-  (* stronger than [sconf_at ms] and a leaf produces it in one step.        *)
+  (* triple at a NAMED value plus a closer -- but the ENGINE cannot use a   *)
+  (* closer at all, and for a reason that is structural rather than         *)
+  (* incidental: the cycle body has to hand the S-mode FRAMES back at the   *)
+  (* file the instruction landed on ([WpInstrRun]/[SmodeCorePt]'s           *)
+  (* [spt_ex_obl] shape), and the frames are over 25 CELLS -- mstatus,      *)
+  (* cur_privilege, mie, mideleg and menvcfg among them.  A closer swallows *)
+  (* exactly those, so a bundle-shaped return would strand five cells the   *)
+  (* frame needs and the round trip would not close.                       *)
+  (*                                                                      *)
+  (* So [sconf_at_priv ms] is [sconf]'s BODY with the mstatus value pulled  *)
+  (* out: the same information, in the form the frame speaks.  It is        *)
+  (* strictly stronger than [sconf_at ms] (whence [sconf_at_of_priv]) and a *)
+  (* leaf produces it from [sconf] in ONE step ([sconf_at_priv_open]), so   *)
+  (* nothing above the engine pays for the difference.                      *)
   (* ------------------------------------------------------------------ *)
   Definition sconf_at_priv (ms : mword 64) : iProp Σ :=
-    (sconf_priv_closer ∗ cur_privilege ↦ᵣ Supervisor ∗ sconf_msown ms)%I.
+    (∃ mdv : mword 64,
+       ⌜ sconf_ms_facts ms ⌝ ∗
+       ⌜ and_vec MIE_S (not_vec mdv) = zeros' 64 ⌝ ∗
+       hw_config ∗ minstret_inv ∗
+       cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ ms ∗
+       ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗ sret_tie ms ∗
+       mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv ∗ menvcfg ↦ᵣ MENVCFG_S)%I.
 
   Lemma sconf_at_priv_open : sconf -∗ ∃ ms : mword 64, sconf_at_priv ms.
   Proof.
-    iIntros "H". iDestruct (sconf_priv_open with "H") as (ms) "(Hcl & Hp & Ho)".
-    iExists ms. rewrite /sconf_at_priv. iFrame "Hcl Hp Ho".
+    iIntros "H". iDestruct (sconf_to_cells with "H") as (mst0 mdv0)
+      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+        Hmdl & Hmenv)".
+    iExists mst0. rewrite /sconf_at_priv. iExists mdv0.
+    iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+    iPureIntro. split; assumption.
   Qed.
 
-  (* ...and back, once the privilege cell has come out of the frame *)
-  Lemma sconf_at_of_priv (ms : mword 64) :
-    sconf_priv_closer -∗ cur_privilege ↦ᵣ Supervisor -∗ sconf_msown ms -∗
-    sconf_at ms.
+  Lemma sconf_at_priv_close (ms : mword 64) : sconf_at_priv ms -∗ sconf.
   Proof.
-    iIntros "Hcl Hpriv Hown". rewrite /sconf_at. iFrame "Hown".
-    iIntros (ms') "Hown'". iApply ("Hcl" with "Hpriv Hown'").
+    iIntros "H". iDestruct "H" as (mdv)
+      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+        Hmdl & Hmenv)".
+    iApply (sconf_of_cells ms mdv Hmsf Hmm
+              with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
   Qed.
 
-  Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) : Prop :=
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR /\
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false /\
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true /\
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true /\
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true /\
-    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z.
+  (* the accessor face, built from the cells: the closer is [sconf_of_cells]
+     at the REPLACEMENT mstatus, whose facts ride in [sconf_msown] itself. *)
+  Lemma sconf_at_of_cells (ms mdv : mword 64) :
+    sconf_ms_facts ms ->
+    and_vec MIE_S (not_vec mdv) = zeros' 64 ->
+    hw_config -∗ minstret_inv -∗
+    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ ms -∗
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗ sret_tie ms -∗
+    mie ↦ᵣ MIE_S -∗ mideleg ↦ᵣ mdv -∗ menvcfg ↦ᵣ MENVCFG_S -∗ sconf_at ms.
+  Proof.
+    intros Hmsf Hmm.
+    iIntros "#Hhw #Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+    rewrite /sconf_at. iSplitL "Hms Hhalf Htie".
+    { rewrite /sconf_msown. iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+    iIntros (ms') "Hown'".
+    iDestruct "Hown'" as "(Hms' & Hhalf' & Htie' & %Hmsf')".
+    iApply (sconf_of_cells ms' mdv Hmsf' Hmm
+              with "Hhw Hminv Hpriv Hms' Hhalf' Htie' Hmie Hmdl Hmenv").
+  Qed.
 
-  Definition satp_facts (satp0 : mword 64) (root_ppn : mword 44) : Prop :=
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) /\
-    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
-      = (mword_of_int 0 : mword 16) /\
-    autocast (T := mword)
-      (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn.
+  Lemma sconf_at_of_priv (ms : mword 64) : sconf_at_priv ms -∗ sconf_at ms.
+  Proof.
+    iIntros "H". iDestruct "H" as (mdv)
+      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+        Hmdl & Hmenv)".
+    iApply (sconf_at_of_cells ms mdv Hmsf Hmm
+              with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
+  Qed.
 
   Lemma tlb_res_to_cells (root_ppn : mword 44) :
     tlb_res_pt root_ppn -∗
@@ -1305,6 +1483,60 @@ Section IntrEngine.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
               with "Hpcfg Hpaddr").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE CAPABILITY'S FOUR CELLS, both ways.                               *)
+  (*                                                                      *)
+  (* [sie_cap] hides satp / tlb / pmpcfg_n / pmpaddr_n inside [strans_inv], *)
+  (* and those four are in the S-mode footprint, so the same round trip     *)
+  (* [sconf_at_priv] does for the mstatus block has to happen here: cells   *)
+  (* out on the way into a frame, cells back in on the way out.  Both       *)
+  (* directions are [IntrDefs]'s regime bundle face ([strans_swp_open] /    *)
+  (* [strans_swp_close]) plus the three conjuncts of [sie_cap] the walk     *)
+  (* never touches, which is what [sie_cap_rest] names.                     *)
+  (* ------------------------------------------------------------------ *)
+  Definition sie_cap_rest (kt : ktier) (m : regfile) (av : nat) (b : bool)
+      (p : mword 64) : iProp Σ :=
+    (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + av) ∗
+     sie_arm kt b p ∗ sr_ktier_wit strans_regime kt)%I.
+
+  Lemma sie_cap_to_cells (kt : ktier) (m : regfile) (av : nat) (b : bool)
+      (p : mword 64) :
+    sie_cap kt m av b p -∗
+    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p.
+  Proof.
+    iIntros "(Hstk & Htr & Harm & #Hwit)".
+    iDestruct (strans_swp_open with "Htr") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+    iExists satp0, tlbv, pcfg, paddr.
+    iSplitR; [iPureIntro; exact Hsok |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    rewrite /sie_cap_rest.
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Hwit".
+  Qed.
+
+  Lemma sie_cap_of_cells (kt : ktier) (m : regfile) (av : nat) (b : bool)
+      (p satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    strans_satp_ok satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+    pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    strans_res_at satp0 tlbv -∗ sie_cap_rest kt m av b p -∗
+    sie_cap kt m av b p.
+  Proof.
+    intros Hsok Hpok.
+    iIntros "Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & #Hwit)".
+    rewrite /sie_cap. iFrame "Hstk Harm Hwit".
+    iApply (strans_swp_close satp0 tlbv pcfg paddr Hsok Hpok
+              with "Hsatp Htlb Hpcfg Hpaddr Hres").
   Qed.
 
 End IntrEngine.
@@ -1399,6 +1631,34 @@ Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
         sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R npc ms' m' av' -∗
         WP (Loop : expr riscv_lang)))%I.
 
+(* WHAT THE INSTRUCTION HANDS BACK BESIDE THE FRAMES.  The cycle body owes
+   [SmodeCorePt.spt_ex_obl] a frame at the file the instruction landed on,
+   so the 25 cells the leaf borrowed go back INTO the frame and only the
+   non-cell residue rides here -- the two mstatus ghosts, the regime's own
+   residue, the three conjuncts of [sie_cap] the walk never touches, the
+   register file, and the caller's rider and continuation.
+
+   IT IS KEYED ON [rs2], and it has to be: the ghosts are tied to the
+   mstatus VALUE and the residue to the satp/tlb values, and those values
+   are in the frame.  Reading them off the landing file is what keeps the
+   two halves talking about the same cells. *)
+Definition intr_ret `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    (kt : ktier) (p : mword 64) (b' : bool)
+    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+    (rs2 : regstate) : iProp Σ :=
+  (∃ (m' : regfile) (av' : nat),
+     ghost_var sie_gname (1/2)
+       (_get_Mstatus_SIE (register_lookup mstatus rs2)) ∗
+     sret_tie (register_lookup mstatus rs2) ∗
+     strans_res_at (register_lookup satp rs2) (register_lookup tlb rs2) ∗
+     sie_cap_rest kt m' av' b' p ∗
+     gpr_file (tp_pin m') ∗ resv_any cpu_id ∗
+     R (register_lookup (R_bitvector_64 nextPC) rs2)
+       (register_lookup mstatus rs2) m' av' ∗
+     (∀ (npc0 ms0 : mword 64) (m0 : regfile) (av0 : nat),
+        sie_cap_gpr_at kt ms0 m0 av0 b' p -∗ pc_is npc0 -∗
+        R npc0 ms0 m0 av0 -∗ WP (Loop : expr riscv_lang)))%I.
+
 (* the CYCLE'S RIDER, keyed on the file the body landed on ([rs2]): its
    [nextPC] is the pc the cycle commits, so both arms name their landing pc
    by reading it off rather than by an existential the continuation could
@@ -1408,9 +1668,17 @@ Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (i : instruction) (b' : bool)
     (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
-  ((* --- RETIRE: the leaf kept the bundles, at its own map --- *)
-                (∃ (ms' : mword 64) (m' : regfile) (av' : nat),
-                   sconf_priv_closer ∗ sconf_msown ms' ∗
+  ((* --- RETIRE: the bundles, re-formed from the cells the landing frame
+        gave back.  [cur_privilege] is NOT here: that cell stays in the
+        cycle's own frame across the tick, and the continuation puts it
+        back into [sconf_at] with [sconf_at_of_cells]. --- *)
+                (∃ (ms' mdv' : mword 64) (m' : regfile) (av' : nat),
+                   ⌜ sconf_ms_facts ms' ⌝ ∗
+                   ⌜ and_vec MIE_S (not_vec mdv') = zeros' 64 ⌝ ∗
+                   mstatus ↦ᵣ ms' ∗
+                   ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms') ∗
+                   sret_tie ms' ∗
+                   mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv' ∗ menvcfg ↦ᵣ MENVCFG_S ∗
                    sie_cap kt m' av' b' p ∗ gpr_file (tp_pin m') ∗
                    resv_any cpu_id ∗
                    R (register_lookup (R_bitvector_64 nextPC) rs2) ms' m' av' ∗
@@ -1483,8 +1751,8 @@ Proof.
   iDestruct (hw_config_cert with "Hhw") as "#Hcert".
   iDestruct (hw_config_kmap with "Hhw") as "#Hkm".
   pose proof (elp_no_lp elp0 Helpnp) as Help0.
-  destruct Hsatpf as (Hmode & Hasid & Hppn).
-  destruct Hpmpf as (HA & Hord & HX & HW & HR & Hcov).
+  pose proof Hsatpf as Hsf'. destruct Hsf' as (Hmode & Hasid & Hppn).
+  pose proof Hpmpf as Hpf'. destruct Hpf' as (HA & Hord & HX & HW & HR & Hcov).
   pose proof Hmsf as Hmsf'. destruct Hmsf' as (_ & HSXL & _).
   (* ---- the cycle's own frame: the six writable cells and the five
          read-only ones.  Everything else stays in this proof's hands and is
@@ -1550,17 +1818,35 @@ Proof.
                   Hpaddr Hsatp Hmie Hmdl Hmenv".
           iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
         iApply (swp_mono with "[] [-]").
-        2:{ iApply (swp_run_hart_active_instr_S (s_rs pc0 pc0 msr (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg
-         paddr mc micfg misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S
-         mdv0 MENVCFG_S tlbv) root_ppn pc0 is_rvc i
-                      ip mdv0 mst0
+        2:{ iApply (swp_run_hart_active_instr_S pc0 msr
+                      (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                      pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                      pmar0 elp0 satp0 mdv0 tlbv root_ppn is_rvc i
+                      (* THE LANDING FILE IS A TOWER, and the pure handle
+                         says so: the outer level has to take the S-mode
+                         frames apart again into the cells the cycle's own
+                         frame keeps and the cells the bundles re-form
+                         from, and only a tower can be split that way. *)
+                      (fun rs2 : regstate =>
+                         ∃ (npc ms1 mdv1 cy1 ti1 ip1 satp1 : mword 64)
+                           (pcfg1 : type_of_register pmpcfg_n)
+                           (paddr1 : type_of_register pmpaddr_n)
+                           (tlb1 : type_of_register tlb),
+                           sconf_ms_facts ms1 /\
+                           and_vec MIE_S (not_vec mdv1) = zeros' 64 /\
+                           strans_satp_ok satp1 /\ pmp_ent0_ok pcfg1 paddr1 /\
+                           rs2 = s_rs pc0 npc msr
+                                   (minstret_inc_flag mc micfg Supervisor)
+                                   cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0
+                                   mseccfg0 (mword_of_int 0) pmar0 elp0 satp1
+                                   MIE_S mdv1 MENVCFG_S tlb1)
+                      (intr_ret kt p b' R)
                       (wp_next true p (fun CID =>
                          intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))
                        ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
                        ∗ sret_tie mst0
                        ∗ stack_own (KTR := kt) (m !!! Regidx csp_rs1)
                            (trap_res true + av)
-                       ∗ strans_kpt
                        ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1)
                        ∗ ghost_var sie_gname (1/4) vb ∗ stvec ↦ᵣ handler
                        ∗ (∃ v : mword 64, sepc ↦ᵣ v)
@@ -1569,40 +1855,25 @@ Proof.
                        ∗ (∃ a b : mword 1, sret_bits a b)
                        ∗ cpu_claim p ∗ cpu_hart 0 true p ∅
                        ∗ gpr_file (tp_pin m))%I
-                      (∃ rs2 : regstate,
-                        ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2⌝ ∗
-                        hreg_frame rs2 i_Drw ∗ hreg_frame_ro i_Df rs2 i_Dro ∗
-                        intr_psi kt m av p pc0 is_rvc i b' R rs2)%I
                       (fun ii pr => ∃ rs2 : regstate,
                         ⌜intr_Q (minstret_inc_flag mc micfg Supervisor) rs2⌝ ∗
                         swp (handle_interrupt ii pr)
                           (fun _ => hreg_frame rs2 i_Drw ∗
                                     hreg_frame_ro i_Df rs2 i_Dro ∗
                                     intr_psi kt m av p pc0 is_rvc i b' R rs2))%I
-                      ltac:(by srs) ltac:(by srs)
-                      ltac:(srs; exact Hmisaval)
-                      ltac:(srs; exact Hsecval)
-                      ltac:(by srs) ltac:(by srs) ltac:(by srs) HSXL
-                      ltac:(by srs) ltac:(by srs) ltac:(by srs) Hmm
-                      ltac:(srs; exact Help0)
-                      ltac:(srs; exact Hpmaall)
-                      ltac:(srs; exact Hmode) ltac:(srs; exact Hasid)
-                      ltac:(srs; exact Hppn)
-                      ltac:(srs; exact HA) ltac:(srs; exact Hord)
-                      ltac:(srs; exact HX) ltac:(srs; exact HW)
-                      ltac:(srs; exact HR) ltac:(srs; exact Hcov)
-                      with "Hcert Hkm Hinstr Hkinv [Hsnap] Hfrag
-                            [$Hbody $Hhalf $Htie $Hstk $Hbit1 $Hq1 $Hq4 $Hstv
+                      Hmisaval HSXL (proj1 Hmsf) Hmm Helpnp
+                      (pma_all_ram Hpmaall) Hsatpf Hpmpf
+                      with "Hcert Hinstr Hbit1 Hkinv Hsnap Hfrag
+                            [$Hbody $Hhalf $Htie $Hstk $Hq1 $Hq4 $Hstv
                              $Hsepcx $Hscausex $Hstvalx $Hsppc $Hclm $Hcpu
                              $Hfile]
                             Hsrw Hsro [] []").
-            { srs. iExact "Hsnap". }
             (* ---------- THE TRAP ---------- *)
-            iIntros (ii pr) "%Hd HW Hsrw Hsro Hsnap' Hfrag".
+            iIntros (ii pr) "%Hd HW Hbit1 Hsnap' Hfrag Hsrw Hsro".
             destruct Hd as (meip & seip & Hd).
             pose proof (s_dispatch_Some_S _ _ _ _ _ _ _ _ Hd) as Hpr.
             subst pr.
-            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hbit1 & Hq1 & Hq4 &
+            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hq1 & Hq4 &
                                 Hstv & Hsepcx & Hscausex & Hstvalx & Hsppc &
                                 Hclm & Hcpu & Hfile)".
             iDestruct "Hsepcx" as (se_old) "Hsepc".
@@ -1685,13 +1956,15 @@ Proof.
             iFrame "Hsp Hfile Hwn".
             iApply (resv_any_intro with "Hfrag").
             (* ---------- THE INSTRUCTION ---------- *)
-            iIntros (tlbf) "HW Hsrw Hsro Hsnap' Hresv'".
-            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hbit1 & Hq1 &
+            iIntros (tlbf) "HW Hbit1 Hsnap' Hresv' Hsrw Hsro".
+            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hq1 &
                                 Hq4 & Hstv & Hsepcx & Hscausex & Hstvalx &
                                 Hsppc & Hclm & Hcpu & Hfile)".
-            pose proof (s_rs_set_nPC_tlb pc0 pc0 (add_vec_int pc0 (if is_rvc then 2 else 4)) msr (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
-                       pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0) pmar0 elp0
-                       satp0 MIE_S mdv0 MENVCFG_S tlbv tlbf) as Hagf.
+            pose proof (s_rs_set_nPC pc0 pc0
+                       (add_vec_int pc0 (if is_rvc then 2 else 4)) msr
+                       (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                       pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbf) as Hagf.
             iDestruct (s_rw_ext _ _ Hagf with "Hsrw") as "Hsrw".
             iDestruct (s_ro_ext (DfracOwn 1) _ _ Hagf with "Hsro") as "Hsro".
             iAssert (s_cells pc0 (add_vec_int pc0 (if is_rvc then 2 else 4)) msr (minstret_inc_flag mc micfg Supervisor) cy ti ip
@@ -1738,28 +2011,92 @@ Proof.
             iDestruct "Hres" as (npc ms' m' av')
               "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
             iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
-            iDestruct "Hsc'" as "(Hcl & Hpriv' & Hmsown)".
+            (* THE BUNDLES GO BACK INTO CELLS: the frame the body owes is
+               over the 25, and both bundles hold some of them. *)
+            iDestruct "Hsc'" as (mdv') "(%Hmsf' & %Hmm' & _ & _ & Hpriv' &
+                                         Hms' & Hhalf' & Htie' & Hmie' &
+                                         Hmdl' & Hmenv')".
+            iDestruct (sie_cap_to_cells with "Hcap'")
+              as (satp1 tlb1 pcfg1 paddr1)
+                 "(%Hsok1 & %Hpok1 & Hsatp1 & Htlb1 & Hpcfg1 & Hpaddr1 &
+                   Hres1 & Hrest1)".
             iSplitR; [done|].
             iExists (s_rs pc0 npc msr (minstret_inc_flag mc micfg Supervisor)
-                   cy' ti' ip'
-                   mst0 pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
-                   pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbf).
+                   cy' ti' ip' ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                   (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S
+                   tlb1).
             iSplitR.
-            { iPureIntro. rewrite /intr_Q. split_and!; by srs. }
-            iSplitL "HPC Hmsr Hmi Hcy Hti Hip".
-            { rewrite i_rw_split. srs. iFrame. }
-            iSplitL "HnPC Hhs Hpriv'".
-            { rewrite i_ro_split. srs. iFrame "HnPC Hhs Hpriv' Hmc Hmicfg". }
-            iLeft. iExists ms', m', av'.
-            iFrame "Hcl Hmsown Hcap' Hfile' Hresv2 Hcont".
-            srs. iExact "HRv". }
+            { iPureIntro.
+              exists npc, ms', mdv', cy', ti', ip', satp1, pcfg1, paddr1, tlb1.
+              split_and!; try assumption; reflexivity. }
+            iAssert (hreg_frame (s_rs pc0 npc msr
+                       (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                       pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Drw ∗
+                     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc0 npc msr
+                       (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                       pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Dro)%I
+              with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                     Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv']"
+              as "[Hsrw2 Hsro2]".
+            { rewrite (s_frames_cells pc0 npc msr
+                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip'
+                         ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                         (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv'
+                         MENVCFG_S tlb1).
+              rewrite /s_cells. srs.
+              iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                      Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv'".
+              iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+            iFrame "Hsrw2 Hsro2".
+            rewrite /intr_ret. srs. iExists m', av'.
+            iFrame "Hhalf' Htie' Hres1 Hrest1 Hfile' Hresv2 HRv Hcont". }
         iIntros (st) "[Hi | Hr]".
         - iDestruct "Hi" as (ii pr) "(-> & Hq)".
           iDestruct "Hq" as (rs2) "(%HQ & Hh)".
           iExists rs2. iSplitR; [done|]. iExact "Hh".
-        - iDestruct "Hr" as (w) "(-> & Hr)".
-          iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HPsi)".
-          iExists rs2. iSplitR; [done|]. iFrame. }
+        - (* the instruction retired: the frames come back at the landing
+             tower, and here they are split for the LAST time -- the cycle's
+             own eleven cells into its frame, the other fourteen back into
+             the two bundles the rider carries. *)
+          iDestruct "Hr" as (w) "(-> & Hr)".
+          iDestruct "Hr" as (rs2) "(%HQ & Hsrw & Hsro & Hret)".
+          destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
+                          paddr1 & tlb1 & Hmsf1 & Hmm1 & Hsok1 & Hpok1 & ->).
+          iEval (rewrite /intr_ret) in "Hret".
+          iEval (srs) in "Hret".
+          iDestruct "Hret" as (m' av')
+            "(Hhalf' & Htie' & Hres1 & Hrest1 & Hfile' & Hresv' & HRv &
+              Hcont)".
+          iAssert (s_cells pc0 npc msr (minstret_inc_flag mc micfg Supervisor)
+                     cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0
+                     (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S
+                     tlb1) with "[Hsrw Hsro]" as "Hcells".
+          { rewrite -s_frames_cells. iFrame. }
+          iEval (rewrite /s_cells) in "Hcells".
+          iDestruct "Hcells" as
+            "(HPC & HnPC & Hmsr & Hmi & Hcy & Hti & Hip & Htlb1 & Hpriv &
+              Hms1 & Hhs & Hpcfg1 & Hpaddr1 & ? & ? & ? & ? & ? & ? & ? & ? &
+              Hsatp1 & Hmie1 & Hmdl1 & Hmenv1)".
+          iExists (s_rs pc0 npc msr (minstret_inc_flag mc micfg Supervisor)
+                     cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0
+                     (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S
+                     tlb1).
+          iSplitR. { iPureIntro. rewrite /intr_Q. split_and!; by srs. }
+          iSplitL "HPC Hmsr Hmi Hcy Hti Hip".
+          { rewrite i_rw_split. srs. iFrame. }
+          iSplitL "HnPC Hhs Hpriv".
+          { rewrite i_ro_split. srs. iFrame "HnPC Hhs Hpriv Hmc Hmicfg". }
+          iLeft. iExists ms1, mdv1, m', av'.
+          iSplitR; [iPureIntro; exact Hmsf1 |].
+          iSplitR; [iPureIntro; exact Hmm1 |].
+          iFrame "Hms1 Hhalf' Htie' Hmie1 Hmdl1 Hmenv1 Hfile' Hresv' Hcont".
+          iSplitL "Hsatp1 Htlb1 Hpcfg1 Hpaddr1 Hres1 Hrest1".
+          { iApply (sie_cap_of_cells kt m' av' b' p satp1 tlb1 pcfg1 paddr1
+                      Hsok1 Hpok1
+                      with "Hsatp1 Htlb1 Hpcfg1 Hpaddr1 Hres1 Hrest1"). }
+          srs. iExact "HRv". }
     iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HPsi)".
     iExists (wrap_post rs2 mi). iSplitR; [iPureIntro; by exists rs2, mi|].
     iFrame "Hrw Hro". iExists rs2, mi. iFrame "HPsi". iPureIntro. by split. }
@@ -1804,14 +2141,19 @@ Proof.
       by iFrame. }
     iDestruct "Hpsi" as "[HRet | HTrap]".
     - (* ---- the instruction retired: hand the caller its own bundles ---- *)
-      iDestruct "HRet" as (ms' m' av')
-        "(Hcl & Hmsown & Hcap' & Hfile' & Hresv' & HRv & Hcont)".
-      iApply ("Hmkpc" with "[Hhs3 Hpriv3 Hcl Hmsown Hcap' Hfile' HRv Hcont]
+      iDestruct "HRet" as (ms' mdv' m' av')
+        "(%Hmsf' & %Hmm' & Hms' & Hhalf' & Htie' & Hmie' & Hmdl' & Hmenv' &
+          Hcap' & Hfile' & Hresv' & HRv & Hcont)".
+      iApply ("Hmkpc" with "[Hhs3 Hpriv3 Hms' Hhalf' Htie' Hmie' Hmdl' Hmenv'
+                             Hcap' Hfile' HRv Hcont]
                             Hresv'").
       iIntros "Hpc'".
-      iApply ("Hcont" with "[Hhs3 Hpriv3 Hcl Hmsown Hcap' Hfile'] Hpc' HRv").
+      iApply ("Hcont" with "[Hhs3 Hpriv3 Hms' Hhalf' Htie' Hmie' Hmdl' Hmenv'
+                             Hcap' Hfile'] Hpc' HRv").
       rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hcap' Hfile'".
-      iApply (sconf_at_of_priv ms' with "Hcl Hpriv3 Hmsown").
+      iApply (sconf_at_of_cells ms' mdv' Hmsf' Hmm'
+                with "Hhw Hminv Hpriv3 Hms' Hhalf' Htie' Hmie' Hmdl'
+                      Hmenv'").
     - (* ---- a trap was taken: run the handler and re-enter the loop ---- *)
       iDestruct "HTrap" as (sc mstT mdvT)
         "(%HscT & %HmsfT & %HmmT & HmsT & HhalfT & HtieT & HmieT &
