@@ -392,41 +392,54 @@ The bridge back is `PtAdBits.pte_canon_inv` (`pte_canon q0 = pte_canon p0 →
 ∃ a d, q0 = pte_set_ad p0 a d`) and `pte_set_ad_ppn` (the PPN survives), both
 of which already exist -- the machinery anticipated the variance.
 
-#### AND THE WRAPPER FAMILY'S LANDING FILE MUST BECOME EXISTENTIAL
+#### RETRACTED: the leaf existential and the wrapper existential
 
-A consequence of the A/D finding, and it reaches further than the walk.
-`CommonWalk.u_walk_entry` caches the WHOLE leaf --
-`TLB_Entry_pte := … pte0` -- so if the live leaf's A/D are not pinned, the
-INSTALLED TLB ENTRY is not pinned, and therefore neither is the file the fetch
-lands on.
+Two things this page claimed between `73bad959` and `6c0efcbb` are WRONG and
+are withdrawn.  Both came from the same mistake -- deriving the A/D story
+myself instead of reading what the existing proofs settle.
 
-`WpSFrames.wp_instr_s*` currently takes that landing TLB value `tlbv'` as a
-LEMMA BINDER: the caller picks it before the translate obligation runs.  That
-cannot be discharged -- the value is only revealed inside the read node's
-fupd, and an evar in the outer goal cannot be instantiated from inside it.
+**RETRACTED 1: "the leaf read obligation must go existential."**
+**RETRACTED 2: "`wp_instr_s*`'s `tlbv'` must stop being a lemma binder."**
 
-So the translate obligation's post has to be `∃ tlbv', hreg_frame (s_rs … tlbv') …`
-and the obligations AFTER the fetch (the instruction read, the execute) have
-to be `∀ tlbv'`-quantified.  Neither of them reads the TLB, so the
-∀-quantification costs their callers nothing.
+`PtTreeAdue.exec_translate_TLB_hit_pt_upd` already handles the unpinned leaf,
+and it does so WITHOUT an existential anywhere: it takes the cached word `q0`,
+the memory word `m0` and the updated word `m0'` as ORDINARY BINDERS, relates
+them by the premise `exists a2 d2, m0 = pte_set_ad q0 a2 d2` (which is just
+"the TLB invariant"), and returns the CACHED entry's PPN.  Its own comment
+says the operative thing: *"the returned PPN is the cached entry's either way,
+which is why both outcomes are invariant-absorbable."*  Binder-plus-premise
+does the whole job; nothing downstream has to carry an existential, and
+`tlbv'` stays a binder.
 
-**This is the shape `sr_absorb` already had.**  Its post is `∃ σ'` with
-`σ'.(sregs) = σ.(sregs) ∨ ∃ tv, … register_set tlb tv …` -- the post-state
-existential exists precisely because the walk's effect on the TLB is not known
-in advance.  The `swp` wrappers pinned it; that was the mistake, and the
-recorded `sr_swp_translate` shape (`∃ rsf`, above) already has it right.
-Affects `wp_instr_s`, `_rvc`, `_rvc2`, `_base2` -- all four written this
-session, so all four are cheap to change.
+The rule that would have saved the detour, and that this page should have
+followed: **when the A/D story looks like it needs new theory, it does not --
+`PtTreeAdue` already has it.**  `pte_canon_inv`, `pte_set_ad_ppn`,
+`update_PTE_Bits_set_ad`, `pt_fill_ent_uwe` ("needs only that the new word is
+an A/D variant: PPN and G are stable") and `tlb_set_pte_uwe` are all there
+precisely for this, and the two write-back arms are already named and proved
+in both the miss and hit paths.
+
+#### AND THE WRITE-BACK IS ONE FUSED STEP
+
+`RiscvLang`'s MemRead arm guards the plain RAM read with `ak_excl = false` and
+hands every exclusive read to the FUSED arm: on this machine an LR/SC pair is
+ONE step.  So the write-back is not "an exclusive read node then a conditional
+write node" -- `HartAmo.wp_hart_amo` (proved) takes the exclusive read, `k`
+footprinted silent steps, and the conditional write they land on, which is
+exactly `update_and_write_pte`'s shape.  The other half of the same design:
+a STANDALONE conditional write is unguarded on purpose and takes the ordinary
+store arm (`RiscvLang.wr_node`'s comment), which is why
+`swp_checked_mem_write_pte8_con` is sound on its own.
 
 #### What is left, in order
 
-1. **RELAX THE LEAF READ OBLIGATION** through `CommonWalk.swp_rec_walk_leaf` →
-   `swp_pt_walk_user` → `swp_translate_TLB_miss_user` →
-   `HartSTrans.swp_translate_miss`: the leaf's post becomes
-   `∃ q0, ⌜r = Ok q0⌝ ∗ ⌜pte_canon q0 = pte_canon pte0⌝`, the returned PPN
-   stays pinned (`pte_set_ad_ppn`), and the installed TLB entry -- hence the
-   post-FILE -- becomes existential in `q0`.  All four lemmas were written
-   this session, so this is cheap to iterate.
+1. **THE `swp` FACE OF `HartAmo.wp_hart_amo`** -- the fused exclusive-read /
+   silent-steps / conditional-write step, which is what `update_and_write_pte`
+   is.  `HartEvents` already has the pattern for turning a `wp_hart_*` event
+   rule into its `swp` face (`swp_hart_ram_read` / `_write`); this is the same
+   move on the fused rule.  Note `wp_hart_amo` takes ONE frame
+   (`hreg_frame rs D`), not the `Drw`/`Dro` split, so the face has to decide
+   how the read-only half rides along.
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
    `swp_translate_miss` both carry `update_PTE_Bits … = None` -- i.e. they
@@ -446,11 +459,9 @@ session, so all four are cheap to change.
    into (`swp_translate_hit` | `swp_translate_miss`), each with its `_upd` /
    `_refresh` arm; the hit/miss arm picked by destructing the slot in `tlbv`,
    which the caller holds in its own frame.
-4. **MAKE `wp_instr_s*`'s LANDING FILE EXISTENTIAL** (previous section) -- all
-   four wrappers.
-5. **The regime field** `sr_swp_translate` (shape recorded above) + its two
+4. **The regime field** `sr_swp_translate` (shape recorded above) + its two
    instances.
-6. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
+5. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
    `WpSmodeIntr.wp_instr_s_intr` the same way at the kpt instance.
 
 ### What `WpIntrInv` actually needs
