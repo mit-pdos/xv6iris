@@ -12,6 +12,7 @@ SetShrink.v
 FastSetSolver.v
 FastSetSolverTests.v
 BvShift.v
+ResvAxioms.v
 ArchReset.v
 RiscvModelBytes.v
 VirtioModel.v

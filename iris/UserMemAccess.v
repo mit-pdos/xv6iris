@@ -4,14 +4,16 @@
    reservation live; it sits on top of the physical composers of
    UserMemPt.v.
 
-   §0 the reservation platform-effect axioms.  [load_reservation] and
+   §0 the reservation platform-effect COROLLARIES.  [load_reservation] and
       [cancel_reservation] are OPAQUE monadic platform axioms (the LR/SC
-      reservation set is NOT part of [mstate]); we assume they leave the
-      modeled architectural state (sregs / mem / mdev) unchanged -- the
-      exec analogues of the pure [match_reservation] / [valid_reservation]
-      platform axioms.  This extends the reservation platform-axiom
-      family; nothing about a particular reservation content is assumed
-      (match_reservation stays opaque and is destructed both ways in SC).
+      reservation set is NOT part of [mstate]).  What is assumed about them
+      lives in [ResvAxioms.v], at the TERM level ([load_reservation a n =
+      returnm tt]) -- read that file's header for why the exec-level
+      assumption this section used to make is not enough under per-node
+      stepping.  The two [exec_*] facts below are one-line corollaries and
+      keep their exact statements, so no consumer moved.  Nothing about a
+      particular reservation content is assumed (match_reservation stays
+      opaque and is destructed both ways in SC).
 
    §1 the aligned vmem_read_addr reduction (LOAD res=false / LR res=true):
       a single aligned access, translation absorbed, value from the pages.
@@ -35,19 +37,23 @@ Require Import SmodePte.
 Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
+Require Import ResvAxioms.
 Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* §0 Reservation platform-effect axioms (see the file header).           *)
+(* §0 Reservation platform-effect corollaries of ResvAxioms.v (see the    *)
+(*    file header, and ResvAxioms.v's, for why the axioms are TERM-level). *)
 (* ===================================================================== *)
 
-Axiom exec_load_reservation :
+Lemma exec_load_reservation :
   forall (a : mword (if 64 =? 32 then 34 else 64)) (w : Z) (s : mstate),
     exec (load_reservation a w) s = Some (tt, s).
+Proof. intros a w s. rewrite load_reservation_term. apply exec_returnm. Qed.
 
-Axiom exec_cancel_reservation :
+Lemma exec_cancel_reservation :
   forall (s : mstate), exec (cancel_reservation tt) s = Some (tt, s).
+Proof. intros s. rewrite cancel_reservation_term. apply exec_returnm. Qed.
 
 (* ===================================================================== *)
 (* §1 The aligned vmem_read_addr reduction, WIDTH-GENERIC and premise-     *)
