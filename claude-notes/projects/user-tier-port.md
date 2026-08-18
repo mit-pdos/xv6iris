@@ -993,3 +993,62 @@ FUNCTION (`u_gpr_val g` on x1..x31, the pinned CSR values elsewhere), not a
 `register_set` tower: a tower answers `register_lookup (R_bitvector_64
 (gpr_of_Z (uint i)))` at a symbolic `i` only through a 32-way split of
 `register_beq`, once per tower level.
+
+## 10. THE ONE THING §3.6 GOT WRONG: `elp` IS `↦ᵣ□`, SO THE TRAP TOWER CANNOT BE ONE `swp_hmrun_of_exec` (found 2026-08-18, P7)
+
+**[V] measured, and it blocks `wp_user_step_active`.**  §3.6 says the U trap
+tower is one `swp_hmrun_of_exec … (mm := ∅)`, and §3.1's `u_Drw` list — which
+`UserFrame.u_rw_named` implements faithfully — does **not** contain `elp`
+(§3.1 puts it in `u_Dro`).  But the tower WRITES it: `trap_handler` runs
+`zicfilp_preserve_elp_on_trap Supervisor`, whose tail is
+`reset_elp tt = write_reg elp (landing_pad_bits_backwards NO_LP_EXPECTED)`
+(`rv64d.v:21598,21601-21625`).  Accordingly all four of P6's twins take
+`Dw elp = true` (`UserTrap.v:432,600,650,698`) — and
+
+```coq
+Goal Du_w (R_bitvector_1 elp : register) = false.   (* vm_compute; reflexivity *)
+```
+
+so they cannot be instantiated at `Du_w`, and `swp_hmrun_of_exec`'s
+`(forall r, Dw r = true -> r ∈ Drw)` cannot be discharged.
+
+**AND `elp` CANNOT SIMPLY MOVE TO `u_Drw`.**  `HartLift.hreg_frame rs D` is
+`[∗ set] r ∈ D, r ↦ᵣ register_lookup r rs` at the FULL fraction, while the
+only owner of `elp` in the whole tree is `RiscvFetchExec.hw_config`, which
+holds it `↦ᵣ□` (`elp ↦ᵣ` at an owned fraction occurs only in `BootConfig.v`,
+before the discard).  Nobody can write `elp`, ever — which is right, because
+the model's write is a NO-OP: `hw_config` pins
+`eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false` and `elp` is
+one bit, so `elp0` IS `NO_LP_EXPECTED`, exactly the value `reset_elp` writes.
+
+**THE FIX, and it has a precedent in this very port.**  `HartRegNode.
+swp_write_reg_same` is "the write that changes nothing: write a register you
+do NOT own, with the value already there", and the machinery inventory names
+its two clients as *"the elp reset: MRET's, and the trap handler's"* — the
+M-mode tier already splits there.  Note it takes `reg_pointsto r dq v` at an
+ARBITRARY dfrac, so the persistent `elp ↦ᵣ□ elp0` discharges it.  So:
+
+> **RE-CUT `UserTrap`'s TOWER ONCE, AT `reset_elp`, IN THREE PIECES:**
+> * `A` — the prefix through `zicfilp_preserve_elp_on_trap`'s
+>   `write_reg mstatus (update_subrange_vec_dec w 23 23 elp_v)`, landing at
+>   `s1`.  `goodmb` at `Dw mstatus` only.
+> * the `elp` NODE — `swp_write_reg_same`, whose `hregwrite_val_at` sees the
+>   head because `reset_elp` is the head of what is left.
+> * `B` — the rest, from `s1e`.  `goodmb` at `Dw scause/stval/sepc/
+>   cur_privilege/mstatus`, i.e. exactly P6's premise list minus `Dw elp`.
+>
+> ALL FOUR ENTRY POINTS INHERIT IT: `handle_exception -> exception_handler ->
+> trap_handler` and `handle_interrupt -> trap_handler`, so the cut is made
+> once and `exec_/goodmb_handle_interrupt_U`, `_exception_handler_U`,
+> `_handle_exception_U` become compositions of the three pieces.
+
+**THE ALTERNATIVE, if a second family ever wants it:** give `hmrun` a THIRD
+footprint `Dsame` for writes gated on `register_lookup r rs = v` rather than
+on ownership — the walker-level twin of `swp_write_reg_same`.  That is the
+more general fix and it would delete the split entirely, but it is a
+bottom-of-tree edit to `HartMemRun`, so it should wait for a second client.
+
+**WHAT IS NOT AFFECTED:** only the tower.  `grep 'Dw elp = true'` over the
+P5 twins (`UserExecFacts.v`, `UserCsr.v`) returns nothing — a U-mode EXECUTE
+never writes `elp` (the Zicfilp gate is off at U), so the execute families
+instantiate at `Du_w` unchanged.
