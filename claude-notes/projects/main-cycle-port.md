@@ -35,7 +35,7 @@ RED ROOTS, with what each needs and what it GATES (dependent counts off
 
 | file | needs |
 |---|---|
-| `WpIntrInv` | THE NEW ROOT.  It inlines the interrupt reasoning `wp_exec_step_interrupt_inv` used to package (its own comment says "verbatim"), so it must be rewritten against `HartStepAny.swp_exec_step_any` + `WpIntrCore.swp_run_hart_active_S`.  Everything it needs is proved |
+| `WpIntrInv` | THE NEW ROOT, and it is gated on the S-MODE WRAPPER, not on anything missing at the engine level — see §"what WpIntrInv actually needs" |
 | `BootBridge`, `UserExec` | the same story, one level out |
 | `SmodeCorePt` | `wp_exec_step_decode_execute_inv_priv`'s callers; the swp side is `HartMCycle.swp_exec_step_decode_execute` and the S-mode fetch now exists |
 | `WpMmodeLoad` / `WpMmodeStore` | width-8 sweep of `HartMStore` |
@@ -216,6 +216,41 @@ What is left on this path is therefore ONE thing, not two:
 Some (r, σf)` plus σf's frame properties), and its `swp` twin is the work.  It
 WRITES (the TLB fill), so it is not a `goodb` transport; it is a walk with
 memory events, the shape `HartMFetch.swp_fetch_ram` has in M-mode.
+
+### What `WpIntrInv` actually needs
+
+Its two rules are the last whole-cycle-shaped ones in the interrupt path:
+
+- `wp_exec_step_retire_or_intr` — a σ-callback returning a DISJUNCTION of exec
+  facts (retire / take a pending interrupt).  Its replacement is exactly
+  `HartStepAny.swp_exec_step_any`, whose body postcondition matches on the
+  step reached; that rule and its body (`WpIntrCore.swp_run_hart_active_S`)
+  are both proved.
+- `wp_exec_step_intr` — the S-mode Löb-loop engine over it, with ONE consumer
+  (`WpSmodeIntr:123`).
+
+**THE GAP IS NOT AT THE ENGINE, IT IS AT THE BUNDLE.**  `swp_exec_step_any`
+speaks in FRAMES (`hreg_frame rs Drw` / `hreg_frame_ro`); `wp_exec_step_intr`
+speaks in the S-mode RESOURCE bundle (`sie_cap_gpr`, `sconf`, `gpr_file`,
+`pc_is`).  What converts one to the other is the S-mode WRAPPER — the twin of
+`WpInstr.wp_instr` / `mm_cycle`, which is exactly that translation for M-mode:
+a tower (`mm_rs` and its 19 lookups), the frame intro/elim pair
+(`mm_frames_intro` / `_elim`), and the tick agreement.
+
+So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
+
+1. an S-mode tower `s_rs` over the bundle's cells, with its lookups and
+   `Opaque` seal — `mm_rs` is the pattern, and `mc_rs` (WpInstrConfig) shows
+   how to leave one cell (there, the privilege) parametric;
+2. `s_frames_intro` / `_elim` — bundle ⇄ frames, the only place the S-mode
+   resource algebra is touched;
+3. `s_cycle` = `HartMCycle.swp_exec_step_decode_execute` at that tower (the
+   rule is already privilege-agnostic, so this is instantiation);
+4. `wp_instr_s` = `s_cycle` + `WpInstrRun.swp_run_hart_active_instr`'s S-mode
+   sibling over `HartSTrans.swp_fetch_S`.
+
+Only then do `wp_exec_step_retire_or_intr` and `wp_exec_step_intr` convert,
+and `WpSmodeIntr`'s call site with them.
 
 ### The page-table proofs are BRIDGED, not rewritten
 
