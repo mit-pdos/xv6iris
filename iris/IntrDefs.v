@@ -1536,7 +1536,6 @@ Section IntrDefsBase.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -1578,7 +1577,7 @@ Section IntrDefsBase.
                       strans_swp_res rsf ∗ resv_any cpu_id).
   Proof.
     intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
       Hadm Hside.
     iIntros "#Hat #Hcert Hfrag Hres Hrw Hro".
@@ -1590,7 +1589,7 @@ Section IntrDefsBase.
           exfalso. vm_compute in Hmode. discriminate. }
       iApply (swp_mono with "[Hpend Hstv] [-]");
         [| iApply (bare_swp_translate acc Drw Dro Df rs dst Db va pa ppn kp rr
-                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg
+                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HDpma HDcfg
                      HDaddr HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa
                      Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat Hadm Hbs
                      with "Hat Hcert Hfrag [//] Hrw Hro") ].
@@ -1607,7 +1606,7 @@ Section IntrDefsBase.
       iApply (swp_mono with "[Hkpt] [-]");
         [| iApply (kpt_swp_translate (strans_root rs) acc Drw Dro Df rs dst Db
                      va pa ppn kp rr
-                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg
+                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HDpma HDcfg
                      HDaddr HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa
                      Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat I Hks
                      with "Hat Hcert Hfrag Hres Hrw Hro") ].
@@ -1635,15 +1634,16 @@ Section IntrDefsBase.
     Db mstatus = true -> Db satp = true ->
     _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
     register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (tlb : register) ∈ Drw ->
     strans_swp_side acc va ppn kp Db Drw Dro rs dst.
   Proof.
-    intros Hacc [Hb | Hk] Hpmp Hpma HMPRV HDm HDs HSXL Hag.
+    intros Hacc [Hb | Hk] Hpmp Hpma HMPRV HDm HDs HSXL Hag HWtlb.
     - left.
       exact (bare_swp_side_ok acc va ppn kp Db Drw Dro rs dst
-               Hacc Hb Hpmp Hpma HMPRV HDm HDs HSXL Hag).
+               Hacc Hb Hpmp Hpma HMPRV HDm HDs HSXL Hag HWtlb).
     - right.
       exact (kpt_swp_side_ok (strans_root rs) acc va ppn kp Db Drw Dro rs dst
-               Hacc Hk Hpmp Hpma HMPRV HDm HDs HSXL Hag).
+               Hacc Hk Hpmp Hpma HMPRV HDm HDs HSXL Hag HWtlb).
   Qed.
 
   (* the slot's translation mode, AS DATA.  [strans_satp_ok] is a
@@ -1679,7 +1679,6 @@ Section IntrDefsBase.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -1720,7 +1719,7 @@ Section IntrDefsBase.
                       strans_swp_res rsf ∗ resv_any cpu_id).
   Proof.
     intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
       Hside.
     iIntros "Hwit #Hat #Hcert Hfrag Hres Hrw Hro".
@@ -1734,7 +1733,7 @@ Section IntrDefsBase.
       iApply (swp_mono with "[Hkpt] [-]");
         [| iApply (kpt_swp_translate (strans_root rs) acc Drw Dro Df rs dst Db
                      va pa ppn kp rr
-                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg
+                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HDpma HDcfg
                      HDaddr HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa
                      Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat I Hks
                      with "Hat Hcert Hfrag Hres Hrw Hro") ].

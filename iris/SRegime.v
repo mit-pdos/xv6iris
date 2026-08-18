@@ -498,7 +498,6 @@ Section SRegimeDef.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -557,7 +556,6 @@ Section SRegimeDef.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -668,6 +666,12 @@ Section SRegimeDef.
       Db mstatus = true -> Db satp = true ->
       _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
       register_lookup satp dst.(sregs) = register_lookup satp rs ->
+      (* the WALKING regimes need the TLB cell writable; a regime that never
+         walks ignores this.  It sits here, on the introduction the LEAF
+         calls (a leaf knows its own [Drw]), rather than on
+         [sr_swp_translate], so that the Bare arm is not made to fund a cell
+         the model never touches at Bare. *)
+      (tlb : register) ∈ Drw ->
       sr_swp_side acc va ppn kp Db Drw Dro rs dst;
     (* ---- THE ARM'S TRANSLATION MODE, AS DATA ---------------------------
        [sr_swp_satp_ok] is a Prop, and the regime-generic MEMORY leaves
@@ -871,7 +875,6 @@ Section SRegimeDef.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -913,7 +916,7 @@ Section SRegimeDef.
                       (True : iProp Σ) ∗ resv_any cpu_id).
   Proof.
     intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
       Hadm (Hsatpmode & Hep & Hssr).
     assert (Hpa : pa = va) by (rewrite <- Hconcat; exact Hadm).
@@ -1018,9 +1021,12 @@ Section SRegimeDef.
     Db mstatus = true -> Db satp = true ->
     _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
     register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (* the Bare arm IGNORES this: [translateAddr] returns before the TLB is
+       consulted at all when [mode = Bare] *)
+    (tlb : register) ∈ Drw ->
     bare_swp_side acc va ppn kp Db Drw Dro rs dst.
   Proof.
-    intros Hacc Hsatp _ _ HMPRV _ _ _ _.
+    intros Hacc Hsatp _ _ HMPRV _ _ _ _ _.
     exact (bare_swp_side_intro acc va ppn kp Db Drw Dro rs dst Hacc Hsatp HMPRV).
   Qed.
 
@@ -1040,7 +1046,6 @@ Section SRegimeDef.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -1081,7 +1086,7 @@ Section SRegimeDef.
                       (True : iProp Σ) ∗ resv_any cpu_id).
   Proof.
     intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
       Hside.
     iIntros "H". iDestruct "H" as %[].
@@ -1261,7 +1266,15 @@ Section SRegimeShared.
          ('b"1") = true
     /\ (ram_base + ram_size
         <= uint (vec_access_dec (register_lookup pmpaddr_n rs) 0) * 4)%Z
-    /\ pma_allows_ram (register_lookup pma_regions rs).
+    /\ pma_allows_ram (register_lookup pma_regions rs)
+    (* THE WALK'S OWN FRAME REQUIREMENT, and it belongs HERE rather than in
+       [sr_swp_translate]'s type: only a regime that actually WALKS fills the
+       TLB, and a blanket premise on the field forces every OTHER regime to
+       fund a cell it never touches.  At Bare the model's [translateAddr]
+       returns before the TLB is consulted at all (rv64d.v: the [Bare] arm is
+       a bare [returnR]), which is why [bare_swp_side] has no such conjunct
+       and why [bare_swp_translate] never used the premise it was given. *)
+    /\ (tlb : register) ∈ Drw.
 
   Lemma kpt_swp_translate (root_ppn : mword 44) :
     forall (acc : MemoryAccessType mem_payload)
@@ -1274,7 +1287,6 @@ Section SRegimeShared.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -1316,10 +1328,10 @@ Section SRegimeShared.
                       kpt_swp_res root_ppn rsf ∗ resv_any cpu_id).
   Proof.
     intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat _
       (Hmode & Hasid & Hppn & Htm & Htmg & HA & Hord & HR & HW & Hcov &
-       Hpallow).
+       Hpallow & HWtlb).
     assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE (register_lookup menvcfg dst.(sregs)))
                        ('b"0") = true)
       by (rewrite Hmenv; vm_compute; reflexivity).
@@ -1417,10 +1429,14 @@ Section SRegimeShared.
     Db mstatus = true -> Db satp = true ->
     _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
     register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (* the walk fills the TLB, so THIS regime needs the cell writable; it is
+       a premise here rather than on [sr_swp_translate] so that a regime
+       which never walks is not made to fund it *)
+    (tlb : register) ∈ Drw ->
     kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst.
   Proof.
     intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov) Hpma
-      HDm HDs HSXL Hsatp.
+      HDm HDs HSXL Hsatp HWtlb.
     rewrite /kpt_swp_side. split_and!.
     - exact Hmode.
     - exact Hasid.
@@ -1435,6 +1451,7 @@ Section SRegimeShared.
     - exact HW.
     - exact Hcov.
     - exact Hpma.
+    - exact HWtlb.
   Qed.
 
   (* the record's two introduction fields, at the SHARED-TABLE arm *)
@@ -1450,11 +1467,12 @@ Section SRegimeShared.
     Db mstatus = true -> Db satp = true ->
     _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
     register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (tlb : register) ∈ Drw ->
     kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst.
   Proof.
-    intros _ Hsatp Hpmp Hpma _ HDm HDs HSXL Hag.
+    intros _ Hsatp Hpmp Hpma _ HDm HDs HSXL Hag HWtlb.
     exact (kpt_swp_side_intro root_ppn acc va ppn kp Db Drw Dro rs dst
-             Hsatp Hpmp Hpma HDm HDs HSXL Hag).
+             Hsatp Hpmp Hpma HDm HDs HSXL Hag HWtlb).
   Qed.
 
   Lemma kpt_swp_mode_ok (root_ppn : mword 44) (satp0 : mword 64) :
@@ -1473,7 +1491,6 @@ Section SRegimeShared.
       (mstatus : register) ∈ Drw ∪ Dro ->
       (cur_privilege : register) ∈ Drw ∪ Dro ->
       (satp : register) ∈ Drw ∪ Dro ->
-      (tlb : register) ∈ Drw ->
       (pma_regions : register) ∈ Drw ∪ Dro ->
       (pmpcfg_n : register) ∈ Drw ∪ Dro ->
       (pmpaddr_n : register) ∈ Drw ∪ Dro ->
@@ -1514,12 +1531,12 @@ Section SRegimeShared.
                       kpt_swp_res root_ppn rsf ∗ resv_any cpu_id).
   Proof.
     intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
       Hside.
     iIntros "_".
     iApply (kpt_swp_translate root_ppn acc Drw Dro Df rs dst Db va pa ppn kp rr
-              Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr
+              Hdisj Hacc Hallow HDmst HDpriv HDsatp HDpma HDcfg HDaddr
               HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff
               Heffg Hss Hssg Hcanon Hconcat I Hside).
   Qed.

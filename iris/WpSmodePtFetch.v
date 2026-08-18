@@ -197,7 +197,8 @@ Section SPtData.
         | rewrite sda_rs_mst; exact HMPRV
         | exact spf_Db_mst | exact spf_Db_satp
         | cbn [sregs]; rewrite sda_rs_mst; exact HSXL
-        | cbn [sregs]; reflexivity ]. }
+        | cbn [sregs]; reflexivity
+        | rewrite /sda_Drw; set_solver ]. }
     assert (Heff : exec (effectivePrivilege acc
                      (register_lookup mstatus
                         (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
@@ -222,7 +223,7 @@ Section SPtData.
                    dev0_state)
                 spf_Db va (pa_of ppn va) ppn kp rr
                 sda_disj Hacc Hallow
-                sda_in_mst sda_in_priv sda_in_satp sda_w_tlb sda_in_pma
+                sda_in_mst sda_in_priv sda_in_satp sda_in_pma
                 sda_in_pcfg sda_in_paddr sda_in_htif
                 spf_Db_in_sda (fun r _ => eq_refl)
                 spf_leafchk_in_sda (fun r _ => eq_refl)
@@ -243,7 +244,7 @@ Section SPtData.
                    dev0_state)
                 spf_Db va (pa_of ppn va) ppn kp rr
                 sda_disj Hacc Hallow
-                sda_in_mst sda_in_priv sda_in_satp sda_w_tlb sda_in_pma
+                sda_in_mst sda_in_priv sda_in_satp sda_in_pma
                 sda_in_pcfg sda_in_paddr sda_in_htif
                 spf_Db_in_sda (fun r _ => eq_refl)
                 spf_leafchk_in_sda (fun r _ => eq_refl)

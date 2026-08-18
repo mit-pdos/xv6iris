@@ -3113,7 +3113,10 @@ Section SmodeCorePt.
       - exact HDm.
       - exact HDs.
       - cbn [sregs]. rewrite s_rs_mst. exact HSXL.
-      - reflexivity. }
+      - reflexivity.
+      (* the walking regimes' TLB requirement, now on the introduction rather
+         than on [sr_swp_translate] -- and the leaf's own frame has it *)
+      - rewrite /s_Drw. set_solver. }
     iApply (swp_mono with "[] [-]").
     2:{ iApply (sr_swp_translate R (InstructionFetch tt) s_Drw s_Dro Df
                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -3123,7 +3126,7 @@ Section SmodeCorePt.
                      ∅ dev0_state)
                   Db va (pa_of ppn va) ppn KP_rx rr
                   s_disj (or_introl eq_refl) eq_refl
-                  s_in_mst s_in_priv s_in_satp s_w_tlb s_in_pma s_in_pcfg
+                  s_in_mst s_in_priv s_in_satp s_in_pma s_in_pcfg
                   s_in_paddr s_in_htif
                   HDb (fun r _ => eq_refl) HDlc (fun r _ => eq_refl)
                   ltac:(by apply s_rs_priv) ltac:(by apply s_rs_htif) eq_refl
