@@ -1944,6 +1944,19 @@ hart owns; frozen after M-mode boot; NOT handed back -- persistent); (B)
 two PC cells (`pc_is` now carries `minstret_res ∗ clock_res ∗ resv_any`,
 exclusive ownership nothing else holds; the trap frame is their only carrier).
 
+**RULE (user, 2026-08-18): the translation side-condition of a memory
+access -- the mapping claim `kmap_at (svpn a) ppn kp`, canonicality,
+RAM-ness, and the tier pin -- is ALWAYS derived from the points-to of the
+bytes being accessed**: for a data access from the leaf's `mem_pointsto`
+(its own conjuncts; `wordw_claim_of` for the AU forms), for a fetch from the
+text bytes' claim inside `instr` (`code_text`).  Only the KT1 WITNESS
+(`sr_ktier_wit R KT1`: "the table is installed") comes from the capability,
+because no byte can carry it.  Never from static bundles
+(`kmap_static_claims`, `tramp_window_static`) or an ambient `CurKtier`
+default -- those are equivalent facts, but not the principle; the two
+producers that took that shortcut (`spt_tr_obl_of_regime`,
+`TrampStepPt.tramp_phys_id`) are to be restated on `instr`'s claim.
+
 ## CHECKPOINT 2026-08-18 (evening) -- where the fan-out stands
 
 Landed, admit-free: reservation semantics+logic; M-mode leaves; S-mode
