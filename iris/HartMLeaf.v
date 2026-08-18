@@ -1200,13 +1200,12 @@ Section leaf.
       iApply (swp_try_step_hp ml_Drw ml_Dro (ml_Df q) mlb_pre pmar0
                 pcfg hp_flag (SailStdpp.Values.mword_of_int 1)
                 ([∗ list] j ∈ seq 0 4,
-                   (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I
+                   (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I None
                 ml_disj ml_in_priv ml_in_misa ml_in_mst ml_in_hart
                 ml_in_mc ml_in_micfg ml_w_mi ml_in_mi ml_w_ms
                 ml_in_ms ml_w_PC ml_in_PC ml_w_nPC ml_in_nPC
                 ml_in_pma ml_in_pcfg ml_in_htif
                 Hpriv Hhart Hpc Hpma Hpcfg Hhtif HmisaS HmisaC HmIE' Hmprv'
-                None
                 Hlpad Hunlock Hpallow t_ram_pc t_b0 t_b1 t_va_pc t_pa_pc
                 t_ram_flag t_va_flag t_pa_flag t_split Hrx Hgta
                 with "Hcert Hfrag Hrw Hro [] [Hflag]").

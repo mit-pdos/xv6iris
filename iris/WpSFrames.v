@@ -539,11 +539,12 @@ Section sframes.
     iApply (swp_mono with "[Hfrag] H").
     iIntros (st). iDestruct 1 as (rs2) "(%HQ & Hst)". iExists rs2.
     iSplitR; [done|].
-    destruct st as [[[] w]|[i p]| | ]; try done.
-    - iDestruct "Hst" as "(Hrw & Hro & HPsi)". iFrame "Hrw Hro HPsi".
-      iApply (resv_any_intro with "Hfrag").
+    destruct st as [[i p]| | |[er w]| ]; try (iDestruct "Hst" as %[]).
     - iApply (swp_mono with "[Hfrag] Hst").
       iIntros (u) "(Hrw & Hro & HPsi)". iFrame "Hrw Hro HPsi".
+      iApply (resv_any_intro with "Hfrag").
+    - destruct er; try (iDestruct "Hst" as %[]). destruct u.
+      iDestruct "Hst" as "(Hrw & Hro & HPsi)". iFrame "Hrw Hro HPsi".
       iApply (resv_any_intro with "Hfrag").
   Qed.
 
