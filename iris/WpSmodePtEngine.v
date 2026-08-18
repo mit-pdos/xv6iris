@@ -642,3 +642,204 @@ Section SretSwp.
 End SretSwp.
 
 
+
+(* ===================================================================== *)
+(* §3  THE S-MODE DATA-ACCESS FOOTPRINT.                                  *)
+(*                                                                       *)
+(* [HartSMem]'s engines are stated over a frame, and an S-mode data leaf   *)
+(* holds CELLS -- the ones its wrapper lends (cur_privilege, mstatus,      *)
+(* menvcfg, satp, pmpcfg_n, pmpaddr_n, tlb) plus the persistent pins       *)
+(* [hw_config] carries (misa, pma_regions, htif_tohost_base).  That is     *)
+(* exactly the read set of [translateAddr] + [transform_effective_address] *)
+(* + the PMP/PMA checks, and nothing else; the GPRs stay out (a symbolic   *)
+(* register index is the one node no walker takes) and so do PC/nextPC (a  *)
+(* load or a store touches neither).                                       *)
+(*                                                                       *)
+(* [tlb] is the ONLY writable cell: the walk may fill it, which is what     *)
+(* [SRegime.sr_swp_translate]'s landing disjunct records.                  *)
+(* ===================================================================== *)
+Definition sda_Drw : gset register := {[ (tlb : register) ]}.
+
+Definition sda_Dro : gset register :=
+  {[ (mstatus : register); (cur_privilege : register); (menvcfg : register);
+     (satp : register); (pma_regions : register); (pmpcfg_n : register);
+     (pmpaddr_n : register); (htif_tohost_base : register);
+     (misa : register) ]}.
+
+(* the fraction split: the config cells at the caller's [dq], the regime's
+   three at full ownership, the [hw_config] pins discarded *)
+Definition sda_Df (dq : dfrac) : register -> dfrac := fun r =>
+  if decide (r = (misa : register)) then DfracDiscarded
+  else if decide (r = (pma_regions : register)) then DfracDiscarded
+  else if decide (r = (htif_tohost_base : register)) then DfracDiscarded
+  else if decide (r = (satp : register)) then DfracOwn 1
+  else if decide (r = (pmpcfg_n : register)) then DfracOwn 1
+  else if decide (r = (pmpaddr_n : register)) then DfracOwn 1
+  else dq.
+
+Definition sda_rs (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+    (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n)
+    (tlbv : type_of_register tlb) : regstate :=
+  register_set tlb tlbv
+  (register_set mstatus mst0
+  (register_set cur_privilege Supervisor
+  (register_set menvcfg menv0
+  (register_set satp satp0
+  (register_set pma_regions pmar0
+  (register_set pmpcfg_n pcfg
+  (register_set pmpaddr_n paddr
+  (register_set htif_tohost_base None
+  (register_set misa MISA_C init_regstate))))))))).
+
+Local Ltac sdtm := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
+
+Section sda_lookups.
+  Context (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+          (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+          (paddr : type_of_register pmpaddr_n)
+          (tlbv : type_of_register tlb).
+  Local Notation rs := (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv).
+
+  Lemma sda_rs_tlb : register_lookup tlb rs = tlbv.
+  Proof. rewrite /sda_rs. apply register_lookup_set. Qed.
+  Lemma sda_rs_mst : register_lookup mstatus rs = mst0.
+  Proof. rewrite /sda_rs. sdtm. apply register_lookup_set. Qed.
+  Lemma sda_rs_priv : register_lookup cur_privilege rs = Supervisor.
+  Proof. rewrite /sda_rs. sdtm. sdtm. apply register_lookup_set. Qed.
+  Lemma sda_rs_menv : register_lookup menvcfg rs = menv0.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. apply register_lookup_set. Qed.
+  Lemma sda_rs_satp : register_lookup satp rs = satp0.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. sdtm. apply register_lookup_set. Qed.
+  Lemma sda_rs_pma : register_lookup pma_regions rs = pmar0.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. sdtm. sdtm.
+         apply register_lookup_set. Qed.
+  Lemma sda_rs_pcfg : register_lookup pmpcfg_n rs = pcfg.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm.
+         apply register_lookup_set. Qed.
+  Lemma sda_rs_paddr : register_lookup pmpaddr_n rs = paddr.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm.
+         apply register_lookup_set. Qed.
+  Lemma sda_rs_htif : register_lookup htif_tohost_base rs = None.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm.
+         apply register_lookup_set. Qed.
+  Lemma sda_rs_misa : register_lookup misa rs = MISA_C.
+  Proof. rewrite /sda_rs. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm. sdtm.
+         apply register_lookup_set. Qed.
+End sda_lookups.
+
+Lemma sda_disj : sda_Drw ## sda_Dro.
+Proof. rewrite /sda_Drw /sda_Dro. set_solver. Qed.
+
+Lemma sda_w_tlb : (tlb : register) ∈ sda_Drw.
+Proof. rewrite /sda_Drw. set_solver. Qed.
+Lemma sda_in_tlb : (tlb : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Drw. set_solver. Qed.
+Lemma sda_in_mst : (mstatus : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_priv : (cur_privilege : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_menv : (menvcfg : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_satp : (satp : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_pma : (pma_regions : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_pcfg : (pmpcfg_n : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_paddr : (pmpaddr_n : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_htif : (htif_tohost_base : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_misa : (misa : register) ∈ sda_Drw ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+
+Local Ltac sdadf :=
+  unfold sda_Df;
+  repeat first [ rewrite decide_True; [reflexivity|reflexivity]
+               | rewrite decide_False; [|discriminate] ];
+  reflexivity.
+Lemma sda_Df_misa dq : sda_Df dq misa = DfracDiscarded. Proof. sdadf. Qed.
+Lemma sda_Df_pma dq : sda_Df dq pma_regions = DfracDiscarded. Proof. sdadf. Qed.
+Lemma sda_Df_htif dq : sda_Df dq htif_tohost_base = DfracDiscarded.
+Proof. sdadf. Qed.
+Lemma sda_Df_satp dq : sda_Df dq satp = DfracOwn 1. Proof. sdadf. Qed.
+Lemma sda_Df_pcfg dq : sda_Df dq pmpcfg_n = DfracOwn 1. Proof. sdadf. Qed.
+Lemma sda_Df_paddr dq : sda_Df dq pmpaddr_n = DfracOwn 1. Proof. sdadf. Qed.
+Lemma sda_Df_mst dq : sda_Df dq mstatus = dq. Proof. sdadf. Qed.
+Lemma sda_Df_priv dq : sda_Df dq cur_privilege = dq. Proof. sdadf. Qed.
+Lemma sda_Df_menv dq : sda_Df dq menvcfg = dq. Proof. sdadf. Qed.
+
+(* THE TLB WRITE-BACK, as a frame transport: the walk's landing file is
+   [register_set tlb tv (sda_rs … tlbv)], which is not syntactically the
+   tower at [tv] but agrees with it on all ten cells. *)
+Lemma sda_set_tlb (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+    (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n)
+    (tlbv tv : type_of_register tlb) :
+  reg_agree_on (sda_Drw ∪ sda_Dro)
+    (register_set tlb tv (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv))
+    (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tv).
+Proof.
+  intros r Hr. rewrite /sda_Drw /sda_Dro in Hr.
+  repeat (apply elem_of_union in Hr as [Hr|Hr]);
+    apply elem_of_singleton in Hr; subst r;
+    first [ rewrite register_lookup_set | sdtm ];
+    rewrite ?sda_rs_tlb ?sda_rs_mst ?sda_rs_priv ?sda_rs_menv ?sda_rs_satp
+            ?sda_rs_pma ?sda_rs_pcfg ?sda_rs_paddr ?sda_rs_htif ?sda_rs_misa;
+    reflexivity.
+Qed.
+
+Section SdaFrames.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma sda_rw_ext (rs rs' : regstate) :
+    reg_agree_on (sda_Drw ∪ sda_Dro) rs rs' ->
+    hreg_frame rs sda_Drw -∗ (hreg_frame rs' sda_Drw : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ sda_Drw
+      (reg_agree_mono (sda_Drw ∪ sda_Dro) sda_Drw _ _ ltac:(set_solver) Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma sda_ro_ext (Df : register -> dfrac) (rs rs' : regstate) :
+    reg_agree_on (sda_Drw ∪ sda_Dro) rs rs' ->
+    hreg_frame_ro Df rs sda_Dro -∗ (hreg_frame_ro Df rs' sda_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext Df _ _ sda_Dro
+      (reg_agree_mono (sda_Drw ∪ sda_Dro) sda_Dro _ _ ltac:(set_solver) Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  (* THE CELL <-> FRAME BRIDGE.  Ten cells in, the frame out; the three
+     [hw_config] pins are persistent, so the elimination hands back only the
+     seven the leaf owns. *)
+  Lemma sda_frames (dq : dfrac) (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    (hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drw ∗
+     hreg_frame_ro (sda_Df dq)
+       (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro : iProp Σ)
+    ⊣⊢ (reg_pointsto tlb (DfracOwn 1) tlbv ∗
+        reg_pointsto mstatus dq mst0 ∗
+        reg_pointsto cur_privilege dq Supervisor ∗
+        reg_pointsto menvcfg dq menv0 ∗
+        reg_pointsto satp (DfracOwn 1) satp0 ∗
+        reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+        reg_pointsto pmpcfg_n (DfracOwn 1) pcfg ∗
+        reg_pointsto pmpaddr_n (DfracOwn 1) paddr ∗
+        reg_pointsto htif_tohost_base DfracDiscarded None ∗
+        reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    rewrite /hreg_frame /hreg_frame_ro /sda_Drw /sda_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite sda_rs_tlb sda_rs_mst sda_rs_priv sda_rs_menv sda_rs_satp
+            sda_rs_pma sda_rs_pcfg sda_rs_paddr sda_rs_htif sda_rs_misa.
+    rewrite sda_Df_misa sda_Df_pma sda_Df_htif sda_Df_satp sda_Df_pcfg
+            sda_Df_paddr sda_Df_mst sda_Df_priv sda_Df_menv.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+End SdaFrames.
