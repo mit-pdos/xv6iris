@@ -13,11 +13,13 @@
      - [b = true]: [wp_instr_s_intr].  The sret-target premise is DERIVED from
        [instr_bytes]' 2-alignment ([update_bit0_zero_of_aligned2]), so no call
        site carries it;
-     - [b = false]: [wp_instr_s_sconf_off_clock], STATED AND NOT PROVED, and
-       deliberately isolated -- it is [SmodeCorePt.wp_instr_s_config_sr] at
-       [strans_regime], and it waits on exactly two things in that wrapper's
-       surface (an EXISTENTIAL output config, and the three clock cells lent
-       to the leaf).  Both are spelled out at the lemma itself.
+     - [b = false]: [wp_instr_s_sconf_off_clock], which inlines the cycle
+       ([HartSwp.swp_loop] + [HartMCycle.swp_tick_wrap_ex]) so that the
+       callback's outermost [▷] is stripped BEFORE the body is supplied,
+       runs [WpIntrInv.swp_run_hart_active_instr_S_res] at the regime
+       residue, and refutes the dispatch from the capability's SIE ghost.
+       See the note at the lemma for why it is not
+       [SmodeCorePt.wp_instr_s_config_regime] instead.
 
    WHAT THE PER-NODE PORT CHANGED IN THE SHAPES, and why:
      - the leaf hands the bundles BACK inside the [swp (execute i)]
@@ -76,6 +78,9 @@ Require Import RegFile HartTp WpNext WpGpr MinstretInv InstrBytes WpMmodeLeafBas
 Require Import SmodeCore.
 Require Import AlignBits.
 Require Import HartSwp HartMFrame WpMmodeSwpBase.
+(* the SIE=0 arm inlines the cycle: [swp_loop]'s later is taken by hand, and
+   the S-mode footprint's frames/agreements come from these three. *)
+Require Import HartLift HartSpan HartMCycle HartStepAny WpSFrames HartSFrame SRegime WpIntrCore.
 Require Import IntrDefs WpIntrInv.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -190,41 +195,53 @@ Section WpSmodeIntr.
           sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R npc ms' m' n' -∗
           WP (Loop : expr riscv_lang)))%I.
 
-  (* THE SIE=0 ARM.  STATED, NOT PROVED, and it is the ONLY hole in this
-     file and in [WpIntrInv].  It is [SmodeCorePt.wp_instr_s_config_regime]
-     at [IntrDefs.strans_regime] with [Res := strans_res_at satp0]: the
-     bundle opens into that wrapper's raw cells ([WpIntrInv.sconf_to_cells]
-     and [WpIntrInv.sie_cap_to_cells], the latter arm-GENERIC through the
-     regime's bundle face, so the Bare slot at SIE=0 is covered too), and
-     SIE=0 itself comes off the capability's own ghost quarter
-     ([sie_arm kt false p]), which is what makes the dispatch's [Some] arm
-     refutable and the trap payload [False].
+  (* the landing family of the SIE=0 arm: the tower at whatever the
+     instruction left in the cells it may write.  Every component the leaf
+     can move is existential here -- mstatus and mideleg (csrci/csrsi
+     sstatus, sret), satp / the two PMP cells / the tlb (the capability's
+     own slot), the landing pc and the three clock cells -- which is what
+     lets the rider [WpIntrInv.intr_ret] be keyed on the file. *)
+  Definition off_Q (pc msr : mword 64) (mc : mword 32)
+      (micfg misa0 mseccfg0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp) (rs2 : regstate) : Prop :=
+    exists (npc ms1 mdv1 cy1 ti1 ip1 satp1 : mword 64)
+      (pcfg1 : type_of_register pmpcfg_n)
+      (paddr1 : type_of_register pmpaddr_n) (tlb1 : type_of_register tlb),
+      sconf_ms_facts ms1 /\
+      and_vec MIE_S (not_vec mdv1) = zeros' 64 /\
+      strans_satp_ok satp1 /\ pmp_ent0_ok pcfg1 paddr1 /\
+      rs2 = s_rs pc npc msr (minstret_inc_flag mc micfg Supervisor)
+              cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0
+              (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1.
 
-     Two of the three things that blocked it have landed in that wrapper:
-     the leaf now BORROWS the three clock cells ([clock_res]), and it now
-     CHOOSES the post mstatus/mideleg (they ride existentially with the
-     landing pc, keyed into the rider) -- which this funnel needs because
-     csrci/csrsi sstatus and sret MOVE SIE, and at [b = false] moving it is
-     exactly the [b' = true] transition.
+  (* THE SIE=0 ARM, PROVED HERE RATHER THAN ON [SmodeCorePt]'s WRAPPER.
+     The wrapper ([wp_instr_s_config_regime]) now has everything this arm
+     needs on the leaf side -- the borrowed [clock_res] and an existential
+     post mstatus/mideleg, which this funnel cannot do without (csrci/csrsi
+     sstatus and sret MOVE SIE, and at [b = false] moving it IS the
+     [b' = true] transition) -- but not the LATER.  This funnel takes its
+     callback under one outermost [▷], because the cycle offers exactly one
+     and a [▷] inside the callback would arrive through the rider, after it;
+     the wrapper takes its leaf obligation with no [▷] at all, and the only
+     later in the whole chain ([HartSwp.swp_loop]'s) is stripped three
+     layers inside it -- i.e. after the obligation has had to be handed
+     over.  [▷ (swp e Φ) ⊢ swp e Φ] does not hold, so there is no way to
+     supply it from outside.
 
-     WHAT IS LEFT IS ONE LATER.  This funnel takes its callback under one
-     OUTERMOST [▷] ([▷ wp_next b p (obligation ∗ continuation)]), because
-     the cycle offers exactly one and a [▷] inside the callback would
-     arrive through the rider, after it.  At [b = true] the engine applies
-     [HartMCycle.wp_loop_cycle_ex] itself and strips it; at [b = false] the
-     strip happens three layers inside the wrapper ([HartSwp.swp_loop]'s
-     [▷], the only one in that file), i.e. after the obligation has had to
-     be handed over -- and [▷ (swp e Φ) ⊢ swp e Φ] is not available, [swp]
-     having no later of its own.  So the wrapper has to accept the LEAF
-     OBLIGATION under [▷].  That is a weakening (P ⊢ ▷P: no existing caller
-     breaks) and the later already exists at the bottom of the chain --
-     [wp_loop_cycle_ex]'s body premise is [▷] and both
-     [HartStepAny.swp_exec_step_any_ex] and [SmodeCorePt.spt_cycle] pass
-     their body straight into it, so it is one word in each statement and
-     an [iNext] in each proof.
-
-     Everything else in this file and in the engine below it is proved, so
-     when that lands the instantiation is the ONLY edit here. *)
+     So this arm INLINES [HartMCycle.wp_loop_cycle_ex]'s own two lines
+     ([swp_loop] then [swp_tick_wrap_ex]) and takes that later HERE.  The
+     rest is the SIE=1 engine's plumbing with the trap arm deleted:
+       - the bundle opens into the 25 cells ([WpIntrInv.sconf_to_cells] and
+         [WpIntrInv.sie_cap_to_cells], the latter arm-GENERIC through the
+         regime's own bundle face, so the Bare slot before kvminithart is
+         covered as well as the kernel table);
+       - SIE=0 is read off the capability's ghost quarter, which is what
+         the index [b = false] MEANS, and it makes [s_dispatch] [None] --
+         so the run rule's trap payload is instantiated at [False];
+       - the body is [WpIntrInv.swp_run_hart_active_instr_S_res] at the
+         regime residue, and the rider is [WpIntrInv.intr_ret], the same
+         one the SIE=1 engine uses: the frames go back at the landing
+         tower and the non-cell residue rides beside them. *)
   Lemma wp_instr_s_sconf_off_clock (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
       (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
@@ -234,7 +251,259 @@ Section WpSmodeIntr.
     ▷ wp_next false p (sconf_step_obl_clock m n false b' pc is_rvc i R) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-  Admitted.
+    iIntros "Hcg Hpc #Hinstr Hbody".
+    (* ---- the bundle, into the 25 cells ---- *)
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
+      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+        Hmdl & Hmenv)".
+    iDestruct (sie_cap_to_cells with "Hcap") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres & Hrest)".
+    (* SIE = 0 IS READ OFF THE CAPABILITY'S OWN GHOST QUARTER, which is what
+       the arm index [b = false] MEANS.  It is what makes the dispatch's
+       [Some] arm refutable below, so the whole trap payload is [False]. *)
+    iDestruct "Hrest" as "(Hstk & Harm & #Hwit)".
+    iEval (rewrite /sie_arm) in "Harm".
+    iDestruct (ghost_var_agree with "Hhalf Harm") as %HSIE0.
+    assert (HSIE : eq_vec (_get_Mstatus_SIE mst0) ('b"1") = false)
+      by (rewrite HSIE0; vm_compute; reflexivity).
+    iAssert (sie_cap_rest kt m n false p) with "[Hstk Harm]" as "Hrest".
+    { rewrite /sie_cap_rest /sie_arm. iFrame "Hstk Harm Hwit". }
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+    iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
+    iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
+        %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
+        %Hmisaval & %Hsecval & #Hkmapb)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    pose proof Hmsf as Hmsf'. destruct Hmsf' as (HMPRV & HSXL & _).
+    (* ---- the cycle's frame, at the tower the cells make ---- *)
+    iAssert (hreg_frame (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                 misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                 MENVCFG_S tlbv) s_Drw ∗
+             hreg_frame_ro (s_Df (DfracOwn 1))
+               (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                  MENVCFG_S tlbv) s_Dro)%I
+      with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
+             Hsatp Hmie Hmdl Hmenv]" as "[Hsrw Hsro]".
+    { rewrite (s_frames_cells pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                 misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                 MENVCFG_S tlbv).
+      rewrite /s_cells. srs.
+      iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
+              Hsatp Hmie Hmdl Hmenv".
+      iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+    (* ---- THE CYCLE, WITH THE LATER STRIPPED BY HAND.
+       [HartMCycle.wp_loop_cycle_ex] is inlined ([swp_loop] + [swp_tick_wrap_ex],
+       its own two lines) for ONE reason: this funnel's callback sits under an
+       outermost [▷], and [swp_loop]'s later is the only one in the whole
+       chain -- taking it here is what puts the leaf's obligation in hand
+       BEFORE the body has to be supplied. ---- *)
+    iDestruct "Hresv" as (rr) "Hfrag".
+    iApply (swp_loop rr with "Hcert Hfrag").
+    iNext. iIntros (tick) "Hfrag".
+    iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
+              with "[] [-]").
+    2:{ iApply (swp_tick_wrap_ex s_Drw s_Dro (s_Df (DfracOwn 1))
+                  (fun rsx => exists (rs2 : regstate) (mi : mword 64),
+                     off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
+                     rsx = wrap_post rs2 mi)
+                  (fun rsx => ∃ (rs2 : regstate) (mi : mword 64),
+                     ⌜off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
+                      rsx = wrap_post rs2 mi⌝ ∗ intr_ret kt p b' R rs2)%I
+                  tick s_disj s_w_cy s_w_ti s_w_ip with "Hcert [-]").
+        (* [swp_try_step_any_ex] lands at [wrap_post rs2 mi] with the two
+           existentials OUTSIDE; the tick wants them inside its [rs1]. *)
+        iApply (swp_mono with "[] [-]").
+        2:{ iApply (swp_try_step_any_ex s_Drw s_Dro (s_Df (DfracOwn 1))
+                  (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                     MENVCFG_S tlbv)
+                  (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
+                  (intr_ret kt p b' R)
+                  s_disj s_in_priv s_in_hart s_in_mc s_in_micfg s_w_mi
+                  s_in_mi s_w_ms s_in_ms s_w_PC s_in_PC s_in_nPC
+                  ltac:(by srs)
+                  ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
+                          & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
+                          & _ & _ & ->); by srs)
+                  ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
+                          & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
+                          & _ & _ & ->);
+                        rewrite s_rs_mc s_rs_micfg s_rs_priv; by srs)
+                  with "Hcert Hsrw Hsro [-]").
+        iIntros "Hrw Hro".
+        (* the prelude's file, re-anchored on the tower *)
+        pose proof (s_pre_agree pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                      misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S
+                      mdv0 MENVCFG_S tlbv) as Hpre.
+        iDestruct (s_rw_ext _ _ Hpre with "Hrw") as "Hrw".
+        iDestruct (s_ro_ext (DfracOwn 1) _ _ Hpre with "Hro") as "Hro".
+        iApply (swp_mono with "[] [-]").
+        2:{ iApply (swp_run_hart_active_instr_S_res pc msr
+                      (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                      pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                      pmar0 elp0 satp0 mdv0 tlbv is_rvc i
+                      (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
+                      (intr_ret kt p b' R)
+                      (wp_next false p
+                         (sconf_step_obl_clock m n false b' pc is_rvc i R)
+                       ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
+                       ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
+                       ∗ gpr_file (tp_pin m))%I
+                      (fun _ _ => False)%I
+                      Hmisaval HSXL HMPRV Hmm Helpnp (pma_all_ram Hpmaall)
+                      Hsok Hpok
+                      with "Hcert Hinstr Hres Hfrag
+                            [$Hbody $Hhalf $Htie $Hrest $Hfile] Hrw Hro
+                            [] []").
+            (* ---------- NO TRAP: SIE = 0 makes [s_dispatch] [None] ------- *)
+            { iIntros (ii pr) "%Hd _ _ _ _ _".
+              iPureIntro. destruct Hd as (meip & seip & Hd).
+              rewrite /s_dispatch HSIE in Hd. cbn [andb] in Hd. discriminate. }
+            (* ---------- THE INSTRUCTION ---------- *)
+            iIntros (tv') "HW HRes Hany Hrw Hro".
+            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hrest & Hfile)".
+            pose proof (s_rs_set_nPC pc pc
+                       (add_vec_int pc (if is_rvc then 2 else 4)) msr
+                       (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                       pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv') as Hagf.
+            iDestruct (s_rw_ext _ _ Hagf with "Hrw") as "Hrw".
+            iDestruct (s_ro_ext (DfracOwn 1) _ _ Hagf with "Hro") as "Hro".
+            iAssert (s_cells pc (add_vec_int pc (if is_rvc then 2 else 4)) msr
+                       (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                       pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv')
+              with "[Hrw Hro]" as "Hcells".
+            { rewrite -s_frames_cells. iFrame. }
+            iEval (rewrite /s_cells) in "Hcells".
+            iDestruct "Hcells" as
+              "(HPC & HnPC & Hmsr & Hmi & Hcy & Hti & Hip & Htlb & Hpriv &
+                Hms & Hhs & Hpcfg & Hpaddr & ? & ? & ? & ? & ? & ? & ? & ? &
+                Hsatp & Hmie & Hmdl & Hmenv)".
+            iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]"
+              as "Hsc".
+            { iApply (sconf_of_cells mst0 mdv0 Hmsf Hmm
+                        with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl
+                              Hmenv"). }
+            iAssert (sie_cap kt m n false p)
+              with "[Hsatp Htlb Hpcfg Hpaddr HRes Hrest]" as "Hcap".
+            { iApply (sie_cap_of_cells kt m n false p satp0 tv' pcfg paddr
+                        Hsok Hpok
+                        with "Hsatp Htlb Hpcfg Hpaddr HRes Hrest"). }
+            iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
+            { iExists cy, ti, ip. iFrame. }
+            iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn")
+              as "[Hobl Hcont]".
+            iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
+            2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hany Hclk"). }
+            iIntros (e) "(-> & Hr)".
+            iDestruct "Hr" as (npc ms' m' av')
+              "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
+            iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
+            iDestruct "Hsc'" as (mdv') "(%Hmsf' & %Hmm' & _ & _ & Hpriv' &
+                                         Hms' & Hhalf' & Htie' & Hmie' &
+                                         Hmdl' & Hmenv')".
+            iDestruct (sie_cap_to_cells with "Hcap'")
+              as (satp1 tlb1 pcfg1 paddr1)
+                 "(%Hsok1 & %Hpok1 & Hsatp1 & Htlb1 & Hpcfg1 & Hpaddr1 &
+                   Hres1 & Hrest1)".
+            iSplitR; [done|].
+            iExists (s_rs pc npc msr (minstret_inc_flag mc micfg Supervisor)
+                   cy' ti' ip' ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                   (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S
+                   tlb1).
+            iSplitR.
+            { iPureIntro.
+              exists npc, ms', mdv', cy', ti', ip', satp1, pcfg1, paddr1, tlb1.
+              split_and!; try assumption; reflexivity. }
+            iAssert (hreg_frame (s_rs pc npc msr
+                       (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                       pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Drw ∗
+                     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc npc msr
+                       (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                       pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                       pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Dro)%I
+              with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                     Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv']"
+              as "[Hrw2 Hro2]".
+            { rewrite (s_frames_cells pc npc msr
+                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip'
+                         ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                         (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv'
+                         MENVCFG_S tlb1).
+              rewrite /s_cells. srs.
+              iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                      Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv'".
+              iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+            iFrame "Hrw2 Hro2".
+            rewrite /intr_ret. srs. iExists m', av'.
+            iFrame "Hhalf' Htie' Hres1 Hrest1 Hfile' Hresv2 HRv Hcont". }
+        iIntros (st) "[Hi | Hr]".
+        - iDestruct "Hi" as (ii pr) "(-> & %Hf)". destruct Hf.
+        - iDestruct "Hr" as (w) "(-> & Hr)".
+          iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HRet)".
+          iExists rs2. iSplitR; [done|]. iFrame. }
+        iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HRet)".
+        iExists (wrap_post rs2 mi).
+        iSplitR; [iPureIntro; by exists rs2, mi |].
+        iFrame "Hrw Hro". iExists rs2, mi. iFrame "HRet".
+        iPureIntro. by split. }
+    (* ---- THE CYCLE'S CONTINUATION ---- *)
+    iIntros (u). iDestruct 1 as (rs3 rs1) "((%HP & %Hag) & Hrw & Hro & HRet)".
+    iDestruct "HRet" as (rs2 mi) "((%HQ & %Heq) & HRet)".
+    subst rs1.
+    destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
+                    paddr1 & tlb1 & Hmsf1 & Hmm1 & Hsok1 & Hpok1 & ->).
+    iEval (rewrite /intr_ret) in "HRet".
+    iEval (srs) in "HRet".
+    iDestruct "HRet" as (m' av')
+      "(Hhalf1 & Htie1 & Hres1 & Hrest1 & Hfile1 & Hresv1 & HRv & Hcont)".
+    pose proof (s_tick_agree pc npc msr
+                  (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
+                  pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0) pmar0
+                  elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1 mi rs3 Hag) as Hag'.
+    iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+    iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
+    iAssert (s_cells npc npc mi (minstret_inc_flag mc micfg Supervisor)
+               (register_lookup (R_bitvector_64 mcycle) rs3)
+               (register_lookup (R_bitvector_64 mtime) rs3)
+               (register_lookup (R_bitvector_64 mip) rs3)
+               ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+               pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1)
+      with "[Hrw Hro]" as "Hcells".
+    { rewrite -s_frames_cells. iFrame. }
+    iEval (rewrite /s_cells) in "Hcells".
+    iDestruct "Hcells" as
+      "(HPC & HnPC & Hmsr3 & Hmi3 & Hcy3 & Hti3 & Hip3 & Htlb3 & Hpriv3 &
+        Hms3 & Hhs3 & Hpcfg3 & Hpaddr3 & ? & ? & ? & ? & ? & ? & ? & ? &
+        Hsatp3 & Hmie3 & Hmdl3 & Hmenv3)".
+    iApply ("Hcont" $! npc ms1 m' av' with
+              "[Hhs3 Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3 Hsatp3
+                Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1 Hfile1]
+               [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1] HRv").
+    - rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hfile1".
+      iSplitL "Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3".
+      { iApply (sconf_at_of_cells ms1 mdv1 Hmsf1 Hmm1
+                  with "Hhw Hminv Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3
+                        Hmenv3"). }
+      iApply (sie_cap_of_cells kt m' av' b' p satp1 tlb1 pcfg1 paddr1
+                Hsok1 Hpok1
+                with "Hsatp3 Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1").
+    - rewrite /pc_is. iFrame "HPC HnPC Hresv1".
+      iSplitL "Hmsr3 Hmi3".
+      { iExists mi, (minstret_inc_flag mc micfg Supervisor), mc, micfg.
+        by iFrame "Hmsr3 Hmi3 Hmc Hmicfg". }
+      iExists (register_lookup (R_bitvector_64 mcycle) rs3),
+              (register_lookup (R_bitvector_64 mtime) rs3),
+              (register_lookup (R_bitvector_64 mip) rs3).
+      by iFrame "Hcy3 Hti3 Hip3".
+  Qed.
 
   Lemma wp_instr_s_sconf_clock
       (m : regfile) (n : nat) (b b' : bool)
