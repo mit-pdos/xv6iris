@@ -947,3 +947,49 @@ specialisation to `Du_r`/`Du_w` is `goodmb_mono`.  P7 owns the definition
 of the new `base_exec_total_u` shape and commits it FIRST (UserClassifyAsm.v);
 P4's `arm_*` conversions in UserMemClassify*.v code against that commit.
 The byte-map type is spelled `PtBytes.pamap` everywhere (§8.1).
+
+### §9 IS LANDED (commit "UserClassifyAsm: the PURE pair convention"), and here is exactly what P3/P4 code against
+
+`UserClassifyAsm.v` is now Iris-free and holds the convention.  The three
+things a memory-arm author needs:
+
+1. **The reference state is `u_state rs mm := MState rs mm dev0_state`**
+   (`UserClassifyAsm.u_state`).  `u_state_sregs` / `u_state_mem` are
+   `reflexivity`.  An arm's `exec` fact and its `goodmb` twin are stated at
+   `u_state (register_set nextPC (add_vec_int va 4) rsf) mm` — spelled
+   LITERALLY, because that is what `HartRunFull.run_fetch_base` spells and a
+   `Definition` in between is a conversion bomb.
+
+2. **The post-state is TWO conjuncts, not a resource move.**
+   `reg_agree_on u_Dfix s_x.(sregs) <the ticked file>` and
+   `u_mem_step P t t' mm s_x.(mem)` (plus
+   `tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb s_x.(sregs))`).
+   `u_Dfix` = the footprint minus `nextPC`, `tlb` and the 31 GPRs.  The four
+   shapes an arm ever needs are `u_fix_refl`, `u_fix_gpr` (one GPR write, at
+   a SYMBOLIC index — this is `u_gpr_notin`, the one membership no
+   `vm_compute` can do, and it comes off `u_rw_nodup` + `u_disj`),
+   `u_fix_npc` (a jump) and `u_fix_trans`.  There are ~30 `u_fix_*`
+   membership lemmas for projecting a single cell out of the agreement.
+
+3. **The ambient pins are ONE premise, `u_exec_pins P t rsf`** = `u_hw_pins`
+   (the pure content of `hw_config`) ∧ `u_cfg_pins` (`user_cfg`'s two
+   state-enable pins; the other four config cells are NOT there — no U-mode
+   *execute* reads stvec/mie/mideleg/medeleg, only the trap tower does)
+   ∧ `u_pt_pins` (`pmp_config` + satp) ∧ the `tlb_ok_pt` fact.  **This is
+   the extension point**: a missing ambient pin goes in `u_exec_pins`, not
+   into an arm's own premise list — that is what keeps the `arm_*`
+   statements uniform enough for `UserTotalU`'s `lazymatch` tables.
+
+`u_landing_map` is the lemma that turns `swp_hmrun_of_exec`'s existential
+post map into `s'.(mem)`: at the reference state `mm ⊆ s'.(mem)` plus
+`dom mm' = dom mm` plus `u_mem_step`'s own `dom` clause pin it completely.
+
+**§8's OPEN QUESTION IS ANSWERED: the entry `rs` is BUILT, not taken from a
+σ.**  Under per-node semantics there is no `mstate_interp` at the tier's
+boundary to read `σ.(sregs)` off — the frames are ghost resources whose file
+the caller NAMES — so `UserKernelBridge.userret_to_user_inv`'s successor
+must exhibit one.  It is a `Build_regstate` whose `bitvector_64_s` is a
+FUNCTION (`u_gpr_val g` on x1..x31, the pinned CSR values elsewhere), not a
+`register_set` tower: a tower answers `register_lookup (R_bitvector_64
+(gpr_of_Z (uint i)))` at a symbolic `i` only through a 32-way split of
+`register_beq`, once per tower level.
