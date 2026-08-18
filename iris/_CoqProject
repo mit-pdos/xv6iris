@@ -200,6 +200,7 @@ CodeKernelvec.v
 CodeMemset.v
 MstatusBits.v
 WpIntrCore.v
+HartRunFull.v
 PlicPlan.v
 WpUart.v
 RiscvAdequacy.v

@@ -909,6 +909,40 @@ Section mcycle.
       exists rs1. split; [exact HP|apply reg_agree_refl].
   Qed.
 
+  (* THE SAME, WITH THE RIDER INDEXED BY THE BODY'S POST-FILE.  A body whose
+     landing file is EXISTENTIAL (an S-mode fetch that may or may not fill
+     the TLB) carries resources keyed on that file (the regime residue at
+     the landing tlb value); a plain [Ψ] cannot name it, so it rides as
+     [Ψ rs1] and the continuation receives it beside the file it belongs to. *)
+  Lemma swp_tick_wrap_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : regstate -> iProp Σ) (tick : bool) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    swp (try_step 0 false)
+      (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
+                  hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ rs1) -∗
+    swp (riscv_step tick)
+      (fun _ => ∃ (rs2 rs1 : regstate),
+                  ⌜P rs1 /\ reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ ∗
+                  hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Ψ rs1).
+  Proof.
+    intros Hdisj HWcy HWti HWip. iIntros "#Hcert Hbody".
+    rewrite /riscv_step.
+    iApply (swp_bind_use (try_step 0 false) _ _ _ with "Hbody [-]").
+    iIntros (b). iDestruct 1 as (rs1) "(%HP & Hrw & Hro & HΨ)".
+    destruct tick.
+    - iApply (swp_mono with "[HΨ] [-]");
+        [|iApply (swp_tick_clock_any Drw Dro Df rs1 Hdisj HWcy HWti HWip
+                    with "Hcert Hrw Hro")].
+      iIntros (u). iDestruct 1 as (rs2) "(%Hag & Hrw & Hro)".
+      iExists rs2, rs1. iFrame. iPureIntro. by split.
+    - iApply swp_ret. iExists rs1, rs1. iFrame. iPureIntro.
+      split; [exact HP|apply reg_agree_refl].
+  Qed.
+
   (* ================================================================== *)
   (* THE BOUNDARY RULE: [WP Loop] from [WP Loop], for one whole cycle.    *)
   (*                                                                    *)
@@ -954,6 +988,38 @@ Section mcycle.
     2:{ iApply (swp_tick_wrap Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
                   with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
     iIntros (u). iDestruct 1 as (rs2) "(%Hex & Hrw & Hro & HPsi)".
+    iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
+  Qed.
+
+  (* the indexed-rider twin of [wp_loop_cycle] (see [swp_tick_wrap_ex]) *)
+  Lemma wp_loop_cycle_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : regstate -> iProp Σ) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    resv_any cpu_id -∗
+    ▷ (resv_frag cpu_id None -∗
+       swp (try_step 0 false)
+         (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
+                     hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ rs1)) -∗
+    ▷ (∀ rs2 rs1 : regstate,
+         ⌜P rs1 /\ reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ -∗
+         hreg_frame rs2 Drw -∗ hreg_frame_ro Df rs2 Dro -∗ Ψ rs1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hdisj HWcy HWti HWip.
+    iIntros "#Hcert Hfrag Hbody Hcont".
+    iDestruct "Hfrag" as (rr) "Hfrag".
+    iApply (swp_loop rr with "Hcert Hfrag").
+    iNext. iIntros (tick) "Hfrag".
+    iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
+              with "[Hcont] [-]").
+    2:{ iApply (swp_tick_wrap_ex Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
+                  with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
+    iIntros (u). iDestruct 1 as (rs2 rs1) "(%Hex & Hrw & Hro & HPsi)".
     iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
   Qed.
 
