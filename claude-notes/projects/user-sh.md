@@ -128,12 +128,34 @@ links that block after `base`; the rescan splits it, returning
 
 `strlen` is instruction-for-instruction echo's and its proof replayed.
 
-**In flight**, one lane each: `UProofShParse.v` (`parseredirs`, `parseexec`,
-`parsepipe`, `parseline`), `UProofShCmd.v` (`nulterminate`, `parsecmd`),
-`UProofShTop.v` (`fork1`, `runcmd`), `UProofShMain.v` (`main`, `start`).
-The last three carry the functions they cannot yet `Require` as section
-`Hypothesis`es — visible in the closed lemma's type, discharged by a
-one-line `apply`, and (unlike an `Admitted`) impossible to land by accident.
+**DONE.** The remaining ten landed in four parallel lanes:
+
+| file | lines | functions |
+|---|---|---|
+| `UProofShParse.v` | 8996 | `parseredirs`, `parseexec`, `parsepipe`, `parseline` |
+| `UProofShCmd.v` | 3672 | `nulterminate`, `parsecmd` |
+| `UProofShTop.v` | 1013 | `fork1`, `runcmd` |
+| `UProofShMain.v` | 1945 | `main`, `start` |
+| `UProofShEcho.v` | 118 | THE THEOREM, `wp_sh_execs_echo` |
+
+All 30 reachable functions discharge their contracts exactly as stated;
+every file is axiom-clean at the same baseline (5 platform axioms +
+funext), with no `Admitted` and no new `Axiom` anywhere.
+
+Two lemmas were proved in parallel with the ones they call, so each
+carried its callee as a **section `Hypothesis`** rather than an `Admitted`
+— visible in the closed lemma's type, hence impossible to land silently —
+and `UProofShEcho.v` §1 discharges both by application.
+
+Worth keeping from the proofs themselves: `parseexec`'s argument loop is
+plain Rocq induction on the token list with `sh_tokens bs off toks` as the
+invariant, so the `ShTokNil`/`ShTokCons` split IS the loop's case split —
+which is what that inductive was shaped for. And `nulterminate`'s `switch`
+is the tier's first COMPUTED control transfer: the displacement is read
+out of `.rodata` as DATA (through `sh_data_sub`, with the leaf from
+`sh_text_layout_load`) and the target computed; `wp_uv_cjr` carried it
+unchanged. `runcmd`'s jump table is the same shape and needed nothing new
+in the catalog.
 
 **`UProofShInput.v` — why a file of pure lemmas earns its place.** The
 parser's contracts are general in the buffer `bs` and its tokenization
