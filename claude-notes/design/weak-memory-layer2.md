@@ -951,6 +951,38 @@ verdicts that bind the plan:
   store stays promisable and `wp_behavior_factor` stands.  This matches
   the Sail-fidelity reading: the update happens at its program position.
 
+**W-TV ADOPTED (the user, 2026-08-18; audit verdict (B), all probes and
+quotes in the W3 report).**  The machine gains the translation-ordering
+edge: a `w_tbank` view bank (joined per read with `fwd_view` only, read at
+each node's PRE-state, reset at the instruction BOUNDARY before the fetch)
+joined into every memory-access node's `vaddr`, hence into `w_vcap`.  The
+boundary sentence of record, alongside no-icache and the dropped FENCE
+I/O bits:
+
+> Hardware that lets a store propagate to memory before the
+> translation-table reads that served a program-order-earlier translated
+> access of the same hart have been performed is outside the model of
+> record.  RVWMO does not formalize page-table walks
+> (`rvwmo.adoc`, `norm:rvwmo_only_mainmem`), so this is not an ISA
+> theorem; it is the ratified Arm VMSA model's Dependency-ordered-before
+> clause `[Imp & TTD & R]; tr-ib; [Exp & M]; po; [Exp & W | HU]`
+> (Arm ARM B2.3.7) transposed to RISC-V, and it is the translation
+> instance of RVWMO ppo rule 13, whose own rationale is "a store
+> generally cannot be performed until it is known that preceding
+> instructions will not cause an exception due to failed address
+> resolution".  The corresponding ordering onto program-order-later LOADS
+> is deliberately NOT taken (`w_vcap` is absent from `load_vpre`),
+> matching both Arm models.  Also inside the boundary: the same edge from
+> an instruction fetch's own translation reads, and the ordering between
+> the component accesses of a misaligned or page-crossing access, both of
+> which RVWMO likewise does not formalize.
+
+Effect (i) needs no boundary at all — the privileged spec asserts it
+("those implicit accesses are ordered before their associated explicit
+accesses", `supervisor.adoc:1303-1304`).  Implementation rides the RMW
+split's S1 under the audit's five conditions (certification worklist,
+W3 entry).
+
 **The RMW split (the user, 2026-08-18): CONFIRMED.**  Layer 1 and the event
 language mirror the reservation design of `main-cycle-port.md` §3a (shape
 borrowed, not the file): the fused `LRmw` dies; exclusive read and

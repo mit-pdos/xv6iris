@@ -46,9 +46,11 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
   walker-read-ENTRY shapes, variant B): bank the instruction's prior read
   timestamps `w_ldv`-style and join them into every memory-access node's
   `vaddr` (hence `w_vcap` via the existing `ctrl_post`), dying at
-  `LInstr`.  No discriminator.  BLOCKED ON: W3's audit verdict, then the
-  user's go (it is a model-of-record ordering addition).  If adopted,
-  bundle into the split's S1 (`wstate`/`lstate` opened once).
+  `LInstr`.  No discriminator.  **ADOPTED (the user, 2026-08-18)** — the
+  boundary sentence is recorded in layer2 §13; implementation per the W3
+  entry's five conditions (note condition 1 refines the reset point:
+  instruction BOUNDARY before the fetch, not `LInstr`), bundled into the
+  split's S1 (`wstate`/`lstate` opened once).
 - **W3 — the W-TV containment audit: DONE (2026-08-18), verdict (B) —
   ADOPT as a documented model-of-record boundary, awaiting the user's go.**
   Nothing in {(i),(ii),(iii)} contradicts the ISA: (i) is ASSERTED by the
