@@ -1935,6 +1935,15 @@ exactly `mem_pointsto` minus the physical ownership, so every caller has it
 from the same points-to it puts inside the AU (`wordw_claim_of`; invariant
 callers via `WpSconfLock.lock_claims`).  ~24 call sites in 10 files updated.
 
+**APPROVED (user, 2026-08-18), kernel<->user-tier bridge:** (A)
+`UserKernelBridge.userret_to_user_inv` takes three persistent inputs
+`mcounteren/scounteren/mhpmcounter ↦ᵣ□` (a U-mode counter `csrr` reads them
+in `counter_enabled`; per node every read must be answerable from what the
+hart owns; frozen after M-mode boot; NOT handed back -- persistent); (B)
+`user_trap_frame_open`/`_intro` speak `pc_is (stvec_base …)` instead of the
+two PC cells (`pc_is` now carries `minstret_res ∗ clock_res ∗ resv_any`,
+exclusive ownership nothing else holds; the trap frame is their only carrier).
+
 ## CHECKPOINT 2026-08-18 (evening) -- where the fan-out stands
 
 Landed, admit-free: reservation semantics+logic; M-mode leaves; S-mode
