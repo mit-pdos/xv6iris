@@ -258,6 +258,7 @@ UserExecFacts.v
 UserCsr.v
 UserTotalU.v
 UserActiveClass.v
+UserMemTotal.v
 UserMemClassify.v
 UserMemClassifyAmo.v
 SpecUser.v
