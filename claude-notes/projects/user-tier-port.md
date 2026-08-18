@@ -1258,3 +1258,78 @@ algebra, not page-table reasoning: `write_bytes m a 8 q = word_bytes a q ∪ m`
 the data half, and then "⋃ of a disjoint list with ONE element replaced by a
 same-domain map" — with the standing warning that `pt_maps`' body mentions
 `seqZ 0 512`, so no `cbn` and no `done` may touch it.
+
+## 11. THE CERTIFICATE OF A READ-ONLY GATE IS FREE — compute it at `dstateU` and transport it (found 2026-08-18, P7)
+
+**[V] P5's jump / CSR / ZICBOM / SSAMOSWAP twins were not closable as
+stated.**  `UserExecFacts.goodmb_execute_JAL_total` / `_JALR_total` /
+`_BTYPE_total`, `UserCsr.goodmb_execute_CSRReg_total_U` / `_CSRImm_total_U`
+and `goodmb_execute_ZICBOM_U` / `_SSAMOSWAP_U` all take
+
+```coq
+goodmb Dr Dw (currentlyEnabled Ext_Zca | Ext_Zicfilp | Ext_S) s ∅ = true
+```
+
+as a PREMISE, and **nothing in the tree produced one**.  The gate is
+`Acc`-guarded, so at a symbolic state neither `reflexivity` nor `vm_compute`
+closes it, and mirroring `RiscvFetchExec.exec_currentlyEnabled_Zca` node for
+node is ~120 lines of nested `and_boolM`/`or_boolM` bookkeeping per gate.
+An `eauto` that meets one of these premises does not fail — it **searches
+for minutes**, which is how this was found.
+
+**THE CHEAP ROUTE, and it is general.**  A gate is READ-ONLY and reads only
+`misa` / `cur_privilege` / `menvcfg` / `senvcfg` — all of `DecodeTotalU.D_u`.
+So compute the certificate ONCE at the CONCRETE decode reference state
+`dstateU`, where it is `reflexivity` **in 2 ms**, and transport it:
+
+```coq
+Lemma goodb_agree_congr (D : register -> bool) {X} (m : M X) (s1 s2 : mstate) :
+  (forall r, D r = true ->
+     register_lookup r s1.(sregs) = register_lookup r s2.(sregs)) ->
+  goodb D m s2 = true -> goodb D m s1 = true.        (* 8-line induction *)
+```
+
+`goodb` consults the state only through the values of the registers it
+DECLARES, so two files agreeing on `D` give the same answer.  Then
+`goodmb_of_goodb` + `goodmb_mono` (D_u ⊆ Du_r) finishes.  `UserTotalU`'s
+`u_gm_gate` / `u_gm_zca` / `u_gm_zicfilp` / `u_gm_extS` are the four users.
+
+> **THE GENERAL SHAPE: any read-only stretch whose read set is inside `D_u`
+> is certified by `u_gm_gate` — compute at `dstateU`, transport by
+> `agree_on D_u`.**  It is not a JAL/CSR special case, and it is much
+> cheaper than assembling a `goodmb` along the stretch's own chain.  Reach
+> for it before writing a single `goodmb_bind`.
+
+## 12. THE U FOOTPRINT WAS MISSING THE THREE COUNTER-PERMISSION CELLS (found and FIXED 2026-08-18, P7)
+
+**[V] `mcounteren`, `scounteren` and `mhpmcounter` were outside `u_Drw ∪
+u_Dro`** (`Du_r … = false`, checked by `vm_compute`), while a U-mode `csrr`
+of `cycle` / `time` / `instret` / `hpmcounterN` reads all three:
+`is_CSR_accessible` runs `counter_enabled i User`, which reads `mcounteren`
+and then `scounteren` UNCONDITIONALLY
+(`UserCsr.exec_counter_enabled_U_total`), and the hpm path reads
+`mhpmcounter`.  Under whole-cycle stepping the interpreter answered those
+reads off `gen_heap_interp` and no bundle had to hold them; **under per-node
+stepping every read the cycle makes must be answerable from what the hart
+OWNS**, so the CSR arm was uncertifiable and `base_exec_total_u_holds`
+unprovable.
+
+**FIXED, and the fix is cheap because all three are frozen after M-mode
+boot:** they join `u_ro_list` with `u_Df` = `DfracDiscarded`, `user_cfg`
+holds them at `↦ᵣ□` with EXISTENTIAL values (a denied counter read is
+`Illegal_Instruction`, which is a `u_result_ok` outcome, so the tier is total
+whatever the permission bits say), and `u_pins_cfg` / `u_rs` /
+`u_frames_intro` / `_elim` gain three entries each.
+
+**THE ONE RIPPLE OUTSIDE THE TIER:** `UserKernelBridge.userret_to_user_inv`
+gains three `↦ᵣ□` premises, so `wp_userret_pt`'s continuation must hand them
+over.  They are persistent, so this costs the kernel side nothing beyond
+naming them.
+
+**THE RULE THIS INSTANCES, and it is worth applying to the S-mode tier
+before it lands the same way:** §1.4 enumerated the off-frame registers by
+reading the CYCLE's top-level reads.  That misses registers read inside a
+CSR's *accessibility* check, which is data-dependent on the CSR number.  The
+enumeration to trust is the union of the READ SETS OF THE `goodmb` TWINS, not
+a reading of the cycle — `grep 'Dr [a-z_]* = true'` over the twin catalogue
+is the check, and it takes a minute.
