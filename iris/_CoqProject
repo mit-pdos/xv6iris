@@ -28,6 +28,7 @@ HartSpan.v
 HartSpanChar.v
 HartRunGen.v
 HartSFrame.v
+WpSFrames.v
 HartMCycle.v
 HartStepAny.v
 HartMPmp.v
