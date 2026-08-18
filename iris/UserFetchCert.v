@@ -31,7 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import WpDecodeBridge HartGoodb HartMemRun HartMemAsm PtBytes.
 Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte.
 Require Import CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
-Require Import UptTree UserPtTree UserBits UserMem UserFetch.
+Require Import ExecCommon UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
 Require Import UserBytes PtWalkCert.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1084,4 +1084,85 @@ Proof.
   destruct j as [ | [ | [ | [ | ] ] ] ]; try lia;
     cbn [lookup_total list_lookup_total];
     [ exact Hb0 | exact Hb1 | exact Hb2 | exact Hb3 ].
+Qed.
+
+(* ===================================================================== *)
+(* 6. THE THREE [translateAddr] INGREDIENTS AT THE FETCH, certified.       *)
+(* ===================================================================== *)
+
+Lemma goodb_read_reg_D (Db : register -> bool) {E} (r : register) (s : mstate) :
+  Db r = true -> goodb Db (Defs.read_reg r : Defs.monad E _) s = true.
+Proof. intros HD. unfold Defs.read_reg. cbn [goodb]. by rewrite HD. Qed.
+
+Lemma goodb_effectivePrivilege_fetch (Db : register -> bool) (m : mword 64)
+    (p : Privilege) (s : mstate) :
+  goodb Db (effectivePrivilege (InstructionFetch tt) m p) s = true.
+Proof.
+  unfold effectivePrivilege.
+  replace (generic_neq (InstructionFetch tt) (InstructionFetch tt)) with false
+    by (vm_compute; reflexivity).
+  reflexivity.
+Qed.
+
+Lemma goodb_is_shadow_stack_fetch (Db : register -> bool) (s : mstate) :
+  goodb Db (is_shadow_stack_access (InstructionFetch tt)) s = true.
+Proof. unfold is_shadow_stack_access. cbn match. reflexivity. Qed.
+
+Lemma goodb_architecture_Supervisor (Db : register -> bool) (s : mstate) :
+  Db mstatus = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  goodb Db (architecture Supervisor) s = true.
+Proof.
+  intros HD HSXL. unfold architecture. cbn match.
+  match goal with |- goodb _ (Defs.bind ?L _) _ = true =>
+    assert (Hin : exec L s
+                  = Some (_get_Mstatus_SXL (register_lookup mstatus s.(sregs)), s));
+    [ | assert (Hing : goodb Db L s = true) ] end.
+  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). apply exec_returnM. }
+  { rewrite (goodb_bind Db _ _ s _ (goodb_read_reg_D Db mstatus s HD)
+               (exec_read_reg mstatus s)). reflexivity. }
+  rewrite (goodb_bind Db _ _ s _ Hing Hin).
+  unfold architecture_bits_backwards. rewrite HSXL.
+  replace (eq_vec ('b"10") ('b"01")) with false by (vm_compute; reflexivity).
+  cbn match.
+  replace (eq_vec ('b"10") ('b"10")) with true by (vm_compute; reflexivity).
+  cbn match. reflexivity.
+Qed.
+
+Lemma goodb_translationMode_U (Db : register -> bool) (satp0 : mword 64) (s : mstate) :
+  Db mstatus = true -> Db satp = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  register_lookup satp s.(sregs) = satp0 ->
+  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+  goodb Db (translationMode User) s = true.
+Proof.
+  intros HDms HDsatp HSXL Hsatp Hmode.
+  unfold translationMode.
+  change (generic_eq User Machine) with false. cbn match.
+  rewrite (goodb_bind Db _ _ s RV64
+             (goodb_architecture_Supervisor Db s HDms HSXL)
+             (exec_architecture_Supervisor s HSXL)).
+  assert (Hae : exec (Defs.assert_exp' (Z.geb xlen 64) "sys/vmem.sail:254.25-254.26") s
+                = Some (eq_refl, s)).
+  { replace (Z.geb xlen 64) with true by (vm_compute; reflexivity).
+    unfold Defs.assert_exp'. cbn match. apply exec_returnm. }
+  assert (Haeg : goodb Db (Defs.assert_exp' (Z.geb xlen 64)
+                             "sys/vmem.sail:254.25-254.26" : M _) s = true).
+  { unfold Defs.assert_exp'.
+    replace (Z.geb xlen 64) with true by (vm_compute; reflexivity).
+    cbn match. reflexivity. }
+  match goal with |- goodb _ (Defs.bind ?L _) _ = true =>
+    assert (Hmb : exec L s = Some (_get_Satp64_Mode (Mk_Satp64 satp0), s));
+    [ | assert (Hmbg : goodb Db L s = true) ] end.
+  { rewrite (exec_bind_Some _ _ _ _ _ Hae).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+    rewrite Hsatp. apply exec_returnm. }
+  { rewrite (goodb_bind Db _ _ s _ Haeg Hae).
+    rewrite (goodb_bind Db _ _ s _ (goodb_read_reg_D Db satp s HDsatp)
+               (exec_read_reg satp s)). reflexivity. }
+  rewrite (goodb_bind Db _ _ s _ Hmbg Hmb).
+  rewrite Hmode.
+  replace (satpMode_of_bits RV64 ('b"1000" : mword 4)) with (Some Sv39)
+    by (vm_compute; reflexivity).
+  cbn match. reflexivity.
 Qed.
