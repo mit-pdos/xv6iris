@@ -209,6 +209,7 @@ UProofShParse.v
 UProofShCmd.v
 UProofShTop.v
 UProofShMain.v
+UProofShEcho.v
 UCodeInit.v
 UmodeInitIo.v
 USpecInit.v
