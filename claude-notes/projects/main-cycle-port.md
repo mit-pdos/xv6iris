@@ -293,7 +293,20 @@ So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
    puts it — a caller names the file its handler lands on before running it,
    which is what a handler spec gives.
 
-   **Old caveat, still true for the other shapes:**
+   **ALL FOUR SHAPES ARE DONE**: `wp_instr_s` (4-aligned base),
+   `wp_instr_s_rvc` (4-aligned compressed — the SAME fetch rule, since
+   `swp_fetch`'s `if isRVC` conclusion gives `F_RVC` there and `F_Base` here,
+   so the shape distinction lives in which `run_hart_active` rule consumes
+   it), `wp_instr_s_rvc2` and `wp_instr_s_base2`.
+
+   `wp_instr_s_base2` is the `rsf` thread at its widest: THREE TLB values in
+   one statement (`tlbv → tlbv1 → tlbv'`), because it reads two halfwords at
+   two addresses and the first walk may fill the TLB before the second
+   starts.  The compressed shapes carry the model's own quirk: TWO `execute`
+   obligations, since `execute i` answers `ExecuteAs other` and it is
+   `other` that retires.
+
+   **Superseded caveat, kept for the reasoning:**
    `swp_fetch_S` covers the 4-ALIGNED BASE shape only.  The other three
    (`base2`, `rvc`, `rvc2`) each need an S-mode `fetch_bytes` instance the
    way `swp_fetch_bytes_S` is one — the halfword reads at the TRANSLATED
