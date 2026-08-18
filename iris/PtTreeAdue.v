@@ -851,7 +851,7 @@ Section ptewrite.
     change (8 * (0 + 1) * 8 - 1) with 63. change (8 * 0 * 8) with 0.
     rewrite subrange_full_64 autocast_id.
     iApply (swp_use_cer4 (write_ram Write_plain (Physaddr pa) 8 v tt)
-              _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+              _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 8 (mwrite_req8 pa v) _
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
@@ -960,7 +960,7 @@ Section ptewrite.
     change (8 * (0 + 1) * 8 - 1) with 63. change (8 * 0 * 8) with 0.
     rewrite subrange_full_64 autocast_id.
     iApply (swp_use_cer4 (write_ram Write_RISCV_conditional (Physaddr pa) 8 v tt)
-              _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+              _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 8 (mwrite_req8_con pa v) _
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗

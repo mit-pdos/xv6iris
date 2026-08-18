@@ -507,7 +507,7 @@ Section store.
     change (8 * (0 + 1) * 4 - 1) with 31. change (8 * 0 * 4) with 0.
     rewrite subrange_full_32 autocast_id.
     iApply (swp_use_cer4 (write_ram Write_plain (Physaddr pa) 4 v tt)
-              _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+              _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 4 (mwrite_req pa v) _
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗

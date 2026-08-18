@@ -115,6 +115,8 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_pstateGS :: ghost_varG Σ (SailStdpp.Values.mword 32);
   (* the FS log-region mirror (crash/power layer): capacity only *)
   riscv_pre_mirrorGS :: ghost_varG Σ log_mirror;
+  (* the per-hart reservation mirror (design/main-cycle-port.md §3a) *)
+  riscv_pre_resvGS :: ghost_mapG Σ CPU (option resv);
   (* the generation counter (crash/power layer) *)
   riscv_pre_genGS :: mono_natG Σ;
   (* the generation REGISTRY (crash/power layer): gen -> era record *)
@@ -150,6 +152,7 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ CPU;
      ghost_varΣ (SailStdpp.Values.mword 32);
      ghost_varΣ log_mirror;
+     ghost_mapΣ CPU (option resv);
      mono_natΣ;
      ghost_mapΣ nat riscvEraGS;
      diskImgΣ;
