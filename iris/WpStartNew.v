@@ -86,6 +86,7 @@ Require Import WpGprMretWp.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeMret.
 Require Import InstrBytes KernelText WpTimerinit.
+Require Import MinstretInv.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -1130,14 +1131,18 @@ Section WpStartThm.
 
     (* ---- unbundle the FULL config once, naming the entry mstatus [ms0];
        split all cells in half: a working bundle at 1/2 + pinned halves. ---- *)
-    iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
+    (* [minstret_inv] left the bundle (it is [emp] now -- MinstretInv.v -- and
+       the counter facts moved into [pc_is]), but the leaves below still take
+       it as a premise, so mint it here rather than re-thread every call. *)
+    iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & Hhs & Hpriv & Hmst)".
+    iPoseProof minstret_inv_intro as "#Hinv".
     iDestruct "Hmst" as (ms0) "(Hms & %HoIE & %HoPRV & %HoSXL & %HoKF)".
     iDestruct "Hhs" as "[HhsA HhsK]".
     iDestruct "Hpriv" as "[HprivA HprivK]".
     iDestruct "Hms" as "[HmsA HmsK]".
     iDestruct "Hpcf" as "[HpcfA HpcfK]".
     iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) ms0 HoIE HoPRV HoSXL HoKF
-                  with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
+                  with "Hhw HhsA HprivA HmsA") as "Hmm".
     (* invariant facts of the post-csrw mstatus value *)
     assert (HmIE1 : eq_vec (_get_Mstatus_MIE (st_ms1 ms0)) ('b"1") = false).
     { unfold st_ms1. rewrite mstatus_legalized_MIE. rewrite st_va5_40_MIE. exact HoIE. }
@@ -1252,7 +1257,7 @@ Section WpStartThm.
     (* ---- 41. csrw mstatus, a5: recombine to FULL raw cells and run the
        RAW config-writing WP; the value stays a single symbol. ---- *)
     assert (L41a5 : st_m40 m sp0 ms0 !!! Regidx ti_a5 = st_va5_40 ms0) by (st_unfold; st_look).
-    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & _ & HhsA & HprivA & HmstA)".
+    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & HhsA & HprivA & HmstA)".
     iDestruct "HmstA" as (ms0') "(HmsA & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "HmsA HmsK") as %->.
     iDestruct (reg_half_join with "HhsA HhsK") as "Hhs".
@@ -1270,7 +1275,7 @@ Section WpStartThm.
     iDestruct "Hms" as "[HmsA HmsK]".
     iDestruct "Hpcf" as "[HpcfA HpcfK]".
     iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1 HKF1
-                  with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
+                  with "Hhw HhsA HprivA HmsA") as "Hmm".
 
     (* ---- 42. auipc a5, 1 ---- *)
     iApply (wp_auipc_gpr st_pc42 ti_a5 si42 (st_m40 m sp0 ms0) pmpcfg0 (1/2)%Qp
@@ -1416,7 +1421,7 @@ Section WpStartThm.
     (* ---- 58. csrw pmpcfg0, a5: recombine to FULL and run the RAW WP. ---- *)
     assert (L58a5 : st_m57 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5 = (mword_of_int 15 : mword 64))
       by (st_unfold; st_look).
-    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & _ & HhsA & HprivA & HmstA)".
+    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & HhsA & HprivA & HmstA)".
     iDestruct "HmstA" as (ms1') "(HmsA & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "HmsA HmsK") as %->.
     iDestruct (reg_half_join with "HhsA HhsK") as "Hhs".
@@ -1434,7 +1439,7 @@ Section WpStartThm.
     iDestruct "Hms" as "[HmsA HmsK]".
     iDestruct "Hpcf" as "[HpcfA HpcfK]".
     iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1 HKF1
-                  with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
+                  with "Hhw HhsA HprivA HmsA") as "Hmm".
 
     (* ---- ADUE write: [menvcfg |= 1<<61] (start+0x58..0x62) ---- *)
     (* ae0: csrr a5, menvcfg  (a5 := menvcfg0) *)
@@ -1564,7 +1569,7 @@ Section WpStartThm.
              with (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)) in "Hfile".
 
     (* ---- 63. MRET into Supervisor mode at <main>. ---- *)
-    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & _ & HhsA & HprivA & HmstA)".
+    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & HhsA & HprivA & HmstA)".
     iDestruct "HmstA" as (ms1') "(HmsA & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "HmsA HmsK") as %->.
     iDestruct (reg_half_join with "HhsA HhsK") as "Hhs".
