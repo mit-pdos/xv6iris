@@ -482,6 +482,7 @@ Section UserWaitClose.
   Lemma u_close_inv (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
       (tlbvec : type_of_register tlb)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
       (rs3 : regstate) (hs3 : HartState) (ms3 va3 va3' : mword 64) :
     user_hart_ok hs3 ->
     user_mstatus_ok ms3 ->
@@ -506,6 +507,8 @@ Section UserWaitClose.
     senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     (R_bitvector_32 sstateen0) ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scenv -∗ mhpmcounter ↦ᵣ□ hpm -∗
     hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
     resv_any cpu_id -∗ pt_claims 2 t -∗ bytes_own mm -∗
     (∀ (t' : ptree) (mm' : PtBytes.pamap) (tlbvec' : type_of_register tlb),
@@ -517,8 +520,8 @@ Section UserWaitClose.
   Proof.
     intros Hhok Hmsok Hlock Lhs Lpriv Lms Lpc Lnpc Lstvec Lmie Lmdl Lmenv
       Lsatp Lpcfg Lpaddr Ltlb Htlbok Hwf.
-    iIntros "Hpmp #Hmedl #Hsenv #Hmste #Hsste Hrw Hro Hresv Hclaims Hbytes
-             Hclose Hrut".
+    iIntros "Hpmp #Hmedl #Hsenv #Hmste #Hsste #Hmcen #Hscen #Hhpm
+             Hrw Hro Hresv Hclaims Hbytes Hclose Hrut".
     iDestruct (u_frames_elim rs3 (uc_dqc C) hs3 ms3
                  (register_lookup (R_bitvector_64 scause) rs3)
                  (register_lookup (R_bitvector_64 stval) rs3)
@@ -534,6 +537,9 @@ Section UserWaitClose.
                  (register_lookup (R_bitvector_64 medeleg) rs3) MENVCFG_S
                  (register_lookup (R_bitvector_64 mstateen0) rs3)
                  (register_lookup (R_bitvector_32 sstateen0) rs3)
+                 (register_lookup (R_bitvector_32 mcounteren) rs3)
+                 (register_lookup (R_bitvector_32 scounteren) rs3)
+                 (register_lookup mhpmcounter rs3)
                  (register_lookup (R_bitvector_64 misa) rs3)
                  (register_lookup (R_bitvector_64 mseccfg) rs3)
                  (register_lookup (R_bitvector_64 senvcfg) rs3)
@@ -548,14 +554,15 @@ Section UserWaitClose.
                  ltac:(rewrite /u_pins_tick; split_and!; reflexivity)
                  ltac:(rewrite /u_pins_cfg; split_and!;
                        [ exact Lstvec | exact Lmie | exact Lmdl
-                       | reflexivity | exact Lmenv | reflexivity | reflexivity ])
+                       | reflexivity | exact Lmenv | reflexivity | reflexivity
+                       | reflexivity | reflexivity | reflexivity ])
                  ltac:(rewrite /u_pins_hw; split_and!; reflexivity)
                  ltac:(rewrite /u_pins_pt; split_and!;
                        [ exact Lsatp | exact Lpcfg | exact Lpaddr | exact Ltlb ])
                  with "Hrw Hro")
       as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & HPC & HnPC & Hgpr &
            Hminstret & Hmincr & #Hmcnt & #Hmicfg & Hmcycle & Hmtime & Hmip &
-           Hstvec & Hmie & Hmdl & _ & Hmenv & _ & _ &
+           Hstvec & Hmie & Hmdl & _ & Hmenv & _ & _ & _ & _ & _ &
            _ & _ & _ & _ & _ & _ &
            Hsatp & Htlb & Hpcfg & Hpaddr)".
     iExists hs3, ms3, (register_lookup (R_bitvector_64 scause) rs3),
@@ -579,7 +586,9 @@ Section UserWaitClose.
       iApply ("Hpmp" with "Hpcfg Hpaddr"). }
     iFrame "Hrut".
     rewrite /user_cfg. iFrame "Hstvec Hmie Hmdl Hmenv".
-    by iFrame "Hmedl Hsenv Hmste Hsste".
+    iFrame "Hmedl Hsenv Hmste Hsste".
+    iSplitR; [ iExists mcenv, scenv; iFrame "Hmcen Hscen"
+             | iExists hpm; iFrame "Hhpm" ].
   Qed.
 
 End UserWaitClose.
@@ -612,7 +621,9 @@ Section UserStepWaitArm.
     iDestruct "Hmr" as (mst mi mc micfg) "(Hminstret & Hmincr & #Hmcnt & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hmcycle & Hmtime & Hmip)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hsenv &
-                          #Hmste & #Hsste)".
+                          #Hmste & #Hsste & Hctr & Hhpmb)".
+    iDestruct "Hctr" as (mcenv scenv) "[#Hmcen #Hscen]".
+    iDestruct "Hhpmb" as (hpm) "#Hhpm".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & _ &
         _ & _ & _ & _ & %Hmisaeq & %Hseceq & _ & #Hcert)".
@@ -627,20 +638,21 @@ Section UserStepWaitArm.
                 HpA Hpord HpX HpW HpR Hpcov). }
     (* ---- the entry file ---- *)
     set (RS := u_rs g (HART_WAITING (wr, ib)) mi mc (mword_of_int 0 : mword 32)
-                 elp0 pmar0 None pcfg paddr tlbvec
+                 mcenv scenv hpm elp0 pmar0 None pcfg paddr tlbvec
                  va va' ms_v sc_v stval_v sepc_v mst cy ti ip micfg
                  misa0 mseccfg0 (mword_of_int 0 : mword 64)
                  (uc_stvec C) (uc_mie C) (uc_mideleg C) (uc_medeleg C)
                  MENVCFG_S (mword_of_int 0 : mword 64) usatp).
-    iDestruct (u_frames_intro RS (uc_dqc C) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-                 (u_rs_pins_regs _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
-                 (u_rs_pins_tick _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
-                 (u_rs_pins_cfg _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
-                 (u_rs_pins_hw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
-                 (u_rs_pins_pt _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+    iDestruct (u_frames_intro RS (uc_dqc C) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 (u_rs_pins_regs _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_tick _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_cfg _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_hw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_pt _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
                  with "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr
                        Hminstret Hmincr Hmcnt Hmicfg Hmcycle Hmtime Hmip
                        Hstvec Hmie Hmdl Hmedl Hmenv Hmste Hsste
+                       Hmcen Hscen Hhpm
                        Hmisa Hmseccfg Hpma Hhtif Help Hsenv
                        Hsatp Htlb Hpcfg Hpaddr")
       as "[Hrw Hro]".
@@ -662,7 +674,8 @@ Section UserStepWaitArm.
                 register_beq r (R_bool minstret_increment) = false ->
                 register_lookup r rs3 = register_lookup r RS)
         by (intros r H1 H2 H3; exact (wpin_stay RS rsP rs3 r Hstay Hag H1 H2 H3)).
-      iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr rs3
+      iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr
+                mcenv scenv hpm rs3
                 (HART_WAITING (wr, ib)) ms_v va va'
                 ltac:(exact Hwr)
                 Hmsok
@@ -681,8 +694,8 @@ Section UserStepWaitArm.
                 ltac:(rewrite (T _ u_in_paddr ltac:(u_notin_clock) eq_refl); reflexivity)
                 ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl); reflexivity)
                 Htlbok Hwf
-                with "Hpmpi Hmedl Hsenv Hmste Hsste Hrw Hro Hresv Hclaims
-                      Hbytes Hclose Hrut").
+                with "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
+                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
     - (* ---- WAKE: hart_state := ACTIVE, PC ticks to nextPC ---- *)
       assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
                 register_beq r (R_bitvector_64 minstret) = false ->
@@ -692,7 +705,8 @@ Section UserStepWaitArm.
                 register_lookup r rs3 = register_lookup r RS)
         by (intros r H1 H2 H3 H4 H5 H6;
             exact (wpin_wake RS rs' rs3 mi2 r Hwk Hag H1 H2 H3 H4 H5 H6)).
-      iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr rs3
+      iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr
+                mcenv scenv hpm rs3
                 (HART_ACTIVE tt) ms_v va' va'
                 ltac:(exact I)
                 Hmsok
@@ -711,8 +725,8 @@ Section UserStepWaitArm.
                 ltac:(rewrite (T _ u_in_paddr ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
                 ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
                 Htlbok Hwf
-                with "Hpmpi Hmedl Hsenv Hmste Hsste Hrw Hro Hresv Hclaims
-                      Hbytes Hclose Hrut").
+                with "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
+                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
   Qed.
 
 End UserStepWaitArm.

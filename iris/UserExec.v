@@ -280,7 +280,22 @@ Section UserExec.
         other read of it (e.g. [hw_config]'s own copy, RiscvFetchExec.v). *)
      senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
      mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
-     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32))%I.
+     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
+     (* THE COUNTER-PERMISSION CELLS, and they are not optional.  A U-mode
+        [csrr] of cycle / time / instret / hpmcounterN runs [counter_enabled],
+        which reads mcounteren and scounteren UNCONDITIONALLY (UserCsr's
+        [exec_counter_enabled_U_total]), and the hpm path reads mhpmcounter.
+        Under whole-cycle stepping the interpreter answered those reads off
+        [gen_heap_interp] and no bundle had to hold them; under per-node
+        stepping every read the cycle makes must be ANSWERABLE, so the hart
+        owns them.  Their VALUES are existential -- the U-mode CSR arm is
+        total whatever the permission bits say (denied reads are
+        Illegal_Instruction, which is a [u_result_ok] outcome) -- so they are
+        [box] like [medeleg] and cost the kernel nothing to hand over. *)
+     (∃ mcenv scenv : mword 32,
+        (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv ∗
+        (R_bitvector_32 scounteren) ↦ᵣ□ scenv) ∗
+     (∃ hpm : type_of_register mhpmcounter, mhpmcounter ↦ᵣ□ hpm))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The loop invariant: A VALID USER-MODE EXECUTION STATE.  Everything an *)

@@ -93,6 +93,8 @@ Section UserKernelBridge.
       (stv medeleg_v : mword 64)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (mstateen0v : mword 64) (sstateen0v : mword 32)
+      (mcounteren_v scounteren_v : mword 32)
+      (mhpmcounter_v : type_of_register mhpmcounter)
       (g : regfile) :
     (* mstatus pins on the pre-sret value (FS/VS = Off: FP/vector disabled --
        the user machine runs with the FP and vector units off, an invariant
@@ -143,6 +145,16 @@ Section UserKernelBridge.
     medeleg ↦ᵣ□ medeleg_v -∗
     mstateen0 ↦ᵣ□ mstateen0v -∗
     sstateen0 ↦ᵣ□ sstateen0v -∗
+    (* THE COUNTER-PERMISSION CELLS.  New with the port, and forced by it:
+       a U-mode [csrr] of a counter CSR reads mcounteren / scounteren /
+       mhpmcounter, and under per-node stepping every read the cycle makes
+       must be answerable from what the hart OWNS.  All three are [box] --
+       nothing writes them after M-mode boot -- so handing them over costs
+       the kernel nothing, and their VALUES are unconstrained (a denied
+       counter read is Illegal_Instruction, which the user tier classifies). *)
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
+    mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
     (* ---- the user data pages ---- *)
     udata_own pt.(ud_data) -∗
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
@@ -153,7 +165,7 @@ Section UserKernelBridge.
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hcov Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
-             Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrut".
+             Hsc Hstval Hstvec Hmedl Hmse Hsse Hmcen Hscen Hhpm Hdata Hrut".
     unfold user_inv.
     iExists (HART_ACTIVE tt), (sret_ms5 mstatus0), sc_v, stval_v, sepc0,
             (ret_pc sepc0), (ret_pc sepc0), g.
@@ -178,11 +190,14 @@ Section UserKernelBridge.
       iFrame "Hutlb Hdata".
       rewrite Hum in Hcov Hacc.
       iPureIntro. split; [exact Hcov | exact Hacc]. }
-    iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse".
+    iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hmcen Hscen Hhpm".
     { (* user_cfg *)
       unfold user_cfg.
       rewrite Hdqc Hstvec Hmie Hmdl Hmedl.
-      iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
+      iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse".
+      iSplitL "Hmcen Hscen".
+      - iExists mcounteren_v, scounteren_v. iFrame "Hmcen Hscen".
+      - iExists mhpmcounter_v. iFrame "Hhpm". }
     (* Rut pt *)
     iFrame "Hrut".
   Qed.
@@ -231,6 +246,10 @@ Section UserKernelBridge.
       senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
+      (∃ mcenv scenv : mword 32,
+         (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv ∗
+         (R_bitvector_32 scounteren) ↦ᵣ□ scenv) ∗
+      (∃ hpm : type_of_register mhpmcounter, mhpmcounter ↦ᵣ□ hpm) ∗
       Rut pt.
   Proof.
     iIntros "H".
@@ -241,10 +260,11 @@ Section UserKernelBridge.
     iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
     unfold user_cfg.
     iDestruct "Hcfg" as
-      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
+      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse & Hctr & Hhpm)".
     iExists ms_v, sc_v, stval_v, sepc_v, g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
-            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hrut".
+            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse
+            Hctr Hhpm Hrut".
     iPureIntro. split; [exact Hok | split; [exact Hcov | exact Hacc]].
   Qed.
 

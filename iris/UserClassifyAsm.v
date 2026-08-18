@@ -340,6 +340,86 @@ Definition u_exec_pins (P : uptd) (t : ptree) (rs : regstate) : Prop :=
 (* in between would be a conversion bomb (durable notes).                 *)
 (* ===================================================================== *)
 
+(* THE POSTCONDITION BODY, named.  Both totalities are "premises -> this",
+   and every [finish_*] / [arm_*] of [UserTotalU] closes exactly this for ONE
+   result shape -- so it is the memory arms' contract too, and it is named
+   here rather than in [UserTotalU] so P4 can code against it without paying
+   that file. *)
+Definition base_post (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (va : mword 64) (w : mword 32) : Prop :=
+  exists (instr : instruction) (r : ExecutionResult) (s_x : mstate)
+         (t' : ptree),
+    (* DECODE.  Read-only, so it keeps its [goodb] route: the [exec] fact is
+       the one the tier already proves, and [hval] is what
+       [HartRunFull.run_fetch_base] asks for -- one [hval_of_goodb]. *)
+    exec (ext_decode w) (u_state rsf mm) = Some (instr, u_state rsf mm) /\
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w) instr rsf /\
+    is_lpad_instruction instr = false /\
+    (* EXECUTE, with its certificate, at the ticked file *)
+    (exec (execute instr)
+       (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
+       = Some (r, s_x)
+     /\ goodmb Du_r Du_w (execute instr)
+          (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm = true
+     \/ (exists other : instruction,
+           exec (execute instr)
+             (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
+             = Some (ExecuteAs other,
+                     u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
+           /\ goodmb Du_r Du_w (execute instr)
+                (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm
+              = true
+           /\ exec (execute other)
+                (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
+              = Some (r, s_x)
+           /\ goodmb Du_r Du_w (execute other)
+                (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm
+              = true)) /\
+    u_result_ok r /\
+    match r with ExecuteAs _ => False | _ => True end /\
+    (* THE POST-STATE *)
+    reg_agree_on u_Dfix s_x.(sregs)
+      (register_set nextPC (add_vec_int va 4) rsf) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb s_x.(sregs)) /\
+    u_mem_step P t t' mm s_x.(mem).
+
+(* ...and the compressed twin, at [va+2] over [ext_decode_compressed], with
+   the [Ext_Zca] gate riding as the extra [exec] conjunct it always was. *)
+Definition rvc_post (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (va : mword 64) (h : mword 16) : Prop :=
+  exists (instr : instruction) (r : ExecutionResult) (s_x : mstate)
+         (t' : ptree),
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (instr, u_state rsf mm) /\
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) instr rsf /\
+    exec (currentlyEnabled Ext_Zca) (u_state rsf mm)
+      = Some (true, u_state rsf mm) /\
+    (exec (execute instr)
+       (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
+       = Some (r, s_x)
+     /\ goodmb Du_r Du_w (execute instr)
+          (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm = true
+     \/ (exists other : instruction,
+           exec (execute instr)
+             (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
+             = Some (ExecuteAs other,
+                     u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
+           /\ goodmb Du_r Du_w (execute instr)
+                (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm
+              = true
+           /\ exec (execute other)
+                (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
+              = Some (r, s_x)
+           /\ goodmb Du_r Du_w (execute other)
+                (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm
+              = true)) /\
+    u_result_ok r /\
+    match r with ExecuteAs _ => False | _ => True end /\
+    reg_agree_on u_Dfix s_x.(sregs)
+      (register_set nextPC (add_vec_int va 2) rsf) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb s_x.(sregs)) /\
+    u_mem_step P t t' mm s_x.(mem).
+
 (* 5-way BASE totality: decode w -> instr; execute (possibly one base
    ExecuteAs redirect, e.g. SINVAL_VMA) -> r with u_result_ok r. *)
 Definition base_exec_total_u (P : uptd) (va : mword 64) (mi : bool) : Prop :=
@@ -347,83 +427,17 @@ Definition base_exec_total_u (P : uptd) (va : mword 64) (mi : bool) : Prop :=
     post_fetch_cfg (u_state rsf mm) va mi ->
     u_exec_pins P t rsf ->
     u_mem_wf P t mm ->
-    exists (instr : instruction) (r : ExecutionResult) (s_x : mstate)
-           (t' : ptree),
-      (* DECODE.  Read-only, so it keeps its [goodb] route: the [exec] fact
-         is the one the tier already proves, and [hval] is what
-         [HartRunFull.run_fetch_base] asks for -- one [hval_of_goodb]. *)
-      exec (ext_decode w) (u_state rsf mm) = Some (instr, u_state rsf mm) /\
-      hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w) instr rsf /\
-      is_lpad_instruction instr = false /\
-      (* EXECUTE, with its certificate, at the ticked file *)
-      (exec (execute instr)
-         (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
-         = Some (r, s_x)
-       /\ goodmb Du_r Du_w (execute instr)
-            (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm = true
-       \/ (exists other : instruction,
-             exec (execute instr)
-               (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
-               = Some (ExecuteAs other,
-                       u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
-             /\ goodmb Du_r Du_w (execute instr)
-                  (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm
-                = true
-             /\ exec (execute other)
-                  (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)
-                = Some (r, s_x)
-             /\ goodmb Du_r Du_w (execute other)
-                  (u_state (register_set nextPC (add_vec_int va 4) rsf) mm) mm
-                = true)) /\
-      u_result_ok r /\
-      match r with ExecuteAs _ => False | _ => True end /\
-      (* THE POST-STATE *)
-      reg_agree_on u_Dfix s_x.(sregs)
-        (register_set nextPC (add_vec_int va 4) rsf) /\
-      tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb s_x.(sregs)) /\
-      u_mem_step P t t' mm s_x.(mem).
+    base_post P t mm rsf va w.
 
-(* 5-way RVC totality: decode_compressed h -> instr; execute either
-   DIRECTLY (C_NOP/C_NTL/ZCMOP/C_NOT/C_ZEXT_B/C_ILLEGAL) or via one
-   ExecuteAs redirect -> r with u_result_ok r.  Mirrors base_exec_total_u;
-   the [Ext_Zca] gate rides as the extra [exec] conjunct it always was. *)
+(* 5-way RVC totality: decode_compressed h -> instr; execute either DIRECTLY
+   (C_NOP/C_NTL/ZCMOP/C_NOT/C_ZEXT_B/C_ILLEGAL) or via one ExecuteAs
+   redirect -> r with u_result_ok r. *)
 Definition rvc_exec_total_u (P : uptd) (va : mword 64) (mi : bool) : Prop :=
   forall (h : mword 16) (rsf : regstate) (t : ptree) (mm : pamap),
     post_fetch_cfg (u_state rsf mm) va mi ->
     u_exec_pins P t rsf ->
     u_mem_wf P t mm ->
-    exists (instr : instruction) (r : ExecutionResult) (s_x : mstate)
-           (t' : ptree),
-      exec (ext_decode_compressed h) (u_state rsf mm)
-        = Some (instr, u_state rsf mm) /\
-      hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) instr rsf /\
-      exec (currentlyEnabled Ext_Zca) (u_state rsf mm)
-        = Some (true, u_state rsf mm) /\
-      (exec (execute instr)
-         (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
-         = Some (r, s_x)
-       /\ goodmb Du_r Du_w (execute instr)
-            (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm = true
-       \/ (exists other : instruction,
-             exec (execute instr)
-               (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
-               = Some (ExecuteAs other,
-                       u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
-             /\ goodmb Du_r Du_w (execute instr)
-                  (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm
-                = true
-             /\ exec (execute other)
-                  (u_state (register_set nextPC (add_vec_int va 2) rsf) mm)
-                = Some (r, s_x)
-             /\ goodmb Du_r Du_w (execute other)
-                  (u_state (register_set nextPC (add_vec_int va 2) rsf) mm) mm
-                = true)) /\
-      u_result_ok r /\
-      match r with ExecuteAs _ => False | _ => True end /\
-      reg_agree_on u_Dfix s_x.(sregs)
-        (register_set nextPC (add_vec_int va 2) rsf) /\
-      tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb s_x.(sregs)) /\
-      u_mem_step P t t' mm s_x.(mem).
+    rvc_post P t mm rsf va h.
 
 (* ===================================================================== *)
 (* 4. THE THREE POST-STATE SHAPES, once.                                  *)

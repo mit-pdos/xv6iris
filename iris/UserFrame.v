@@ -113,7 +113,17 @@ Definition u_ro_list : list register :=
     (R_bitvector_64 mideleg : register); (R_bitvector_64 medeleg : register);
     (R_bitvector_64 menvcfg : register);
     (R_bitvector_64 mstateen0 : register);
-    (R_bitvector_32 sstateen0 : register); (R_bitvector_64 satp : register);
+    (R_bitvector_32 sstateen0 : register);
+    (* the COUNTER-PERMISSION cells.  A U-mode [csrr] of cycle / time /
+       instret / hpmcounterN runs [counter_enabled], which reads mcounteren
+       and scounteren UNCONDITIONALLY, and the hpm path reads mhpmcounter --
+       so a per-node cycle cannot answer those reads unless the hart OWNS
+       the cells.  Nothing writes them after M-mode boot, so [user_cfg]
+       holds all three at [box] and [u_Df] gives them [DfracDiscarded]. *)
+    (R_bitvector_32 mcounteren : register);
+    (R_bitvector_32 scounteren : register);
+    (mhpmcounter : register);
+    (R_bitvector_64 satp : register);
     (pmpcfg_n : register); (pmpaddr_n : register) ].
 
 Definition u_Dgpr : gset register := list_to_set u_gpr_list.
@@ -502,7 +512,9 @@ Definition u_Df (dqc : dfrac) (r : register) : dfrac :=
   | R_bitvector_64 medeleg | R_bitvector_64 mstateen0
   | R_bitvector_64 senvcfg | R_bitvector_64 misa | R_bitvector_64 mseccfg
   | R_bitvector_64 minstretcfg => DfracDiscarded
-  | R_bitvector_32 sstateen0 | R_bitvector_32 mcountinhibit => DfracDiscarded
+  | R_bitvector_32 sstateen0 | R_bitvector_32 mcountinhibit
+  | R_bitvector_32 mcounteren | R_bitvector_32 scounteren => DfracDiscarded
+  | R_vector_32_bitvector_64 mhpmcounter => DfracDiscarded
   | R_bitvector_1 elp => DfracDiscarded
   | R_list_PMA_Region pma_regions => DfracDiscarded
   | R_option_bitvector_64 htif_tohost_base => DfracDiscarded
@@ -539,6 +551,12 @@ Proof. reflexivity. Qed.
 Lemma u_Df_pma dq : u_Df dq pma_regions = DfracDiscarded.
 Proof. reflexivity. Qed.
 Lemma u_Df_htif dq : u_Df dq htif_tohost_base = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_mcen dq : u_Df dq (R_bitvector_32 mcounteren) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_scen dq : u_Df dq (R_bitvector_32 scounteren) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_hpm dq : u_Df dq mhpmcounter = DfracDiscarded.
 Proof. reflexivity. Qed.
 Lemma u_Df_satp dq : u_Df dq satp = DfracOwn 1.
 Proof. reflexivity. Qed.
@@ -582,14 +600,18 @@ Definition u_pins_tick (rs : regstate) (mst : mword 64) (mi : bool)
 
 (* [UserExec.user_cfg] *)
 Definition u_pins_cfg (rs : regstate)
-    (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32) : Prop :=
+    (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32)
+    (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter) : Prop :=
   register_lookup (R_bitvector_64 stvec) rs = stvecv /\
   register_lookup (R_bitvector_64 mie) rs = miev /\
   register_lookup (R_bitvector_64 mideleg) rs = mdlv /\
   register_lookup (R_bitvector_64 medeleg) rs = medv /\
   register_lookup (R_bitvector_64 menvcfg) rs = menvv /\
   register_lookup (R_bitvector_64 mstateen0) rs = mstenv /\
-  register_lookup (R_bitvector_32 sstateen0) rs = sstenv.
+  register_lookup (R_bitvector_32 sstateen0) rs = sstenv /\
+  register_lookup (R_bitvector_32 mcounteren) rs = mcenv /\
+  register_lookup (R_bitvector_32 scounteren) rs = scenv /\
+  register_lookup mhpmcounter rs = hpm.
 
 (* [RiscvFetchExec.hw_config] *)
 Definition u_pins_hw (rs : regstate) (misav mseccfgv senvv : mword 64)
@@ -637,13 +659,14 @@ Section UFrames.
       (ms sc stv sep va va' : mword 64) (g : regfile)
       (mst : mword 64) (mi : bool) (mc : mword 32) (micfg cy ti ip : mword 64)
       (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
       (misav mseccfgv senvv : mword 64) (pmar : list PMA_Region)
       (htifv : type_of_register htif_tohost_base) (elpv : mword 1)
       (satpv : mword 64) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
     u_pins_regs rs hs ms sc stv sep va va' g ->
     u_pins_tick rs mst mi mc micfg cy ti ip ->
-    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv ->
+    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv mcenv scenv hpm ->
     u_pins_hw rs misav mseccfgv senvv pmar htifv elpv ->
     u_pins_pt rs satpv pcfg paddr tlbv ->
     (* [user_regs] *)
@@ -659,6 +682,8 @@ Section UFrames.
     stvec ↦ᵣ{dqc} stvecv -∗ mie ↦ᵣ{dqc} miev -∗ mideleg ↦ᵣ{dqc} mdlv -∗
     medeleg ↦ᵣ□ medv -∗ menvcfg ↦ᵣ{dqc} menvv -∗
     mstateen0 ↦ᵣ□ mstenv -∗ (R_bitvector_32 sstateen0) ↦ᵣ□ sstenv -∗
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scenv -∗ mhpmcounter ↦ᵣ□ hpm -∗
     (* [hw_config] *)
     misa ↦ᵣ□ misav -∗ mseccfg ↦ᵣ□ mseccfgv -∗ pma_regions ↦ᵣ□ pmar -∗
     htif_tohost_base ↦ᵣ□ htifv -∗ (R_bitvector_1 elp) ↦ᵣ□ elpv -∗
@@ -669,12 +694,13 @@ Section UFrames.
   Proof.
     intros (Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & Hpc & Hnpc & Hgag)
            (Hmst & Hmi & Hmc & Hmicfg & Hcy & Hti & Hip)
-           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste)
+           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste & Hmcen &
+            Hscen & Hhpm)
            (Hmisa & Hsec & Hsenv & Hpma & Hhtif & Help)
            (Hsatp & Hpcfg & Hpaddr & Htlb).
     iIntros "Hhs Hpriv Hmstatus Hscause Hstval Hsepc HPC HnPC Hgpr".
     iIntros "Hminstret Hmincr #Hmcnt #Hmicfg Hmcycle Hmtime Hmip".
-    iIntros "Hstvec Hmie Hmdl #Hmedl Hmenv #Hmste #Hsste".
+    iIntros "Hstvec Hmie Hmdl #Hmedl Hmenv #Hmste #Hsste #Hmcen #Hscen #Hhpm".
     iIntros "#Hmisa #Hmseccfg #Hpma #Hhtif #Help #Hsenv".
     iIntros "Hsatp Htlb Hpcfg Hpaddr".
     iSplitR "Hstvec Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr".
@@ -689,10 +715,10 @@ Section UFrames.
     - rewrite /hreg_frame_ro /u_Dro (big_sepS_list_to_set _ _ u_ro_nodup).
       rewrite /u_ro_list /=.
       rewrite Hmisa Hsec Hpma Hhtif Help Hsenv Hmc Hmicfg Hstvec Hmie Hmdl
-              Hmedl Hmenv Hmste Hsste Hsatp Hpcfg Hpaddr.
+              Hmedl Hmenv Hmste Hsste Hmcen Hscen Hhpm Hsatp Hpcfg Hpaddr.
       iFrame "Hstvec Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr".
       by iFrame "Hmisa Hmseccfg Hpma Hhtif Help Hsenv Hmcnt Hmicfg Hmedl
-                 Hmste Hsste".
+                 Hmste Hsste Hmcen Hscen Hhpm".
   Qed.
 
   (* ...and back.  The file may be a DIFFERENT one ([rs'] -- a cycle writes
@@ -704,13 +730,14 @@ Section UFrames.
       (ms sc stv sep va va' : mword 64)
       (mst : mword 64) (mi : bool) (mc : mword 32) (micfg cy ti ip : mword 64)
       (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
       (misav mseccfgv senvv : mword 64) (pmar : list PMA_Region)
       (htifv : type_of_register htif_tohost_base) (elpv : mword 1)
       (satpv : mword 64) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
     u_pins_regs rs hs ms sc stv sep va va' (u_regfile rs) ->
     u_pins_tick rs mst mi mc micfg cy ti ip ->
-    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv ->
+    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv mcenv scenv hpm ->
     u_pins_hw rs misav mseccfgv senvv pmar htifv elpv ->
     u_pins_pt rs satpv pcfg paddr tlbv ->
     hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dqc) rs u_Dro -∗
@@ -724,6 +751,8 @@ Section UFrames.
      stvec ↦ᵣ{dqc} stvecv ∗ mie ↦ᵣ{dqc} miev ∗ mideleg ↦ᵣ{dqc} mdlv ∗
      medeleg ↦ᵣ□ medv ∗ menvcfg ↦ᵣ{dqc} menvv ∗
      mstateen0 ↦ᵣ□ mstenv ∗ (R_bitvector_32 sstateen0) ↦ᵣ□ sstenv ∗
+     (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv ∗
+     (R_bitvector_32 scounteren) ↦ᵣ□ scenv ∗ mhpmcounter ↦ᵣ□ hpm ∗
      misa ↦ᵣ□ misav ∗ mseccfg ↦ᵣ□ mseccfgv ∗ pma_regions ↦ᵣ□ pmar ∗
      htif_tohost_base ↦ᵣ□ htifv ∗ (R_bitvector_1 elp) ↦ᵣ□ elpv ∗
      senvcfg ↦ᵣ□ senvv ∗
@@ -731,7 +760,8 @@ Section UFrames.
   Proof.
     intros (Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & Hpc & Hnpc & _)
            (Hmst & Hmi & Hmc & Hmicfg & Hcy & Hti & Hip)
-           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste)
+           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste & Hmcen &
+            Hscen & Hhpm)
            (Hmisa & Hsec & Hsenv & Hpma & Hhtif & Help)
            (Hsatp & Hpcfg & Hpaddr & Htlb).
     iIntros "Hrw Hro".
@@ -749,15 +779,16 @@ Section UFrames.
     rewrite /hreg_frame_ro /u_Dro (big_sepS_list_to_set _ _ u_ro_nodup).
     rewrite /u_ro_list /=.
     rewrite Hmisa Hsec Hpma Hhtif Help Hsenv Hmc Hmicfg Hstvec Hmie Hmdl
-            Hmedl Hmenv Hmste Hsste Hsatp Hpcfg Hpaddr.
+            Hmedl Hmenv Hmste Hsste Hmcen Hscen Hhpm Hsatp Hpcfg Hpaddr.
     iDestruct "Hro" as "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv &
                          #Hmcnt & #Hmicfg & Hstvec & Hmie & Hmdl & #Hmedl &
-                         Hmenv & #Hmste & #Hsste & Hsatp & Hpcfg & Hpaddr & _)".
+                         Hmenv & #Hmste & #Hsste & #Hmcen & #Hscen & #Hhpm &
+                         Hsatp & Hpcfg & Hpaddr & _)".
     iFrame "HPC HnPC Hhs Hpriv Hmstatus Hscause Hstval Hsepc Hgpr Hminstret
             Hmincr Hmcycle Hmtime Hmip Hstvec Hmie Hmdl Hmenv Hsatp Htlbc
             Hpcfg Hpaddr".
-    by iFrame "Hmcnt Hmicfg Hmedl Hmste Hsste Hmisa Hmseccfg Hpma Hhtif Help
-               Hsenv".
+    by iFrame "Hmcnt Hmicfg Hmedl Hmste Hsste Hmcen Hscen Hhpm Hmisa Hmseccfg
+               Hpma Hhtif Help Hsenv".
   Qed.
 
 End UFrames.
@@ -916,7 +947,8 @@ Definition u_bv64 (g : regfile)
   end.
 
 Definition u_rs (g : regfile) (hs : HartState) (mi : bool)
-    (mc sstenv : mword 32) (elpv : mword 1)
+    (mc sstenv mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+    (elpv : mword 1)
     (pmar : list PMA_Region) (htifv : type_of_register htif_tohost_base)
     (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
     (tlbv : type_of_register tlb)
@@ -930,6 +962,7 @@ Definition u_rs (g : regfile) (hs : HartState) (mi : bool)
     inhabitant inhabitant inhabitant
     (fun r => match r with
               | sstateen0 => sstenv | mcountinhibit => mc
+              | mcounteren => mcenv | scounteren => scenv
               | _ => mword_of_int 0 end)
     inhabitant inhabitant inhabitant
     (u_bv64 g va va' ms sc stv sep mst cy ti ip micfg
@@ -938,14 +971,15 @@ Definition u_rs (g : regfile) (hs : HartState) (mi : bool)
     (fun r => match r with minstret_increment => mi | _ => false end)
     (fun _ => pmar)
     (fun _ => htifv)
-    inhabitant
+    (fun _ => hpm)
     (fun _ => paddr)
     (fun _ => pcfg)
     (fun _ => tlbv).
 
 Section URs.
   Context (g : regfile) (hs : HartState) (mi : bool)
-          (mc sstenv : mword 32) (elpv : mword 1)
+          (mc sstenv mcenv scenv : mword 32)
+          (hpm : type_of_register mhpmcounter) (elpv : mword 1)
           (pmar : list PMA_Region) (htifv : type_of_register htif_tohost_base)
           (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
           (tlbv : type_of_register tlb)
@@ -954,7 +988,7 @@ Section URs.
              : mword 64).
 
   Local Notation RS :=
-    (u_rs g hs mi mc sstenv elpv pmar htifv pcfg paddr tlbv
+    (u_rs g hs mi mc sstenv mcenv scenv hpm elpv pmar htifv pcfg paddr tlbv
        va va' ms sc stv sep mst cy ti ip micfg
        misav mseccfgv senvv stvecv miev mdlv medv menvv mstenv satpv).
 
@@ -1016,7 +1050,7 @@ Qed.
   Proof. rewrite /u_pins_tick. split_and!; reflexivity. Qed.
 
   Lemma u_rs_pins_cfg :
-    u_pins_cfg RS stvecv miev mdlv medv menvv mstenv sstenv.
+    u_pins_cfg RS stvecv miev mdlv medv menvv mstenv sstenv mcenv scenv hpm.
   Proof. rewrite /u_pins_cfg. split_and!; reflexivity. Qed.
 
   Lemma u_rs_pins_hw : u_pins_hw RS misav mseccfgv senvv pmar htifv elpv.
