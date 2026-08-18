@@ -1,9 +1,13 @@
 (* TrampStepPt.v -- the S-mode TRAMPOLINE-page fetch and step engine, PER
    NODE.  One S-mode instruction whose VA is a trampoline va [pc] and whose
    BYTES live at the physical [pa] on the trampoline page: the two are tied
-   only by the geometry premises below plus [KptPt.tramp_window_static]
-   (the page IS kernel text, so its static [kmap_static] entry pins the
-   byte window's claim to the identity ppn).
+   by the geometry premises below and by the BYTES' OWN CLAIM -- [instr pa]
+   is [↦ₓ□] data, so [code_text] hands over the [kmap_at] for the window,
+   [text_canonical] its canonicality and the datum's tier pin its identity
+   ([ktier_pin_id]).  NOTHING comes from a static bundle: the whole
+   side-condition of the fetch's memory side is a projection of the
+   points-to of the bytes being fetched (the user rule, recorded in
+   claude-notes/projects/main-cycle-port.md).
 
    [wp_instr_tramp_pt] is [SmodeCorePt.wp_instr_s_config_regime] with that
    va/pa split, and the whole-cycle [Habs] (a [translateAddr] fupd over a
@@ -113,21 +117,6 @@ Section TrampFetchPt.
        (elp0 : type_of_register elp),
        tramp_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
          mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res)%I.
-
-  (* the byte window's PHYSICAL claim is the IDENTITY one: the trampoline
-     page IS kernel text, so the static [kmap_static] entry pins the claim's
-     ppn to [kpt_leaf_ppn] and [pa_of] collapses.  This is what lets the
-     fetch's memory side run at [pa] while its translation runs at [pc]. *)
-  Lemma tramp_phys_id (b : mword 64) (ppn : mword 44) :
-    kmap_static (svpn_of b) KP_rx ->
-    (uint b < 274877906944)%Z ->
-    kmap_static_claims -∗ kmap_at (svpn_of b) ppn KP_rx -∗ ⌜ pa_of ppn b = b ⌝.
-  Proof.
-    intros Hs Hc. iIntros "#Hb #Hk".
-    iDestruct (kmap_static_claims_at (svpn_of b) KP_rx Hs with "Hb") as "#Hk0".
-    iDestruct (kmap_at_agree with "Hk Hk0") as %[-> _].
-    iPureIntro. exact (pa_of_id b Hc).
-  Qed.
 
   Section TrampDispatch.
     Context (Df : register -> dfrac).
@@ -242,9 +231,7 @@ Section TrampFetchPt.
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
       is_aligned_vaddr (Virtaddr pc) 2 = true ->
       is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
-      is_aligned_paddr (Physaddr pa) 2 = true ->
       gen_cert -∗
-      kmap_static_claims -∗
       instr pa is_rvc i -∗
       W -∗
       resv_frag cpu_id None -∗
@@ -260,13 +247,9 @@ Section TrampFetchPt.
       swp (run_hart_active 0) (spt_run_post Df Q Rr Qi).
     Proof.
       intros Hmisa Hmenv Help Hpallow HA Hord HX Hcov
-             Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al.
-      pose proof (tramp_window_static pc pa Hident Hident2 Hpa2al) as Hstat.
-      assert (Hst0 : kmap_static (svpn_of pa) KP_rx).
-      { pose proof (Hstat 0%nat ltac:(lia)) as Hh. rewrite pa_add_0 in Hh. exact Hh. }
-      pose proof (Hstat 2%nat ltac:(lia)) as Hst2.
+             Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
       pose proof (eq_sym Hpa4va4) as Hpv.
-      iIntros "#Hcert #Hkmapb Hinstr HW Hfrag0 HRes Hrw Hro Hdisp #Htr Hex".
+      iIntros "#Hcert Hinstr HW Hfrag0 HRes Hrw Hro Hdisp #Htr Hex".
       iAssert ((W ∗ Res tlbv ∗ resv_frag cpu_id None) -∗
                hreg_frame (srs tlbv) s_Drw -∗
                hreg_frame_ro Df (srs tlbv) s_Dro -∗
@@ -301,9 +284,9 @@ Section TrampFetchPt.
           iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "#Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iEval (rewrite pa_add_0) in "Hb0".
-          iDestruct (code_text with "Hb0") as (ppn) "(#Hk & _ & _)".
+          iDestruct (code_text with "Hb0") as (ppn) "(#Hk & _ & %Hid)".
           iDestruct (text_canonical with "Hb0") as %Hcan.
-          iDestruct (tramp_phys_id pa ppn Hst0 Hcan with "Hkmapb Hk") as %Hpaid.
+          pose proof (ktier_pin_id ppn pa Hid) as Hpaid.
           pose proof (off4_bound pa Halpa) as Hoff.
           rewrite (uint_unsigned_n _) in Hoff.
           iDestruct (s_chunk_ram pa pa 0 4 4 (nth_byte w) ppn
@@ -361,17 +344,16 @@ Section TrampFetchPt.
           iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "#Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iEval (rewrite pa_add_0) in "Hb0".
-          iDestruct (code_text with "Hb0") as (ppnl) "(#Hkl & _ & _)".
+          iDestruct (code_text with "Hb0") as (ppnl) "(#Hkl & _ & %Hidl)".
           iDestruct (text_canonical with "Hb0") as %Hcanl.
-          iDestruct (tramp_phys_id pa ppnl Hst0 Hcanl with "Hkmapb Hkl") as %Hpaidl.
+          pose proof (ktier_pin_id ppnl pa Hidl) as Hpaidl.
           pose proof (off_bound_div pa 2 ltac:(lia) ltac:(exists 2048; lia) H2al)
             as Hoffl. rewrite (uint_unsigned_n _) in Hoffl.
           iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hb") as "#Hb2".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_text with "Hb2") as (ppnh) "(#Hkh & _ & _)".
+          iDestruct (code_text with "Hb2") as (ppnh) "(#Hkh & _ & %Hidh)".
           iDestruct (text_canonical with "Hb2") as %Hcanh.
-          iDestruct (tramp_phys_id (add_vec_int pa 2) ppnh Hst2 Hcanh
-                       with "Hkmapb Hkh") as %Hpaidh.
+          pose proof (ktier_pin_id ppnh (add_vec_int pa 2) Hidh) as Hpaidh.
           pose proof (off_bound_div (add_vec_int pa 2) 2 ltac:(lia)
                         ltac:(exists 2048; lia) Hvah2) as Hoffh.
           rewrite (uint_unsigned_n _) in Hoffh.
@@ -475,9 +457,9 @@ Section TrampFetchPt.
           iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "#Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iEval (rewrite pa_add_0) in "Hb0".
-          iDestruct (code_text with "Hb0") as (ppn) "(#Hk & _ & _)".
+          iDestruct (code_text with "Hb0") as (ppn) "(#Hk & _ & %Hid)".
           iDestruct (text_canonical with "Hb0") as %Hcan.
-          iDestruct (tramp_phys_id pa ppn Hst0 Hcan with "Hkmapb Hk") as %Hpaid.
+          pose proof (ktier_pin_id ppn pa Hid) as Hpaid.
           pose proof (off4_bound pa Halpa) as Hoff.
           rewrite (uint_unsigned_n _) in Hoff.
           iDestruct (s_chunk_ram pa pa 0 4 4 (nth_byte w) ppn
@@ -538,9 +520,9 @@ Section TrampFetchPt.
           iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "#Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iEval (rewrite pa_add_0) in "Hb0".
-          iDestruct (code_text with "Hb0") as (ppn) "(#Hk & _ & _)".
+          iDestruct (code_text with "Hb0") as (ppn) "(#Hk & _ & %Hid)".
           iDestruct (text_canonical with "Hb0") as %Hcan.
-          iDestruct (tramp_phys_id pa ppn Hst0 Hcan with "Hkmapb Hk") as %Hpaid.
+          pose proof (ktier_pin_id ppn pa Hid) as Hpaid.
           pose proof (off_bound_div pa 2 ltac:(lia) ltac:(exists 2048; lia) H2al)
             as Hoff. rewrite (uint_unsigned_n _) in Hoff.
           iDestruct (s_chunk_ram pa pa 0 2 2 (nth_byte h) ppn
@@ -639,7 +621,6 @@ Section TrampFetchPt.
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
-    is_aligned_paddr (Physaddr pa) 2 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -695,11 +676,10 @@ Section TrampFetchPt.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmp
-           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al.
+           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
     pose proof Hpmp as (HA & Hord & HX & HW & HR & Hcov).
     iIntros "#Hhw #Hminv Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
              Htlbc HRes Hpc Hinstr Htr Hex Hcont".
-    iDestruct (hw_config_kmap with "Hhw") as "#Hkmapb".
     iDestruct (spt_frames_intro dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
                  paddr tlbv
                  with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
@@ -761,8 +741,8 @@ Section TrampFetchPt.
                    emp%I (fun _ _ => False%I)
                    Hmisaval Hmenvval Helpnp (pma_all_ram Hpmaall)
                    HA Hord HX Hcov
-                   Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al
-                   with "Hcert Hkmapb Hinstr [] Hfrag HRes Hrw Hro [] Htr0
+                   Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
+                   with "Hcert Hinstr [] Hfrag HRes Hrw Hro [] Htr0
                          [Hex]") ].
     - iIntros (st) "[Hi | Hr]".
       + iDestruct "Hi" as (ii pr) "(_ & Hf)". iDestruct "Hf" as %[].
