@@ -439,4 +439,60 @@ Section SFrames.
   Qed.
 
 
+  (* THE BUNDLE HOLDS DIFFERENT CELLS AT DIFFERENT FRACTIONS, so the S-mode
+     [Df] is not uniform: [SmodeCore.smode_config] hands over its config
+     cells at a fraction [dq], while [KptShare.tlb_res_pt] hands over satp
+     and the two PMP cells at FULL ownership.  [hreg_frame_ro] takes a
+     per-register [Df] precisely so this needs no weakening step (and a
+     weakening step would not even typecheck: an arbitrary [dfrac] is not
+     below [DfracOwn 1]). *)
+  Definition s_Df_mix (dq : dfrac) : register -> dfrac := fun r =>
+    if decide (r = (misa : register)) then DfracDiscarded
+    else if decide (r = (mseccfg : register)) then DfracDiscarded
+    else if decide (r = (pma_regions : register)) then DfracDiscarded
+    else if decide (r = (htif_tohost_base : register)) then DfracDiscarded
+    else if decide (r = (elp : register)) then DfracDiscarded
+    else if decide (r = (senvcfg : register)) then DfracDiscarded
+    else if decide (r = (R_bitvector_32 mcountinhibit : register))
+    then DfracDiscarded
+    else if decide (r = (R_bitvector_64 minstretcfg : register))
+    then DfracDiscarded
+    else if decide (r = (satp : register)) then DfracOwn 1
+    else if decide (r = (pmpcfg_n : register)) then DfracOwn 1
+    else if decide (r = (pmpaddr_n : register)) then DfracOwn 1
+    else dq.
+
+  Lemma s_ro_split_mix (dq : dfrac) (rs : regstate) :
+    (hreg_frame_ro (s_Df_mix dq) rs s_Dro : iProp Σ) ⊣⊢
+    (reg_pointsto cur_privilege dq (register_lookup cur_privilege rs) ∗
+     reg_pointsto mstatus dq (register_lookup mstatus rs) ∗
+     reg_pointsto hart_state dq (register_lookup hart_state rs) ∗
+     reg_pointsto pmpcfg_n (DfracOwn 1) (register_lookup pmpcfg_n rs) ∗
+     reg_pointsto pmpaddr_n (DfracOwn 1) (register_lookup pmpaddr_n rs) ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded
+       (register_lookup (R_bitvector_32 mcountinhibit) rs) ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded
+       (register_lookup (R_bitvector_64 minstretcfg) rs) ∗
+     reg_pointsto misa DfracDiscarded (register_lookup misa rs) ∗
+     reg_pointsto mseccfg DfracDiscarded (register_lookup mseccfg rs) ∗
+     reg_pointsto pma_regions DfracDiscarded
+       (register_lookup pma_regions rs) ∗
+     reg_pointsto htif_tohost_base DfracDiscarded
+       (register_lookup htif_tohost_base rs) ∗
+     reg_pointsto elp DfracDiscarded (register_lookup elp rs) ∗
+     reg_pointsto senvcfg DfracDiscarded (register_lookup senvcfg rs) ∗
+     reg_pointsto satp (DfracOwn 1) (register_lookup satp rs) ∗
+     reg_pointsto mie dq (register_lookup mie rs) ∗
+     reg_pointsto mideleg dq (register_lookup mideleg rs) ∗
+     reg_pointsto menvcfg dq (register_lookup menvcfg rs))%I.
+  Proof.
+    rewrite /hreg_frame_ro /s_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    unfold s_Df_mix.
+    repeat (rewrite decide_False; [|discriminate]).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+
 End SFrames.
