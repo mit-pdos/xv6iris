@@ -366,12 +366,19 @@ and `Step_Execute (Retire_Success tt, ib)` (tick + bump), i.e.
 of *generic* machinery and it is privilege-agnostic — state it that way, the
 S-mode kernel will want the exception arms when `WpSmodeWfi` lands.
 
-### 3.3 The dispatch at User
+### 3.3 The dispatch at User — **BUILT**, in `HartRunFull.v`
 
-New lemma `swp_dispatchInterrupt_U`, **in `WpIntrCore.v` beside its S twin** (so
-`s_pending` / `s_ext_ip` stay in one file; `WpIntrCore.v` is a red root, but
-`coqc` stops at the first error so a lemma added above line 602 is still
-checked — the worklist's own trick):
+`swp_dispatchInterrupt_U` (and its `swp_getPendingSet_U` half) is in
+`HartRunFull.v`, NOT in `WpIntrCore.v`: the file is edited by the S-mode lane,
+and the U rule's only need of it is `s_pending` plus the two privilege-free
+wire lemmas, which it imports.  The one change against the sketch below is the
+spelling of the answer: `HartRunFull.dispatch_of_pending : mword 64 -> option (InterruptType *
+Privilege)` is the decision ONCE THE PENDING SET IS KNOWN — the shared core of
+`WpIntrCore.s_dispatch` (Supervisor, SIE-gated) and `UserStep.u_dispatch`
+(User, ungated).  `u_dispatch a b c d e = dispatch_of_pending (s_pending a b c
+d e)` **by `reflexivity` [V, checked]**, so the tier bridges it in one line —
+or, better, `UserStep.u_dispatch`'s body becomes that application and the
+duplicate goes away.
 
 ```coq
   Lemma swp_dispatchInterrupt_U (Drw Dro : gset register) (Df : register -> dfrac)
@@ -389,7 +396,7 @@ checked — the worklist's own trick):
     gen_cert -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (dispatchInterrupt User)
       (fun r => ∃ meip seip : mword 1,
-                ⌜r = u_dispatch mip_v meip seip mie_v mdv_v⌝ ∗
+                ⌜r = dispatch_of_pending (s_pending mip_v meip seip mie_v mdv_v)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
 ```
 
@@ -399,16 +406,62 @@ short-circuit **without reading mstatus** (`and_boolM (returnM false) _`,
 `UserStep.v:70-100` **[V]**), so the U rule needs **no mstatus premise at all**
 and is strictly simpler than the S one.  Reuse `swp_read_mip_S:179` and
 `swp_external_interrupts_pending_S:141` verbatim — they are privilege-free.
-**~120 lines.**  `u_dispatch` (`UserStep.v:47`) and
-`exec_dispatchInterrupt_U_reduce:120` are the map to mirror; both stay.
+`u_dispatch` (`UserStep.v:47`) and `exec_dispatchInterrupt_U_reduce:120` are
+the map it mirrors; both stay.
 
-### 3.4 `run_hart_active` at User: the fetch/decode/execute peel
+### 3.4 `run_hart_active` at User: the fetch/decode/execute peel — **BUILT**
 
-New file **`HartRunFull.v`** (or a `UserRun.v` if you prefer to keep it in the
-tier; it is privilege-generic, so `HartRunFull.v` beside `HartRunGen.v` is the
-better home).  `HartRunGen.swp_run_hart_active_gen:213` **[V]** is the template,
-but three things must be generalised, and each is forced by a user outcome the
-M/S rules cannot express:
+`HartRunFull.v`.  What a caller applies:
+
+* `swp_run_hart_active_full` — the core.  Dispatch obligation identical to
+  `HartRunGen.swp_run_hart_active_gen`'s; fetch obligation
+  `swp (fetch tt) (run_fetch_post Drw Dro Df Pe Pf Px)`; conclusion
+  `fun st => match st with Step_Pending_Interrupt (ii,pr) => Qi ii pr
+  | Step_Execute (r,ib) => Pe r ib | Step_Fetch_Failure (Virtaddr xv,e) =>
+  Pf xv e | Step_Ext_Fetch_Failure x => Px x | Step_Waiting _ => False end`.
+  That IS `swp_try_step_full`'s body postcondition once `st` is destructed
+  (the body's `∃ rs2, ⌜Q st rs2⌝ ∗ …` goes INSIDE each `P`), so the two meet
+  with one `swp_mono`.
+* `swp_run_hart_active_U` — the core with the dispatch discharged by §3.3,
+  `Qi` baked (the wire values are not known until the dispatch has run, so the
+  existential lives in the payload, as in `swp_run_hart_active_S`).
+* the five instances, each pinning the fetch's shape and reading off one exec
+  composer: `swp_run_hart_active_base` / `_base_redirect` / `_rvc` /
+  `_rvc_direct` / `_fetch_fail`.  Their conclusion is `HartRunGen`'s
+  disjunctive one generalised from `RETIRE_SUCCESS` to any `resf`, so
+  `swp_run_hart_active_gen` is the `resf := RETIRE_SUCCESS` instance.
+
+The obligations the fetch and execute agents write to:
+
+```coq
+  (* run_fetch_post Drw Dro Df Pe Pf Px : FetchResult -> iProp Σ *)
+  | F_Base w        => run_fetch_base Drw Dro Df Pe w
+  | F_RVC h         => run_fetch_rvc  Drw Dro Df Pe h
+  | F_Error (e, xv) => Pf xv e
+  | F_Ext_Error x   => Px x
+
+  (* run_fetch_base: rsf is EXISTENTIAL -- a filling walk does not land where
+     it started -- so the decode certificate and the lpad refusal are stated
+     about rsf HERE rather than as premises of the rule *)
+  ∃ (rsf : regstate) (i : instruction) (pc : mword 64) (nl : nat),
+    ⌜register_lookup PC rsf = pc⌝ ∗ ⌜hval (Drw ∪ Dro) Drw rsf (ext_decode w) i rsf⌝ ∗
+    ⌜hfrun nl (Drw ∪ Dro) Drw rsf (is_landing_pad_expected tt) = Some (false, rsf)⌝ ∗
+    hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+    (frames (register_set nextPC (add_vec_int pc 4) rsf) -∗
+       swp (execute i) (run_exec_post Pe (zero_extend' 32 w)))
+  (* run_fetch_rvc adds ⌜hfrun nz … (currentlyEnabled Ext_Zca) = Some (true, rsf)⌝
+     (hand it HartRunGen.hfrun_cE_Zca) and uses nextPC+2 *)
+
+  (* run_exec_post Pe ib : ExecutionResult -> iProp Σ -- the redirect is a
+     SECOND swp inside the FIRST execute's post, not a side condition *)
+  | ExecuteAs other => swp (execute other) (fun e' => Pe e' ib)
+  | _               => Pe e ib
+```
+
+`run_exec_post_direct` (needs `match e with ExecuteAs _ => False | _ => True
+end`) and `run_exec_post_redirect` are the two introduction forms.
+
+Why each generalisation is forced, kept because it is the design:
 
 1. **the FETCH obligation becomes match-shaped** — the model's `fetch` can
    answer `F_Base w`, `F_RVC h` or an error that `run_hart_active` early-returns
@@ -621,7 +674,7 @@ hypotheses, and its proof is that lemma's proof with `exec_bind_Some` replaced b
 | I2 | `u_Drw` / `u_Dro` / `Du_r` / `Du_w` / `Df_u` / `u_pins` + the membership lemmas | `UserFrame.v` (new) | EVERY `goodmb` twin mentions `Du_r`/`Du_w` |
 | I3 | `u_mem_wf` / `u_mem_step` / `user_pt_inv_bytes` / `ptree_bytes` | `UserBytes.v` (new) + `PtTree.v` | every memory twin's premise |
 | I4 | the `⟨exec, goodmb⟩` PAIR CONVENTION: for every existing `exec_X`, a twin `goodmb_X` with the SAME binders and hypotheses, in the SAME file, immediately after | tree-wide | prevents two agents inventing two shapes |
-| I5 | `swp_run_hart_active_u_*` (fetch obligation match-shaped, execute result-generic, redirect) | `HartRunFull.v` (new) | the fetch and execute agents write to it |
+| I5 | **DONE** — `swp_run_hart_active_full` + `_U` + the five instances (fetch obligation match-shaped, execute result-generic, redirect) | `HartRunFull.v` | the fetch and execute agents write to it; shapes in §3.4 |
 | I6 | `swp_try_step_full` / `swp_exec_step_full` (6 arms) + `swp_try_step_waiting` | `HartStepFull.v` (new) | the engine agent and the tier agent meet here |
 
 Write I1–I6 as **statements with `Admitted` bodies in one commit**, then fan out.
@@ -635,8 +688,8 @@ Write I1–I6 as **statements with `Admitted` bodies in one commit**, then fan o
 * **P1 (1 agent).**  `HartStepFull.v` (I6) — the six arms + the waiting rule.
   Depends only on `HartStepAny`/`HartMCycle` and the five `exec_riscv_step_*`
   facts, which are PURE and already proved.  **~600 lines.**
-* **P2 (1 agent).**  `HartRunFull.v` (I5) + `swp_dispatchInterrupt_U` in
-  `WpIntrCore.v`.  **~620 lines.**
+* **P2 — DONE.**  `HartRunFull.v` (I5) + `swp_dispatchInterrupt_U`, which
+  lives in `HartRunFull.v` too (§3.3).  Closes at the five platform axioms.
 * **P3 (1 agent).**  The WALK + FETCH twins: `CommonWalk.v`, `PtTreeAdue.v`,
   `UserTranslate.v`, `UserFetchPt.v`, `UserFetch.v`.  **~740 lines.**
 * **P4 (2 agents, split by family).**  The DATA-ACCESS twins: `UserMemPt.v`,
