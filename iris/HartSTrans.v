@@ -36,7 +36,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
         RiscvFetchExec RiscvTryStep.
-Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb.
+Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb HartEvents.
 Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree PtTreeAdue.
 Require Import HartMFetch HartMPmp SmodePte.
 Local Open Scope Z_scope.
@@ -169,6 +169,62 @@ Local Ltac spmp_peel_D reg H Hstop HD rsN HagN :=
 (* [SmodePte.exec_pmpMatchAddr_TOR_match] with the state dropped: its proof
    is three rewrites and never touches [s], so the PURE equation is what a
    footprint peel can actually rewrite with. *)
+
+(* ---------------------------------------------------------------------- *)
+(* THE PMA CHECK FOR AN 8-BYTE PTE READ.                                    *)
+(*                                                                        *)
+(* [HartMFetch.hfrun_check_pma_ifetch] is already width-generic, so what    *)
+(* changes here is only WHICH grant conjunct the region has to supply:      *)
+(* a fetch reads [PMA_executable], a page-table read reads                  *)
+(* [PMA_supports_pte_read].  Both sit in the same [pma_allows_ram] bundle,  *)
+(* so the caller's premise does not grow.                                   *)
+(* ---------------------------------------------------------------------- *)
+
+Local Ltac scmr_cbn :=
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.liftR Defs.try_catch
+     Defs.catch_early_return Defs.returnm returnM returnR
+     Defs.returnR Defs.read_reg Defs.early_return Defs.throw
+     Defs.assert_exp Defs.assert_exp'
+     Defs.and_boolM Defs.or_boolM andb orb negb not
+     check_pma_with_pmp_priority pmaCheck mag_pma_check
+     is_mag_applicable_access __id
+     get_config_rvfi plat_have_clint plat_have_sig].
+
+Local Ltac scmr_read :=
+  rewrite hfrun_read;
+  match goal with
+  | |- context [ bool_decide ?P ] =>
+      rewrite (bool_decide_eq_true_2 P ltac:(assumption))
+  end.
+
+Lemma hfrun_check_pma_pte (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (n : Z) :
+  (pma_regions : register) ∈ D ->
+  register_lookup pma_regions rs = pmar0 ->
+  pma_allows_ram pmar0 ->
+  pma_ram_access pa n ->
+  is_aligned_paddr (Physaddr pa) n = true ->
+  hfrun 6 D Drw rs
+    (check_pma_with_pmp_priority (Load PageTableEntry) PBMT_PMA Supervisor
+       (Physaddr pa) n false)
+  = Some (Values.Ok
+            {| Phys_Mem_Access_Info_splittable := CannotSplit;
+               Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+Proof.
+  intros HD Hpma Hpallow Hacc Hpa.
+  unfold check_pma_with_pmp_priority. scmr_cbn.
+  scmr_read. rewrite Hpma. scmr_cbn.
+  destruct (Hpallow pa n Hacc) as (region & Hmatch & Hgrant).
+  destruct region as [rbase rsize rattr rdtree].
+  destruct Hgrant as (_ & _ & _ & _ & Hpte & _).
+  cbn [PMA_Region_attributes] in Hpte.
+  rewrite Hmatch. scmr_cbn.
+  rewrite Hpte. scmr_cbn.
+  rewrite Hpa. scmr_cbn.
+  apply hfrun_ret.
+Qed.
+
 Lemma pmpMatchAddr_TOR_match_pure (addr width : mword 64) (ent : mword 8)
     (pmpaddr prev : mword 64) :
   pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent) = TOR ->
@@ -689,3 +745,153 @@ Section strans.
   Qed.
 
 End strans.
+
+
+(* ====================================================================== *)
+(* THE PTE READ, as a node.                                                *)
+(*                                                                        *)
+(* [HartMFetch.swp_checked_mem_read_ifetch4]'s shape at the page walk's     *)
+(* access: [Load PageTableEntry] at [Supervisor], width 8.  The memory      *)
+(* itself arrives the same way it does there -- as an ATOMIC-STEP fupd      *)
+(* [∀ σ, mstate_interp σ ={⊤,∅}=∗ ⌜read_bytes …⌝ ∗ ▷ (|={∅,⊤}=> …)] -- and  *)
+(* that is the shape that makes the shared kernel table usable here: the    *)
+(* [kptN] invariant is opened INSIDE this one node and closed again before  *)
+(* the next, which is the only way an invariant can be reached at all once  *)
+(* a translation spans many nodes.                                         *)
+(* ====================================================================== *)
+Section pteread.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma swp_checked_mem_read_pte8 (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (bytes : bv 64) :
+    Drw ## Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec paddr 0)) 4)
+      (uint pa) (uint (to_bits 64 8)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    pma_allows_ram pmar0 ->
+    pma_ram_access pa 8 ->
+    addr_is_ram pa ->
+    is_aligned_paddr (Physaddr pa) 8 = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) pa 8 = Some bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    swp (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
+           (Physaddr pa) 8 false false false false)
+      (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
+      HA Hord Hrange HR Hpallow Hacc Hram Hpa.
+    iIntros "#Hcert Hrw Hro Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold checked_mem_read.
+    iApply (swp_use_cer
+              (check_pma_with_pmp_priority (Load PageTableEntry) PBMT_PMA
+                 Supervisor (Physaddr pa) 8 false) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_check_pma_pte (Drw ∪ Dro) Drw rs pa pmar0 8
+                   HD Hpma Hpallow Hacc Hpa) with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind_ret. cbn beta iota zeta.
+    cbn [Phys_Mem_Access_Info_granule_size_exp Phys_Mem_Access_Info_splittable].
+    cbn beta iota zeta delta [split_misaligned misaligned_order
+      sys_misaligned_order_decreasing read_kind_of_flags].
+    change (Instances.generic_eq CannotSplit CannotSplit) with true.
+    cbn beta iota.
+    rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
+    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
+      Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
+    cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
+    rewrite mliftR_ret mbind_ret. cbn beta iota.
+    change (0 * 8) with 0. rewrite avi0.
+    iApply (swp_use_cer3
+              (pmpCheck (Physaddr pa) 8 (Load PageTableEntry) Supervisor)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_pmpCheck_S (Load PageTableEntry) Drw Dro Df rs pcfg paddr
+                pa 8 Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange
+                ltac:(unfold pmpCheckRWX; cbn match; rewrite HR; reflexivity)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind0_ret.
+    iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) 8)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa 8
+                   ltac:(lia) HDhtif Hhtif Hram)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 8 false)
+              _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_hart_ram_read 8 (mread_req8 pa) _
+                (fun r => (⌜r = (bytes, default_meta)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+                (hread_req_at_read_ram8 pa)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                with "Hcert [Hrw Hro Hmem]").
+      iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "[%Hrb Hclose]".
+      iModIntro. iExists bytes. iSplitR; [done|]. iNext.
+      iMod "Hclose" as "Hσ". iModIntro. iFrame "Hσ".
+      rewrite hread_resume_read_ram8. iApply swp_ret. by iFrame. }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
+    rewrite mbind_ret. cbn beta.
+    change (0 =? 1 - 1) with true. cbn beta iota zeta.
+    rewrite !autocast_id usvd_zeros_full_64 mcer_ret.
+    iApply ("Hcont" $! (Values.Ok (bytes, tt))). by iFrame.
+  Qed.
+
+  (* [read_pte] on top of the node: [mem_read_priv] at [Load PageTableEntry]
+     is [checked_mem_read] plus the callback and the meta drop, both pure.
+     [SmodePte.exec_read_pte_S] reduces the same two steps on the exec side. *)
+  Lemma swp_read_pte_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pa : SailStdpp.Values.mword 64) (w : bv 64) :
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
+              (Physaddr pa) 8 false false false false)
+         (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (read_pte (Physaddr pa) 8)
+      (fun r => ⌜r = Values.Ok w⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    iIntros "#Hcert Hrw Hro Hcmr".
+    unfold read_pte, mem_read_priv, mem_read_priv_meta.
+    cbn [orb andb].
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+              with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_bind_use _ _
+                (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+                with "[Hrw Hro Hcmr] [-]").
+      - iApply ("Hcmr" with "Hrw Hro").
+      - iIntros (v) "(-> & Hrw & Hro)". iApply swp_ret. by iFrame. }
+    iIntros (v) "(-> & Hrw & Hro)". iApply swp_ret.
+    cbn [MemoryOpResult_drop_meta]. by iFrame.
+  Qed.
+
+End pteread.
