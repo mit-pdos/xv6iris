@@ -1248,6 +1248,37 @@ Evidence:
 | `HartMStore.swp_vmem_write_gen` | `vmem_write` with the address computation as an obligation + an abstract rider `Q` | an `hfrun` premise only discharges at CONCRETE operands; `Q` carries `gpr_file` through |
 | `InstrBytes.mmode_config_cert` | `gen_cert` out of the bundle without consuming it | every leaf's obligation needs it and the bundle is gone by then |
 | `MinstretInv.minstret_inv := emp` | a persistent no-op | so three upstream leaves keep their statements; **delete when green** |
+| `HartSMem.v` | the S-MODE DATA-ACCESS engines: `swp_execute_LOAD_S`, `swp_execute_STORE_S`, `swp_execute_AMOSWAP_S`, and the twelve instantiations | `HartMLoad`/`HartMStore` one privilege over.  THREE things change and nothing else does: the TRANSLATION is an obligation whose conclusion is `SRegime.sr_swp_translate`'s verbatim (so the engine is regime-agnostic and everything after it runs at the landing file `rsf`), the PMP check is `PtTreeAdue.swp_pmpCheck_S` at the kernel's TOR entry 0, and the WIDTH is a parameter.  RAM and MMIO are ONE tower: the sections are parametric in an address class (`Acls`/`Pma` plus the five facts derived from it) and in the memory obligation (`Mobl`/`Wobl`), so a device access -- which still goes through `read_ram`/`write_ram`, since `within_mmio_readable` is FALSE outside the CLINT, and is routed to the device by the STEP RELATION -- is the same proof at a different instantiation |
+
+### THE S-MODE DATA ENGINES ARE BUILT (`HartSMem.v`), and three things about them recur
+
+1. **THE MEMORY NODE IS THE ONLY THING THAT CANNOT BE WIDTH-GENERIC.**  Everything
+   from `checked_mem_read` up to `execute_LOAD` proves once over a symbolic
+   `width`; the node cannot, because `ReadReq.t n` / `bv (8*n)` are TYPE indices
+   (the trap `HartMFetch`'s 2-byte twins already record).  So the node enters the
+   generic chain as a hypothesis and there are four instances.  The same reason
+   forces the memory obligation to be stated BYTE-WISE (`mem_bytes_at`) rather
+   than as `read_bytes … = Some w`: `read_bytes` ties the value's index to the
+   access's, and at a symbolic width `8 * Z.to_N width` and `Z_idx (8 * width)`
+   are equal only by `lia`.  `write_bytes` has NO such tie (its value width is a
+   separate index), so the store side states the real thing.
+
+2. **`returnR` DOES NOT UNFOLD UNDER A WHITELISTED `cbn`** (the model sets it
+   `simpl never`), and the early-return regions are full of
+   `returnR R v >>= k`.  `HartSwp.mbind_ret` then does not match and the proof
+   looks stuck for no reason.  `HartSMem.mbindR_ret` / `mbind0R_ret` are the two
+   equations that fix it, both `reflexivity`.  `mcer_ret` needs no twin --
+   `rewrite` keys on `catch_early_return` and unifies its argument up to
+   conversion.
+
+3. **THE MODEL'S BIND CHAINS ARE RIGHT-NESTED, so `swp_use_cer` at DEPTH 1 is
+   usually right.**  `m >>= fun v => rest` has the lambda extend to the end of
+   the function, so a straight-line sequence of calls is
+   `bind (liftR m) (fun v => bind … )`, not a left-nested tower.  The depth
+   instances (`_cer2`/`_cer3`/`_cer4`) are needed exactly where a call's RESULT
+   is post-processed before the sequence continues -- an `and_boolM` arm, a
+   `match` on the call's result that the next `>>=` consumes, the `untilMT`
+   body.
 
 **THE RULE THAT DECIDES EVERY REMAINING CASE — ask whether the stretch WRITES:**
 - **read-only, any depth → `goodb`** at `dstateM`, transported by agreement.
