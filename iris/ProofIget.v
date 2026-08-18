@@ -84,6 +84,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import KptPt KMap.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes.
@@ -366,6 +367,63 @@ Proof.
   vm_compute in Hj; discriminate.
 Qed.
 
+(* ===================================================================== *)
+(* THE ADDRESS CLAIM for the four escrow-opening [sw]s into entry [e].    *)
+(*                                                                        *)
+(* The per-node memory forms take [WpSconfMem.wordw_claim] BESIDE their   *)
+(* atomic update: an access TRANSLATES several nodes before the memory    *)
+(* node where the (linear, one-shot) update is opened, so the window's    *)
+(* mapping cannot be read out of the update -- and not out of the escrow  *)
+(* either, whose accessors are ghost UPDATES that cannot be peeked and    *)
+(* put back.  For a kernel-DATA address the claim needs no resource but   *)
+(* the ambient static bundle ([KMap.kmap_static_claims_at] + [pa_of_id]), *)
+(* and the itable is a .bss object, so its fields are kdata by            *)
+(* ARITHMETIC -- [IcacheRef.ientry_unsigned] is the whole geometry.       *)
+(* (Twin: [ProofIunlock.iul_wordw_claim_u], [ProofBread]'s.)              *)
+(* ===================================================================== *)
+
+(* entry k's field at 12-bit displacement [imm] (whose value is [d]), in
+   plain Z and with no wrap. *)
+Lemma ig_ientry_field_unsigned (k : nat) (d : Z) (imm : mword 12) :
+  (k < NINODE)%nat -> (0 <= d < ISLOTSZ)%Z ->
+  bv_unsigned (sign_extend' 64 imm : mword 64) = d ->
+  bv_unsigned (add_vec (ientry k) (sign_extend' 64 imm))
+  = (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + d)%Z.
+Proof.
+  intros Hk Hd Himm.
+  rewrite add_vec64_unsigned Himm.
+  rewrite (ientry_unsigned k ltac:(unfold NINODE in *; lia)).
+  apply bv_wrap_small.
+  assert (Hbm : bv_modulus 64 = 18446744073709551616%Z) by (vm_compute; reflexivity).
+  rewrite Hbm.
+  assert (Hkz : (Z.of_nat k <= 49)%Z) by (unfold NINODE in Hk; lia).
+  unfold ISLOTSZ in *. unfold KernelSyms.itable. lia.
+Qed.
+
+Lemma ig_ientry_field_range (k : nat) (d : Z) :
+  (k < NINODE)%nat -> (0 <= d < ISLOTSZ)%Z ->
+  (2147512320 <= KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + d < 2281701376)%Z.
+Proof.
+  intros Hk Hd.
+  assert (Hkz : (Z.of_nat k <= 49)%Z) by (unfold NINODE in Hk; lia).
+  unfold ISLOTSZ in *. unfold KernelSyms.itable. lia.
+Qed.
+
+Lemma ig_ientry_field_rem4 (k : nat) (d : Z) :
+  (0 <= d)%Z -> (4 | d)%Z ->
+  Z.rem (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + d) 4 = 0%Z.
+Proof.
+  intros Hd0 [m Hm].
+  assert (Hkz : (0 <= Z.of_nat k)%Z) by lia.
+  assert (Hnn : (0 <= KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + d)%Z)
+    by (unfold ISLOTSZ, KernelSyms.itable; lia).
+  rewrite Z.rem_mod_nonneg; [| exact Hnn | lia].
+  replace (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + d)%Z
+    with (4 * (536904254 + 34 * Z.of_nat k + m))%Z
+    by (rewrite Hm; unfold ISLOTSZ, KernelSyms.itable; lia).
+  rewrite Z.mul_comm. apply Z_mod_mult.
+Qed.
+
 Section IgetMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
@@ -385,6 +443,32 @@ Section ProofIget.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the claim, off the ambient static bundle and one arithmetic fact --
+     see the header block above [Section IgetMsg]. *)
+  Lemma ig_wordw_claim_u (width : Z) (a : Arch.pa) (n : Z) :
+    bv_unsigned a = n ->
+    (2147512320 <= n < 2281701376)%Z ->
+    Z.rem n width = 0%Z ->
+    kmap_static_claims -∗ wordw_claim (KTR := KT0) width a.
+  Proof.
+    intros Hn Hrange Hrem. iIntros "#Hb".
+    assert (Hkd : addr_is_kdata a).
+    { unfold addr_is_kdata, text_end, ram_base, ram_size.
+      rewrite RiscvExtras.uint_unsigned Hn. lia. }
+    assert (Hcan : (uint (a : mword 64) < 274877906944)%Z)
+      by (rewrite RiscvExtras.uint_unsigned Hn; lia).
+    assert (Hal : is_aligned_paddr (Physaddr a) width = true).
+    { unfold is_aligned_paddr. apply Z.eqb_eq.
+      rewrite RiscvExtras.uint_unsigned Hn. exact Hrem. }
+    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw
+                 (kdata_svpn_class a Hkd) with "Hb") as "#Hk0".
+    rewrite /wordw_claim. iSplitR; [iPureIntro; exact Hal |].
+    iExists (kpt_leaf_ppn (svpn_of a)). rewrite (pa_of_id a Hcan).
+    iFrame "Hk0". iPureIntro. split_and!;
+      [ exact Hcan | exact (addr_is_kdata_ram a Hkd)
+      | exact (ktier_pin_of_id KT0 (kpt_leaf_ppn (svpn_of a)) a (pa_of_id a Hcan)) ].
+  Qed.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -1254,11 +1338,19 @@ Section ProofIget.
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
             assert (Hsv6e : trunc32 (rget N1 Rs2) = dev).
             { rewrite (rget_ne N1 Rs2 ltac:(nz)) HN1s2. apply trunc32_sext. }
+            iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm1 Hcg]".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (ic_id cn e (1/2) false dev inumT)
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi6e [Hgid]").
+                      with "Hcg Hpc Hi6e [] [Hgid]").
+            { rewrite Hpa6e /i_dev.
+              iApply (ig_wordw_claim_u 4 _ _
+                        (ig_ientry_field_unsigned e 0 (mword_of_int 0 : mword 12) He
+                           ltac:(unfold ISLOTSZ; lia) ltac:(vm_compute; reflexivity))
+                        (ig_ientry_field_range e 0 He ltac:(unfold ISLOTSZ; lia))
+                        (ig_ientry_field_rem4 e 0 ltac:(lia) ltac:(exists 0%Z; reflexivity))
+                        with "Hkm1"). }
             { rewrite Hpa6e Hsv6e.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_dev cn γfs γi cov logstart e devT inumT dev
@@ -1286,12 +1378,20 @@ Section ProofIget.
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
             assert (Hsv72 : trunc32 (rget N1 Rs4) = inum).
             { rewrite (rget_ne N1 Rs4 ltac:(nz)) HN1s4. apply trunc32_sext. }
+            iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm2 Hcg]".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
                       (mword_of_int 4 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        ic_id cn e (1/2) true dev inum ∗ ic_mid cn e)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi72 [Hgid HinT Hbundle]").
+                      with "Hcg Hpc Hi72 [] [Hgid HinT Hbundle]").
+            { rewrite Hpa72 /i_inum.
+              iApply (ig_wordw_claim_u 4 _ _
+                        (ig_ientry_field_unsigned e 4 (mword_of_int 4 : mword 12) He
+                           ltac:(unfold ISLOTSZ; lia) ltac:(vm_compute; reflexivity))
+                        (ig_ientry_field_range e 4 He ltac:(unfold ISLOTSZ; lia))
+                        (ig_ientry_field_rem4 e 4 ltac:(lia) ltac:(exists 1%Z; reflexivity))
+                        with "Hkm2"). }
             { rewrite Hpa72 Hsv72.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_free cn γfs γi cov logstart e dev inumT dev inum
@@ -1340,6 +1440,7 @@ Section ProofIget.
             assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
             (* the slot's share authority, out of the LOCK's resource *)
             iDestruct (isl_pool_acc_upd M e He with "Hipool") as "[Hisl Hislback]".
+            iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm3 Hcg]".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
                       (mword_of_int 8 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
@@ -1347,7 +1448,14 @@ Section ProofIget.
                        iref_tok e (1/2/2)%Qp ∗
                        ∃ g : gname, live_gen e (1/2) g ∗ ity_pending g)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi78 [Hhalf Hisl]").
+                      with "Hcg Hpc Hi78 [] [Hhalf Hisl]").
+            { rewrite Hpa78 /i_ref.
+              iApply (ig_wordw_claim_u 4 _ _
+                        (ig_ientry_field_unsigned e 8 (mword_of_int 8 : mword 12) He
+                           ltac:(unfold ISLOTSZ; lia) ltac:(vm_compute; reflexivity))
+                        (ig_ientry_field_range e 8 He ltac:(unfold ISLOTSZ; lia))
+                        (ig_ientry_field_rem4 e 8 ltac:(lia) ltac:(exists 2%Z; reflexivity))
+                        with "Hkm3"). }
             { rewrite Hpa78 Hsv78.
               iInv "Hinv" as ">Hbody" "Hclose2".
               iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells & Hlpool)".
@@ -1409,13 +1517,21 @@ Section ProofIget.
                          ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
             assert (Hsv7c : trunc32 (rget V1 Rz) = valid_word false).
             { rewrite (rget_ne V1 Rz ltac:(nz)) Hx0. exact ig_trunc32_zero. }
+            iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm4 Hcg]".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
                       (mword_of_int 64 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
                        ic_id cn e (1/2) true dev inum)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi7c [Hmt Hgid2 Hd2 Hlvh Hpend]").
+                      with "Hcg Hpc Hi7c [] [Hmt Hgid2 Hd2 Hlvh Hpend]").
+            { rewrite Hpa7c /i_valid.
+              iApply (ig_wordw_claim_u 4 _ _
+                        (ig_ientry_field_unsigned e 64 (mword_of_int 64 : mword 12) He
+                           ltac:(unfold ISLOTSZ; lia) ltac:(vm_compute; reflexivity))
+                        (ig_ientry_field_range e 64 He ltac:(unfold ISLOTSZ; lia))
+                        (ig_ientry_field_rem4 e 64 ltac:(lia) ltac:(exists 16%Z; reflexivity))
+                        with "Hkm4"). }
             { rewrite Hpa7c Hsv7c.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iDestruct (ic_open_mid cn γfs γi cov logstart e with "Hmt Hbody")
@@ -1613,12 +1729,20 @@ Section ProofIget.
       assert (Hpa44 : add_vec (rget Mr Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref (ientry j)).
       { rewrite (rget_ne Mr Rs1 ltac:(nz)) HMs1. reflexivity. }
+      iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm0 Hcg]".
       iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x44)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) Mr (trap_res b + (K - 6))%nat
                 (fun v => (⌜v = iref_word M j⌝ ∗ itable_half M)%I)
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
                 ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-                with "Hcg Hpc Hi44 [Hhalf]").
+                with "Hcg Hpc Hi44 [] [Hhalf]").
+      { rewrite Hpa44 /i_ref.
+        iApply (ig_wordw_claim_u 4 _ _
+                  (ig_ientry_field_unsigned j 8 (mword_of_int 8 : mword 12) Hk
+                     ltac:(unfold ISLOTSZ; lia) ltac:(vm_compute; reflexivity))
+                  (ig_ientry_field_range j 8 Hk ltac:(unfold ISLOTSZ; lia))
+                  (ig_ientry_field_rem4 j 8 ltac:(lia) ltac:(exists 2%Z; reflexivity))
+                  with "Hkm0"). }
       { rewrite Hpa44.
         iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) M j
                 ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback]".
@@ -1863,13 +1987,21 @@ Section ProofIget.
         assert (Hqv : (qj + qj'/2 < 1/2)%Qp) by (apply ig_frac_lt1; by apply Qp.sub_Some).
         (* the slot's share authority, out of the LOCK's resource *)
         iDestruct (isl_pool_acc_upd M j ltac:(lia) with "Hipool") as "[Hisl Hislback]".
+        iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm5 Hcg]".
         iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (trap_res b + (K - 6))%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
                    isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
                    iref_tok j (qj'/2)%Qp)%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                  with "Hcg Hpc Hi58 [Hhalf Hisl]").
+                  with "Hcg Hpc Hi58 [] [Hhalf Hisl]").
+        { rewrite Hpa58 /i_ref.
+          iApply (ig_wordw_claim_u 4 _ _
+                    (ig_ientry_field_unsigned j 8 (mword_of_int 8 : mword 12) Hk
+                       ltac:(unfold ISLOTSZ; lia) ltac:(vm_compute; reflexivity))
+                    (ig_ientry_field_range j 8 Hk ltac:(unfold ISLOTSZ; lia))
+                    (ig_ientry_field_rem4 j 8 ltac:(lia) ltac:(exists 2%Z; reflexivity))
+                    with "Hkm5"). }
         { rewrite Hpa58 Hstv.
           iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) M j qj (qj'/2)%Qp nj
                   ltac:(solve_ndisj) HMj Hqv Hno1 with "Hinv Hhalf Hisl") as "[Hcell Hback2]".
