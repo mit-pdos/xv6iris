@@ -1,6 +1,8 @@
 (* WpSconfBtype.v -- the SIE-AGNOSTIC branch leaf layer (interrupt-sweep
    stage 5): [sconf]+[sie_cap] twins of WpSmodePtBtype.v's leaves over
-   the agnostic funnel [wp_instr_s_sconf].
+   the agnostic funnel [wp_instr_s_sconf] -- since the per-node port,
+   through that funnel's two BRANCH engines,
+   [WpSconfEngine.wp_btype_{fall,taken}_s_sconf].
 
    Branches write NO general register, so [sie_cap] passes through
    UNTOUCHED (no retarget, no rd premises); a FALL-THROUGH leaf does not

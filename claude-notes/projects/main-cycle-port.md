@@ -1464,6 +1464,70 @@ both about the state of the tree rather than about any leaf:
 
 ## THE LEAF SWEEP: state, and the rule that makes it cheap
 
+### THE S-MODE LEAF SWEEP IS DONE for the register-only families (2026-08-18)
+
+`WpSconfAlu` (50 leaves), `WpSconfBtype` (28), `WpSconfCtl` (8) are green and
+fast (8.9 s / 5.3 s / 6.5 s); **every retained leaf statement is byte-identical**
+to the pre-sweep commit, checked mechanically.  What the sweep needed, and the
+three findings worth keeping:
+
+1. **THE OBLIGATION MUST TAKE THE VALUE FUNCTION, NOT THE VALUE.**
+   `WpSmodeIntr.wp_gpr_write_s_sconf`'s obligation is hart-generic with `wval`
+   fixed by the caller AT THE CALLER'S HART.  That is right for a leaf reading
+   no caller-chosen register and **unprovable** for one that does: the walk
+   answers the read at the hart the σ-callback was instantiated at, and the two
+   differ at tp.  `ops_ok` cannot close it (`src_ok` is guarded on `b = true`;
+   the guard that saves `b = false` is `wp_next`'s, which the obligation does
+   not carry) — this is the "guarded route" `IntrDefs`' `SrcOk` note points at.
+   The fix is not a guard: give the obligation `f` and take
+   `f (rget m rsa) (rget m rsb) = wval` as a premise.  The obligation then
+   mentions no hart-specific value and is VERBATIM what `WpMmodeSwpBase`'s node
+   shapes conclude, so a converted leaf is one `iApply` of the engine and one
+   of the node shape.  `WpSconfEngine.v` is that family (one master
+   `wp_gpr_write_s_sconf_gen` — width, cap transformer, PC lent — plus five
+   instances); WpSconfAlu's own three engines ARE those, generalized, and are
+   gone from it.
+
+2. **A PREMISE ABOUT AN x0 OPERAND CANNOT BE PURE.**  Eight branch leaves
+   compare against x0, whose value is `zero_reg` only because `gpr_file` says
+   so.  So the branch funnels take the comparison as
+   `∀ hh, gpr_file (tp_pin m) -∗ ⌜cmp … = _⌝ ∗ gpr_file (tp_pin m)` — an
+   ordinary leaf supplies it from its premise and its `SrcOk` classes, an x0
+   leaf peels the zero first.  Same shape will fit any leaf whose pure premise
+   mentions a register the instruction reads at index 0.
+
+3. **THE M-MODE JUMP ENGINES PIN cur_privilege IN TWO PLACES, AND ONLY ONE OF
+   THEM IS REAL.**  `swp_jump_to_zca`'s four-cell frame never needed the
+   privilege (`hfrun_jump_to_zca` reads only misa, writes only nextPC) — the
+   S-mode twin is two cells.  `hval_update_elp_state` genuinely does, via
+   `currentlyEnabled Ext_Zicfilp`; its twin is the same `goodb` bridge at
+   `D_s`/`dstateS`/`agree_s` with `WpDecode.exec_cE_zicfilp_false_S`.  Before
+   widening an M-mode engine, check WHICH of its config cells the underlying
+   walker actually reads.
+
+   Related: a barrier is a SILENT node, so `hfrun` walks FENCEI outright; only
+   FENCE's nine-way `if` chain (symbolic pred/succ) needs a `destruct`, and its
+   LAST arm is `returnM tt`, not a barrier.
+
+4. **`ltac:(…)` AS A LEMMA ARGUMENT SEES THE APPLICATION'S EVARS.**  Three
+   times the same failure: `ltac:(by rewrite (rget_sp m))` /
+   `ltac:(rewrite ret_pc_jalr; apply ret_pc_aligned)` inside an `iApply`'s
+   argument list fails with *"does not match any subterm of the goal"*, because
+   the tactic runs before the application's implicit arguments are solved.
+   POSE THE FACT FIRST (`assert (H : …) by …`) and pass `H`.  (This is
+   `WpMmodeJump`'s `jrskip` comment, generalized.)
+
+Also landed: the three ALU leaves parked in consumer files are home in
+`WpSconfAlu.v` with their exec bridges — `wp_srliw_s_sconf` (WpSconfSrliw.v,
+DELETED), `wp_sraiw_s_sconf` / `wp_sllw_s_sconf` (ProofBallocParts.v) and
+bfree's `sllw` copy.  The two `sllw` copies were NOT the same statement
+(bfree's takes an explicit `wval`), so both are kept as the
+`wp_csub_wval_s_sconf`/`wp_csub_s_sconf` pair already is.
+
+**LEFT in this family:** nothing register-only.  `ProofBallocParts.v` /
+`ProofBfree.v` no longer consume any leaf engine, but they sit behind red
+roots (`WpSconfMem`, `SRegime`, `WpSmodePtMem`) so neither has been compiled.
+
 Nine leaf files plus `ProofSpin` are converted to the `swp` obligation, **14
 statements verified byte-identical** (mechanically, against the pre-sweep
 commit).  Green: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`,

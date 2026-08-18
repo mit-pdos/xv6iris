@@ -2,7 +2,10 @@
    (interrupt-sweep stage 5): [sconf]+[sie_cap] twins of
    WpSmodePtCtl.v's fence / c.j / jal / c.ret leaves over the agnostic
    funnel [wp_instr_s_sconf], plus the compressed indirect call c.jalr
-   (the c.ret leaf with rd = ra, i.e. with the link write).
+   (the c.ret leaf with rd = ra, i.e. with the link write).  Since the
+   per-node port they go through that funnel's GENERAL engine,
+   [WpSconfEngine.wp_instr_s_gen], which hands the obligation [sconf]
+   whole -- a fence reads cur_privilege + menvcfg, a jump reads misa.
 
    Spec cleanups made in this pass:
      - the config premises are gone as everywhere in the sweep;
