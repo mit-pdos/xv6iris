@@ -392,6 +392,32 @@ The bridge back is `PtAdBits.pte_canon_inv` (`pte_canon q0 = pte_canon p0 →
 ∃ a d, q0 = pte_set_ad p0 a d`) and `pte_set_ad_ppn` (the PPN survives), both
 of which already exist -- the machinery anticipated the variance.
 
+#### AND THE WRAPPER FAMILY'S LANDING FILE MUST BECOME EXISTENTIAL
+
+A consequence of the A/D finding, and it reaches further than the walk.
+`CommonWalk.u_walk_entry` caches the WHOLE leaf --
+`TLB_Entry_pte := … pte0` -- so if the live leaf's A/D are not pinned, the
+INSTALLED TLB ENTRY is not pinned, and therefore neither is the file the fetch
+lands on.
+
+`WpSFrames.wp_instr_s*` currently takes that landing TLB value `tlbv'` as a
+LEMMA BINDER: the caller picks it before the translate obligation runs.  That
+cannot be discharged -- the value is only revealed inside the read node's
+fupd, and an evar in the outer goal cannot be instantiated from inside it.
+
+So the translate obligation's post has to be `∃ tlbv', hreg_frame (s_rs … tlbv') …`
+and the obligations AFTER the fetch (the instruction read, the execute) have
+to be `∀ tlbv'`-quantified.  Neither of them reads the TLB, so the
+∀-quantification costs their callers nothing.
+
+**This is the shape `sr_absorb` already had.**  Its post is `∃ σ'` with
+`σ'.(sregs) = σ.(sregs) ∨ ∃ tv, … register_set tlb tv …` -- the post-state
+existential exists precisely because the walk's effect on the TLB is not known
+in advance.  The `swp` wrappers pinned it; that was the mistake, and the
+recorded `sr_swp_translate` shape (`∃ rsf`, above) already has it right.
+Affects `wp_instr_s`, `_rvc`, `_rvc2`, `_base2` -- all four written this
+session, so all four are cheap to change.
+
 #### What is left, in order
 
 1. **RELAX THE LEAF READ OBLIGATION** through `CommonWalk.swp_rec_walk_leaf` →
@@ -420,9 +446,11 @@ of which already exist -- the machinery anticipated the variance.
    into (`swp_translate_hit` | `swp_translate_miss`), each with its `_upd` /
    `_refresh` arm; the hit/miss arm picked by destructing the slot in `tlbv`,
    which the caller holds in its own frame.
-4. **The regime field** `sr_swp_translate` (shape recorded above) + its two
+4. **MAKE `wp_instr_s*`'s LANDING FILE EXISTENTIAL** (previous section) -- all
+   four wrappers.
+5. **The regime field** `sr_swp_translate` (shape recorded above) + its two
    instances.
-5. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
+6. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
    `WpSmodeIntr.wp_instr_s_intr` the same way at the kpt instance.
 
 ### What `WpIntrInv` actually needs
