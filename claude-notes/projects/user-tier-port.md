@@ -1262,195 +1262,53 @@ becomes `match goal with |- context[F ?X] => replace (F X) with <rhs> by
 `update_and_write_pte` (whose two occurrences do not even carry the same
 width argument).
 
-### THE ONE MISSING LEMMA, and it is an I3 (UserBytes) item
+### WHAT `u_fetch_pure` IS STILL WAITING ON
 
-`u_fetch_pure` — the pure fetch composer of §4.2, in P7's
-`UserClassifyAsm` style (reference state `u_state rs mm`, premises
-`post_fetch_cfg` / `u_exec_pins` / `u_mem_wf`, conclusion the `exec` fact +
-`goodmb Du_r Du_w (fetch tt) … mm = true` + the landing file + `tlb_ok_pt`
-at the new tree + `u_mem_step`) — is assembled from
-`PtWalkCert.goodmb_ptree_translateAddr`, `UserFetchCert.goodmb_fetch_ok_4`
-and `UserFetchCert`'s `u_mem_wf` projections, EXCEPT for its `u_mem_step`
-conjunct on the Svadu A/D write-back arm, which needs
+`UserFetchCert.v` now carries everything the composer of §4.2 needs EXCEPT
+one lemma and the ~150-line assembly:
 
-```coq
-Lemma ptree_bytes_set_leaf (t : ptree) (vpn : mword 27) (p2 p1 p0 q : mword 64) :
-  maps_disj (pt_maps 2 t) ->
-  ptree_maps t vpn p2 p1 p0 ->
-  ptree_bytes 2 (ptree_set_leaf t vpn q)
-  = write_bytes (ptree_bytes 2 t) (pt_addr0 p1 vpn) 8 q.
-```
+* the fetch's own halves — `goodmb_checked_mem_read_ram_4_U`,
+  `goodmb_mem_read_fetch_4_U`, `goodmb_fetch_bytes_ok`, `goodmb_fetch_ok_4`,
+  and the three `translateAddr` ingredients (`goodb_effectivePrivilege_fetch`
+  / `_is_shadow_stack_fetch` / `_translationMode_U`);
+* the `u_mem_wf` projections the walk asks for
+  (`ptree_maps_slot2/1/0` → `u_slot_mem_at` / `u_slot_owned`);
+* **the byte-level ADUE absorption, which was the real blocker and is
+  PROVED**: `ptree_bytes_set_leaf` (writing the leaf slot IS setting the
+  leaf in the tree) and, on top of it, `u_mem_step_writeback` — so all
+  three conjuncts of `u_mem_step` have a supplier on the write-back arm;
+* `u_writeback_data` (a page-table write does not touch the data half) and
+  `u_fetch_bytes` (the four instruction bytes are in the owned map with
+  SOME value), which is what justifies the instruction read at the POST-
+  translate state.
 
-i.e. **the byte-level statement of the ADUE absorption**: writing the leaf
-slot IS setting the leaf in the tree.  Nothing in `UserBytes.v` says it
-(P0's `u_mem_step` is stated over `pt_same_shape` and the tree spec, and
-those two halves are already available — `pt_maps_disj_shape` and
-`UptTree.upt_tree_spec_set_leaf`); it is the third conjunct,
-`mm' = ptree_bytes 2 t' ∪ md'`, that has no supplier.  Its proof is map
-algebra, not page-table reasoning: `write_bytes m a 8 q = word_bytes a q ∪ m`
-(both insert the same eight pairs), `insert_union_l` to push the write past
-the data half, and then "⋃ of a disjoint list with ONE element replaced by a
-same-domain map" — with the standing warning that `pt_maps`' body mentions
-`seqZ 0 512`, so no `cbn` and no `done` may touch it.
-
-## 11. THE CERTIFICATE OF A READ-ONLY GATE IS FREE — compute it at `dstateU` and transport it (found 2026-08-18, P7)
-
-**[V] P5's jump / CSR / ZICBOM / SSAMOSWAP twins were not closable as
-stated.**  `UserExecFacts.goodmb_execute_JAL_total` / `_JALR_total` /
-`_BTYPE_total`, `UserCsr.goodmb_execute_CSRReg_total_U` / `_CSRImm_total_U`
-and `goodmb_execute_ZICBOM_U` / `_SSAMOSWAP_U` all take
+**THE ONE LEMMA LEFT IS `goodb_pte_is_invalid`**, the EVENT-FREENESS of the
+PTE validity test:
 
 ```coq
-goodmb Dr Dw (currentlyEnabled Ext_Zca | Ext_Zicfilp | Ext_S) s ∅ = true
+Lemma goodb_pte_is_invalid (Db : register -> bool) (q : mword 64) (s : mstate) :
+  Db misa = true -> Db menvcfg = true ->
+  goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec q 7 0))
+              (ext_bits_of_PTE q)) s = true.
 ```
 
-as a PREMISE, and **nothing in the tree produced one**.  The gate is
-`Acc`-guarded, so at a symbolic state neither `reflexivity` nor `vm_compute`
-closes it, and mirroring `RiscvFetchExec.exec_currentlyEnabled_Zca` node for
-node is ~120 lines of nested `and_boolM`/`or_boolM` bookkeeping per gate.
-An `eauto` that meets one of these premises does not fail — it **searches
-for minutes**, which is how this was found.
+`CommonWalk`'s `H0ig`/`H1ig`/`H2ig` and `PtWalkCert`'s copies take it as a
+hypothesis, meant to be discharged per instance at a CONCRETE flag byte.
+The user tier cannot do that: the walk's two POINTER words are abstract
+(`ptree_maps` pins only `pte_valid`/`pte_ptr`), so the fact has to be proved
+once, at an arbitrary word.  It IS true — the test's only register read is
+`currentlyEnabled Ext_Svrsw60t59b` (in the reserved-bit arm), which reads
+`misa` — but **it does NOT fall to `vm_compute`**: unlike
+`currentlyEnabled Ext_Svadu`, the Svrsw gate does not reduce to a closed
+boolean at an abstract state (measured: no answer in 2 min).  It wants the
+same `and_boolM`/`or_boolM` peel every other gate gets, with the extension
+probe supplied by name.  Its home is `PtTree.v` beside `pte_valid`.
 
-**THE CHEAP ROUTE, and it is general.**  A gate is READ-ONLY and reads only
-`misa` / `cur_privilege` / `menvcfg` / `senvcfg` — all of `DecodeTotalU.D_u`.
-So compute the certificate ONCE at the CONCRETE decode reference state
-`dstateU`, where it is `reflexivity` **in 2 ms**, and transport it:
-
-```coq
-Lemma goodb_agree_congr (D : register -> bool) {X} (m : M X) (s1 s2 : mstate) :
-  (forall r, D r = true ->
-     register_lookup r s1.(sregs) = register_lookup r s2.(sregs)) ->
-  goodb D m s2 = true -> goodb D m s1 = true.        (* 8-line induction *)
-```
-
-`goodb` consults the state only through the values of the registers it
-DECLARES, so two files agreeing on `D` give the same answer.  Then
-`goodmb_of_goodb` + `goodmb_mono` (D_u ⊆ Du_r) finishes.  `UserTotalU`'s
-`u_gm_gate` / `u_gm_zca` / `u_gm_zicfilp` / `u_gm_extS` are the four users.
-
-> **THE GENERAL SHAPE: any read-only stretch whose read set is inside `D_u`
-> is certified by `u_gm_gate` — compute at `dstateU`, transport by
-> `agree_on D_u`.**  It is not a JAL/CSR special case, and it is much
-> cheaper than assembling a `goodmb` along the stretch's own chain.  Reach
-> for it before writing a single `goodmb_bind`.
-
-## 12. THE U FOOTPRINT WAS MISSING THE THREE COUNTER-PERMISSION CELLS (found and FIXED 2026-08-18, P7)
-
-**[V] `mcounteren`, `scounteren` and `mhpmcounter` were outside `u_Drw ∪
-u_Dro`** (`Du_r … = false`, checked by `vm_compute`), while a U-mode `csrr`
-of `cycle` / `time` / `instret` / `hpmcounterN` reads all three:
-`is_CSR_accessible` runs `counter_enabled i User`, which reads `mcounteren`
-and then `scounteren` UNCONDITIONALLY
-(`UserCsr.exec_counter_enabled_U_total`), and the hpm path reads
-`mhpmcounter`.  Under whole-cycle stepping the interpreter answered those
-reads off `gen_heap_interp` and no bundle had to hold them; **under per-node
-stepping every read the cycle makes must be answerable from what the hart
-OWNS**, so the CSR arm was uncertifiable and `base_exec_total_u_holds`
-unprovable.
-
-**FIXED, and the fix is cheap because all three are frozen after M-mode
-boot:** they join `u_ro_list` with `u_Df` = `DfracDiscarded`, `user_cfg`
-holds them at `↦ᵣ□` with EXISTENTIAL values (a denied counter read is
-`Illegal_Instruction`, which is a `u_result_ok` outcome, so the tier is total
-whatever the permission bits say), and `u_pins_cfg` / `u_rs` /
-`u_frames_intro` / `_elim` gain three entries each.
-
-**THE ONE RIPPLE OUTSIDE THE TIER:** `UserKernelBridge.userret_to_user_inv`
-gains three `↦ᵣ□` premises, so `wp_userret_pt`'s continuation must hand them
-over.  They are persistent, so this costs the kernel side nothing beyond
-naming them.
-
-**THE RULE THIS INSTANCES, and it is worth applying to the S-mode tier
-before it lands the same way:** §1.4 enumerated the off-frame registers by
-reading the CYCLE's top-level reads.  That misses registers read inside a
-CSR's *accessibility* check, which is data-dependent on the CSR number.  The
-enumeration to trust is the union of the READ SETS OF THE `goodmb` TWINS, not
-a reading of the cycle — `grep 'Dr [a-z_]* = true'` over the twin catalogue
-is the check, and it takes a minute.
-
-### P4a IS DONE — the tally, and what each file's twins are keyed on
-
-| file | twins | keyed on |
-|---|---|---|
-| `HartMemAsm.v` (NEW) | — | the general-`mm` toolkit, the bind context, the two memory nodes, the two RAM bricks |
-| `UserMemPt.v` | 14 | the PHYSICAL path: the two PMP grants, the two DATA `pmaCheck`s, the writable window pair, `checked_mem_read`/`mem_read`, `checked_mem_write`/`mem_write_value`, `mem_write_ea` |
-| `UserMemAccess.v` | 27 | the VMEM path: `vmem_read_addr`/`vmem_write_addr` aligned + misaligned + LR/SC + the fault and disjunctive arms, `translate_and_read_value`, the reservation pair; **plus 5 shared §0b helpers** (`goodmb_split_on_page_boundary`, `goodmb_translate_and_read_value_gen`, the three intra-page reductions the families are instances of) |
-| `UserMemMis.v` | 26 | the PER-PAGE SPLIT: the plan/exception arms, `read_ram_chunk`, the three `*_mis_U` composers, the six `vmem_*_split2*` straddles, the two `translate_and_*_value` twins |
-| `UserMemArms.v` | 15 | the EXECUTE arms: `vmem_read`/`vmem_write` and `execute_LOAD/STORE/LOADRES/STORECON/AMO`, ok + err + the three AMO fault arms |
-
-Chain verification, in dependency order, all clean and admit-free:
-`HartMemAsm` 1.9 s, `PtWalkCert` 10.6 s, `UserMemPt` 5.9 s, `UserMemAccess`
-7.8 s, `UserMemMis` 11.6 s, `UserMemArms` 8.5 s.  `Print Assumptions` across
-the families yields only `rv64d.plat_term_write`, `rv64d.load_reservation`,
-`rv64d.match_reservation` — all three already in the adequacy baseline — plus
-`ResvAxioms.load_reservation_term` where LR/SC is involved.  **No new axioms.**
-
-**A LAYER WITH NO MEMORY NODE OF ITS OWN OWES NEITHER PURE OBLIGATION.**
-`vmem_read_addr`, `vmem_write_addr`, `pmaCheck`, `pmpCheck`,
-`memory_exception` and `transform_effective_address` never make a byte access
-themselves — every one sits inside a `translateAddr` / `mem_read` /
-`mem_write_*` hypothesis, which arrives with its own certificate.  So
-`dev_addr pa = false` and `bytes_owned mm pa n = true` appear ONLY on the
-physical layer (`UserMemPt`, `UserMemMis`'s chunk reads) and would be dead
-weight higher up.  Read that as the rule for any new row: **put the pure
-obligation where the node is, not where the address is.**
-
-**TWO TRAPS THE SWEEP ADDED.**  (i) `goodmb_split_on_page_boundary` cannot be
-unconditional — the off-page arm is an `assert_exp'` and `goodmb` of a `fail`
-node is `false`, so the twin takes the split's own `exec` fact.  (ii) **A
-NODE-FOR-NODE COPY OF AN EXEC PROOF IS NOT ALWAYS LITERAL ACROSS FILES.**
-`MemAccessGen.exec_vmem_write_addr_intra` steps past the dependent
-`if andb res (not (match_reservation …))` with a `match goal … change`; under
-an import set that pulls in `iris.proofmode` that `if` has ALREADY
-iota-reduced when the walk reaches it, so the `match` has no applicable
-clause and fails with a bare *"No matching clauses for match"* —
-indistinguishable from a wrong proof.  Wrap such a `change` in `try`.
-
-**WHAT THE SPLIT LANE HAD TO BUILD, and where it belongs at the fold-back.**
-The N-chunk split loop had no `goodmb` counterpart anywhere in the tree, so
-`UserMemMis.v` now also carries `gm_untilMT'_last` / `_step` / `_chain` (the
-twin of `MemAccessGen.execR_untilMT'_chain`; every iteration's certificate is
-read back at the ORIGINAL map by `goodmb_after_dom`, so a WRITING iteration
-costs no map bookkeeping), the three split composers
-`goodmb_checked_mem_read_split` / `_write_split` / `goodmb_mem_write_ea_split`,
-and `goodmb_mem_write_value_of_checked_plain` — the last one generic in the
-post state, which `UserMemPt`'s aligned `goodmb_mem_write_value_U` is not,
-because a misaligned chain lands on `wchain … N` rather than on
-`MState … (write_bytes …)`.  The `gm_untilMT'_*` trio belongs in
-`HartMemAsm`; the composers belong beside their exec twins.
-
-**TWO MORE SHAPE TRAPS.**  (i) **Sail's `>>` binds TIGHTER than `>>=`**, so a
-collapsed `returnR tt >> B` node left by a `pmpCheck` peel sits one bind IN,
-and the `execR_bind0_Some (execR_returnR_fwd tt s)` rewrite that works
-verbatim in `MemAccessGen` finds no subterm — one `change` covers all four
-cases (`exec`/`goodmb` × top-level/one-bind-in).  (ii) **`cbn beta zeta` is
-not enough after peeling `split_on_page_boundary` / `split_misaligned`**: the
-`let '(p, q) := …` is a `match`, so `cbn beta zeta match` is what exposes the
-next head to `gmm_lift`.  The exec proofs get away without it because
-`rewrite` works on subterms and the tactics do not.
-
-### §5.5 vs §5.3 ON THE DISPATCH TABLES: what "EMPTY diff" can and cannot mean
-
-§5.5 asks for an EMPTY `git diff` of `UserTotalU.v`'s two tables; §5.3 says
-the `arm_*` statements change shape so the tables' applications must be
-RETYPED.  Both cannot hold, and §5.3 is the one that is true: a pure arm
-takes `(t mm rsf va [mi] w)` where an Iris one took `(E sigma sigma_f va g
-w)`, and it owes a certificate the Iris one did not.
-
-**The checkable claim, and it is the one that matters, is that the CASE TREE
-does not move**: every `| _ = Some (CTOR ?p, _) =>` clause head and every
-payload `destruct` line is byte-identical — **104 lines in the base table and
-67 in the RVC table, verified mechanically against the pre-port commit.**
-Only the `fin`/`finm` argument lists differ.  Read §5.5's criterion that way.
-
-Two things kept the tables that stable, and they are worth copying:
-* **no dispatch-table entry ever names a `goodmb` twin.**  The certificate is
-  discharged by `u_gm1` inside `fin`/`finm`, off a hint database
-  (`u_gm`) holding P5's catalogue.  Naming twins per entry would have
-  touched all ~98 lines.
-* **`fin` may not mention the proof's hypotheses.**  `Local Ltac fin lem :=
-  apply (lem Hpins Hwf); …` does not compile: an `Ltac` body's identifiers
-  are resolved at DEFINITION time, where the proof's hypotheses do not exist.
-  Use `apply lem; solve [ assumption | u_gm1 ]` and let `assumption` name
-  them.  (This is the durable notes' trap about a tactic notation's `constr`
-  argument, one level down.)
+With it, `u_fetch_pure` is the assembly: `upt_spec_maps` for the path, the
+section-3 projections for the three slots,
+`KptTree.ptree_translateAddr_cases` and
+`PtWalkCert.goodmb_ptree_translateAddr` for the translation (its three
+outcome arms giving `t'` by `tlb_ok_pt_fill_self` /
+`UptTree.upt_tree_spec_set_leaf` and `u_mem_step` by `u_mem_step_refl` /
+`u_mem_step_writeback`), `u_fetch_bytes` + `u_writeback_data` for the
+instruction read, and `exec_fetch_ok_4` / `goodmb_fetch_ok_4` on top.
