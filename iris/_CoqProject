@@ -107,6 +107,7 @@ WpMmodeUtype.v
 WpMmodeJalr.v
 WpMmodeMret.v
 WpSmodeLeafBase.v
+WpSmodePtEngine.v
 WpSmodePtLeaves.v
 WpSmodePtAlu.v
 WpSmodePtBtype.v
@@ -188,6 +189,7 @@ UserBits.v
 SmodeCore.v
 PtTreeAdue.v
 KptTree.v
+KptGoodb.v
 KptShare.v
 HartSMem.v
 SmodeCorePt.v
