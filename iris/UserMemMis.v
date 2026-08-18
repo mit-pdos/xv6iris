@@ -25,6 +25,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import UserBits SmodeCore CommonWalk UptTree UserPtTree.
 Require Import MemAccessGen UserMemPt UserMemAccess.
+Require Import HartMemRun HartMemAsm PtWalkCert.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -281,6 +282,55 @@ Proof.
   rewrite Hintra. apply exec_returnm.
 Qed.
 
+Lemma page_mask_eq_intra (a : mword 64) (w : Z) :
+  0 < w -> in_one_page a w ->
+  eq_vec (and_vec a (update_subrange_vec_dec ((ones 64) : bits 64)
+                       (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1)))))
+         (and_vec (sub_vec_int (add_vec_int a w) 1)
+                  (update_subrange_vec_dec ((ones 64) : bits 64)
+                     (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1))))) = true.
+Proof.
+  intros Hpos Hp.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  destruct Hr as [Hr0 Hr1].
+  pose proof (in_one_page_room a w Hpos Hp) as Hnw.
+  assert (Hwle : w <= 4096).
+  { unfold in_one_page in Hp.
+    pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)). lia. }
+  assert (Hsub : bv_unsigned (sub_vec_int (add_vec_int a w) 1) = bv_unsigned a + (w - 1)).
+  { unfold sub_vec_int, add_vec_int.
+    rewrite sub_vec64_unsigned. rewrite add_vec64_unsigned.
+    rewrite !moi64_unsigned.
+    assert (Hww : bv_wrap 64 w = w)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    assert (Hw1 : bv_wrap 64 1 = 1)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    rewrite Hww. rewrite Hw1.
+    rewrite bv_wrap_sub_idemp_l.
+    assert (Hsimp : bv_unsigned a + w - 1 = bv_unsigned a + (w - 1)) by (clear; lia).
+    rewrite Hsimp.
+    apply bv_wrap_small. rewrite bv_modulus64.
+    assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+    rewrite <- H64. split; [ clear - Hr0 Hpos; lia | exact Hnw ]. }
+  apply eq_vec_true_iff. apply bv_eq.
+  rewrite !and_vec64_unsigned. rewrite page_mask64_val.
+  rewrite Hsub.
+  assert (Hnn : 0 <= bv_unsigned a + (w - 1)) by (clear - Hr0 Hpos; lia).
+  rewrite (z_land_pagemask (bv_unsigned a) Hr0 Hr1).
+  rewrite (z_land_pagemask (bv_unsigned a + (w - 1)) Hnn Hnw).
+  rewrite <- (z_shiftr12_stable_page (bv_unsigned a) w Hr0 Hpos Hp). reflexivity.
+Qed.
+
+Lemma goodmb_split_on_page_boundary_intra (Dr Dw : register -> bool)
+    (a : mword 64) (w : Z) s mm :
+  0 < w -> in_one_page a w ->
+  goodmb Dr Dw (split_on_page_boundary a w) s mm = true.
+Proof.
+  intros Hpos Hp. unfold split_on_page_boundary.
+  rewrite (page_mask_eq_intra a w Hpos Hp). apply goodmb_returnm.
+Qed.
+
 (* the page window, at an arbitrary in-page offset *)
 Lemma u_walk_pa_window_page (pte0 va : mword 64) (k : Z) (j : nat) :
   0 < k -> in_one_page va k -> (j < Z.to_nat k)%nat ->
@@ -310,11 +360,25 @@ Proof.
   intro H. unfold pma_misaligned_exception. cbn match. rewrite H. apply exec_returnM.
 Qed.
 
+Lemma goodmb_pma_misaligned_exception_load (Dr Dw : register -> bool) (pma : PMA) s mm :
+  (pma.(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None ->
+  goodmb Dr Dw (pma_misaligned_exception pma (Load Data)) s mm = true.
+Proof.
+  intro H. unfold pma_misaligned_exception. cbn match. rewrite H. apply goodmb_returnm.
+Qed.
+
 Lemma exec_pma_misaligned_exception_store (pma : PMA) s :
   (pma.(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None ->
   exec (pma_misaligned_exception pma (Store Data)) s = Some (None, s).
 Proof.
   intro H. unfold pma_misaligned_exception. cbn match. rewrite H. apply exec_returnM.
+Qed.
+
+Lemma goodmb_pma_misaligned_exception_store (Dr Dw : register -> bool) (pma : PMA) s mm :
+  (pma.(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None ->
+  goodmb Dr Dw (pma_misaligned_exception pma (Store Data)) s mm = true.
+Proof.
+  intro H. unfold pma_misaligned_exception. cbn match. rewrite H. apply goodmb_returnm.
 Qed.
 
 Lemma exec_mag_pma_check_plan (pma : PMA) (acc : MemoryAccessType mem_payload)
@@ -333,6 +397,26 @@ Proof.
   - rewrite (exec_bind_Some _ _ _ _ _ Hme). cbn match.
     destruct b; destruct (mag_of_pma pma (is_vector_access acc)) as [mag|];
       cbn match; eexists; eexists; apply exec_returnM.
+Qed.
+
+Lemma goodmb_mag_pma_check_plan (Dr Dw : register -> bool) (pma : PMA)
+    (acc : MemoryAccessType mem_payload)
+    (paddr : physaddr) (width : Z) (b : bool) s mm :
+  goodmb Dr Dw (is_mag_applicable_access acc width) s mm = true ->
+  exec (is_mag_applicable_access acc width) s = Some (b, s) ->
+  goodmb Dr Dw (pma_misaligned_exception pma acc) s mm = true ->
+  exec (pma_misaligned_exception pma acc) s = Some (None, s) ->
+  goodmb Dr Dw (mag_pma_check pma acc paddr width) s mm = true.
+Proof.
+  intros Hmag Hma Hmeg Hme.
+  unfold mag_pma_check.
+  erewrite (gm_bind Dr Dw _ _ s s mm b Hmag Hma).
+  destruct (orb (is_aligned_paddr paddr width)
+                (andb b (within_pma_mag pma paddr width (is_vector_access acc)))) eqn:E.
+  - apply goodmb_returnm.
+  - erewrite (gm_bind Dr Dw _ _ s s mm None Hmeg Hme). cbn match.
+    destruct b; destruct (mag_of_pma pma (is_vector_access acc)) as [mag|];
+      cbn match; apply goodmb_returnm.
 Qed.
 
 Ltac pma_plan_peel Hmatch Hfield Hmag :=
@@ -370,6 +454,50 @@ Proof.
   pma_plan_peel Hmatch Hread Hmag.
 Qed.
 
+Ltac gm_pma_plan_peel Hrg Hfield Hmatch Hmagg Hmage :=
+  unfold pmaCheck; apply goodmb_cer;
+  match goal with |- goodmb _ _ _ ?st _ = _ =>
+    gmm_lift Hrg (exec_read_reg pma_regions st) end;
+  rewrite Hmatch; cbn [PMA_Region_attributes] in Hfield |- *; cbn match;
+  erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ];
+  cbn match beta; cbn [Riscv.rv64d.not negb];
+  match goal with
+  | |- goodmb ?dr ?dw ?T ?st ?m = _ =>
+      match T with context[Defs.assert_exp' true ?msg] =>
+        gmxlR (goodmb_assert_exp'_true dr dw msg st m)
+              (exec_assert_exp'_true msg st) end
+  end;
+  rewrite mbind_Ret; rewrite bindR_ret;
+  rewrite Hfield; cbn [Riscv.rv64d.not negb];
+  gmm_lift Hmagg Hmage; cbn beta; cbn match; apply goodmb_returnm.
+
+Lemma goodmb_pmaCheck_ram_load_plan (Dr Dw : register -> bool)
+    (k : Z) (addr : mword 64) (pbmt : page_based_mem_type) (region : PMA_Region) s mm :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) k (Load Data) pbmt false) s mm = true.
+Proof.
+  intros HD Hmatch Hread Hme.
+  assert (Hrg : goodmb Dr Dw (Defs.read_reg pma_regions : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HD).
+  destruct (exec_mag_pma_check_plan (override_PMA (PMA_Region_attributes region) pbmt)
+              (Load Data) (Physaddr addr) k _ s
+              (exec_is_mag_applicable_load_data k s)
+              (exec_pma_misaligned_exception_load _ s Hme)) as (sp & g & Hmage).
+  pose proof (goodmb_mag_pma_check_plan Dr Dw
+                (override_PMA (PMA_Region_attributes region) pbmt)
+                (Load Data) (Physaddr addr) k _ s mm
+                (goodmb_returnm Dr Dw _ s mm)
+                (exec_is_mag_applicable_load_data k s)
+                (goodmb_pma_misaligned_exception_load Dr Dw _ s mm Hme)
+                (exec_pma_misaligned_exception_load _ s Hme)) as Hmagg.
+  destruct region as [rbase rsize rattr rdtree].
+  gm_pma_plan_peel Hrg Hread Hmatch Hmagg Hmage.
+Qed.
+
 Lemma exec_pmaCheck_ram_store_plan (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
     (region : PMA_Region) s :
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
@@ -388,6 +516,33 @@ Proof.
             Phys_Mem_Access_Info_granule_size_exp := g |}.
   destruct region as [rbase rsize rattr rdtree].
   pma_plan_peel Hmatch Hwrite Hmag.
+Qed.
+
+Lemma goodmb_pmaCheck_ram_store_plan (Dr Dw : register -> bool)
+    (k : Z) (addr : mword 64) (pbmt : page_based_mem_type) (region : PMA_Region) s mm :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+  ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) k (Store Data) pbmt false) s mm = true.
+Proof.
+  intros HD Hmatch Hwrite Hme.
+  assert (Hrg : goodmb Dr Dw (Defs.read_reg pma_regions : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HD).
+  destruct (exec_mag_pma_check_plan (override_PMA (PMA_Region_attributes region) pbmt)
+              (Store Data) (Physaddr addr) k _ s
+              (exec_is_mag_applicable_store_data k s)
+              (exec_pma_misaligned_exception_store _ s Hme)) as (sp & g & Hmage).
+  pose proof (goodmb_mag_pma_check_plan Dr Dw
+                (override_PMA (PMA_Region_attributes region) pbmt)
+                (Store Data) (Physaddr addr) k _ s mm
+                (goodmb_returnm Dr Dw _ s mm)
+                (exec_is_mag_applicable_store_data k s)
+                (goodmb_pma_misaligned_exception_store Dr Dw _ s mm Hme)
+                (exec_pma_misaligned_exception_store _ s Hme)) as Hmagg.
+  destruct region as [rbase rsize rattr rdtree].
+  gm_pma_plan_peel Hrg Hwrite Hmatch Hmagg Hmage.
 Qed.
 
 (* ===================================================================== *)
@@ -494,6 +649,37 @@ Lemma pa_add_chunk (pa : mword 64) (k : nat) (bytes : Z) :
 Proof.
   intros Hb. unfold pa_add. f_equal.
   rewrite Nat2Z.inj_mul. rewrite Z2Nat.id; [reflexivity | exact Hb].
+Qed.
+
+Lemma read_ram_exec_read_bytes (rk : read_kind) (a : mword 64) (bytes : Z)
+    (meta : bool) s res :
+  rk_ram_ok rk = true -> dev_addr a = false ->
+  exec (read_ram rk (Physaddr a) bytes meta) s = Some res ->
+  read_bytes s.(mem) a (Z.to_N bytes) <> None.
+Proof.
+  intros Hrk Hdev He Hnone.
+  destruct rk; try discriminate Hrk;
+    (unfold read_ram in He; cbn match in He;
+     rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)) in He;
+     cbn beta zeta in He;
+     unfold Defs.sail_mem_read in He; cbn beta zeta in He;
+     unfold Defs.bind in He; cbn [Interface.iMon_bind] in He;
+     rewrite exec_MemRead in He; [ | exact Hdev ];
+     cbn [Interface.ReadReq.pa Mem_read_request_pa] in He;
+     rewrite Hnone in He; discriminate He).
+Qed.
+
+Lemma goodmb_read_ram_chunk (Dr Dw : register -> bool) (rk : read_kind)
+    (a : mword 64) (bytes : Z) (meta : bool) s mm :
+  rk_ram_ok rk = true ->
+  dev_addr a = false ->
+  bytes_owned mm a (Z.to_N bytes) = true ->
+  (exists v, exec (read_ram rk (Physaddr a) bytes meta) s = Some ((v, tt), s)) ->
+  goodmb Dr Dw (read_ram rk (Physaddr a) bytes meta) s mm = true.
+Proof.
+  intros Hrk Hdev Hown [v Hv].
+  exact (goodmb_read_ram Dr Dw rk bytes a meta s mm Hrk Hdev Hown
+           (read_ram_exec_read_bytes rk a bytes meta s _ Hrk Hdev Hv)).
 Qed.
 
 Lemma pa_add_bump2 (p : mword 64) (d n : nat) : pa_add (pa_add p d) n = pa_add p (d + n).
@@ -1567,6 +1753,22 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_translate_and_read_value_err (Dr Dw : register -> bool) (width : Z)
+    (va : mword 64) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (e : ExceptionType) (er : ExecutionResult) s s1 mm :
+  goodmb Dr Dw (translateAddr (Virtaddr va) acc) s mm = true ->
+  exec (translateAddr (Virtaddr va) acc) s = Some (Err (e, tt), s1) ->
+  goodmb Dr Dw (memory_exception (Virtaddr va) e) s1 mm = true ->
+  exec (memory_exception (Virtaddr va) e) s1 = Some (er, s1) ->
+  goodmb Dr Dw (translate_and_read_value (Virtaddr va) width acc aq rl res) s mm = true.
+Proof.
+  intros Htrg Htr Hmeg Hme.
+  unfold translate_and_read_value.
+  gmm_peel Htrg Htr. cbn match beta.
+  gmm_peel Hmeg Hme. cbn match beta.
+  apply goodmb_returnm.
+Qed.
+
 Lemma exec_translate_and_write_value_gen (width : Z) (va pa : mword 64)
     (value : mword (8 * width)) (acc : MemoryAccessType mem_payload)
     (aq rl res : bool) (pbmt : page_based_mem_type) (b : bool) s s1 s2 :
@@ -1586,6 +1788,30 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma goodmb_translate_and_write_value_gen (Dr Dw : register -> bool) (width : Z)
+    (va pa : mword 64) (value : mword (8 * width))
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (pbmt : page_based_mem_type) (b : bool) s s1 s2 mm :
+  goodmb Dr Dw (translateAddr (Virtaddr va) acc) s mm = true ->
+  exec (translateAddr (Virtaddr va) acc) s
+    = Some (Ok (Physaddr pa, pbmt, init_ext_ptw), s1) ->
+  goodmb Dr Dw (mem_write_ea (Physaddr pa) width acc pbmt aq rl res) s1 mm = true ->
+  exec (mem_write_ea (Physaddr pa) width acc pbmt aq rl res) s1 = Some (Ok tt, s1) ->
+  goodmb Dr Dw (mem_write_value (Physaddr pa) width value acc pbmt aq rl res) s1 mm
+    = true ->
+  exec (mem_write_value (Physaddr pa) width value acc pbmt aq rl res) s1
+    = Some (Ok b, s2) ->
+  goodmb Dr Dw (translate_and_write_value (Virtaddr va) width value acc aq rl res) s mm
+    = true.
+Proof.
+  intros Htrg Htr Heag Hea Hwvg Hwv.
+  unfold translate_and_write_value.
+  gmm_peel Htrg Htr. cbn match beta.
+  gmm_peel Heag Hea. cbn match beta.
+  gmm_peel Hwvg Hwv. cbn match beta.
+  apply goodmb_returnm.
+Qed.
+
 Lemma exec_translate_and_write_value_err (width : Z) (va : mword 64)
     (value : mword (8 * width)) (acc : MemoryAccessType mem_payload)
     (aq rl res : bool) (e : ExceptionType) (er : ExecutionResult) s s1 :
@@ -1599,6 +1825,24 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
   rewrite (exec_bind_Some _ _ _ _ _ Hme). cbn match beta.
   apply exec_returnM.
+Qed.
+
+Lemma goodmb_translate_and_write_value_err (Dr Dw : register -> bool) (width : Z)
+    (va : mword 64) (value : mword (8 * width))
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (e : ExceptionType) (er : ExecutionResult) s s1 mm :
+  goodmb Dr Dw (translateAddr (Virtaddr va) acc) s mm = true ->
+  exec (translateAddr (Virtaddr va) acc) s = Some (Err (e, tt), s1) ->
+  goodmb Dr Dw (memory_exception (Virtaddr va) e) s1 mm = true ->
+  exec (memory_exception (Virtaddr va) e) s1 = Some (er, s1) ->
+  goodmb Dr Dw (translate_and_write_value (Virtaddr va) width value acc aq rl res) s mm
+    = true.
+Proof.
+  intros Htrg Htr Hmeg Hme.
+  unfold translate_and_write_value.
+  gmm_peel Htrg Htr. cbn match beta.
+  gmm_peel Hmeg Hme. cbn match beta.
+  apply goodmb_returnm.
 Qed.
 
 (* ===================================================================== *)
@@ -1724,6 +1968,73 @@ Proof.
   replace (pow2 3 - bv_unsigned a mod 8) with (4096 - bv_unsigned a mod 4096)
     by (change (pow2 3) with 8; lia).
   apply exec_returnm.
+Qed.
+
+Lemma page_mask_eq_straddle (a : mword 64) (w : Z) :
+  0 < w -> w <= 8 -> ~ in_one_page a w ->
+  eq_vec (and_vec a (update_subrange_vec_dec ((ones 64) : bits 64)
+                       (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1)))))
+         (and_vec (sub_vec_int (add_vec_int a w) 1)
+                  (update_subrange_vec_dec ((ones 64) : bits 64)
+                     (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1))))) = false.
+Proof.
+  intros Hw Hw8 Hout.
+  pose proof Hout as Hout'. unfold in_one_page in Hout'.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  assert (Hmod : 0 <= bv_unsigned a mod 4096 < 4096) by (apply Z.mod_pos_bound; lia).
+  apply eq_vec_false_iff. intro Heq.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !and_vec64_unsigned in Heq. rewrite page_mask64_val in Heq.
+  assert (Hsub : bv_unsigned (sub_vec_int (add_vec_int a w) 1)
+                 = bv_wrap 64 (bv_unsigned a + (w - 1))).
+  { unfold sub_vec_int, add_vec_int.
+    rewrite sub_vec64_unsigned. rewrite add_vec64_unsigned.
+    rewrite !moi64_unsigned.
+    assert (Hww : bv_wrap 64 w = w)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    assert (Hw1 : bv_wrap 64 1 = 1)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    rewrite Hww. rewrite Hw1. rewrite bv_wrap_sub_idemp_l.
+    f_equal. lia. }
+  rewrite Hsub in Heq.
+  pose proof (bv_wrap_in_range 64 (bv_unsigned a + (w - 1))) as Hbr.
+  unfold bv_modulus in Hbr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hbr.
+  rewrite (z_land_pagemask (bv_unsigned a) (proj1 Hr) (proj2 Hr)) in Heq.
+  rewrite (z_land_pagemask _ (proj1 Hbr) (proj2 Hbr)) in Heq.
+  apply (page_num_differs a w Hw Hw8 Hout).
+  apply (f_equal (fun z => Z.shiftr z 12)) in Heq.
+  rewrite !Z.shiftr_shiftl_l in Heq; [| lia | lia].
+  change (12 - 12)%Z with 0%Z in Heq.
+  rewrite !Z.shiftl_0_r in Heq. exact Heq.
+Qed.
+
+Lemma goodmb_split_on_page_boundary_straddle (Dr Dw : register -> bool)
+    (a : mword 64) (w : Z) s mm :
+  0 < w -> w <= 8 -> ~ in_one_page a w ->
+  goodmb Dr Dw (split_on_page_boundary a w) s mm = true.
+Proof.
+  intros Hw Hw8 Hout.
+  pose proof Hout as Hout'. unfold in_one_page in Hout'.
+  assert (Hmod : 0 <= bv_unsigned a mod 4096 < 4096) by (apply Z.mod_pos_bound; lia).
+  assert (Hm8 : bv_unsigned a mod 4096 mod 8 = bv_unsigned a mod 4096 - 4088).
+  { assert (Hd : (8 | 4088)) by (exists 511; reflexivity).
+    assert (Hlo : 4088 <= bv_unsigned a mod 4096) by lia.
+    rewrite <- (Z.mod_add (bv_unsigned a mod 4096) (-511) 8); [| lia].
+    apply Z.mod_small. lia. }
+  assert (Hm8' : bv_unsigned a mod 8 = bv_unsigned a mod 4096 - 4088).
+  { rewrite <- Hm8. symmetry. apply Z.mod_mod_divide. exists 512; reflexivity. }
+  unfold split_on_page_boundary.
+  rewrite (page_mask_eq_straddle a w Hw Hw8 Hout). cbn match.
+  assert (Hs3 : uint (subrange_vec_dec a (Z.sub 3 1) 0) = bv_unsigned a mod 8).
+  { rewrite (uint_unsigned_n _).
+    exact (subrange_dec_unsigned_lo0 a 2 8 ltac:(lia) ltac:(vm_compute; reflexivity)). }
+  rewrite Hs3.
+  replace (Z.ltb (pow2 3 - bv_unsigned a mod 8) w) with true.
+  2:{ symmetry. apply Z.ltb_lt. change (pow2 3) with 8. lia. }
+  erewrite gm_bind; [ | apply goodmb_assert_exp'_true | apply exec_assert_exp'_true ].
+  cbn beta. apply goodmb_returnm.
 Qed.
 
 (* the two parts' own geometry: both lie in one page, and both are non-empty *)
