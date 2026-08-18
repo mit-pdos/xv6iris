@@ -1333,3 +1333,41 @@ CSR's *accessibility* check, which is data-dependent on the CSR number.  The
 enumeration to trust is the union of the READ SETS OF THE `goodmb` TWINS, not
 a reading of the cycle — `grep 'Dr [a-z_]* = true'` over the twin catalogue
 is the check, and it takes a minute.
+
+### P4a IS DONE — the tally, and what each file's twins are keyed on
+
+| file | twins | keyed on |
+|---|---|---|
+| `HartMemAsm.v` (NEW) | — | the general-`mm` toolkit, the bind context, the two memory nodes, the two RAM bricks |
+| `UserMemPt.v` | 14 | the PHYSICAL path: the two PMP grants, the two DATA `pmaCheck`s, the writable window pair, `checked_mem_read`/`mem_read`, `checked_mem_write`/`mem_write_value`, `mem_write_ea` |
+| `UserMemAccess.v` | 27 | the VMEM path: `vmem_read_addr`/`vmem_write_addr` aligned + misaligned + LR/SC + the fault and disjunctive arms, `translate_and_read_value`, the reservation pair; **plus 5 shared §0b helpers** (`goodmb_split_on_page_boundary`, `goodmb_translate_and_read_value_gen`, the three intra-page reductions the families are instances of) |
+| `UserMemMis.v` | 26 | the PER-PAGE SPLIT: the plan/exception arms, `read_ram_chunk`, the three `*_mis_U` composers, the six `vmem_*_split2*` straddles, the two `translate_and_*_value` twins |
+| `UserMemArms.v` | 15 | the EXECUTE arms: `vmem_read`/`vmem_write` and `execute_LOAD/STORE/LOADRES/STORECON/AMO`, ok + err + the three AMO fault arms |
+
+Chain verification, in dependency order, all clean and admit-free:
+`HartMemAsm` 1.9 s, `PtWalkCert` 10.6 s, `UserMemPt` 5.9 s, `UserMemAccess`
+7.8 s, `UserMemMis` 11.6 s, `UserMemArms` 8.5 s.  `Print Assumptions` across
+the families yields only `rv64d.plat_term_write`, `rv64d.load_reservation`,
+`rv64d.match_reservation` — all three already in the adequacy baseline — plus
+`ResvAxioms.load_reservation_term` where LR/SC is involved.  **No new axioms.**
+
+**A LAYER WITH NO MEMORY NODE OF ITS OWN OWES NEITHER PURE OBLIGATION.**
+`vmem_read_addr`, `vmem_write_addr`, `pmaCheck`, `pmpCheck`,
+`memory_exception` and `transform_effective_address` never make a byte access
+themselves — every one sits inside a `translateAddr` / `mem_read` /
+`mem_write_*` hypothesis, which arrives with its own certificate.  So
+`dev_addr pa = false` and `bytes_owned mm pa n = true` appear ONLY on the
+physical layer (`UserMemPt`, `UserMemMis`'s chunk reads) and would be dead
+weight higher up.  Read that as the rule for any new row: **put the pure
+obligation where the node is, not where the address is.**
+
+**TWO TRAPS THE SWEEP ADDED.**  (i) `goodmb_split_on_page_boundary` cannot be
+unconditional — the off-page arm is an `assert_exp'` and `goodmb` of a `fail`
+node is `false`, so the twin takes the split's own `exec` fact.  (ii) **A
+NODE-FOR-NODE COPY OF AN EXEC PROOF IS NOT ALWAYS LITERAL ACROSS FILES.**
+`MemAccessGen.exec_vmem_write_addr_intra` steps past the dependent
+`if andb res (not (match_reservation …))` with a `match goal … change`; under
+an import set that pulls in `iris.proofmode` that `if` has ALREADY
+iota-reduced when the walk reaches it, so the `match` has no applicable
+clause and fails with a bare *"No matching clauses for match"* —
+indistinguishable from a wrong proof.  Wrap such a `change` in `try`.
