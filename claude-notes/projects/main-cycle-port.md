@@ -850,6 +850,46 @@ and `WpSmodeIntr`'s call site with them.
 
 ### THE S-MODE WRAPPER SHAPES (decided 2026-08-18; both bundle wrappers use it)
 
+**WHAT THE FIVE WRAPPERS' INSTRUCTION OBLIGATION CARRIES, as landed
+2026-08-18.**  Four things travel into it that the original shape did not
+have, and each was a leaf family that could not be written otherwise:
+
+- **`⌜pmp_ent0_ok pcfg paddr⌝`** (all five) and **`⌜sr_swp_satp_ok R satp0⌝`**
+  (the two `sr_inv R` wrappers).  The FETCH obligation had both; the
+  instruction obligation had neither, and a DATA leaf needs them —
+  `SRegime.sr_swp_side_ok` takes the satp arm fact and `HartSMem`'s checks
+  take the grant, and neither is recoverable inside the obligation because
+  the residue is the regime's and Bare's is `True`.
+  **`wp_instr_s_config_regime` / `wp_instr_s_regime` took FOUR of
+  `pmp_ent0_ok`'s six conjuncts** — the ones the fetch walks (A = TOR, the
+  zero-order test, X, coverage) — so W and R were never in the statement and
+  they could not hand the obligation the whole grant.  They take
+  `pmp_ent0_ok` WHOLE now and destructure it; that is strictly less for a
+  caller holding the bundle, and it deleted three copies of
+  `unfold pmp_ent0_ok; split_and!; assumption` from `wp_instr_s_config_sr`.
+- **the landing tlb is EXISTENTIAL in the post**
+  (`∃ tv2, tlb ↦ᵣ tv2 ∗ <residue> tv2`): a data access translates, and
+  `sr_swp_translate`'s post is existential in the landing file precisely
+  because the walk may FILL the TLB.
+- **`MinstretInv.clock_res` is LENT to the leaf** and returned.  Those three
+  cells are in `s_Drw` and the whole frame already reaches the instruction,
+  but the wrapper was framing them OUT across it, so `csrr time` / `csrr sip`
+  / `csrw stimecmp` could not be written at all.  Existential both ways costs
+  nothing: `s_tick_agree` already reads the post clock off the landing file
+  (`spt_cycle`'s agreement excludes `tk_clock3`).
+- **the leaf CHOOSES the post mstatus and mideleg** — the three CONFIG
+  wrappers only.  `csrsi`/`csrci sstatus` and `sret` MOVE SIE, so on the
+  b = false arm no caller can name the post mstatus.  They ride in ONE
+  existential with the landing pc and the rider is keyed on all three
+  (`Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ`).
+  **The two BUNDLE wrappers may NOT take this**, and the reason is
+  structural: `SmodeCore.smode_config` requires SIE = 0 of the mstatus it
+  re-bundles, so a leaf that moved SIE is exactly what they cannot accept.
+  They keep a FIXED post config and carry the equations through the rider
+  (`fun npc ms1 mdv1 => ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗ Rl npc`), which
+  is what lets the raw-cell wrapper underneath stay existential.
+
+
 The M-mode wrappers (`WpInstr.wp_instr*`, `WpInstrConfig.wp_instr_config`)
 keep the LEAF INTERFACE in cells: the leaf receives the cells it may touch,
 returns `swp (execute i)` with those cells (possibly rewritten) in the post,
