@@ -417,3 +417,257 @@ Section memrun.
   Qed.
 
 End memrun.
+
+(* ====================================================================== *)
+(* 3. THE EXEC BRIDGE: [WpDecodeBridge.goodb]'s twin, with a byte map.      *)
+(*                                                                         *)
+(* The user tier's facts are whole-cycle [exec] facts at a symbolic state.  *)
+(* [goodmb] is the FOOTPRINT CERTIFICATE that turns one of them into a      *)
+(* walker fact: it follows the state-resolved execution path exactly as     *)
+(* [goodb] does, and                                                       *)
+(*   - a register READ needs [Dr r] and a register WRITE needs [Dw r].      *)
+(*     ([goodb] REFUSES every write; the walker takes the ones in [Drw],    *)
+(*     so the certificate needs the second footprint.)                     *)
+(*   - a memory access needs [dev_addr = false] and its whole footprint     *)
+(*     inside the owned bytes ([bytes_owned]); a read takes EXEC's value    *)
+(*     (off [s.(mem)] -- the walker's map answers the same, being a submap  *)
+(*     that contains the footprint), and a write moves [s] and [mm]         *)
+(*     together.                                                           *)
+(*   - MMIO is refused, and so is everything [goodb] refuses.               *)
+(*                                                                         *)
+(* Only [dom mm] is ever consulted (the [bytes_owned] tests) and the walk   *)
+(* preserves it, so a caller may read the map argument as the owned         *)
+(* ADDRESS SET, spelled as the map it already holds.                        *)
+(*                                                                         *)
+(* Generic in the error family for the same reason [goodb] is: a stretch    *)
+(* inside a [catch_early_return] region lives at [monadR].                  *)
+(* ====================================================================== *)
+
+Fixpoint goodmb (Dr Dw : register -> bool) {E X} (m : Defs.monad E X)
+    (s : mstate) (mm : gmap Arch.pa (bv 8)) {struct m} : bool :=
+  match m with
+  | Interface.Ret _ => true
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T
+             return (T -> Interface.iMon (fun _ => E) X) -> bool with
+       | Interface.RegRead r _ => fun k =>
+           andb (Dr r) (goodmb Dr Dw (k (register_lookup r s.(sregs))) s mm)
+       | Interface.RegWrite r _ v => fun k =>
+           andb (Dw r) (goodmb Dr Dw (k tt) (set_reg s r v) mm)
+       | Interface.MemRead n req => fun k =>
+           andb (andb (negb (dev_addr (Interface.ReadReq.pa req)))
+                   (bytes_owned mm (Interface.ReadReq.pa req) n))
+             (match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+              | Some w => goodmb Dr Dw (k (inl (w, None))) s mm
+              | None => false
+              end)
+       | Interface.MemWrite n req => fun k =>
+           andb (andb (negb (dev_addr (Interface.WriteReq.pa req)))
+                   (bytes_owned mm (Interface.WriteReq.pa req) n))
+             (goodmb Dr Dw (k (inl None))
+                (MState s.(sregs)
+                   (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                      (Interface.WriteReq.value req)) s.(mdev))
+                (write_bytes mm (Interface.WriteReq.pa req) n
+                   (Interface.WriteReq.value req)))
+       | Interface.InstrAnnounce _    => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.BranchAnnounce _ _ => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.Barrier _          => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.CacheOp _          => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.TlbOp _            => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.TakeException _    => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.ReturnException _  => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.TranslationStart _ => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.TranslationEnd _   => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.CycleCount         => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.Message _          => fun k => goodmb Dr Dw (k tt) s mm
+       | Interface.GetCycleCount      => fun k => goodmb Dr Dw (k 0%Z) s mm
+       | _ => fun _ => false
+       end) k
+  end.
+
+(* ---------------------------------------------------------------------- *)
+(* The walker's reduction equations at the two register and the two memory  *)
+(* nodes ([HartSpan]'s [hfrun_read]/[hfrun_write] discipline; the silent    *)
+(* classes need none -- their step is a conversion).                        *)
+(* ---------------------------------------------------------------------- *)
+Lemma hmrun_read {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
+    (mm : gmap Arch.pa (bv 8)) (r : register) (ak : option unit)
+    (k : type_of_register r -> M X) :
+  hmrun (S n) D Drw rs mm (Interface.Next (Interface.RegRead r ak) k)
+  = if bool_decide (r ∈ D)
+    then hmrun n D Drw rs mm (k (register_lookup r rs))
+    else None.
+Proof. reflexivity. Qed.
+
+Lemma hmrun_write {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
+    (mm : gmap Arch.pa (bv 8)) (r : register) (ak : option unit)
+    (v : type_of_register r) (k : unit -> M X) :
+  hmrun (S n) D Drw rs mm (Interface.Next (Interface.RegWrite r ak v) k)
+  = if bool_decide (r ∈ Drw)
+    then hmrun n D Drw (register_set r v rs) mm (k tt)
+    else None.
+Proof. reflexivity. Qed.
+
+Lemma hmrun_ram_read {X : Type} (n : nat) (D Drw : gset register)
+    (rs : regstate) (mm : gmap Arch.pa (bv 8)) (nb : N)
+    (req : Interface.ReadReq.t nb) (k : _ -> M X) :
+  hmrun (S n) D Drw rs mm (Interface.Next (Interface.MemRead nb req) k)
+  = if dev_addr (Interface.ReadReq.pa req) then None
+    else match read_bytes mm (Interface.ReadReq.pa req) nb with
+         | Some w => hmrun n D Drw rs mm (k (inl (w, None)))
+         | None => None
+         end.
+Proof. reflexivity. Qed.
+
+Lemma hmrun_ram_write {X : Type} (n : nat) (D Drw : gset register)
+    (rs : regstate) (mm : gmap Arch.pa (bv 8)) (nb : N)
+    (req : Interface.WriteReq.t nb) (k : _ -> M X) :
+  hmrun (S n) D Drw rs mm (Interface.Next (Interface.MemWrite nb req) k)
+  = if dev_addr (Interface.WriteReq.pa req) then None
+    else if bytes_owned mm (Interface.WriteReq.pa req) nb
+         then hmrun n D Drw rs
+                (write_bytes mm (Interface.WriteReq.pa req) nb
+                   (Interface.WriteReq.value req)) (k (inl None))
+         else None.
+Proof. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* The three map facts the bridge runs on: a store preserves the submap     *)
+(* relation, a store inside the footprint preserves the owned DOMAIN, and   *)
+(* an owned footprint makes the map answer a read exactly as memory does.   *)
+(* ---------------------------------------------------------------------- *)
+Lemma foldr_ins_mono (pa : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
+    (mm mem : gmap Arch.pa (bv 8)) :
+  mm ⊆ mem ->
+  foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm js
+  ⊆ foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mem js.
+Proof.
+  intros H. induction js as [|j js IH]; cbn [foldr]; [exact H|].
+  by apply insert_mono.
+Qed.
+
+Lemma write_bytes_mono (pa : Arch.pa) (n : N) {wd : N} (v : bv wd)
+    (mm mem : gmap Arch.pa (bv 8)) :
+  mm ⊆ mem -> write_bytes mm pa n v ⊆ write_bytes mem pa n v.
+Proof. intros H. exact (foldr_ins_mono pa v (seq 0 (N.to_nat n)) mm mem H). Qed.
+
+Lemma foldr_ins_dom (pa : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
+    (mm : gmap Arch.pa (bv 8)) :
+  (forall j : nat, j ∈ js -> is_Some (mm !! pa_add pa j)) ->
+  dom (foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm js) = dom mm.
+Proof.
+  induction js as [|j js IH]; cbn [foldr]; intros Hd; [reflexivity|].
+  rewrite dom_insert_L.
+  rewrite (IH (fun j' Hj' => Hd j' (elem_of_list_further j' j js Hj'))).
+  assert (Hin : pa_add pa j ∈ dom mm)
+    by (apply elem_of_dom, Hd, elem_of_list_here).
+  set_solver.
+Qed.
+
+Lemma write_bytes_dom (pa : Arch.pa) (n : N) {wd : N} (v : bv wd)
+    (mm : gmap Arch.pa (bv 8)) :
+  bytes_owned mm pa n = true -> dom (write_bytes mm pa n v) = dom mm.
+Proof.
+  intros Hok. apply foldr_ins_dom. intros j Hj.
+  apply elem_of_seq in Hj. apply (bytes_owned_spec mm pa n Hok j). lia.
+Qed.
+
+Lemma read_bytes_owned_mono (mm mem : gmap Arch.pa (bv 8)) (pa : Arch.pa)
+    (n : N) (w : bv (8 * n)) :
+  bytes_owned mm pa n = true ->
+  mm ⊆ mem ->
+  read_bytes mem pa n = Some w ->
+  read_bytes mm pa n = Some w.
+Proof.
+  intros Hok Hsub Hrb. apply read_bytes_of_bytes. intros j Hj.
+  destruct (bytes_owned_spec mm pa n Hok j Hj) as [b Hb].
+  pose proof (map_subseteq_spec mm mem) as [Hs _].
+  pose proof (Hs Hsub _ _ Hb) as Hb'.
+  rewrite (read_bytes_spec _ _ _ _ Hrb j Hj) in Hb'.
+  by injection Hb' as ->.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE BRIDGE.  A certified [exec] fact IS a walker fact at the owned map,  *)
+(* and the walk lands on a map that is still a submap of the successor      *)
+(* memory WITH THE SAME DOMAIN -- which is what lets a chain of these       *)
+(* compose and what keeps the caller's [bytes_own] footprint fixed.         *)
+(* ---------------------------------------------------------------------- *)
+Lemma hmrun_of_exec (Dr Dw : register -> bool) (D Drw : gset register)
+    {X : Type} (m : M X) (s s' : mstate) (x : X)
+    (mm : gmap Arch.pa (bv 8)) :
+  (forall r, Dr r = true -> r ∈ D) ->
+  (forall r, Dw r = true -> r ∈ Drw) ->
+  mm ⊆ s.(mem) ->
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (x, s') ->
+  exists (n : nat) (mm' : gmap Arch.pa (bv 8)),
+    hmrun n D Drw s.(sregs) mm m = Some (x, s'.(sregs), mm') /\
+    mm' ⊆ s'.(mem) /\ dom mm' = dom mm.
+Proof.
+  intros Hdr Hdw. revert s s' x mm.
+  induction m as [y | T oc k IH]; intros s s' x mm Hsub Hg He.
+  - (* [Ret]: fuel 1, the map handed straight back *)
+    cbn [exec] in He. injection He as <- <-.
+    exists 1%nat, mm. split; [reflexivity|]. split; [exact Hsub|reflexivity].
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb exec] in Hg, He; try discriminate Hg.
+    { (* REGISTER READ *)
+      apply andb_prop in Hg as [HD Hg].
+      destruct (IH (register_lookup reg s.(sregs)) s s' x mm Hsub Hg He)
+        as (n0 & mm' & Hw & Hs1 & Hd1).
+      exists (S n0), mm'. split; [|split; [exact Hs1|exact Hd1]].
+      rewrite hmrun_read (bool_decide_eq_true_2 _ (Hdr reg HD)). exact Hw. }
+    { (* REGISTER WRITE *)
+      apply andb_prop in Hg as [HD Hg].
+      assert (Hsub' : mm ⊆ (set_reg s reg regval).(mem))
+        by (rewrite mem_set_reg; exact Hsub).
+      destruct (IH tt (set_reg s reg regval) s' x mm Hsub' Hg He)
+        as (n0 & mm' & Hw & Hs1 & Hd1).
+      rewrite sregs_set_reg in Hw.
+      exists (S n0), mm'. split; [|split; [exact Hs1|exact Hd1]].
+      rewrite hmrun_write (bool_decide_eq_true_2 _ (Hdw reg HD)). exact Hw. }
+    { (* RAM READ; MMIO is refused by the certificate *)
+      apply andb_prop in Hg as [Hg1 Hg2].
+      apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev.
+      rewrite Hdev in He. cbn beta iota in He.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb)
+        as [w|] eqn:Hrb; [|discriminate Hg2].
+      destruct (IH (inl (w, None)) s s' x mm Hsub Hg2 He)
+        as (n0 & mm' & Hw & Hs1 & Hd1).
+      exists (S n0), mm'. split; [|split; [exact Hs1|exact Hd1]].
+      rewrite hmrun_ram_read Hdev.
+      by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
+    { (* RAM WRITE; MMIO is refused by the certificate *)
+      apply andb_prop in Hg as [Hg1 Hg2].
+      apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev.
+      rewrite Hdev in He. cbn beta iota in He.
+      assert (Hsub' :
+        write_bytes mm (Interface.WriteReq.pa wreq) nb
+          (Interface.WriteReq.value wreq)
+        ⊆ (MState s.(sregs)
+             (write_bytes s.(mem) (Interface.WriteReq.pa wreq) nb
+                (Interface.WriteReq.value wreq)) s.(mdev)).(mem))
+        by (apply write_bytes_mono, Hsub).
+      destruct (IH (inl None)
+                  (MState s.(sregs)
+                     (write_bytes s.(mem) (Interface.WriteReq.pa wreq) nb
+                        (Interface.WriteReq.value wreq)) s.(mdev))
+                  s' x _ Hsub' Hg2 He)
+        as (n0 & mm' & Hw & Hs1 & Hd1).
+      exists (S n0), mm'. split; [|split; [exact Hs1|]].
+      * rewrite hmrun_ram_write Hdev Hfp. exact Hw.
+      * rewrite Hd1. by apply write_bytes_dom. }
+    (* THE TWELVE SILENT CLASSES: one walker step is a conversion *)
+    all: first
+           [ destruct (IH tt s s' x mm Hsub Hg He)
+               as (n0 & mm' & Hw & Hs1 & Hd1)
+           | destruct (IH 0%Z s s' x mm Hsub Hg He)
+               as (n0 & mm' & Hw & Hs1 & Hd1) ];
+         exists (S n0), mm'; split; [exact Hw|split; [exact Hs1|exact Hd1]].
+Qed.
