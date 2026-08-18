@@ -428,7 +428,7 @@ Section sframes.
   (* file it lands on; handing back a tower here would be pinning the arm   *)
   (* this rule exists not to pin.                                          *)
   (* ==================================================================== *)
-  Lemma s_cycle_any (pc : mword 64) (Psi : iProp Σ) (Q : regstate -> Prop)
+  Lemma s_cycle_any {dq : dfrac} (pc : mword 64) (Psi : iProp Σ) (Q : regstate -> Prop)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
@@ -443,14 +443,14 @@ Section sframes.
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
       s_Drw -∗
-    hreg_frame_ro (s_Df (DfracOwn 1))
+    hreg_frame_ro (s_Df dq)
       (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
          mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
     (* the body, at the prelude's file, offering BOTH arms *)
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
                    cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
                    pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1))
+     hreg_frame_ro (s_Df dq)
        (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
           cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
           pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
@@ -459,11 +459,11 @@ Section sframes.
             match st with
             | Step_Execute (Retire_Success tt, _) =>
                 hreg_frame rs2 s_Drw ∗
-                hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Psi
+                hreg_frame_ro (s_Df dq) rs2 s_Dro ∗ Psi
             | Step_Pending_Interrupt (i, p) =>
                 swp (handle_interrupt i p)
                   (fun _ => hreg_frame rs2 s_Drw ∗
-                            hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Psi)
+                            hreg_frame_ro (s_Df dq) rs2 s_Dro ∗ Psi)
             | _ => False
             end)) -∗
     ▷ (∀ rs3 : regstate,
@@ -471,13 +471,13 @@ Section sframes.
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro (s_Df (DfracOwn 1)) rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro (s_Df dq) rs3 s_Dro -∗ Psi -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi.
     iIntros "#Hcert Hrw Hro Hbody Hcont".
-    iApply (swp_exec_step_any s_Drw s_Dro (s_Df (DfracOwn 1))
+    iApply (swp_exec_step_any s_Drw s_Dro (s_Df dq)
               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
               (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
@@ -512,7 +512,7 @@ Section sframes.
   (* same rule over [swp_fetch_S_rvc2] / [_S_base2] and                     *)
   (* [swp_run_hart_active_gen_rvc].                                        *)
   (* ==================================================================== *)
-  Lemma wp_instr_s (pc npc pa : mword 64) (w : mword 32) (i : instruction)
+  Lemma wp_instr_s {dq : dfrac} (pc npc pa : mword 64) (w : mword 32) (i : instruction)
       (nl : nat) (Psi : iProp Σ) (Q : regstate -> Prop)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
@@ -539,12 +539,12 @@ Section sframes.
     gen_cert -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-    hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+    hreg_frame_ro (s_Df dq) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
     (* the dispatch: BOTH arms, the machine picks *)
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (dispatchInterrupt Supervisor)
          (fun o => match o with
@@ -552,52 +552,52 @@ Section sframes.
                        ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                          swp (handle_interrupt ii pr)
                            (fun _ => hreg_frame rs2 s_Drw ∗
-                              hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Psi)
+                              hreg_frame_ro (s_Df dq) rs2 s_Dro ∗ Psi)
                    | None => hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw ∗
-                             hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                             hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro
                    end)) -∗
     (* the translation and the text read *)
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro -∗
        swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
               (Physaddr pa) 4 false false false false)
          (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (* THE ONE OBLIGATION THE LEAF OWES *)
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1))
+     hreg_frame_ro (s_Df dq)
        (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv'))
        s_Dro -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    hreg_frame rs2ex s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) rs2ex s_Dro ∗ Psi)) -∗
+                   hreg_frame_ro (s_Df dq) rs2ex s_Dro ∗ Psi)) -∗
     ▷ (∀ rs3 : regstate,
          ⌜∃ (rs2 : regstate) (mi : mword 64),
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro (s_Df (DfracOwn 1)) rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro (s_Df dq) rs3 s_Dro -∗ Psi -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -612,14 +612,14 @@ Section sframes.
        wants the MATCH.  One [swp_mono] between them, and it is where the
        trap payload lines up with the handler slot. *)
     iApply (swp_mono with "[] [-]");
-      [| iApply (swp_run_hart_active_gen s_Drw s_Dro (s_Df (DfracOwn 1))
+      [| iApply (swp_run_hart_active_gen s_Drw s_Dro (s_Df dq)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') rs2ex Supervisor pc w i nl Psi
                    (fun ii pr => (∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                        swp (handle_interrupt ii pr)
                          (fun _ => hreg_frame rs2 s_Drw ∗
-                            hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro
+                            hreg_frame_ro (s_Df dq) rs2 s_Dro
                             ∗ Psi))%I)
                    s_disj s_in_priv s_in_PC s_w_nPC ltac:(srs) ltac:(srs)
                    Hdec Hlpad
@@ -632,7 +632,7 @@ Section sframes.
         iExists rs2ex. iSplitR; [done|]. iFrame.
     - iIntros "Hrw Hro".
       iApply (swp_mono with "[] [-]");
-        [| iApply (swp_fetch_S s_Drw s_Dro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+        [| iApply (swp_fetch_S s_Drw s_Dro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')
                      pc pa w s_disj s_in_PC s_in_mst s_in_priv
@@ -652,7 +652,7 @@ Section sframes.
   (* ([swp_fetch_S]): its [if isRVC] conclusion gives [F_RVC] here and      *)
   (* [F_Base] there, so 4-alignment needs no second fetch lemma.           *)
   (* ==================================================================== *)
-  Lemma wp_instr_s_rvc (pc pa : mword 64) (w : mword 32)
+  Lemma wp_instr_s_rvc {dq : dfrac} (pc pa : mword 64) (w : mword 32)
       (i other : instruction) (nl : nat) (Psi : iProp Σ) (Q : regstate -> Prop)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
@@ -682,11 +682,11 @@ Section sframes.
     gen_cert -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-    hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+    hreg_frame_ro (s_Df dq) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (dispatchInterrupt Supervisor)
          (fun o => match o with
@@ -694,38 +694,38 @@ Section sframes.
                        ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                          swp (handle_interrupt ii pr)
                            (fun _ => hreg_frame rs2 s_Drw ∗
-                              hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Psi)
+                              hreg_frame_ro (s_Df dq) rs2 s_Dro ∗ Psi)
                    | None => hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw ∗
-                             hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                             hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro
                    end)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro -∗
        swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
               (Physaddr pa) 4 false false false false)
          (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (* the EXPANSION: [execute i] answers [ExecuteAs other] *)
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
+     hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro -∗
        swp (execute i)
@@ -733,26 +733,26 @@ Section sframes.
                    hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
+                   hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro)) -∗
     (* ...and [other] is what retires *)
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
+     hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro -∗
        swp (execute other)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    hreg_frame rs2ex s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) rs2ex s_Dro ∗ Psi)) -∗
+                   hreg_frame_ro (s_Df dq) rs2ex s_Dro ∗ Psi)) -∗
     ▷ (∀ rs3 : regstate,
          ⌜∃ (rs2 : regstate) (mi : mword 64),
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro (s_Df (DfracOwn 1)) rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro (s_Df dq) rs3 s_Dro -∗ Psi -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -764,7 +764,7 @@ Section sframes.
               with "Hcert Hrw Hro [Hdisp Htr Hcmr Hexp Hex] Hcont").
     iIntros "Hrw Hro".
     iApply (swp_mono with "[] [-]");
-      [| iApply (swp_run_hart_active_gen_rvc s_Drw s_Dro (s_Df (DfracOwn 1))
+      [| iApply (swp_run_hart_active_gen_rvc s_Drw s_Dro (s_Df dq)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') rs2ex Supervisor pc (subrange_vec_dec w 15 0)
@@ -772,7 +772,7 @@ Section sframes.
                    (fun ii pr => (∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                        swp (handle_interrupt ii pr)
                          (fun _ => hreg_frame rs2 s_Drw ∗
-                            hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro
+                            hreg_frame_ro (s_Df dq) rs2 s_Dro
                             ∗ Psi))%I)
                    s_disj s_in_priv s_in_misa s_in_PC s_w_nPC
                    ltac:(srs) ltac:(srs) ltac:(rewrite s_rs_misa; exact HmisaC)
@@ -786,7 +786,7 @@ Section sframes.
         iExists rs2ex. iSplitR; [done|]. iFrame.
     - iIntros "Hrw Hro".
       iApply (swp_mono with "[] [-]");
-        [| iApply (swp_fetch_S s_Drw s_Dro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+        [| iApply (swp_fetch_S s_Drw s_Dro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')
                      pc pa w s_disj s_in_PC s_in_mst s_in_priv
@@ -805,7 +805,7 @@ Section sframes.
   (* The alignment premises invert accordingly, and misa.C is read by the   *)
   (* fetch itself here (the misalignment test does not short-circuit).      *)
   (* ==================================================================== *)
-  Lemma wp_instr_s_rvc2 (pc pa : mword 64) (h : mword 16)
+  Lemma wp_instr_s_rvc2 {dq : dfrac} (pc pa : mword 64) (h : mword 16)
       (i other : instruction) (nl : nat) (Psi : iProp Σ) (Q : regstate -> Prop)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
@@ -834,11 +834,11 @@ Section sframes.
     gen_cert -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-    hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+    hreg_frame_ro (s_Df dq) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (dispatchInterrupt Supervisor)
          (fun o => match o with
@@ -846,37 +846,37 @@ Section sframes.
                        ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                          swp (handle_interrupt ii pr)
                            (fun _ => hreg_frame rs2 s_Drw ∗
-                              hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Psi)
+                              hreg_frame_ro (s_Df dq) rs2 s_Dro ∗ Psi)
                    | None => hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw ∗
-                             hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                             hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro
                    end)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro -∗
        swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
               (Physaddr pa) 2 false false false false)
          (fun r => ⌜r = Values.Ok (h, tt)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
+     hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro -∗
        swp (execute i)
@@ -884,25 +884,25 @@ Section sframes.
                    hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
+                   hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
+     hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro -∗
        swp (execute other)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    hreg_frame rs2ex s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) rs2ex s_Dro ∗ Psi)) -∗
+                   hreg_frame_ro (s_Df dq) rs2ex s_Dro ∗ Psi)) -∗
     ▷ (∀ rs3 : regstate,
          ⌜∃ (rs2 : regstate) (mi : mword 64),
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro (s_Df (DfracOwn 1)) rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro (s_Df dq) rs3 s_Dro -∗ Psi -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -914,14 +914,14 @@ Section sframes.
               with "Hcert Hrw Hro [Hdisp Htr Hcmr Hexp Hex] Hcont").
     iIntros "Hrw Hro".
     iApply (swp_mono with "[] [-]");
-      [| iApply (swp_run_hart_active_gen_rvc s_Drw s_Dro (s_Df (DfracOwn 1))
+      [| iApply (swp_run_hart_active_gen_rvc s_Drw s_Dro (s_Df dq)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') rs2ex Supervisor pc h i other nl Psi
                    (fun ii pr => (∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                        swp (handle_interrupt ii pr)
                          (fun _ => hreg_frame rs2 s_Drw ∗
-                            hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro
+                            hreg_frame_ro (s_Df dq) rs2 s_Dro
                             ∗ Psi))%I)
                    s_disj s_in_priv s_in_misa s_in_PC s_w_nPC
                    ltac:(srs) ltac:(srs) ltac:(rewrite s_rs_misa; exact HmisaC)
@@ -934,7 +934,7 @@ Section sframes.
       + iDestruct "Hr" as "(-> & Hrw & Hro & HPsi)".
         iExists rs2ex. iSplitR; [done|]. iFrame.
     - iIntros "Hrw Hro".
-      iApply (swp_fetch_S_rvc2 s_Drw s_Dro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+      iApply (swp_fetch_S_rvc2 s_Drw s_Dro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')
                 pc pa h s_disj s_in_PC s_in_misa s_in_mst s_in_priv
@@ -953,7 +953,7 @@ Section sframes.
   (* the statement for that reason ([tlbv] -> [tlbv1] -> [tlbv']), which is *)
   (* the [rsf] thread at its widest.                                       *)
   (* ==================================================================== *)
-  Lemma wp_instr_s_base2 (pc pa1 pa2 : mword 64) (ilo ihi : mword 16)
+  Lemma wp_instr_s_base2 {dq : dfrac} (pc pa1 pa2 : mword 64) (ilo ihi : mword 16)
       (i : instruction) (nl : nat) (Psi : iProp Σ) (Q : regstate -> Prop)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
@@ -983,11 +983,11 @@ Section sframes.
     gen_cert -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-    hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+    hreg_frame_ro (s_Df dq) (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (dispatchInterrupt Supervisor)
          (fun o => match o with
@@ -995,72 +995,72 @@ Section sframes.
                        ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                          swp (handle_interrupt ii pr)
                            (fun _ => hreg_frame rs2 s_Drw ∗
-                              hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Psi)
+                              hreg_frame_ro (s_Df dq) rs2 s_Dro ∗ Psi)
                    | None => hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw ∗
-                             hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                             hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro
                    end)) -∗
     (* the LOW halfword: translate pc, read there *)
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
        swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
          (fun r => ⌜r = Values.Ok (Physaddr pa1, PBMT_PMA, init_ext_ptw)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Dro)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Dro -∗
        swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
               (Physaddr pa1) 2 false false false false)
          (fun r => ⌜r = Values.Ok (ilo, tt)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Dro)) -∗
     (* the HIGH halfword: translate pc+2, read there *)
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) s_Dro -∗
        swp (translateAddr (Virtaddr (add_vec_int pc 2)) (InstructionFetch tt))
          (fun r => ⌜r = Values.Ok (Physaddr pa2, PBMT_PMA, init_ext_ptw)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+     hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro -∗
        swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
               (Physaddr pa2) 2 false false false false)
          (fun r => ⌜r = Values.Ok (ihi, tt)⌝ ∗
                    hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
+                   hreg_frame_ro (s_Df dq) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') s_Dro)) -∗
     (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Drw -∗
-     hreg_frame_ro (s_Df (DfracOwn 1)) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4)
+     hreg_frame_ro (s_Df dq) (register_set (R_bitvector_64 nextPC) (add_vec_int pc 4)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) s_Dro -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    hreg_frame rs2ex s_Drw ∗
-                   hreg_frame_ro (s_Df (DfracOwn 1)) rs2ex s_Dro ∗ Psi)) -∗
+                   hreg_frame_ro (s_Df dq) rs2ex s_Dro ∗ Psi)) -∗
     ▷ (∀ rs3 : regstate,
          ⌜∃ (rs2 : regstate) (mi : mword 64),
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro (s_Df (DfracOwn 1)) rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro (s_Df dq) rs3 s_Dro -∗ Psi -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1072,7 +1072,7 @@ Section sframes.
               with "Hcert Hrw Hro [Hdisp Htr1 Hcmr1 Htr2 Hcmr2 Hex] Hcont").
     iIntros "Hrw Hro".
     iApply (swp_mono with "[] [-]");
-      [| iApply (swp_run_hart_active_gen s_Drw s_Dro (s_Df (DfracOwn 1))
+      [| iApply (swp_run_hart_active_gen s_Drw s_Dro (s_Df dq)
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv') rs2ex Supervisor pc (concat_vec ihi ilo) i nl
@@ -1080,7 +1080,7 @@ Section sframes.
                    (fun ii pr => (∃ rs2 : regstate, ⌜Q rs2⌝ ∗
                        swp (handle_interrupt ii pr)
                          (fun _ => hreg_frame rs2 s_Drw ∗
-                            hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro
+                            hreg_frame_ro (s_Df dq) rs2 s_Dro
                             ∗ Psi))%I)
                    s_disj s_in_priv s_in_PC s_w_nPC ltac:(srs) ltac:(srs)
                    Hdec Hlpad
@@ -1092,7 +1092,7 @@ Section sframes.
       + iDestruct "Hr" as "(-> & Hrw & Hro & HPsi)".
         iExists rs2ex. iSplitR; [done|]. iFrame.
     - iIntros "Hrw Hro".
-      iApply (swp_fetch_S_base2 s_Drw s_Dro (s_Df (DfracOwn 1))
+      iApply (swp_fetch_S_base2 s_Drw s_Dro (s_Df dq)
                 (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv1) (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
