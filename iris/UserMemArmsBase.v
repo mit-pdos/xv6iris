@@ -53,25 +53,6 @@ Set Printing Depth 40.
 Lemma tlb_not_u_Dfix : bool_decide ((tlb : register) ∈ u_Dfix) = false.
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma u_fix_tlb (tv : type_of_register tlb) (rs : regstate) :
-  reg_agree_on u_Dfix (register_set tlb tv rs) rs.
-Proof.
-  intros r Hr. apply irrelevant_register_set.
-  destruct (register_beq r tlb) eqn:Hb; [|reflexivity].
-  exfalso. apply register_beq_true in Hb. subst r.
-  pose proof tlb_not_u_Dfix as H.
-  rewrite (bool_decide_eq_true_2 _ Hr) in H. discriminate.
-Qed.
-
-(* the landing file of a walk agrees with its entry file on [u_Dfix] *)
-Lemma u_fix_land (rs rs' : regstate) :
-  (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) ->
-  reg_agree_on u_Dfix rs' rs.
-Proof.
-  intros [-> | (tv & ->)]; [ apply u_fix_refl | apply u_fix_tlb ].
-Qed.
-
-
 (* the U-mode pointer-masking probe's certificate *)
 Lemma goodb_currentlyEnabled_S (Db : register -> bool) (s : mstate) :
   Db misa = true -> goodb Db (currentlyEnabled Ext_S) s = true.
