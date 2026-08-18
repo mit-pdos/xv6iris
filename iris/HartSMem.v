@@ -2621,3 +2621,196 @@ Section instances.
       (fun pa v R rr H => swp_dev_write_node4 pa v R rr (dev_cls_dev 4 pa H)).
 
 End instances.
+
+(* ====================================================================== *)
+(* 12. THE AMO PATH (amoswap.w.aq -- what WpSconfLock's acquire uses).      *)
+(*                                                                        *)
+(* The three nodes of one AMO, in the reservation design of                *)
+(* claude-notes/design/main-cycle-port.md §3a: the effective-address        *)
+(* announcement ([mem_write_ea], no event), the EXCLUSIVE read (which       *)
+(* records [(pa, n, bytes)] in the hart's reservation) and the CONDITIONAL  *)
+(* write (which consumes exactly that reservation and learns from           *)
+(* [resv_ok] that the bytes it is overwriting are the ones it read).  The   *)
+(* window between them -- the [rX_bits rs2] read and the AMOCAS test -- is  *)
+(* an ORDINARY silent stretch taking the ordinary rules; there is no fused  *)
+(* AMO step and no walker for the window.                                  *)
+(* ====================================================================== *)
+
+(* the EXCLUSIVE read request: [read_kind_of_flags true false true] is
+   [Read_RISCV_reserved_acquire], which the model maps to AV_exclusive at
+   AS_rel_or_acq -- that acquire strength is the only difference from
+   [HartMFetch.mread_req8_res]. *)
+Definition mread_req4_racq (pa : SailStdpp.Values.mword 64)
+    : Interface.ReadReq.t 4 :=
+  {| Interface.ReadReq.pa := pa;
+     Interface.ReadReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_explicit
+         {| SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety
+              := SailStdpp.ConcurrencyInterfaceTypes.AV_exclusive;
+            SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_strength
+              := SailStdpp.ConcurrencyInterfaceTypes.AS_rel_or_acq |};
+     Interface.ReadReq.va := None;
+     Interface.ReadReq.translation := tt;
+     Interface.ReadReq.tag := false |}.
+
+Lemma hread_req_at_read_ram4_racq (pa : SailStdpp.Values.mword 64) :
+  hread_req_at 4 (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
+  = Some (mread_req4_racq pa).
+Proof.
+  unfold read_ram, Defs.sail_mem_read. req_cbn.
+  cbn [hread_req_at].
+  destruct (decide (4%N = 4%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hread_resume_read_ram4_racq (pa : SailStdpp.Values.mword 64) (w : bv 32) :
+  hread_resume (bv_unsigned w)
+    (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
+  = Interface.Ret (w, default_meta).
+Proof.
+  unfold read_ram, Defs.sail_mem_read. req_cbn.
+  cbn [hread_resume].
+  rewrite Z_to_bv_bv_unsigned TypeCasts.cast_N_refl.
+  reflexivity.
+Qed.
+
+(* the CONDITIONAL write request: [write_kind_of_flags false false true] is
+   [Write_RISCV_conditional] -> AV_exclusive at AS_normal. *)
+Definition mwrite_req4_con (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 32) : Interface.WriteReq.t 4 :=
+  {| Interface.WriteReq.pa := pa;
+     Interface.WriteReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_explicit
+         {| SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety
+              := SailStdpp.ConcurrencyInterfaceTypes.AV_exclusive;
+            SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_strength
+              := SailStdpp.ConcurrencyInterfaceTypes.AS_normal |};
+     Interface.WriteReq.value :=
+       TypeCasts.cast_N v (Defs.sail_mem_write_subproof 4);
+     Interface.WriteReq.va := None;
+     Interface.WriteReq.translation := tt;
+     Interface.WriteReq.tag := None |}.
+
+Lemma hwrite_req_at_write_ram4_con (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 32) :
+  hwrite_req_at 4 (write_ram Write_RISCV_conditional (Physaddr pa) 4 v tt)
+  = Some (mwrite_req4_con pa v).
+Proof.
+  unfold write_ram, Defs.sail_mem_write. wreq_cbn.
+  cbn [hwrite_req_at].
+  destruct (decide (4%N = 4%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hwrite_resume_write_ram4_con (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 32) :
+  hwrite_resume (write_ram Write_RISCV_conditional (Physaddr pa) 4 v tt)
+  = Interface.Ret true.
+Proof.
+  unfold write_ram, Defs.sail_mem_write. wreq_cbn.
+  cbn [hwrite_resume]. reflexivity.
+Qed.
+
+Lemma mwrite_req4_con_value (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 32) :
+  Interface.WriteReq.value (mwrite_req4_con pa v) = v.
+Proof.
+  cbn [mwrite_req4_con Interface.WriteReq.value]. apply TypeCasts.cast_N_refl.
+Qed.
+
+(* the PMA check at an ATOMIC access.  [res_or_con] is TRUE here (that is
+   what tells [pmaCheck] to take the atomic arm), and the grant is the
+   conjunction of readable, writable and the region's atomic support at this
+   op and width -- the [∀ op n, n <= 16] conjunct of [pma_class_grants]. *)
+Lemma hfrun_check_pma_amo_S (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (width : Z)
+    (aq rl : bool) :
+  Z.leb width 16 = true ->
+  (pma_regions : register) ∈ D ->
+  register_lookup pma_regions rs = pmar0 ->
+  pma_allows_ram pmar0 ->
+  pma_ram_access pa width ->
+  is_aligned_paddr (Physaddr pa) width = true ->
+  hfrun 6 D Drw rs
+    (check_pma_with_pmp_priority (Atomic (AMOSWAP, aq, rl, Data, Data))
+       PBMT_PMA Supervisor (Physaddr pa) width true)
+  = Some (Values.Ok
+            {| Phys_Mem_Access_Info_splittable := CannotSplit;
+               Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+Proof.
+  intros Hw16 HD Hpma Hpallow Hacc Hpa.
+  unfold check_pma_with_pmp_priority. sm_cbn.
+  sm_read. rewrite Hpma. sm_cbn.
+  destruct (Hpallow pa width Hacc) as (region & Hmatch & Hgrant).
+  destruct region as [rbase rsize rattr rdtree].
+  destruct Hgrant as (_ & Hr & Hw & Hat & _).
+  cbn [PMA_Region_attributes] in Hr, Hw, Hat.
+  rewrite Hmatch. sm_cbn.
+  rewrite Hr Hw (Hat AMOSWAP width Hw16). sm_cbn.
+  rewrite Hpa. sm_cbn.
+  apply hfrun_ret.
+Qed.
+
+Section samo_nodes.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the EXCLUSIVE read node: the plain read plus the reservation update.  It
+     is the ONLY thing the atomic window needs from the language -- what makes
+     the region atomic is that a competing write to the reserved bytes
+     self-loops until the conditional write clears the reservation. *)
+  Lemma swp_read_ram_node4_racq (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ)
+      (rr : option resv) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    swp (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
+      (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R ∗
+                resv_frag cpu_id (Some (snap_of pa 4 bytes))).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hfrag Hmem".
+    iApply (swp_hart_ram_read_excl 4 (mread_req4_racq pa) _ _ rr
+              (hread_req_at_read_ram4_racq pa) Hdev ltac:(reflexivity)
+              with "Hcert Hfrag [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as "[%Hb Hcl]".
+    iModIntro. iExists bytes.
+    iSplitR; [ iPureIntro; by apply read_bytes_of_bytes | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    iIntros "Hfrag". rewrite hread_resume_read_ram4_racq.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+  (* the CONDITIONAL write node.  Its callback LEARNS the old bytes -- that
+     is [resv_ok] talking, and it is the one thing the logic needs to make an
+     acquire sound (the invariant it opens at the write must know the word is
+     the one the exclusive read saw). *)
+  Lemma swp_write_ram_node4_con (pa : SailStdpp.Values.mword 64)
+      (v old : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
+    (∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some old⌝ -∗
+        mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 v) σ.(mdev)) ∗ R)) -∗
+    swp (write_ram Write_RISCV_conditional (Physaddr pa) 4 v tt)
+      (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hfrag Hmem".
+    iApply (swp_hart_ram_write_cond 4 (mwrite_req4_con pa v) _ _ old
+              (hwrite_req_at_write_ram4_con pa v) Hdev ltac:(lia)
+              with "Hcert Hfrag [Hmem]").
+    iIntros (s) "%Hrb Hs". iMod ("Hmem" $! s with "[//] Hs") as "Hcl".
+    iModIntro. iNext. iMod "Hcl" as "[Hs HR]". iModIntro.
+    rewrite mwrite_req4_con_value. iFrame "Hs".
+    iIntros "Hfrag". rewrite hwrite_resume_write_ram4_con.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+End samo_nodes.
