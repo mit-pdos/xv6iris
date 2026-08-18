@@ -1642,9 +1642,28 @@ bfree's `sllw` copy.  The two `sllw` copies were NOT the same statement
 (bfree's takes an explicit `wval`), so both are kept as the
 `wp_csub_wval_s_sconf`/`wp_csub_s_sconf` pair already is.
 
-**LEFT in this family:** nothing register-only.  `ProofBallocParts.v` /
-`ProofBfree.v` no longer consume any leaf engine, but they sit behind red
-roots (`WpSconfMem`, `SRegime`, `WpSmodePtMem`) so neither has been compiled.
+**AND THE ENGINE LAYER PAID FOR ITSELF WITHIN THE DAY.**  `sconf_step_obl`
+then grew three things (the hole-free funnel, d1e56cd6..77acabee): a second arm
+index `b'`, an mstatus witness (`sconf_at_priv ms'` in the post, the
+continuation on `sie_cap_gpr_at`), and a rider widened to
+`R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ` applied at the
+callback's own CID.  The re-target was **four funnel applications in
+`WpSconfEngine.v`** — `b' := b` (no leaf in these families moves SIE),
+`WpIntrInv.sconf_at_priv_open` for the witness (none of them writes mstatus, so
+there is nothing to name), `sie_cap_gpr_at_close` on the way out — and **all 86
+leaves recompiled with zero edits**.  Put a funnel change's cost in one engine
+file, not in the leaves.
+
+**GREEN, whole family:** `WpSconfEngine` 10.8 s, `WpSconfAlu` 8.3 s,
+`WpSconfBtype` 4.9 s, `WpSconfCtl` 7.2 s, `ProofBallocParts` 3.7 s,
+`ProofBfree` 31.7 s — and the consumers that take the folded-in leaves
+(`ProofBalloc`, `ProofIupdate`) build too, which is what checks the fold-in from
+the call-site side.
+
+**OWED:** sweep D cloned the branch/jump engines into `WpSmodePtEngine.v` as
+`sb_*` / `cj_*` (dfrac-parametric `cj_Df`) because the PT tier must not depend
+on `IntrDefs`.  Fold the two copies back together at the milestone — the split
+is an import constraint, not a design one.
 
 Nine leaf files plus `ProofSpin` are converted to the `swp` obligation, **14
 statements verified byte-identical** (mechanically, against the pre-sweep
