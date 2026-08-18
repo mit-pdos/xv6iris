@@ -262,6 +262,7 @@ UserTotalU.v
 UserActiveClass.v
 UserMemTotal.v
 UserMemClassify.v
+UserMemArmsBase.v
 UserMemClassifyAmo.v
 SpecUser.v
 ProofUser.v
