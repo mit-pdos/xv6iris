@@ -37,10 +37,15 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
-Require Import HartMCycle.
+Require Import HartMCycle HartRunGen HartSTrans.
 Require Import SmodeCore.
 Require Import InstrBytes IntrDefs KptShare SmodePte.
 Local Open Scope Z_scope.
+
+(* the misalignment tests' spelling, as [HartMFetch] and [HartSTrans] use it *)
+Local Notation zerobit :=
+  (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 1)
+     (BinaryString.Raw.to_N "0" 0%N)).
 
 Section sframes.
   Context `{!riscvGS Σ}.
@@ -378,5 +383,37 @@ Section sframes.
     iApply ("Hcont" with "Hhs Hsc Hpc Htlb HPsi").
   Qed.
 
+
+  (* ==================================================================== *)
+  (* wp_instr_s -- AND WHY [s_cycle] IS THE WRONG BASE FOR IT.              *)
+  (*                                                                      *)
+  (* I built [s_cycle] as [WpInstr.mm_cycle]'s mirror and then tried to     *)
+  (* fill its body with [HartRunGen.swp_run_hart_active_gen].  It does not  *)
+  (* fit, and the mismatch is the point rather than an accident:            *)
+  (*                                                                      *)
+  (*   [s_cycle] sits on [HartMCycle.swp_exec_step_decode_execute], whose   *)
+  (*   body is RETIRE-ONLY -- one arm, [Step_Execute (RETIRE_SUCCESS, w)].  *)
+  (*   [swp_run_hart_active_gen]'s conclusion is a DISJUNCTION, because at  *)
+  (*   Supervisor the dispatch reads the PLIC wires and the machine, not    *)
+  (*   the caller, picks the arm.                                          *)
+  (*                                                                      *)
+  (* M-mode gets away with the one-armed base for a real reason             *)
+  (* ([HartMDispatch.swp_dispatchInterrupt_M] short-circuits before the     *)
+  (* wires, so [None] is pinned).  S-MODE HAS NO SUCH SHORTCUT, so the      *)
+  (* general wrapper must sit on [HartStepAny.swp_exec_step_any] instead --  *)
+  (* whose body already MATCHES on the step and whose trap arm carries       *)
+  (* [swp (handle_interrupt i p) ..], which is exactly what                  *)
+  (* [swp_run_hart_active_gen]'s [Qi] slot is for.                          *)
+  (*                                                                      *)
+  (* SO THE NEXT PIECE IS [s_cycle_any]: this file's [s_cycle] with          *)
+  (* [swp_exec_step_any] in place of [swp_exec_step_decode_execute] and the  *)
+  (* post-file a PREDICATE [Q] rather than a parameter (the two arms land on *)
+  (* different files).  Everything else here is reusable unchanged: the      *)
+  (* bridges, the three transports, the frame extensions.                   *)
+  (*                                                                      *)
+  (* [s_cycle] IS NOT WASTED.  It is exactly right wherever a caller CAN     *)
+  (* rule out a trap -- a critical section with SIE clear -- and it is the   *)
+  (* cheaper rule there.  It is simply not the general case at Supervisor.  *)
+  (* ==================================================================== *)
 
 End sframes.

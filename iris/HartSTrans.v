@@ -366,4 +366,159 @@ Section strans.
   Qed.
 
 
+  (* the HALFWORD fetch_bytes at Supervisor, [swp_fetch_bytes_S]'s twin one
+     width down: the model translates and reads at [granule_start], and a
+     base instruction's second halfword is fetched at [pc+2] while
+     [fetch_start] stays [pc] -- so the two addresses are separate here for
+     the same reason they are in [HartMFetch.swp_fetch_bytes_M2]. *)
+  Lemma swp_fetch_bytes_S2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf : regstate) (fs gs pa : mword 64) (h : mword 16) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rsf = Supervisor ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr gs) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame rsf Drw -∗ hreg_frame_ro Df rsf Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
+              (Physaddr pa) 2 false false false false)
+         (fun r => ⌜r = Values.Ok (h, tt)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch_bytes fs gs 2)
+      (fun r => ⌜r = @FetchBytes_Success 2 h⌝ ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Htr Hcmr".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch_bytes.
+    cbn beta iota zeta delta [ext_fetch_check_pc].
+    rewrite mbind0_ret.
+    iApply (swp_use_cer (translateAddr (Virtaddr gs) (InstructionFetch tt))
+              _ _ C HC with "[Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    iApply (swp_use_cer
+              (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2
+                 false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_mem_read_M2 Drw Dro Df rsf (Physaddr pa) h Supervisor Hdisj
+                HDmst HDpriv Hpriv with "Hcert Hrw Hro Hcmr"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite autocast_id mcer_ret.
+    iApply ("Hcont" $! (@FetchBytes_Success 2 h)). by iFrame.
+  Qed.
+
+  (* the 2-mod-4 COMPRESSED shape at Supervisor *)
+  Lemma swp_fetch_S_rvc2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf : regstate) (pc pa : mword 64) (h : mword 16) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup cur_privilege rsf = Supervisor ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
+    isRVC h = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame rsf Drw -∗ hreg_frame_ro Df rsf Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
+              (Physaddr pa) 2 false false false false)
+         (fun r => ⌜r = Values.Ok (h, tt)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = F_RVC h⌝ ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    intros Hdisj HDpc HDmisa HDmst HDpriv Hpc Hpriv HmisaC Hb0 Hb1 Hal4 Hrvc.
+    iIntros "#Hcert Hrw Hro Htr Hcmr".
+    iApply (swp_fetch_rvc2 Drw Dro Df rs rsf pc h Hdisj HDpc HDmisa Hpc Hb0
+              Hb1 Hal4 HmisaC Hrvc with "Hcert Hrw Hro [Htr Hcmr]").
+    iIntros "Hrw Hro".
+    iApply (swp_fetch_bytes_S2 Drw Dro Df rs rsf pc pc pa h Hdisj HDmst
+              HDpriv Hpriv with "Hcert Hrw Hro Htr Hcmr").
+  Qed.
+
+
+  (* the 2-mod-4 BASE shape at Supervisor: TWO halfword fetches, so TWO
+     translations -- and the first may already have filled the TLB, which is
+     why [swp_fetch_base2] threads an intermediate file.  The second
+     translation therefore starts at [rsf1], and the PC the model re-reads
+     between them is pinned there. *)
+  Lemma swp_fetch_S_base2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf1 rsf2 : regstate) (pc pa1 pa2 : mword 64)
+      (ilo ihi : mword 16) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup (R_bitvector_64 PC) rsf1 = pc ->
+    register_lookup cur_privilege rsf1 = Supervisor ->
+    register_lookup cur_privilege rsf2 = Supervisor ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
+    isRVC ilo = false ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (* the low halfword: translate pc, read there *)
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa1, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   hreg_frame rsf1 Drw ∗ hreg_frame_ro Df rsf1 Dro)) -∗
+    (hreg_frame rsf1 Drw -∗ hreg_frame_ro Df rsf1 Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
+              (Physaddr pa1) 2 false false false false)
+         (fun r => ⌜r = Values.Ok (ilo, tt)⌝ ∗
+                   hreg_frame rsf1 Drw ∗ hreg_frame_ro Df rsf1 Dro)) -∗
+    (* the high halfword: translate pc+2, read there *)
+    (hreg_frame rsf1 Drw -∗ hreg_frame_ro Df rsf1 Dro -∗
+       swp (translateAddr (Virtaddr (add_vec_int pc 2)) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa2, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   hreg_frame rsf2 Drw ∗ hreg_frame_ro Df rsf2 Dro)) -∗
+    (hreg_frame rsf2 Drw -∗ hreg_frame_ro Df rsf2 Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
+              (Physaddr pa2) 2 false false false false)
+         (fun r => ⌜r = Values.Ok (ihi, tt)⌝ ∗
+                   hreg_frame rsf2 Drw ∗ hreg_frame_ro Df rsf2 Dro)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
+                hreg_frame rsf2 Drw ∗ hreg_frame_ro Df rsf2 Dro).
+  Proof.
+    intros Hdisj HDpc HDmisa HDmst HDpriv Hpc Hpc1 Hpriv1 Hpriv2 HmisaC
+      Hb0 Hb1 Hal4 Hnrvc.
+    iIntros "#Hcert Hrw Hro Htr1 Hcmr1 Htr2 Hcmr2".
+    iApply (swp_fetch_base2 Drw Dro Df rs rsf1 rsf2 pc ilo ihi Hdisj HDpc
+              HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hnrvc Hpc1
+              with "Hcert Hrw Hro [Htr1 Hcmr1] [Htr2 Hcmr2]").
+    - iIntros "Hrw Hro".
+      iApply (swp_fetch_bytes_S2 Drw Dro Df rs rsf1 pc pc pa1 ilo Hdisj HDmst
+                HDpriv Hpriv1 with "Hcert Hrw Hro Htr1 Hcmr1").
+    - iIntros "Hrw Hro".
+      iApply (swp_fetch_bytes_S2 Drw Dro Df rsf1 rsf2 pc (add_vec_int pc 2)
+                pa2 ihi Hdisj HDmst HDpriv Hpriv2
+                with "Hcert Hrw Hro Htr2 Hcmr2").
+  Qed.
+
+
 End strans.

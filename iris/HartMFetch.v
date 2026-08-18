@@ -909,8 +909,11 @@ Section fetch.
   (* premises.  (This file's header says "Ext_Zca is never read" -- true  *)
   (* of the 4-aligned path, and exactly why this one needs its own rule.) *)
   (* ------------------------------------------------------------------ *)
+  (* THE LANDING FILE IS A PARAMETER, for [swp_fetch]'s reason: where
+     [fetch_bytes] lands is the fetch's business, not this rule's.  M-mode
+     passes [rsf := rs]; S-mode's may have filled the TLB. *)
   Lemma swp_fetch_rvc2 (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (rs rsf : regstate) (pc : SailStdpp.Values.mword 64)
       (h : SailStdpp.Values.mword 16) :
     Drw ## Dro ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
@@ -931,10 +934,10 @@ Section fetch.
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
        swp (fetch_bytes pc pc 2)
          (fun r => ⌜r = @FetchBytes_Success 2 h⌝ ∗
-                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
     swp (fetch tt)
       (fun r => ⌜r = F_RVC h⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
   Proof.
     intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hrvc.
     iIntros "#Hcert Hrw Hro Hfb".
@@ -1009,8 +1012,11 @@ Section fetch.
   (* is a BGE sitting after seven compressed instructions -- so it is   *)
   (* not an exotic corner the kernel avoids.                             *)
   (* ------------------------------------------------------------------ *)
+  (* TWO landing files, because there are two reads: in S-mode the FIRST may
+     already have filled the TLB, so the second starts where the first
+     landed.  M-mode passes [rsf1 := rsf2 := rs]. *)
   Lemma swp_fetch_base2 (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (rs rsf1 rsf2 : regstate) (pc : SailStdpp.Values.mword 64)
       (ilo ihi : SailStdpp.Values.mword 16) :
     Drw ## Dro ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
@@ -1025,22 +1031,26 @@ Section fetch.
     eq_vec (_get_Misa_C (register_lookup misa rs))
       (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
     isRVC ilo = false ->
+    (* the PC the model re-reads between the two halfword fetches, at the file
+       the FIRST one landed on -- a fetch does not write PC, so a caller
+       discharges this by the same tower lookup *)
+    register_lookup (R_bitvector_64 PC) rsf1 = pc ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
        swp (fetch_bytes pc pc 2)
          (fun r => ⌜r = @FetchBytes_Success 2 ilo⌝ ∗
-                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+                   hreg_frame rsf1 Drw ∗ hreg_frame_ro Df rsf1 Dro)) -∗
+    (hreg_frame rsf1 Drw -∗ hreg_frame_ro Df rsf1 Dro -∗
        swp (fetch_bytes pc (add_vec_int pc 2) 2)
          (fun r => ⌜r = @FetchBytes_Success 2 ihi⌝ ∗
-                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+                   hreg_frame rsf2 Drw ∗ hreg_frame_ro Df rsf2 Dro)) -∗
     swp (fetch tt)
       (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rsf2 Drw ∗ hreg_frame_ro Df rsf2 Dro).
   Proof.
-    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hnrvc.
+    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hnrvc Hpc1.
     iIntros "#Hcert Hrw Hro Hlo Hhi".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold fetch. mf_glue.
@@ -1102,18 +1112,19 @@ Section fetch.
               with "[Hrw Hro Hlo] [-]").
     { iApply ("Hlo" with "Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    (* NOT compressed, so the model goes back for the high halfword *)
+    (* NOT compressed, so the model goes back for the high halfword.  The two
+       PC reads happen at the file the first fetch landed on. *)
     rewrite Hnrvc. cbn beta iota.
     iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
               with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+    { iApply (swp_read_reg_pinned Drw Dro Df rsf1 _ Hdisj HDpc
                 with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc1.
     iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
               with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+    { iApply (swp_read_reg_pinned Drw Dro Df rsf1 _ Hdisj HDpc
                 with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc1.
     iApply (swp_use_cer (fetch_bytes pc (add_vec_int pc 2) 2) _ _ C HC
               with "[Hrw Hro Hhi] [-]").
     { iApply ("Hhi" with "Hrw Hro"). }
@@ -1254,7 +1265,7 @@ Section fetch.
       Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hal4
       Hpa Hrvc.
     iIntros "#Hcert Hrw Hro Hmem".
-    iApply (swp_fetch_rvc2 Drw Dro Df rs pc h Hdisj HDpc HDmisa Hpc Hb0 Hb1
+    iApply (swp_fetch_rvc2 Drw Dro Df rs rs pc h Hdisj HDpc HDmisa Hpc Hb0 Hb1
               Hal4 HmisaC Hrvc with "Hcert Hrw Hro [Hmem]").
     iIntros "Hrw Hro".
     iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc pc h Hdisj HDmst HDpriv Hpriv
@@ -1318,8 +1329,9 @@ Section fetch.
       Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2
       Hb0 Hb1 Hal4 Hpa Hpa2 Hnrvc.
     iIntros "#Hcert Hrw Hro Hlo Hhi".
-    iApply (swp_fetch_base2 Drw Dro Df rs pc ilo ihi Hdisj HDpc HDmisa Hpc
-              Hb0 Hb1 Hal4 HmisaC Hnrvc with "Hcert Hrw Hro [Hlo] [Hhi]").
+    iApply (swp_fetch_base2 Drw Dro Df rs rs rs pc ilo ihi Hdisj HDpc HDmisa
+              Hpc Hb0 Hb1 Hal4 HmisaC Hnrvc Hpc
+              with "Hcert Hrw Hro [Hlo] [Hhi]").
     - iIntros "Hrw Hro".
       iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc pc ilo Hdisj HDmst HDpriv
                 Hpriv with "Hcert Hrw Hro [Hlo]").
