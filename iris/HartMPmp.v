@@ -148,6 +148,21 @@ Local Ltac mpmp_peel_D reg H Hstop HD rsN HagN :=
    arithmetic that discharges it stays with the caller, who knows the width.
    Everything else here (the 16-entry loop, the address match, the Machine +
    unlocked allow) was already width-agnostic. *)
+(* an OFF entry answers NoMatch whatever the width -- the all-OFF PMP
+   (the reset machine's, and the M-mode kernel's before pmpcfg0 is written)
+   never sees a partial match at any width.  Stated as the same dichotomy
+   [mpmp_matchaddr_pure_local] gives, so the walk below is shared. *)
+Local Lemma mpmp_matchaddr_off_local (pa : physaddr)
+    (wbv : SailStdpp.Values.mword 64) (ent : SailStdpp.Values.mword 8)
+    (paddr prev : SailStdpp.Values.mword 64) :
+  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent) = OFF ->
+  pmpMatchAddr pa wbv ent paddr prev = returnM PMP_NoMatch
+  \/ pmpMatchAddr pa wbv ent paddr prev = returnM PMP_Match.
+Proof.
+  intros Hoff. destruct pa as [a].
+  unfold pmpMatchAddr. cbn zeta. rewrite Hoff. left. reflexivity.
+Qed.
+
 Lemma mpmp_hval (D Drw : gset register)
     (pcfg : type_of_register pmpcfg_n)
     (addr : SailStdpp.Values.mword 64) (rs : regstate) (wd : Z)
@@ -243,6 +258,124 @@ Proof.
         match type of Hch with
         | context [ pmpMatchAddr ?PA ?W ?ENT ?PD ?PV ] =>
             destruct (mpmp_matchaddr_pure_local PA W ENT PD PV Hfit) as [Hm|Hm]
+        end; rewrite Hm in Hch; mpmp_red Hch.
+        * exact (IH (Z.add from 1) rs5 l' Hag'' Hch Hstop').
+        * rewrite (Hunlock from) in Hch.
+          replace (Instances.generic_eq Machine Machine) with true in Hch
+            by (vm_compute; reflexivity).
+          match type of Hch with
+          | context [ pmpCheckRWX ?E acc ] =>
+              destruct (Hrwx E) as (bx & Hbx); rewrite Hbx in Hch
+          end; destruct bx; (mpmp_red Hch;
+            exists rs5; split; [exact Hag''|exact Hch]).
+  }
+  destruct (HLOOP 16%nat 0 rs0 l Hag0 Hchain Hstop) as (rs1 & Hag1 & Hch1).
+  assert (Hl : l = (Interface.Ret None, rs1))
+    by (apply (hspan_stop_refl D Drw _ rs1 l); [reflexivity|exact Hch1]).
+  rewrite Hl. cbn. split; [reflexivity|exact Hag1].
+Qed.
+
+(* THE ALL-OFF TWIN, at ANY width: no fit premise, since an OFF entry cannot
+   partially match.  This is what the M-mode 8-byte data accesses need (a
+   [pmp_all_off] configuration, RiscvLang), where the one-grain fit fails. *)
+Lemma mpmp_hval_off (D Drw : gset register)
+    (pcfg : type_of_register pmpcfg_n)
+    (addr : SailStdpp.Values.mword 64) (rs : regstate) (wd : Z)
+    (acc : MemoryAccessType mem_payload) :
+  (forall ent : SailStdpp.Values.mword 8,
+     exists b : bool, pmpCheckRWX ent acc = returnM b) ->
+  (pmpcfg_n : register) ∈ D ->
+  pmp_all_off pcfg ->
+  register_lookup pmpcfg_n rs = pcfg ->
+  hval D Drw rs (pmpCheck (Physaddr addr) wd acc Machine) None rs.
+Proof.
+  intros Hrwx HD Hoff Hpcfg rs0 l Hag0 Hchain Hstop.
+  assert (Hunlock : forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false)
+    by (intro i; exact (proj2 (Hoff i))).
+  (* normalize the checker to the fueled loop under its handler
+     (closed tests by vm on never-consumed facts; spine by the incantation) *)
+  unfold pmpCheck in Hchain.
+  replace (Z.eqb sys_pmp_count 0) with false in Hchain
+    by (vm_compute; reflexivity).
+  replace (Z.sub sys_pmp_count 1) with 15 in Hchain
+    by (vm_compute; reflexivity).
+  unfold Defs.foreach_ZM_up in Hchain.
+  replace (S (Z.abs_nat (Z.sub 0 15))) with 16%nat in Hchain
+    by (vm_compute; reflexivity).
+  mpmp_red Hchain.
+  (* the loop invariant, generic in the fuel and start index; the body [B]
+     and the after-loop default [AF] are captured from the hypothesis *)
+  match type of Hchain with
+  | context [ Defs.bind0 (Defs.foreach_ZM_up' _ _ _ _ _ ?B) ?AF ] =>
+    assert (HLOOP : forall (n : nat) (from : Z) (rs0' : regstate)
+                           (l' : M (option ExceptionType) * regstate),
+      reg_agree_on D rs0' rs ->
+      hspan D Drw
+        (Defs.catch_early_return
+           (Defs.bind0 (Defs.foreach_ZM_up' from 15 1 n tt B) AF),
+         rs0') l' ->
+      hspan_stops Drw l'.1 = true ->
+      exists rs1, reg_agree_on D rs1 rs /\
+           hspan D Drw (Interface.Ret None, rs1) l')
+  end.
+  { intro n; induction n as [|n IH]; intros from rs0' l' Hag' Hch Hstop'.
+    - (* fuel exhausted: the residual is the M-mode default allow *)
+      cbn [Defs.foreach_ZM_up'] in Hch.
+      destruct (Z.leb from 15) eqn:Hle;
+        (replace (Instances.generic_eq Machine Machine) with true in Hch
+           by (vm_compute; reflexivity);
+         mpmp_red Hch;
+         exists rs0'; split; [exact Hag'|exact Hch]).
+    - cbn [Defs.foreach_ZM_up'] in Hch.
+      destruct (Z.leb from 15) eqn:Hle.
+      2: { (* index past the last entry: default allow *)
+        replace (Instances.generic_eq Machine Machine) with true in Hch
+          by (vm_compute; reflexivity).
+        mpmp_red Hch.
+        exists rs0'; split; [exact Hag'|exact Hch]. }
+      destruct (Z.gtb from 0) eqn:Hgt; mpmp_red Hch.
+      + (* i > 0: prev-entry pmpcfg + pmpaddr, then cfg, entry pmpcfg + pmpaddr *)
+        mpmp_peel_any pmpcfg_n Hch Hstop' w1 rs1 Hag1. mpmp_red Hch.
+        mpmp_peel_any pmpaddr_n Hch Hstop' v1 rs2 Hag2. mpmp_red Hch.
+        mpmp_peel_D pmpcfg_n Hch Hstop' HD rs3 Hag3.
+        rewrite (Hag2 _ HD) (Hag1 _ HD) (Hag' _ HD) Hpcfg in Hch.
+        mpmp_red Hch.
+        mpmp_peel_any pmpcfg_n Hch Hstop' w4 rs4 Hag4. mpmp_red Hch.
+        mpmp_peel_any pmpaddr_n Hch Hstop' v2 rs5 Hag5. mpmp_red Hch.
+        assert (Hag'' : reg_agree_on D rs5 rs).
+        { intros r Hr.
+          rewrite (Hag5 r Hr) (Hag4 r Hr) (Hag3 r Hr) (Hag2 r Hr) (Hag1 r Hr).
+          exact (Hag' r Hr). }
+        match type of Hch with
+        | context [ pmpMatchAddr ?PA ?W ?ENT ?PD ?PV ] =>
+            destruct (mpmp_matchaddr_off_local PA W ENT PD PV
+                        ltac:(apply Hoff)) as [Hm|Hm]
+        end; rewrite Hm in Hch; mpmp_red Hch.
+        * (* NoMatch: the next entry *)
+          exact (IH (Z.add from 1) rs5 l' Hag'' Hch Hstop').
+        * (* Match: Machine + unlocked allows, early return *)
+          rewrite (Hunlock from) in Hch.
+          replace (Instances.generic_eq Machine Machine) with true in Hch
+            by (vm_compute; reflexivity).
+          match type of Hch with
+          | context [ pmpCheckRWX ?E acc ] =>
+              destruct (Hrwx E) as (bx & Hbx); rewrite Hbx in Hch
+          end; destruct bx; (mpmp_red Hch;
+            exists rs5; split; [exact Hag''|exact Hch]).
+      + (* i = 0: no previous entry; cfg, then entry pmpcfg + pmpaddr *)
+        mpmp_peel_D pmpcfg_n Hch Hstop' HD rs3 Hag3.
+        rewrite (Hag' _ HD) Hpcfg in Hch.
+        mpmp_red Hch.
+        mpmp_peel_any pmpcfg_n Hch Hstop' w4 rs4 Hag4. mpmp_red Hch.
+        mpmp_peel_any pmpaddr_n Hch Hstop' v2 rs5 Hag5. mpmp_red Hch.
+        assert (Hag'' : reg_agree_on D rs5 rs).
+        { intros r Hr.
+          rewrite (Hag5 r Hr) (Hag4 r Hr) (Hag3 r Hr).
+          exact (Hag' r Hr). }
+        match type of Hch with
+        | context [ pmpMatchAddr ?PA ?W ?ENT ?PD ?PV ] =>
+            destruct (mpmp_matchaddr_off_local PA W ENT PD PV
+                        ltac:(apply Hoff)) as [Hm|Hm]
         end; rewrite Hm in Hch; mpmp_red Hch.
         * exact (IH (Z.add from 1) rs5 l' Hag'' Hch Hstop').
         * rewrite (Hunlock from) in Hch.
@@ -391,6 +524,49 @@ Section swp_pmp.
     exact (swp_span Drw Dro Df rs rs _ None Hdisj
              (mpmp_hval_ifetch2 (Drw ∪ Dro) Drw pcfg addr rs
                 HD Hunlock Halign Hpcfg)).
+  Qed.
+
+  (* the all-OFF PMP at width 8, store and load: the M-mode data accesses *)
+  Lemma swp_pmpCheck_store8_off (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pcfg : type_of_register pmpcfg_n)
+      (addr : SailStdpp.Values.mword 64) :
+    Drw ## Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    pmp_all_off pcfg ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (pmpCheck (Physaddr addr) 8 (Store Data) Machine)
+      (fun r => ⌜r = None⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hoff Hpcfg.
+    exact (swp_span Drw Dro Df rs rs _ None Hdisj
+             (mpmp_hval_off (Drw ∪ Dro) Drw pcfg addr rs 8 (Store Data)
+                ltac:(intros ent; eexists; reflexivity) HD Hoff Hpcfg)).
+  Qed.
+
+  Lemma swp_pmpCheck_load8_off (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pcfg : type_of_register pmpcfg_n)
+      (addr : SailStdpp.Values.mword 64) :
+    Drw ## Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    pmp_all_off pcfg ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (pmpCheck (Physaddr addr) 8 (Load Data) Machine)
+      (fun r => ⌜r = None⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hoff Hpcfg.
+    exact (swp_span Drw Dro Df rs rs _ None Hdisj
+             (mpmp_hval_off (Drw ∪ Dro) Drw pcfg addr rs 8 (Load Data)
+                ltac:(intros ent; eexists; reflexivity) HD Hoff Hpcfg)).
   Qed.
 
   Lemma swp_pmpCheck_store4 (Drw Dro : gset register)
