@@ -273,7 +273,15 @@ Section WPExec.
      rules absorb that arm by Löb.  Only the conditional-write rule needs to
      KNOW [r] (to learn the RMW's old value), and that is the rule that will
      hand [state_interp] the [resv_frag]/[resv_ok] pair. *)
+  (* THE RESERVATION-AGNOSTIC FORM.  Usable exactly by the rules whose arms
+     never touch the hart's reservation -- register nodes, announces, plain
+     and MMIO READS -- because writing back the value already there is a
+     no-op on the mirror's auth ([RiscvPtsto.resv_map_insert_id]).  Every arm
+     that CHANGES it (any RAM/MMIO write, the exclusive read, the [Ret]
+     boundary) needs [wp_hart_step_resv] below instead: a [ghost_map] auth
+     cannot be updated without its fragment. *)
   Lemma wp_hart_step (m : M unit) :
+    (forall oth σ r m' σ' r', mnode_step oth σ r m m' σ' r' -> r' = r) ->
     gen_cert -∗
     (∀ σ oth r, mstate_interp σ ={⊤,∅}=∗
        ∃ m0 σ0 r0, ⌜mnode_step oth σ r m m0 σ0 r0⌝ ∗
@@ -282,6 +290,7 @@ Section WPExec.
                WP (HartE gen_id cpu_id m' : expr riscv_lang))) -∗
     WP (HartE gen_id cpu_id m : expr riscv_lang).
   Proof.
+    intros Hpres.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
@@ -319,7 +328,7 @@ Section WPExec.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
@@ -356,7 +365,19 @@ Section WPExec.
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
     iFrame "Hgr' Hmem' Hdev'".
-    iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2.
+    iSplitL "Hdauth".
+    { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2. }
+    (* the mirror: this rule's arms preserve the reservation, so the auth's
+       map is unchanged; [resv_ok] comes from the language's own step
+       invariant. *)
+    iSplitL "Hresv".
+    { iEval (rewrite /resv_auth_at) in "Hresv".
+      rewrite /resv_auth_at
+        (resv_map_insert_id g.(gresv) cpu_id r2
+           (eq_sym (Hpres _ _ _ _ _ _ Hnode))).
+      iFrame "Hresv". }
+    iPureIntro.
+    exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
   Qed.
 
   (* THE BOUNDARY RULE, derived: at [Loop] the only node is the restart, so
