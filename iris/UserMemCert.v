@@ -2497,3 +2497,405 @@ Proof.
                (fun j Hj => proj2 (proj2 (Hwin j ltac:(lia)))) Hstep)
     | exact Hcfg0 | exact Hpins0 ].
 Qed.
+
+(* ===================================================================== *)
+(* 14. THE AMO BRICKS THAT DID NOT EXIST, and [u_amo_pure].               *)
+(*                                                                       *)
+(* [UserMemAccess] ends with a "THE AMO PMA BRICK -- PORT PENDING" note:   *)
+(* the LR/SC [pmaCheck] pair was ported but the atomic one was not, on the *)
+(* diagnosis that [RiscvExtras.pma_ok_peel]'s assert-arm fires and its     *)
+(* [execR_liftR_seq] then fails to match.  IT DOES MATCH.  The atomic arm  *)
+(* of [pmaCheck] is structurally the LR/SC arm -- [assert_exp' res_or_con] *)
+(* then a [returnR] of an [andb] of attribute fields -- so [pma_ok_peel]   *)
+(* closes it unchanged once the FIELD hypothesis is spelled as the whole   *)
+(* three-way [andb] the arm returns (readable, writable, and              *)
+(* [pma_allows_atomic_op] at THIS op and width).  All three are conjuncts  *)
+(* of [pma_allows_all]'s RAM class, so nothing new is assumed.            *)
+(* ===================================================================== *)
+
+Lemma exec_pmaCheck_ram_amo_ok (k : Z) (addr : mword 64)
+    (pbmt : page_based_mem_type) (region : PMA_Region) (op : amoop) (aq rl : bool) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable)
+    (andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable)
+       (pma_allows_atomic_op
+          (override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support) op k))
+    = true ->
+  exec (pmaCheck (Physaddr addr) k (Atomic (op, aq, rl, Data, Data)) pbmt true) s
+    = Some (Ok pma_ok_aligned, s).
+Proof.
+  intros Hmatch Halign Hfield.
+  destruct region as [rbase rsize rattr rdtree].
+  (* THE AMO ARM SCRUTINISES [op].  Every branch is identical, but the
+     generated [match op with AMOSWAP | _ => ...] blocks [cbn match] at a
+     symbolic op -- which is what made [pma_ok_peel]'s assert arm report
+     "does not match any subterm" and left this brick unported in P4a.
+     One [destruct op] in front of the tactic is the whole fix. *)
+  destruct op;
+    match goal with
+    | |- context[Atomic (?o, _, _, _, _)] =>
+        pma_ok_peel Hmatch Hfield (exec_is_mag_applicable_amo o aq rl k s) Halign
+    end.
+Qed.
+
+Lemma goodmb_pmaCheck_ram_amo_ok (Dr Dw : register -> bool) (k : Z) (addr : mword 64)
+    (pbmt : page_based_mem_type) (region : PMA_Region) (op : amoop) (aq rl : bool)
+    s mm :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable)
+    (andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable)
+       (pma_allows_atomic_op
+          (override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support) op k))
+    = true ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) k (Atomic (op, aq, rl, Data, Data)) pbmt true)
+    s mm = true.
+Proof.
+  intros HD Hmatch Halign Hfield.
+  assert (Hrg : goodmb Dr Dw (Defs.read_reg pma_regions : M _) s mm = true)
+    by (rewrite goodmb_read_reg; exact HD).
+  unfold pmaCheck. apply goodmb_cer.
+  gmm_lift Hrg (exec_read_reg pma_regions s). cbn beta.
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hfield |- *.
+  (* same [destruct op] as the exec twin, and for the same reason *)
+  destruct op;
+    (cbn match;
+     erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ];
+     cbn match beta;
+     cbn [Riscv.rv64d.not negb];
+     match goal with |- context[Defs.assert_exp' true ?msg] =>
+       gmxlR (goodmb_assert_exp'_true Dr Dw msg s mm) (exec_assert_exp'_true msg s) end;
+     cbn beta;
+     erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ];
+     cbn match beta;
+     rewrite Hfield; cbn [Riscv.rv64d.not negb]; cbn match;
+     match goal with |- context[Atomic (?o, _, _, _, _)] =>
+       gmm_lift (goodmb_mag_pma_check_aligned Dr Dw (override_PMA rattr pbmt)
+                   (Atomic (o, aq, rl, Data, Data)) (Physaddr addr) k true s mm
+                   (goodmb_returnm Dr Dw true s mm)
+                   (exec_is_mag_applicable_amo o aq rl k s) Halign)
+                (exec_mag_pma_check_aligned (override_PMA rattr pbmt)
+                   (Atomic (o, aq, rl, Data, Data)) (Physaddr addr) k true s
+                   (exec_is_mag_applicable_amo o aq rl k s) Halign) end;
+     cbn beta; cbn match; apply goodmb_returnm).
+Qed.
+
+Lemma exec_pmpCheck_user_grant_amo (op : amoop) (aq rl : bool) (a : mword 64)
+    (width : Z) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0))
+    ('b"1") = true ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0))
+    ('b"1") = true ->
+  exec (pmpCheck (Physaddr a) width (Atomic (op, aq, rl, Data, Data)) User) s
+    = Some (None, s).
+Proof.
+  intros HA Hord Hrange HR HW.
+  (* TWO shape notes, neither of which the InstructionFetch / Load / Store
+     versions of this lemma need.  [sys_pmp_count] is OPAQUE in this import
+     set (PtWalkCert makes it so), so [cbn] cannot decide the loop guard and
+     the [if] has to be closed by hand; and the entry-0 body is then the LEFT
+     operand of the loop's own bind, so the peel starts one level in and the
+     early return is carried out by [UserMemMis.execR_bind_inl]. *)
+  destruct op;
+    (unfold pmpCheck; rewrite exec_catch_early_return;
+     replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity);
+     cbn zeta;
+     rewrite execR_bind0;
+     match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
+       assert (Hfe : execR (foreach_ZM_up F T S V B) s = Some (inl None, s));
+       [ unfold foreach_ZM_up; cbn [foreach_ZM_up'];
+         replace (0 <=? sys_pmp_count - 1) with true by (vm_compute; reflexivity);
+         change (0 >? 0) with false; cbn match;
+         rewrite bindR_ret; cbn beta;
+         lazymatch goal with |- execR (Defs.bind ?inner ?kk) s = _ =>
+           assert (Hin : execR inner s = Some (inl None, s));
+           [ rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)); cbn beta;
+             rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpReadAddrReg_val 0 s)); cbn beta;
+             rewrite (execR_liftR_seq _ _ _ _ _
+                        (exec_pmpMatchAddr_TOR_match a (to_bits 64 width)
+                           (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                           (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
+                           (zeros' 64) s HA Hord Hrange)); cbn beta;
+             cbn match;
+             unfold or_boolM;
+             rewrite execR_bind;
+             match goal with
+             | |- context[pmpCheckRWX ?e ?acc] =>
+                 assert (Hrwx : exec (pmpCheckRWX e acc) s = Some (true, s))
+                   by (unfold pmpCheckRWX; cbn match; rewrite HR; rewrite HW;
+                       apply exec_returnm);
+                 rewrite (execR_liftR_seq _ _ _ _ _ Hrwx)
+             end;
+             cbn match; rewrite (execR_returnm_fwd true s); cbn match beta;
+             rewrite execR_bind; rewrite execR_returnR; cbn match;
+             unfold early_return, throw; cbn [execR]; cbn match; reflexivity
+           | exact (execR_bind_inl _ kk s s None Hin) ]
+         end
+       | rewrite Hfe; cbn match; reflexivity ] end).
+Qed.
+
+Lemma goodmb_pmpCheck_user_grant_amo (Dr Dw : register -> bool) (op : amoop)
+    (aq rl : bool) (a : mword 64) (width : Z) s mm :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0))
+    ('b"1") = true ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0))
+    ('b"1") = true ->
+  goodmb Dr Dw (pmpCheck (Physaddr a) width (Atomic (op, aq, rl, Data, Data)) User)
+    s mm = true.
+Proof.
+  intros HDc HDa HA Hord Hrange HR HW.
+  apply (goodmb_pmpCheck_grant Dr Dw a width (Atomic (op, aq, rl, Data, Data)) User
+           s mm HDc HDa HA Hord Hrange);
+    [ unfold pmpCheckRWX; cbn match; rewrite HR; rewrite HW; apply exec_returnm
+    | unfold pmpCheckRWX; cbn match; apply goodmb_returnm ].
+Qed.
+
+(* --- the two flag side conditions an AMO always satisfies --- *)
+Lemma mem_flags_ok_amo (aq rl : bool) : mem_flags_ok aq (andb aq rl).
+Proof. unfold mem_flags_ok. destruct aq; [ by left | by right ]. Qed.
+
+Lemma wr_flags_ok_amo (aq rl : bool) : wr_flags_ok (andb aq rl) rl.
+Proof.
+  unfold wr_flags_ok. destruct rl; [ by right |].
+  left. by rewrite andb_false_r.
+Qed.
+
+(* ===================================================================== *)
+(* [u_amo_pure] -- THE PURE U-MODE ATOMIC.                                *)
+(*                                                                       *)
+(* Four model calls, in the order the AMO leaf issues them: the walk, the  *)
+(* effective-address announcement, the READ and the WRITE, all at          *)
+(* [Atomic (op, aq, rl, Data, Data)].  THE ACCESS TYPE'S aq/rl AND THE MEM *)
+(* LEVEL'S ARE AGAIN NOT THE SAME PAIR: the leaf reads at [(aq, aq && rl)] *)
+(* and writes at [(aq && rl, rl)] (UserMemClassifyAmo), and both of those  *)
+(* satisfy the shells' side conditions unconditionally.                    *)
+(*                                                                       *)
+(* Width up to 8.  The 128-bit AMOCAS.Q path has its own layer            *)
+(* ([UserMemClassifyAmo]'s width-16 section) and is not covered here.      *)
+(* ===================================================================== *)
+
+Lemma u_amo_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w va : mword 64) (v : mword (8 * k)) (op : amoop) (aq rl : bool) :
+  0 < k -> k <= 8 -> (k | 4096) -> uint (to_bits 64 k) = k ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (Atomic (op, aq, rl, Data, Data)) w ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (dv : mword (8 * k)) (rs' : regstate) (mm' mm2 : pamap) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (Atomic (op, aq, rl, Data, Data)))
+      (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rs' mm') /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Atomic (op, aq, rl, Data, Data)))
+      (u_state rs mm) mm = true /\
+    exec (mem_write_ea (Physaddr (u_walk_pa w va)) k
+            (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
+      (u_state rs' mm') = Some (Ok tt, u_state rs' mm') /\
+    goodmb Du_r Du_w (mem_write_ea (Physaddr (u_walk_pa w va)) k
+            (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
+      (u_state rs' mm') mm' = true /\
+    exec (mem_read (Atomic (op, aq, rl, Data, Data)) PBMT_PMA
+            (Physaddr (u_walk_pa w va)) k aq (andb aq rl) true) (u_state rs' mm')
+      = Some (Ok dv, u_state rs' mm') /\
+    goodmb Du_r Du_w (mem_read (Atomic (op, aq, rl, Data, Data)) PBMT_PMA
+            (Physaddr (u_walk_pa w va)) k aq (andb aq rl) true)
+      (u_state rs' mm') mm' = true /\
+    exec (mem_write_value (Physaddr (u_walk_pa w va)) k v
+            (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
+      (u_state rs' mm') = Some (Ok true, u_state rs' mm2) /\
+    goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w va)) k v
+            (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
+      (u_state rs' mm') mm' = true /\
+    (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
+    u_mem_step P t t' mm mm' /\
+    u_mem_step P t t' mm mm2 /\
+    u_data_cfg rs' /\ u_exec_pins P t' rs'.
+Proof.
+  intros Hk Hk8 Hkdvd Huintk Hal Hl Hleaf Hcanon Hcfg Hpins Hwf.
+  assert (Hp : in_one_page va k) by exact (in_one_page_aligned va k Hk Hkdvd Hal).
+  destruct (u_walk_pure (Atomic (op, aq, rl, Data, Data)) P t mm rs w va
+              (or_intror (or_intror (or_intror (or_intror (or_intror
+                 (ex_intro _ op (ex_intro _ aq (ex_intro _ rl eq_refl))))))))
+              Hl Hleaf Hcanon Hcfg Hpins Hwf)
+    as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
+  pose proof Hcfg' as Hcfg0. pose proof Hpins' as Hpins0.
+  set (pa := u_walk_pa w va).
+  set (s' := u_state rs' mm').
+  set (ac := Atomic (op, aq, rl, Data, Data)).
+  pose proof (u_page_window P t' mm' k w va Hk Hp Hwf' Hl) as Hwin.
+  assert (Hown : bytes_owned mm' pa (Z.to_N k) = true)
+    by exact (u_page_owned P t' mm' k w va Hk Hp Hwf' Hl).
+  assert (Hdev : dev_addr pa = false)
+    by exact (u_mem_wf_not_dev_data P t' mm' w va Hwf' Hl).
+  destruct Hcfg' as (Lcp & Lms & Lmenv).
+  destruct Lms as (Lsxl & Lmprv & _).
+  destruct Hpins' as (Hhw & _ & Hpt & _).
+  destruct Hhw as (Hmisa & _ & _ & Hhtif & Hall & _).
+  destruct Hpt as (_ & HA & Hord & _ & HW & HR & Hcovp).
+  assert (Hram0 : addr_is_ram pa)
+    by (rewrite <- (pa_add_0 pa); exact (proj1 (proj2 (Hwin 0%nat ltac:(lia))))).
+  assert (Hramk : addr_is_ram (pa_add pa (Z.to_nat k - 1)))
+    by exact (proj1 (proj2 (Hwin (Z.to_nat k - 1)%nat ltac:(lia)))).
+  destruct (pma_all_ram Hall pa k
+              (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
+                 Hram0 Hramk (pma_width_le k 8 Hk Hk8 eq_refl)))
+    as (region & Hpmam & _ & Hrd & Hwrb & Hatom & _ & _ & _ & _).
+  assert (Halign : is_aligned_paddr (Physaddr pa) k = true)
+    by exact (pa_aligned_div _ va k Hk Hkdvd Hal).
+  assert (Hgate : andb (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable)
+                    (andb (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_writable)
+                       (pma_allows_atomic_op
+                          (override_PMA (PMA_Region_attributes region) PBMT_PMA)
+                            .(PMA_atomic_support) op k)) = true).
+  { rewrite Hrd. rewrite Hwrb. cbn [andb].
+    exact (Hatom op k ltac:(apply Z.leb_le; lia)). }
+  assert (Hpmae : exec (pmaCheck (Physaddr pa) k ac PBMT_PMA true) s'
+                  = Some (Ok pma_ok_aligned, s'))
+    by exact (exec_pmaCheck_ram_amo_ok k pa PBMT_PMA region op aq rl s'
+                Hpmam Halign Hgate).
+  assert (Hpmag : goodmb Du_r Du_w (pmaCheck (Physaddr pa) k ac PBMT_PMA true)
+                    s' mm' = true)
+    by exact (goodmb_pmaCheck_ram_amo_ok Du_r Du_w k pa PBMT_PMA region op aq rl s' mm'
+                ltac:(vm_compute; reflexivity) Hpmam Halign Hgate).
+  assert (Hcpe : exec (check_pma_with_pmp_priority ac PBMT_PMA User
+                         (Physaddr pa) k true) s' = Some (Ok pma_ok_aligned, s')).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _ Hpmae). cbn match. apply exec_returnM. }
+  assert (Hcpg : goodmb Du_r Du_w (check_pma_with_pmp_priority ac PBMT_PMA User
+                    (Physaddr pa) k true) s' mm' = true)
+    by exact (goodmb_check_pma_with_pmp_priority Du_r Du_w _ _ User _ _ true _ s' mm'
+                Hpmag Hpmae).
+  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+            (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
+            (uint pa) (uint (to_bits 64 k)) = PMP_Match)
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+                ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
+  assert (Hpmpe : exec (pmpCheck (Physaddr pa) k ac User) s' = Some (None, s'))
+    by exact (exec_pmpCheck_user_grant_amo op aq rl pa k s' HA Hord Hrange HR HW).
+  assert (Hpmpg : goodmb Du_r Du_w (pmpCheck (Physaddr pa) k ac User) s' mm' = true)
+    by exact (goodmb_pmpCheck_user_grant_amo Du_r Du_w op aq rl pa k s' mm'
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                HA Hord Hrange HR HW).
+  assert (Hclint : exec (within_clint (Physaddr pa) k) s' = Some (false, s'))
+    by exact (within_clint_false pa k s' (addr_is_ram_not_in_clint _ Hram0) Hk).
+  assert (Hsig : exec (within_sig (Physaddr pa) k) s' = Some (false, s'))
+    by exact (within_sig_false pa k s' (addr_is_ram_not_in_sig _ Hram0) Hk).
+  assert (Hmmiore : exec (within_mmio_readable (Physaddr pa) k) s' = Some (false, s')).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hclint). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (within_htif_false pa k s' Hhtif)).
+    cbn match. reflexivity. }
+  assert (Hmmiorg : goodmb Du_r Du_w (within_mmio_readable (Physaddr pa) k) s' mm' = true)
+    by exact (goodmb_within_mmio_readable Du_r Du_w pa k s' mm'
+                ltac:(vm_compute; reflexivity) Hhtif Hclint Hsig).
+  assert (Hmmiowe : exec (within_mmio_writable (Physaddr pa) k) s' = Some (false, s')).
+  { unfold within_mmio_writable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hclint). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _
+               (within_htif_writable_false pa k s' Hhtif)). cbn match. reflexivity. }
+  assert (Hmmiowg : goodmb Du_r Du_w (within_mmio_writable (Physaddr pa) k) s' mm' = true)
+    by exact (goodmb_within_mmio_writable Du_r Du_w pa k s' mm'
+                ltac:(vm_compute; reflexivity) Hhtif Hclint Hsig).
+  assert (Heffe : exec (effectivePrivilege ac (register_lookup mstatus rs')
+                          (register_lookup cur_privilege rs')) s' = Some (User, s')).
+  { rewrite Lcp.
+    exact (exec_effectivePrivilege_mprv0 ac (register_lookup mstatus rs') User s' Lmprv). }
+  (* the READ half *)
+  destruct (exec_read_kind_of_flags_resv aq (andb aq rl) s' (mem_flags_ok_amo aq rl))
+    as (rk & Hrk & Hrkf).
+  assert (Hrbne : read_bytes mm' pa (Z.to_N k) <> None)
+    by (apply read_bytes_is_Some; intros j Hj; exact (proj1 (Hwin j ltac:(lia)))).
+  destruct (exec_read_ram_resv_gen rk k pa s' Hrk Hdev Hrbne) as (dv & Hrame).
+  assert (Hchkre : exec (checked_mem_read ac PBMT_PMA User (Physaddr pa) k
+                           aq (andb aq rl) true false) s'
+                   = Some (Ok (dv, default_meta), s'))
+    by exact (exec_checked_mem_read_u k Hk ac PBMT_PMA User pa aq (andb aq rl) true
+                rk dv s' Hcpe Hrkf Hpmpe Hmmiore Hrame).
+  assert (Hchkrg : goodmb Du_r Du_w (checked_mem_read ac PBMT_PMA User (Physaddr pa) k
+                     aq (andb aq rl) true false) s' mm' = true)
+    by exact (goodmb_checked_mem_read_u Du_r Du_w k Hk ac PBMT_PMA User pa
+                aq (andb aq rl) true rk dv s' mm' Hcpe Hcpg Hrkf
+                (goodmb_read_kind_of_flags_resv Du_r Du_w aq (andb aq rl) s' mm'
+                   (mem_flags_ok_amo aq rl))
+                Hpmpe Hpmpg Hmmiore Hmmiorg Hdev Hown (rk_resv_ram_ok rk Hrk) Hrame).
+  (* the WRITE half *)
+  destruct (exec_write_kind_of_flags_cond (andb aq rl) rl s' (wr_flags_ok_amo aq rl))
+    as (wk & Hwk & Hwkf).
+  destruct (exec_write_ram_cond_gen wk k pa v s' Hwk Hdev) as (nn & vv & Hwre).
+  assert (Hchkwe : exec (checked_mem_write (Physaddr pa) k v ac PBMT_PMA User tt
+                           (andb aq rl) rl true) s'
+                   = Some (Ok true,
+                           MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N k) vv)
+                             s'.(mdev)))
+    by exact (exec_checked_mem_write_u k Hk ac PBMT_PMA User pa (andb aq rl) rl true
+                wk v s' _ Hcpe Hwkf Hpmpe Hmmiowe Hwre).
+  assert (Hchkwg : goodmb Du_r Du_w (checked_mem_write (Physaddr pa) k v ac PBMT_PMA
+                     User tt (andb aq rl) rl true) s' mm' = true)
+    by exact (goodmb_checked_mem_write_u Du_r Du_w k Hk ac PBMT_PMA User pa
+                (andb aq rl) rl true wk v s' _ mm' Hcpe Hcpg Hwkf
+                (goodmb_write_kind_of_flags_cond Du_r Du_w (andb aq rl) rl s' mm'
+                   (wr_flags_ok_amo aq rl))
+                Hpmpe Hpmpg Hmmiowe Hmmiowg Hdev Hown (wk_cond_ram_ok wk Hwk) Hwre).
+  exists dv, rs', mm', (write_bytes mm' pa (Z.to_N k) vv), t'. split_and!;
+    [ exact Htr | exact Htrg
+    | exact (exec_mem_write_ea_u k Hk pa ac PBMT_PMA User (andb aq rl) rl true wk s'
+               Heffe Hcpe Hwkf Hpmpe)
+    | exact (goodmb_mem_write_ea_u Du_r Du_w k Hk pa ac PBMT_PMA User
+               (andb aq rl) rl true wk s' mm'
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (goodmb_effectivePrivilege_mprv0 Du_r Du_w ac
+                  (register_lookup mstatus rs') (register_lookup cur_privilege rs')
+                  s' mm' Lmprv)
+               Heffe Hcpg Hcpe
+               (goodmb_write_kind_of_flags_cond Du_r Du_w (andb aq rl) rl s' mm'
+                  (wr_flags_ok_amo aq rl)) Hwkf Hpmpg Hpmpe)
+    | exact (exec_mem_read_of_checked_u ac PBMT_PMA pa k dv User aq (andb aq rl) true
+               s' (mem_flags_ok_amo aq rl) Heffe Hchkre)
+    | exact (goodmb_mem_read_of_checked_u Du_r Du_w ac PBMT_PMA pa k dv User
+               aq (andb aq rl) true s' mm' (mem_flags_ok_amo aq rl)
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (goodmb_effectivePrivilege_mprv0 Du_r Du_w ac
+                  (register_lookup mstatus rs') (register_lookup cur_privilege rs')
+                  s' mm' Lmprv)
+               Heffe Hchkrg Hchkre)
+    | exact (exec_mem_write_value_of_checked_u ac PBMT_PMA pa k v true User
+               (andb aq rl) rl true s' _ Heffe Hchkwe)
+    | exact (goodmb_mem_write_value_of_checked_u Du_r Du_w ac PBMT_PMA pa k v true
+               User (andb aq rl) rl true s' _ mm'
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (goodmb_effectivePrivilege_mprv0 Du_r Du_w ac
+                  (register_lookup mstatus rs') (register_lookup cur_privilege rs')
+                  s' mm' Lmprv)
+               Heffe Hchkwg Hchkwe)
+    | exact Hfile | exact Htlbok' | exact Hstep
+    | exact (u_mem_step_write_in P t t' mm mm' pa (Z.to_N k) vv
+               (fun j Hj => proj2 (proj2 (Hwin j ltac:(lia)))) Hstep)
+    | exact Hcfg0 | exact Hpins0 ].
+Qed.
