@@ -433,37 +433,38 @@ store arm (`RiscvLang.wr_node`'s comment), which is why
 
 #### What is left, in order
 
-1. **THE `swp` FACE OF `HartAmo.wp_hart_amo`**, and it is blocked on ONE
-   thing that is worth naming precisely before starting.
+1. **`HartAmo.wp_hart_amo`'s WINDOW PREMISE MUST MOVE INSIDE THE FUPD.**
+   (The `swp` face itself is DONE -- `swp_hart_amo`, with the `hsil`/context
+   commutation it needed; see `4d0f3c2b` and `4a64cb4a`.)
 
-   The fused rule names its window with `hsil k D (rs, hread_resume … m)` --
-   `HartLift`'s computable silent stepper.  Under `swp` the region always
-   sits inside a context (`update_and_write_pte` is inside
-   `translate_TLB_hit` inside `translate` inside `translateAddr` inside
-   `fetch`), and `swp`'s ∀-bound `C` is opaque, so the premise has to be
-   discharged for `C m` from a fact about `m`.  `mctx C` gives exactly that
-   at the head node -- and `hsil_node` looks only at the head node -- but the
-   commutation CANNOT EVEN BE STATED, because `hsil` is pinned at `M unit`
-   (`hcur := regstate * M unit`) while the inner `m` is an `M X`.
+   The fused rule currently demands its window fact **for every possible read
+   value**:
 
-   Two ways out; the first is the one to take.
+   ```
+   (forall w, hwrite_req_at nw (hsil k D (rs, hread_resume (bv_unsigned w) m)).2
+              = Some (wreq w)) ->
+   ```
 
-   - **Generalize `hsil_node` / `hrun_silent` / `hsil` / `hcur` from
-     `M unit` to `M X`, in place.**  The bodies are already X-agnostic --
-     nothing in `hsil_node` uses unit-ness -- so this is an additive
-     generalization with every existing use instantiating at `X := unit`.
-     Touches `HartLift`, `HartAmo`, `HartSpan`, `HartLift2`, `HartPilot`.
-     Then the commutation (`hsil_node D rs (C m)` follows the inner walk,
-     given `mctx C`) is statable and cheap.
-   - Bridge `hspan` (the swp layer's walker: X-generic, relational, and it
-     already STOPS at memory nodes, which is exactly the window's shape) to
-     `hsil`.  No such bridge exists -- `HartSpanChar` has none -- and the two
-     walkers are different in kind (computable vs relational), so this is the
-     larger job despite looking like the natural one.
+   That is too strong here, and not by a technicality.  The A/D write-back's
+   window runs `check_leaf_pte` on the RE-READ word; a word failing its checks
+   EARLY-RETURNS, so the walk never reaches the conditional write and
+   `hwrite_req_at` is `None`.  (The same `w` also breaks `swp_hart_amo`'s
+   `hsil_opaque` side condition, for the same reason -- an early return is
+   exactly what both exclude.)  So the premise is false for bad `w`, and no
+   caller can discharge it.
 
-   Also note for when it is unblocked: `wp_hart_amo` takes ONE frame
-   (`hreg_frame rs D`), not the `Drw`/`Dro` split the swp layer uses, so the
-   face has to decide how the read-only half rides along.
+   The exec side does not have this problem because
+   `exec_translate_TLB_hit_pt_upd` takes the re-read word `m0` as a BINDER and
+   pins it with `pte_valid m0 -> pte_leaf m0 -> pte_no_napot m0 ->
+   pte_check_ok … m0 -> update_PTE_Bits m0 acc = Some m0'`.
+
+   The patch, and it is a rearrangement rather than a reproof: move the
+   per-`w` facts (the window, the write's `dev_addr`, its `ak_excl`, and the
+   `hsil_opaque` condition) INSIDE the caller's fupd, next to
+   `⌜read_bytes mm … = Some w⌝` where `w` is the ACTUAL value.  The rule's
+   own proof already builds its witness at the actual `w`, and the conclusion
+   already mentions `wreq w` only inside the fupd, so nothing else moves.
+
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
    `swp_translate_miss` both carry `update_PTE_Bits … = None` -- i.e. they
