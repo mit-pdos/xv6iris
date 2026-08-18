@@ -350,10 +350,19 @@ Section SRegimeDef.
      supplies that.  Hence EVERY hart can be in its Bare arm at once, and
      the arm survives the kernel map's growth (a secondary hart spins on
      [started] in Bare long after the boot hart's satp switch). *)
+  (* THE tlb CELL IS A MEMBER, added 2026-08-18 with the swp layer.  At the
+     exec layer nobody owned it (it lived in the sigma the whole-instruction
+     rule handed out); at the swp layer the S-mode frame [HartSFrame.s_Drw]
+     OWNS it, because a Sv39 fetch WRITES it (the TLB fill) and
+     [SRegime.sr_swp_translate] demands [(tlb : register) ∈ Drw].  So every
+     S-mode translation slot must fund that cell, and [tlb_res_pt] already
+     did -- this is the Bare arm catching up.  The cell is unconstrained
+     here: Bare never reads or writes it. *)
   Definition bare_inv : iProp Σ :=
-    (∃ satp0 : mword 64,
+    (∃ (satp0 : mword 64) (tlbv : type_of_register tlb),
        satp ↦ᵣ satp0 ∗
        ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4) ⌝ ∗
+       tlb ↦ᵣ tlbv ∗
        pmp_config (mword_of_int 0))%I.
 
   Lemma bare_absorb :
@@ -387,7 +396,7 @@ Section SRegimeDef.
   Proof.
     intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
     iIntros "Hat Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct "Hinv" as (satp0 tlbv0) "(Hsatp & %Hmode & Htlb0 & Hpmp)".
     (* honoring: the claim is ADMISSIBLE, i.e. the identity -- so the pa the
        caller derived from it is va itself, which is what Bare translates to *)
     assert (Hpa : pa = va).
@@ -404,7 +413,7 @@ Section SRegimeDef.
     iSplit; [iPureIntro; left; reflexivity |].
     iSplit; [iPureIntro; exact Hpmp |].
     iFrame "Hri Hgh".
-    iExists satp0. iFrame "Hsatp Hpmp". iPureIntro. exact Hmode.
+    iExists satp0, tlbv0. iFrame "Hsatp Htlb0 Hpmp". iPureIntro. exact Hmode.
   Qed.
 
   Lemma bare_transform :
@@ -420,7 +429,7 @@ Section SRegimeDef.
   Proof.
     intros acc ea σ Hacc Hcp HSXL Heff Hpml.
     iIntros "Hri Hinv".
-    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct "Hinv" as (satp0 tlbv0) "(Hsatp & %Hmode & Htlb0 & Hpmp)".
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iPureIntro.
     exact (exec_transform_effective_address_mode acc Bare ea σ Hcp Heff Hpml
@@ -435,7 +444,7 @@ Section SRegimeDef.
   Proof.
     intros σ HSXL.
     iIntros "Hri Hinv".
-    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct "Hinv" as (satp0 tlbv0) "(Hsatp & %Hmode & Htlb0 & Hpmp)".
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iPureIntro. exists Bare.
     exact (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode).
@@ -823,6 +832,18 @@ Proof.
   apply hfrun_ret.
 Qed.
 
+(* [SmodePte.pmp_config]'s pure half, named so the OPEN/CLOSE fields below
+   can hand it across without unfolding the bundle. *)
+Definition pmp_ent0_ok (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n) : Prop :=
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR
+  /\ zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false
+  /\ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true
+  /\ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true
+  /\ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true
+  /\ (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z.
+
 Section SRegimeSwp.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -899,6 +920,49 @@ Section SRegimeSwp.
                       ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                       hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                       sr_swp_res rsf ∗ resv_any cpu_id);
+
+    (* ---------------- THE BUNDLE FACE (added with the swp layer) --------
+       [sr_inv R] is what every S-mode LEAF carries and what the wrappers
+       must keep taking, but the swp engine needs the four cells the regime
+       hides inside it -- satp, tlb, pmpcfg_n, pmpaddr_n -- IN THE FRAME
+       ([HartSFrame.s_Drw] / [s_Dro]), because the walk reads and writes
+       them.  So the record gains an OPEN and a CLOSE, plus the residue as
+       a function of the two cell values it can depend on.
+
+       WHY THE RESIDUE IS INDEXED BY (satp, tlb) AND NOT BY THE FILE.  A
+       wrapper's file is a TOWER whose other components come out of
+       [pc_is] / [hw_config] existentially, so "the residue at the tower"
+       is not statable as a premise.  Every instance's residue reads the
+       file only through those two cells ([sr_swp_res_agree] is the law
+       that says so), and both are cells the bundle hands over, so the
+       indexed form is exactly as strong and can be named.
+
+       The two PURE side conditions travel the same way: [sr_swp_satp_ok]
+       is the regime's own constraint on the satp VALUE (Bare's mode, the
+       kernel table's mode/asid/root) and [pmp_ent0_ok] is entry 0's grant,
+       which is [SmodePte.pmp_config]'s pure half. *)
+    sr_swp_res_at : mword 64 -> type_of_register tlb -> iProp Σ;
+    sr_swp_satp_ok : mword 64 -> Prop;
+    sr_swp_res_agree : forall rs : regstate,
+      sr_swp_res_at (register_lookup satp rs) (register_lookup tlb rs)
+      ⊣⊢ sr_swp_res rs;
+    sr_swp_open :
+      sr_inv R -∗
+      ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+        (pcfg : type_of_register pmpcfg_n)
+        (paddr : type_of_register pmpaddr_n),
+        ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+        satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
+        pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+        sr_swp_res_at satp0 tlbv;
+    sr_swp_close : forall (satp0 : mword 64) (tlbv : type_of_register tlb)
+        (pcfg : type_of_register pmpcfg_n)
+        (paddr : type_of_register pmpaddr_n),
+      sr_swp_satp_ok satp0 ->
+      pmp_ent0_ok pcfg paddr ->
+      ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+        pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+        sr_swp_res_at satp0 tlbv -∗ sr_inv R;
   }.
 
   (* ---------------- the BARE instance ---------------- *)
@@ -987,8 +1051,52 @@ Section SRegimeSwp.
     iPureIntro. left. reflexivity.
   Qed.
 
+  (* the BARE bundle face.  The residue is nothing, so open/close are just
+     [bare_inv]'s own destructor/constructor plus [pmp_config]'s. *)
+  Definition bare_satp_ok (satp0 : mword 64) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4).
+
+  Lemma bare_swp_res_agree (rs : regstate) :
+    (True : iProp Σ) ⊣⊢ (True : iProp Σ).
+  Proof. reflexivity. Qed.
+
+  Lemma bare_swp_open :
+    bare_inv -∗
+    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗ (True : iProp Σ).
+  Proof.
+    iIntros "H". iDestruct "H" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iExists satp0, tlbv, pcfg, paddr.
+    iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR;
+      [ iPureIntro; unfold pmp_ent0_ok; split_and!; assumption |].
+    iFrame "Hsatp Htlb Hpcfg Hpaddr".
+  Qed.
+
+  Lemma bare_swp_close (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
+    bare_satp_ok satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+      pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗ (True : iProp Σ) -∗ bare_inv.
+  Proof.
+    intros Hmode (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "Hsatp Htlb Hpcfg Hpaddr _".
+    rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+    iSplitR; [iPureIntro; exact Hmode |].
+    iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
+              with "Hpcfg Hpaddr").
+  Qed.
+
   Definition bare_regime_swp : s_regime_swp bare_regime :=
-    SRegimeSwp bare_regime (fun _ => True%I) bare_swp_side bare_swp_translate.
+    SRegimeSwp bare_regime (fun _ => True%I) bare_swp_side bare_swp_translate
+      (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
+      bare_swp_open bare_swp_close.
 
   (* ---------------- the SHARED-KERNEL-TABLE instance ---------------- *)
 
@@ -1125,9 +1233,73 @@ Section SRegimeSwp.
     iPureIntro. exact Hshape.
   Qed.
 
+  (* the SHARED-KERNEL-TABLE bundle face.  [tlb_res_pt]'s destructor and
+     constructor, with the satp facts moved into [sr_swp_satp_ok] (they are
+     about the satp VALUE, not the residue) and the TLB coherence plus the
+     table invariant left as the residue. *)
+  Definition kpt_res_at (root_ppn : mword 44) (satp0 : mword 64)
+      (tv : type_of_register tlb) : iProp Σ :=
+    (tlb_snap_ok tv ∗ kpt_inv root_ppn)%I.
+
+  Definition kpt_satp_ok (root_ppn : mword 44) (satp0 : mword 64) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4)
+    /\ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
+       = (mword_of_int 0 : mword 16)
+    /\ autocast (T := mword)
+         (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn.
+
+  Lemma kpt_swp_res_agree (root_ppn : mword 44) (rs : regstate) :
+    kpt_res_at root_ppn (register_lookup satp rs) (register_lookup tlb rs)
+    ⊣⊢ kpt_swp_res root_ppn rs.
+  Proof. reflexivity. Qed.
+
+  Lemma kpt_swp_open (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      kpt_res_at root_ppn satp0 tlbv.
+  Proof.
+    iIntros "H". iDestruct "H" as (satp0 tlbv)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkpt)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iExists satp0, tlbv, pcfg, paddr.
+    iSplitR;
+      [ iPureIntro; unfold kpt_satp_ok; split_and!; assumption |].
+    iSplitR;
+      [ iPureIntro; unfold pmp_ent0_ok; split_and!; assumption |].
+    rewrite /kpt_res_at. iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkpt".
+  Qed.
+
+  Lemma kpt_swp_close (root_ppn : mword 44) (satp0 : mword 64)
+      (tlbv : type_of_register tlb) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    kpt_satp_ok root_ppn satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+      pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+      kpt_res_at root_ppn satp0 tlbv -∗ tlb_res_pt root_ppn.
+  Proof.
+    intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "Hsatp Htlb Hpcfg Hpaddr [Hsnap #Hkpt]".
+    rewrite /tlb_res_pt. iExists satp0, tlbv.
+    iFrame "Hsatp Htlb Hsnap Hkpt".
+    iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR; [iPureIntro; exact Hasid |].
+    iSplitR; [iPureIntro; exact Hppn |].
+    iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+              with "Hpcfg Hpaddr").
+  Qed.
+
   Definition kpt_share_regime_swp (root_ppn : mword 44)
       : s_regime_swp (kpt_share_regime root_ppn) :=
     SRegimeSwp (kpt_share_regime root_ppn) (kpt_swp_res root_ppn)
-      (kpt_swp_side root_ppn) (kpt_swp_translate root_ppn).
+      (kpt_swp_side root_ppn) (kpt_swp_translate root_ppn)
+      (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
+      (kpt_swp_res_agree root_ppn) (kpt_swp_open root_ppn)
+      (kpt_swp_close root_ppn).
 
 End SRegimeSwp.
