@@ -639,6 +639,42 @@ a conditional write is a plain store, as before.
    the `kptN` seam for it is HARDER than the read seam, because a write is not
    pure: it must take `ptree_own` out of the invariant, update it, and put it
    back, all inside one node.
+**2b. DECIDED (2026-08-18): THE KERNEL-TABLE LEAF IS EXISTENTIAL AT THE SWP
+LAYER, AND THE WRITE-BACK IS TAKEN PER NODE.**  Two facts settle it: xv6's
+`mappages` writes A/D-CLEAR words (0x0B/0x07 -- `KptPt.kperm_flags` is the
+PRESET variant only), so the Svadu write-back on the kernel table IS
+reachable; and `kpt_lb` agrees only up to `ptree_canon`, so a per-node opening
+sees the leaf as SOME A/D variant.  Hence:
+   - the PTE READ NODE goes PREDICATE-INDEXED: `swp_checked_mem_read_pte8_ex`
+     / `swp_read_pte_S_ex` (obligation `∀ σ, … ∃ w, read_bytes … = Some w ∧
+     P w`, post `∃ w, ⌜r = Ok w⌝ ∗ ⌜P w⌝ ∗ frames`); the pinned forms are the
+     instance `P := (= w)`;
+   - `CommonWalk`'s leaf arm and `HartSTrans.swp_translate_miss` get `_ex`
+     twins whose leaf is `∃ q0, pte_canon q0 = pte_canon p0` and whose leaf
+     hypotheses are the A/D-QUANTIFIED ones the tree already states (`∀ a d,
+     … (pte_set_ad p0 a d)`); the walk's ppn is A/D-stable, only the installed
+     entry carries the word read;
+   - `update_and_write_pte` is decided AFTER the read: `update_PTE_Bits q0 =
+     None` → the refresh arm (no memory event, the bridge carries it), `Some`
+     → `PtTreeAdue.swp_update_and_write_pte_upd` (its own re-read is
+     existential too: an `_ex` twin);
+   - the `kptN` WRITE SEAM: at the conditional-write node the caller knows
+     `read_bytes σ.mem addr0 8 = Some m0` (the cond-write rule, from the
+     reservation), opens `kptN`, `ptree_own_path_upd` gives the live leaf's
+     `↦ₚ₈` at full (its word IS `m0` by gen_heap agreement), writes it with
+     `PtTreeAdue.phys_word_pointsto_write`, closes with `ptree_set_leaf`;
+     `kpt_lb` is re-derived by `ptree_canon_set_leaf` (no ghost update),
+     the spec by `kpt_tree_spec_gen_set_leaf` -- exactly what
+     `KptShare.tlb_res_pt_translateAddr_at`'s exec proof does at its single
+     opening, split into per-node openings;
+   - the REGIME FIELD needs a companion `sr_swp_res : regstate → iProp`
+     (`True` for Bare; `tlb_snap_ok tlbv ∗ kpt_inv root_ppn`-shaped for the
+     kernel table), taken at the pre-file and returned at the landing file --
+     a fill moves `tlbv`, and `PtTree.tlb_ok_pt_fill` re-establishes it.
+   The stop report that found this is in `HartSKpt.v`'s closing note; the
+   pieces that DID land there: `kpt_noupd`, `kpt_addr_ok*`/`kpt_path_at`,
+   `swp_read_pte_kpt` (the pinned levels' read at the frame).
+
 3. **`swp_translate_kpt`** -- assembly: `PtTreeAdue.swp_translateAddr_pt_front`
    into (`swp_translate_hit` | `swp_translate_miss`), each with its `_upd` /
    `_refresh` arm; the hit/miss arm picked by destructing the slot in `tlbv`,
