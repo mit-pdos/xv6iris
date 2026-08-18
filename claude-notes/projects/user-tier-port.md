@@ -1883,3 +1883,104 @@ Also: the execute-level closers lost their landing DISJUNCTION premise
 `reg_agree_on u_Dfix` it was only ever used to produce — **the
 disjunction does not compose across the two walks a straddling access
 runs**, so it was the wrong premise from the start.
+
+## 16. P4b IS 17 / 19 — the compressed thirteen and LR (2026-08-18, session 2)
+
+### THE COMPRESSED THIRTEEN COST 860 LINES, AND THE REASON IS REUSABLE
+
+`UserMemArmsC.v`.  Every compressed memory instruction's `execute` is ONE
+`returnm` of an `ExecuteAs (LOAD …)` / `ExecuteAs (STORE …)` — the whole
+family EXPANDS to the base form and only then touches memory.  So the
+thirteen arms are **two engines plus thirteen one-line instantiations**:
+`arm_c_load_u` / `arm_c_store_u` at an arbitrary width and an arbitrary
+pair of register operands, and each arm names its own expansion.
+
+The only difference from `UserMemArmsBase`'s `arm_LOAD_u` / `arm_STORE_u`
+is the TICK and the CLOSER: the execute runs at `va+2` and closes
+`rvc_post` through `UserMemTotal.finish_mem_rvc` (which carries the
+`Ext_Zca` gate and the `ExecuteAs` redirect) instead of `finish_mem_base`.
+
+**THE ACCESS HALF IS TICK-AGNOSTIC AND WAS REUSED VERBATIM.**
+`u_vmem_read_pure` / `u_vmem_write_pure` take the ticked file as an opaque
+`regstate`; nothing about the trichotomy (`in_one_page_dec` crossed with
+`data_classify`) mentions where the file came from.  That is the general
+rule this package confirms twice: **state an access-level lemma on a
+`regstate`, never on the geometry that produced it** — the reward is that a
+whole instruction family lands as instantiations.
+
+Two things the compressed arms needed that the base ones did not:
+
+* **THE REDIRECT'S OWN STEP CERTIFICATE.**  `finish_mem_rvc` asks for
+  `goodmb` on `execute ci` as well as on `execute other`.  `execute ci` is
+  a `returnm`, so each `goodmb_execute_C_*_U` twin is one `reflexivity` —
+  but they have to EXIST, because **`goodmb` is not determined by `exec`**.
+* **THE `Ext_Zca` GATE RIDES `u_exec_pins`' misa PIN, NOT `post_fetch_cfg`**,
+  which does not carry misa at all.  `s0_zca` applied to
+  `(proj1 (proj1 Hpins))`.
+
+### LR: AN ATOMIC ACCESS IS NEVER SPLIT ACROSS A PAGE — IT IS REFUSED
+
+`UserMemArmsA.v`, `arm_LOADRES_u`.  This is the structural fact that makes
+the atomic arms' case tree SMALLER than the data arms', and it is worth
+stating because the obvious guess is the opposite:
+
+`plat_misaligned_exception` returns `None` for an ordinary load or store —
+the model then SPLITS the access on the page boundary, which is why
+`UserMemArmsBase`'s engine is a trichotomy crossed with `in_one_page_dec` —
+but at `res = true` (reserved / conditional / atomic) it returns
+`Some AccessFault` and the access faults **before any translation happens**
+(`UserMemAccess.plat_misaligned_lrsc`).  So LR/SC/AMO have three arms, not
+seven:
+
+| arm | outcome |
+|---|---|
+| misaligned | `E_Load_Access_Fault` / `E_SAMO_Access_Fault`, state untouched, no walk |
+| aligned + mapped | ONE page by construction (`in_one_page_aligned` at `(k \| 4096)`), one walk |
+| aligned + unmapped/denied | the ordinary translate fault |
+
+### `vm_compute` CANNOT DECIDE AN ACCESS-TYPE DISEQUALITY AT A SYMBOLIC FLAG
+
+`u_pmlen_pure` takes three `generic_neq acc …= true` premises.  At
+`acc := Load Data` they are `ltac:(vm_compute; reflexivity)`; at
+`acc := LoadReserved (aq, rl, Data)` **that silently fails to reduce** and
+the error is a page of the generated positive-indexed decision procedure
+with no mention of `aq`.  The tag is not closed until the booleans are.
+One `destruct aq, rl` in front is the whole fix — the SAME shape as the AMO
+PMA brick's (§15) — and `UserMemArmsA` hands the three in by name
+(`u_neq_lr` / `u_neq_sc` / `u_neq_amo`) rather than carrying an `ltac:`
+that fails at every use site.
+
+### THE CONTRACT CHECK IS NOW IN THE FILES, NOT IN A SCRATCH FILE
+
+§15 said to verify each arm's signature against `UserTotalU`'s frozen
+`Variable` mechanically.  The fourteen new arms carry that check as a
+`Definition arm_X_u_contract (pt : uptd) : <the Variable body, verbatim>
+:= arm_X_u pt.` at the foot of their file — a typing judgement rather than
+an eye comparison, and one that a later edit cannot drift past.
+
+### WHAT SC AND AMO STILL NEED (and it is NOT more of the same)
+
+`arm_STORECON_u` and `arm_AMO_u` are the last two.  Both are blocked on the
+same gap, and it is a real one:
+
+* **`UserMemCert.u_sc_pure` COVERS ONLY THE RESERVATION-HELD OUTCOME.**  It
+  concludes `mem_write_value … = Some (Ok true, …)`, i.e. the SC that
+  writes.  An SC whose reservation does not match returns `Ok false` and
+  writes nothing, and the arm cannot force which one happens: the
+  reservation is machine state the arm does not own.  So the SC arm needs a
+  SECOND composer (or `u_sc_pure` restated with the bool existential and
+  the map unchanged in the `false` case) before its case tree can close.
+  `UserMemArms.exec_execute_STORECON_u_ok` is already stated at an
+  arbitrary `b`, so the execute half is ready for both.
+* **BOTH PIN `uint rd <> 0`.**  `exec_execute_STORECON_u_ok` and
+  `exec_execute_LOADRES_u_ok` do; the LR arm already carries the
+  `gpr_write_state` shape fix (`exec/goodmb_execute_LOADRES_u_retire`, in
+  `UserMemArmsA` §0) and SC wants the same, else its whole case tree is
+  duplicated at `rd = x0`.
+* AMO additionally has the 128-bit `AMOCAS.Q` path, which has its own layer
+  (`UserMemClassifyAmo`), and `u_amo_pure` issues FOUR calls (walk,
+  `mem_write_ea`, `mem_read`, `mem_write_value`) whose aq/rl pairs are NOT
+  the access type's — the leaf reads at `(aq, aq && rl)` and writes at
+  `(aq && rl, rl)`.
+
+Neither is a day's work, but neither is a copy of the LR arm either.

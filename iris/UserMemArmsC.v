@@ -862,3 +862,170 @@ Section UserMemArmsC.
   Qed.
 
 End UserMemArmsC.
+
+(* ====================================================================== *)
+(* THE CONTRACT CHECK, MECHANICAL.                                        *)
+(*                                                                        *)
+(* Worklist section 15's rule: an arm's signature is long enough that a    *)
+(* silent mismatch with [UserTotalU]'s frozen [Variable] would surface     *)
+(* only at [ProofUser]'s instantiation, hundreds of files later.  Each     *)
+(* [Definition] below states that [Variable]'s body COPIED VERBATIM and    *)
+(* inhabits it with the arm, so the check is a typing judgement rather     *)
+(* than an eye comparison.  They cost nothing at run time and are the      *)
+(* cheapest possible regression test for the interface.                    *)
+(* ====================================================================== *)
+Definition arm_C_LW_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 5 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LW p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LW p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LW_u pt.
+
+Definition arm_C_LD_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 5 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LD p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LD p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LD_u pt.
+
+Definition arm_C_LWSP_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 6 * regidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LWSP p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LWSP p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LWSP_u pt.
+
+Definition arm_C_LDSP_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 6 * regidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LDSP p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LDSP p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LDSP_u pt.
+
+Definition arm_C_SW_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 5 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_SW p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_SW p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_SW_u pt.
+
+Definition arm_C_SD_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 5 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_SD p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_SD p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_SD_u pt.
+
+Definition arm_C_SWSP_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 6 * regidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_SWSP p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_SWSP p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_SWSP_u pt.
+
+Definition arm_C_SDSP_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 6 * regidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_SDSP p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_SDSP p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_SDSP_u pt.
+
+Definition arm_C_LBU_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 2 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LBU p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LBU p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LBU_u pt.
+
+Definition arm_C_LH_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 2 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LH p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LH p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LH_u pt.
+
+Definition arm_C_LHU_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 2 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_LHU p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_LHU p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_LHU_u pt.
+
+Definition arm_C_SB_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 2 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_SB p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_SB p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_SB_u pt.
+
+Definition arm_C_SH_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (h : mword 16) (p : bits 2 * cregidx * cregidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    exec (ext_decode_compressed h) (u_state rsf mm)
+      = Some (C_SH p, u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode_compressed h) (C_SH p) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    rvc_post pt t mm rsf va h
+  := arm_C_SH_u pt.

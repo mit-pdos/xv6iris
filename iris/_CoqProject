@@ -265,6 +265,7 @@ UserMemTotal.v
 UserMemClassify.v
 UserMemArmsBase.v
 UserMemArmsC.v
+UserMemArmsA.v
 UserMemClassifyAmo.v
 SpecUser.v
 ProofUser.v
