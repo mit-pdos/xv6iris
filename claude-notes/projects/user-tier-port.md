@@ -929,3 +929,21 @@ Decide it in P7, at `UserKernelBridge.userret_to_user_inv`.
   `gpr_file_of_enum`; `UserFrame.v` carries byte-identical copies because
   their real home is `WpGpr.v` and paying that cone now buys nothing.
   **Fold both copies into `WpGpr.v` at the milestone.**
+
+## 9. THE PAIR CONVENTION FOR THE TIER'S TOTALITY FACTS (decided 2026-08-18, binds P3/P4/P7)
+
+`base_exec_total_u` / `rvc_exec_total_u` (UserClassifyAsm.v) become PURE
+`Prop`s (§5.3, recommended route taken): they keep their NAMES and their
+`exec … = Some (r, s')` conjuncts, and gain, per arm, the certificate
+`goodmb Du_r Du_w (execute i) s mm = true` and the post-state
+characterisation (`u_result_ok r`, `u_mem_step P t t' s.(mem) s'.(mem)` /
+`mm' ⊆ s'.(mem)` as `swp_hmrun_of_exec` wants).  The reference state is
+always `s := MState rs mm dev0_state` with `rs` the frame's file and `mm` the
+owned map (`UserBytes.u_mem_wf P t mm`).  Memory twins (P3/P4) are stated
+generically in `(Dr Dw : register -> bool)` with `Dr r = true`/`Dw r = true`
+hypotheses (as P5/P6 did) and at an ARBITRARY `mm` with `u_mem_wf`-derived
+premises (`bytes_owned mm pa n = true`, `dev_addr pa = false`); the
+specialisation to `Du_r`/`Du_w` is `goodmb_mono`.  P7 owns the definition
+of the new `base_exec_total_u` shape and commits it FIRST (UserClassifyAsm.v);
+P4's `arm_*` conversions in UserMemClassify*.v code against that commit.
+The byte-map type is spelled `PtBytes.pamap` everywhere (§8.1).
