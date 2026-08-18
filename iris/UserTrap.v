@@ -839,6 +839,281 @@ Section UTrapReduce.
     assert (Heq = eq_refl) as -> by apply proof_irrel. reflexivity.
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* THE THREE ENTRY POINTS AT THE [swp] LAYER.  Each is a [swp_bind_use]  *)
+  (* chain of read-only prefixes around [swp_trap_handler_u] plus the one  *)
+  (* [nextPC] write of [set_next_pc]; nothing here touches [elp], so the   *)
+  (* split is paid once, above.                                            *)
+  (* ------------------------------------------------------------------- *)
+  Lemma goodmb_set_next_pc (Dr Dw : register -> bool) (v : mword 64)
+      (st : mstate) :
+    Dw nextPC = true -> goodmb Dr Dw (set_next_pc v) st ∅ = true.
+  Proof.
+    intro HWnpc. unfold set_next_pc. cbn match.
+    erewrite goodmb_bind0_empty;
+      [ apply goodmb_returnm
+      | etransitivity; [ apply goodmb_write_reg | exact HWnpc ]
+      | apply (exec_write_reg (R_bitvector_64 nextPC) v st) ].
+  Qed.
+
+  Lemma swp_exception_handler_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+      (Dr Dw : register -> bool) (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (e : ExceptionType) (xv : mword 64)
+      (Hc : c = rv64d_types.Exception e)
+      (Hinfo : info = xtval_exception_value e xv)
+      (Hdel : bit_to_bool (access_vec_dec (register_lookup medeleg s.(sregs))
+                (uint (exceptionType_bits_forwards e))) = true) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    Dr mstatus = true -> Dr elp = true -> Dr misa = true -> Dr scause = true ->
+    Dr cur_privilege = true -> Dr stvec = true ->
+    Dr stval = true -> Dr sepc = true -> Dr medeleg = true ->
+    Dw mstatus = true -> Dw scause = true ->
+    Dw stval = true -> Dw sepc = true -> Dw cur_privilege = true ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    elp_v = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    gen_cert -∗ resv_any cpu_id -∗
+    (R_bitvector_1 elp) ↦ᵣ□ (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (exception_handler User (make_sync_exception e xv) pc0)
+      (fun v => ⌜v = stvec_base stvec_v⌝ ∗
+        ∃ rs' : regstate,
+          ⌜reg_agree_on (Drw ∪ Dro) rs' s9.(sregs)⌝ ∗
+          hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗ resv_any cpu_id)%I.
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd.
+    intros Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+           HRmedel HWms HWsc HWstval HWsepc HWcp Hag0 Helpv.
+    assert (HESs : exec (currentlyEnabled Ext_S) s = Some (true, s)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. exact HmisaS. }
+    iIntros "#Hcert Hany #Helpc Hrw Hro".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    unfold exception_handler.
+    cbn [make_sync_exception sync_exception_trap sync_exception_excinfo
+         sync_exception_ext].
+    iApply (swp_bind_use (exception_delegatee e User) _ _ _
+              with "[Hany Hrw Hro] [-]").
+    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df (exception_delegatee e User)
+                s s Supervisor rs ∅ Hdisj HDr HDw Hag0 (map_empty_subseteq _)
+                (goodmb_exception_delegatee_U Dr Dw e _ s HRmedel HRmisa
+                   eq_refl HESs Hdel)
+                (exec_exception_delegatee_U e _ s eq_refl HESs Hdel)
+                with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (d) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    change (get_config_print_exception tt) with false. cbn match.
+    iApply swp_bind0. iApply swp_ret.
+    rewrite <- Hc. rewrite <- Hinfo.
+    iApply (swp_trap_handler_u Dr Dw Drw Dro Df rs1 Hdisj HDr HDw
+              HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+              HWms HWsc HWstval HWsepc HWcp Hag1 Helpv
+              with "Hcert Hany Helpc Hrw Hro").
+  Qed.
+
+  Lemma swp_handle_exception_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+      (Dr Dw : register -> bool) (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (e : ExceptionType) (xv : mword 64)
+      (Hc : c = rv64d_types.Exception e)
+      (Hinfo : info = xtval_exception_value e xv)
+      (Hdel : bit_to_bool (access_vec_dec (register_lookup medeleg s.(sregs))
+                (uint (exceptionType_bits_forwards e))) = true) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    Dr mstatus = true -> Dr elp = true -> Dr misa = true -> Dr scause = true ->
+    Dr cur_privilege = true -> Dr stvec = true ->
+    Dr stval = true -> Dr sepc = true -> Dr medeleg = true -> Dr PC = true ->
+    Dw mstatus = true -> Dw scause = true ->
+    Dw stval = true -> Dw sepc = true -> Dw cur_privilege = true ->
+    Dw nextPC = true ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    elp_v = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    gen_cert -∗ resv_any cpu_id -∗
+    (R_bitvector_1 elp) ↦ᵣ□ (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (handle_exception xv e)
+      (fun _ => ∃ rs' : regstate,
+          ⌜reg_agree_on (Drw ∪ Dro) rs'
+             (set_reg s9 nextPC (stvec_base stvec_v)).(sregs)⌝ ∗
+          hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗ resv_any cpu_id)%I.
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd Hpc.
+    intros Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+           HRmedel HRpc HWms HWsc HWstval HWsepc HWcp HWnpc Hag0 Helpv.
+    iIntros "#Hcert Hany #Helpc Hrw Hro".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    unfold handle_exception.
+    iApply (swp_bind_use (Defs.read_reg cur_privilege : M _) _ _ _
+              with "[Hany Hrw Hro] [-]").
+    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                (Defs.read_reg cur_privilege : M _) s s
+                (register_lookup cur_privilege s.(sregs)) rs ∅
+                Hdisj HDr HDw Hag0 (map_empty_subseteq _)
+                ltac:(etransitivity; [ apply goodmb_read_reg | exact HRcp ])
+                (exec_read_reg cur_privilege s)
+                with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (p) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    cbn beta. rewrite Hpriv.
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC) : M _) _ _ _
+              with "[Hany Hrw Hro] [-]").
+    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                (Defs.read_reg (R_bitvector_64 PC) : M _) s s
+                (register_lookup (R_bitvector_64 PC) s.(sregs)) rs1 ∅
+                Hdisj HDr HDw Hag1 (map_empty_subseteq _)
+                ltac:(etransitivity; [ apply goodmb_read_reg | exact HRpc ])
+                (exec_read_reg (R_bitvector_64 PC) s)
+                with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (q) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2 mm2) "(%Hag2 & _ & _ & Hrw & Hro & _ & Hany)".
+    cbn beta. rewrite Hpc.
+    iApply (swp_bind_use (exception_handler User (make_sync_exception e xv) pc0)
+              _ _ _ with "[Hany Hrw Hro] [-]").
+    { iApply (swp_exception_handler_u Dr Dw Drw Dro Df rs2 e xv Hc Hinfo Hdel
+                Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval
+                HRsepc HRmedel HWms HWsc HWstval HWsepc HWcp Hag2 Helpv
+                with "Hcert Hany Helpc Hrw Hro"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs3) "(%Hag3 & Hrw & Hro & Hany)".
+    iApply (swp_mono with "[] [Hany Hrw Hro]").
+    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                  (set_next_pc (stvec_base stvec_v)) s9
+                  (set_reg s9 (R_bitvector_64 nextPC) (stvec_base stvec_v)) tt
+                  rs3 ∅ Hdisj HDr HDw Hag3 (map_empty_subseteq _)
+                  (goodmb_set_next_pc Dr Dw (stvec_base stvec_v) s9 HWnpc)
+                  (exec_set_next_pc (stvec_base stvec_v) s9)
+                  with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (u) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs4 mm4) "(%Hag4 & _ & _ & Hrw & Hro & _ & Hany)".
+    iExists rs4. iFrame "Hrw Hro Hany". done.
+  Qed.
+
+  Lemma swp_handle_interrupt_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+      (Dr Dw : register -> bool) (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (i : InterruptType)
+      (Hc : c = Interrupt i) (Hinfo : info = None) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    Dr mstatus = true -> Dr elp = true -> Dr misa = true -> Dr scause = true ->
+    Dr cur_privilege = true -> Dr stvec = true ->
+    Dr stval = true -> Dr sepc = true -> Dr PC = true ->
+    Dw mstatus = true -> Dw scause = true ->
+    Dw stval = true -> Dw sepc = true -> Dw cur_privilege = true ->
+    Dw nextPC = true ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    elp_v = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    gen_cert -∗ resv_any cpu_id -∗
+    (R_bitvector_1 elp) ↦ᵣ□ (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (handle_interrupt i Supervisor)
+      (fun _ => ∃ rs' : regstate,
+          ⌜reg_agree_on (Drw ∪ Dro) rs'
+             (set_reg s9 nextPC (stvec_base stvec_v)).(sregs)⌝ ∗
+          hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗ resv_any cpu_id)%I.
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd Hpc.
+    intros Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+           HRpc HWms HWsc HWstval HWsepc HWcp HWnpc Hag0 Helpv.
+    iIntros "#Hcert Hany #Helpc Hrw Hro".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    unfold handle_interrupt.
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC) : M _) _ _ _
+              with "[Hany Hrw Hro] [-]").
+    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                (Defs.read_reg (R_bitvector_64 PC) : M _) s s
+                (register_lookup (R_bitvector_64 PC) s.(sregs)) rs ∅
+                Hdisj HDr HDw Hag0 (map_empty_subseteq _)
+                ltac:(etransitivity; [ apply goodmb_read_reg | exact HRpc ])
+                (exec_read_reg (R_bitvector_64 PC) s)
+                with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (q) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    cbn beta. rewrite Hpc. rewrite <- Hc. rewrite <- Hinfo.
+    iApply (swp_bind_use (trap_handler Supervisor c pc0 info None) _ _ _
+              with "[Hany Hrw Hro] [-]").
+    { iApply (swp_trap_handler_u Dr Dw Drw Dro Df rs1 Hdisj HDr HDw
+                HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+                HWms HWsc HWstval HWsepc HWcp Hag1 Helpv
+                with "Hcert Hany Helpc Hrw Hro"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2) "(%Hag2 & Hrw & Hro & Hany)".
+    iApply (swp_mono with "[] [Hany Hrw Hro]").
+    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                  (set_next_pc (stvec_base stvec_v)) s9
+                  (set_reg s9 (R_bitvector_64 nextPC) (stvec_base stvec_v)) tt
+                  rs2 ∅ Hdisj HDr HDw Hag2 (map_empty_subseteq _)
+                  (goodmb_set_next_pc Dr Dw (stvec_base stvec_v) s9 HWnpc)
+                  (exec_set_next_pc (stvec_base stvec_v) s9)
+                  with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (u) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
+    iExists rs3. iFrame "Hrw Hro Hany". done.
+  Qed.
+
+
+  (* the EXECUTE-TRAP arm's shape: [swp_try_step_full] hands the tower
+     [bind (exception_handler p exc pcx) set_next_pc] directly, without
+     [handle_exception]'s two reads (the step already read them). *)
+  Lemma swp_exec_trap_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+      (Dr Dw : register -> bool) (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (e : ExceptionType) (xv : mword 64)
+      (Hc : c = rv64d_types.Exception e)
+      (Hinfo : info = xtval_exception_value e xv)
+      (Hdel : bit_to_bool (access_vec_dec (register_lookup medeleg s.(sregs))
+                (uint (exceptionType_bits_forwards e))) = true) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    Dr mstatus = true -> Dr elp = true -> Dr misa = true -> Dr scause = true ->
+    Dr cur_privilege = true -> Dr stvec = true ->
+    Dr stval = true -> Dr sepc = true -> Dr medeleg = true ->
+    Dw mstatus = true -> Dw scause = true ->
+    Dw stval = true -> Dw sepc = true -> Dw cur_privilege = true ->
+    Dw nextPC = true ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    elp_v = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    gen_cert -∗ resv_any cpu_id -∗
+    (R_bitvector_1 elp) ↦ᵣ□ (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (Defs.bind (exception_handler User (make_sync_exception e xv) pc0)
+           set_next_pc)
+      (fun _ => ∃ rs' : regstate,
+          ⌜reg_agree_on (Drw ∪ Dro) rs'
+             (set_reg s9 nextPC (stvec_base stvec_v)).(sregs)⌝ ∗
+          hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗ resv_any cpu_id)%I.
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd.
+    intros Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval HRsepc
+           HRmedel HWms HWsc HWstval HWsepc HWcp HWnpc Hag0 Helpv.
+    iIntros "#Hcert Hany #Helpc Hrw Hro".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    iApply (swp_bind_use (exception_handler User (make_sync_exception e xv) pc0)
+              _ _ _ with "[Hany Hrw Hro] [-]").
+    { iApply (swp_exception_handler_u Dr Dw Drw Dro Df rs e xv Hc Hinfo Hdel
+                Hdisj HDr HDw HRms HRelp HRmisa HRsc HRcp HRstvec HRstval
+                HRsepc HRmedel HWms HWsc HWstval HWsepc HWcp Hag0 Helpv
+                with "Hcert Hany Helpc Hrw Hro"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs1) "(%Hag1 & Hrw & Hro & Hany)".
+    iApply (swp_mono with "[] [Hany Hrw Hro]").
+    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                  (set_next_pc (stvec_base stvec_v)) s9
+                  (set_reg s9 (R_bitvector_64 nextPC) (stvec_base stvec_v)) tt
+                  rs1 ∅ Hdisj HDr HDw Hag1 (map_empty_subseteq _)
+                  (goodmb_set_next_pc Dr Dw (stvec_base stvec_v) s9 HWnpc)
+                  (exec_set_next_pc (stvec_base stvec_v) s9)
+                  with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (u) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2 mm2) "(%Hag2 & _ & _ & Hrw & Hro & _ & Hany)".
+    iExists rs2. iFrame "Hrw Hro Hany". done.
+  Qed.
+
   (* --- instances: the three model entry points that reach the tower --- *)
 
   Lemma exec_handle_interrupt_U (i : InterruptType)
