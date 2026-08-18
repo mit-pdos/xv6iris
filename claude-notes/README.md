@@ -167,6 +167,13 @@ are working on that effort — the relevant `projects/` file.
   three site facts (lock protection per edge, sync-byte discipline, byte
   classification), what Ψ can export (`w_rdw`, `w_lock`) and the ⚑ choice
   for the byte→lock map (explicit side condition vs ghost export).
+- **[`weak-memory-rmw-split.md`](design/weak-memory-rmw-split.md)** — the RMW
+  SPLIT at the weak tier (2026-08-18, user-confirmed): the fused `LRmw` dies;
+  `LExLoad`/`LExStore` + an agent-local reservation (`w_res`, per-byte read
+  timestamps) mirror `main-cycle-port.md` §3a's shape; `excl_ok`'s window
+  moves to the write's fulfil; the SC tier's blocking self-loops deliberately
+  do NOT cross over; front-loading untouched.  Slices S1–S5; worklist in the
+  certification project file's S-track.
 - **[`weak-memory-deps.md`](design/weak-memory-deps.md)** — PROPOSAL
   (2026-08-17): restore PARM's dependency tracking (per-register views +
   `vcap`) in the full machine and the pf fragment, so the model IS

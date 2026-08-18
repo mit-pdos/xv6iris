@@ -890,3 +890,29 @@ theorem regardless (§12).  What binds future work:
   non-promisability gate is scoped by whatever discriminator that
   investigation lands.  Worklist:
   [`../projects/weak-memory-certification.md`](../projects/weak-memory-certification.md).
+
+**§13 REALIZATION CONSTRAINT (the user, 2026-08-18): NO PREMISES.**  Stating
+§13 as an undischarged hypothesis of `robust_main_l2` (the investigated
+`no_early_ad` traced-bundle premise) is REJECTED: no assumption that is not a
+machine-checked theorem.  The two admissible realizations: (i) the machine
+DEFINITION itself never exhibits the behavior (like no-icache — a property of
+the model, not a hypothesis), with whatever that costs re-proved; or (ii) the
+behavior stays in the machine and the ROBUSTNESS THEOREM covers it (the
+generalized, walker-idempotent exhibit of §12's option (b)).  Two recorded
+obstacles to (i): a `WPPromise`-side gate is impossible (the arm carries no
+label — the discriminator's read value does not exist at promise time), and
+an append-at-fulfil arm breaks `wp_behavior_factor`'s frozen-log phase.
+OPEN (investigation in flight): whether (i) even SUFFICES — the §8 cycle has
+a variant where the early promise is the ORDINARY store `f` (promisable in
+any promise machine) and the unordered thing is the walk READ, so the cycle
+may survive walker-write non-promisability; if so (ii), or a Layer-2 case
+that closes walker-entry segments by the certification analysis, is forced
+regardless.
+
+**The RMW split (the user, 2026-08-18): CONFIRMED.**  Layer 1 and the event
+language mirror the reservation design of `main-cycle-port.md` §3a (shape
+borrowed, not the file): the fused `LRmw` dies; exclusive read and
+conditional write become separate labels with an agent-local reservation;
+`excl_ok`'s window moves to the write's fulfil; the SC tier's blocking
+self-loops do NOT cross over.  Design:
+[`weak-memory-rmw-split.md`](weak-memory-rmw-split.md).

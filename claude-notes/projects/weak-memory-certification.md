@@ -18,17 +18,31 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
 
 - **W1 — walker-naming spike**: **DONE (2026-08-18) — GO** on the
   written-value discriminator, with conjunct (ii) REPLACED (see Findings).
-- **W2 — realizing §13** (blocked on: the fused-RMW change the user has
-  announced, and the user's confirmation of the premise shape): the
-  discriminator `wlb_ad` (stdpp-only, beside `WeakMem`) + the ~30-line
-  `PtAdBits.v` bridge (`update_PTE_Bits w acc = Some w' → ad_variant w w'`;
-  the two hard bit-facts are proved in the spike's scratch file) + §13 stated
-  as the traced-bundle premise `no_early_ad` threaded through
-  `robust_main_l2` — NOT as a `WPPromise`-side machine change (see Findings
-  for why that is architecturally blocked).  Also owed here: the one-line
-  staleness fix to `WeakInterp.v`'s access-kind table (A/D path is
-  `Read_RISCV_reserved`/`Write_RISCV_conditional` post-fork, not
-  `Write_plain`).
+- **W2 — realizing §13, PREMISE-FREE** (re-scoped 2026-08-18: the user
+  REJECTS undischarged premises — the `no_early_ad` route is dead; see
+  layer2 §13's addendum).  Blocked on the W1′ investigation below.  What
+  survives regardless: the discriminator's bit-level facts (the spike's
+  `update_PTE_Bits_A1`/`update_PTE_Bits_ne`, to land in `PtAdBits.v` when a
+  consumer exists) and the one-line staleness fix to `WeakInterp.v`'s
+  access-kind table (A/D path is `Read_RISCV_reserved`/
+  `Write_RISCV_conditional` post-fork, not `Write_plain`).
+- **W1′ — the premise-free walker analysis** (investigation): does
+  walker-write non-promisability even SUFFICE for `gdep2_acyclic` (the §8
+  cycle's variant with the ORDINARY store `f` promised early and the walk
+  READ late may survive it); if not — or since a machine gate is blocked
+  anyway (no label at `WPPromise`; append-at-fulfil breaks front-loading) —
+  which theorem route closes walker-entry segments: the certification
+  analysis (L2′ treating the walker edges like any early read) or the
+  walker-idempotent exhibit (§12 option (b)), and what each costs.
+  **Status: IN FLIGHT (2026-08-18).**
+- **S-track — the RMW split** (design:
+  [`../design/weak-memory-rmw-split.md`](../design/weak-memory-rmw-split.md),
+  user-confirmed; gates D8-2's final shape and the L2 vocabulary):
+  - **S0 — validation pass**: check the design against the tree; produce the
+    per-slice file/lemma inventory; flag any spec mismatch (esp. the
+    `ak_latest`/`ak_excl` decoupling's consumers and `w_res`'s place
+    relative to `ws_le`).  **Status: IN FLIGHT (2026-08-18).**
+  - **S1–S5** per the design file's §8.
 - **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
   (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
   wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
