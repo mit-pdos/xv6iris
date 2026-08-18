@@ -319,9 +319,15 @@ Section SpecMain.
   (* [kernelvec_handler_spec] is in hand, which is also the moment the     *)
   (* claim first becomes true.                                            *)
   (* ------------------------------------------------------------------- *)
+  (* THE tlb CELL IS GONE FROM HERE, and it is not lost: [SRegime.bare_inv]
+     funds it now (the swp-layer S-mode frame OWNS that cell, because a Sv39
+     fetch writes it), and [bare_inv] is inside [IntrDefs.strans_inv]'s Bare
+     arm, which this hart's [sie_cap] carries.  Holding it here as well would
+     be holding one cell twice.  The index survives only so that callers do
+     not have to be re-threaded. *)
   Definition main_hart_raw
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) : iProp Σ :=
-    (strans_pending ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs_raw)%I.
+    (strans_pending ∗ trap_csrs_raw)%I.
 
   (* ------------------------------------------------------------------- *)
   (* main(), entered on the BOOT hart.                                    *)

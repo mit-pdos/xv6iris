@@ -435,9 +435,13 @@ Section BootBridge.
                     ltac:(rewrite Hu2; lia))
                  with "Hcl Hstk") as "Hstk".
     (* --- the Bare translation slot --- *)
-    iAssert (bare_inv) with "[Hsatp Hpcf Hpad]" as "Hbare".
-    { rewrite /bare_inv. iExists satpf.
+    (* the tlb cell goes IN HERE now ([SRegime.bare_inv] funds it, so that
+       the swp-layer S-mode frame can own it), not out with the raw hart
+       bundle. *)
+    iAssert (bare_inv) with "[Hsatp Hpcf Hpad Htlb]" as "Hbare".
+    { rewrite /bare_inv. iExists satpf, tlbvec0.
       iFrame "Hsatp". iSplitR; [iPureIntro; exact Hsatpm |].
+      iFrame "Htlb".
       destruct Hpmp as (HA & Hord & HX & HW & HR & Hcov).
       iApply (pmp_config_intro (mword_of_int 0) _ _ HA Hord HX HW HR Hcov
                 with "Hpcf Hpad"). }
@@ -488,7 +492,7 @@ Section BootBridge.
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
     iFrame "Hctx Hcpu Hg4a".
     rewrite /main_hart_raw /trap_csrs_raw.
-    iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
+    iFrame "Hbit2 Hsepc Hscause Hstval".
     iExists (_get_Mstatus_SPP msf), (_get_Mstatus_SPIE msf). iExact "Hspp2".
   Qed.
 
