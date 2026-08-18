@@ -1,3 +1,47 @@
+(* ===================================================================== *)
+(* THE PER-NODE PORT: WHERE THIS FILE STANDS (2026-08-18).                *)
+(*                                                                        *)
+(* CONVERTED to the [swp] obligation of [WpSmodeIntr.sconf_step_obl] and   *)
+(* verified: [wp_csrr_ro_s_sconf] and its three instances                  *)
+(* ([wp_csrr_scause_s_sconf] / [_stval_] / [_sepc_]), [wp_csrw_stvec_s_    *)
+(* sconf] and [wp_csrw_sepc_s_sconf].  All six run on [HartSCsr]'s         *)
+(* privilege-generic CSR engines; every STATEMENT is byte-identical except *)
+(* [wp_csrr_ro_s_sconf]'s, whose whole-[execute] [exec] premise had to     *)
+(* become an [swp] obligation (an [exec] fact constrains the START state   *)
+(* only, and a per-node walk may be interfered with between nodes -- the   *)
+(* same forced change [WpSmodeIntr.wp_gpr_write_s_sconf] made).  Its three *)
+(* instances are unchanged.                                               *)
+(*                                                                        *)
+(* NOT CONVERTED, and FIVE OF THEM CANNOT BE until the S-mode wrapper is   *)
+(* generalized -- see claude-notes/projects/main-cycle-port.md, section     *)
+(* THE S-MODE WRAPPER IS TOO RIGID FOR THREE FAMILIES OF LEAF:             *)
+(*                                                                        *)
+(*   - the four ARM-MOVING leaves ([wp_csrci_sstatus_s_sconf],             *)
+(*     [wp_csrsi_sstatus_x0_s_sconf], [wp_csrsi_sstatus_x0_enable_s_       *)
+(*     sconf], [wp_csrci_sstatus_x0_s_sconf]).  [sconf_step_obl] takes     *)
+(*     [sie_cap kt m n b p] and demands [sie_cap kt m' n' b p] BACK at the *)
+(*     SAME arm index, and after the flip that conjunction is FALSE, not   *)
+(*     merely unreachable: [sconf]'s ghost half is at the new SIE bit      *)
+(*     while [sie_arm true p]'s quarter is at the old one.  The wrapper    *)
+(*     needs a SECOND index [b'] on the way out;                           *)
+(*   - [wp_csrr_sstatus_s_sconf], whose continuation names the mstatus it  *)
+(*     read ([sconf_at ms] beside [rd := sstatus_read ms]).  [sconf] hides *)
+(*     mstatus behind an existential in BOTH directions, and no rider      *)
+(*     recovers it: [P ⊢ Q ∗ (Q -∗ P)] is false when [P] carries more than *)
+(*     [Q].  The wrapper needs to expose the landing mstatus.              *)
+(*                                                                        *)
+(* The other five ([wp_csrsi_sstatus_x0_idem_], [wp_csrci_sstatus_x0_      *)
+(* idem_], [wp_csrw_sstatus_val_], [wp_csrw_sstatus_], [wp_csrr_satp_kpt_])*)
+(* are convertible as they stand -- they want the sstatus write's          *)
+(* assembled [goodb] certificate (the [legalize_sstatus] wall, worklist    *)
+(* section TWO LIMITS OF goodb) and, for satp, the mstatus.TVM check's.    *)
+(*                                                                        *)
+(* ALL TEN KEEP THEIR PRE-PORT PROOFS and sit at the END of the section,   *)
+(* so this file is RED from the first of them down and everything ABOVE    *)
+(* -- the engines and the six converted leaves -- is machine-checked in    *)
+(* the committed form.  NOTHING here is [Admitted]: a leaf-level admit     *)
+(* would make the whole interrupts-off tier vacuous while compiling.       *)
+(* ===================================================================== *)
 (* WpSconfCsr.v -- the S-mode CSR leaves over [sconf]+[sie_cap]: the
    sstatus reads/flips, [wp_csrw_stvec_s_sconf] (the trap-vector
    install) and [wp_csrr_scause_s_sconf] (the trap-cause read).
@@ -44,6 +88,10 @@ Require Import WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn.
 Require Import HartTp WpNext.
+(* the privilege-generic CSR swp engines and the frame kit at Supervisor *)
+Require Import HartSCsr HartSwp HartMFrame HartLift HartSpan HartSpanChar
+        HartMCycle HartRegNode HartGoodb
+        WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 (* [sr_ktier_wit]: the capability's tier witness, which this file's sstatus
@@ -576,6 +624,284 @@ Lemma intr_count_pre_off `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
   intr_count_pre false n eb -∗ intr_count n eb.
 Proof. iIntros "H". iExact "H". Qed.
 
+(* ===================================================================== *)
+(* THE TERM REDUCTIONS of the three trap-CSR reads.  [exec_read_CSR_*]     *)
+(* above are the exec-side facts; these are the same cascade walk done at  *)
+(* the TERM, which is what the per-node layer needs (an [exec] fact        *)
+(* constrains the start state only).  Printed rather than guessed -- see   *)
+(* the worklist's "PRINTING A MODEL TERM IS HOW YOU GET A _red LEMMA".     *)
+(* ===================================================================== *)
+Lemma read_CSR_scause_red :
+  read_CSR csr_scause = (Defs.read_reg scause : M (mword 64)).
+Proof. unfold csr_scause. drive_csr_term. reflexivity. Qed.
+
+Lemma read_CSR_stval_red :
+  read_CSR csr_stval = (Defs.read_reg stval : M (mword 64)).
+Proof. unfold csr_stval. drive_csr_term. reflexivity. Qed.
+
+Lemma read_CSR_satp_red :
+  read_CSR csr_satp = (Defs.read_reg satp : M (mword 64)).
+Proof. unfold csr_satp. drive_csr_term. reflexivity. Qed.
+
+Lemma read_CSR_sepc_red :
+  read_CSR csr_sepc
+  = (Defs.bind (Defs.read_reg sepc) (fun v : mword 64 => align_pc v)
+     : M (mword 64)).
+Proof. unfold csr_sepc. drive_csr_term. unfold get_xepc. cbn match. reflexivity. Qed.
+
+(* [align_pc] at a SYMBOLIC word: the only read is misa (through
+   [currentlyEnabled Ext_Zca]), which the reference state pins, so the whole
+   stretch rides the goodb certificate and the value is never inspected --
+   which is why the certificate computes at all (goodb is not computable when
+   CONTROL FLOW depends on symbolic data; here it does not). *)
+Lemma hval_align_pc (D Drw : gset register) (rs : regstate) (w : mword 64) :
+  (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+  (misa : register) ∈ D ->
+  register_lookup cur_privilege rs = Supervisor ->
+  register_lookup mseccfg rs = mword_of_int 0 ->
+  register_lookup misa rs = MISA_C ->
+  hval D Drw rs (align_pc w) (mepc_val w) rs.
+Proof.
+  intros HD1 HD2 HD3 Hp Hs Hm.
+  apply (hval_of_goodb D_m D Drw _ dstateS rs (mepc_val w)
+           (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm)).
+  - vm_compute. reflexivity.
+  - unfold align_pc.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_currentlyEnabled_Zca dstateS
+                  ltac:(vm_compute; reflexivity))).
+    cbn zeta match. apply exec_returnM.
+Qed.
+(* ===================================================================== *)
+(* THE TWO S-CSR WRITES, at the TERM.  Both dispatch clauses were PRINTED   *)
+(* out of a pruned goal rather than hand-written -- see the worklist's      *)
+(* note on getting the ASSOCIATION wrong.                                  *)
+(* ===================================================================== *)
+Lemma write_CSR_stvec_red (v : mword 64) :
+  write_CSR csr_stvec v
+  = (Defs.bind (set_stvec v) (fun w : mword 64 => returnM (Ok w))
+     : M (result (mword 64) unit)).
+Proof. unfold write_CSR, csr_stvec. drive_csr_term. reflexivity. Qed.
+
+Lemma write_CSR_sepc_red (v : mword 64) :
+  write_CSR csr_sepc v
+  = (Defs.bind (set_xepc Supervisor v) (fun w : mword 64 => returnM (Ok w))
+     : M (result (mword 64) unit)).
+Proof. unfold write_CSR, csr_sepc. drive_csr_term. reflexivity. Qed.
+
+(* [HartSwp.mbind_ret] is keyed on [Interface.Ret]; the MODEL spells its
+   returns [returnM], which is a [Definition] and so never matches
+   syntactically.  Same equation, the model's own spelling. *)
+Lemma mbind_returnM {A B : Type} (v : A) (f : A -> M B) :
+  Defs.bind (returnM v) f = f v.
+Proof. reflexivity. Qed.
+
+Section SWrites.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* [legalize_tvec] READS NOTHING -- it is a match on the written value's
+     mode field over [returnM]s -- so its certificate needs no read set at
+     all.  goodb is not COMPUTABLE here (the control flow is driven by the
+     symbolic [v]), which is exactly the case the worklist says a plain
+     [destruct] of the scrutinee closes: each arm is then concrete. *)
+  Local Lemma hval_legalize_tvec_stvec (D Drw : gset register) (rs : regstate)
+      (o v : mword 64) :
+    trapVectorMode_forwards (_get_Mtvec_Mode v) <> TV_Reserved ->
+    hval D Drw rs
+      (legalize_tvec o v plat_stvec_direct_mode_supported 2
+         plat_stvec_vectored_mode_supported
+         plat_stvec_vectored_base_alignment_exp) v rs.
+  Proof.
+    intro Hm.
+    apply (hval_of_goodb (fun _ => false) D Drw _ dstateS rs v
+             ltac:(intros r Hr; discriminate)
+             ltac:(intros r Hr; discriminate)).
+    - unfold legalize_tvec.
+      (* the scrutinee is spelled at [Mk_Mtvec v], so the case split has to be
+         too -- and the third arm is the one [Hm] rules out. *)
+      destruct (trapVectorMode_forwards (_get_Mtvec_Mode (Mk_Mtvec v)))
+        eqn:Hmode;
+        [ repeat first [ rewrite Hmode | rewrite mbind_returnM ]; reflexivity
+        | repeat first [ rewrite Hmode | rewrite mbind_returnM ]; reflexivity
+        | exfalso; apply Hm; exact Hmode ].
+    - exact (exec_legalize_tvec_stvec o v dstateS Hm).
+  Qed.
+
+  (* [legalize_xepc] reads nothing either ([hartSupports] is a platform
+     constant), and here the control flow does not touch the value, so the
+     certificate simply computes. *)
+  Local Lemma hval_legalize_xepc (D Drw : gset register) (rs : regstate)
+      (v : mword 64) :
+    hval D Drw rs (legalize_xepc v) (mepc_val v) rs.
+  Proof.
+    apply (hval_of_goodb (fun _ => false) D Drw _ dstateS rs (mepc_val v)
+             ltac:(intros r Hr; discriminate)
+             ltac:(intros r Hr; discriminate)).
+    - vm_compute. reflexivity.
+    - exact (exec_legalize_xepc v dstateS).
+  Qed.
+
+  (* the stvec write: read the old value, legalize (pure), write, read back *)
+  Lemma swp_write_CSR_stvec_S (dq : dfrac) (tv0 v : mword 64) :
+    trapVectorMode_forwards (_get_Mtvec_Mode v) <> TV_Reserved ->
+    gen_cert -∗
+    hreg_frame (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+      (cw_Drw (R_bitvector_64 stvec)) -∗
+    hreg_frame_ro (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+      cw_Dro -∗
+    swp (write_CSR csr_stvec v)
+      (fun x => ⌜x = Ok v⌝ ∗
+         hreg_frame (pw_rs Supervisor (R_bitvector_64 stvec) v)
+           (cw_Drw (R_bitvector_64 stvec)) ∗
+         hreg_frame_ro (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 stvec) v)
+           cw_Dro).
+  Proof.
+    intros Hmode.
+    assert (Hfresh : cw_fresh (R_bitvector_64 stvec))
+      by (split_and!; vm_compute; reflexivity).
+    iIntros "#Hcert Hrw Hro".
+    rewrite write_CSR_stvec_red.
+    iApply (swp_bind_use _ _
+              (fun w : mword 64 => ⌜w = v⌝ ∗
+                 hreg_frame (pw_rs Supervisor (R_bitvector_64 stvec) v)
+                   (cw_Drw (R_bitvector_64 stvec)) ∗
+                 hreg_frame_ro (cw_Df dq)
+                   (pw_rs Supervisor (R_bitvector_64 stvec) v) cw_Dro)%I
+              _ with "[Hrw Hro] [-]").
+    { unfold set_stvec.
+      (* 1. the old value *)
+      iApply (swp_bind_use _ _
+                (fun o : mword 64 => ⌜o = tv0⌝ ∗
+                   hreg_frame (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+                     (cw_Drw (R_bitvector_64 stvec)) ∗
+                   hreg_frame_ro (cw_Df dq)
+                     (pw_rs Supervisor (R_bitvector_64 stvec) tv0) cw_Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_read_reg_pinned (cw_Drw (R_bitvector_64 stvec)) cw_Dro
+                       (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+                       (R_bitvector_64 stvec) (cw_disj _ Hfresh) (cw_in_r _)
+                       with "Hcert Hrw Hro") ].
+        iIntros (o) "(-> & Hrw & Hro)".
+        rewrite (pw_rs_r Supervisor (R_bitvector_64 stvec) tv0). by iFrame. }
+      iIntros (o) "(-> & Hrw & Hro)".
+      (* 2. the legalization: pure, so it rides the certificate *)
+      iApply (swp_bind_use _ _
+                (fun w : mword 64 => ⌜w = v⌝ ∗
+                   hreg_frame (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+                     (cw_Drw (R_bitvector_64 stvec)) ∗
+                   hreg_frame_ro (cw_Df dq)
+                     (pw_rs Supervisor (R_bitvector_64 stvec) tv0) cw_Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply (swp_span (cw_Drw (R_bitvector_64 stvec)) cw_Dro (cw_Df dq)
+                  (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+                  (pw_rs Supervisor (R_bitvector_64 stvec) tv0) _ v
+                  (cw_disj _ Hfresh)
+                  (hval_legalize_tvec_stvec _ _ _ tv0 v Hmode)
+                  with "Hcert Hrw Hro"). }
+      iIntros (w) "(-> & Hrw & Hro)".
+      (* 3. the write, then the read-back *)
+      iApply (swp_bind0_use _ _
+                (fun _ =>
+                   hreg_frame (pw_rs Supervisor (R_bitvector_64 stvec) v)
+                     (cw_Drw (R_bitvector_64 stvec)) ∗
+                   hreg_frame_ro (cw_Df dq)
+                     (pw_rs Supervisor (R_bitvector_64 stvec) v) cw_Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_reg_owned (cw_Drw (R_bitvector_64 stvec)) cw_Dro
+                       (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+                       (R_bitvector_64 stvec) v (cw_disj _ Hfresh) (cw_w_r _)
+                       with "Hcert Hrw Hro") ].
+        iIntros (u) "[Hrw Hro]".
+        iSplitL "Hrw".
+        { iApply (cw_rw_ext (R_bitvector_64 stvec) _ _
+                    (reg_agree_l _ _ _ _ (pw_set_agree Supervisor
+                       (R_bitvector_64 stvec) tv0 v Hfresh)) with "Hrw"). }
+        iApply (cw_ro_ext dq _ _
+                  (reg_agree_r _ _ _ _ (pw_set_agree Supervisor
+                     (R_bitvector_64 stvec) tv0 v Hfresh)) with "Hro"). }
+      iIntros (u) "[Hrw Hro]".
+      iApply (swp_mono with "[] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw (R_bitvector_64 stvec)) cw_Dro
+                     (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 stvec) v)
+                     (R_bitvector_64 stvec) (cw_disj _ Hfresh) (cw_in_r _)
+                     with "Hcert Hrw Hro") ].
+      iIntros (c) "(-> & Hrw & Hro)".
+      rewrite (pw_rs_r Supervisor (R_bitvector_64 stvec) v). by iFrame. }
+    iIntros (w) "(-> & Hrw & Hro)". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* the sepc write: legalize (pure, bit 0 cleared), write, return *)
+  Lemma swp_write_CSR_sepc_S (dq : dfrac) (ep0 v : mword 64) :
+    gen_cert -∗
+    hreg_frame (pw_rs Supervisor (R_bitvector_64 sepc) ep0)
+      (cw_Drw (R_bitvector_64 sepc)) -∗
+    hreg_frame_ro (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 sepc) ep0)
+      cw_Dro -∗
+    swp (write_CSR csr_sepc v)
+      (fun x => ⌜x = Ok (mepc_val v)⌝ ∗
+         hreg_frame (pw_rs Supervisor (R_bitvector_64 sepc) (mepc_val v))
+           (cw_Drw (R_bitvector_64 sepc)) ∗
+         hreg_frame_ro (cw_Df dq)
+           (pw_rs Supervisor (R_bitvector_64 sepc) (mepc_val v)) cw_Dro).
+  Proof.
+    assert (Hfresh : cw_fresh (R_bitvector_64 sepc))
+      by (split_and!; vm_compute; reflexivity).
+    iIntros "#Hcert Hrw Hro".
+    rewrite write_CSR_sepc_red.
+    iApply (swp_bind_use _ _
+              (fun w : mword 64 => ⌜w = mepc_val v⌝ ∗
+                 hreg_frame (pw_rs Supervisor (R_bitvector_64 sepc) (mepc_val v))
+                   (cw_Drw (R_bitvector_64 sepc)) ∗
+                 hreg_frame_ro (cw_Df dq)
+                   (pw_rs Supervisor (R_bitvector_64 sepc) (mepc_val v))
+                   cw_Dro)%I
+              _ with "[Hrw Hro] [-]").
+    { unfold set_xepc. cbn match.
+      iApply (swp_bind_use _ _
+                (fun t : mword 64 => ⌜t = mepc_val v⌝ ∗
+                   hreg_frame (pw_rs Supervisor (R_bitvector_64 sepc) ep0)
+                     (cw_Drw (R_bitvector_64 sepc)) ∗
+                   hreg_frame_ro (cw_Df dq)
+                     (pw_rs Supervisor (R_bitvector_64 sepc) ep0) cw_Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply (swp_span (cw_Drw (R_bitvector_64 sepc)) cw_Dro (cw_Df dq)
+                  (pw_rs Supervisor (R_bitvector_64 sepc) ep0)
+                  (pw_rs Supervisor (R_bitvector_64 sepc) ep0) _ (mepc_val v)
+                  (cw_disj _ Hfresh) (hval_legalize_xepc _ _ _ v)
+                  with "Hcert Hrw Hro"). }
+      iIntros (t) "(-> & Hrw & Hro)".
+      iApply (swp_bind0_use _ _
+                (fun _ =>
+                   hreg_frame (pw_rs Supervisor (R_bitvector_64 sepc)
+                                 (mepc_val v)) (cw_Drw (R_bitvector_64 sepc)) ∗
+                   hreg_frame_ro (cw_Df dq)
+                     (pw_rs Supervisor (R_bitvector_64 sepc) (mepc_val v))
+                     cw_Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_reg_owned (cw_Drw (R_bitvector_64 sepc)) cw_Dro
+                       (cw_Df dq) (pw_rs Supervisor (R_bitvector_64 sepc) ep0)
+                       (R_bitvector_64 sepc) (mepc_val v) (cw_disj _ Hfresh)
+                       (cw_w_r _) with "Hcert Hrw Hro") ].
+        iIntros (u) "[Hrw Hro]".
+        iSplitL "Hrw".
+        { iApply (cw_rw_ext (R_bitvector_64 sepc) _ _
+                    (reg_agree_l _ _ _ _ (pw_set_agree Supervisor
+                       (R_bitvector_64 sepc) ep0 (mepc_val v) Hfresh))
+                    with "Hrw"). }
+        iApply (cw_ro_ext dq _ _
+                  (reg_agree_r _ _ _ _ (pw_set_agree Supervisor
+                     (R_bitvector_64 sepc) ep0 (mepc_val v) Hfresh))
+                  with "Hro"). }
+      iIntros (u) "[Hrw Hro]". iApply swp_ret. by iFrame. }
+    iIntros (w) "(-> & Hrw & Hro)". iApply swp_ret. by iFrame.
+  Qed.
+
+End SWrites.
+
 Section WpSconfCsr.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -584,6 +910,1037 @@ Section WpSconfCsr.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
+
+
+
+  (* ------------------------------------------------------------------- *)
+  (* The GENERAL csrrci-on-sstatus execute (no idempotence collapse):     *)
+  (* the write lands [legalize_sstatus_val m (sstatus_write_val m imm5)]  *)
+  (* in mstatus, rd gets the OLD S-view.                                  *)
+  (* ------------------------------------------------------------------- *)
+  Local Lemma exec_execute_csrrci_sstatus_gen (imm5 rd : mword 5) (m : mword 64) s :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    register_lookup mstatus s.(sregs) = m ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec imm5 (zeros' 5) = false ->
+    uint rd <> 0 ->
+    exec (execute (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRC))) s
+      = Some (RETIRE_SUCCESS,
+              set_reg (set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
+                      (R_bitvector_64 (gpr_of_Z (uint rd)))
+                      (regval_into_reg (sstatus_read m))).
+  Proof.
+    intros Hpriv Hm HS HU Himm Hrd.
+    change (execute (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRC)))
+      with (execute_CSRImm csr_sstatus imm5 (Regidx rd) CSRRC).
+    unfold execute_CSRImm.
+    rewrite Himm.
+    cbn match.
+    unfold doCSR.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    unfold ext_check_CSR. cbn match.
+    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
+    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
+    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
+    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
+    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_val m imm5)) s
+                     = Some (Ok (subrange_vec_dec
+                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
+                                   (Z.sub xlen 1) 0),
+                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))).
+    { rewrite (exec_write_CSR_sstatus (sstatus_write_val m imm5) s HS HU).
+      rewrite Hm. reflexivity. }
+    change (and_vec (sstatus_read m) (not_vec (zero_extend' 64 imm5)))
+      with (sstatus_write_val m imm5).
+    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
+    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5))).
+    assert (Hwc : exec (wX_bits (Regidx rd) (sstatus_read m) >>
+                        csr_id_write_callback csr_sstatus
+                          (subrange_vec_dec
+                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
+                             (Z.sub xlen 1) 0)) s1
+                  = Some (tt, set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
+                                (regval_into_reg (sstatus_read m)))).
+    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd (sstatus_read m) s1)).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      apply (exec_csr_id_write_callback_sstatus _ _). }
+    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
+    apply exec_returnm.
+  Qed.
+
+
+  (* ------------------------------------------------------------------- *)
+  (* THE '1'->'0' FLIP: csrci sstatus, 2 (push_off's intr_off).           *)
+  (*                                                                      *)
+  (* The SIE=1 characterization of the write is PROVEN                    *)
+  (* SIE=1 characterization of the legalized write (SIE cleared, the      *)
+  (* sconf fact set preserved); it is taken as a premise so the ghost     *)
+  (* choreography below is proven now and the bit lemma lands once,       *)
+  (* later, in WpGprCsrwC style.  At SIE=0 it already follows from        *)
+  (* [legalize_sie_clear_idem].                                           *)
+  (*                                                                      *)
+  (* Choreography ('1' arm): the funnel's σf-callback flips mstatus to    *)
+  (* ms' by reg_update, reads the quarter out of [intr_res],              *)
+  (* [sie_ghost_flip]s ALL THREE pieces to '0' (bundle half + capability  *)
+  (* quarter + the [intr_res] quarter), re-forms [intr_res] at b := '0'   *)
+  (* (the handler guard is vacuous), and hands the caller the freed       *)
+  (* '1'-arm payload (the trap CSRs, [intr_res] among them, + the stack   *)
+  (* bound).  The '0' arm is the idempotent write, ghosts untouched.      *)
+  (* THIS USED TO OPEN [intrN] ACROSS THE STEP; there is no invariant any *)
+  (* more, so there is no mask side condition either.                     *)
+  (* ------------------------------------------------------------------- *)
+(* ===================================================================== *)
+(* THE ARM-FLIP SEAM AND ITS avail INDEX -- READ THIS BEFORE TOUCHING ANY  *)
+(* OF THE FOUR csrci/csrsi LEAVES BELOW.                                   *)
+(*                                                                        *)
+(* [IntrDefs.sie_cap m av b p] owns [trap_res b + av] free stack slots     *)
+(* below sp: [av] usable by kernel code plus an ARM-DEPENDENT trap reserve *)
+(* ([kv_frame_slots] at [b = true], nothing at [b = false] -- see          *)
+(* [IntrDefs.trap_res] for why an arm-blind reserve is unsatisfiable).     *)
+(* These four leaves are the only instructions in the tree that MOVE THE   *)
+(* ARM, so they are the only ones at which that reserve appears or         *)
+(* disappears -- and stack slots are not persistent, so the total carve    *)
+(* must be CONSERVED across each of them.  Hence the uniform rule:         *)
+(*                                                                        *)
+(*   a leaf moving the arm from [b0] to [b1] has                            *)
+(*     PRE  index [trap_res b1 + n]   and   POST index [trap_res b0 + n].   *)
+(*                                                                        *)
+(* Both sides then carve [trap_res b0 + (trap_res b1 + n)] slots, i.e. the *)
+(* stack conjunct is LITERALLY THE SAME PROPOSITION on the way in and on   *)
+(* the way out -- a pure re-indexing, never a split, and never a           *)
+(* [kv_frame_slots <= n] premise (which is what rejected alternative (a)   *)
+(* at [IntrDefs.trap_res] would have cost).  Each direction collapses to   *)
+(* the identity at the arm where nothing moves, because [trap_res false +  *)
+(* n] is DEFINITIONALLY [n]:                                              *)
+(*                                                                        *)
+(*   DISABLING ([b1 = false]): pre [n] (verbatim what it always was),      *)
+(*     post [trap_res b + n] -- the freed reserve becomes usable stack.    *)
+(*     At [b = false] the post is [n] too, so nothing changes.             *)
+(*   ENABLING ([b1 = true]): pre [trap_res true + n], post                 *)
+(*     [trap_res b + n] -- re-enabling interrupts PAYS the reserve out of  *)
+(*     the caller's budget.  At [b = true] (the idempotent write) pre and  *)
+(*     post coincide and the carve rides through untouched.                *)
+(*                                                                        *)
+(* THE CONSEQUENCE FOR CALLERS IS NOT LOCAL, and that is the point: the    *)
+(* window between a push_off/acquire and its matching pop_off/release runs *)
+(* at [trap_res b + av], not [av].  Do not "fix" a caller by dropping the  *)
+(* difference -- the reserve is exactly what funds the trap handler, and a  *)
+(* pop_off that cannot re-establish it is unprovable.                      *)
+(* ===================================================================== *)
+  (* DISABLING: pre index [n], post index [trap_res b + n] -- the reserve the
+     enabled arm was holding becomes usable stack.  See the seam header. *)
+
+
+  (* ------------------------------------------------------------------- *)
+  (* THE '0'->'1' RESTORE: csrsi sstatus, 2 (pop_off's intr_on).           *)
+  (* ------------------------------------------------------------------- *)
+
+  (* two full cells for the same register cannot coexist (refutes the
+     already-enabled branch of the restore: the caller's payload and a
+     '1'-armed capability would both own sepc). *)
+  Local Lemma reg_pointsto_excl (r : register) (v w : type_of_register r) :
+    r ↦ᵣ v -∗ r ↦ᵣ w -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. apply dfrac_valid_own_r in Hv.
+    exact (irreflexivity (<)%Qp 1%Qp Hv).
+  Qed.
+
+  Local Lemma exec_execute_csrsi_sstatus_x0 (imm5 : mword 5) (m : mword 64) s :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    register_lookup mstatus s.(sregs) = m ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec imm5 (zeros' 5) = false ->
+    exec (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRS))) s
+      = Some (RETIRE_SUCCESS,
+              set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5))).
+  Proof.
+    intros Hpriv Hm HS HU Himm.
+    change (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRS)))
+      with (execute_CSRImm csr_sstatus imm5 (Regidx (mword_of_int 0)) CSRRS).
+    unfold execute_CSRImm.
+    rewrite Himm.
+    cbn match.
+    unfold doCSR.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    unfold ext_check_CSR. cbn match.
+    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
+    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
+    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
+    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
+    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_set_val m imm5)) s
+                     = Some (Ok (subrange_vec_dec
+                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
+                                   (Z.sub xlen 1) 0),
+                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))).
+    { rewrite (exec_write_CSR_sstatus (sstatus_write_set_val m imm5) s HS HU).
+      rewrite Hm. reflexivity. }
+    change (or_vec (sstatus_read m) (zero_extend' 64 imm5))
+      with (sstatus_write_set_val m imm5).
+    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
+    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5))).
+    assert (Hwc : exec (wX_bits (Regidx (mword_of_int 0)) (sstatus_read m) >>
+                        csr_id_write_callback csr_sstatus
+                          (subrange_vec_dec
+                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
+                             (Z.sub xlen 1) 0)) s1
+                  = Some (tt, s1)).
+    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (mword_of_int 0) (sstatus_read m) s1)).
+      replace (Z.eqb (uint (mword_of_int 0 : mword 5)) 0) with true by reflexivity.
+      apply (exec_csr_id_write_callback_sstatus _ _). }
+    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
+    apply exec_returnm.
+  Qed.
+
+  (* pop_off's restore: consumes the saved payload to re-arm the
+     capability.  The MIRROR of the csrci leaf above: the pieces go IN and
+     the arm is rebuilt whole, so the caller supplies the CELLS
+     ([cpu_cells 0 true p]) and the counting token at level 1, and gets NO
+     [intr_count] back -- the eighth the flip produces goes straight into
+     [sie_arm true p]'s nested [cpu_hart 0 true p], which is where the
+     enabled arm keeps it.  (Asking the caller for a whole [cpu_hart 0 true
+     p] would ask it for that eighth at '1' while its own bundle still pins
+     it at '0'.)  The already-enabled branch of [sie_cap] is refuted by
+     sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
+  (* ENABLING: pre index [trap_res true + n], post index [trap_res b + n].
+     Re-enabling interrupts must PAY the trap reserve, and the caller pays it
+     out of the very slots its own push_off/csrci freed.  See the seam header
+     above [wp_csrci_sstatus_s_sconf]. *)
+
+  (* ------------------------------------------------------------------- *)
+  (* THE LEVEL-0 FLIPS: scheduler()'s INLINED intr_on()/intr_off() at the  *)
+  (* head of its dispatch loop.  Both instructions have rd = x0, and both  *)
+  (* stay at noff level 0 -- they are NOT the push/pop pair (which moves    *)
+  (* k -> S k / S k -> k and hands the trap CSRs to [trap_csrs_pay]), but  *)
+  (* an unbalanced enable/disable of the loop's own interrupt window.      *)
+  (* ------------------------------------------------------------------- *)
+
+  (* the x0 twin of [exec_execute_csrrci_sstatus_gen]: [csrci sstatus,imm]
+     with rd = x0.  The wX_bits write-back takes the x0 NO-OP path, so the
+     only state change is mstatus := the legalized cleared write (no rd
+     cell is touched, hence no [uint rd <> 0] premise and no gpr update in
+     the leaves below). *)
+  Local Lemma exec_execute_csrrci_sstatus_x0 (imm5 : mword 5) (m : mword 64) s :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    register_lookup mstatus s.(sregs) = m ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec imm5 (zeros' 5) = false ->
+    exec (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRC))) s
+      = Some (RETIRE_SUCCESS,
+              set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5))).
+  Proof.
+    intros Hpriv Hm HS HU Himm.
+    change (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRC)))
+      with (execute_CSRImm csr_sstatus imm5 (Regidx (mword_of_int 0)) CSRRC).
+    unfold execute_CSRImm.
+    rewrite Himm.
+    cbn match.
+    unfold doCSR.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    unfold ext_check_CSR. cbn match.
+    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
+    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
+    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
+    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
+    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_val m imm5)) s
+                     = Some (Ok (subrange_vec_dec
+                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
+                                   (Z.sub xlen 1) 0),
+                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))).
+    { rewrite (exec_write_CSR_sstatus (sstatus_write_val m imm5) s HS HU).
+      rewrite Hm. reflexivity. }
+    change (and_vec (sstatus_read m) (not_vec (zero_extend' 64 imm5)))
+      with (sstatus_write_val m imm5).
+    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
+    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5))).
+    assert (Hwc : exec (wX_bits (Regidx (mword_of_int 0)) (sstatus_read m) >>
+                        csr_id_write_callback csr_sstatus
+                          (subrange_vec_dec
+                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
+                             (Z.sub xlen 1) 0)) s1
+                  = Some (tt, s1)).
+    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (mword_of_int 0) (sstatus_read m) s1)).
+      replace (Z.eqb (uint (mword_of_int 0 : mword 5)) 0) with true by reflexivity.
+      apply (exec_csr_id_write_callback_sstatus _ _). }
+    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
+    apply exec_returnm.
+  Qed.
+
+  (* intr_on() at level 0, from EITHER base state.
+       eb = false: the real '0'->'1' flip.  [intr_count 0 false] is just
+     the count eighth at '0', so together with the persistent
+     handler resource -- which rides inside [trap_csrs] -- the pop_off
+     restore leaf applies verbatim (same four-piece ghost choreography:
+     bundle half + capability eighth + count eighth + the [intr_res] quarter,
+     with the whole of [trap_csrs] moving INTO the arm's '1' branch).
+       eb = true: SIE is ALREADY '1' (ghost agreement between the arm's own
+     eighth and the mstatus-tied half), so the write is idempotent on the
+     bit and NO ghost moves; the legalized write still changes mstatus's
+     term, but [csrsi_sie_flip] says the new word again has SIE = '1' and
+     again satisfies [sconf_ms_facts], which is all the bundle needs.  The
+     capability's '1' arm (trap CSRs + per-cpu cells + invariant copy) rides
+     through untouched, and every one of the caller's [if eb then emp else _]
+     premises is [emp] -- at [eb = true] all of that is ALREADY in the arm,
+     which is exactly why the counting token is one of them. *)
+  (* ------------------------------------------------------------------- *)
+  (* THE IDEMPOTENT SET AT AN ALREADY-ENABLED ARM -- AND IT IS            *)
+  (* INDEX-GENERIC, WHICH IS THE WHOLE POINT.                             *)
+  (*                                                                      *)
+  (* [csrsi sstatus,2] with SIE already '1' writes the bit that is already *)
+  (* set: the ghost state does not move (the arm's own eighth and the      *)
+  (* mstatus-tied half already agree at '1'), the '1' arm rides through    *)
+  (* untouched, and -- decisively -- THE STACK CONJUNCT IS NEVER TOUCHED.  *)
+  (* So this leaf holds at an ARBITRARY index [n]: pre and post are the    *)
+  (* SAME [sie_cap_gpr m n true p], with no [trap_res true + _] shape      *)
+  (* demanded of it and no [kv_frame_slots <= n] premise.                  *)
+  (*                                                                      *)
+  (* WHY THAT MATTERS, AND WHY THIS IS A SEPARATE LEMMA.                   *)
+  (* [wp_csrsi_sstatus_x0_enable_s_sconf] below is the arm-GENERIC enable, *)
+  (* and its contract must be stated at pre index [trap_res true + n] --   *)
+  (* at [eb = false] it is a real 0 -> 1 flip and the reserve has to come  *)
+  (* out of the index.  Instantiated at [eb = true] that shape is still    *)
+  (* sound but it is a REQUIREMENT: it forces the caller's index to be at  *)
+  (* least [kv_frame_slots], on top of whatever the enabled arm is already *)
+  (* holding in reserve.  scheduler()'s loop head is exactly that caller   *)
+  (* -- its [intr_on] is reached with interrupts already on from the       *)
+  (* second round onwards -- and paying there would make [SpecScheduler]   *)
+  (* demand [2 * kv_frame_slots + 20], a factor-of-two reserve, which is   *)
+  (* the pathology the arm-dependent carve exists to remove.  Splitting    *)
+  (* the idempotent case out gives that caller a leaf that moves nothing:  *)
+  (* ONE reserve, paid once, at the single real enable.                    *)
+  (*                                                                      *)
+  (* The arm-generic enable's [eb = true] branch IS this lemma at          *)
+  (* [n := trap_res true + n], so nothing is restated: the proof below is  *)
+  (* the one that used to sit inline there.                                *)
+  (* ------------------------------------------------------------------- *)
+
+  (* ENABLING, so the same index discipline as [wp_csrsi_sstatus_x0_s_sconf]:
+     pre [trap_res true + n], post [trap_res eb + n].  At [eb = true] the two
+     coincide (the write is idempotent and the reserve rides through); at
+     [eb = false] this delegates to that leaf at [b := false], whose pre/post
+     indices are then literally these. *)
+
+  (* intr_off() at level 0, FROM enabled: the '1'->'0' flip of
+     [wp_csrci_sstatus_s_sconf] with rd = x0 and no level push.  Same
+     choreography ([sie_ghost_flip_off] on all four pieces -- bundle half +
+     capability eighth + count eighth + the [intr_res] quarter -- re-forming
+     [intr_res] at the same installed vector), but the freed '1'-arm payload
+     lands DIFFERENTLY: the trap CSRs go straight to the caller (level 0 with
+     a now-disabled base owes them explicitly), [intr_res] RIDES OUT WITH
+     THEM (it used to be a persistent [intr_inv] copy that could simply be
+     dropped, because the caller kept its own [intr_handler_avail]; owned,
+     there is exactly one and the caller must get it), and the count eighth
+     comes back at [sie_bit false] -- i.e. [intr_count 0 false], not
+     [intr_count 1 _].
+
+     THE TWO EIGHTHS ARE NOT THE CALLER'S TO SUPPLY AT [b = true].  This
+     leaf used to demand a separate [intr_count 0 true] BESIDE the bundle,
+     and hand back [cpu_hart 0 true p] (which CONTAINS an [intr_count 0
+     true]) beside an [intr_count 0 false] -- the same eighth at two
+     values, which the comment on [cpu_priv_pay] above forbids.  Nobody
+     could hold the premise: at [b = true] the arm owns BOTH eighths
+     ([sie_arm]'s own plus the one inside [cpu_hart 0 true p]), and at
+     [b = false] the last branch below refutes it outright, so the contract
+     was vacuous at every index.  It now takes [intr_count_pre b 0 true]
+     (the pure fact at the enabled arm, the token at the disabled one) and
+     returns the freed cells as [cpu_priv_pay b p], exactly like its
+     sibling [wp_csrci_sstatus_s_sconf]: the flip's second eighth is taken
+     out of the arm's own [cpu_hart], not out of the caller. *)
+  (* DISABLING, same index discipline as [wp_csrci_sstatus_s_sconf]: pre [n],
+     post [trap_res b + n].  Reachable only at [b = true] (the [b = false] arm
+     is refuted below), where the post index is [kv_frame_slots + n] -- the
+     scheduler's inlined intr_off() freeing its own reserve. *)
+
+  (* ------------------------------------------------------------------- *)
+  (* THE IDEMPOTENT CLEAR AT AN ALREADY-DISABLED ARM -- the exact mirror  *)
+  (* of [wp_csrsi_sstatus_x0_idem_s_sconf] above.                          *)
+  (*                                                                      *)
+  (* [csrci sstatus,2] with SIE already '0' clears the bit that is already *)
+  (* clear: the ghost state does not move (the disabled arm's eighth and   *)
+  (* the mstatus-tied half already agree at '0'), the arm rides through     *)
+  (* untouched, and the stack conjunct is never touched -- so pre and post *)
+  (* are the SAME [sie_cap_gpr m n false p] at an ARBITRARY index [n],     *)
+  (* with no reserve to move and nothing to pay out.                       *)
+  (*                                                                      *)
+  (* WHY IT IS NEEDED.  [wp_csrci_sstatus_x0_s_sconf] REFUTES its          *)
+  (* [b = false] arm (its [intr_count_pre] premise is unsatisfiable there),*)
+  (* so an intr_off() reached with interrupts ALREADY off had no leaf at    *)
+  (* all.  prepare_return is exactly such a caller: usertrap reaches it     *)
+  (* with SIE = 0 on the devintr / vmfault / unexpected-scause paths, and   *)
+  (* only the syscall path (which does its own [csrsi] first) arrives       *)
+  (* enabled.  [WpIntrOff.wp_intr_off_lvl0_s_sconf] is the index-generic    *)
+  (* composite the two arms feed.                                          *)
+  (* ------------------------------------------------------------------- *)
+
+  (* ===================================================================== *)
+  (* THE PINNED INDEX: WHY THE SEVEN LEAVES BELOW SAY [false] AND NOT [b].  *)
+  (*                                                                        *)
+  (* Every leaf from here to the end of the section threads a PER-HART       *)
+  (* resource EXPLICITLY, beside the bundle: a trap-CSR cell ([stvec],       *)
+  (* [sepc], [scause], [stval] -- each a single register of THIS hart), or   *)
+  (* the travelling SPP/SPIE ghost half ([sret_bits], i.e.                   *)
+  (* [era_sp{p,ie}_name cpu_id]).  Their postconditions live under           *)
+  (* [wp_next _ p (fun CID => ...)], whose binder shadows the ambient [CID]  *)
+  (* -- so every resource written inside the continuation is about the hart  *)
+  (* execution RESUMES on, not the hart the instruction started on           *)
+  (* (WpNext.v).                                                            *)
+  (*                                                                        *)
+  (* At [b = true] a trap can be taken AT THIS INSTRUCTION and the thread    *)
+  (* resumed on a different hart.  A [b]-generic version of these leaves     *)
+  (* would then read/write the ENTRY hart's CSR (that is the only cell the   *)
+  (* premise could possibly be about -- it is the one the step executes on)  *)
+  (* and hand it straight back as the RESUMING hart's.  So at [b = true]     *)
+  (* these postconditions are FALSE, not merely unprovable: they equate two  *)
+  (* different harts' state.  Nothing exploits that today only because a     *)
+  (* trap currently returns on the hart it came from; it stops being an      *)
+  (* accident and starts being a soundness hole the moment migration is      *)
+  (* real.  Pinning the index at the literal [false] is therefore a          *)
+  (* correction, not a restriction -- every call site was already at         *)
+  (* [false] (ProofTrapinithart, ProofKerneltrapParts, ProofDevintr: the     *)
+  (* trap-handler tier, which runs with interrupts off by construction).     *)
+  (*                                                                        *)
+  (* DO NOT "GENERALISE" THE INDEX BACK.  If you need one of these           *)
+  (* instructions at [b = true], the missing piece is not a weaker index:    *)
+  (* it is a statement that says which hart each cell belongs to, i.e. the   *)
+  (* [sie_cap] enabled arm's own existentially-quantified trap CSRs, or a    *)
+  (* payload transported across the crossing the way the csrci/csrsi flip    *)
+  (* family does it.                                                        *)
+  (*                                                                        *)
+  (* The [wp_next false p (fun CID => ...)] WRAPPER STAYS.  It is not the    *)
+  (* problem (at [false] it collapses by [wp_next_off]), and every call site *)
+  (* discharges it with [iApply wp_next_off_intro], which needs the head to  *)
+  (* still be [wp_next].                                                    *)
+  (*                                                                        *)
+  (* THIS DOES NOT APPLY TO THE SIE-FLIP FAMILY ABOVE                        *)
+  (* ([wp_csrci_sstatus_s_sconf] & co.), which is legitimately [b]-generic:  *)
+  (* the write that DISABLES interrupts is genuinely applied at [b = true]   *)
+  (* on its input side (pinning it would make push_off unstatable), and it   *)
+  (* handles the crossing through its [b]-guarded payloads                   *)
+  (* ([intr_count_pre], [trap_csrs_pay], [cpu_claim_pay], [cpu_priv_pay]).  *)
+  (* Nor to [wp_csrr_sstatus_s_sconf], which threads nothing extra (its      *)
+  (* [hart_state] cell comes OUT of the bundle and returns INTO              *)
+  (* [sie_cap_gpr_at]), nor to [WpSconfTimer]'s [wp_csrr_time_s_sconf],      *)
+  (* which owns no cell at all.                                             *)
+  (* ===================================================================== *)
+
+  (* ---- csrw stvec,rs1 -- installs the trap vector.  The [stvec] cell is
+     threaded EXPLICITLY: only the Bare arm of the translation slot owns it,
+     so between kvminithart and trapinithart it rides client-side.  The
+     written word lands VERBATIM; the one premise on it is that its MODE
+     field is not the reserved encoding, which is exactly what
+     [legalize_tvec] would otherwise silently rewrite.  Taking the value as
+     an explicit [wval] (rather than leaving [m !!! Regidx rs1] in the
+     post) keeps the stored term closed at the call site.
+
+     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
+     INDEX] above.  At [b = true] the post would hand [stvec ↦ᵣ wval] back
+     as the RESUMING hart's stvec while the instruction wrote the ENTRY
+     hart's, which is FALSE rather than unprovable. ---- *)
+  Lemma wp_csrw_stvec_s_sconf
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (tv0 wval : mword 64) :
+    uint rs1 <> 0 ->
+    rget m rs1 = wval ->
+    trapVectorMode_forwards (_get_Mtvec_Mode wval) <> TV_Reserved ->
+    sie_cap_gpr kt m n false p -∗
+    stvec ↦ᵣ tv0 -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n false p -∗
+      stvec ↦ᵣ wval -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 stvec))
+      by (split_and!; vm_compute; reflexivity).
+    iApply (wp_instr_s_sconf m n false pc false
+              (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
+              (fun npc m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
+                 stvec ↦ᵣ wval)%I
+              with "Hcg Hpc Hinstr [Hstv Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitL "Hstv".
+    - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      iDestruct (pw_frames_in Supervisor (DfracOwn 1) (R_bitvector_64 stvec) tv0
+                   Hfresh with "Hstv Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)))
+        with (execute_CSRReg csr_stvec (Regidx rs1) zreg CSRRW).
+      iApply (swp_mono with
+                "[Hmsx Hmiex Hmenvx Hcap HPC HnPC Hresv] [Hrw Hro Hfile]");
+        [| iApply (swp_execute_CSRReg_w_p (cw_Drw (R_bitvector_64 stvec)) cw_Dro
+                     (cw_Df (DfracOwn 1))
+                     (pw_rs Supervisor (R_bitvector_64 stvec) tv0)
+                     (pw_rs Supervisor (R_bitvector_64 stvec) wval)
+                     (tp_pin m) csr_stvec Supervisor rs1 wval
+                     (cw_disj _ Hfresh) (cw_in_priv _)
+                     (pw_rs_priv Supervisor (R_bitvector_64 stvec) tv0 Hfresh)
+                     ltac:(by vm_compute)
+                     (hval_check_CSR_result_S _ _ _ csr_stvec CSRWrite
+                        (cw_in_priv _) (cw_in_sec _) (cw_in_misa _)
+                        (pw_rs_priv Supervisor (R_bitvector_64 stvec) tv0 Hfresh)
+                        (pw_rs_sec Supervisor (R_bitvector_64 stvec) tv0 Hfresh)
+                        (pw_rs_misa Supervisor (R_bitvector_64 stvec) tv0 Hfresh)
+                        ltac:(by vm_compute)
+                        (exec_check_CSR_result_csrw_stvec_S dstateS
+                           ltac:(by vm_compute)))
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     ltac:(by vm_compute)
+                     with "Hcert Hfile Hrw Hro [ ]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (pw_frames_out Supervisor (DfracOwn 1) (R_bitvector_64 stvec)
+                     wval Hfresh with "[$Hrw $Hro]") as "(Hstv & Hpriv & _ & _)".
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4), m, n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hmsx Hmiex Hmenvx".
+        { iFrame "Hhw Hminv Hpriv Hmsx Hmiex Hmenvx". }
+        iFrame "Hcap Hf".
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hstv".
+      + iIntros "Hrw Hro".
+        change (tp_pin m !!! Regidx rs1) with (rget m rs1). rewrite Hwval.
+        iApply (swp_write_CSR_stvec_S (DfracOwn 1) tv0 wval Hmode
+                  with "Hcert Hrw Hro").
+    - iIntros (npc m' n') "Hcg' Hpc' (-> & -> & -> & Hstv)".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hstv Hpc'"). done.
+  Qed.
+
+  (* ---- csrw sstatus,rs1 -- THE S-STATUS RESTORE, and the one leaf whose
+     postcondition EXPOSES mstatus.
+
+     THE WRITTEN WORD IS ABSTRACT, carrying the five field premises
+     [flip_core] wants.  It was once taken as [sstatus_read ms0] for a
+     well-formed source mstatus, on the grounds that a RESTORE (kerneltrap
+     writing back the sstatus an earlier csrr saved) is the only way the
+     instruction is used -- and that stopped being true at prepare_return,
+     whose word is a read-modify-write:
+
+         x = r_sstatus(); x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE; w_sstatus(x);
+
+     No mstatus [ms0] has [sstatus_read ms0 = x] for free there; proving one
+     does means a whole-word identity over [lower_mstatus]'s nest of slice
+     updates, where the five field facts are each three lines
+     ([WpGprCsrwC]'s [bv_extract_and] / [bv_extract_or] block).  So the
+     restore shape is now the COROLLARY [wp_csrw_sstatus_s_sconf] below,
+     which discharges the five from [sconf_ms_facts ms0] exactly as this
+     leaf's body used to.
+
+     THE WRITE MUST NOT MOVE SIE -- premise [_get_Sstatus_SIE wval = sie_bit
+     b].  A restore whose saved SIE differs from the live one would have to
+     move all THREE ghost pieces and re-seal the interrupt invariant; that
+     is what the csrci/csrsi flip leaves are for, and duplicating their
+     choreography here would be the wrong shape.  At the trap-handler use
+     the premise is free: the trap cleared SIE, nothing in the handler
+     turned it back on, and the saved word was read after the clear.
+
+     The post hands back [sie_cap_gpr_at msf] -- the mstatus-EXPOSING
+     flavour (IntrDefs) -- because SPP and SPIE are the entire point: they
+     are what kernelvec's [sret] reads.  Close it with
+     [sie_cap_gpr_at_close] as soon as they have been recorded.
+
+     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
+     INDEX] above.  Here the crossing would corrupt a GHOST rather than a
+     cell: [sret_bits] is [era_sp{p,ie}_name cpu_id], the travelling half of
+     THIS hart's SPP/SPIE tie, and the post re-ties it at the [msf] this
+     instruction installed.  At [b = true] that hands the entry hart's
+     freshly-tied half back as the RESUMING hart's -- FALSE, not merely
+     unprovable.  (At [b = true] the premise was in any case vacuous: the
+     enabled arm owns the travelling half, so no caller could supply it --
+     but a vacuous premise in front of a false conclusion is exactly the
+     shape that survives a future refactor and then bites, which is why the
+     index is pinned rather than left to the arm.)  The SIE premise reads
+     [sie_bit false] for the same reason, and is what says the restore does
+     not move SIE. ---- *)
+
+  (* ---- THE RESTORE SHAPE: the written word is one an earlier [csrr
+     sstatus] read, so the five field premises above come from that mstatus'
+     [sconf_ms_facts] and the S-view/M-view field agreement
+     ([WpGprCsrwC.sX_lower]).  This is kerneltrap's [csrw sstatus,s1] and
+     kernelvec's route to [sret]; the statement is unchanged from before the
+     leaf above was generalized, so its call sites are untouched. ---- *)
+
+  (* ---- csrw sepc,rs1 -- restores the trapped pc.  The [sepc] cell is
+     threaded EXPLICITLY, exactly as stvec's is at [wp_csrw_stvec_s_sconf]
+     and for the same reason: at [b = false] nothing in the ambient bundle
+     owns it (the enabled arm's copy exists only at [b = true], and a
+     handler running with interrupts off holds the trap CSRs itself).
+     Unlike stvec's, the written word does NOT land verbatim: sepc's write
+     legalizes through [mepc_val], so the post-value carries the wrapper --
+     a caller writing back a 2-aligned epc collapses it.
+
+     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
+     INDEX] above.  At [b = true] the post would hand [sepc ↦ᵣ mepc_val
+     wval] back as the RESUMING hart's sepc while the instruction wrote the
+     ENTRY hart's, which is FALSE rather than unprovable -- and sepc is the
+     worst cell to get wrong, since it is what the eventual [sret] jumps
+     to. ---- *)
+  Lemma wp_csrw_sepc_s_sconf
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (ep0 wval : mword 64) :
+    uint rs1 <> 0 ->
+    rget m rs1 = wval ->
+    sie_cap_gpr kt m n false p -∗
+    sepc ↦ᵣ ep0 -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n false p -∗
+      sepc ↦ᵣ mepc_val wval -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrs1 Hwval) "Hcg Hsepc Hpc Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 sepc))
+      by (split_and!; vm_compute; reflexivity).
+    iApply (wp_instr_s_sconf m n false pc false
+              (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))
+              (fun npc m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
+                 sepc ↦ᵣ mepc_val wval)%I
+              with "Hcg Hpc Hinstr [Hsepc Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitL "Hsepc".
+    - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      iDestruct (pw_frames_in Supervisor (DfracOwn 1) (R_bitvector_64 sepc) ep0
+                   Hfresh with "Hsepc Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)))
+        with (execute_CSRReg csr_sepc (Regidx rs1) zreg CSRRW).
+      iApply (swp_mono with
+                "[Hmsx Hmiex Hmenvx Hcap HPC HnPC Hresv] [Hrw Hro Hfile]");
+        [| iApply (swp_execute_CSRReg_w_p (cw_Drw (R_bitvector_64 sepc)) cw_Dro
+                     (cw_Df (DfracOwn 1))
+                     (pw_rs Supervisor (R_bitvector_64 sepc) ep0)
+                     (pw_rs Supervisor (R_bitvector_64 sepc) (mepc_val wval))
+                     (tp_pin m) csr_sepc Supervisor rs1 (mepc_val wval)
+                     (cw_disj _ Hfresh) (cw_in_priv _)
+                     (pw_rs_priv Supervisor (R_bitvector_64 sepc) ep0 Hfresh)
+                     ltac:(by vm_compute)
+                     (hval_check_CSR_result_S _ _ _ csr_sepc CSRWrite
+                        (cw_in_priv _) (cw_in_sec _) (cw_in_misa _)
+                        (pw_rs_priv Supervisor (R_bitvector_64 sepc) ep0 Hfresh)
+                        (pw_rs_sec Supervisor (R_bitvector_64 sepc) ep0 Hfresh)
+                        (pw_rs_misa Supervisor (R_bitvector_64 sepc) ep0 Hfresh)
+                        ltac:(by vm_compute)
+                        (exec_check_CSR_result_csrw_sepc_S dstateS
+                           ltac:(by vm_compute)))
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     ltac:(by vm_compute)
+                     with "Hcert Hfile Hrw Hro [ ]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (pw_frames_out Supervisor (DfracOwn 1) (R_bitvector_64 sepc)
+                     (mepc_val wval) Hfresh with "[$Hrw $Hro]")
+          as "(Hsepc & Hpriv & _ & _)".
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4), m, n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hmsx Hmiex Hmenvx".
+        { iFrame "Hhw Hminv Hpriv Hmsx Hmiex Hmenvx". }
+        iFrame "Hcap Hf".
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hsepc".
+      + iIntros "Hrw Hro".
+        change (tp_pin m !!! Regidx rs1) with (rget m rs1). rewrite Hwval.
+        iApply (swp_write_CSR_sepc_S (DfracOwn 1) ep0 wval
+                  with "Hcert Hrw Hro").
+    - iIntros (npc m' n') "Hcg' Hpc' (-> & -> & -> & Hsepc)".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hsepc Hpc'"). done.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE READ-ONLY S-CSR LEAF, STATED ONCE.                                *)
+  (*                                                                       *)
+  (* sepc / scause / stval are the same instruction with three different   *)
+  (* CSR numbers, and the WP-level plumbing (funnel, nextPC bump, gpr      *)
+  (* insert, [sie_cap] retarget, rejoin) is character-for-character the    *)
+  (* same for all three.  So the leaf abstracts over the two things that   *)
+  (* actually vary -- the CSR number with its exec-layer fact, and how the *)
+  (* architectural read transforms the cell ([f]: the identity for         *)
+  (* scause/stval, bit-0 clearing for sepc, whose read runs [align_pc]) -- *)
+  (* and each CSR contributes a five-line instance below.  Cloning the     *)
+  (* proof three times is what this replaces.                              *)
+  (*                                                                       *)
+  (* THE CELL IS THREADED, AND AT A PINNED VALUE.  A trap-CSR read is the  *)
+  (* kind of read whose RESULT a caller has to reason about -- devintr's   *)
+  (* whole body is a three-way branch on scause, and kerneltrap saves sepc *)
+  (* to restore it later -- so unlike [wp_csrr_time_s_sconf], whose value  *)
+  (* is Forall-quantified because mtime is unowned, this leaf takes the    *)
+  (* cell and hands the SAME word back in [rd].  The fraction is           *)
+  (* arbitrary: reading pins the value and does not need the cell          *)
+  (* exclusively, so a caller holding the cell under [IntrDefs.trap_csrs]  *)
+  (* can lend a share.                                                     *)
+  (*                                                                       *)
+  (* [rg] is a [register_bitvector_64] rather than a [register] so that    *)
+  (* the cell's value type is definitionally [mword 64]; [Hnpc_ne] is what *)
+  (* migrates its lookup across the nextPC bump, and is a [vm_compute] at  *)
+  (* every instance.                                                       *)
+  (*                                                                       *)
+  (* THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED   *)
+  (* INDEX] above; pinning it HERE pins all three instances below with it.  *)
+  (* The cell is threaded in AND back out, so at [b = true] the             *)
+  (* [R_bitvector_64 rg ↦ᵣ{dq} v] in the post would be the RESUMING hart's  *)
+  (* cell, while the read that pinned [v] -- and the [rd] value derived     *)
+  (* from it, which is the whole point of the leaf -- happened on the ENTRY *)
+  (* hart.  That is FALSE, not merely unprovable.  The arbitrary fraction   *)
+  (* does not rescue it: a share of the wrong hart's cell is still the      *)
+  (* wrong hart's cell.  (The [b]-generic form was in any case unusable at  *)
+  (* the enabled arm: [sie_cap true] holds trap-CSR cells of its OWN under  *)
+  (* existentials and this leaf never opens it, so a caller there had to be *)
+  (* lending a share it got from somewhere else.)                          *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_csrr_ro_s_sconf
+      (pc : mword 64) (csrn : mword 12) (rg : register_bitvector_64)
+      (f : mword 64 -> mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (dq : dfrac) (v : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    register_beq (R_bitvector_64 rg) nextPC = false ->
+    (* THE CELL IS NONE OF THE THREE CONFIG PINS -- [vm_compute] at every
+       instance.  It is what makes the four-cell footprint disjoint. *)
+    cw_fresh (R_bitvector_64 rg) ->
+    (* THE FOUR CHECK FACTS.  The legality check is READ-ONLY however deep,
+       so it rides [HartGoodb.hval_of_goodb] off the Supervisor reference
+       state -- [HartSCsr.hval_check_CSR_result_S], whose read set is [D_m]
+       (measured: the stateen gate that would read menvcfg is off at
+       MENVCFG_S, so the check reads the same three cells at Supervisor as at
+       Machine).  Each instance discharges these by [vm_compute] plus the
+       exec-layer fact it already had. *)
+    ext_check_CSR csrn Supervisor CSRRead = true ->
+    goodb D_m (check_CSR_result csrn Supervisor CSRRead) dstateS = true ->
+    exec (check_CSR_result csrn Supervisor CSRRead) dstateS
+      = Some (CSR_Check_OK tt, dstateS) ->
+    eq_vec csrn (Ox"344") = false ->
+    eq_vec csrn (Ox"144") = false ->
+    (forall x, csr_id_read_callback csrn x = Defs.returnm tt) ->
+    (* THE READ ITSELF, AS AN [swp] OBLIGATION -- the premise that replaces
+       the old whole-[execute] [exec] fact, and it HAD to.  An [exec] fact
+       quantifies over the START state only, while a per-node walk may be
+       interfered with between nodes, so nothing bridges the two; the same
+       change [WpSmodeIntr.wp_gpr_write_s_sconf] made.  It is stated
+       FRAME-GENERICALLY so the instances below say nothing about which
+       footprint the engine picks: all they need is that the cell and misa
+       are pinned. *)
+    ( ∀ (Drw Dro : gset register) (Df : register -> dfrac) (rs : regstate),
+        ⌜ Drw ## Dro /\
+          (R_bitvector_64 rg : register) ∈ Drw ∪ Dro /\
+          (misa : register) ∈ Drw ∪ Dro /\
+          (cur_privilege : register) ∈ Drw ∪ Dro /\
+          (mseccfg : register) ∈ Drw ∪ Dro /\
+          register_lookup (R_bitvector_64 rg) rs = v /\
+          register_lookup misa rs = MISA_C /\
+          register_lookup cur_privilege rs = Supervisor /\
+          register_lookup mseccfg rs = mword_of_int 0 ⌝ -∗
+        gen_cert -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (read_CSR csrn)
+          (fun x => ⌜x = f v⌝ ∗ hreg_frame rs Drw ∗
+                    hreg_frame_ro Df rs Dro) ) -∗
+    sie_cap_gpr kt m n false p -∗
+    R_bitvector_64 rg ↦ᵣ{dq} v -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csrn, zreg, Regidx rd, CSRRS)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (f v)]> m) n false p -∗
+      R_bitvector_64 rg ↦ᵣ{dq} v -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok Hne Hfresh Hext Hgb Hex H344 H144 Hcb)
+            "Hrdcsr Hcg Hcell Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg (f v)]> m !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+    iApply (wp_instr_s_sconf m n false pc false
+              (CSRReg (csrn, zreg, Regidx rd, CSRRS))
+              (fun npc m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗
+                 ⌜m' = <[Regidx rd := regval_into_reg (f v)]> m⌝ ∗
+                 ⌜n' = n⌝ ∗ R_bitvector_64 rg ↦ᵣ{dq} v)%I
+              with "Hcg Hpc Hinstr [Hrdcsr Hcell Hcont]").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic callback
+       is discharged at the ambient hart and nothing is renamed. *)
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitL "Hrdcsr Hcell".
+    - (* ---- the instruction ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+      iDestruct "Hmsx" as (ms0) "(Hms & Hsie & Hsret & %Hmsf)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      iDestruct (pr_frames_in Supervisor (DfracOwn 1) dq (R_bitvector_64 rg) v
+                   Hfresh with "Hcell Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRReg (csrn, zreg, Regidx rd, CSRRS)))
+        with (execute_CSRReg csrn zreg (Regidx rd) CSRRS).
+      iApply (swp_mono with
+                "[Hms Hsie Hsret Hmiex Hmenvx Hcap HPC HnPC Hresv]
+                 [Hrw Hro Hfile Hrdcsr]");
+        [| iApply (swp_execute_CSRReg_r_p ∅ (cr_Dro (R_bitvector_64 rg))
+                     (cr_Df (DfracOwn 1) dq (R_bitvector_64 rg))
+                     (pw_rs Supervisor (R_bitvector_64 rg) v) (tp_pin m)
+                     csrn Supervisor rd (f v)
+                     (cr_disj _) (cr_in_priv _)
+                     (pw_rs_priv Supervisor (R_bitvector_64 rg) v Hfresh) Hrd Hext
+                     (hval_check_CSR_result_S _ ∅ _ csrn CSRRead
+                        (cr_in_priv _) (cr_in_sec _) (cr_in_misa _)
+                        (pw_rs_priv Supervisor (R_bitvector_64 rg) v Hfresh)
+                        (pw_rs_sec Supervisor (R_bitvector_64 rg) v Hfresh)
+                        (pw_rs_misa Supervisor (R_bitvector_64 rg) v Hfresh) Hgb Hex)
+                     H344 H144 Hcb with "Hcert Hfile Hrw Hro [Hrdcsr]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (pr_frames_out Supervisor (DfracOwn 1) dq
+                     (R_bitvector_64 rg) v Hfresh with "Hro")
+          as "(Hcell & Hpriv & _ & _)".
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4),
+                (<[Regidx rd := regval_into_reg (f v)]> m), n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hms Hsie Hsret Hmiex Hmenvx".
+        { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+          iExists ms0. iFrame "Hms Hsie Hsret". iPureIntro. exact Hmsf. }
+        iSplitL "Hcap".
+        { iApply (sie_cap_retarget m
+                    (<[Regidx rd := regval_into_reg (f v)]> m) n false Hsp
+                    with "Hcap"). }
+        iSplitL "Hf".
+        { iEval (rewrite (tp_pin_upd m rd (regval_into_reg (f v)) Hrdtp))
+            in "Hf". iExact "Hf". }
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hcell".
+      + iIntros "Hrw Hro".
+        iApply ("Hrdcsr" $! ∅ (cr_Dro (R_bitvector_64 rg))
+                  (cr_Df (DfracOwn 1) dq (R_bitvector_64 rg))
+                  (pw_rs Supervisor (R_bitvector_64 rg) v)
+                  with "[%] Hcert Hrw Hro").
+        split_and!;
+          [ apply cr_disj | apply cr_in_r | apply cr_in_misa
+          | apply cr_in_priv | apply cr_in_sec
+          | apply (pw_rs_r Supervisor (R_bitvector_64 rg) v)
+          | apply (pw_rs_misa Supervisor (R_bitvector_64 rg) v Hfresh)
+          | apply (pw_rs_priv Supervisor (R_bitvector_64 rg) v Hfresh)
+          | apply (pw_rs_sec Supervisor (R_bitvector_64 rg) v Hfresh) ].
+    - (* ---- the continuation ---- *)
+      iIntros (npc m' n') "Hcg' Hpc' (-> & -> & -> & Hcell)".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hcell Hpc'"). done.
+  Qed.
+
+  (* ---- the three instances.  scause and stval read their cell verbatim;
+     sepc's read runs [align_pc], so its value carries [mepc_val].
+
+     ALL THREE INHERIT THE PINNED INDEX from [wp_csrr_ro_s_sconf] -- they
+     could not be [b]-generic even if one wanted them to be, since the
+     generic leaf they are five lines of is not.  See [THE PINNED INDEX]
+     above: each threads one of THIS hart's trap-CSR cells in and back out,
+     so at [b = true] the post would be about the resuming hart's cell while
+     the read happened on the entry hart's, which is FALSE rather than
+     unprovable. ---- *)
+
+  Lemma wp_csrr_scause_s_sconf
+      (pc : mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (dq : dfrac) (sc : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr kt m n false p -∗
+    scause ↦ᵣ{dq} sc -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_scause, zreg, Regidx rd, CSRRS)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg sc]> m) n false p -∗
+      scause ↦ᵣ{dq} sc -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok) "Hcg Hcell Hpc Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 scause))
+      by (split_and!; vm_compute; reflexivity).
+    iApply (wp_csrr_ro_s_sconf pc csr_scause scause (fun x => x) rd m n dq sc
+              Hrd Hrdok ltac:(by vm_compute) Hfresh
+              ltac:(by vm_compute)
+              ltac:(by vm_compute)
+              (exec_check_CSR_result_scause_S dstateS ltac:(by vm_compute))
+              ltac:(by vm_compute) ltac:(by vm_compute)
+              ltac:(intro; by vm_compute)
+              with "[] Hcg Hcell Hpc Hinstr Hcont").
+    iIntros (Drw Dro Df rs (Hd & Hin & _ & _ & _ & Hv & _)) "#Hcert Hrw Hro".
+    rewrite read_CSR_scause_red.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_read_reg_pinned Drw Dro Df rs (R_bitvector_64 scause)
+                   Hd Hin with "Hcert Hrw Hro") ].
+    iIntros (x) "(-> & Hrw & Hro)". rewrite Hv. by iFrame.
+  Qed.
+
+  (* stval: NO CALL SITE TODAY (kerneltrap's usermode arm will be the first).
+     It is kept because it is the third five-line instance of a leaf that
+     exists precisely to be instantiated three times, and because deleting
+     it would leave the [f]-generic proof looking over-general.  Its index is
+     pinned like its siblings' -- a future first caller will be in the
+     trap-handler tier, i.e. at interrupts-off, exactly as the others are. *)
+  Lemma wp_csrr_stval_s_sconf
+      (pc : mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (dq : dfrac) (tv : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr kt m n false p -∗
+    stval ↦ᵣ{dq} tv -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_stval, zreg, Regidx rd, CSRRS)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg tv]> m) n false p -∗
+      stval ↦ᵣ{dq} tv -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok) "Hcg Hcell Hpc Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 stval))
+      by (split_and!; vm_compute; reflexivity).
+    iApply (wp_csrr_ro_s_sconf pc csr_stval stval (fun x => x) rd m n dq tv
+              Hrd Hrdok ltac:(by vm_compute) Hfresh
+              ltac:(by vm_compute)
+              ltac:(by vm_compute)
+              (exec_check_CSR_result_stval_S dstateS ltac:(by vm_compute))
+              ltac:(by vm_compute) ltac:(by vm_compute)
+              ltac:(intro; by vm_compute)
+              with "[] Hcg Hcell Hpc Hinstr Hcont").
+    iIntros (Drw Dro Df rs (Hd & Hin & _ & _ & _ & Hv & _)) "#Hcert Hrw Hro".
+    rewrite read_CSR_stval_red.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_read_reg_pinned Drw Dro Df rs (R_bitvector_64 stval)
+                   Hd Hin with "Hcert Hrw Hro") ].
+    iIntros (x) "(-> & Hrw & Hro)". rewrite Hv. by iFrame.
+  Qed.
+
+  (* sepc: the value that lands in [rd] is [mepc_val ep], not [ep].  A
+     caller that knows its saved epc is 2-aligned (every write to the cell
+     went through [legalize_xepc], and every trap writes an aligned pc)
+     collapses the wrapper itself; the leaf does not assume it. *)
+  Lemma wp_csrr_sepc_s_sconf
+      (pc : mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (dq : dfrac) (ep : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr kt m n false p -∗
+    sepc ↦ᵣ{dq} ep -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_sepc, zreg, Regidx rd, CSRRS)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n false p -∗
+      sepc ↦ᵣ{dq} ep -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrd Hrdok) "Hcg Hcell Hpc Hinstr Hcont".
+    assert (Hfresh : cw_fresh (R_bitvector_64 sepc))
+      by (split_and!; vm_compute; reflexivity).
+    iApply (wp_csrr_ro_s_sconf pc csr_sepc sepc mepc_val rd m n dq ep
+              Hrd Hrdok ltac:(by vm_compute) Hfresh
+              ltac:(by vm_compute)
+              ltac:(by vm_compute)
+              (exec_check_CSR_result_sepc_S dstateS ltac:(by vm_compute))
+              ltac:(by vm_compute) ltac:(by vm_compute)
+              ltac:(intro; by vm_compute)
+              with "[] Hcg Hcell Hpc Hinstr Hcont").
+    (* sepc's read is NOT its cell: [align_pc] clears bit 0, so the stretch
+       is the cell read followed by a misa-gated pure step.  The first is a
+       pinned node, the second the goodb transport above. *)
+    iIntros (Drw Dro Df rs (Hd & Hin & Hmi & Hpriv & Hsec & Hv & Hmisa & Hlpriv & Hlsec))
+            "#Hcert Hrw Hro".
+    rewrite read_CSR_sepc_red.
+    iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 sepc)) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs (R_bitvector_64 sepc)
+                Hd Hin with "Hcert Hrw Hro"). }
+    iIntros (x) "(-> & Hrw & Hro)". rewrite Hv.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_span Drw Dro Df rs rs _ (mepc_val ep) Hd
+                   (hval_align_pc (Drw ∪ Dro) Drw rs ep Hpriv Hsec Hmi
+                      Hlpriv Hlsec Hmisa) with "Hcert Hrw Hro") ].
+    iIntros (y) "(-> & Hrw & Hro)". by iFrame.
+  Qed.
+
+  (* ---- csrr rd,satp -- THE ONE RO READ THAT CANNOT BE AN INSTANCE OF
+     [wp_csrr_ro_s_sconf], and the reason is ownership rather than decode.
+
+     The three instances above thread a cell the ambient bundle does NOT
+     hold: sepc / scause / stval belong to whoever is running with
+     interrupts off.  satp is different -- [IntrDefs.strans_inv] owns it in
+     BOTH arms ([SRegime.bare_inv] at Bare, [KptShare.tlb_res_pt] at KPT),
+     and [strans_inv] is inside [sie_cap], inside [sie_cap_gpr].  So
+     [sie_cap_gpr m n false p ∗ satp ↦ᵣ{dq} v] is not a premise set a caller
+     can be short of; it is one NO caller can hold, and a leaf demanding it
+     is vacuous however carefully it is proved.  (It was: this lemma had
+     that shape until prepare_return tried to call it.)
+
+     WHAT THE CALLER SUPPLIES INSTEAD IS THE KPT RECEIPT.  [kpt_on cpu_id]
+     pins the arm at KPT and opens it
+     ([IntrDefs.strans_inv_acc_kpt]); the cell comes out of the
+     [tlb_res_pt] inside ([KptShare.tlb_res_pt_satp_acc]) and goes straight
+     back, so the borrow never escapes this leaf and the bundle handed back
+     is whole.  That also explains why the value is not a parameter: it is
+     whatever the live kernel table's satp says, so it comes back
+     EXISTENTIALLY, carrying the three [satp_rooted] facts the arm knows
+     about it -- which is exactly what a reader of [kernel_satp] wants and
+     strictly more than a bare points-to would give.
+
+     The mstatus obligation the other three discard is used here: satp's
+     accessibility is mstatus.TVM = 0 rather than Ext_S, and that bit is the
+     last conjunct of [sconf_ms_facts], which [sconf] was already
+     carrying. ---- *)
+
+
+  (* =================================================================== *)
+  (* THE TEN LEAVES THE PER-NODE SWEEP HAS NOT REACHED.  They are at the  *)
+  (* END of the section ON PURPOSE: they still carry their PRE-PORT       *)
+  (* proofs, so this file is red from here down and everything ABOVE --   *)
+  (* the engines and the six converted leaves -- is machine-checked in    *)
+  (* the committed form.  Five of the ten are BLOCKED on the wrapper (see *)
+  (* the file header); the other five want the sstatus write's assembled  *)
+  (* goodb certificate, and satp's the mstatus.TVM one.  Their STATEMENTS *)
+  (* are byte-identical to the pre-sweep ones and must stay that way.     *)
+  (* (Each one's own doc comment stays where it was, above the place it   *)
+  (* used to sit.)                                                       *)
+  (* =================================================================== *)
 
   Lemma wp_csrr_sstatus_s_sconf
       (pc : mword 64) (rd : mword 5)
@@ -734,129 +2091,6 @@ Section WpSconfCsr.
       iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'. }
     iExact "Hfmap".
   Qed.
-
-
-  (* ------------------------------------------------------------------- *)
-  (* The GENERAL csrrci-on-sstatus execute (no idempotence collapse):     *)
-  (* the write lands [legalize_sstatus_val m (sstatus_write_val m imm5)]  *)
-  (* in mstatus, rd gets the OLD S-view.                                  *)
-  (* ------------------------------------------------------------------- *)
-  Local Lemma exec_execute_csrrci_sstatus_gen (imm5 rd : mword 5) (m : mword 64) s :
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    register_lookup mstatus s.(sregs) = m ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec imm5 (zeros' 5) = false ->
-    uint rd <> 0 ->
-    exec (execute (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRC))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg (set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
-                      (R_bitvector_64 (gpr_of_Z (uint rd)))
-                      (regval_into_reg (sstatus_read m))).
-  Proof.
-    intros Hpriv Hm HS HU Himm Hrd.
-    change (execute (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRC)))
-      with (execute_CSRImm csr_sstatus imm5 (Regidx rd) CSRRC).
-    unfold execute_CSRImm.
-    rewrite Himm.
-    cbn match.
-    unfold doCSR.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    unfold ext_check_CSR. cbn match.
-    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
-    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
-    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
-    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
-    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_val m imm5)) s
-                     = Some (Ok (subrange_vec_dec
-                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
-                                   (Z.sub xlen 1) 0),
-                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))).
-    { rewrite (exec_write_CSR_sstatus (sstatus_write_val m imm5) s HS HU).
-      rewrite Hm. reflexivity. }
-    change (and_vec (sstatus_read m) (not_vec (zero_extend' 64 imm5)))
-      with (sstatus_write_val m imm5).
-    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
-    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5))).
-    assert (Hwc : exec (wX_bits (Regidx rd) (sstatus_read m) >>
-                        csr_id_write_callback csr_sstatus
-                          (subrange_vec_dec
-                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
-                             (Z.sub xlen 1) 0)) s1
-                  = Some (tt, set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
-                                (regval_into_reg (sstatus_read m)))).
-    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd (sstatus_read m) s1)).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      apply (exec_csr_id_write_callback_sstatus _ _). }
-    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
-    apply exec_returnm.
-  Qed.
-
-
-  (* ------------------------------------------------------------------- *)
-  (* THE '1'->'0' FLIP: csrci sstatus, 2 (push_off's intr_off).           *)
-  (*                                                                      *)
-  (* The SIE=1 characterization of the write is PROVEN                    *)
-  (* SIE=1 characterization of the legalized write (SIE cleared, the      *)
-  (* sconf fact set preserved); it is taken as a premise so the ghost     *)
-  (* choreography below is proven now and the bit lemma lands once,       *)
-  (* later, in WpGprCsrwC style.  At SIE=0 it already follows from        *)
-  (* [legalize_sie_clear_idem].                                           *)
-  (*                                                                      *)
-  (* Choreography ('1' arm): the funnel's σf-callback flips mstatus to    *)
-  (* ms' by reg_update, reads the quarter out of [intr_res],              *)
-  (* [sie_ghost_flip]s ALL THREE pieces to '0' (bundle half + capability  *)
-  (* quarter + the [intr_res] quarter), re-forms [intr_res] at b := '0'   *)
-  (* (the handler guard is vacuous), and hands the caller the freed       *)
-  (* '1'-arm payload (the trap CSRs, [intr_res] among them, + the stack   *)
-  (* bound).  The '0' arm is the idempotent write, ghosts untouched.      *)
-  (* THIS USED TO OPEN [intrN] ACROSS THE STEP; there is no invariant any *)
-  (* more, so there is no mask side condition either.                     *)
-  (* ------------------------------------------------------------------- *)
-(* ===================================================================== *)
-(* THE ARM-FLIP SEAM AND ITS avail INDEX -- READ THIS BEFORE TOUCHING ANY  *)
-(* OF THE FOUR csrci/csrsi LEAVES BELOW.                                   *)
-(*                                                                        *)
-(* [IntrDefs.sie_cap m av b p] owns [trap_res b + av] free stack slots     *)
-(* below sp: [av] usable by kernel code plus an ARM-DEPENDENT trap reserve *)
-(* ([kv_frame_slots] at [b = true], nothing at [b = false] -- see          *)
-(* [IntrDefs.trap_res] for why an arm-blind reserve is unsatisfiable).     *)
-(* These four leaves are the only instructions in the tree that MOVE THE   *)
-(* ARM, so they are the only ones at which that reserve appears or         *)
-(* disappears -- and stack slots are not persistent, so the total carve    *)
-(* must be CONSERVED across each of them.  Hence the uniform rule:         *)
-(*                                                                        *)
-(*   a leaf moving the arm from [b0] to [b1] has                            *)
-(*     PRE  index [trap_res b1 + n]   and   POST index [trap_res b0 + n].   *)
-(*                                                                        *)
-(* Both sides then carve [trap_res b0 + (trap_res b1 + n)] slots, i.e. the *)
-(* stack conjunct is LITERALLY THE SAME PROPOSITION on the way in and on   *)
-(* the way out -- a pure re-indexing, never a split, and never a           *)
-(* [kv_frame_slots <= n] premise (which is what rejected alternative (a)   *)
-(* at [IntrDefs.trap_res] would have cost).  Each direction collapses to   *)
-(* the identity at the arm where nothing moves, because [trap_res false +  *)
-(* n] is DEFINITIONALLY [n]:                                              *)
-(*                                                                        *)
-(*   DISABLING ([b1 = false]): pre [n] (verbatim what it always was),      *)
-(*     post [trap_res b + n] -- the freed reserve becomes usable stack.    *)
-(*     At [b = false] the post is [n] too, so nothing changes.             *)
-(*   ENABLING ([b1 = true]): pre [trap_res true + n], post                 *)
-(*     [trap_res b + n] -- re-enabling interrupts PAYS the reserve out of  *)
-(*     the caller's budget.  At [b = true] (the idempotent write) pre and  *)
-(*     post coincide and the carve rides through untouched.                *)
-(*                                                                        *)
-(* THE CONSEQUENCE FOR CALLERS IS NOT LOCAL, and that is the point: the    *)
-(* window between a push_off/acquire and its matching pop_off/release runs *)
-(* at [trap_res b + av], not [av].  Do not "fix" a caller by dropping the  *)
-(* difference -- the reserve is exactly what funds the trap handler, and a  *)
-(* pop_off that cannot re-establish it is unprovable.                      *)
-(* ===================================================================== *)
-  (* DISABLING: pre index [n], post index [trap_res b + n] -- the reserve the
-     enabled arm was holding becomes usable stack.  See the seam header. *)
   Lemma wp_csrci_sstatus_s_sconf
       (pc : mword 64) (rd : mword 5) (k : nat) (eb : bool)
       (m : regfile) (n : nat) (b : bool) :
@@ -1057,89 +2291,6 @@ Section WpSconfCsr.
       { rewrite /cpu_claim_pay. destruct k; [rewrite (Heb0 eq_refl) |]; done. }
       { rewrite /cpu_priv_pay. done. }
   Qed.
-
-
-  (* ------------------------------------------------------------------- *)
-  (* THE '0'->'1' RESTORE: csrsi sstatus, 2 (pop_off's intr_on).           *)
-  (* ------------------------------------------------------------------- *)
-
-  (* two full cells for the same register cannot coexist (refutes the
-     already-enabled branch of the restore: the caller's payload and a
-     '1'-armed capability would both own sepc). *)
-  Local Lemma reg_pointsto_excl (r : register) (v w : type_of_register r) :
-    r ↦ᵣ v -∗ r ↦ᵣ w -∗ False.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    exfalso. apply dfrac_valid_own_r in Hv.
-    exact (irreflexivity (<)%Qp 1%Qp Hv).
-  Qed.
-
-  Local Lemma exec_execute_csrsi_sstatus_x0 (imm5 : mword 5) (m : mword 64) s :
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    register_lookup mstatus s.(sregs) = m ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec imm5 (zeros' 5) = false ->
-    exec (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRS))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5))).
-  Proof.
-    intros Hpriv Hm HS HU Himm.
-    change (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRS)))
-      with (execute_CSRImm csr_sstatus imm5 (Regidx (mword_of_int 0)) CSRRS).
-    unfold execute_CSRImm.
-    rewrite Himm.
-    cbn match.
-    unfold doCSR.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    unfold ext_check_CSR. cbn match.
-    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
-    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
-    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
-    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
-    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_set_val m imm5)) s
-                     = Some (Ok (subrange_vec_dec
-                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
-                                   (Z.sub xlen 1) 0),
-                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))).
-    { rewrite (exec_write_CSR_sstatus (sstatus_write_set_val m imm5) s HS HU).
-      rewrite Hm. reflexivity. }
-    change (or_vec (sstatus_read m) (zero_extend' 64 imm5))
-      with (sstatus_write_set_val m imm5).
-    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
-    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5))).
-    assert (Hwc : exec (wX_bits (Regidx (mword_of_int 0)) (sstatus_read m) >>
-                        csr_id_write_callback csr_sstatus
-                          (subrange_vec_dec
-                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
-                             (Z.sub xlen 1) 0)) s1
-                  = Some (tt, s1)).
-    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (mword_of_int 0) (sstatus_read m) s1)).
-      replace (Z.eqb (uint (mword_of_int 0 : mword 5)) 0) with true by reflexivity.
-      apply (exec_csr_id_write_callback_sstatus _ _). }
-    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
-    apply exec_returnm.
-  Qed.
-
-  (* pop_off's restore: consumes the saved payload to re-arm the
-     capability.  The MIRROR of the csrci leaf above: the pieces go IN and
-     the arm is rebuilt whole, so the caller supplies the CELLS
-     ([cpu_cells 0 true p]) and the counting token at level 1, and gets NO
-     [intr_count] back -- the eighth the flip produces goes straight into
-     [sie_arm true p]'s nested [cpu_hart 0 true p], which is where the
-     enabled arm keeps it.  (Asking the caller for a whole [cpu_hart 0 true
-     p] would ask it for that eighth at '1' while its own bundle still pins
-     it at '0'.)  The already-enabled branch of [sie_cap] is refuted by
-     sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
-  (* ENABLING: pre index [trap_res true + n], post index [trap_res b + n].
-     Re-enabling interrupts must PAY the trap reserve, and the caller pays it
-     out of the very slots its own push_off/csrci freed.  See the seam header
-     above [wp_csrci_sstatus_s_sconf]. *)
   Lemma wp_csrsi_sstatus_x0_s_sconf
       (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
@@ -1257,118 +2408,6 @@ Section WpSconfCsr.
     iApply ("Hcont" $! ms0 with "[%] Hcg [$Hpc' $Hnpc]").
     { exact Hmsf. }
   Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* THE LEVEL-0 FLIPS: scheduler()'s INLINED intr_on()/intr_off() at the  *)
-  (* head of its dispatch loop.  Both instructions have rd = x0, and both  *)
-  (* stay at noff level 0 -- they are NOT the push/pop pair (which moves    *)
-  (* k -> S k / S k -> k and hands the trap CSRs to [trap_csrs_pay]), but  *)
-  (* an unbalanced enable/disable of the loop's own interrupt window.      *)
-  (* ------------------------------------------------------------------- *)
-
-  (* the x0 twin of [exec_execute_csrrci_sstatus_gen]: [csrci sstatus,imm]
-     with rd = x0.  The wX_bits write-back takes the x0 NO-OP path, so the
-     only state change is mstatus := the legalized cleared write (no rd
-     cell is touched, hence no [uint rd <> 0] premise and no gpr update in
-     the leaves below). *)
-  Local Lemma exec_execute_csrrci_sstatus_x0 (imm5 : mword 5) (m : mword 64) s :
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    register_lookup mstatus s.(sregs) = m ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec imm5 (zeros' 5) = false ->
-    exec (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRC))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5))).
-  Proof.
-    intros Hpriv Hm HS HU Himm.
-    change (execute (CSRImm (csr_sstatus, imm5, Regidx (mword_of_int 0), CSRRC)))
-      with (execute_CSRImm csr_sstatus imm5 (Regidx (mword_of_int 0)) CSRRC).
-    unfold execute_CSRImm.
-    rewrite Himm.
-    cbn match.
-    unfold doCSR.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    unfold ext_check_CSR. cbn match.
-    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
-    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
-    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
-    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
-    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_val m imm5)) s
-                     = Some (Ok (subrange_vec_dec
-                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
-                                   (Z.sub xlen 1) 0),
-                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))).
-    { rewrite (exec_write_CSR_sstatus (sstatus_write_val m imm5) s HS HU).
-      rewrite Hm. reflexivity. }
-    change (and_vec (sstatus_read m) (not_vec (zero_extend' 64 imm5)))
-      with (sstatus_write_val m imm5).
-    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
-    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_val m imm5))).
-    assert (Hwc : exec (wX_bits (Regidx (mword_of_int 0)) (sstatus_read m) >>
-                        csr_id_write_callback csr_sstatus
-                          (subrange_vec_dec
-                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_val m imm5)))
-                             (Z.sub xlen 1) 0)) s1
-                  = Some (tt, s1)).
-    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (mword_of_int 0) (sstatus_read m) s1)).
-      replace (Z.eqb (uint (mword_of_int 0 : mword 5)) 0) with true by reflexivity.
-      apply (exec_csr_id_write_callback_sstatus _ _). }
-    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
-    apply exec_returnm.
-  Qed.
-
-  (* intr_on() at level 0, from EITHER base state.
-       eb = false: the real '0'->'1' flip.  [intr_count 0 false] is just
-     the count eighth at '0', so together with the persistent
-     handler resource -- which rides inside [trap_csrs] -- the pop_off
-     restore leaf applies verbatim (same four-piece ghost choreography:
-     bundle half + capability eighth + count eighth + the [intr_res] quarter,
-     with the whole of [trap_csrs] moving INTO the arm's '1' branch).
-       eb = true: SIE is ALREADY '1' (ghost agreement between the arm's own
-     eighth and the mstatus-tied half), so the write is idempotent on the
-     bit and NO ghost moves; the legalized write still changes mstatus's
-     term, but [csrsi_sie_flip] says the new word again has SIE = '1' and
-     again satisfies [sconf_ms_facts], which is all the bundle needs.  The
-     capability's '1' arm (trap CSRs + per-cpu cells + invariant copy) rides
-     through untouched, and every one of the caller's [if eb then emp else _]
-     premises is [emp] -- at [eb = true] all of that is ALREADY in the arm,
-     which is exactly why the counting token is one of them. *)
-  (* ------------------------------------------------------------------- *)
-  (* THE IDEMPOTENT SET AT AN ALREADY-ENABLED ARM -- AND IT IS            *)
-  (* INDEX-GENERIC, WHICH IS THE WHOLE POINT.                             *)
-  (*                                                                      *)
-  (* [csrsi sstatus,2] with SIE already '1' writes the bit that is already *)
-  (* set: the ghost state does not move (the arm's own eighth and the      *)
-  (* mstatus-tied half already agree at '1'), the '1' arm rides through    *)
-  (* untouched, and -- decisively -- THE STACK CONJUNCT IS NEVER TOUCHED.  *)
-  (* So this leaf holds at an ARBITRARY index [n]: pre and post are the    *)
-  (* SAME [sie_cap_gpr m n true p], with no [trap_res true + _] shape      *)
-  (* demanded of it and no [kv_frame_slots <= n] premise.                  *)
-  (*                                                                      *)
-  (* WHY THAT MATTERS, AND WHY THIS IS A SEPARATE LEMMA.                   *)
-  (* [wp_csrsi_sstatus_x0_enable_s_sconf] below is the arm-GENERIC enable, *)
-  (* and its contract must be stated at pre index [trap_res true + n] --   *)
-  (* at [eb = false] it is a real 0 -> 1 flip and the reserve has to come  *)
-  (* out of the index.  Instantiated at [eb = true] that shape is still    *)
-  (* sound but it is a REQUIREMENT: it forces the caller's index to be at  *)
-  (* least [kv_frame_slots], on top of whatever the enabled arm is already *)
-  (* holding in reserve.  scheduler()'s loop head is exactly that caller   *)
-  (* -- its [intr_on] is reached with interrupts already on from the       *)
-  (* second round onwards -- and paying there would make [SpecScheduler]   *)
-  (* demand [2 * kv_frame_slots + 20], a factor-of-two reserve, which is   *)
-  (* the pathology the arm-dependent carve exists to remove.  Splitting    *)
-  (* the idempotent case out gives that caller a leaf that moves nothing:  *)
-  (* ONE reserve, paid once, at the single real enable.                    *)
-  (*                                                                      *)
-  (* The arm-generic enable's [eb = true] branch IS this lemma at          *)
-  (* [n := trap_res true + n], so nothing is restated: the proof below is  *)
-  (* the one that used to sit inline there.                                *)
-  (* ------------------------------------------------------------------- *)
   Lemma wp_csrsi_sstatus_x0_idem_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) :
     sie_cap_gpr kt m n true p -∗
@@ -1454,12 +2493,6 @@ Section WpSconfCsr.
     iApply ("Hcont" $! ms0 with "[%] Hcg [$Hpc' $Hnpc]").
     { exact Hmsf. }
   Qed.
-
-  (* ENABLING, so the same index discipline as [wp_csrsi_sstatus_x0_s_sconf]:
-     pre [trap_res true + n], post [trap_res eb + n].  At [eb = true] the two
-     coincide (the write is idempotent and the reserve rides through); at
-     [eb = false] this delegates to that leaf at [b := false], whose pre/post
-     indices are then literally these. *)
   Lemma wp_csrsi_sstatus_x0_enable_s_sconf
       (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
     sie_cap_gpr kt m (trap_res true + n)%nat eb p -∗
@@ -1491,37 +2524,6 @@ Section WpSconfCsr.
     iApply (wp_csrsi_sstatus_x0_idem_s_sconf pc m (trap_res true + n)%nat
               with "Hcg Hpc Hinstr Hcont").
   Qed.
-
-  (* intr_off() at level 0, FROM enabled: the '1'->'0' flip of
-     [wp_csrci_sstatus_s_sconf] with rd = x0 and no level push.  Same
-     choreography ([sie_ghost_flip_off] on all four pieces -- bundle half +
-     capability eighth + count eighth + the [intr_res] quarter -- re-forming
-     [intr_res] at the same installed vector), but the freed '1'-arm payload
-     lands DIFFERENTLY: the trap CSRs go straight to the caller (level 0 with
-     a now-disabled base owes them explicitly), [intr_res] RIDES OUT WITH
-     THEM (it used to be a persistent [intr_inv] copy that could simply be
-     dropped, because the caller kept its own [intr_handler_avail]; owned,
-     there is exactly one and the caller must get it), and the count eighth
-     comes back at [sie_bit false] -- i.e. [intr_count 0 false], not
-     [intr_count 1 _].
-
-     THE TWO EIGHTHS ARE NOT THE CALLER'S TO SUPPLY AT [b = true].  This
-     leaf used to demand a separate [intr_count 0 true] BESIDE the bundle,
-     and hand back [cpu_hart 0 true p] (which CONTAINS an [intr_count 0
-     true]) beside an [intr_count 0 false] -- the same eighth at two
-     values, which the comment on [cpu_priv_pay] above forbids.  Nobody
-     could hold the premise: at [b = true] the arm owns BOTH eighths
-     ([sie_arm]'s own plus the one inside [cpu_hart 0 true p]), and at
-     [b = false] the last branch below refutes it outright, so the contract
-     was vacuous at every index.  It now takes [intr_count_pre b 0 true]
-     (the pure fact at the enabled arm, the token at the disabled one) and
-     returns the freed cells as [cpu_priv_pay b p], exactly like its
-     sibling [wp_csrci_sstatus_s_sconf]: the flip's second eighth is taken
-     out of the arm's own [cpu_hart], not out of the caller. *)
-  (* DISABLING, same index discipline as [wp_csrci_sstatus_s_sconf]: pre [n],
-     post [trap_res b + n].  Reachable only at [b = true] (the [b = false] arm
-     is refuted below), where the post index is [kv_frame_slots + n] -- the
-     scheduler's inlined intr_off() freeing its own reserve. *)
   Lemma wp_csrci_sstatus_x0_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr kt m n b p -∗
@@ -1648,27 +2650,6 @@ Section WpSconfCsr.
     { iExact "Hclmx". }
     { rewrite /cpu_priv_pay. iExact "Hcells". }
   Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* THE IDEMPOTENT CLEAR AT AN ALREADY-DISABLED ARM -- the exact mirror  *)
-  (* of [wp_csrsi_sstatus_x0_idem_s_sconf] above.                          *)
-  (*                                                                      *)
-  (* [csrci sstatus,2] with SIE already '0' clears the bit that is already *)
-  (* clear: the ghost state does not move (the disabled arm's eighth and   *)
-  (* the mstatus-tied half already agree at '0'), the arm rides through     *)
-  (* untouched, and the stack conjunct is never touched -- so pre and post *)
-  (* are the SAME [sie_cap_gpr m n false p] at an ARBITRARY index [n],     *)
-  (* with no reserve to move and nothing to pay out.                       *)
-  (*                                                                      *)
-  (* WHY IT IS NEEDED.  [wp_csrci_sstatus_x0_s_sconf] REFUTES its          *)
-  (* [b = false] arm (its [intr_count_pre] premise is unsatisfiable there),*)
-  (* so an intr_off() reached with interrupts ALREADY off had no leaf at    *)
-  (* all.  prepare_return is exactly such a caller: usertrap reaches it     *)
-  (* with SIE = 0 on the devintr / vmfault / unexpected-scause paths, and   *)
-  (* only the syscall path (which does its own [csrsi] first) arrives       *)
-  (* enabled.  [WpIntrOff.wp_intr_off_lvl0_s_sconf] is the index-generic    *)
-  (* composite the two arms feed.                                          *)
-  (* ------------------------------------------------------------------- *)
   Lemma wp_csrci_sstatus_x0_idem_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) :
     sie_cap_gpr kt m n false p -∗
@@ -1744,188 +2725,6 @@ Section WpSconfCsr.
     iApply ("Hcont" $! ms0 with "[%] Hcg [$Hpc' $Hnpc]").
     { exact Hmsf. }
   Qed.
-
-  (* ===================================================================== *)
-  (* THE PINNED INDEX: WHY THE SEVEN LEAVES BELOW SAY [false] AND NOT [b].  *)
-  (*                                                                        *)
-  (* Every leaf from here to the end of the section threads a PER-HART       *)
-  (* resource EXPLICITLY, beside the bundle: a trap-CSR cell ([stvec],       *)
-  (* [sepc], [scause], [stval] -- each a single register of THIS hart), or   *)
-  (* the travelling SPP/SPIE ghost half ([sret_bits], i.e.                   *)
-  (* [era_sp{p,ie}_name cpu_id]).  Their postconditions live under           *)
-  (* [wp_next _ p (fun CID => ...)], whose binder shadows the ambient [CID]  *)
-  (* -- so every resource written inside the continuation is about the hart  *)
-  (* execution RESUMES on, not the hart the instruction started on           *)
-  (* (WpNext.v).                                                            *)
-  (*                                                                        *)
-  (* At [b = true] a trap can be taken AT THIS INSTRUCTION and the thread    *)
-  (* resumed on a different hart.  A [b]-generic version of these leaves     *)
-  (* would then read/write the ENTRY hart's CSR (that is the only cell the   *)
-  (* premise could possibly be about -- it is the one the step executes on)  *)
-  (* and hand it straight back as the RESUMING hart's.  So at [b = true]     *)
-  (* these postconditions are FALSE, not merely unprovable: they equate two  *)
-  (* different harts' state.  Nothing exploits that today only because a     *)
-  (* trap currently returns on the hart it came from; it stops being an      *)
-  (* accident and starts being a soundness hole the moment migration is      *)
-  (* real.  Pinning the index at the literal [false] is therefore a          *)
-  (* correction, not a restriction -- every call site was already at         *)
-  (* [false] (ProofTrapinithart, ProofKerneltrapParts, ProofDevintr: the     *)
-  (* trap-handler tier, which runs with interrupts off by construction).     *)
-  (*                                                                        *)
-  (* DO NOT "GENERALISE" THE INDEX BACK.  If you need one of these           *)
-  (* instructions at [b = true], the missing piece is not a weaker index:    *)
-  (* it is a statement that says which hart each cell belongs to, i.e. the   *)
-  (* [sie_cap] enabled arm's own existentially-quantified trap CSRs, or a    *)
-  (* payload transported across the crossing the way the csrci/csrsi flip    *)
-  (* family does it.                                                        *)
-  (*                                                                        *)
-  (* The [wp_next false p (fun CID => ...)] WRAPPER STAYS.  It is not the    *)
-  (* problem (at [false] it collapses by [wp_next_off]), and every call site *)
-  (* discharges it with [iApply wp_next_off_intro], which needs the head to  *)
-  (* still be [wp_next].                                                    *)
-  (*                                                                        *)
-  (* THIS DOES NOT APPLY TO THE SIE-FLIP FAMILY ABOVE                        *)
-  (* ([wp_csrci_sstatus_s_sconf] & co.), which is legitimately [b]-generic:  *)
-  (* the write that DISABLES interrupts is genuinely applied at [b = true]   *)
-  (* on its input side (pinning it would make push_off unstatable), and it   *)
-  (* handles the crossing through its [b]-guarded payloads                   *)
-  (* ([intr_count_pre], [trap_csrs_pay], [cpu_claim_pay], [cpu_priv_pay]).  *)
-  (* Nor to [wp_csrr_sstatus_s_sconf], which threads nothing extra (its      *)
-  (* [hart_state] cell comes OUT of the bundle and returns INTO              *)
-  (* [sie_cap_gpr_at]), nor to [WpSconfTimer]'s [wp_csrr_time_s_sconf],      *)
-  (* which owns no cell at all.                                             *)
-  (* ===================================================================== *)
-
-  (* ---- csrw stvec,rs1 -- installs the trap vector.  The [stvec] cell is
-     threaded EXPLICITLY: only the Bare arm of the translation slot owns it,
-     so between kvminithart and trapinithart it rides client-side.  The
-     written word lands VERBATIM; the one premise on it is that its MODE
-     field is not the reserved encoding, which is exactly what
-     [legalize_tvec] would otherwise silently rewrite.  Taking the value as
-     an explicit [wval] (rather than leaving [m !!! Regidx rs1] in the
-     post) keeps the stored term closed at the call site.
-
-     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
-     INDEX] above.  At [b = true] the post would hand [stvec ↦ᵣ wval] back
-     as the RESUMING hart's stvec while the instruction wrote the ENTRY
-     hart's, which is FALSE rather than unprovable. ---- *)
-  Lemma wp_csrw_stvec_s_sconf
-      (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (tv0 wval : mword 64) :
-    uint rs1 <> 0 ->
-    rget m rs1 = wval ->
-    trapVectorMode_forwards (_get_Mtvec_Mode wval) <> TV_Reserved ->
-    sie_cap_gpr kt m n false p -∗
-    stvec ↦ᵣ tv0 -∗
-    pc_is pc -∗
-    instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr kt m n false p -∗
-      stvec ↦ᵣ wval -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n false pc false
-              (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
-              with "Hcg Hpc Hinstr").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic obligation
-       is discharged by [wp_next]'s OWN introduction rule at the ambient hart --
-       the same [wp_next_off_intro] a b = false leaf already uses for its own
-       conclusion.  Nothing is renamed and nothing is substituted: the body below
-       is the pre-move proof VERBATIM. *)
-    iApply wp_next_off_intro.
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & _)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hstv")  as %Lstv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    (* the rs1 value: the pinned gpr file has it in the step state *)
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
-    iDestruct ("Hfb" with "Hr1c") as "Hfile".
-    assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                   = wval).
-    { rewrite -Hwval. unfold rget. rewrite rf_lookup. rewrite -Lva.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
-    iMod (reg_update _ stvec _ wval with "Hreg Hstv") as "[Hreg Hstv]".
-    iModIntro.
-    iExists (set_reg s_pc stvec wval).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      rewrite <- Lrs1.
-      apply (exec_execute_csrw_stvec_S rs1 s_pc Hrs1 Lpriv_spc
-               ltac:(rewrite Lmisa_spc; exact HmisaS)).
-      rewrite Lrs1. exact Hmode. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc stvec wval).(sregs)
-                   = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hmsx $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg Hstv [$Hpc' $Hnpc]").
-    iPureIntro. done.
-  Qed.
-
-  (* ---- csrw sstatus,rs1 -- THE S-STATUS RESTORE, and the one leaf whose
-     postcondition EXPOSES mstatus.
-
-     THE WRITTEN WORD IS ABSTRACT, carrying the five field premises
-     [flip_core] wants.  It was once taken as [sstatus_read ms0] for a
-     well-formed source mstatus, on the grounds that a RESTORE (kerneltrap
-     writing back the sstatus an earlier csrr saved) is the only way the
-     instruction is used -- and that stopped being true at prepare_return,
-     whose word is a read-modify-write:
-
-         x = r_sstatus(); x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE; w_sstatus(x);
-
-     No mstatus [ms0] has [sstatus_read ms0 = x] for free there; proving one
-     does means a whole-word identity over [lower_mstatus]'s nest of slice
-     updates, where the five field facts are each three lines
-     ([WpGprCsrwC]'s [bv_extract_and] / [bv_extract_or] block).  So the
-     restore shape is now the COROLLARY [wp_csrw_sstatus_s_sconf] below,
-     which discharges the five from [sconf_ms_facts ms0] exactly as this
-     leaf's body used to.
-
-     THE WRITE MUST NOT MOVE SIE -- premise [_get_Sstatus_SIE wval = sie_bit
-     b].  A restore whose saved SIE differs from the live one would have to
-     move all THREE ghost pieces and re-seal the interrupt invariant; that
-     is what the csrci/csrsi flip leaves are for, and duplicating their
-     choreography here would be the wrong shape.  At the trap-handler use
-     the premise is free: the trap cleared SIE, nothing in the handler
-     turned it back on, and the saved word was read after the clear.
-
-     The post hands back [sie_cap_gpr_at msf] -- the mstatus-EXPOSING
-     flavour (IntrDefs) -- because SPP and SPIE are the entire point: they
-     are what kernelvec's [sret] reads.  Close it with
-     [sie_cap_gpr_at_close] as soon as they have been recorded.
-
-     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
-     INDEX] above.  Here the crossing would corrupt a GHOST rather than a
-     cell: [sret_bits] is [era_sp{p,ie}_name cpu_id], the travelling half of
-     THIS hart's SPP/SPIE tie, and the post re-ties it at the [msf] this
-     instruction installed.  At [b = true] that hands the entry hart's
-     freshly-tied half back as the RESUMING hart's -- FALSE, not merely
-     unprovable.  (At [b = true] the premise was in any case vacuous: the
-     enabled arm owns the travelling half, so no caller could supply it --
-     but a vacuous premise in front of a false conclusion is exactly the
-     shape that survives a future refactor and then bites, which is why the
-     index is pinned rather than left to the arm.)  The SIE premise reads
-     [sie_bit false] for the same reason, and is what says the restore does
-     not move SIE. ---- *)
   Lemma wp_csrw_sstatus_val_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (wval : mword 64) (vspp vspie : mword 1) :
@@ -2052,13 +2851,6 @@ Section WpSconfCsr.
       iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'. }
     rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit Hfile".
   Qed.
-
-  (* ---- THE RESTORE SHAPE: the written word is one an earlier [csrr
-     sstatus] read, so the five field premises above come from that mstatus'
-     [sconf_ms_facts] and the S-view/M-view field agreement
-     ([WpGprCsrwC.sX_lower]).  This is kerneltrap's [csrw sstatus,s1] and
-     kernelvec's route to [sret]; the statement is unchanged from before the
-     leaf above was generalized, so its call sites are untouched. ---- *)
   Lemma wp_csrw_sstatus_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (ms0 : mword 64) (vspp vspie : mword 1) :
@@ -2111,351 +2903,6 @@ Section WpSconfCsr.
     - rewrite Hf_spp HWspp. reflexivity.
     - rewrite Hf_spie HWspie. reflexivity.
   Qed.
-
-  (* ---- csrw sepc,rs1 -- restores the trapped pc.  The [sepc] cell is
-     threaded EXPLICITLY, exactly as stvec's is at [wp_csrw_stvec_s_sconf]
-     and for the same reason: at [b = false] nothing in the ambient bundle
-     owns it (the enabled arm's copy exists only at [b = true], and a
-     handler running with interrupts off holds the trap CSRs itself).
-     Unlike stvec's, the written word does NOT land verbatim: sepc's write
-     legalizes through [mepc_val], so the post-value carries the wrapper --
-     a caller writing back a 2-aligned epc collapses it.
-
-     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
-     INDEX] above.  At [b = true] the post would hand [sepc ↦ᵣ mepc_val
-     wval] back as the RESUMING hart's sepc while the instruction wrote the
-     ENTRY hart's, which is FALSE rather than unprovable -- and sepc is the
-     worst cell to get wrong, since it is what the eventual [sret] jumps
-     to. ---- *)
-  Lemma wp_csrw_sepc_s_sconf
-      (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (ep0 wval : mword 64) :
-    uint rs1 <> 0 ->
-    rget m rs1 = wval ->
-    sie_cap_gpr kt m n false p -∗
-    sepc ↦ᵣ ep0 -∗
-    pc_is pc -∗
-    instr pc false (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr kt m n false p -∗
-      sepc ↦ᵣ mepc_val wval -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrs1 Hwval) "Hcg Hsepc Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n false pc false
-              (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))
-              with "Hcg Hpc Hinstr").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic obligation
-       is discharged by [wp_next]'s OWN introduction rule at the ambient hart --
-       the same [wp_next_off_intro] a b = false leaf already uses for its own
-       conclusion.  Nothing is renamed and nothing is substituted: the body below
-       is the pre-move proof VERBATIM. *)
-    iApply wp_next_off_intro.
-    iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & _)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hsepc") as %Lsepc.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg sigma nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
-    iDestruct ("Hfb" with "Hr1c") as "Hfile".
-    assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                   = wval).
-    { rewrite -Hwval. unfold rget. rewrite rf_lookup. rewrite -Lva.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
-    iMod (reg_update _ sepc _ (mepc_val wval) with "Hreg Hsepc") as "[Hreg Hsepc]".
-    iModIntro.
-    iExists (set_reg s_pc sepc (mepc_val wval)).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      rewrite <- Lrs1.
-      apply (exec_execute_csrw_sepc_S rs1 s_pc Hrs1 Lpriv_spc
-               ltac:(rewrite Lmisa_spc; exact HmisaS)). }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc sepc (mepc_val wval)).(sregs)
-                   = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hmsx $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg Hsepc [$Hpc' $Hnpc]").
-    iPureIntro. done.
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* THE READ-ONLY S-CSR LEAF, STATED ONCE.                                *)
-  (*                                                                       *)
-  (* sepc / scause / stval are the same instruction with three different   *)
-  (* CSR numbers, and the WP-level plumbing (funnel, nextPC bump, gpr      *)
-  (* insert, [sie_cap] retarget, rejoin) is character-for-character the    *)
-  (* same for all three.  So the leaf abstracts over the two things that   *)
-  (* actually vary -- the CSR number with its exec-layer fact, and how the *)
-  (* architectural read transforms the cell ([f]: the identity for         *)
-  (* scause/stval, bit-0 clearing for sepc, whose read runs [align_pc]) -- *)
-  (* and each CSR contributes a five-line instance below.  Cloning the     *)
-  (* proof three times is what this replaces.                              *)
-  (*                                                                       *)
-  (* THE CELL IS THREADED, AND AT A PINNED VALUE.  A trap-CSR read is the  *)
-  (* kind of read whose RESULT a caller has to reason about -- devintr's   *)
-  (* whole body is a three-way branch on scause, and kerneltrap saves sepc *)
-  (* to restore it later -- so unlike [wp_csrr_time_s_sconf], whose value  *)
-  (* is Forall-quantified because mtime is unowned, this leaf takes the    *)
-  (* cell and hands the SAME word back in [rd].  The fraction is           *)
-  (* arbitrary: reading pins the value and does not need the cell          *)
-  (* exclusively, so a caller holding the cell under [IntrDefs.trap_csrs]  *)
-  (* can lend a share.                                                     *)
-  (*                                                                       *)
-  (* [rg] is a [register_bitvector_64] rather than a [register] so that    *)
-  (* the cell's value type is definitionally [mword 64]; [Hnpc_ne] is what *)
-  (* migrates its lookup across the nextPC bump, and is a [vm_compute] at  *)
-  (* every instance.                                                       *)
-  (*                                                                       *)
-  (* THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED   *)
-  (* INDEX] above; pinning it HERE pins all three instances below with it.  *)
-  (* The cell is threaded in AND back out, so at [b = true] the             *)
-  (* [R_bitvector_64 rg ↦ᵣ{dq} v] in the post would be the RESUMING hart's  *)
-  (* cell, while the read that pinned [v] -- and the [rd] value derived     *)
-  (* from it, which is the whole point of the leaf -- happened on the ENTRY *)
-  (* hart.  That is FALSE, not merely unprovable.  The arbitrary fraction   *)
-  (* does not rescue it: a share of the wrong hart's cell is still the      *)
-  (* wrong hart's cell.  (The [b]-generic form was in any case unusable at  *)
-  (* the enabled arm: [sie_cap true] holds trap-CSR cells of its OWN under  *)
-  (* existentials and this leaf never opens it, so a caller there had to be *)
-  (* lending a share it got from somewhere else.)                          *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_csrr_ro_s_sconf
-      (pc : mword 64) (csrn : mword 12) (rg : register_bitvector_64)
-      (f : mword 64 -> mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (dq : dfrac) (v : mword 64) :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    register_beq (R_bitvector_64 rg) nextPC = false ->
-    (* THE FOURTH HYPOTHESIS IS THE mstatus FACT SET, not just the one bit
-       satp's reader wants.  [sconf] already carries [sconf_ms_facts] under
-       its mstatus existential -- this leaf simply stops throwing it away,
-       and hands the obligation the whole bundle rather than a projection of
-       it, so a future S-mode read gated on MXR/TSR/SXL costs nothing here.
-       The three Ext_S-gated instances below ignore it with a [_]. *)
-    ( forall s : mstate,
-        register_lookup cur_privilege s.(sregs) = Supervisor ->
-        eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-        eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-        sconf_ms_facts (register_lookup mstatus s.(sregs)) ->
-        exec (execute (CSRReg (csrn, zreg, Regidx rd, CSRRS))) s
-          = Some (RETIRE_SUCCESS,
-                  set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                    (regval_into_reg
-                       (f (register_lookup (R_bitvector_64 rg) s.(sregs))))) ) ->
-    sie_cap_gpr kt m n false p -∗
-    R_bitvector_64 rg ↦ᵣ{dq} v -∗
-    pc_is pc -∗
-    instr pc false (CSRReg (csrn, zreg, Regidx rd, CSRRS)) -∗
-    wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (f v)]> m) n false p -∗
-      R_bitvector_64 rg ↦ᵣ{dq} v -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hrdok Hne Hexec) "Hcg Hcell Hpc Hinstr Hcont".
-    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
-    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n false pc false
-              (CSRReg (csrn, zreg, Regidx rd, CSRRS))
-              with "Hcg Hpc Hinstr").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic obligation
-       is discharged by [wp_next]'s OWN introduction rule at the ambient hart --
-       the same [wp_next_off_intro] a b = false leaf already uses for its own
-       conclusion.  Nothing is renamed and nothing is substituted: the body below
-       is the pre-move proof VERBATIM. *)
-    iApply wp_next_off_intro.
-    iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hsie & Hsret & %Hmsf)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hcell") as %Lcell.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg sigma nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms0)
-      by (unfold s_pc; tmig; exact Lms).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    assert (Lcell_spc : register_lookup (R_bitvector_64 rg) s_pc.(sregs) = v).
-    { unfold s_pc. rewrite irrelevant_register_set; [ exact Lcell | exact Hne ]. }
-    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (f v))
-                 with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (f v))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (f v))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc. rewrite -Lcell_spc.
-      apply (Hexec s_pc Lpriv_spc);
-        [ rewrite Lmisa_spc; exact HmisaS
-        | rewrite Lmisa_spc; exact HmisaC
-        | rewrite Lms_spc;   exact Hmsf ]. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (f v))).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg (f v)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    tp_refold Hrdtp "Hfile".
-    iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg (f v)]> m) n false Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with
-      "Hhs' [$Hhw $Hminv $Hpriv Hms Hsie Hsret $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
-    { iExists ms0. iFrame "Hms Hsie Hsret". iPureIntro. exact Hmsf. }
-    iApply ("Hcont" $! cpu_id with "[] Hcg Hcell [$Hpc' $Hnpc]").
-    iPureIntro. done.
-  Qed.
-
-  (* ---- the three instances.  scause and stval read their cell verbatim;
-     sepc's read runs [align_pc], so its value carries [mepc_val].
-
-     ALL THREE INHERIT THE PINNED INDEX from [wp_csrr_ro_s_sconf] -- they
-     could not be [b]-generic even if one wanted them to be, since the
-     generic leaf they are five lines of is not.  See [THE PINNED INDEX]
-     above: each threads one of THIS hart's trap-CSR cells in and back out,
-     so at [b = true] the post would be about the resuming hart's cell while
-     the read happened on the entry hart's, which is FALSE rather than
-     unprovable. ---- *)
-
-  Lemma wp_csrr_scause_s_sconf
-      (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (dq : dfrac) (sc : mword 64) :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    sie_cap_gpr kt m n false p -∗
-    scause ↦ᵣ{dq} sc -∗
-    pc_is pc -∗
-    instr pc false (CSRReg (csr_scause, zreg, Regidx rd, CSRRS)) -∗
-    wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg sc]> m) n false p -∗
-      scause ↦ᵣ{dq} sc -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_scause scause (fun x => x) rd m n dq sc
-              Hrd Hrdok ltac:(vm_compute; reflexivity)).
-    intros s Hpriv HS _ _.
-    exact (exec_execute_csrr_scause_gpr_S rd s Hrd Hpriv HS).
-  Qed.
-
-  (* stval: NO CALL SITE TODAY (kerneltrap's usermode arm will be the first).
-     It is kept because it is the third five-line instance of a leaf that
-     exists precisely to be instantiated three times, and because deleting
-     it would leave the [f]-generic proof looking over-general.  Its index is
-     pinned like its siblings' -- a future first caller will be in the
-     trap-handler tier, i.e. at interrupts-off, exactly as the others are. *)
-  Lemma wp_csrr_stval_s_sconf
-      (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (dq : dfrac) (tv : mword 64) :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    sie_cap_gpr kt m n false p -∗
-    stval ↦ᵣ{dq} tv -∗
-    pc_is pc -∗
-    instr pc false (CSRReg (csr_stval, zreg, Regidx rd, CSRRS)) -∗
-    wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg tv]> m) n false p -∗
-      stval ↦ᵣ{dq} tv -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_stval stval (fun x => x) rd m n dq tv
-              Hrd Hrdok ltac:(vm_compute; reflexivity)).
-    intros s Hpriv HS _ _.
-    exact (exec_execute_csrr_stval_gpr_S rd s Hrd Hpriv HS).
-  Qed.
-
-  (* sepc: the value that lands in [rd] is [mepc_val ep], not [ep].  A
-     caller that knows its saved epc is 2-aligned (every write to the cell
-     went through [legalize_xepc], and every trap writes an aligned pc)
-     collapses the wrapper itself; the leaf does not assume it. *)
-  Lemma wp_csrr_sepc_s_sconf
-      (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (dq : dfrac) (ep : mword 64) :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    sie_cap_gpr kt m n false p -∗
-    sepc ↦ᵣ{dq} ep -∗
-    pc_is pc -∗
-    instr pc false (CSRReg (csr_sepc, zreg, Regidx rd, CSRRS)) -∗
-    wp_next false p (fun (CID : CpuId) =>
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n false p -∗
-      sepc ↦ᵣ{dq} ep -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_sepc sepc mepc_val rd m n dq ep
-              Hrd Hrdok ltac:(vm_compute; reflexivity)).
-    intros s Hpriv HS HC _.
-    exact (exec_execute_csrr_sepc_gpr_S rd s Hrd Hpriv HS HC).
-  Qed.
-
-  (* ---- csrr rd,satp -- THE ONE RO READ THAT CANNOT BE AN INSTANCE OF
-     [wp_csrr_ro_s_sconf], and the reason is ownership rather than decode.
-
-     The three instances above thread a cell the ambient bundle does NOT
-     hold: sepc / scause / stval belong to whoever is running with
-     interrupts off.  satp is different -- [IntrDefs.strans_inv] owns it in
-     BOTH arms ([SRegime.bare_inv] at Bare, [KptShare.tlb_res_pt] at KPT),
-     and [strans_inv] is inside [sie_cap], inside [sie_cap_gpr].  So
-     [sie_cap_gpr m n false p ∗ satp ↦ᵣ{dq} v] is not a premise set a caller
-     can be short of; it is one NO caller can hold, and a leaf demanding it
-     is vacuous however carefully it is proved.  (It was: this lemma had
-     that shape until prepare_return tried to call it.)
-
-     WHAT THE CALLER SUPPLIES INSTEAD IS THE KPT RECEIPT.  [kpt_on cpu_id]
-     pins the arm at KPT and opens it
-     ([IntrDefs.strans_inv_acc_kpt]); the cell comes out of the
-     [tlb_res_pt] inside ([KptShare.tlb_res_pt_satp_acc]) and goes straight
-     back, so the borrow never escapes this leaf and the bundle handed back
-     is whole.  That also explains why the value is not a parameter: it is
-     whatever the live kernel table's satp says, so it comes back
-     EXISTENTIALLY, carrying the three [satp_rooted] facts the arm knows
-     about it -- which is exactly what a reader of [kernel_satp] wants and
-     strictly more than a bare points-to would give.
-
-     The mstatus obligation the other three discard is used here: satp's
-     accessibility is mstatus.TVM = 0 rather than Ext_S, and that bit is the
-     last conjunct of [sconf_ms_facts], which [sconf] was already
-     carrying. ---- *)
   Lemma wp_csrr_satp_kpt_s_sconf
       (pc : mword 64) (rd : mword 5) (m : regfile) (n : nat) :
     uint rd <> 0 ->
