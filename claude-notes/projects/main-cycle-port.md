@@ -720,6 +720,18 @@ ownership.  Shape:
     RAM access's footprint inside `Sb`), discharged per instruction family
     where the exec facts are proved (`vm_compute` at data-free stretches,
     assembled along binds as `goodb` is).
+**STATUS (2026-08-18): the bridge is BUILT and proved, no axioms**
+(HartMemRun.v, commits f105ffea → 293da610): `hmrun`, `swp_hmrun`, `goodmb`,
+`hmrun_of_exec`, the combinators `goodmb_bind/_bind0/_bindR/_bind0R/
+_try_catch/_liftR/_cer/_mono/_of_goodb`, the landing-map function
+`mm_after` (with `hmrun_of_exec_after`, `mm_after_of_goodb`, `goodmb_dom`),
+and the composite `swp_hmrun_of_exec` (agreement stated on `Drw ∪ Dro`, not
+on Dr/Dw -- the weaker premise cannot conclude anything).  Two computing
+traps recorded in its §6: `dom (mm_after …) = dom mm` does NOT vm_compute
+(gset Countable pinning; state it as `bytes_owned … = true`), and `exec` at
+a concrete state does not vm_compute either (the successor mstate's
+register file is a record of functions) -- `goodmb` does, in ~0.1 s.
+
 Then the U-mode engine ports mechanically: `wp_exec_step_minstret` σ-callback
 sites become `swp_hmrun` at the user frame's own resources; the exec-total
 lemmas stay as they are and gain a `goodmb` twin each.  This is the largest
