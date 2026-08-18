@@ -2102,37 +2102,60 @@ generalize beyond the trampoline:
   `pa_of_id` collapses `pa_of ppn pa` to `pa`.  This works at ANY ambient
   `CurKtier`, which the tier pin does not.
 
-**WHAT THE TOWER IS BLOCKED ON is ONE missing per-node walk, in two
-instances.**  The engine is regime-generic and the SHARED KERNEL TABLE
-instance is proved (`ktramp_fetch_tr_share`, off `SRegime.kpt_share_regime`
-/ `HartSKpt.swp_translate_kpt`).  The other two tables have no swp
-`translateAddr` at all -- only exec-level ones
-(`UptTree.utlb_inv_pt_translateAddr_tramp_fetch`,
-`TransPt.tlb_inv_pt2_translateAddr`):
+**THE USER TABLE'S PER-NODE WALK IS BUILT (`UptWalkPt.v`), AND IT IS A
+CARRY, NOT A REWRITE.**  The user table is OWNED (`ptree_own`), so the whole
+of `translateAddr` over it is a run whose memory accesses are answered from
+an owned byte map -- which is exactly what `HartMemRun.swp_hmrun_of_exec`
+carries from `exec` to `swp`.  So the exec fact is
+`KptTree.ptree_translateAddr_cases` and the certificate is
+`PtWalkCert.goodmb_ptree_translateAddr`, both already proved with the same
+five-way split, and the reference state is THIS HART'S OWN FILE over its own
+byte map (`MState rs mm dev0_state`), which makes `swp_hmrun_of_exec`'s
+agreement premise `reflexivity` and its `mm ⊆ s.(mem)` premise the same.
+The whole file is 890 lines and compiles in 8 s.  Three things about it
+recur:
 
-- the USER table `UptTree.utlb_inv_pt` (`wp_instr_u_pt`'s 7 sites in
-  `UservecPt` / `UserretPt` / `UservecExitPt`);
-- the switch-window two-table invariants `TransPt.tlb_inv_pt2_kcur` /
-  `_kprev` (2 sites).
+- **`UserBytes.u_mem_wf` CANNOT BE INSTANTIATED FOR A TABLE-ONLY CALLER.**
+  It pins the DATA bytes into the same map (`udata_cov` over `ud_data`), and
+  every trampoline/trapframe caller holds `utlb_inv_pt` alone -- so a
+  `uptd` with an empty data set makes `udata_cov` false, and there is no
+  `md` to supply.  `UptWalkPt.upt_tmem` is `u_mem_wf` with the data half
+  dropped; its four consequences (submap, `bytes_owned`, `pt_slot_mem`, the
+  write-back step) are 5 lines each over the same tree lemmas.
+- **THE POST MAP IS PINNED BY ITS DOMAIN.**  `swp_hmrun_of_exec` hands back
+  an existential `mm'` with only `mm' ⊆ s'.(mem)` and `dom mm' = dom mm`;
+  at the reference state that determines it completely
+  (`UserClassifyAsm.u_map_eq`), because a same-shaped tree has the same byte
+  domain.  That is what turns the walk's three arms back into
+  `ptree_own 2 (DfracOwn 1) t'`.
+- **`HartSMem`'s LOAD/STORE ENGINES ARE REGIME-AGNOSTIC, so the user table
+  needs no `s_regime`** -- and could not be one, since `sr_swp_translate` is
+  keyed on a `kmap_at` claim and the user table's mapping facts come from
+  `um`.  The engines' translation premise is `sr_swp_translate`'s CONCLUSION
+  at an abstract residue `Rt : regstate -> iProp`, and
+  `UptWalkPt.utf_translate` is that shape at the trapframe leaf, for both
+  `Load Data` and `Store Data`.
 
-Each needs the assembly `HartSKpt.swp_translate_kpt` is for the kernel
-table: `PtTreeAdue.swp_translateAddr_pt_front`, the hit/miss split
-(`HartSTrans.swp_translate_hit` / `CommonWalk.swp_translate_TLB_miss_user`)
-and the three `read_pte` nodes over the table's own bytes.  **The user
-table is OWNED, so the cheaper route to try first is
-`HartMemRun.swp_hmrun_of_exec`** -- carry the existing exec fact at the
-reference state `MState (srs tv) mm dev0_state` under a `goodmb`
-certificate over the owned PT bytes -- but check the A/D write-back first:
-`pt2_tramp_spec` leaves the trampoline PTE's A/D quantified, and
-`CommonWalk.swp_translate_TLB_miss_user` is stated only for
-`update_PTE_Bits _ acc = None`.
+**WHAT IS LEFT.**  (a) The SWITCH-WINDOW two-table invariants
+`TransPt.tlb_inv_pt2_kcur` / `_kprev` still have no per-node walk: they
+differ from `utlb_inv_pt` in the TLB agreement (`tlb_ok_pt2` over two trees)
+and in taking an ABSTRACT tree spec `Sp` rather than `upt_tree_spec`, so
+`swp_translate_upt` does not instantiate -- the exec side is
+`TransPt.ptree2_translateAddr_cases` and the certificate would have to be
+its `goodmb` twin.  (b) The four files' own leaves.
 
-Downstream of that walk, `UservecPt` / `UserretPt` / `UserretEntryPt` /
-`UservecExitPt` also need their own leaves converted: their obligations are
-the old `∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) … ⌝ ∗ …`
-shape, and the per-node engine hands them `swp (execute i)` instead, so
-each data access becomes a `HartSMem` instantiation over the user table's
-data translation.
+`UservecPt` / `UserretPt` / `UserretEntryPt` / `UservecExitPt` need their
+own leaves converted: their obligations are the old
+`∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) … ⌝ ∗ …` shape and
+the per-node engine hands them `swp (execute i)` instead.  Six leaves and
+two block lemmas: `wp_usd_pt` / `wp_uld_pt` are
+`WpSmodePtMem.wp_sd_s_r_t` / `wp_ld_s_r_t` with `UptWalkPt.utf_translate`
+in place of the regime's translation (`Rt := fun rs => upt_res_pt uroot tfp
+um (register_lookup tlb rs)`); `wp_ucsrw_sscratch_pt` /
+`wp_ucsrr_sscratch_pt` / `wp_ualu_pt` / `wp_usret_pt` are register-only and
+follow `WpSconfCsr` / `WpSmodePtAlu` / `WpSmodePtCtl`; the two block lemmas
+compose.  `UservecPt` and `UserretPt` need only the USER table and are
+unblocked today; `UserretEntryPt` and `UservecExitPt` also need (a).
 
 ## THE DOWNSTREAM COMPILE TAIL (2026-08-18) -- what it took, and the two
 ## things it is BLOCKED on
