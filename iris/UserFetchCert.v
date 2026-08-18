@@ -519,3 +519,433 @@ Qed.
 Lemma u_slot_owned (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) (q : mword 64) :
   u_mem_wf P t mm -> word_bytes a q ∈ pt_maps 2 t -> bytes_owned mm a 8 = true.
 Proof. intros Hwf Hin. exact (u_mem_wf_owned P t mm a q Hwf Hin). Qed.
+
+(* ===================================================================== *)
+(* 4. THE ADUE ABSORPTION AT THE BYTE LEVEL.                              *)
+(*                                                                        *)
+(* [UserBytes.u_mem_step]'s third conjunct asks for                        *)
+(* [mm' = ptree_bytes 2 t' ∪ md'], and on the Svadu write-back arm [mm']  *)
+(* is [write_bytes mm <the leaf slot> 8 q].  Nothing in [UserBytes] says   *)
+(* that writing the slot IS setting the leaf in the tree; this section is  *)
+(* that, and it is map algebra rather than page-table reasoning.           *)
+(* (FOLD BACK into [UserBytes.v] beside [u_mem_step].)                     *)
+(* ===================================================================== *)
+
+(* A WRITE IS A LEFT-BIASED UNION WITH THE WORD.  [write_bytes] folds the
+   same eight inserts [word_bytes] lists, so the two agree. *)
+Lemma foldr_ins_union (a : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
+    (m : pamap) :
+  foldr (fun j acc => <[pa_add a j := nth_byte v j]> acc) m js
+  = (list_to_map ((fun j : nat => (pa_add a j, nth_byte v j)) <$> js) : pamap) ∪ m.
+Proof.
+  induction js as [| j js IH]; cbn [foldr fmap list_fmap].
+  - change (list_to_map [] : pamap) with (∅ : pamap).
+    first [ by rewrite map_empty_union
+          | by rewrite (left_id_L (∅ : pamap) union)
+          | by rewrite left_id_L
+          | symmetry; apply map_empty_union ].
+  - rewrite IH.
+    first [ apply insert_union_l | symmetry; apply insert_union_l ].
+Qed.
+
+Lemma write_bytes_word (m : pamap) (a : Arch.pa) (v : bv 64) :
+  write_bytes m a 8 v = word_bytes a v ∪ m.
+Proof. unfold write_bytes, word_bytes. apply foldr_ins_union. Qed.
+
+Lemma write_bytes_union_l (A B : pamap) (a : Arch.pa) (v : bv 64) :
+  write_bytes (A ∪ B) a 8 v = write_bytes A a 8 v ∪ B.
+Proof.
+  rewrite !write_bytes_word.
+  first [ (rewrite assoc_L; reflexivity)
+        | (rewrite <- assoc_L; reflexivity)
+        | (symmetry; rewrite assoc_L; reflexivity)
+        | (symmetry; rewrite <- assoc_L; reflexivity)
+        | apply map_union_assoc ].
+Qed.
+
+(* [maps_disj] passes to either half of an append *)
+Lemma maps_disj_app_l (l1 l2 : list pamap) : maps_disj (l1 ++ l2) -> maps_disj l1.
+Proof.
+  induction l1 as [| m l1 IH]; intros Hd; [done |].
+  destruct Hd as [Hhd Htl]. split; [| by apply IH].
+  intros m' Hm'. apply Hhd. rewrite elem_of_app. by left.
+Qed.
+
+Lemma maps_disj_app_r (l1 l2 : list pamap) : maps_disj (l1 ++ l2) -> maps_disj l2.
+Proof.
+  induction l1 as [| m l1 IH]; intros Hd; [done |].
+  destruct Hd as [_ Htl]. by apply IH.
+Qed.
+
+Lemma maps_disj_app_cross (l1 l2 : list pamap) :
+  maps_disj (l1 ++ l2) ->
+  forall m1 m2, m1 ∈ l1 -> m2 ∈ l2 -> m1 ##ₘ m2.
+Proof.
+  induction l1 as [| m l1 IH]; intros Hd m1 m2 H1 H2;
+    [ by apply elem_of_nil in H1 |].
+  destruct Hd as [Hhd Htl].
+  apply elem_of_cons in H1 as [-> | H1].
+  - apply Hhd. rewrite elem_of_app. by right.
+  - exact (IH Htl m1 m2 H1 H2).
+Qed.
+
+(* ...and the union of an append splits *)
+Lemma union_list_app (l1 l2 : list pamap) : ⋃ (l1 ++ l2) = (⋃ l1) ∪ (⋃ l2).
+Proof.
+  induction l1 as [| m l1 IH]; cbn [app].
+  - rewrite union_list_nil.
+    first [ by rewrite map_empty_union
+          | by rewrite (left_id_L (∅ : pamap) union)
+          | symmetry; apply map_empty_union ].
+  - rewrite !union_list_cons. rewrite IH.
+    first [ apply map_union_assoc | symmetry; apply map_union_assoc
+          | (rewrite assoc_L; reflexivity)
+          | (rewrite <- assoc_L; reflexivity) ].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4a. ONE ELEMENT OF A DISJOINT LIST, REPLACED BY A SAME-DOMAIN MAP.       *)
+(* This is the shape every level of the tree surgery has, and the only      *)
+(* thing that has to be proved about unions.                                *)
+(* ---------------------------------------------------------------------- *)
+Definition maps_upd_at (X Y : pamap) (l l' : list pamap) : Prop :=
+  exists l1 l2, l = (l1 ++ X :: l2)%list /\ l' = (l1 ++ Y :: l2)%list.
+
+(* a left-biased union absorbs a same-domain map underneath it.  Stated over
+   [is_Some] and NOT over [dom]: naming [gset Arch.pa] in this file
+   re-elaborates the key type's [Countable] instance, which is the section-8
+   trap; [is_Some] mentions no instance at all. *)
+Lemma map_union_absorb_dom (X Y Z : pamap) :
+  (forall a, is_Some (X !! a) -> is_Some (Y !! a)) -> Y ∪ (X ∪ Z) = Y ∪ Z.
+Proof.
+  intros Hd. apply map_eq. intros x.
+  destruct (Y !! x) as [b|] eqn:HY.
+  - rewrite (lookup_union_Some_l Y (X ∪ Z) x b HY).
+    rewrite (lookup_union_Some_l Y Z x b HY). reflexivity.
+  - assert (HX : X !! x = None).
+    { destruct (X !! x) as [c|] eqn:HXc; [| reflexivity ].
+      exfalso. destruct (Hd x (mk_is_Some _ _ HXc)) as [bb Hbb]. congruence. }
+    rewrite (lookup_union_r Y (X ∪ Z) x HY).
+    rewrite (lookup_union_r Y Z x HY).
+    rewrite (lookup_union_r X Z x HX). reflexivity.
+Qed.
+
+Lemma union_list_upd_at (X Y : pamap) (l l' : list pamap) :
+  maps_disj l -> maps_upd_at X Y l l' ->
+  (forall a, is_Some (X !! a) -> is_Some (Y !! a)) ->
+  (forall a, is_Some (Y !! a) -> is_Some (X !! a)) ->
+  ⋃ l' = Y ∪ ⋃ l.
+Proof.
+  intros Hd (l1 & l2 & -> & ->) Hdom Hdom'.
+  assert (HX1 : X ##ₘ ⋃ l1).
+  { apply symmetry, map_disjoint_union_list_l, Forall_forall.
+    intros m Hm. apply elem_of_list_In in Hm.
+    revert Hd. clear -Hm. revert Hm. induction l1 as [| m0 l1 IH]; intros Hm Hd;
+      [ by apply elem_of_nil in Hm |].
+    destruct Hd as [Hhd Htl]. apply elem_of_cons in Hm as [-> | Hm].
+    - apply Hhd. rewrite elem_of_app. right. apply elem_of_cons. by left.
+    - exact (IH Hm Htl). }
+  assert (HY1 : Y ##ₘ ⋃ l1).
+  { apply map_disjoint_spec. intros i x y Hy Hu.
+    destruct (Hdom' i (mk_is_Some _ _ Hy)) as [z Hz].
+    exact (proj1 (map_disjoint_spec X (⋃ l1)) HX1 i z y Hz Hu). }
+  rewrite !union_list_app. rewrite !union_list_cons.
+  rewrite (map_union_assoc (⋃ l1) Y (⋃ l2)).
+  rewrite (map_union_comm (⋃ l1) Y (symmetry HY1)).
+  rewrite <- (map_union_assoc Y (⋃ l1) (⋃ l2)).
+  rewrite (map_union_assoc (⋃ l1) X (⋃ l2)).
+  rewrite (map_union_comm (⋃ l1) X (symmetry HX1)).
+  rewrite <- (map_union_assoc X (⋃ l1) (⋃ l2)).
+  by rewrite (map_union_absorb_dom X Y (⋃ l1 ∪ ⋃ l2) Hdom).
+Qed.
+
+Lemma maps_upd_at_app_l (X Y : pamap) (k l l' : list pamap) :
+  maps_upd_at X Y l l' -> maps_upd_at X Y (k ++ l) (k ++ l').
+Proof.
+  intros (l1 & l2 & -> & ->). exists (k ++ l1)%list, l2.
+  by rewrite <- !app_assoc.
+Qed.
+
+Lemma maps_upd_at_app_r (X Y : pamap) (k l l' : list pamap) :
+  maps_upd_at X Y l l' -> maps_upd_at X Y (l ++ k) (l' ++ k).
+Proof.
+  intros (l1 & l2 & -> & ->). exists l1, (l2 ++ k)%list.
+  by rewrite <- !app_assoc.
+Qed.
+
+(* the two ways a one-index change reaches a list of maps: through an
+   [fmap] (a node's own 512 slots) and through a [concat] of [fmap]
+   (a node's 512 children) *)
+Lemma fmap_agree_off {A} (K : list A) (f g : A -> pamap) :
+  (forall i, i ∈ K -> g i = f i) -> (g <$> K) = (f <$> K).
+Proof.
+  induction K as [| a K IH]; intros Hfg; [reflexivity |].
+  cbn [fmap list_fmap]. rewrite (Hfg a (elem_of_list_here a K)).
+  rewrite IH; [ reflexivity |].
+  intros i Hi. apply Hfg. by apply elem_of_list_further.
+Qed.
+
+Lemma fmap_agree_off_l {A} (K : list A) (h h' : A -> list pamap) :
+  (forall i, i ∈ K -> h' i = h i) -> (h' <$> K) = (h <$> K).
+Proof.
+  induction K as [| a K IH]; intros Hfg; [reflexivity |].
+  cbn [fmap list_fmap]. rewrite (Hfg a (elem_of_list_here a K)).
+  rewrite IH; [ reflexivity |].
+  intros i Hi. apply Hfg. by apply elem_of_list_further.
+Qed.
+
+Lemma nodup_split {A} `{EqDecision A} (L L1 L2 : list A) (i0 : A) :
+  base.NoDup L -> L = (L1 ++ i0 :: L2)%list ->
+  (forall i, i ∈ L1 -> i <> i0) /\ (forall i, i ∈ L2 -> i <> i0).
+Proof.
+  intros Hnd ->.
+  apply stdpp.list_relations.NoDup_app in Hnd as (H1 & Hcross & H2).
+  apply (proj1 (stdpp.list_relations.NoDup_cons i0 L2)) in H2 as [Hni H2].
+  split.
+  - intros i Hi Heq. rewrite Heq in Hi.
+    exact (Hcross i0 Hi (elem_of_list_here _ _)).
+  - intros i Hi Heq. rewrite Heq in Hi. exact (Hni Hi).
+Qed.
+
+Lemma fmap_upd_at {A} `{EqDecision A} (L : list A) (f g : A -> pamap) (i0 : A) :
+  base.NoDup L -> i0 ∈ L ->
+  (forall i, i ∈ L -> i <> i0 -> g i = f i) ->
+  maps_upd_at (f i0) (g i0) (f <$> L) (g <$> L).
+Proof.
+  intros Hnd Hin Hfg.
+  apply elem_of_list_split in Hin as (L1 & L2 & ->).
+  destruct (nodup_split (L1 ++ i0 :: L2)%list L1 L2 i0 Hnd eq_refl) as [Hn1 Hn2].
+  exists (f <$> L1), (f <$> L2).
+  rewrite !fmap_app. cbn [fmap list_fmap]. split; [reflexivity |].
+  rewrite (fmap_agree_off L1 f g
+             (fun i Hi => Hfg i ltac:(rewrite elem_of_app; by left) (Hn1 i Hi))).
+  by rewrite (fmap_agree_off L2 f g
+                (fun i Hi => Hfg i
+                   ltac:(rewrite elem_of_app; right; by apply elem_of_list_further)
+                   (Hn2 i Hi))).
+Qed.
+
+Lemma concat_upd_at {A} `{EqDecision A} (L : list A) (h h' : A -> list pamap)
+    (i0 : A) (X Y : pamap) :
+  base.NoDup L -> i0 ∈ L ->
+  (forall i, i ∈ L -> i <> i0 -> h' i = h i) ->
+  maps_upd_at X Y (h i0) (h' i0) ->
+  maps_upd_at X Y (concat (h <$> L)) (concat (h' <$> L)).
+Proof.
+  intros Hnd Hin Hfg Hupd.
+  apply elem_of_list_split in Hin as (L1 & L2 & ->).
+  destruct (nodup_split (L1 ++ i0 :: L2)%list L1 L2 i0 Hnd eq_refl) as [Hn1 Hn2].
+  rewrite !fmap_app. cbn [fmap list_fmap]. rewrite !concat_app.
+  cbn [concat].
+  rewrite (fmap_agree_off_l L1 h h'
+             (fun i Hi => Hfg i ltac:(rewrite elem_of_app; by left) (Hn1 i Hi))).
+  rewrite (fmap_agree_off_l L2 h h'
+             (fun i Hi => Hfg i
+                ltac:(rewrite elem_of_app; right; by apply elem_of_list_further)
+                (Hn2 i Hi))).
+  apply maps_upd_at_app_l. by apply maps_upd_at_app_r.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4b. THE TREE SURGERY.  [ptree_set_leaf] is [pt_upd_kid] twice and        *)
+(* [pt_upd_ent] once, and each of the three replaces exactly one element of *)
+(* the byte-map list.                                                       *)
+(* ---------------------------------------------------------------------- *)
+Lemma uint_mword9 (j : Z) : (0 <= j < 512)%Z -> uint (mword_of_int j : mword 9) = j.
+Proof.
+  intro Hj.
+  pose proof (bv_unsigned_in_range _ (mword_of_int j : mword 9)) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [| exact (proj1 Hr)].
+  unfold SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_small; [reflexivity |].
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 9)) with 512%Z. exact Hj.
+Qed.
+
+Lemma mword9_of_int_ne (j : Z) (i : mword 9) :
+  (0 <= j < 512)%Z -> j <> uint i -> (mword_of_int j : mword 9) <> i.
+Proof.
+  intros Hj Hne Heq. apply Hne.
+  rewrite <- (uint_mword9 j Hj). by rewrite Heq.
+Qed.
+
+Lemma seqZ_512_nodup : base.NoDup (seqZ 0 512).
+Proof. apply NoDup_seqZ. Qed.
+
+Lemma seqZ_512_mem (i : mword 9) : uint i ∈ seqZ 0 512.
+Proof. apply elem_of_seqZ. pose proof (mword9_uint_range i). lia. Qed.
+
+
+(* the projections of an updated node, as small equations -- NEVER let a
+   [cbn] near a goal that mentions [pt_page_maps]: its body carries
+   [seqZ 0 512] and a whitelisted [cbn] still fires the iota that computes
+   the 512-element list *)
+Lemma pt_base_upd_ent (t : ptree) (i : mword 9) (q : mword 64) :
+  pt_base (pt_upd_ent t i q) = pt_base t.
+Proof. reflexivity. Qed.
+
+Lemma pt_ents_upd_ent_same (t : ptree) (i : mword 9) (q : mword 64) :
+  pt_ents (pt_upd_ent t i q) i = q.
+Proof.
+  unfold pt_upd_ent. cbn [pt_ents].
+  destruct (decide (i = i)) as [_ | Hc]; [ reflexivity | congruence ].
+Qed.
+
+Lemma pt_ents_upd_ent_ne (t : ptree) (i i' : mword 9) (q : mword 64) :
+  i' <> i -> pt_ents (pt_upd_ent t i q) i' = pt_ents t i'.
+Proof.
+  intros Hne. unfold pt_upd_ent. cbn [pt_ents].
+  destruct (decide (i' = i)) as [Hc | _]; [ congruence | reflexivity ].
+Qed.
+
+Lemma pt_kids_upd_kid_same (t : ptree) (i : mword 9) (c : option ptree) :
+  pt_kids (pt_upd_kid t i c) i = c.
+Proof.
+  unfold pt_upd_kid. cbn [pt_kids].
+  destruct (decide (i = i)) as [_ | Hc]; [ reflexivity | congruence ].
+Qed.
+
+Lemma pt_kids_upd_kid_ne (t : ptree) (i i' : mword 9) (c : option ptree) :
+  i' <> i -> pt_kids (pt_upd_kid t i c) i' = pt_kids t i'.
+Proof.
+  intros Hne. unfold pt_upd_kid. cbn [pt_kids].
+  destruct (decide (i' = i)) as [Hc | _]; [ congruence | reflexivity ].
+Qed.
+
+Lemma moi_ne (j k : Z) : (0 <= j < 512)%Z -> (0 <= k < 512)%Z -> k <> j ->
+  (mword_of_int k : mword 9) <> mword_of_int j.
+Proof.
+  intros Hj Hk Hne Hc. apply Hne.
+  rewrite <- (uint_mword9 k Hk). rewrite Hc. by apply uint_mword9.
+Qed.
+
+(* A NODE'S OWN PAGE, with one slot word replaced.  Indexed by the Z the
+   [seqZ] carries -- [mword_of_int (uint i)] is only PROPOSITIONALLY [i], so
+   a statement at [i] would not match the list the [fmap] builds.  And BOTH
+   endpoints are spelled as the [fmap]'s OWN function applied to the index,
+   so [apply] never has to decide [decide (x = x)] by conversion -- which on
+   a symbolic [mword 9] does not come back. *)
+Lemma pt_page_maps_upd_ent (t : ptree) (j : Z) (q : mword 64) :
+  (0 <= j < 512)%Z ->
+  maps_upd_at
+    (word_bytes (u_pte_addr (pt_base t) (mword_of_int j))
+                (pt_ents t (mword_of_int j)))
+    (word_bytes (u_pte_addr (pt_base (pt_upd_ent t (mword_of_int j) q))
+                            (mword_of_int j))
+                (pt_ents (pt_upd_ent t (mword_of_int j) q) (mword_of_int j)))
+    (pt_page_maps t) (pt_page_maps (pt_upd_ent t (mword_of_int j) q)).
+Proof.
+  intros Hj. unfold pt_page_maps.
+  apply (fmap_upd_at (seqZ 0 512)
+           (fun i0 : Z => word_bytes (u_pte_addr (pt_base t) (mword_of_int i0))
+                            (pt_ents t (mword_of_int i0)))
+           (fun i0 : Z =>
+              word_bytes (u_pte_addr (pt_base (pt_upd_ent t (mword_of_int j) q))
+                                     (mword_of_int i0))
+                (pt_ents (pt_upd_ent t (mword_of_int j) q) (mword_of_int i0)))
+           j).
+  - apply seqZ_512_nodup.
+  - apply elem_of_seqZ. lia.
+  - intros k Hk Hne. cbn beta. apply elem_of_seqZ in Hk.
+    rewrite pt_base_upd_ent.
+    rewrite (pt_ents_upd_ent_ne t (mword_of_int j) (mword_of_int k) q
+               (moi_ne j k Hj ltac:(lia) Hne)).
+    reflexivity.
+Qed.
+
+Lemma pt_maps_upd_ent (lvl : nat) (t : ptree) (j : Z) (q : mword 64) :
+  (0 <= j < 512)%Z ->
+  maps_upd_at
+    (word_bytes (u_pte_addr (pt_base t) (mword_of_int j))
+                (pt_ents t (mword_of_int j)))
+    (word_bytes (u_pte_addr (pt_base (pt_upd_ent t (mword_of_int j) q))
+                            (mword_of_int j))
+                (pt_ents (pt_upd_ent t (mword_of_int j) q) (mword_of_int j)))
+    (pt_maps lvl t) (pt_maps lvl (pt_upd_ent t (mword_of_int j) q)).
+Proof.
+  intros Hj. destruct lvl as [| lvl].
+  - rewrite !pt_maps_O. by apply pt_page_maps_upd_ent.
+  - rewrite !pt_maps_S.
+    apply maps_upd_at_app_r. by apply pt_page_maps_upd_ent.
+Qed.
+
+Lemma pt_maps_upd_kid (lvl : nat) (t c c' : ptree) (j : Z) (X Y : pamap) :
+  (0 <= j < 512)%Z ->
+  pt_kids t (mword_of_int j) = Some c ->
+  maps_upd_at X Y (pt_maps lvl c) (pt_maps lvl c') ->
+  maps_upd_at X Y (pt_maps (S lvl) t)
+    (pt_maps (S lvl) (pt_upd_kid t (mword_of_int j) (Some c'))).
+Proof.
+  intros Hj Hk Hupd. rewrite !pt_maps_S.
+  apply maps_upd_at_app_l.
+  apply (concat_upd_at (seqZ 0 512)
+           (fun i0 : Z => match pt_kids t (mword_of_int i0) with
+                          | Some c0 => pt_maps lvl c0 | None => [] end)
+           (fun i0 : Z =>
+              match pt_kids (pt_upd_kid t (mword_of_int j) (Some c'))
+                            (mword_of_int i0) with
+              | Some c0 => pt_maps lvl c0 | None => [] end)
+           j).
+  - apply seqZ_512_nodup.
+  - apply elem_of_seqZ. lia.
+  - intros k Hk2 Hne. cbn beta. apply elem_of_seqZ in Hk2.
+    rewrite (pt_kids_upd_kid_ne t (mword_of_int j) (mword_of_int k) (Some c')
+               (moi_ne j k Hj ltac:(lia) Hne)).
+    reflexivity.
+  - cbn beta. rewrite pt_kids_upd_kid_same. by rewrite Hk.
+Qed.
+
+(* the two byte maps of one slot have the same keys, whatever the words *)
+Lemma word_bytes_is_Some (a : Arch.pa) (w w' : bv 64) (x : Arch.pa) :
+  is_Some (word_bytes a w !! x) -> is_Some (word_bytes a w' !! x).
+Proof.
+  intros [b Hb].
+  destruct (word_bytes_dom_elim a w x ltac:(apply elem_of_dom; by exists b))
+    as (j & Hj & ->).
+  exists (nth_byte w' j). by apply word_bytes_lookup.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4c. THE ABSORPTION.  Writing the leaf slot IS setting the leaf.          *)
+(* ---------------------------------------------------------------------- *)
+Lemma ptree_bytes_set_leaf (t : ptree) (vpn : mword 27) (p2 p1 p0 q : mword 64) :
+  maps_disj (pt_maps 2 t) ->
+  ptree_maps t vpn p2 p1 p0 ->
+  ptree_bytes 2 (ptree_set_leaf t vpn q)
+  = write_bytes (ptree_bytes 2 t) (pt_addr0 p1 vpn) 8 q.
+Proof.
+  intros Hdisj (c1 & c0 & Hk1 & Hk0 & He2 & He1 & He0 & Hb1 & Hb0 & _).
+  (* the three indices, as the [Z]s the slot lists carry *)
+  pose proof (mword9_uint_range (vpn_idx 2 vpn)) as Hr2.
+  pose proof (mword9_uint_range (vpn_idx 1 vpn)) as Hr1.
+  pose proof (mword9_uint_range (vpn_idx 0 vpn)) as Hr0.
+  (* the leaf page, updated *)
+  pose proof (pt_maps_upd_ent 0 c0 (uint (vpn_idx 0 vpn)) q Hr0) as H0.
+  rewrite mword9_uint_id in H0.
+  (* ...through the mid node, then through the root *)
+  pose proof (pt_maps_upd_kid 0 c1 c0 (pt_upd_ent c0 (vpn_idx 0 vpn) q)
+                (uint (vpn_idx 1 vpn)) _ _ Hr1
+                ltac:(rewrite mword9_uint_id; exact Hk0) H0) as H1.
+  rewrite mword9_uint_id in H1.
+  pose proof (pt_maps_upd_kid 1 t c1
+                (pt_upd_kid c1 (vpn_idx 1 vpn)
+                   (Some (pt_upd_ent c0 (vpn_idx 0 vpn) q)))
+                (uint (vpn_idx 2 vpn)) _ _ Hr2
+                ltac:(rewrite mword9_uint_id; exact Hk1) H1) as H2.
+  rewrite mword9_uint_id in H2.
+  (* the tree the model lands on IS that update *)
+  assert (Hsl : ptree_set_leaf t vpn q
+                = pt_upd_kid t (vpn_idx 2 vpn)
+                    (Some (pt_upd_kid c1 (vpn_idx 1 vpn)
+                             (Some (pt_upd_ent c0 (vpn_idx 0 vpn) q))))).
+  { unfold ptree_set_leaf. rewrite Hk1. by rewrite Hk0. }
+  rewrite Hsl.
+  (* the endpoints, in the caller's spelling *)
+  rewrite pt_base_upd_ent in H2. rewrite pt_ents_upd_ent_same in H2.
+  unfold ptree_bytes.
+  rewrite (union_list_upd_at _ _ (pt_maps 2 t) _ Hdisj H2
+             (fun x Hx => word_bytes_is_Some _ _ q x Hx)
+             (fun x Hx => word_bytes_is_Some _ q _ x Hx)).
+  rewrite write_bytes_word.
+  unfold pt_addr0. by rewrite Hb0.
+Qed.
