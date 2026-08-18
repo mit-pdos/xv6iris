@@ -24,6 +24,26 @@
    reads ([WpIntrCore.swp_dispatchInterrupt_S]).  A tower that pinned them
    would be claiming the caller knows what the platform is about to do.
 
+   WHERE THE CELLS COME FROM, which is what the bridge above this file has to
+   assemble (checked, not assumed):
+
+     hart_state, cur_privilege, mstatus, mie, mideleg, menvcfg
+                          -- [IntrDefs.sie_cap_gpr] and the [sconf] inside it
+     PC, nextPC, minstret, minstret_increment, mcountinhibit, minstretcfg,
+     mcycle, mtime, mip
+                          -- [pc_is] (its minstret_res / clock_res)
+     misa, mseccfg, pma_regions, htif_tohost_base, elp, senvcfg
+                          -- [hw_config], pinned and persistent
+     satp, tlb            -- [KptShare.tlb_res_pt], which owns BOTH plus the
+                             Sv39/asid/root facts about satp and
+                             [tlb_snap_ok] about the entry set
+     pmpcfg_n, pmpaddr_n  -- [pmp_config], inside the same [tlb_res_pt]
+
+   So nothing has to be invented for the bridge: [tlb_res_pt] is already the
+   S-mode owner of the two cells M-mode does not have, and its [tlb_snap_ok]
+   is exactly what tells a HIT that the entry it found is a legitimate one --
+   the S-mode analogue of what [instr] does for the text bytes.
+
    The GPRs are likewise absent, for [HartMFrame]'s reason: a leaf is generic
    in its operand indices, so [hfrun] would stall on [bool_decide (r ∈ D)] at
    a symbolic index anyway; they ride in the caller's [R] and are reached per

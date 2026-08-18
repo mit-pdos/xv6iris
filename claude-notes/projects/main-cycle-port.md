@@ -239,9 +239,26 @@ a tower (`mm_rs` and its 19 lookups), the frame intro/elim pair
 
 So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
 
-1. an S-mode tower `s_rs` over the bundle's cells, with its lookups and
-   `Opaque` seal — `mm_rs` is the pattern, and `mc_rs` (WpInstrConfig) shows
-   how to leave one cell (there, the privilege) parametric;
+1. ~~an S-mode tower~~ — **DONE**: `HartSFrame` (`s_Drw` / `s_Dro` / `s_rs`,
+   25 cells, lookups and seal).  It adds five cells to M-mode's set — `tlb`
+   (written: the fill), `satp`, `mie`, `mideleg`, `menvcfg` — and deliberately
+   omits the PLIC wires, which no frame can hold.
+
+   **WHERE EVERY CELL COMES FROM IS SETTLED** (checked against the
+   definitions, not assumed), and nothing has to be invented:
+
+   | cells | owner |
+   |---|---|
+   | hart_state, cur_privilege, mstatus, mie, mideleg, menvcfg | `sie_cap_gpr` / `sconf` |
+   | PC, nextPC, minstret, minstret_increment, mcountinhibit, minstretcfg, mcycle, mtime, mip | `pc_is` |
+   | misa, mseccfg, pma_regions, htif, elp, senvcfg | `hw_config` (pinned, persistent) |
+   | **satp, tlb** | `KptShare.tlb_res_pt` — owns both, with the Sv39/asid/root facts and `tlb_snap_ok` |
+   | pmpcfg_n, pmpaddr_n | `pmp_config`, inside the same `tlb_res_pt` |
+
+   `tlb_snap_ok` is the piece that makes a TLB HIT usable: it says the entry
+   the lookup finds is a legitimate one for the installed tree — the S-mode
+   analogue of what `instr` does for the text bytes.  `kpt_inv` in the same
+   bundle is what will discharge the walk's PTE-read obligations on a MISS.
 2. `s_frames_intro` / `_elim` — bundle ⇄ frames, the only place the S-mode
    resource algebra is touched;
 3. `s_cycle` = `HartMCycle.swp_exec_step_decode_execute` at that tower (the
