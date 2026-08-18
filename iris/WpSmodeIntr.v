@@ -13,10 +13,11 @@
      - [b = true]: [wp_instr_s_intr].  The sret-target premise is DERIVED from
        [instr_bytes]' 2-alignment ([update_bit0_zero_of_aligned2]), so no call
        site carries it;
-     - [b = false]: [wp_instr_s_sconf_off], STATED AND NOT PROVED, and
-       deliberately isolated -- it is [SmodeCorePt.wp_instr_s_config_regime] at
-       [strans_regime], whose surface is still moving in that file.  When it
-       lands, that lemma's proof is the ONLY edit here.
+     - [b = false]: [wp_instr_s_sconf_off_clock], STATED AND NOT PROVED, and
+       deliberately isolated -- it is [SmodeCorePt.wp_instr_s_config_sr] at
+       [strans_regime], and it waits on exactly two things in that wrapper's
+       surface (an EXISTENTIAL output config, and the three clock cells lent
+       to the leaf).  Both are spelled out at the lemma itself.
 
    WHAT THE PER-NODE PORT CHANGED IN THE SHAPES, and why:
      - the leaf hands the bundles BACK inside the [swp (execute i)]
@@ -189,9 +190,36 @@ Section WpSmodeIntr.
           sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R npc ms' m' n' -∗
           WP (Loop : expr riscv_lang)))%I.
 
-  (* THE SIE=0 ARM.  STATED, NOT PROVED -- see the note above; it is
-     [SmodeCorePt.wp_instr_s_config_regime strans_regime] once that file's
-     regime-open/close fields land, with SIE=0 read off the ghost. *)
+  (* THE SIE=0 ARM.  STATED, NOT PROVED, and it is the ONLY hole in this
+     file and in [WpIntrInv].  It is [SmodeCorePt.wp_instr_s_config_sr
+     strans_regime] -- the regime instance, the [sr_inv R] surface and the
+     [Rl npc] rider are all there now -- and what still blocks it is
+     EXACTLY two things in that wrapper's surface, neither of which this
+     file can work around:
+
+       (1) THE OUTPUT CONFIG HAS TO BE EXISTENTIAL.  [wp_instr_s_config_sr]
+           takes the leaf's post-config as PARAMETERS [mstatus1 mie1 mdv1
+           menvcfg1]: the caller must name the mstatus the instruction
+           leaves behind.  This funnel cannot, and must not -- its leaf
+           picks [ms'] and the arm index [b'] existentially, which is the
+           whole content of the generalization: csrsi/csrci sstatus and
+           sret MOVE SIE, and at [b = false] moving it IS the [b' = true]
+           transition.  What is needed is the same lemma with
+             (∃ ms1 mdv1, mstatus ↦ᵣ{dq} ms1 ∗ mideleg ↦ᵣ{dq} mdv1 ∗
+                          ⌜sconf_ms_facts ms1⌝ ∗ ... ∗ Rl npc ms1 mdv1)
+           in the leaf's post and the matching ∀ in the continuation --
+           the same move the tlb value just made ([tv2] existential);
+       (2) THE THREE CLOCK CELLS HAVE TO BE LENT.  [sconf_step_obl_clock]
+           hands the leaf [MinstretInv.clock_res] (mcycle/mtime/mip) and
+           takes it back; the wrapper keeps those three inside the cycle's
+           own frame and gives the leaf only PC / nextPC / resv_any.  They
+           are already in [s_Drw] and [spt_ex_obl] hands the WHOLE frame to
+           the instruction, so this is a split inside the wrapper, not new
+           machinery.  Without it [csrr time] / [csrr sip] /
+           [csrw stimecmp] cannot be written at SIE=0.
+
+     Everything else in this file and in the engine below it is proved, so
+     when those two land the instantiation is the ONLY edit here. *)
   Lemma wp_instr_s_sconf_off_clock (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
       (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
