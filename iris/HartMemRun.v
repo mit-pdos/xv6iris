@@ -671,3 +671,625 @@ Proof.
                as (n0 & mm' & Hw & Hs1 & Hd1) ];
          exists (S n0), mm'; split; [exact Hw|split; [exact Hs1|exact Hd1]].
 Qed.
+
+(* ====================================================================== *)
+(* 4. THE CERTIFICATE INFRASTRUCTURE: how a [goodmb] certificate is         *)
+(*    ASSEMBLED.                                                           *)
+(*                                                                         *)
+(* [goodmb] is discharged by [vm_compute] only where the whole term is      *)
+(* data-free; the user tier's calls are not (they carry symbolic register   *)
+(* and byte values), so a certificate for a CHAIN of model calls has to be  *)
+(* built out of per-call certificates plus the per-call [exec] facts --     *)
+(* exactly as [WpDecodeBridge.goodb]'s is (see the comment above            *)
+(* [goodb_bind]: certificates are ASSEMBLED along binds, not computed).     *)
+(* This section is that toolkit, one lemma per [goodb] combinator.          *)
+(*                                                                         *)
+(* The one new thing a byte map brings is that a RAM write moves BOTH the   *)
+(* machine state and the map, so the continuation's certificate is read at  *)
+(* [exec]'s post state AND at the post map [mm_after m s mm] -- the pure    *)
+(* "map after m", which is the map the walker lands on                      *)
+(* ([hmrun_of_exec_after]).                                                 *)
+(* ====================================================================== *)
+Require Import RiscvTryStep WpDecodeBridge HartGoodb.
+
+(* ---------------------------------------------------------------------- *)
+(* ONLY [dom mm] IS EVER CONSULTED (the header's claim, as a lemma): the     *)
+(* map argument may be read as the owned ADDRESS SET, spelled as whatever    *)
+(* map the caller happens to hold.  This is what makes the EXISTENTIAL post  *)
+(* map of [swp_hmrun_of_exec] enough to chain: the next call's certificate   *)
+(* was proved at some map with the same domain.                             *)
+(* ---------------------------------------------------------------------- *)
+Lemma bytes_owned_dom (mm1 mm2 : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N) :
+  dom mm1 = dom mm2 -> bytes_owned mm1 pa n = bytes_owned mm2 pa n.
+Proof.
+  intros Hd. unfold bytes_owned.
+  induction (seq 0 (N.to_nat n)) as [|j js IH]; [reflexivity|].
+  cbn [forallb]. rewrite IH. f_equal.
+  first [apply bool_decide_ext | apply bool_decide_iff].
+  by rewrite -!elem_of_dom Hd.
+Qed.
+
+(* dom-equal maps make the SAME byte-map updates. *)
+Lemma foldr_ins_dom_eq (pa : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
+    (mm1 mm2 : gmap Arch.pa (bv 8)) :
+  dom mm1 = dom mm2 ->
+  dom (foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm1 js)
+  = dom (foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm2 js).
+Proof.
+  intros H. induction js as [|j js IH]; cbn [foldr]; [exact H|].
+  rewrite !dom_insert_L. by rewrite IH.
+Qed.
+
+Lemma write_bytes_dom_eq (pa : Arch.pa) (n : N) {wd : N} (v : bv wd)
+    (mm1 mm2 : gmap Arch.pa (bv 8)) :
+  dom mm1 = dom mm2 -> dom (write_bytes mm1 pa n v) = dom (write_bytes mm2 pa n v).
+Proof. intros H. exact (foldr_ins_dom_eq pa v (seq 0 (N.to_nat n)) mm1 mm2 H). Qed.
+
+Lemma goodmb_dom (Dr Dw : register -> bool) {E X} (m : Defs.monad E X) :
+  forall (s : mstate) (mm1 mm2 : gmap Arch.pa (bv 8)),
+    dom mm1 = dom mm2 -> goodmb Dr Dw m s mm1 = goodmb Dr Dw m s mm2.
+Proof.
+  induction m as [y | T oc k IH]; intros s mm1 mm2 Hd; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ]; cbn [goodmb].
+  { by rewrite (IH _ s mm1 mm2 Hd). }
+  { by rewrite (IH tt _ mm1 mm2 Hd). }
+  { rewrite (bytes_owned_dom mm1 mm2 (Interface.ReadReq.pa rreq) nb Hd).
+    destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+      [by rewrite (IH _ s mm1 mm2 Hd)|reflexivity]. }
+  { rewrite (bytes_owned_dom mm1 mm2 (Interface.WriteReq.pa wreq) nb Hd).
+    by rewrite (IH (inl None) _ _ _ (write_bytes_dom_eq _ nb _ mm1 mm2 Hd)). }
+  all: try reflexivity.
+  all: first [ by rewrite (IH tt s mm1 mm2 Hd)
+             | by rewrite (IH 0%Z s mm1 mm2 Hd) ].
+Qed.
+
+(* monotone in BOTH footprints *)
+Lemma goodmb_mono (Dr Dw Dr' Dw' : register -> bool) {E X} (m : Defs.monad E X) :
+  (forall r, Dr r = true -> Dr' r = true) ->
+  (forall r, Dw r = true -> Dw' r = true) ->
+  forall (s : mstate) (mm : gmap Arch.pa (bv 8)),
+    goodmb Dr Dw m s mm = true -> goodmb Dr' Dw' m s mm = true.
+Proof.
+  intros Hr Hw. induction m as [y | T oc k IH]; intros s mm Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [goodmb] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [HD Hg]. rewrite (Hr _ HD). cbn [andb].
+    by apply (IH _ s mm). }
+  { apply andb_prop in Hg as [HD Hg]. rewrite (Hw _ HD). cbn [andb].
+    by apply (IH tt _ mm). }
+  { apply andb_prop in Hg as [Hg1 Hg2]. rewrite Hg1. cbn [andb].
+    destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+      [by apply (IH _ s mm)|discriminate Hg2]. }
+  { apply andb_prop in Hg as [Hg1 Hg2]. rewrite Hg1. cbn [andb].
+    by apply (IH (inl None) _ _). }
+  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+(* an event-free, READ-ONLY stretch is certified for ANY map and ANY write
+   footprint: [goodb]'s certificate is a [goodmb] certificate. *)
+Lemma goodmb_of_goodb (Db Dw : register -> bool) {E X} (m : Defs.monad E X)
+    (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodb Db m s = true -> goodmb Db Dw m s mm = true.
+Proof.
+  induction m as [y | T oc k IH]; intros Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [goodb goodmb] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb]. by apply IH. }
+  all: first [ by apply (IH tt) | by apply (IH 0%Z) ].
+Qed.
+
+(* THE MAP AFTER A STRETCH.  [exec] moves the machine state along the
+   state-resolved path; [mm_after] moves the OWNED MAP along the same path --
+   the byte map with [write_bytes] applied at each write the path makes.  It
+   is the map [hmrun] lands on ([hmrun_of_exec_after] below), and it is what
+   lets a certificate for a chain be ASSEMBLED from per-call certificates:
+   [goodmb_bind] evaluates the continuation's certificate at [exec]'s post
+   state and [mm_after]'s post map.  Pure and computable, like [goodmb]. *)
+Fixpoint mm_after {E X} (m : Defs.monad E X) (s : mstate)
+    (mm : gmap Arch.pa (bv 8)) {struct m} : gmap Arch.pa (bv 8) :=
+  match m with
+  | Interface.Ret _ => mm
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T
+             return (T -> Interface.iMon (fun _ => E) X) -> gmap Arch.pa (bv 8) with
+       | Interface.RegRead r _ => fun k =>
+           mm_after (k (register_lookup r s.(sregs))) s mm
+       | Interface.RegWrite r _ v => fun k => mm_after (k tt) (set_reg s r v) mm
+       | Interface.MemRead n req => fun k =>
+           match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+           | Some w => mm_after (k (inl (w, None))) s mm
+           | None => mm
+           end
+       | Interface.MemWrite n req => fun k =>
+           mm_after (k (inl None))
+             (MState s.(sregs)
+                (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                   (Interface.WriteReq.value req)) s.(mdev))
+             (write_bytes mm (Interface.WriteReq.pa req) n
+                (Interface.WriteReq.value req))
+       | Interface.InstrAnnounce _    => fun k => mm_after (k tt) s mm
+       | Interface.BranchAnnounce _ _ => fun k => mm_after (k tt) s mm
+       | Interface.Barrier _          => fun k => mm_after (k tt) s mm
+       | Interface.CacheOp _          => fun k => mm_after (k tt) s mm
+       | Interface.TlbOp _            => fun k => mm_after (k tt) s mm
+       | Interface.TakeException _    => fun k => mm_after (k tt) s mm
+       | Interface.ReturnException _  => fun k => mm_after (k tt) s mm
+       | Interface.TranslationStart _ => fun k => mm_after (k tt) s mm
+       | Interface.TranslationEnd _   => fun k => mm_after (k tt) s mm
+       | Interface.CycleCount         => fun k => mm_after (k tt) s mm
+       | Interface.Message _          => fun k => mm_after (k tt) s mm
+       | Interface.GetCycleCount      => fun k => mm_after (k 0%Z) s mm
+       | _ => fun _ => mm
+       end) k
+  end.
+
+(* a [goodb]-certified stretch touches no memory, so the map does not move *)
+Lemma mm_after_of_goodb (Db : register -> bool) {E X} (m : Defs.monad E X)
+    (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodb Db m s = true -> mm_after m s mm = mm.
+Proof.
+  induction m as [y | T oc k IH]; intros Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [goodb mm_after] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [_ Hg]. by apply IH. }
+  all: first [ by apply (IH tt) | by apply (IH 0%Z) ].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE CERTIFICATE IS ASSEMBLED ALONG A BIND, exactly as [goodb]'s is       *)
+(* ([WpDecodeBridge.goodb_bind] and the comment above it): each call in a   *)
+(* chain contributes its own certificate at its own (state, map), and the   *)
+(* per-call [exec] facts say where the next one is evaluated.  A RAM write  *)
+(* inside [m] moves BOTH, so the continuation's certificate is read at      *)
+(* [exec]'s post state and at [mm_after m s mm].                            *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_bind (Dr Dw : register -> bool) {X Y} (m : M X) (f : X -> M Y)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) (x : X) :
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (x, s') ->
+  goodmb Dr Dw (Defs.bind m f) s mm = goodmb Dr Dw (f x) s' (mm_after m s mm).
+Proof.
+  revert s mm. induction m as [y | T oc k IH]; intros s mm Hg He.
+  - cbn [exec] in He. injection He as <- <-. reflexivity.
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb exec mm_after Defs.bind Interface.iMon_bind] in Hg, He |- *;
+      try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+      rewrite Hfp. cbn [negb andb] in Hg2 |- *.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma goodmb_bind0 (Dr Dw : register -> bool) {Y} (m : M unit) (n : M Y)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (tt, s') ->
+  goodmb Dr Dw (Defs.bind0 m n) s mm = goodmb Dr Dw n s' (mm_after m s mm).
+Proof. intros Hg He. exact (goodmb_bind Dr Dw m (fun _ => n) s s' mm tt Hg He). Qed.
+
+(* the same, in the EARLY-RETURN monad ([HartGoodb.goodb_bindR]'s twin): the
+   [inr] says the step RETURNED rather than early-returned, which is exactly
+   when the continuation runs. *)
+Lemma goodmb_bindR (Dr Dw : register -> bool) {R X Y : Type}
+    (m : Defs.monadR R exception X) (f : X -> Defs.monadR R exception Y)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) (x : X) :
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr x, s') ->
+  goodmb Dr Dw (Defs.bind m f) s mm = goodmb Dr Dw (f x) s' (mm_after m s mm).
+Proof.
+  revert s mm. induction m as [y | T oc k IH]; intros s mm Hg He.
+  - cbn [execR] in He.
+    assert (Hx : x = y) by congruence. assert (Hs : s' = s) by congruence.
+    subst x s'. reflexivity.
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb execR mm_after Defs.bind Interface.iMon_bind] in Hg, He |- *;
+      try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+      rewrite Hfp. cbn [negb andb] in Hg2 |- *.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma goodmb_bind0R (Dr Dw : register -> bool) {R Y : Type}
+    (m : Defs.monadR R exception unit) (n : Defs.monadR R exception Y)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr tt, s') ->
+  goodmb Dr Dw (Defs.bind0 m n) s mm = goodmb Dr Dw n s' (mm_after m s mm).
+Proof.
+  intros Hg He. exact (goodmb_bindR Dr Dw m (fun _ => n) s s' mm tt Hg He).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE EARLY-RETURN WRAPPERS ARE TRANSPARENT ([HartGoodb]'s trio, with a     *)
+(* map): [try_catch] rebuilds the term with the SAME outcome at every node,  *)
+(* and a certified body makes no [ExtraOutcome], so both the certificate     *)
+(* and the map the stretch lands on are those of the body.                   *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_try_catch (Dr Dw : register -> bool) {X E1 E2 : Type}
+    (m : Defs.monad E1 X) (h : E1 -> Defs.monad E2 X) :
+  forall (s : mstate) (mm : gmap Arch.pa (bv 8)),
+    goodmb Dr Dw m s mm = true -> goodmb Dr Dw (Defs.try_catch m h) s mm = true.
+Proof.
+  induction m as [y | T oc k IH]; intros s mm Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [Defs.try_catch goodmb] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+    by apply (IH _ s mm). }
+  { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+    by apply (IH tt _ mm). }
+  { apply andb_prop in Hg as [Hg1 Hg2]. rewrite Hg1. cbn [andb].
+    destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+      [by apply (IH _ s mm)|discriminate Hg2]. }
+  { apply andb_prop in Hg as [Hg1 Hg2]. rewrite Hg1. cbn [andb].
+    by apply (IH (inl None) _ _). }
+  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma mm_after_try_catch (Dr Dw : register -> bool) {X E1 E2 : Type}
+    (m : Defs.monad E1 X) (h : E1 -> Defs.monad E2 X) :
+  forall (s : mstate) (mm : gmap Arch.pa (bv 8)),
+    goodmb Dr Dw m s mm = true ->
+    mm_after (Defs.try_catch m h) s mm = mm_after m s mm.
+Proof.
+  induction m as [y | T oc k IH]; intros s mm Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [Defs.try_catch goodmb mm_after] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [_ Hg]. by apply (IH _ s mm). }
+  { apply andb_prop in Hg as [_ Hg]. by apply (IH tt _ mm). }
+  { apply andb_prop in Hg as [_ Hg2].
+    destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+      [by apply (IH _ s mm)|discriminate Hg2]. }
+  { apply andb_prop in Hg as [_ Hg2]. by apply (IH (inl None) _ _). }
+  all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma goodmb_liftR (Dr Dw : register -> bool) {X R : Type} (m : M X)
+    (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw m s mm = true ->
+  goodmb Dr Dw (Defs.liftR (R := R) m) s mm = true.
+Proof. apply goodmb_try_catch. Qed.
+
+Lemma mm_after_liftR (Dr Dw : register -> bool) {X R : Type} (m : M X)
+    (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw m s mm = true ->
+  mm_after (Defs.liftR (R := R) m) s mm = mm_after m s mm.
+Proof. apply (mm_after_try_catch Dr Dw m _). Qed.
+
+Lemma goodmb_cer (Dr Dw : register -> bool) {X : Type}
+    (m : Defs.monadR X exception X) (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw m s mm = true ->
+  goodmb Dr Dw (Defs.catch_early_return m) s mm = true.
+Proof. apply goodmb_try_catch. Qed.
+
+Lemma mm_after_cer (Dr Dw : register -> bool) {X : Type}
+    (m : Defs.monadR X exception X) (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw m s mm = true ->
+  mm_after (Defs.catch_early_return m) s mm = mm_after m s mm.
+Proof. apply (mm_after_try_catch Dr Dw m _). Qed.
+
+(* ====================================================================== *)
+(* 5. THE COMPOSITE RULE: an [exec] fact plus its certificate, in [swp].    *)
+(*                                                                         *)
+(* [hmrun_of_exec] turns the certified [exec] fact into a walker fact at    *)
+(* the state's OWN register file; [swp_hmrun] consumes a walker fact at the *)
+(* CALLER's file.  Those are not the same file -- the caller's frame only   *)
+(* AGREES with the exec fact's state on the footprint -- so the two are     *)
+(* joined by [hmrun_agree], the walker's read-frame congruence, in the same *)
+(* way [HartGoodb.hval_of_goodb] joins [goodb]'s reference state to the     *)
+(* hart's file.                                                            *)
+(* ====================================================================== *)
+
+(* [hmrun_of_exec] with the landing map NAMED: it is [mm_after m s mm].  This
+   is what makes [mm_after] the right notion for [goodmb_bind] -- the map the
+   certificate hands to the continuation is the map the walker is standing on
+   when the continuation starts. *)
+Lemma hmrun_of_exec_after (Dr Dw : register -> bool) (D Drw : gset register)
+    {X : Type} (m : M X) (s s' : mstate) (x : X)
+    (mm : gmap Arch.pa (bv 8)) :
+  (forall r, Dr r = true -> r ∈ D) ->
+  (forall r, Dw r = true -> r ∈ Drw) ->
+  mm ⊆ s.(mem) ->
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (x, s') ->
+  exists n : nat,
+    hmrun n D Drw s.(sregs) mm m = Some (x, s'.(sregs), mm_after m s mm) /\
+    mm_after m s mm ⊆ s'.(mem) /\ dom (mm_after m s mm) = dom mm.
+Proof.
+  intros Hdr Hdw. revert s s' x mm.
+  induction m as [y | T oc k IH]; intros s s' x mm Hsub Hg He.
+  - cbn [exec] in He. injection He as <- <-.
+    exists 1%nat. split; [reflexivity|]. split; [exact Hsub|reflexivity].
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb exec] in Hg, He; cbn [mm_after]; try discriminate Hg.
+    { (* REGISTER READ *)
+      apply andb_prop in Hg as [HD Hg].
+      destruct (IH (register_lookup reg s.(sregs)) s s' x mm Hsub Hg He)
+        as (n0 & Hw & Hs1 & Hd1).
+      exists (S n0). split; [|split; [exact Hs1|exact Hd1]].
+      rewrite hmrun_read (bool_decide_eq_true_2 _ (Hdr reg HD)). exact Hw. }
+    { (* REGISTER WRITE *)
+      apply andb_prop in Hg as [HD Hg].
+      assert (Hsub' : mm ⊆ (set_reg s reg regval).(mem))
+        by (rewrite mem_set_reg; exact Hsub).
+      destruct (IH tt (set_reg s reg regval) s' x mm Hsub' Hg He)
+        as (n0 & Hw & Hs1 & Hd1).
+      rewrite sregs_set_reg in Hw.
+      exists (S n0). split; [|split; [exact Hs1|exact Hd1]].
+      rewrite hmrun_write (bool_decide_eq_true_2 _ (Hdw reg HD)). exact Hw. }
+    { (* RAM READ *)
+      apply andb_prop in Hg as [Hg1 Hg2].
+      apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev.
+      rewrite Hdev in He. cbn beta iota in He.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb)
+        as [w|] eqn:Hrb; [|discriminate Hg2].
+      destruct (IH (inl (w, None)) s s' x mm Hsub Hg2 He)
+        as (n0 & Hw & Hs1 & Hd1).
+      exists (S n0). split; [|split; [exact Hs1|exact Hd1]].
+      rewrite hmrun_ram_read Hdev.
+      by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
+    { (* RAM WRITE *)
+      apply andb_prop in Hg as [Hg1 Hg2].
+      apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev.
+      rewrite Hdev in He. cbn beta iota in He.
+      assert (Hsub' :
+        write_bytes mm (Interface.WriteReq.pa wreq) nb
+          (Interface.WriteReq.value wreq)
+        ⊆ (MState s.(sregs)
+             (write_bytes s.(mem) (Interface.WriteReq.pa wreq) nb
+                (Interface.WriteReq.value wreq)) s.(mdev)).(mem))
+        by (apply write_bytes_mono, Hsub).
+      destruct (IH (inl None)
+                  (MState s.(sregs)
+                     (write_bytes s.(mem) (Interface.WriteReq.pa wreq) nb
+                        (Interface.WriteReq.value wreq)) s.(mdev))
+                  s' x _ Hsub' Hg2 He)
+        as (n0 & Hw & Hs1 & Hd1).
+      exists (S n0). split; [|split; [exact Hs1|]].
+      * rewrite hmrun_ram_write Hdev Hfp. exact Hw.
+      * rewrite Hd1. by apply write_bytes_dom. }
+    all: first
+           [ destruct (IH tt s s' x mm Hsub Hg He) as (n0 & Hw & Hs1 & Hd1)
+           | destruct (IH 0%Z s s' x mm Hsub Hg He) as (n0 & Hw & Hs1 & Hd1) ];
+         exists (S n0); split; [exact Hw|split; [exact Hs1|exact Hd1]].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE WALKER ONLY CONSULTS THE FILE INSIDE ITS READ FOOTPRINT, so it takes  *)
+(* the same steps from any file that agrees there -- and the landing files    *)
+(* still agree ([HartLift.hsil_node_agree] / [HartLift2.hrun_silent2_agree]   *)
+(* at the memory-inclusive walker).  The byte map is not indexed by the file, *)
+(* so it lands on the SAME map.                                              *)
+(* ---------------------------------------------------------------------- *)
+Lemma hmrun_agree {X : Type} (n : nat) (D Drw : gset register) :
+  forall (rs1 rs2 : regstate) (mm : gmap Arch.pa (bv 8)) (m : M X)
+         (x : X) (rs1' : regstate) (mm' : gmap Arch.pa (bv 8)),
+    reg_agree_on D rs1 rs2 ->
+    hmrun n D Drw rs1 mm m = Some (x, rs1', mm') ->
+    exists rs2', hmrun n D Drw rs2 mm m = Some (x, rs2', mm') /\
+                 reg_agree_on D rs1' rs2'.
+Proof.
+  induction n as [|n IH];
+    intros rs1 rs2 mm m x rs1' mm' Hag Hf; [discriminate Hf|].
+  destruct m as [y|T oc k].
+  { rewrite hmrun_ret in Hf. injection Hf as <- <- <-.
+    exists rs2. split; [reflexivity|exact Hag]. }
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [hmrun] in Hf; try discriminate Hf.
+  { (* REGISTER READ: the answer is the same because the files agree on [D] *)
+    destruct (bool_decide (reg ∈ D)) eqn:Hin; [|discriminate Hf].
+    apply bool_decide_eq_true_1 in Hin.
+    destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
+    exists rs2'. split; [|exact Hag2].
+    rewrite hmrun_read (bool_decide_eq_true_2 _ Hin) -(Hag reg Hin). exact Hf2. }
+  { (* REGISTER WRITE: the same register takes the same value on both sides *)
+    destruct (bool_decide (reg ∈ Drw)) eqn:Hin; [|discriminate Hf].
+    destruct (IH (register_set reg regval rs1) (register_set reg regval rs2)
+                mm _ x rs1' mm' (reg_agree_set D reg regval rs1 rs2 Hag) Hf)
+      as (rs2' & Hf2 & Hag2).
+    exists rs2'. split; [|exact Hag2]. rewrite hmrun_write Hin. exact Hf2. }
+  { (* RAM READ: answered off the map, which does not depend on the file *)
+    destruct (dev_addr (Interface.ReadReq.pa rreq)) eqn:Hdev;
+      [discriminate Hf|].
+    destruct (read_bytes mm (Interface.ReadReq.pa rreq) nb) as [w|] eqn:Hrb;
+      [|discriminate Hf].
+    destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
+    exists rs2'. split; [|exact Hag2].
+    rewrite hmrun_ram_read Hdev Hrb. exact Hf2. }
+  { (* RAM WRITE *)
+    destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
+      [discriminate Hf|].
+    destruct (bytes_owned mm (Interface.WriteReq.pa wreq) nb) eqn:Hfp;
+      [|discriminate Hf].
+    destruct (IH rs1 rs2 _ _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
+    exists rs2'. split; [|exact Hag2].
+    rewrite hmrun_ram_write Hdev Hfp. exact Hf2. }
+  all: destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2);
+       exists rs2'; split; [exact Hf2|exact Hag2].
+Qed.
+
+Section memrun_exec.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* THE COMPOSITE RULE the user tier calls: a whole-cycle [exec] fact, a
+     footprint certificate for it, and the hart's own resources in -- the
+     [swp] out.  The certificate's footprints [Dr]/[Dw] have to land inside
+     the frames the caller holds, and the caller's file [rs] need only AGREE
+     with the exec fact's state on those frames: the walk consults the file
+     only inside its read footprint, so it lands the same modulo agreement
+     ([hmrun_agree]), exactly as [HartGoodb.hval_of_goodb] handles the
+     decode catalogue's reference state.
+
+     The post map is EXISTENTIAL and pinned by [dom mm' = dom mm]: that is
+     all a chained call needs, since [goodmb] consults the map only through
+     [bytes_owned], i.e. only through its domain ([goodmb_dom]).  A caller
+     that wants the map NAMED has it -- it is [mm_after m s mm]; compose
+     [hmrun_of_exec_after] with [swp_hmrun] directly, as this proof does. *)
+  Lemma swp_hmrun_of_exec (Dr Dw : register -> bool) (Drw Dro : gset register)
+      (Df : register -> dfrac) {X : Type} (m : M X) (s s' : mstate) (x : X)
+      (rs : regstate) (mm : gmap Arch.pa (bv 8)) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    mm ⊆ s.(mem) ->
+    goodmb Dr Dw m s mm = true ->
+    exec m s = Some (x, s') ->
+    gen_cert -∗
+    resv_any cpu_id -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    bytes_own mm -∗
+    swp m (fun v => ⌜v = x⌝ ∗
+             ∃ (rs' : regstate) (mm' : gmap Arch.pa (bv 8)),
+               ⌜reg_agree_on (Drw ∪ Dro) rs' s'.(sregs)⌝ ∗
+               ⌜mm' ⊆ s'.(mem)⌝ ∗ ⌜dom mm' = dom mm⌝ ∗
+               hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗
+               bytes_own mm' ∗ resv_any cpu_id).
+  Proof.
+    intros Hdisj Hdr Hdw Hag Hsub Hg He.
+    destruct (hmrun_of_exec_after Dr Dw (Drw ∪ Dro) Drw m s s' x mm
+                Hdr Hdw Hsub Hg He) as (n & Hw & Hsub' & Hdom').
+    assert (Hag' : reg_agree_on (Drw ∪ Dro) s.(sregs) rs)
+      by (intros r Hr; symmetry; exact (Hag r Hr)).
+    destruct (hmrun_agree n (Drw ∪ Dro) Drw s.(sregs) rs mm m x s'.(sregs)
+                (mm_after m s mm) Hag' Hw) as (rs2 & Hw2 & Hag2).
+    assert (Hag3 : reg_agree_on (Drw ∪ Dro) rs2 s'.(sregs))
+      by (intros r Hr; symmetry; exact (Hag2 r Hr)).
+    iIntros "#Hcert Hany Hrw Hro Hown".
+    iApply (swp_mono _ (fun v => ⌜v = x⌝ ∗ hreg_frame rs2 Drw ∗
+                                 hreg_frame_ro Df rs2 Dro ∗
+                                 bytes_own (mm_after m s mm) ∗
+                                 resv_any cpu_id)%I with "[] [-]").
+    - iIntros (v) "(-> & Hrw & Hro & Hown & Hany)". iSplitR; [done|].
+      iExists rs2, (mm_after m s mm). iFrame.
+      iSplitR; [done|]. iSplitR; [done|]. done.
+    - iApply (swp_hmrun n Drw Dro Df rs rs2 mm (mm_after m s mm) m x
+                Hdisj Hw2 with "Hcert Hany Hrw Hro Hown").
+  Qed.
+
+End memrun_exec.
+
+(* ====================================================================== *)
+(* 6. A SANITY INSTANCE: the certificate COMPUTES where the data is         *)
+(*    concrete.                                                            *)
+(*                                                                         *)
+(* The campaign discharges [goodmb] by [vm_compute] wherever a call's       *)
+(* arguments are concrete, and assembles it by section 4 wherever they are  *)
+(* not.  These check the computable half at a concrete state and a concrete *)
+(* one-byte owned map: a register read, a RAM write and a RAM read inside   *)
+(* the owned byte, and -- the checks that say the certificate is not        *)
+(* vacuous -- an MMIO write and a write whose footprint runs off the owned  *)
+(* bytes, both REFUSED.                                                     *)
+(*                                                                         *)
+(* WHAT IS NOT COMPUTABLE, and why the [exec] fact is always a SEPARATE     *)
+(* premise: [exec] of the very same term at the very same concrete state    *)
+(* does NOT [vm_compute] (measured: no answer in minutes).  Its result      *)
+(* carries the whole successor [mstate], whose register file is a record of *)
+(* FUNCTIONS, and normalising that does not finish -- whereas [goodmb]      *)
+(* answers a [bool] and never normalises the state at all.  So the exec     *)
+(* facts come from the model-level lemmas the tier already has and the      *)
+(* certificate comes from computation; do not try to produce the former by  *)
+(* [vm_compute] here.                                                       *)
+(* ====================================================================== *)
+
+(* the owned byte: the first byte of DRAM, held at 0 *)
+Definition ex_pa : Arch.pa := SailStdpp.Values.mword_of_int 0x80000000.
+Definition ex_mm : gmap Arch.pa (bv 8) := {[ ex_pa := Z_to_bv 8 0 ]}.
+Definition ex_s : mstate :=
+  MState (dregs (SailStdpp.Values.mword_of_int 0) Machine) ex_mm dev0_state.
+Definition ex_D_x1 (r : register) : bool := register_beq r (R_bitvector_64 x1).
+
+(* a register read inside the read footprint *)
+Example goodmb_rX1_compute :
+  goodmb ex_D_x1 (fun _ => false)
+    (rX_bits (Regidx (SailStdpp.Values.mword_of_int 1))) ex_s ex_mm = true.
+Proof. vm_compute. reflexivity. Qed.
+
+(* a RAM write whose footprint is owned *)
+Example goodmb_write_ram_compute :
+  goodmb (fun _ => false) (fun _ => false)
+    (write_ram Write_plain (Physaddr ex_pa) 1
+       (SailStdpp.Values.mword_of_int 0xab : SailStdpp.Values.mword (8 * 1)) tt)
+    ex_s ex_mm = true.
+Proof. vm_compute. reflexivity. Qed.
+
+(* and the byte is still owned on the map the write lands on.  STATE THE
+   MAP FACT AS A BOOL: the same fact spelled [dom (mm_after ...) = dom ex_mm]
+   does NOT [vm_compute] -- a [gset Arch.pa] equality drags in the key type's
+   [Countable] instance, the same pinning trap the durable notes record for
+   [set_solver] over [gset (mword n)].  [bytes_owned] is a [bool] and answers
+   in milliseconds. *)
+Example mm_after_write_ram_compute :
+  bytes_owned
+    (mm_after (write_ram Write_plain (Physaddr ex_pa) 1
+                 (SailStdpp.Values.mword_of_int 0xab
+                  : SailStdpp.Values.mword (8 * 1)) tt)
+       ex_s ex_mm) ex_pa 1 = true.
+Proof. vm_compute. reflexivity. Qed.
+
+(* a RAM read off the owned byte *)
+Example goodmb_read_ram_compute :
+  goodmb (fun _ => false) (fun _ => false)
+    (read_ram Read_plain (Physaddr ex_pa) 1 false) ex_s ex_mm = true.
+Proof. vm_compute. reflexivity. Qed.
+
+(* MMIO is refused *)
+Example goodmb_mmio_refused :
+  goodmb (fun _ => false) (fun _ => false)
+    (write_ram Write_plain
+       (Physaddr (SailStdpp.Values.mword_of_int 0x10000000)) 1
+       (SailStdpp.Values.mword_of_int 0xab : SailStdpp.Values.mword (8 * 1)) tt)
+    ex_s ex_mm = false.
+Proof. vm_compute. reflexivity. Qed.
+
+(* a footprint that runs off the owned bytes is refused *)
+Example goodmb_unowned_refused :
+  goodmb (fun _ => false) (fun _ => false)
+    (write_ram Write_plain (Physaddr ex_pa) 2
+       (SailStdpp.Values.mword_of_int 0xab : SailStdpp.Values.mword (8 * 2)) tt)
+    ex_s ex_mm = false.
+Proof. vm_compute. reflexivity. Qed.
