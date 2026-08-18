@@ -176,6 +176,7 @@ PtBytes.v
 UserBytes.v
 PtWalkCert.v
 UserFetchCert.v
+UserMemCert.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
