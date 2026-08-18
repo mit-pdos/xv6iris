@@ -1755,6 +1755,17 @@ Definition resv_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
 Definition resv_frag `{!riscvGS Σ} (c : CPU) (r : option resv) : iProp Σ :=
   (c ↪[era_resv_name riscv_eraGS] r)%I.
 
+(* the frag at SOME value: what a hart owns between instructions.  A leaf
+   that leaves a dangling reservation (an AMOCAS mismatch, an A/D re-read
+   that found the bits set) ends at [Some]; the boundary drops it.  This is
+   the shape [pc_is] carries and every cycle wrapper threads. *)
+Definition resv_any `{!riscvGS Σ} (c : CPU) : iProp Σ :=
+  (∃ r : option resv, resv_frag c r)%I.
+
+Lemma resv_any_intro `{!riscvGS Σ} (c : CPU) (r : option resv) :
+  resv_frag c r -∗ resv_any c.
+Proof. iIntros "H". by iExists r. Qed.
+
 Lemma resv_frag_agree `{!riscvGS Σ} (f : CPU -> option resv) (c : CPU)
     (r : option resv) :
   resv_auth_at riscv_eraGS f -∗ resv_frag c r -∗ ⌜f c = r⌝.

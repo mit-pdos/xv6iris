@@ -440,7 +440,7 @@ Section store.
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (pma_regions : register) ∈ Drw ∪ Dro ->
     (pmpcfg_n : register) ∈ Drw ∪ Dro ->
@@ -453,6 +453,7 @@ Section store.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 4 = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -464,10 +465,11 @@ Section store.
     swp (checked_mem_write (Physaddr pa) 4 v (Store Data) PBMT_PMA Machine
            tt false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDpma HDcfg HDhtif Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hpa.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold checked_mem_write.
     iApply (swp_use_cer
@@ -509,14 +511,14 @@ Section store.
     { iApply (swp_hart_ram_write 4 (mwrite_req pa v) _
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           R)%I)
+                           R ∗ resv_frag cpu_id None)%I)
                 (hwrite_req_at_write_ram pa v)
-                (addr_is_ram_not_dev pa Hram) with "Hcert [Hrw Hro Hmem]").
+                (addr_is_ram_not_dev pa Hram) rr with "Hcert Hfrag [Hrw Hro Hmem]").
       iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "[Hσ HR]". iModIntro.
-      iFrame "Hσ".
+      iFrame "Hσ". iIntros "Hfrag".
       rewrite hwrite_resume_write_ram. iApply swp_ret. by iFrame. }
-    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". s_glue.
     change (0 =? 1 - 1) with true. s_glue.
     rewrite mbind_ret. s_glue.
     rewrite mcer_ret.
@@ -530,7 +532,7 @@ Section store.
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -548,6 +550,7 @@ Section store.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 4 = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -559,11 +562,12 @@ Section store.
     swp (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
            false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hpa.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     unfold mem_write_value, mem_write_value_meta.
     iApply (swp_bind_use (Defs.read_reg mstatus) _ _ _
               with "[Hrw Hro] [-]").
@@ -583,12 +587,13 @@ Section store.
     unfold mem_write_value_priv_meta.
     iApply (swp_bind_use _ _
               (fun r => (⌜r = Values.Ok true⌝ ∗
-                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I) _
-              with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_checked_mem_write Drw Dro Df rs pa v pmar0 pcfg R Hdisj
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                         resv_frag cpu_id None)%I) _
+              with "[Hrw Hro Hmem Hfrag] [-]").
+    { iApply (swp_checked_mem_write Drw Dro Df rs pa v pmar0 pcfg R rr Hdisj
                 HDpma HDcfg HDhtif Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hpa
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
+                with "Hcert Hfrag Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". s_glue.
     iApply swp_ret. by iFrame.
   Qed.
 
@@ -596,7 +601,7 @@ Section store.
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -620,6 +625,7 @@ Section store.
     split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
       = returnM (4, 0) ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -630,11 +636,12 @@ Section store.
                 σ.(mdev)) ∗ R)) -∗
     swp (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold vmem_write_addr.
     rewrite Hva. s_glue.
@@ -683,11 +690,11 @@ Section store.
     change (8 * 4 - 1) with 31. rewrite subrange_full_32 autocast_id.
     iApply (swp_use_cer2
               (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
-                 false false false) _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_mem_write_value Drw Dro Df rs pa v pmar0 pcfg R Hdisj
+                 false false false) _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
+    { iApply (swp_mem_write_value Drw Dro Df rs pa v pmar0 pcfg R rr Hdisj
                 HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
-                Hunlock Hpallow Hram Hpa with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
+                Hunlock Hpallow Hram Hpa with "Hcert Hfrag Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". s_glue.
     rewrite mbind_ret. s_glue.
     change (not sys_misaligned_order_decreasing && false) with false. s_glue.
     rewrite mbind_ret. s_glue.
@@ -718,7 +725,7 @@ Section store.
       (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R Q : iProp Σ) :
+      (R Q : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -739,6 +746,7 @@ Section store.
     split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
       = returnM (4, 0) ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     Q -∗
@@ -754,11 +762,12 @@ Section store.
                 σ.(mdev)) ∗ R)) -∗
     swp (vmem_write base offset 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗ Q ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit.
-    iIntros "#Hcert Hrw Hro HQ Hgta Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro HQ Hgta Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold vmem_write.
     iApply (swp_use_cer
@@ -769,12 +778,12 @@ Section store.
     rewrite mbind_ret. s_glue.
     iApply (swp_use_cer0
               (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false
-                 false) _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg R Hdisj
+                 false) _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
+    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg R rr Hdisj
                 HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
                 Hunlock Hpallow Hram Hva Hpa Hsplit
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro & HR)".
+                with "Hcert Hfrag Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)".
     iApply ("Hcont" $! (Values.Ok true)). by iFrame.
   Qed.
 
@@ -785,7 +794,7 @@ Section store.
       (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -809,6 +818,7 @@ Section store.
       (get_transformed_data_addr base offset (Store Data) 4)
       = Some (Ext_DataAddr_OK (Virtaddr pa), rs) ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -819,11 +829,12 @@ Section store.
                 σ.(mdev)) ∗ R)) -∗
     swp (vmem_write base offset 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     iAssert (emp -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
              swp (get_transformed_data_addr base offset (Store Data) 4)
                (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ emp ∗
@@ -836,10 +847,10 @@ Section store.
       iIntros (r) "(-> & Hrw & Hro)". by iFrame. }
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_vmem_write_gen Drw Dro Df rs base offset pa v pmar0 pcfg
-                   R emp%I Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma
+                   R emp%I rr Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma
                    Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit
-                   with "Hcert Hrw Hro [//] Hgtaobl Hmem") ].
-    iIntros (r) "(-> & _ & Hrw & Hro & HR)". by iFrame.
+                   with "Hcert Hfrag Hrw Hro [//] Hgtaobl Hmem") ].
+    iIntros (r) "(-> & _ & Hrw & Hro & HR & Hfrag)". by iFrame.
   Qed.
 
   Lemma swp_execute_STORE (Drw Dro : gset register) (Df : register -> dfrac)
@@ -847,7 +858,7 @@ Section store.
       (rs2 rs1 : regidx) (d : SailStdpp.Values.mword 64)
       (pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -872,6 +883,7 @@ Section store.
       (get_transformed_data_addr rs1 (sign_extend' 64 imm) (Store Data) 4)
       = Some (Ext_DataAddr_OK (Virtaddr pa), rs) ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -884,11 +896,12 @@ Section store.
                 σ.(mdev)) ∗ R)) -∗
     swp (execute_STORE imm rs2 rs1 4)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hrx Hgta.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     unfold execute_STORE.
     cbn beta iota zeta delta [Defs.assert_exp'].
     rewrite /returnM mbind_ret. s_glue.
@@ -899,13 +912,14 @@ Section store.
     change (4 * 8 - 1) with 31.
     iApply (swp_bind_use _ _
               (fun r => (⌜r = Values.Ok true⌝ ∗
-                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I) _
-              with "[Hrw Hro Hmem] [-]").
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                         resv_frag cpu_id None)%I) _
+              with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_vmem_write Drw Dro Df rs rs1 (sign_extend' 64 imm) pa _
-                pmar0 pcfg R Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv
+                pmar0 pcfg R rr Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv
                 Hpma Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit
-                Hgta with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
+                Hgta with "Hcert Hfrag Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". s_glue.
     iApply swp_ret. by iFrame.
   Qed.
 

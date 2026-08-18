@@ -174,6 +174,8 @@ Section regnode.
     destruct (hregread_at_inv r m Hat) as (ak & K & -> & Hres).
     rewrite (HC _ (Interface.RegRead r ak) K eq_refl).
     iApply (wp_hart_step with "Hcert").
+    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+      cbv beta iota delta [mnode_step] in Hs. exact (proj2 (proj2 Hs)). }
     iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
@@ -209,6 +211,8 @@ Section regnode.
     destruct (hregwrite_val_at_inv r m v Hat) as (ak & K & -> & Hres).
     rewrite (HC _ (Interface.RegWrite r ak v) K eq_refl).
     iApply (wp_hart_step with "Hcert").
+    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+      cbv beta iota delta [mnode_step] in Hs. exact (proj2 (proj2 Hs)). }
     iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.

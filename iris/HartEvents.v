@@ -77,6 +77,10 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
+    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+      rewrite /mnode_step in Hs. cbn beta iota in Hs.
+      rewrite Hdev in Hs. cbn beta iota in Hs.
+      destruct Hs as [(_ & _ & _ & _ & _ & ->) | (Hex & _)]; [done|congruence]. }
     iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
     iModIntro. iExists (C (K (inl (w, None)))), σ, rv.
@@ -108,30 +112,33 @@ Section events.
   (* the self-loop arm the premise survives and Löb closes it.              *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_hart_ram_write {X : Type} (C : M X -> M unit)
-      (n : N) (req : Interface.WriteReq.t n) (m : M X) :
+      (n : N) (req : Interface.WriteReq.t n) (m : M X) (rr : option resv) :
     mctx C ->
     hwrite_req_at n m = Some req ->
     dev_addr (Interface.WriteReq.pa req) = false ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
               (MState σ.(sregs)
                  (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
                     (Interface.WriteReq.value req)) σ.(mdev)) ∗
-            WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang))) -∗
+            (resv_frag cpu_id None -∗
+             WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
-    (* Proof plan: via wp_hart_step; both directions are one arm with no
-       existentials. *)
-    iIntros (HC Hproj Hdev) "#Hcert H".
+    (* Proof plan: via wp_hart_step_resv; the write arm when the footprint is
+       free of other harts' reservations, the self-loop arm otherwise --
+       absorbed by Löb with the premise and the frag untouched. *)
+    iIntros (HC Hproj Hdev) "#Hcert Hfrag H".
     destruct (hwrite_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
     assert (Hg : C m = Interface.Next (Interface.MemWrite n req)
                          (fun v => C (K v)))
       by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
     rewrite Hg.
     iLöb as "IH".
-    iApply (wp_hart_step with "Hcert").
-    iIntros (σ oth rv) "Hσ".
+    iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    iIntros (σ oth) "_ Hσ".
     destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
       as [Hfree|Hblocked].
     - (* the write *)
@@ -148,12 +155,12 @@ Section events.
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(Hov & _) | (_ & -> & -> & ->)]; [done|].
-      iMod "Hk" as "[Hσ HWP]". iModIntro.
-      rewrite -Hres. by iFrame.
+      iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
+      iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag").
     - (* blocked by another hart's reservation: self-loop, premise intact *)
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
       iExists (Interface.Next (Interface.MemWrite n req) (fun v => C (K v))),
-        σ, rv.
+        σ, rr.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. left. done. }
@@ -162,7 +169,7 @@ Section events.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(_ & -> & -> & ->) | (Hfree & _)]; [|done].
       iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
-      iApply ("IH" with "H").
+      iIntros "Hfrag". iApply ("IH" with "Hfrag H").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -173,29 +180,33 @@ Section events.
   (* stale reservation as it waits -- which Löb absorbs.                   *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_hart_ram_read_excl {X : Type} (C : M X -> M unit)
-      (n : N) (req : Interface.ReadReq.t n) (m : M X) :
+      (n : N) (req : Interface.ReadReq.t n) (m : M X) (rr : option resv) :
     mctx C ->
     hread_req_at n m = Some req ->
     dev_addr (Interface.ReadReq.pa req) = false ->
     ak_excl (Interface.ReadReq.access_kind req) = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ w : bv (8 * n),
          ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
-              WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
-                  : expr riscv_lang))) -∗
+              (resv_frag cpu_id (Some (snap_of (Interface.ReadReq.pa req) n w)) -∗
+               WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
+                   : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
-    iIntros (HC Hproj Hdev Hexcl) "#Hcert H".
+    iIntros (HC Hproj Hdev Hexcl) "#Hcert Hfrag H".
     destruct (hread_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
     assert (Hg : C m = Interface.Next (Interface.MemRead n req)
                          (fun v => C (K v)))
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
-    iLöb as "IH".
-    iApply (wp_hart_step with "Hcert").
-    iIntros (σ oth rv) "Hσ".
+    (* the blocked arm RELEASES the stale reservation, so the IH is taken at
+       every frag value *)
+    iLöb as "IH" forall (rr).
+    iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    iIntros (σ oth) "_ Hσ".
     destruct (decide (footprint (Interface.ReadReq.pa req) n ## oth))
       as [Hfree|Hblocked].
     - (* the read, now reserving *)
@@ -217,9 +228,9 @@ Section events.
         pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
         pose proof (Hbytes' j Hj) as H1.
         rewrite H1 in H0. apply Some_inj in H0. exact H0. }
-      iMod "Hk" as "[Hσ HWP]". iModIntro.
-      rewrite -(Hres w). by iFrame.
-    - (* blocked: self-loop, premise intact *)
+      iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
+      iIntros "Hfrag". rewrite -(Hres w). iApply ("HWP" with "Hfrag").
+    - (* blocked: self-loop, own stale reservation dropped, premise intact *)
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
       iExists (Interface.Next (Interface.MemRead n req) (fun v => C (K v))),
         σ, None.
@@ -233,7 +244,7 @@ Section events.
       destruct Hstep as [(Hex & _) | (_ & [(_ & -> & -> & ->) | (Hfree & _)])];
         [congruence| |done].
       iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
-      iApply ("IH" with "H").
+      iIntros "Hfrag". iApply ("IH" with "Hfrag H").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -264,6 +275,10 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
+    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+      rewrite /mnode_step in Hs. cbn beta iota in Hs.
+      rewrite Hdev in Hs. cbn beta iota in Hs.
+      destruct Hs as (_ & _ & _ & _ & _ & ->). done. }
     iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as (w d') "[%Hdr Hk]".
     iModIntro. iExists (C (K (inl (w, None)))), (MState σ.(sregs) σ.(mem) d'), rv.
@@ -285,28 +300,31 @@ Section events.
   (* reservation -- invisible to the caller here.                         *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_hart_dev_write {X : Type} (C : M X -> M unit)
-      (n : N) (req : Interface.WriteReq.t n) (m : M X) :
+      (n : N) (req : Interface.WriteReq.t n) (m : M X) (rr : option resv) :
     mctx C ->
     hwrite_req_at n m = Some req ->
     dev_addr (Interface.WriteReq.pa req) = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ d' : dev_state,
          ⌜dev_write σ.(mdev) (Interface.WriteReq.pa req) n
             (Interface.WriteReq.value req) = Some d'⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗
-              WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang))) -∗
+              (resv_frag cpu_id None -∗
+               WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
-    (* Proof plan: as wp_hart_dev_read. *)
-    iIntros (HC Hproj Hdev) "#Hcert H".
+    (* Proof plan: as wp_hart_dev_read, in the frag form (an MMIO write is a
+       [MemWrite] event and clears the reservation). *)
+    iIntros (HC Hproj Hdev) "#Hcert Hfrag H".
     destruct (hwrite_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
     assert (Hg : C m = Interface.Next (Interface.MemWrite n req)
                          (fun v => C (K v)))
       by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
     rewrite Hg.
-    iApply (wp_hart_step with "Hcert").
-    iIntros (σ oth rv) "Hσ".
+    iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    iIntros (σ oth) "_ Hσ".
     iMod ("H" $! σ with "Hσ") as (d') "[%Hdw Hk]".
     iModIntro. iExists (C (K (inl None))), (MState σ.(sregs) σ.(mem) d'), None.
     iSplitR.
@@ -318,8 +336,8 @@ Section events.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as (d'' & Hdw' & -> & -> & ->).
     rewrite Hdw in Hdw'. injection Hdw' as <-.
-    iMod "Hk" as "[Hσ HWP]". iModIntro.
-    rewrite -Hres. by iFrame.
+    iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
+    iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -352,47 +370,51 @@ Section events.
   Qed.
 
   Lemma swp_hart_ram_read_excl {X : Type} (n : N) (req : Interface.ReadReq.t n)
-      (m : M X) (Φ : X -> iProp Σ) :
+      (m : M X) (Φ : X -> iProp Σ) (rr : option resv) :
     hread_req_at n m = Some req ->
     dev_addr (Interface.ReadReq.pa req) = false ->
     ak_excl (Interface.ReadReq.access_kind req) = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ w : bv (8 * n),
          ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp σ ∗
-              swp (hread_resume (bv_unsigned w) m) Φ)) -∗
+              (resv_frag cpu_id (Some (snap_of (Interface.ReadReq.pa req) n w)) -∗
+               swp (hread_resume (bv_unsigned w) m) Φ))) -∗
     swp m Φ.
   Proof.
-    iIntros (Hproj Hdev Hexcl) "#Hcert H".
+    iIntros (Hproj Hdev Hexcl) "#Hcert Hfrag H".
     rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (wp_hart_ram_read_excl C n req m HC Hproj Hdev Hexcl
-              with "Hcert [H Hcont]").
+    iApply (wp_hart_ram_read_excl C n req m rr HC Hproj Hdev Hexcl
+              with "Hcert Hfrag [H Hcont]").
     iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
     iModIntro. iExists w. iSplitR; [done|]. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
-    iApply (swp_use _ Φ C HC with "Hswp Hcont").
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
+    iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
   Qed.
 
   Lemma swp_hart_ram_write {X : Type} (n : N) (req : Interface.WriteReq.t n)
-      (m : M X) (Φ : X -> iProp Σ) :
+      (m : M X) (Φ : X -> iProp Σ) (rr : option resv) :
     hwrite_req_at n m = Some req ->
     dev_addr (Interface.WriteReq.pa req) = false ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp
               (MState σ.(sregs)
                  (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
                     (Interface.WriteReq.value req)) σ.(mdev)) ∗
-            swp (hwrite_resume m) Φ)) -∗
+            (resv_frag cpu_id None -∗ swp (hwrite_resume m) Φ))) -∗
     swp m Φ.
   Proof.
-    iIntros (Hproj Hdev) "#Hcert H".
+    iIntros (Hproj Hdev) "#Hcert Hfrag H".
     rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (wp_hart_ram_write C n req m HC Hproj Hdev with "Hcert [H Hcont]").
+    iApply (wp_hart_ram_write C n req m rr HC Hproj Hdev
+              with "Hcert Hfrag [H Hcont]").
     iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as "Hk". iModIntro. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
-    iApply (swp_use _ Φ C HC with "Hswp Hcont").
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
+    iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
   Qed.
 
   Lemma swp_hart_dev_read {X : Type} (n : N) (req : Interface.ReadReq.t n)
@@ -417,25 +439,27 @@ Section events.
   Qed.
 
   Lemma swp_hart_dev_write {X : Type} (n : N) (req : Interface.WriteReq.t n)
-      (m : M X) (Φ : X -> iProp Σ) :
+      (m : M X) (Φ : X -> iProp Σ) (rr : option resv) :
     hwrite_req_at n m = Some req ->
     dev_addr (Interface.WriteReq.pa req) = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ d' : dev_state,
          ⌜dev_write σ.(mdev) (Interface.WriteReq.pa req) n
             (Interface.WriteReq.value req) = Some d'⌝ ∗
          ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗
-              swp (hwrite_resume m) Φ)) -∗
+              (resv_frag cpu_id None -∗ swp (hwrite_resume m) Φ))) -∗
     swp m Φ.
   Proof.
-    iIntros (Hproj Hdev) "#Hcert H".
+    iIntros (Hproj Hdev) "#Hcert Hfrag H".
     rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (wp_hart_dev_write C n req m HC Hproj Hdev with "Hcert [H Hcont]").
+    iApply (wp_hart_dev_write C n req m rr HC Hproj Hdev
+              with "Hcert Hfrag [H Hcont]").
     iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as (d') "[%Hdw Hk]".
     iModIntro. iExists d'. iSplitR; [done|]. iNext.
-    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
-    iApply (swp_use _ Φ C HC with "Hswp Hcont").
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
+    iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
   Qed.
 
 End events.

@@ -149,6 +149,22 @@ Proof.
     injection Hnode as <- <-; destruct Hstep as (-> & -> & ->); by split_and!.
 Qed.
 
+(* a silent node never touches the hart's reservation -- the side condition
+   of the reservation-agnostic [wp_hart_step] *)
+Lemma hsil_node_pres (D : gset register) (rs rs' : regstate)
+    (m m' : M unit) :
+  hsil_node D rs m = Some (rs', m') ->
+  forall (oth : gset Arch.pa) (s : mstate) (r : option resv) (m2 : M unit)
+         (s2 : mstate) (r2 : option resv),
+    mnode_step oth s r m m2 s2 r2 -> r2 = r.
+Proof.
+  intros Hnode oth s r m2 s2 r2 Hstep.
+  destruct m as [y|T oc k]; [by simpl in Hnode|].
+  destruct oc; simpl in Hnode; try discriminate Hnode;
+    try (case_decide; [|discriminate Hnode]);
+    injection Hnode as <- <-; destruct Hstep as (_ & _ & ->); reflexivity.
+Qed.
+
 (* ====================================================================== *)
 (* 3. The cursor interface (the finding-F8 form): total functions, small    *)
 (*    projections, once-proven inversions.                                  *)
@@ -433,6 +449,8 @@ Section batch.
   Proof.
     iIntros (Hnode) "#Hcert Hrf H".
     iApply (wp_hart_step with "Hcert").
+    { intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 σ0 r0 m'0 σ'0 r'0 Hs). }
     iIntros (σ oth r) "Hσ". destruct σ as [rs0 mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs D rs0 with "Hri Hrf") as %Hag.

@@ -726,7 +726,7 @@ Section leaf.
       (rs : regstate) (pmar0 : list PMA_Region)
       (pcfg : type_of_register pmpcfg_n)
       (pa : SailStdpp.Values.mword 64) (d : SailStdpp.Values.mword 64)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
     (misa : register) ∈ Drw ∪ Dro ->
@@ -787,6 +787,7 @@ Section leaf.
               register_set (R_bitvector_64 nextPC)
                 (add_vec_int hp_pc 2) rs) ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -806,13 +807,14 @@ Section leaf.
                  hreg_frame (register_set (R_bitvector_64 nextPC)
                                (add_vec_int hp_pc 2) rs) Drw ∗
                  hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
-                                     (add_vec_int hp_pc 2) rs) Dro ∗ R).
+                                     (add_vec_int hp_pc 2) rs) Dro ∗ R ∗
+                 resv_frag cpu_id None).
   Proof.
     intros Hdisj HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC Hlpad Hunlock Hpallow
       Hram
       Hb0 Hb1 Hva Hpa Hmprv Hsram Hsva Hspa Hsplit Hrx Hgta.
-    iIntros "#Hcert Hrw Hro Hmem Hwmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem Hwmem".
     iApply (swp_run_hart_active_rvc Drw Dro Df rs
               (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2) rs)
               hp_pc hp_wf _ _ pmar0 pcfg 8 R Hdisj
@@ -822,18 +824,18 @@ Section leaf.
               hp_isRVC
               (hfrun_hval 100 (Drw ∪ Dro) Drw rs _ _ rs
                  (hfrun_decode_hp (Drw ∪ Dro) Drw rs HDmisa HmisaC))
-              Hlpad with "Hcert Hrw Hro Hmem [] [Hwmem]").
+              Hlpad with "Hcert Hrw Hro Hmem [] [Hwmem Hfrag]").
     - iIntros "Hrw Hro".
       iApply (swp_execute_C_SW Drw Dro Df _ _ _ _ Hdisj with "Hcert Hrw Hro").
     - iIntros "Hrw Hro".
       iApply (swp_execute_STORE Drw Dro Df
                 (register_set (R_bitvector_64 nextPC)
-                   (add_vec_int hp_pc 2) rs) _ _ _ d pa pmar0 pcfg R Hdisj
+                   (add_vec_int hp_pc 2) rs) _ _ _ d pa pmar0 pcfg R rr Hdisj
                 HDmst HDpriv HDpma HDcfg HDhtif
                 ltac:(t_peel; exact Hpriv) ltac:(t_peel; exact Hpma)
                 ltac:(t_peel; exact Hpcfg) ltac:(t_peel; exact Hhtif)
                 ltac:(t_peel; exact Hmprv) Hunlock Hpallow Hsram Hsva Hspa
-                Hsplit Hrx Hgta with "Hcert Hrw Hro Hwmem").
+                Hsplit Hrx Hgta with "Hcert Hfrag Hrw Hro Hwmem").
   Qed.
 
   (* ==================================================================== *)
@@ -845,7 +847,7 @@ Section leaf.
       (rs : regstate) (pmar0 : list PMA_Region)
       (pcfg : type_of_register pmpcfg_n)
       (pa : SailStdpp.Values.mword 64) (d : SailStdpp.Values.mword 64)
-      (R : iProp Σ) :
+      (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
     (misa : register) ∈ Drw ∪ Dro ->
@@ -947,6 +949,7 @@ Section leaf.
                       (register_lookup cur_privilege rs))
                    rs)) ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -963,26 +966,28 @@ Section leaf.
     swp (try_step 0 false)
       (fun _ => ∃ mi : SailStdpp.Values.mword 64,
                   hreg_frame (hp_post rs mi) Drw ∗
-                  hreg_frame_ro Df (hp_post rs mi) Dro ∗ R)%I.
+                  hreg_frame_ro Df (hp_post rs mi) Dro ∗ R ∗
+                  resv_frag cpu_id None)%I.
   Proof.
     intros Hdisj HDpriv HDmisa HDmst HDhart HDmc HDcfg HDmi HDmi'
       HDms HDms'
       HWpc HDpc HDnpc HDnpc' HDpma HDcfg2 HDhtif
       Hpriv Hhart Hpc Hpma Hpcfg Hhtif HmisaS HmisaC HmIE Hmprv Hlpad
       Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa Hsram Hsva Hspa Hsplit Hrx Hgta.
-    iIntros "#Hcert Hrw Hro Hmem Hwmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem Hwmem".
     iApply (swp_mono _ _ _ with "[] [-]").
     2:{ iApply (swp_try_step_gen Drw Dro Df rs
                   (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
-                     (wrap_pre rs)) R Hdisj HDpriv HDhart HDmc HDcfg
+                     (wrap_pre rs)) (R ∗ resv_frag cpu_id None)%I Hdisj HDpriv HDhart HDmc HDcfg
                   HDmi HDmi' HDms HDms' HWpc HDpc HDnpc'
                   Hhart
                   ltac:(t_peel; rewrite /wrap_pre; t_peel; exact Hhart)
                   ltac:(t_peel; rewrite /wrap_pre; apply register_lookup_set)
-                  with "Hcert Hrw Hro [Hmem Hwmem]").
+                  with "Hcert Hrw Hro [Hmem Hwmem Hfrag]").
         iIntros "Hrw Hro". iApply swp_step_ex.
-        iApply (swp_run_hart_active_hp Drw Dro Df (wrap_pre rs)
-                  pmar0 pcfg pa d R Hdisj
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_run_hart_active_hp Drw Dro Df (wrap_pre rs)
+                  pmar0 pcfg pa d R rr Hdisj
                   HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg2 HDhtif
                   ltac:(rewrite /wrap_pre; t_peel; exact Hpriv) ltac:(rewrite /wrap_pre; t_peel; exact Hpc)
                   ltac:(rewrite /wrap_pre; t_peel; exact Hpma) ltac:(rewrite /wrap_pre; t_peel; exact Hpcfg)
@@ -991,8 +996,9 @@ Section leaf.
                   ltac:(rewrite /wrap_pre; t_peel; exact HmisaC) Hlpad
                   Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
                   ltac:(rewrite /wrap_pre; t_peel; exact Hmprv) Hsram Hsva Hspa Hsplit Hrx Hgta
-                  with "Hcert Hrw Hro Hmem Hwmem"). }
-    iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HR)".
+                  with "Hcert Hfrag Hrw Hro Hmem Hwmem") ].
+        iIntros (st) "(-> & Hrw & Hro & HR & Hfrag)". by iFrame. }
+    iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HR & Hfrag)".
     iExists mi. rewrite wrap_post_hp. iFrame.
   Qed.
 
@@ -1113,6 +1119,7 @@ Section leaf.
       (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
       pma_allows_ram pmar0 ->
       gen_cert -∗
+      resv_frag cpu_id None -∗
       hreg_frame mlb_pre ml_Drw -∗
       hreg_frame_ro (ml_Df q) mlb_pre ml_Dro -∗
       ([∗ list] j ∈ seq 0 4, (pa_add hp_pc j) ↦ₓ□ nth_byte hp_wf j) -∗
@@ -1121,8 +1128,9 @@ Section leaf.
         (fun _ => ∃ mi : SailStdpp.Values.mword 64,
                     hreg_frame (hp_post mlb_pre mi) ml_Drw ∗
                     hreg_frame_ro (ml_Df q) (hp_post mlb_pre mi) ml_Dro ∗
-                    [∗ list] j ∈ seq 0 4,
-                      (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I.
+                    ([∗ list] j ∈ seq 0 4,
+                      (pa_add hp_flag j) ↦ₚ nth_byte hp_one j) ∗
+                    resv_frag cpu_id None)%I.
     Proof.
       intros HmS HmC HmIE Hmprv Help Hunlock Hpallow.
       assert (Hpriv : register_lookup cur_privilege mlb_pre = Machine)
@@ -1188,7 +1196,7 @@ Section leaf.
                     ml_in_x15 ml_in_mst ml_in_priv ml_in_sec
                     Hpriv2 Hmprv2 Hpmm2) as Hgta.
       rewrite Hx15 t_off in Hgta.
-      iIntros "#Hcert Hrw Hro #Htext Hflag".
+      iIntros "#Hcert Hfrag Hrw Hro #Htext Hflag".
       iApply (swp_try_step_hp ml_Drw ml_Dro (ml_Df q) mlb_pre pmar0
                 pcfg hp_flag (SailStdpp.Values.mword_of_int 1)
                 ([∗ list] j ∈ seq 0 4,
@@ -1198,9 +1206,10 @@ Section leaf.
                 ml_in_ms ml_w_PC ml_in_PC ml_w_nPC ml_in_nPC
                 ml_in_pma ml_in_pcfg ml_in_htif
                 Hpriv Hhart Hpc Hpma Hpcfg Hhtif HmisaS HmisaC HmIE' Hmprv'
+                None
                 Hlpad Hunlock Hpallow t_ram_pc t_b0 t_b1 t_va_pc t_pa_pc
                 t_ram_flag t_va_flag t_pa_flag t_split Hrx Hgta
-                with "Hcert Hrw Hro [] [Hflag]").
+                with "Hcert Hfrag Hrw Hro [] [Hflag]").
       - iApply ml_fetch_obl. iApply "Htext".
       - rewrite t_stored. iApply (ml_store_obl vold hp_one with "Hflag").
     Qed.
@@ -1230,6 +1239,7 @@ Section leaf.
       (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
       pma_allows_ram pmar0 ->
       gen_cert -∗
+      resv_any cpu_id -∗
       hreg_frame mlb_pre ml_Drw -∗
       hreg_frame_ro (ml_Df q) mlb_pre ml_Dro -∗
       ([∗ list] j ∈ seq 0 4, (pa_add hp_pc j) ↦ₓ□ nth_byte hp_wf j) -∗
@@ -1238,31 +1248,33 @@ Section leaf.
            hreg_frame (mlb_post ms1 cy1 ti1 ip1) ml_Drw -∗
            hreg_frame_ro (ml_Df q) (mlb_post ms1 cy1 ti1 ip1) ml_Dro -∗
            ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte hp_one j) -∗
+           resv_any cpu_id -∗
            WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
     Proof.
       intros HmS HmC HmIE Hmprv Help Hunlock Hpallow.
-      iIntros "#Hcert Hrw Hro #Htext Hflag Hcont".
+      iIntros "#Hcert Hfrag Hrw Hro #Htext Hflag Hcont".
       iApply (wp_loop_cycle ml_Drw ml_Dro (ml_Df q)
                 (fun rs1 => exists mi, rs1 = hp_post mlb_pre mi)
-                ([∗ list] j ∈ seq 0 4,
-                   (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I
+                (([∗ list] j ∈ seq 0 4,
+                   (pa_add hp_flag j) ↦ₚ nth_byte hp_one j) ∗
+                 resv_frag cpu_id None)%I
                 ml_disj ml_w_cy ml_w_ti ml_w_ip
-                with "Hcert [Hrw Hro Hflag] [Hcont]").
-      - iNext.
+                with "Hcert Hfrag [Hrw Hro Hflag] [Hcont]").
+      - iNext. iIntros "Hfrag".
         iApply (swp_mono _ _ _ with "[] [-]").
         2:{ iApply (mlb_body vold HmS HmC HmIE Hmprv Help Hunlock Hpallow
-                      with "Hcert Hrw Hro Htext Hflag"). }
-        iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & Hnew)".
+                      with "Hcert Hfrag Hrw Hro Htext Hflag"). }
+        iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & Hnew & Hfrag)".
         iExists (hp_post mlb_pre mi). iFrame. iPureIntro. by exists mi.
-      - iNext. iIntros (rs2 Hex) "Hrw Hro Hnew".
+      - iNext. iIntros (rs2 Hex) "Hrw Hro [Hnew Hfrag]".
         destruct Hex as (rs1 & (mi & ->) & Hag).
         pose proof (mlb_agree mi rs2 Hag) as Hag2.
         iApply ("Hcont" $! mi
                   (register_lookup (R_bitvector_64 mcycle) rs2)
                   (register_lookup (R_bitvector_64 mtime) rs2)
                   (register_lookup (R_bitvector_64 mip) rs2)
-                  with "[Hrw] [Hro] [Hnew]").
+                  with "[Hrw] [Hro] [Hnew] [Hfrag]").
         + iApply (hreg_frame_ext rs2 _ ml_Drw
                     (reg_agree_mono _ ml_Drw _ _ (union_subseteq_l _ _) Hag2)
                    with "Hrw").
@@ -1270,6 +1282,7 @@ Section leaf.
                     (reg_agree_mono _ ml_Dro _ _ (union_subseteq_r _ _) Hag2)
                    with "Hro").
         + iExact "Hnew".
+        + iApply (resv_any_intro with "Hfrag").
     Qed.
 
   End word.

@@ -380,27 +380,142 @@ Section WPExec.
     exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
   Qed.
 
+  (* THE FRAG FORM: for the arms that CHANGE the hart's reservation (every
+     RAM/MMIO write, the exclusive read, the [Ret] boundary).  The caller
+     brings the hart's [resv_frag] at [rr]; the callback runs at exactly
+     [r := rr] (agreement with the auth), learns that a [Some] reservation's
+     snapshot still IS memory ([resv_ok], the fact the conditional write
+     lives on), and gets the frag back at whatever the arm set. *)
+  Lemma wp_hart_step_resv (m : M unit) (rr : option resv) :
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    (∀ σ oth, ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
+       mstate_interp σ ={⊤,∅}=∗
+       ∃ m0 σ0 r0, ⌜mnode_step oth σ rr m m0 σ0 r0⌝ ∗
+          ▷ (∀ m' σ' r', ⌜mnode_step oth σ rr m m' σ' r'⌝ ={∅,⊤}=∗
+               mstate_interp σ' ∗
+               (resv_frag cpu_id r' -∗
+                WP (HartE gen_id cpu_id m' : expr riscv_lang)))) -∗
+    WP (HartE gen_id cpu_id m : expr riscv_lang).
+  Proof.
+    iIntros "#(Hborn & Hstarted & Hrege) Hfrag H".
+    iApply wp_lift_step; first done.
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
+    { (* DEAD -- the birth bound rules out the unborn side *)
+      assert (Hlt : gen_id < g.(ggen)) by lia.
+      iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hlb".
+      iDestruct (mono_nat_lb_own_le (n := g.(ggen)) (S gen_id) with "Hlb")
+        as "#Hdead"; [lia|].
+      assert (Hnl : ~ thread_live g gen_id) by (intros [_ Hgg]; lia).
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro. exists [], (HartE gen_id cpu_id m), g, [].
+        by apply prim_step_hart_dead. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
+        as (-> & -> & [(Hlive & _) | (_ & -> & ->)]); [by exfalso|].
+      iIntros "_". iMod "Hback" as "_". iModIntro.
+      iFrame "Hgauth Hsauth Htie".
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL; [|done].
+      iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
+    destruct (g.(gpow)) eqn:Hpw; last first.
+    { (* CURRENT BUT POWERED OFF: impossible -- generation [gen_id]'s
+         PowerOn has happened ([gen_started]), but the started count reads
+         [ggen + 0 = gen_id]. *)
+      exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia. }
+    assert (Hlive : thread_live g gen_id) by (split; congruence).
+    (* LIVE.  Tie the ambient era to the existential via the registry. *)
+    iDestruct "Hera" as (E) "(%HRE & Hera)".
+    iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
+    assert (E = riscv_eraGS) as ->.
+    { rewrite Heq in HRE. congruence. }
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
+    iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+    iDestruct (resv_frag_agree _ cpu_id rr with "Hresv Hfrag") as %Hrr.
+    iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
+    iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
+            (others_resv g.(gresv) cpu_id)
+            with "[] [Hri Hmem Hdev]") as (m0 σ0 r0) "(%Hwit & Hk)".
+    { iPureIntro. intros rv Hrv. apply (Hrok cpu_id). by rewrite Hrr. }
+    { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
+    rewrite -Hrr in Hwit.
+    iModIntro. iSplitR.
+    { iPureIntro.
+      exists [], (HartE gen_id cpu_id m0),
+             (GState (<[cpu_id := σ0.(sregs)]> g.(gregs)) σ0.(mem) σ0.(mdev)
+                g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))), [].
+      left. exists gen_id, cpu_id, m. split_and!; try reflexivity.
+      left. split; [exact Hlive|]. by exists m0, σ0, r0. }
+    iIntros (e2 g2 efs Hstep) "!>".
+    destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
+      as (-> & -> & [(_ & (m2 & σ2 & r2 & Hnode & -> & ->)) | (Hnl & _)]);
+      last by exfalso.
+    (* the hart moved no disk byte: the durable conjunct is FRAMED, at the
+       post-state's own image ([RiscvLang.mnode_step_v_disk]) *)
+    pose proof (mnode_step_v_disk _ _ _ _ _ _ _ Hnode) as Hvd.
+    assert (Hdview2 : disk_view dmap (v_disk (dvirtio (mdev σ2))))
+      by (rewrite Hvd; exact Hdview).
+    assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (mdev σ2)))
+      by (symmetry; exact Hvd).
+    rewrite Hrr in Hnode.
+    iMod ("Hk" $! m2 σ2 r2 with "[//]") as "[(Hri' & Hmem' & Hdev') HWP]".
+    iDestruct ("Hclose" with "Hri'") as "Hgr'".
+    iMod (resv_frag_update g.(gresv) cpu_id rr r2 with "Hresv Hfrag")
+      as "[Hresv Hfrag]".
+    iDestruct ("HWP" with "Hfrag") as "HWP".
+    iIntros "_ !>".
+    iEval (rewrite /fs_tie_interp Hvd2) in "Htie".
+    rewrite /state_interp /power_interp /fs_tie_interp
+      /era_interp /disk_dur_interp /disk_img_auth /=.
+    iFrame "Hgauth Hsauth Htie HWP".
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
+    iSplitL "Hdauth".
+    { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2. }
+    (* the mirror was moved to the post-state's map by the frag update;
+       [resv_ok] comes from the language's own step invariant *)
+    iFrame "Hresv". iPureIntro.
+    exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
+  Qed.
+
+
+
   (* THE BOUNDARY RULE, derived: at [Loop] the only node is the restart, so
      the caller owes nothing about σ at all and simply picks up the WP of a
      fresh cycle -- at BOTH ticks, since the tick is chosen by the machine.
      This is where the old rule's ∀-over-[tick] now lives; the [tick_clock]
      tail is then ordinary register nodes of the same cycle, not a second
      successor state the caller has to name. *)
-  Lemma wp_hart_restart :
+  (* The boundary is where a DANGLING reservation is dropped (§3a), so this
+     is a frag-form rule: the hart's [resv_frag] comes in at whatever the
+     last instruction left and goes out at [None] for the next cycle. *)
+  Lemma wp_hart_restart (rr : option resv) :
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     ▷ (∀ tick : bool,
+         resv_frag cpu_id None -∗
          WP (HartE gen_id cpu_id (riscv_step tick) : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcert H". rewrite /LoopE.
-    iApply (wp_hart_step with "Hcert").
-    iIntros (σ oth r) "Hsi".
+    iIntros "#Hcert Hfrag H". rewrite /LoopE.
+    iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
+    iIntros (σ oth) "_ Hsi".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
     iExists (riscv_step false), σ, None.
     iSplitR; [iPureIntro; by exists false|].
     iNext. iIntros (m' σ' r') "%Hn".
     destruct Hn as (tick & -> & -> & ->).
-    iMod "Hback" as "_". iModIntro. iFrame "Hsi". iApply "H".
+    iMod "Hback" as "_". iModIntro. iFrame "Hsi". iIntros "Hfrag".
+    iApply ("H" with "Hfrag").
   Qed.
 
 End WPExec.
@@ -459,7 +574,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
@@ -489,7 +604,12 @@ Section WPDev.
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
     iFrame "Hgr' Hmem' Hdev'".
-    iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2.
+    iSplitL "Hdauth".
+    { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2. }
+    (* the reservation mirror: a device step never touches [gresv], so the
+       auth is framed; [resv_ok] is the language's step invariant *)
+    iFrame "Hresv". iPureIntro.
+    exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
   Qed.
 
   (* THE ONE RULE THAT HANDS THE IMAGE CONJUNCT OVER (crash.md): a DMA
@@ -551,7 +671,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) (start_count g)
             with "[] [$Hgr $Hmem $Hdev Hdauth Htie Hsauth]") as "Hk".
@@ -580,7 +700,12 @@ Section WPDev.
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
     iFrame "Hgr' Hmem' Hdev'".
-    iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdview'.
+    iSplitL "Hdauth'".
+    { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdview'. }
+    (* the reservation mirror: a device step never touches [gresv], so the
+       auth is framed; [resv_ok] is the language's step invariant *)
+    iFrame "Hresv". iPureIntro.
+    exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
   Qed.
 
   Lemma wp_plic_step :
@@ -622,7 +747,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
@@ -649,7 +774,12 @@ Section WPDev.
     rewrite Hpw. iExists riscv_eraGS.
     iSplitR; [iPureIntro; exact HRE|].
     iFrame "Hgr' Hmem' Hdev'".
-    iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview.
+    iSplitL "Hdauth".
+    { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+    (* the reservation mirror: a device step never touches [gresv], so the
+       auth is framed; [resv_ok] is the language's step invariant *)
+    iFrame "Hresv". iPureIntro.
+    exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok).
   Qed.
 
 End WPDev.

@@ -345,9 +345,14 @@ Section stepany.
            (register_lookup cur_privilege rs1)) ->
     reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
     gen_cert -∗
+    (* the reservation mirror (design §3a): in at whatever the last
+       instruction left, handed to the body at [None]; the body returns it
+       inside [Psi] if the caller wants it back *)
+    resv_any cpu_id -∗
     hreg_frame rs1 Drw -∗
     hreg_frame_ro Df rs1 Dro -∗
-    (hreg_frame rsA Drw -∗ hreg_frame_ro Df rsA Dro -∗
+    (resv_frag cpu_id None -∗
+     hreg_frame rsA Drw -∗ hreg_frame_ro Df rsA Dro -∗
        swp (run_hart_active 0)
          (fun st => ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
             match st with
@@ -370,27 +375,27 @@ Section stepany.
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
       HWpc HDpc HDnpc Hhart HQhart HQmi Hpre.
-    iIntros "#Hcert Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
     iApply (wp_loop_cycle Drw Dro Df
               (fun rsx => exists (rs2 : regstate)
                             (mi : SailStdpp.Values.mword 64),
                  Q rs2 /\ rsx = wrap_post rs2 mi)
-              Psi Hdisj HWcy HWti HWip with "Hcert [Hrw Hro Hbody] [Hcont]").
+              Psi Hdisj HWcy HWti HWip with "Hcert Hfrag [Hrw Hro Hbody] [Hcont]").
     2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
         destruct Hag as (rsP & (rs2 & mi & HQ & ->) & Hag).
         iApply ("Hcont" with "[%] Hrw Hro HPsi").
         exists rs2, mi. split; [exact HQ | exact Hag]. }
-    iNext.
+    iNext. iIntros "Hfrag".
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_any Drw Dro Df rs1 Q Psi Hdisj HDpriv
                    HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
-                   Hhart HQhart HQmi with "Hcert Hrw Hro [Hbody]") ].
+                   Hhart HQhart HQmi with "Hcert Hrw Hro [Hbody Hfrag]") ].
     { iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HPsi)".
       iExists _. iSplitR; [iPureIntro; by exists rs2, mi|]. iFrame. }
     iIntros "Hrw Hro".
     rewrite (hreg_frame_ext _ rsA Drw (reg_agree_l _ _ _ _ Hpre)).
     rewrite (hreg_frame_ro_ext Df _ rsA Dro (reg_agree_r _ _ _ _ Hpre)).
-    iApply ("Hbody" with "Hrw Hro").
+    iApply ("Hbody" with "Hfrag Hrw Hro").
   Qed.
 
 End stepany.

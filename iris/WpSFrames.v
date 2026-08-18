@@ -441,6 +441,7 @@ Section sframes.
        register_lookup (R_bool minstret_increment) rs2
        = minstret_inc_flag mc micfg Supervisor) ->
     gen_cert -∗
+    resv_any cpu_id -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
       s_Drw -∗
@@ -448,7 +449,8 @@ Section sframes.
       (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
          mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
     (* the body, at the prelude's file, offering BOTH arms *)
-    (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+    (resv_frag cpu_id None -∗
+     hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
                    cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
                    pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
      hreg_frame_ro Df
@@ -477,7 +479,7 @@ Section sframes.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi.
-    iIntros "#Hcert Hrw Hro Hbody Hcont".
+    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
     iApply (swp_exec_step_any s_Drw s_Dro Df
               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
@@ -491,7 +493,7 @@ Section sframes.
                     by rewrite s_rs_mc s_rs_micfg s_rs_priv)
               (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
-              with "Hcert Hrw Hro Hbody Hcont").
+              with "Hcert Hfrag Hrw Hro Hbody Hcont").
   Qed.
 
 

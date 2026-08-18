@@ -453,6 +453,9 @@ Section span.
       by (destruct oc; try reflexivity; discriminate Hns).
     rewrite (HC _ oc k Hoc).
     iApply (wp_hart_step with "Hcert").
+    { (* a span node is a register or silent node: it keeps the reservation *)
+      intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
+      destruct oc; try discriminate Hns; destruct Hs as (_ & _ & ->); reflexivity. }
     iIntros (σ oth rv) "Hσ". destruct σ as [rsM mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs Drw rsM with "Hri Hrf") as %HagW.

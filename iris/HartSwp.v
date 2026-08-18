@@ -294,14 +294,16 @@ Section swp.
      the whole-cycle rule of the pre-port semantics, restated over the
      per-node language.  The ∀-over-[tick] is the machine's choice, which
      is why it is here and not inside a leaf. *)
-  Lemma swp_loop :
+  Lemma swp_loop (rr : option resv) :
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     ▷ (∀ tick : bool,
+         resv_frag cpu_id None -∗
          swp (riscv_step tick) (fun _ => WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcert H". iApply (wp_hart_restart with "Hcert").
-    iNext. iIntros (tick). iApply swp_wp_loop. iApply "H".
+    iIntros "#Hcert Hfrag H". iApply (wp_hart_restart rr with "Hcert Hfrag").
+    iNext. iIntros (tick) "Hfrag". iApply swp_wp_loop. iApply ("H" with "Hfrag").
   Qed.
 
   (* ---- modalities: [swp] is closed under everything WP is ---- *)

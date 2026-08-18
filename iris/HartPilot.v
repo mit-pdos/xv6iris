@@ -319,7 +319,7 @@ Section pilot.
       (x0 x1 x2 x3 : hcur)
       (nf : N) (reqf : Interface.ReadReq.t nf) (wf : bv (8 * nf))
       (nw : N) (reqw : Interface.WriteReq.t nw) (vold : bv (8 * nw))
-      (dqf : dfrac) :
+      (dqf : dfrac) (rr : option resv) :
     x1 = hsil n1 D x0 ->
     x2 = hsil n2 D (hcur_read (bv_unsigned wf) x1) ->
     x3 = hsil n3 D (hcur_write x2) ->
@@ -330,6 +330,7 @@ Section pilot.
     dev_addr (Interface.WriteReq.pa reqw) = false ->
     hnode_tag x3.2 = 0%nat ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame x0.1 D -∗
     ([∗ list] j ∈ seq 0 (N.to_nat nf),
        (pa_add (Interface.ReadReq.pa reqf) j) ↦ₚ{dqf} nth_byte wf j) -∗
@@ -339,11 +340,12 @@ Section pilot.
        ([∗ list] j ∈ seq 0 (N.to_nat nw),
           (pa_add (Interface.WriteReq.pa reqw) j) ↦ₚ
             nth_byte (Interface.WriteReq.value reqw) j) -∗
+       resv_frag cpu_id None -∗
        WP (LoopE gen_id cpu_id : expr riscv_lang)) -∗
     WP (HartE gen_id cpu_id x0.2 : expr riscv_lang).
   Proof.
     iIntros (Hx1 Hx2 Hx3 Hreqf Hdevf Hexf Hreqw Hdevw Htag)
-      "#Hcert Hrf Hfetch Hold Hcont".
+      "#Hcert Hfrag Hrf Hfetch Hold Hcont".
     (* stretch 1 *)
     iApply (wp_hart_batch D n1 x0 with "Hcert Hrf").
     rewrite -Hx1. iIntros "Hrf".
@@ -364,8 +366,8 @@ Section pilot.
               with "Hcert Hrf").
     rewrite -Hx2. iIntros "Hrf".
     (* the store *)
-    iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 mctx_id
-              Hreqw Hdevw with "Hcert").
+    iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 rr mctx_id
+              Hreqw Hdevw with "Hcert Hfrag").
     iIntros (σ') "Hσ". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
@@ -375,13 +377,14 @@ Section pilot.
       as "[Hmem Hnew]".
     iModIntro.
     iSplitL "Hri Hmem Hdev"; [by iFrame|].
+    iIntros "Hfrag".
     (* stretch 3 *)
     iApply (wp_hart_batch D n3 (hcur_write x2) with "Hcert Hrf").
     rewrite -Hx3. iIntros "Hrf".
     (* the boundary *)
     destruct (hnode_tag_ret _ Htag) as [[] Hret].
     rewrite Hret /LoopE.
-    iApply ("Hcont" with "Hrf Hnew").
+    iApply ("Hcont" with "Hrf Hnew Hfrag").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -389,14 +392,16 @@ Section pilot.
   (*     [reflexivity] in the definitions' own spelling; the projection  *)
   (*     facts are §5's VM-checked lemmas.  Nothing here computes.        *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_pilot_started_store (dqf : dfrac) (vold : bv 32) :
+  Lemma wp_pilot_started_store (dqf : dfrac) (vold : bv 32) (rr : option resv) :
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame hp_rs0 hp_D -∗
     ([∗ list] j ∈ seq 0 4,
        (pa_add (Interface.ReadReq.pa hp_reqf) j) ↦ₚ{dqf} nth_byte hp_wf j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte vold j) -∗
     ▷ (hreg_frame hp_x3.1 hp_D -∗
        ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte hp_one j) -∗
+       resv_frag cpu_id None -∗
        WP (LoopE gen_id cpu_id : expr riscv_lang)) -∗
     WP (HartE gen_id cpu_id (riscv_step false) : expr riscv_lang).
   Proof.
@@ -404,12 +409,12 @@ Section pilot.
     have Hx2 : hp_x2 = hsil 600 hp_D (hcur_read (bv_unsigned hp_wf) hp_x1)
       by reflexivity.
     have Hx3 : hp_x3 = hsil 400 hp_D (hcur_write hp_x2) by reflexivity.
-    iIntros "#Hcert Hrf Hfetch Hold Hcont".
+    iIntros "#Hcert Hfrag Hrf Hfetch Hold Hcont".
     iApply (wp_hart_rw_seq hp_D 400 600 400 hp_x0 hp_x1 hp_x2 hp_x3
-              4 hp_reqf hp_wf 4 hp_reqw vold dqf
+              4 hp_reqf hp_wf 4 hp_reqw vold dqf rr
               Hx1 Hx2 Hx3 hp_fetch_req hp_fetch_ram hp_fetch_plain
               hp_store_req hp_store_ram hp_tail_ret
-              with "Hcert Hrf Hfetch [Hold] [Hcont]").
+              with "Hcert Hfrag Hrf Hfetch [Hold] [Hcont]").
     - rewrite hp_store_pa. iExact "Hold".
     - rewrite hp_store_pa hp_store_val. iExact "Hcont".
   Qed.
