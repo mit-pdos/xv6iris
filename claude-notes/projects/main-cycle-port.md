@@ -13,6 +13,11 @@ Branch `hart-node-port` (off `main`).  The port replaces the whole-instruction
 hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
+**2026-08-18 DECISION: the FUSED AMO/write-back arm is RETIRED in favour of a
+per-hart RESERVATION in σ (design §3a).**  The next piece of work is
+implementing it (item 1 under "What is left, in order" in the S-mode fetch
+section); the two-footprint-walker item it replaces is closed.
+
 **BOTH WRAPPERS ARE DONE AND THE CSR FAMILIES ARE GREEN.**  No admits anywhere;
 `wp_instr` closes at exactly the 5 rv64d platform axioms.  The sweep has needed
 **zero leaf statement changes** (18 verified byte-identical against the
@@ -419,71 +424,57 @@ an A/D variant: PPN and G are stable") and `tlb_set_pte_uwe` are all there
 precisely for this, and the two write-back arms are already named and proved
 in both the miss and hit paths.
 
-#### AND THE WRITE-BACK IS ONE FUSED STEP
+#### THE WRITE-BACK IS AN EXCLUSIVE READ, A SILENT STRETCH, AND A CONDITIONAL WRITE — THREE ORDINARY NODES
 
-`RiscvLang`'s MemRead arm guards the plain RAM read with `ak_excl = false` and
-hands every exclusive read to the FUSED arm: on this machine an LR/SC pair is
-ONE step.  So the write-back is not "an exclusive read node then a conditional
-write node" -- `HartAmo.wp_hart_amo` (proved) takes the exclusive read, `k`
-footprinted silent steps, and the conditional write they land on, which is
-exactly `update_and_write_pte`'s shape.  The other half of the same design:
-a STANDALONE conditional write is unguarded on purpose and takes the ordinary
-store arm (`RiscvLang.wr_node`'s comment), which is why
-`swp_checked_mem_write_pte8_con` is sound on its own.
+**DECIDED (2026-08-18): the fused arm is RETIRED; design §3a is the
+replacement.**  The exclusive read becomes an ordinary RAM read that also
+records `(pa, n, snapshot)` in the hart's `gresv` slot; the window between
+it and `write_pte_conditional` is an ordinary silent stretch under `swp` —
+the SAME `hsil`/`hfrun` walker as everywhere else, with the read-only
+registers held at a fraction exactly as the swp layer already holds them;
+the conditional write is an ordinary RAM write node whose rule additionally
+consumes `resv_frag c (Some (pa,n,snap))` + `resv_ok` to learn the word is
+still `snap`.  Nothing here needs a two-footprint window walker any more.
+`swp_checked_mem_write_pte8_con` stays sound: with no matching reservation
+a conditional write is a plain store, as before.
 
 #### What is left, in order
 
-1. **`wp_hart_amo` / `swp_hart_amo` MUST MOVE TO THE TWO-FOOTPRINT WALKER.**
-   Found while writing the write-back twin's statement, and it has to be
-   settled before that lemma can even be stated.
+1. **THE RESERVATION (design §3a) — implement it; this REPLACES the
+   "move `wp_hart_amo` to the two-footprint walker" item.**  What that item
+   had built (`hsil_node2`/`hrun_silent2`/`hsil2` over `M X`, the `hsil2`
+   stepping API, `hsil2_hspan`, `hsil2_mctx`, `hrun_silent2_agree`) is
+   general two-footprint walker machinery and may still be useful to the
+   swp layer, but it is NO LONGER on this path; `hreg_frame_update_run2`
+   is NOT needed.  In order:
 
-   The fused rule names its window with `hsil` -- ONE footprint `D`, used for
-   both reads and writes -- and correspondingly demands `hreg_frame rs D`,
-   i.e. FULL ownership of every register the window touches.  But the
-   write-back's window reads `misa`, `menvcfg`, `pmpcfg_n`, `pmpaddr_n`,
-   `pma_regions`, `htif_tohost_base` -- all of which the swp layer holds
-   READ-ONLY at a fraction, in `hreg_frame_ro Df rs Dro`.  So the rule as
-   stated cannot be applied from the swp layer at all.
-
-   Two facts make the fix cheap rather than deep:
-
-   - **The window writes NO register.**  `update_and_write_pte`'s body is
-     `read_pte_exclusive` → `check_leaf_pte` → `update_PTE_Bits` →
-     `write_pte_conditional`, and none of them writes one (the TLB write is
-     LATER, outside the window).  So the split is needed only to let the
-     read-only half be held at a fraction, not to police writes.
-   - **`HartLift2` ALREADY HAS THE TWO-FOOTPRINT WALKER**: `hrun_silent2` /
-     `hsil2` / `hsil2D`, indexed by `Drw` and `Dro` exactly as the swp frames
-     are.  So this is a re-indexing of the fused rule onto an existing
-     walker, not a new one -- and the `hsil` stepping API and `hsil_mctx`
-     commutation just built will need their `hsil2` counterparts, which are
-     the same proofs.
-
-   **Progress**: the walker side is DONE (`92479b0d`, `015d7ea6`) --
-   `hsil_node2`/`hrun_silent2`/`hsil2` generalized to `M X` (free: no users
-   outside their file), the `hsil2` stepping API, `hsil2_hspan`,
-   `hsil2_mctx`, and `hrun_silent2_agree`.  What is left is
-   `hreg_frame_update_run2` and then restating the two rules.
-
-   **The one trap in `hreg_frame_update_run2`, met and recorded rather than
-   solved**: it cannot be obtained from `hreg_frame_update_run` by renaming.
-   That proof closes its per-node cases with a single `first [...]` whose
-   branches assume the SAME footprint decides the read and the write; under
-   `hsil_node2` they differ (`r ∈ Drw ∪ Dro` for a read, `r ∈ Drw` for a
-   write), so the RegRead and RegWrite branches need separate `case_decide`
-   handling.  The statement is otherwise a clean mirror, and the read-only
-   frame does not appear in it at all -- `hsil_node2` writes only in `Drw`,
-   so `hreg_frame_ro` is needed only at the CALL SITE, to supply the
-   `Drw ∪ Dro` agreement.
-
-   Only then does the write-back twin become statable.  Its shape (following
-   `exec_translate_TLB_hit_pt_upd`'s `Hu` assert, which inlines the same
-   region): cached word, memory word and updated word as BINDERS pinned by
-   premises; the caller supplies only
-   `∀ mm, gen_heap_interp mm ={⊤,∅}=∗ ⌜read_bytes mm pteaddr 8 = Some m0⌝ ∗
-   ▷ (|={∅,⊤}=> gen_heap_interp (write_bytes mm pteaddr 8 m0') ∗ R)`,
-   and the twin discharges the window, `dev_addr`, `ak_excl` and
-   `hsil_opaque` facts itself.
+   a. `RiscvLang.v`: `gstate` gains `gresv : CPU → option resv`
+      (`resv = pa × n × snapshot`); `mstate` gains the focused hart's slot
+      plus the other harts' reservations read-only; `mnode_step` arms per
+      §3a (exclusive read: self-loop-if-other-overlap else read+record;
+      plain store: self-loop-if-other-overlap else write+clear own;
+      conditional write: needs own matching reservation, write+clear;
+      boundary clears; the plain-read `ak_excl` guard, `silent1`,
+      `silent_run`, `wr_node` and the fused arm are DELETED); the disk DMA
+      write step gets the same overlap guard.  Prove the step invariant
+      `resv_ok` (reserved bytes = snapshot) is preserved by `prim_step`.
+   b. State interp: per-hart `resv_frag c` (ghost cell, the `mm_Drw`
+      pattern) + the pure `resv_ok σ` conjunct; adequacy allocates every
+      hart's frag at `None`.
+   c. Rules: `HartEvents` RAM read/write rules re-proved by Löb over the
+      self-loop arm (statements UNCHANGED); new `swp` rules for the
+      exclusive read (plain read + frag `None → Some`) and the conditional
+      write (plain write + frag `Some → None` + `resv_ok` ⇒ old value =
+      snapshot); the plain-store rule's own-clear is a frag update the
+      caller sees only if it holds `Some` — for the common `None` case the
+      rule is literally today's.  Boundary rule (`wp_hart_restart` /
+      the cycle wrapper) resets the frag to `None`.
+   d. Delete `HartAmo.v`'s fused rule and pure window layer; re-derive
+      the acquire (`amoswap.w.aq`) as: exclusive-read rule opening the lock
+      invariant read-only, ordinary window, conditional-write rule doing
+      the one logical atomic access.
+   e. Then the write-back twin below is just the conditional-write rule at
+      `(Store PageTableEntry)`/`Supervisor`/8 through the `kptN` seam.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
@@ -785,8 +776,9 @@ The language and the bracket:
 
 - `iris/RiscvLang.v` — `HartE gen cpu m`; `LoopE` a Definition;
   `mnode_step` (hart-local, on `mstate`) + `hart_node_step`
-  (focus / step / write-back); the fused-AMO window
-  (`silent1`/`silent_run`/`wr_node`, `ak_excl`); per-arm `prim_step`
+  (focus / step / write-back); `ak_excl`; **still carries the RETIRED
+  fused-AMO window** (`silent1`/`silent_run`/`wr_node`) until §3a's
+  reservation lands ("Left, in order" / the write-back item); per-arm `prim_step`
   inversion; `prim_step_hart_regs_frame` — the batching licence: plic's
   `sig_seip` wire is the only cross-thread register write.
 - `iris/HartBlock.v` — the solo-block bracket, sound direction
@@ -823,9 +815,10 @@ The proof interface (design §5 items 1, 1c, 6, 7):
 - `iris/HartRegNode.v` — single-node RegRead/RegWrite (the escape hatch
   for invariant-held cells and the `sig_seip` wire), likewise both forms,
   plus the `hregread_resume_red`/`hregwrite_resume_red` equations.
-- `iris/HartAmo.v` — the fused-AMO rule (`∃ w` inside the fupd, window
-  data a function of `w`) and the pure window layer.  Still WP-shaped:
-  there is no `swp` for the exclusive read alone, by design.
+- `iris/HartAmo.v` — the fused-AMO rule and its pure window layer.
+  **RETIRED by design §3a**; to be deleted when the reservation lands
+  (the exclusive read and conditional write become ordinary `swp`
+  memory-event rules).
 - `iris/HartLift.v` / `iris/HartLift2.v` — the older cursor batch and the
   two-footprint functional batch.  **Superseded by `hfrun`**; `HartLift`'s
   projections (`hread_req_at`, `hread_resume`, `hreg_frame`, …) are still

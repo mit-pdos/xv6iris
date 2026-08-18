@@ -66,25 +66,19 @@ invent semantics):
   logic stays inside the monad where the model put it.
 - **device `MemRead`/`MemWrite`** (`dev_addr`): against `gdev` via
   `dev_read`/`dev_write`, as `run` does.
-- **the AMO window (MANDATORY: keep it FUSED).**  An exclusive
-  (`ak_latest = true`) RAM read steps together with its in-window silent
-  nodes and the paired conditional write as ONE step (transcribe the
-  window-walking: a `silent_run`-style rtc over register/choice nodes to
-  the conditional-write node).  This is what keeps a lock acquire a
-  single invariant access in the logic; the weak branch's
-  `WeakSailLTS.silent1`/`wr_node` and `WeakEvLang`'s fused arm are the
-  pattern.  Guard the plain-read arm with `ak_latest = false`, or the
-  two arms overlap and no atomic acquire rule is statable (spike finding
-  F6).  VERIFIED ON MAIN'S MODEL AND IMAGE, so the guard costs nothing:
-  the kernel ELF contains exactly ONE atomic (`acquire`'s `amoswap.w.aq`)
-  and NO `lr`/`sc` at all, so no bare exclusive read is ever executed; the
-  model's `read_ram`/`write_ram` give BOTH halves of an AMO
-  `AV_exclusive` (`Read_RISCV_reserved{,_acquire}` /
-  `Write_RISCV_conditional{,_release}`), so one `ak_excl` predicate keys
-  both; and `execute_AMO`'s window between the read and the write is
-  register reads plus pure arithmetic — no `cancel_reservation` (that is
-  in `execute_SC` and `reset_sys` only), so the silent walker needs no
-  opaque-effect arm.
+- **exclusive accesses: a per-hart RESERVATION in σ, never a fused
+  step.**  See §3a below for the whole design.  In one line: an exclusive
+  RAM read (`ak_excl = true`) is an ordinary read that ALSO records
+  `(pa, n, bytes-read)` in `gresv cpu`; while that reservation stands,
+  every OTHER thread's overlapping RAM write and overlapping exclusive
+  read SELF-LOOPS; the hart's next `MemWrite` (conditional or plain) and
+  the cycle boundary clear it.  Atomicity of an RMW is mutual exclusion on
+  the reserved bytes, the window's silent nodes are ORDINARY steps taking
+  the ordinary rules, and no rule or invariant outside the two exclusive
+  arms changes.  (History: the port first FUSED read+window+write into one
+  step, transcribed from the weak branch's `WeakSailLTS.silent1`/`wr_node`.
+  That was wrong for this project and is retired — §3a records why, so it
+  is not re-proposed.)
 - **`Barrier`/announce/`Choose`/`GetCycleCount`/…**: silent, as `run`
   treats them (at SC, fences are semantically inert; if `run` models
   fence.tso in two phases, carry the parked half as an extra `HartE`
@@ -110,6 +104,131 @@ Sail monad value, syntactically known and monotonically consumed —
 expressions are for exactly this, and WP-of-an-instruction becomes proof
 by syntactic descent.
 
+### 3a. Exclusive accesses: the reservation design (SETTLED — do not re-fuse)
+
+**What the model emits (verified on `model-xv6iris/rv64d.v`; re-verify the
+line anchors after a model regeneration).**  Exactly three sites issue
+`AV_exclusive` events (`AV_atomic_rmw` is never emitted; `read_ram`/
+`write_ram` map `Read_RISCV_reserved{,_acquire}` / `Write_RISCV_conditional
+{,_release}` to `AK_explicit … AV_exclusive`, and the `_strong_` variants
+to `AK_arch … AV_exclusive`, so one `ak_excl` predicate keys every one):
+
+| site | shape | can the read be left WITHOUT its write? |
+|---|---|---|
+| `execute_AMO` (~41898) | `translateAddr` → `mem_write_ea` (no event) → exclusive `mem_read` → window: `rX rs2` (+ `rX rd` for AMOCAS), mstatus/priv/PMP register reads → `mem_write_value (con=true)` | YES: AMOCAS with `loaded ≠ rd` writes `rd` and issues no store (U-mode AMOCAS is supported, `crash.md`). |
+| `update_and_write_pte` (~24965), from BOTH `translate_TLB_hit` and `translate_TLB_miss` | `read_pte_exclusive` → `check_leaf_pte` (register reads only) → `update_PTE_Bits` on the RE-READ word → `write_pte_conditional` | YES, two ways: `check_leaf_pte` returns `Err`, or `update_PTE_Bits (re-read) = None` (someone set A/D between the walk's plain read and the exclusive re-read). `Ok false` → `internal_error` (stuck, by the model's own choice). |
+| `execute_LOADRES`/`STORECON` | reservation via the AXIOMS `load_reservation`/`match_reservation`/`cancel_reservation` (opaque `M` terms) | out of scope: the kernel has no `lr`/`sc`, and the tree cannot even be stepped through those axioms. Nothing here supports or forbids it. |
+
+Consequences the design must survive: ONE cycle can contain up to THREE
+exclusive reads (fetch-walk PTE, data-walk PTE, the AMO's own), the earlier
+ones may dangle (a walk that finds A/D already set on re-read, then an
+AMO), and the addresses coincide only in the pathological self-mapping
+case — the semantics must still not be WRONG there.
+
+**Why fusion was wrong here.**  A dangling exclusive read has no fused
+witness (`silent1` has no memory arm, so it never MIS-fuses — it is
+STUCK).  Adequacy is `NotStuck` (`RiscvAdequacy.v`: every reachable
+configuration is reducible), so "stuck is fine" only where unreachable,
+and the A/D re-read race and the AMOCAS-mismatch path are reachable in
+principle — they were excluded only by exclusive-ownership arguments
+(per-process page table runs on one CPU; kernel PTEs A/D-preset).  Worse
+for the proofs, fusion made the window's silent nodes a SEPARATE
+reasoning principle (the footprinted `hsil`/`hsil2` walkers, the ∀-`w`
+uniform-window premises of `wp_hart_amo`, the one-vs-two-footprint
+re-indexing) instead of the ordinary node rules.
+
+**The design.**
+
+σ: `gstate` gains `gresv : CPU → option resv`, with `resv := (pa, n,
+snap)` where `snap` is the bytes read (a `gmap Arch.pa (bv 8)` over the
+footprint, or `bv (8*n)` — pick whichever `read_bytes`/`write_bytes`
+already speak).  `mstate` gains the same slot for the focused hart, PLUS
+the read-only view of the OTHER harts' reservations that the guards below
+need (`hart_node_step` supplies it from `gresv` when it focuses; the
+device arms read `gresv` directly).  Initial/reset: all `None`.
+
+`mnode_step` arms (only these change; every other arm is untouched):
+
+- **RAM `MemRead`, `ak_excl = true`**: if any OTHER hart holds a
+  reservation overlapping `[pa, pa+n)` → SELF-LOOP (`m' = m`, `s' = s`);
+  else the ordinary read of `w` AND `gresv cpu := Some (pa, n, bytes of
+  w)` — unconditionally overwriting the hart's own stale reservation, so
+  the atomic region begins at the LAST exclusive read (a dangling PTE read
+  is simply superseded by the AMO's read).
+- **RAM `MemRead`, `ak_excl = false`**: unchanged, and NEVER blocked by
+  anyone's reservation (a reader linearizes before the RMW; the reserving
+  hart's stretch is register-only, so nothing observes the difference).
+  The old `ak_excl = false` GUARD on this arm goes away with the fused
+  arm — the two arms no longer overlap because they are keyed on the
+  access kind alone.
+- **RAM `MemWrite`, `ak_excl = true` (the conditional write)**: requires
+  `gresv cpu = Some (pa, n, _)` on the SAME footprint → ordinary write,
+  `gresv cpu := None`.  With no matching reservation, keep the current
+  fallback (a standalone conditional write is a plain store); it does not
+  occur in the model.
+- **RAM `MemWrite`, `ak_excl = false` (plain store)**: if any OTHER hart
+  holds an overlapping reservation → SELF-LOOP; else the ordinary write,
+  and `gresv cpu := None` (EVERY `MemWrite` event of a hart clears its own
+  reservation, atomic or not — decided, keeps a reservation from outliving
+  the silent stretch it protects, and makes `resv_ok` below trivial for
+  the hart's own stores).
+- **device `MemRead`/`MemWrite`**: unchanged (never blocked, never
+  reserved; `dev_addr` and RAM are disjoint).
+- **boundary `Ret tt`**: `gresv cpu := None` — the per-cycle garbage
+  collection; a dangling reservation never crosses an instruction.
+- **device threads' RAM writes** (the disk's DMA burst into RAM): the same
+  overlapping-reservation SELF-LOOP guard as a hart's plain store.  Device
+  RAM reads: unblocked.
+
+**Why the self-loop costs nobody anything (this was the objection that was
+raised and refuted — recorded so it is not raised again).**  Which arm a
+plain store / exclusive read takes is decided by σ alone, and a node rule
+proved with `wp_lift_step` sees σ BEFORE running the caller's premise.  So
+the generic store rule is proved once by Löb: if σ carries a conflicting
+reservation, the only step is the self-loop → hand `state_interp σ` back
+unchanged and conclude from the IH with the caller's premise untouched;
+otherwise the only step is the real write → run the caller's fupd exactly
+as before.  The rule STATEMENT (`x ↦ v ∗ (x ↦ v' -∗ WP k) ⊢ WP store`)
+does not change, and neither does any invariant, points-to, or device
+rule.  Same for the exclusive read's self-loop.
+
+**The one thing the logic needs, and why.**  At the conditional write the
+RMW hart opens its invariant, sees `x ↦ v'`, and must know `v' = w` (the
+value it read) — an acquire cannot take `R` without knowing the write is
+0→1.  Physically true (all writers were blocked), but no invariant carries
+it across interference.  Hence the snapshot and:
+
+- **a per-hart ghost mirror `resv_frag c (gresv c)`** in `state_interp`,
+  exactly the pattern of the per-hart register cells (`mm_Drw`): the cycle
+  wrapper owns it holding `None` at every boundary; the exclusive-read,
+  conditional-write, plain-store (own-clear) and boundary rules update it;
+  nothing else touches it.  A cycle proof knows syntactically where its
+  exclusive reads are, so it always knows the frag's value.
+- **one pure conjunct in `state_interp`**:
+  `resv_ok σ := ∀ c pa n snap, gresv σ c = Some (pa,n,snap) →
+  read_bytes (gmem σ) pa n = snap`.  It is a step invariant of the
+  language, and only the memory-writing arms re-establish it: a hart's or
+  device's plain store fires only when no OTHER hart reserves the
+  footprint and clears the hart's own; the exclusive read writes the true
+  snapshot; the conditional write clears.  The conditional-write rule then
+  gets `v' = w` from `resv_frag c (Some (x,n,w))` + `resv_ok` + `x ↦ v'`.
+
+**What this buys / retires.**  The window's silent nodes are ordinary
+steps taking the ordinary rules; `hsil`/`hsil2`, `hreg_frame_update_run2`,
+the fused `wp_hart_amo`/`swp_hart_amo`, `silent1`/`silent_run`/`wr_node`
+and the plain-read `ak_excl` guard all go.  New: an exclusive-read rule
+(the plain-read rule plus the frag update) and a conditional-write rule
+(the plain-write rule plus frag + `resv_ok`).  `acquire` opens the lock
+invariant read-only at the read and does its ONE logical atomic access at
+the write.  The A/D write-back's two outcomes (`PtTreeAdue` `_upd` /
+`_refresh`) are the conditional write happening or the window taking the
+no-write branch — neither is stuck any more; AMOCAS-mismatch and every
+dangling read are plain reads whose reservation is superseded or
+GC'd.  Semantic delta vs. hardware: a competitor's write is DELAYED past
+the silent stretch rather than interleaved into it — linearizable at SC,
+and strictly fewer interleavings are dropped than the fused arm dropped
+(the whole window) or the old whole-`run` machine dropped.
+
 ## 4. The semantic delta — state it honestly in the PR
 
 Mid-instruction interleaving becomes REAL: another hart's (or device's)
@@ -126,7 +245,8 @@ branch):
 1. any proof that opens an invariant across a whole instruction to LINK
    two accesses (candidates: the page-walker's read-then-A/D-update —
    the `CommonWalk` technique — and the interrupt-absorbing step
-   engines).  The fused-AMO arm keeps lock acquires safe; anything else
+   engines).  The reservation (§3a) keeps lock acquires safe — the
+   conditional write is the one logical atomic access; anything else
    must move to a ghost protocol.  Enumerate and report before the leaf
    sweep.
 1b. the two VALUE-AGNOSTIC register invariants are safe, and that is not an
@@ -273,8 +393,10 @@ proof interface is:
    opening the invariant — and each of those is a bind boundary in the
    model's source, so the chop needs no special support.
 2. **Per-memory-event rules**: one WP rule each for RAM read, RAM write,
-   the fused AMO, device read/write — these are where the real reasoning
-   (points-to, invariants) happens, exactly as in today's leaves.
+   the exclusive read and the conditional write (§3a: plain read/write plus
+   the `resv_frag` update, the latter also consuming `resv_ok`), device
+   read/write — these are where the real reasoning (points-to, invariants)
+   happens, exactly as in today's leaves.
 3. **A pinned-text fetch rule** (spike finding F7, MANDATORY): the fetch
    is an ordinary RAM read node, so without a special rule every
    instruction pays one general memory-event rule for its own fetch.
@@ -351,9 +473,9 @@ proof interface is:
    provers (below) → **`swp`** → leaves (compose by `swp_bind` along the
    model's own structure).
 
-   WHAT `swp` DOES NOT FIX: the fused AMO (read + window + paired write are
-   one atomic event by design, so there is no `swp` for the exclusive read
-   alone).
+   The exclusive read and the conditional write are ordinary memory-event
+   nodes under `swp` (§3a) — the window between them is an ordinary silent
+   stretch, so no separate walker exists for it.
 
 7. **THE TWO ROUTES INTO `swp`, AND THE ONE PURE PREDICATE THEY SHARE.**
    Everything enters through `swp_span`, whose pure premise is
@@ -532,12 +654,11 @@ of the development, and **971 files sit behind it** (`RiscvExec` 1054,
   `MinstretInv.v`.
   The bracket is proven in the SOUND direction only (block ⇒ run), which is
   the unconditional one and the one the adapter consumes.  The converse is
-  NOT unconditionally true — the language fuses the AMO and guards the plain
-  read with `ak_excl = false`, so a `run` containing a bare exclusive read
-  has no block — and its honest witness is the reflective stepper's own
-  functional interpreter (Phase B), where "the fused window was found" is a
-  computation rather than a hypothesis.  Do not try to state it with a
-  shape predicate.
+  NOT unconditionally true — a `run` whose exclusive read or plain store
+  lands on another hart's reservation has a self-looping prefix, not a
+  block (§3a) — and its honest witness is the reflective stepper's own
+  functional interpreter (Phase B).  Do not try to state it with a shape
+  predicate.
 - **Phase B — the proof-interface kit** (§5 items 1–5b), and it is on the
   CRITICAL PATH, not an optimization: nothing above `MinstretInv.v` compiles
   until the adapter exists.  Land it against ONE pilot leaf and ONE small
