@@ -153,6 +153,7 @@ CodeKvmmap.v
 InstrBytes.v
 WpInstrRun.v
 WpInstr.v
+WpInstrMip.v
 WpInstrConfig.v
 KernelText.v
 StackOwn.v
