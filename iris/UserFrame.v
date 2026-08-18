@@ -480,3 +480,284 @@ Section UGprFrame.
   Qed.
 
 End UGprFrame.
+
+(* ===================================================================== *)
+(* 5. THE READ-ONLY FRAME'S FRACTIONS.                                    *)
+(*                                                                       *)
+(* [hreg_frame_ro] is dfrac-GENERIC per cell because the user tier's      *)
+(* read-only half genuinely mixes three owners:                           *)
+(*   [user_cfg]'s four writable-by-the-kernel cells at the config         *)
+(*   fraction [dqc] ([UserExec.uc_dqc]); the cells nothing ever writes    *)
+(*   again, held [box] by [user_cfg] / [hw_config] / [minstret_res]; and  *)
+(*   [utlb_inv_pt]'s satp / pmp cells, which the hart owns outright.      *)
+(* [HartSFrame.s_Df] is the same construction one mode over.              *)
+(* ===================================================================== *)
+
+Definition u_Df (dqc : dfrac) (r : register) : dfrac :=
+  match r with
+  (* [user_cfg]'s split cells: the kernel keeps the complementary share *)
+  | R_bitvector_64 stvec | R_bitvector_64 mie | R_bitvector_64 mideleg
+  | R_bitvector_64 menvcfg => dqc
+  (* frozen after M-mode boot -- [user_cfg] / [hw_config] / [minstret_res] *)
+  | R_bitvector_64 medeleg | R_bitvector_64 mstateen0
+  | R_bitvector_64 senvcfg | R_bitvector_64 misa | R_bitvector_64 mseccfg
+  | R_bitvector_64 minstretcfg => DfracDiscarded
+  | R_bitvector_32 sstateen0 | R_bitvector_32 mcountinhibit => DfracDiscarded
+  | R_bitvector_1 elp => DfracDiscarded
+  | R_list_PMA_Region pma_regions => DfracDiscarded
+  | R_option_bitvector_64 htif_tohost_base => DfracDiscarded
+  (* satp / pmpcfg_n / pmpaddr_n, owned outright inside [utlb_inv_pt] *)
+  | _ => DfracOwn 1
+  end.
+
+Lemma u_Df_stvec dq : u_Df dq stvec = dq.
+Proof. reflexivity. Qed.
+Lemma u_Df_mie dq : u_Df dq mie = dq.
+Proof. reflexivity. Qed.
+Lemma u_Df_mdl dq : u_Df dq mideleg = dq.
+Proof. reflexivity. Qed.
+Lemma u_Df_menv dq : u_Df dq menvcfg = dq.
+Proof. reflexivity. Qed.
+Lemma u_Df_medl dq : u_Df dq medeleg = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_mste dq : u_Df dq mstateen0 = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_sste dq : u_Df dq (R_bitvector_32 sstateen0) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_senv dq : u_Df dq senvcfg = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_misa dq : u_Df dq misa = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_sec dq : u_Df dq mseccfg = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_micfg dq : u_Df dq (R_bitvector_64 minstretcfg) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_mc dq : u_Df dq (R_bitvector_32 mcountinhibit) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_elp dq : u_Df dq (R_bitvector_1 elp) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_pma dq : u_Df dq pma_regions = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_htif dq : u_Df dq htif_tohost_base = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma u_Df_satp dq : u_Df dq satp = DfracOwn 1.
+Proof. reflexivity. Qed.
+Lemma u_Df_pcfg dq : u_Df dq pmpcfg_n = DfracOwn 1.
+Proof. reflexivity. Qed.
+Lemma u_Df_paddr dq : u_Df dq pmpaddr_n = DfracOwn 1.
+Proof. reflexivity. Qed.
+
+(* ===================================================================== *)
+(* 6. THE PINS: what the reference file [rs] holds, cell by cell.          *)
+(*                                                                       *)
+(* Split by OWNER, so a consumer supplies exactly the group it is         *)
+(* unpacking and no lemma takes thirty arguments it does not use.         *)
+(* ===================================================================== *)
+
+(* [UserExec.user_regs]: the per-step mutable cells and the GPR file *)
+Definition u_pins_regs (rs : regstate) (hs : HartState)
+    (ms sc stv sep va va' : mword 64) (g : regfile) : Prop :=
+  register_lookup hart_state rs = hs /\
+  register_lookup cur_privilege rs = User /\
+  register_lookup (R_bitvector_64 mstatus) rs = ms /\
+  register_lookup (R_bitvector_64 scause) rs = sc /\
+  register_lookup (R_bitvector_64 stval) rs = stv /\
+  register_lookup (R_bitvector_64 sepc) rs = sep /\
+  register_lookup (R_bitvector_64 PC) rs = va /\
+  register_lookup (R_bitvector_64 nextPC) rs = va' /\
+  u_gpr_agree g rs.
+
+(* [MinstretInv.minstret_res] + [clock_res]: the three riders [pc_is] adds.
+   Their values are EXISTENTIAL per step -- the tick writes them -- which is
+   exactly why they are pinned HERE and nowhere else. *)
+Definition u_pins_tick (rs : regstate) (mst : mword 64) (mi : bool)
+    (mc : mword 32) (micfg cy ti ip : mword 64) : Prop :=
+  register_lookup (R_bitvector_64 minstret) rs = mst /\
+  register_lookup (R_bool minstret_increment) rs = mi /\
+  register_lookup (R_bitvector_32 mcountinhibit) rs = mc /\
+  register_lookup (R_bitvector_64 minstretcfg) rs = micfg /\
+  register_lookup (R_bitvector_64 mcycle) rs = cy /\
+  register_lookup (R_bitvector_64 mtime) rs = ti /\
+  register_lookup (R_bitvector_64 mip) rs = ip.
+
+(* [UserExec.user_cfg] *)
+Definition u_pins_cfg (rs : regstate)
+    (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32) : Prop :=
+  register_lookup (R_bitvector_64 stvec) rs = stvecv /\
+  register_lookup (R_bitvector_64 mie) rs = miev /\
+  register_lookup (R_bitvector_64 mideleg) rs = mdlv /\
+  register_lookup (R_bitvector_64 medeleg) rs = medv /\
+  register_lookup (R_bitvector_64 menvcfg) rs = menvv /\
+  register_lookup (R_bitvector_64 mstateen0) rs = mstenv /\
+  register_lookup (R_bitvector_32 sstateen0) rs = sstenv.
+
+(* [RiscvFetchExec.hw_config] *)
+Definition u_pins_hw (rs : regstate) (misav mseccfgv senvv : mword 64)
+    (pmar : list PMA_Region) (htifv : type_of_register htif_tohost_base)
+    (elpv : mword 1) : Prop :=
+  register_lookup (R_bitvector_64 misa) rs = misav /\
+  register_lookup (R_bitvector_64 mseccfg) rs = mseccfgv /\
+  register_lookup (R_bitvector_64 senvcfg) rs = senvv /\
+  register_lookup pma_regions rs = pmar /\
+  register_lookup htif_tohost_base rs = htifv /\
+  register_lookup (R_bitvector_1 elp) rs = elpv.
+
+(* [UptTree.utlb_inv_pt] (satp, tlb) and the [SmodePte.pmp_config] inside it *)
+Definition u_pins_pt (rs : regstate) (satpv : mword 64)
+    (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+    (tlbv : type_of_register tlb) : Prop :=
+  register_lookup (R_bitvector_64 satp) rs = satpv /\
+  register_lookup pmpcfg_n rs = pcfg /\
+  register_lookup pmpaddr_n rs = paddr /\
+  register_lookup tlb rs = tlbv.
+
+(* ===================================================================== *)
+(* 7. THE FRAMES, IN AND OUT.                                             *)
+(*                                                                       *)
+(* [InstrBytes.mm_frames_intro]/[_elim] (M-mode) and                      *)
+(* [WpSFrames.s_frames_intro]/[_elim] (S-mode) are the twins.  This pair  *)
+(* is stated over the RAW CELLS rather than over [UserExec.user_regs] /   *)
+(* [user_cfg] / [utlb_inv_pt] / [hw_config], on purpose: [UserExec.v] is  *)
+(* red across the port and belongs to the tier package (P7), so wiring    *)
+(* the bundles to these two lemmas is ONE [iDestruct] per bundle at the   *)
+(* one place that owns them.  Everything structural -- the two            *)
+(* [big_sepS_list_to_set] splits, the 31-way GPR bridge, the per-cell     *)
+(* fractions -- is paid here, once.                                       *)
+(*                                                                       *)
+(* [senvcfg] is listed with [hw_config]'s cells and not with              *)
+(* [user_cfg]'s, though both hold it: it is [box] in both, hence freely   *)
+(* duplicable, so one copy discharges the frame and the other survives.   *)
+(* ===================================================================== *)
+
+Section UFrames.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma u_frames_intro (rs : regstate) (dqc : dfrac) (hs : HartState)
+      (ms sc stv sep va va' : mword 64) (g : regfile)
+      (mst : mword 64) (mi : bool) (mc : mword 32) (micfg cy ti ip : mword 64)
+      (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32)
+      (misav mseccfgv senvv : mword 64) (pmar : list PMA_Region)
+      (htifv : type_of_register htif_tohost_base) (elpv : mword 1)
+      (satpv : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    u_pins_regs rs hs ms sc stv sep va va' g ->
+    u_pins_tick rs mst mi mc micfg cy ti ip ->
+    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv ->
+    u_pins_hw rs misav mseccfgv senvv pmar htifv elpv ->
+    u_pins_pt rs satpv pcfg paddr tlbv ->
+    (* [user_regs] *)
+    hart_state ↦ᵣ hs -∗ cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms -∗
+    scause ↦ᵣ sc -∗ stval ↦ᵣ stv -∗ sepc ↦ᵣ sep -∗
+    PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗ gpr_file g -∗
+    (* [minstret_res] and [clock_res], unpacked *)
+    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi -∗
+    (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc -∗
+    (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg -∗
+    mcycle ↦ᵣ cy -∗ mtime ↦ᵣ ti -∗ mip ↦ᵣ ip -∗
+    (* [user_cfg] *)
+    stvec ↦ᵣ{dqc} stvecv -∗ mie ↦ᵣ{dqc} miev -∗ mideleg ↦ᵣ{dqc} mdlv -∗
+    medeleg ↦ᵣ□ medv -∗ menvcfg ↦ᵣ{dqc} menvv -∗
+    mstateen0 ↦ᵣ□ mstenv -∗ (R_bitvector_32 sstateen0) ↦ᵣ□ sstenv -∗
+    (* [hw_config] *)
+    misa ↦ᵣ□ misav -∗ mseccfg ↦ᵣ□ mseccfgv -∗ pma_regions ↦ᵣ□ pmar -∗
+    htif_tohost_base ↦ᵣ□ htifv -∗ (R_bitvector_1 elp) ↦ᵣ□ elpv -∗
+    senvcfg ↦ᵣ□ senvv -∗
+    (* [utlb_inv_pt] and its [pmp_config] *)
+    satp ↦ᵣ satpv -∗ tlb ↦ᵣ tlbv -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    hreg_frame rs u_Drw ∗ hreg_frame_ro (u_Df dqc) rs u_Dro.
+  Proof.
+    intros (Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & Hpc & Hnpc & Hgag)
+           (Hmst & Hmi & Hmc & Hmicfg & Hcy & Hti & Hip)
+           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste)
+           (Hmisa & Hsec & Hsenv & Hpma & Hhtif & Help)
+           (Hsatp & Hpcfg & Hpaddr & Htlb).
+    iIntros "Hhs Hpriv Hmstatus Hscause Hstval Hsepc HPC HnPC Hgpr".
+    iIntros "Hminstret Hmincr #Hmcnt #Hmicfg Hmcycle Hmtime Hmip".
+    iIntros "Hstvec Hmie Hmdl #Hmedl Hmenv #Hmste #Hsste".
+    iIntros "#Hmisa #Hmseccfg #Hpma #Hhtif #Help #Hsenv".
+    iIntros "Hsatp Htlb Hpcfg Hpaddr".
+    iSplitR "Hstvec Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr".
+    - rewrite /hreg_frame /u_Drw (big_sepS_list_to_set _ _ u_rw_nodup).
+      rewrite /u_rw_list big_sepL_app.
+      iSplitR "Hgpr".
+      + rewrite /u_rw_named /=.
+        rewrite Hhs Hpriv Hms Hsc Hstv Hsep Hpc Hnpc Hmst Hmi Hcy Hti Hip Htlb.
+        iFrame.
+      + rewrite <- (u_gpr_frame_list rs).
+        iApply (u_gpr_file_frame g rs Hgag with "Hgpr").
+    - rewrite /hreg_frame_ro /u_Dro (big_sepS_list_to_set _ _ u_ro_nodup).
+      rewrite /u_ro_list /=.
+      rewrite Hmisa Hsec Hpma Hhtif Help Hsenv Hmc Hmicfg Hstvec Hmie Hmdl
+              Hmedl Hmenv Hmste Hsste Hsatp Hpcfg Hpaddr.
+      iFrame "Hstvec Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr".
+      by iFrame "Hmisa Hmseccfg Hpma Hhtif Help Hsenv Hmcnt Hmicfg Hmedl
+                 Hmste Hsste".
+  Qed.
+
+  (* ...and back.  The file may be a DIFFERENT one ([rs'] -- a cycle writes
+     PC, the trap CSRs, the GPRs and possibly the TLB), so every value is a
+     fresh parameter and the pins are re-supplied at [rs'].  The GPR file
+     that comes back is [u_regfile rs'], which IS the caller's own file
+     whenever it agrees with [rs'] ([u_gpr_file_eq]). *)
+  Lemma u_frames_elim (rs : regstate) (dqc : dfrac) (hs : HartState)
+      (ms sc stv sep va va' : mword 64)
+      (mst : mword 64) (mi : bool) (mc : mword 32) (micfg cy ti ip : mword 64)
+      (stvecv miev mdlv medv menvv mstenv : mword 64) (sstenv : mword 32)
+      (misav mseccfgv senvv : mword 64) (pmar : list PMA_Region)
+      (htifv : type_of_register htif_tohost_base) (elpv : mword 1)
+      (satpv : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    u_pins_regs rs hs ms sc stv sep va va' (u_regfile rs) ->
+    u_pins_tick rs mst mi mc micfg cy ti ip ->
+    u_pins_cfg rs stvecv miev mdlv medv menvv mstenv sstenv ->
+    u_pins_hw rs misav mseccfgv senvv pmar htifv elpv ->
+    u_pins_pt rs satpv pcfg paddr tlbv ->
+    hreg_frame rs u_Drw -∗ hreg_frame_ro (u_Df dqc) rs u_Dro -∗
+    (hart_state ↦ᵣ hs ∗ cur_privilege ↦ᵣ User ∗ mstatus ↦ᵣ ms ∗
+     scause ↦ᵣ sc ∗ stval ↦ᵣ stv ∗ sepc ↦ᵣ sep ∗
+     PC ↦ᵣ va ∗ nextPC ↦ᵣ va' ∗ gpr_file (u_regfile rs) ∗
+     minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi ∗
+     (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc ∗
+     (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg ∗
+     mcycle ↦ᵣ cy ∗ mtime ↦ᵣ ti ∗ mip ↦ᵣ ip ∗
+     stvec ↦ᵣ{dqc} stvecv ∗ mie ↦ᵣ{dqc} miev ∗ mideleg ↦ᵣ{dqc} mdlv ∗
+     medeleg ↦ᵣ□ medv ∗ menvcfg ↦ᵣ{dqc} menvv ∗
+     mstateen0 ↦ᵣ□ mstenv ∗ (R_bitvector_32 sstateen0) ↦ᵣ□ sstenv ∗
+     misa ↦ᵣ□ misav ∗ mseccfg ↦ᵣ□ mseccfgv ∗ pma_regions ↦ᵣ□ pmar ∗
+     htif_tohost_base ↦ᵣ□ htifv ∗ (R_bitvector_1 elp) ↦ᵣ□ elpv ∗
+     senvcfg ↦ᵣ□ senvv ∗
+     satp ↦ᵣ satpv ∗ tlb ↦ᵣ tlbv ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr).
+  Proof.
+    intros (Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & Hpc & Hnpc & _)
+           (Hmst & Hmi & Hmc & Hmicfg & Hcy & Hti & Hip)
+           (Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hmste & Hsste)
+           (Hmisa & Hsec & Hsenv & Hpma & Hhtif & Help)
+           (Hsatp & Hpcfg & Hpaddr & Htlb).
+    iIntros "Hrw Hro".
+    rewrite /hreg_frame /u_Drw (big_sepS_list_to_set _ _ u_rw_nodup).
+    rewrite /u_rw_list big_sepL_app.
+    iDestruct "Hrw" as "[Hn Hg]".
+    rewrite /u_rw_named /=.
+    rewrite Hhs Hpriv Hms Hsc Hstv Hsep Hpc Hnpc Hmst Hmi Hcy Hti Hip Htlb.
+    iDestruct "Hn" as "(HPC & HnPC & Hhs & Hpriv & Hmstatus & Hscause &
+                        Hstval & Hsepc & Hminstret & Hmincr & Hmcycle &
+                        Hmtime & Hmip & Htlbc & _)".
+    iAssert (hreg_frame rs u_Dgpr) with "[Hg]" as "Hgf".
+    { rewrite u_gpr_frame_list. iExact "Hg". }
+    iDestruct (u_frame_gpr_file rs with "Hgf") as "Hgpr".
+    rewrite /hreg_frame_ro /u_Dro (big_sepS_list_to_set _ _ u_ro_nodup).
+    rewrite /u_ro_list /=.
+    rewrite Hmisa Hsec Hpma Hhtif Help Hsenv Hmc Hmicfg Hstvec Hmie Hmdl
+            Hmedl Hmenv Hmste Hsste Hsatp Hpcfg Hpaddr.
+    iDestruct "Hro" as "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv &
+                         #Hmcnt & #Hmicfg & Hstvec & Hmie & Hmdl & #Hmedl &
+                         Hmenv & #Hmste & #Hsste & Hsatp & Hpcfg & Hpaddr & _)".
+    iFrame "HPC HnPC Hhs Hpriv Hmstatus Hscause Hstval Hsepc Hgpr Hminstret
+            Hmincr Hmcycle Hmtime Hmip Hstvec Hmie Hmdl Hmenv Hsatp Htlbc
+            Hpcfg Hpaddr".
+    by iFrame "Hmcnt Hmicfg Hmedl Hmste Hsste Hmisa Hmseccfg Hpma Hhtif Help
+               Hsenv".
+  Qed.
+
+End UFrames.
