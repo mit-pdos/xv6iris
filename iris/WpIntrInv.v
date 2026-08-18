@@ -227,15 +227,6 @@ End IFrames.
 (* elp reset, the one write to a cell no frame may own                    *)
 (* ([HartRegNode.swp_write_reg_same]; the other client is MRET's).        *)
 (* ===================================================================== *)
-Definition trap_rs (rs : regstate) (ii : InterruptType)
-    (pc0 sc_old stvec_v ms_v : mword 64) (elp_v : mword 1) : regstate :=
-  register_set (R_bitvector_64 nextPC) (stvec_base stvec_v)
- (register_set cur_privilege Supervisor
- (register_set sepc pc0
- (register_set stval (zeros' 64)
- (register_set scause (trap_scause sc_old ii)
- (register_set mstatus (trap_ms elp_v ms_v) rs))))).
-
 Lemma i_sub_s : i_Drw ∪ i_Dro ⊆ s_Drw ∪ s_Dro.
 Proof. rewrite /i_Drw /i_Dro /s_Drw /s_Dro. set_solver. Qed.
 
@@ -260,7 +251,7 @@ Ltac srs :=
    25-deep [register_set] tower, so a [rewrite register_lookup_set] whose
    unifier may delta-unfold it peels INTO the tower and ends up comparing
    [cold_regs] against a value -- a hang, not an error. *)
-Opaque s_rs.
+#[local] Opaque s_rs.
 
 (* peel a [register_set] tower down to a tower lookup.
    THE CLOSER IS TARGETED, and that is not a style choice: closing such a
