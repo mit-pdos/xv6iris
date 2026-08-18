@@ -434,3 +434,372 @@ Proof.
      erewrite gm_MemWrite; [ | exact Hdev | exact Hfp ];
      reflexivity).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 8. THE GENERAL BIND CONTEXT -- one lemma instead of a family indexed by  *)
+(*    NESTING DEPTH.                                                       *)
+(*                                                                         *)
+(* Sail's [>>]/[>>=] are LEFT associative, so a straight-line region reads  *)
+(* as [bind (bind (bind m g) h) f] and the depth GROWS as a walk descends   *)
+(* into a branch's own chain.  A [_nest] lemma per depth is the wrong       *)
+(* shape.  What every one of them really needs of its context is the two    *)
+(* equations below -- [Phi] takes a [Ret] to the continuation and commutes  *)
+(* with a [Next] node -- and EVERY composition of binds satisfies both by   *)
+(* CONVERSION, at any depth, so each use discharges them with               *)
+(* [reflexivity]:                                                          *)
+(*                                                                         *)
+(*   erewrite (gm_ctx (fun z => Defs.bind (Defs.bind z g) f) _              *)
+(*              ltac:(reflexivity) ltac:(reflexivity) _ _ _ _ _ Hg He).     *)
+(*                                                                         *)
+(* Three variants, because the driver differs: [gm_ctx] over [exec] in the  *)
+(* plain monad, [gm_ctxR] over [execR] in an early-return region, and       *)
+(* [gm_cer_ctx] for a region wrapped in [catch_early_return] -- which is    *)
+(* the one a THROWING body needs, since [goodmb] refuses an                 *)
+(* [ExtraOutcome] node and the wrapper must stay on while the chain is      *)
+(* peeled.                                                                 *)
+(* ---------------------------------------------------------------------- *)
+Lemma gm_ctx_after (Dr Dw : register -> bool) {Y Z : Type}
+    (Phi : M Y -> M Z) (G : Y -> M Z)
+    (Hret : forall y, Phi (Interface.Ret y) = G y)
+    (Hnext : forall (T : Type) (oc : Interface.outcome _ T) (k : T -> M Y),
+       Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t)))
+    (m : M Y) :
+  forall (s s' : mstate) mm (y : Y),
+    goodmb Dr Dw m s mm = true ->
+    exec m s = Some (y, s') ->
+    goodmb Dr Dw (Phi m) s mm = goodmb Dr Dw (G y) s' (mm_after m s mm).
+Proof.
+  induction m as [y0 | T oc k IH]; intros s s' mm y Hg He.
+  - cbn [exec] in He. injection He as <- <-. cbn [mm_after]. by rewrite Hret.
+  - rewrite Hnext.
+    destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb exec mm_after] in Hg, He |- *; try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s s' mm y). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ s' mm y). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *.
+      rewrite Hfp. cbn [negb andb].
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s s' mm y). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ s' _ y). }
+    all: first [ by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
+Qed.
+
+Lemma gm_ctxR_after (Dr Dw : register -> bool) {R Y Z : Type}
+    (Phi : Defs.monadR R exception Y -> Defs.monadR R exception Z)
+    (G : Y -> Defs.monadR R exception Z)
+    (Hret : forall y, Phi (Interface.Ret y) = G y)
+    (Hnext : forall (T : Type) (oc : Interface.outcome _ T)
+                    (k : T -> Defs.monadR R exception Y),
+       Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t)))
+    (m : Defs.monadR R exception Y) :
+  forall (s s' : mstate) mm (y : Y),
+    goodmb Dr Dw m s mm = true ->
+    execR m s = Some (inr y, s') ->
+    goodmb Dr Dw (Phi m) s mm = goodmb Dr Dw (G y) s' (mm_after m s mm).
+Proof.
+  induction m as [y0 | T oc k IH]; intros s s' mm y Hg He.
+  - cbn [execR] in He.
+    assert (Hx : y = y0) by congruence. assert (Hs : s' = s) by congruence.
+    subst y s'. cbn [mm_after]. by rewrite Hret.
+  - rewrite Hnext.
+    destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb execR mm_after] in Hg, He |- *; try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s s' mm y). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ s' mm y). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *.
+      rewrite Hfp. cbn [negb andb].
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s s' mm y). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ s' _ y). }
+    all: first [ by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
+Qed.
+
+Lemma gm_cer_ctx_after (Dr Dw : register -> bool) {R Y : Type}
+    (Phi : Defs.monadR R exception Y -> Defs.monadR R exception R)
+    (G : Y -> Defs.monadR R exception R)
+    (Hret : forall y, Phi (Interface.Ret y) = G y)
+    (Hnext : forall (T : Type) (oc : Interface.outcome _ T)
+                    (k : T -> Defs.monadR R exception Y),
+       Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t)))
+    (m : Defs.monadR R exception Y) :
+  forall (s s' : mstate) mm (y : Y),
+    goodmb Dr Dw m s mm = true ->
+    execR m s = Some (inr y, s') ->
+    goodmb Dr Dw (Defs.catch_early_return (Phi m)) s mm
+    = goodmb Dr Dw (Defs.catch_early_return (G y)) s' (mm_after m s mm).
+Proof.
+  induction m as [y0 | T oc k IH]; intros s s' mm y Hg He.
+  - cbn [execR] in He.
+    assert (Hx : y = y0) by congruence. assert (Hs : s' = s) by congruence.
+    subst y s'. cbn [mm_after]. by rewrite Hret.
+  - rewrite Hnext.
+    destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb execR mm_after Defs.catch_early_return Defs.try_catch]
+        in Hg, He |- *; try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s s' mm y). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ s' mm y). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *.
+      rewrite Hfp. cbn [negb andb].
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s s' mm y). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ s' _ y). }
+    all: first [ by apply (IH tt s s' mm y) | by apply (IH 0%Z s s' mm y) ].
+Qed.
+
+(* the same three with the map collapsed back to [mm], and with EVERY
+   hypothesis a PREMISE rather than an argument: the two shape equations are
+   discharged by [reflexivity] at a still-open [G], which only works if they
+   are GOALS (an [ltac:(reflexivity)] in argument position runs while [G] is
+   an evar -- the durable notes' diverging-[ltac:]-hole trap, and it does
+   diverge here). *)
+Lemma gm_ctx (Dr Dw : register -> bool) {Y Z : Type}
+    (Phi : M Y -> M Z) (G : Y -> M Z)
+    (m : M Y) (s s' : mstate) mm (y : Y) :
+  (forall y0, Phi (Interface.Ret y0) = G y0) ->
+  (forall (T : Type) (oc : Interface.outcome _ T) (k : T -> M Y),
+     Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t))) ->
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (y, s') ->
+  goodmb Dr Dw (Phi m) s mm = goodmb Dr Dw (G y) s' mm.
+Proof.
+  intros Hret Hnext Hg He.
+  rewrite (gm_ctx_after Dr Dw Phi G Hret Hnext m s s' mm y Hg He).
+  exact (goodmb_after_dom Dr Dw m (G y) s s' mm Hg).
+Qed.
+
+Lemma gm_ctxR (Dr Dw : register -> bool) {R Y Z : Type}
+    (Phi : Defs.monadR R exception Y -> Defs.monadR R exception Z)
+    (G : Y -> Defs.monadR R exception Z)
+    (m : Defs.monadR R exception Y) (s s' : mstate) mm (y : Y) :
+  (forall y0, Phi (Interface.Ret y0) = G y0) ->
+  (forall (T : Type) (oc : Interface.outcome _ T)
+          (k : T -> Defs.monadR R exception Y),
+     Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t))) ->
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr y, s') ->
+  goodmb Dr Dw (Phi m) s mm = goodmb Dr Dw (G y) s' mm.
+Proof.
+  intros Hret Hnext Hg He.
+  rewrite (gm_ctxR_after Dr Dw Phi G Hret Hnext m s s' mm y Hg He).
+  exact (goodmb_after_dom Dr Dw m (G y) s s' mm Hg).
+Qed.
+
+Lemma gm_cer_ctx (Dr Dw : register -> bool) {R Y : Type}
+    (Phi : Defs.monadR R exception Y -> Defs.monadR R exception R)
+    (G : Y -> Defs.monadR R exception R)
+    (m : Defs.monadR R exception Y) (s s' : mstate) mm (y : Y) :
+  (forall y0, Phi (Interface.Ret y0) = G y0) ->
+  (forall (T : Type) (oc : Interface.outcome _ T)
+          (k : T -> Defs.monadR R exception Y),
+     Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t))) ->
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr y, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Phi m)) s mm
+  = goodmb Dr Dw (Defs.catch_early_return (G y)) s' mm.
+Proof.
+  intros Hret Hnext Hg He.
+  rewrite (gm_cer_ctx_after Dr Dw Phi G Hret Hnext m s s' mm y Hg He).
+  exact (goodmb_after_dom Dr Dw m (Defs.catch_early_return (G y)) s s' mm Hg).
+Qed.
+
+(* the [liftR] head inside a general context, the shape almost every
+   checked-access region presents *)
+Lemma gm_cer_ctx_lift (Dr Dw : register -> bool) {R Y : Type}
+    (Phi : Defs.monadR R exception Y -> Defs.monadR R exception R)
+    (G : Y -> Defs.monadR R exception R)
+    (m : M Y) (s s' : mstate) mm (y : Y) :
+  (forall y0, Phi (Interface.Ret y0) = G y0) ->
+  (forall (T : Type) (oc : Interface.outcome _ T)
+          (k : T -> Defs.monadR R exception Y),
+     Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t))) ->
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (y, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Phi (Defs.liftR m))) s mm
+  = goodmb Dr Dw (Defs.catch_early_return (G y)) s' mm.
+Proof.
+  intros Hret Hnext Hg He.
+  exact (gm_cer_ctx Dr Dw Phi G (Defs.liftR m) s s' mm y Hret Hnext
+           (goodmb_liftR Dr Dw m s mm Hg) (goodmb_liftR_execR m s s' y He)).
+Qed.
+
+Lemma gm_ctx_lift (Dr Dw : register -> bool) {R Y Z : Type}
+    (Phi : Defs.monadR R exception Y -> Defs.monadR R exception Z)
+    (G : Y -> Defs.monadR R exception Z)
+    (m : M Y) (s s' : mstate) mm (y : Y) :
+  (forall y0, Phi (Interface.Ret y0) = G y0) ->
+  (forall (T : Type) (oc : Interface.outcome _ T)
+          (k : T -> Defs.monadR R exception Y),
+     Phi (Interface.Next oc k) = Interface.Next oc (fun t => Phi (k t))) ->
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (y, s') ->
+  goodmb Dr Dw (Phi (Defs.liftR m)) s mm = goodmb Dr Dw (G y) s' mm.
+Proof.
+  intros Hret Hnext Hg He.
+  exact (gm_ctxR Dr Dw Phi G (Defs.liftR m) s s' mm y Hret Hnext
+           (goodmb_liftR Dr Dw m s mm Hg) (goodmb_liftR_execR m s s' y He)).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 8b. THE SHAPE OBLIGATIONS ARE DISCHARGED STRUCTURALLY, NEVER BY           *)
+(*     [reflexivity].                                                       *)
+(*                                                                         *)
+(* [Phi (Next oc k) = Next oc (fun t => Phi (k t))] IS a conversion, and    *)
+(* closing it with [reflexivity] does not come back: the context [Phi]      *)
+(* carries the region's whole tail -- for [pmpCheck] that is a              *)
+(* [foreach_ZM_up'] over 64 entries under an [Acc] guard -- and the         *)
+(* conversion checker unfolds it rather than noticing the two sides differ  *)
+(* only at the head.  (Measured: >30 s, killed, on the FIRST peel of        *)
+(* [pmpCheck].)  The two node equations below are the same conversion at a  *)
+(* GENERIC term, where it costs nothing, and [gm_shape] closes the          *)
+(* obligation by rewriting with them instead -- syntactic matching, so the  *)
+(* tail is never looked at.                                                 *)
+(* ---------------------------------------------------------------------- *)
+Lemma mbind_Ret {E X Y} (x : X) (f : X -> Defs.monad E Y) :
+  Defs.bind (Interface.Ret x) f = f x.
+Proof. reflexivity. Qed.
+
+Lemma mbind_Next {E X Y} {T : Type} (oc : Interface.outcome _ T)
+    (k : T -> Defs.monad E X) (f : X -> Defs.monad E Y) :
+  Defs.bind (Interface.Next oc k) f
+  = Interface.Next oc (fun t => Defs.bind (k t) f).
+Proof. reflexivity. Qed.
+
+Lemma mbind0_Ret {E Y} (x : unit) (n : Defs.monad E Y) :
+  Defs.bind0 (Interface.Ret x) n = n.
+Proof. by destruct x. Qed.
+
+Lemma mbind0_Next {E Y} {T : Type} (oc : Interface.outcome _ T)
+    (k : T -> Defs.monad E unit) (n : Defs.monad E Y) :
+  Defs.bind0 (Interface.Next oc k) n
+  = Interface.Next oc (fun t => Defs.bind0 (k t) n).
+Proof. reflexivity. Qed.
+
+Ltac gm_shape :=
+  intros ? ? ?;
+  repeat (progress (rewrite ?mbind_Ret; rewrite ?mbind0_Ret;
+                    rewrite ?mbind_Next; rewrite ?mbind0_Next; cbn beta));
+  reflexivity.
+
+(* ---------------------------------------------------------------------- *)
+(* 9. THE PEEL TACTICS over a general context.  Each takes the HEAD as an   *)
+(*    argument (the [goodb]/[goodmb] habit: a bind equation must be GIVEN   *)
+(*    its left operand, and a hand-retyped copy does not match -- so the    *)
+(*    head is the one from the [exec] fact, and [pattern] abstracts THAT    *)
+(*    occurrence out of the goal, at whatever nesting depth it sits).       *)
+(*                                                                         *)
+(*    [gmx h Hg He]   -- plain monad, [exec]-driven.                        *)
+(*    [gmxR h Hg He]  -- early-return monad, [execR]-driven.                *)
+(*    [gmxc h Hg He]  -- inside [catch_early_return], [execR]-driven.       *)
+(*    [gmxl h Hg He]  -- ditto with the head under a [liftR], [exec]-driven *)
+(*                       (the shape a checked-access region presents).      *)
+(*    [gmxlR h Hg He] -- a [liftR] head in a plain early-return context.    *)
+(* ---------------------------------------------------------------------- *)
+Ltac gmx Hg He :=
+  lazymatch type of Hg with
+  | goodmb _ _ ?h _ _ = true =>
+      lazymatch goal with
+      | |- goodmb ?dr ?dw ?T ?s ?mm = _ =>
+          let P := eval pattern h at 1 in T in
+          lazymatch P with
+          | ?F _ =>
+              erewrite (gm_ctx dr dw F (fun y0 => F (Interface.Ret y0))
+                          h s _ mm _);
+                [ cbn beta | intros ?; reflexivity | gm_shape
+                  | exact Hg | exact He ]
+          end
+      end
+  end.
+
+Ltac gmxR Hg He :=
+  lazymatch type of Hg with
+  | goodmb _ _ ?h _ _ = true =>
+      lazymatch goal with
+      | |- goodmb ?dr ?dw ?T ?s ?mm = _ =>
+          let P := eval pattern h at 1 in T in
+          lazymatch P with
+          | ?F _ =>
+              erewrite (gm_ctxR dr dw F (fun y0 => F (Interface.Ret y0))
+                          h s _ mm _);
+                [ cbn beta | intros ?; reflexivity | gm_shape
+                  | exact Hg | exact He ]
+          end
+      end
+  end.
+
+Ltac gmxc Hg He :=
+  lazymatch type of Hg with
+  | goodmb _ _ ?h _ _ = true =>
+      lazymatch goal with
+      | |- goodmb ?dr ?dw (Defs.catch_early_return ?T) ?s ?mm = _ =>
+          let P := eval pattern h at 1 in T in
+          lazymatch P with
+          | ?F _ =>
+              erewrite (gm_cer_ctx dr dw F (fun y0 => F (Interface.Ret y0))
+                          h s _ mm _);
+                [ cbn beta | intros ?; reflexivity | gm_shape
+                  | exact Hg | exact He ]
+          end
+      end
+  end.
+
+Ltac gmxl Hg He :=
+  lazymatch type of Hg with
+  | goodmb _ _ ?h _ _ = true =>
+      lazymatch goal with
+      | |- goodmb ?dr ?dw (Defs.catch_early_return ?T) ?s ?mm = _ =>
+          lazymatch T with
+          | context [ @Defs.liftR ?A ?R ?E h ] =>
+              let P := eval pattern (@Defs.liftR A R E h) at 1 in T in
+              lazymatch P with
+              | ?F _ =>
+                  erewrite (gm_cer_ctx_lift dr dw F
+                              (fun y0 => F (Interface.Ret y0)) h s _ mm _);
+                    [ cbn beta | intros ?; reflexivity
+                      | gm_shape | exact Hg | exact He ]
+              end
+          end
+      end
+  end.
+
+Ltac gmxlR Hg He :=
+  lazymatch type of Hg with
+  | goodmb _ _ ?h _ _ = true =>
+      lazymatch goal with
+      | |- goodmb ?dr ?dw ?T ?s ?mm = _ =>
+          lazymatch T with
+          | context [ @Defs.liftR ?A ?R ?E h ] =>
+              let P := eval pattern (@Defs.liftR A R E h) at 1 in T in
+              lazymatch P with
+              | ?F _ =>
+                  erewrite (gm_ctx_lift dr dw F
+                              (fun y0 => F (Interface.Ret y0)) h s _ mm _);
+                    [ cbn beta | intros ?; reflexivity
+                      | gm_shape | exact Hg | exact He ]
+              end
+          end
+      end
+  end.
