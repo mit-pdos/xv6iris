@@ -433,34 +433,40 @@ store arm (`RiscvLang.wr_node`'s comment), which is why
 
 #### What is left, in order
 
-1. **DISCHARGE THE FUSED RULE'S WINDOW for the write-back.**  The
-   INFRASTRUCTURE for this is now DONE; what is left is the per-lemma work.
+1. **`wp_hart_amo` / `swp_hart_amo` MUST MOVE TO THE TWO-FOOTPRINT WALKER.**
+   Found while writing the write-back twin's statement, and it has to be
+   settled before that lemma can even be stated.
 
-   The costed choice recorded in `bc82a625` is settled, and by route **(a)**,
-   not the recommended (c).  Building the `hsil` stepping API turned out cheap
-   once `hsil_add` replaced the feared composition lemma: a window crossing
-   model-function boundaries is split by ADDING FUEL, not by re-walking the
-   callee inline, so `hfrun_bind`'s expensive shape was never needed.  Built
-   (`7dec0474`):
+   The fused rule names its window with `hsil` -- ONE footprint `D`, used for
+   both reads and writes -- and correspondingly demands `hreg_frame rs D`,
+   i.e. FULL ownership of every register the window touches.  But the
+   write-back's window reads `misa`, `menvcfg`, `pmpcfg_n`, `pmpaddr_n`,
+   `pma_regions`, `htif_tohost_base` -- all of which the swp layer holds
+   READ-ONLY at a fraction, in `hreg_frame_ro Df rs Dro`.  So the rule as
+   stated cannot be applied from the swp layer at all.
 
-   - `HartLift`: `hsil_ret`, `hsil_read_in`, `hsil_write_in`, `hsil_stuck`,
-     `hsil_add`.  The stepping lemmas SPLIT ON MEMBERSHIP rather than carrying
-     an `if decide` -- a rewrite-chain always knows whether the register is in
-     the footprint, and the `if` form cannot be closed by `reflexivity` the way
-     `hfrun_read`'s `bool_decide` one can.  Three attempts died on that before
-     the split form worked.
-   - `HartAmo`: `hsil_node_hspani` / `hsil_hspan` -- every deterministic `hsil`
-     step is an `hspan` step (`hsil_node`'s guards are strictly stronger and
-     interference is reflexive).  Kept even though route (a) won, because it is
-     what lets any swp-side characterization apply to the wp-side rule's
-     deterministic walk.
+   Two facts make the fix cheap rather than deep:
 
-   So the window is now dischargeable in the same rewrite-chain style as
-   `hfrun_check_pma_pte`: step through `checked_mem_read`'s wrap-up, the
-   callback, `check_leaf_pte`'s two register reads, `update_PTE_Bits`, then
-   `write_pte_conditional`'s PMA/PMP/mmio checks, landing on its `write_ram`.
-   The branch points are all pinned -- the PTE checks by the re-read word's
-   premises (now inside the fupd) and the PMP/PMA tests by the caller's cells.
+   - **The window writes NO register.**  `update_and_write_pte`'s body is
+     `read_pte_exclusive` → `check_leaf_pte` → `update_PTE_Bits` →
+     `write_pte_conditional`, and none of them writes one (the TLB write is
+     LATER, outside the window).  So the split is needed only to let the
+     read-only half be held at a fraction, not to police writes.
+   - **`HartLift2` ALREADY HAS THE TWO-FOOTPRINT WALKER**: `hrun_silent2` /
+     `hsil2` / `hsil2D`, indexed by `Drw` and `Dro` exactly as the swp frames
+     are.  So this is a re-indexing of the fused rule onto an existing
+     walker, not a new one -- and the `hsil` stepping API and `hsil_mctx`
+     commutation just built will need their `hsil2` counterparts, which are
+     the same proofs.
+
+   Only then does the write-back twin become statable.  Its shape (following
+   `exec_translate_TLB_hit_pt_upd`'s `Hu` assert, which inlines the same
+   region): cached word, memory word and updated word as BINDERS pinned by
+   premises; the caller supplies only
+   `∀ mm, gen_heap_interp mm ={⊤,∅}=∗ ⌜read_bytes mm pteaddr 8 = Some m0⌝ ∗
+   ▷ (|={∅,⊤}=> gen_heap_interp (write_bytes mm pteaddr 8 m0') ∗ R)`,
+   and the twin discharges the window, `dev_addr`, `ak_excl` and
+   `hsil_opaque` facts itself.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
