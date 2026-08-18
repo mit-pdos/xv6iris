@@ -1312,3 +1312,165 @@ outcome arms giving `t'` by `tlb_ok_pt_fill_self` /
 `UptTree.upt_tree_spec_set_leaf` and `u_mem_step` by `u_mem_step_refl` /
 `u_mem_step_writeback`), `u_fetch_bytes` + `u_writeback_data` for the
 instruction read, and `exec_fetch_ok_4` / `goodmb_fetch_ok_4` on top.
+
+## 11. THE CERTIFICATE OF A READ-ONLY GATE IS FREE — compute it at `dstateU` and transport it (found 2026-08-18, P7)
+
+**[V] P5's jump / CSR / ZICBOM / SSAMOSWAP twins were not closable as
+stated.**  `UserExecFacts.goodmb_execute_JAL_total` / `_JALR_total` /
+`_BTYPE_total`, `UserCsr.goodmb_execute_CSRReg_total_U` / `_CSRImm_total_U`
+and `goodmb_execute_ZICBOM_U` / `_SSAMOSWAP_U` all take
+
+```coq
+goodmb Dr Dw (currentlyEnabled Ext_Zca | Ext_Zicfilp | Ext_S) s ∅ = true
+```
+
+as a PREMISE, and **nothing in the tree produced one**.  The gate is
+`Acc`-guarded, so at a symbolic state neither `reflexivity` nor `vm_compute`
+closes it, and mirroring `RiscvFetchExec.exec_currentlyEnabled_Zca` node for
+node is ~120 lines of nested `and_boolM`/`or_boolM` bookkeeping per gate.
+An `eauto` that meets one of these premises does not fail — it **searches
+for minutes**, which is how this was found.
+
+**THE CHEAP ROUTE, and it is general.**  A gate is READ-ONLY and reads only
+`misa` / `cur_privilege` / `menvcfg` / `senvcfg` — all of `DecodeTotalU.D_u`.
+So compute the certificate ONCE at the CONCRETE decode reference state
+`dstateU`, where it is `reflexivity` **in 2 ms**, and transport it:
+
+```coq
+Lemma goodb_agree_congr (D : register -> bool) {X} (m : M X) (s1 s2 : mstate) :
+  (forall r, D r = true ->
+     register_lookup r s1.(sregs) = register_lookup r s2.(sregs)) ->
+  goodb D m s2 = true -> goodb D m s1 = true.        (* 8-line induction *)
+```
+
+`goodb` consults the state only through the values of the registers it
+DECLARES, so two files agreeing on `D` give the same answer.  Then
+`goodmb_of_goodb` + `goodmb_mono` (D_u ⊆ Du_r) finishes.  `UserTotalU`'s
+`u_gm_gate` / `u_gm_zca` / `u_gm_zicfilp` / `u_gm_extS` are the four users.
+
+> **THE GENERAL SHAPE: any read-only stretch whose read set is inside `D_u`
+> is certified by `u_gm_gate` — compute at `dstateU`, transport by
+> `agree_on D_u`.**  It is not a JAL/CSR special case, and it is much
+> cheaper than assembling a `goodmb` along the stretch's own chain.  Reach
+> for it before writing a single `goodmb_bind`.
+
+## 12. THE U FOOTPRINT WAS MISSING THE THREE COUNTER-PERMISSION CELLS (found and FIXED 2026-08-18, P7)
+
+**[V] `mcounteren`, `scounteren` and `mhpmcounter` were outside `u_Drw ∪
+u_Dro`** (`Du_r … = false`, checked by `vm_compute`), while a U-mode `csrr`
+of `cycle` / `time` / `instret` / `hpmcounterN` reads all three:
+`is_CSR_accessible` runs `counter_enabled i User`, which reads `mcounteren`
+and then `scounteren` UNCONDITIONALLY
+(`UserCsr.exec_counter_enabled_U_total`), and the hpm path reads
+`mhpmcounter`.  Under whole-cycle stepping the interpreter answered those
+reads off `gen_heap_interp` and no bundle had to hold them; **under per-node
+stepping every read the cycle makes must be answerable from what the hart
+OWNS**, so the CSR arm was uncertifiable and `base_exec_total_u_holds`
+unprovable.
+
+**FIXED, and the fix is cheap because all three are frozen after M-mode
+boot:** they join `u_ro_list` with `u_Df` = `DfracDiscarded`, `user_cfg`
+holds them at `↦ᵣ□` with EXISTENTIAL values (a denied counter read is
+`Illegal_Instruction`, which is a `u_result_ok` outcome, so the tier is total
+whatever the permission bits say), and `u_pins_cfg` / `u_rs` /
+`u_frames_intro` / `_elim` gain three entries each.
+
+**THE ONE RIPPLE OUTSIDE THE TIER:** `UserKernelBridge.userret_to_user_inv`
+gains three `↦ᵣ□` premises, so `wp_userret_pt`'s continuation must hand them
+over.  They are persistent, so this costs the kernel side nothing beyond
+naming them.
+
+**THE RULE THIS INSTANCES, and it is worth applying to the S-mode tier
+before it lands the same way:** §1.4 enumerated the off-frame registers by
+reading the CYCLE's top-level reads.  That misses registers read inside a
+CSR's *accessibility* check, which is data-dependent on the CSR number.  The
+enumeration to trust is the union of the READ SETS OF THE `goodmb` TWINS, not
+a reading of the cycle — `grep 'Dr [a-z_]* = true'` over the twin catalogue
+is the check, and it takes a minute.
+
+### P4a IS DONE — the tally, and what each file's twins are keyed on
+
+| file | twins | keyed on |
+|---|---|---|
+| `HartMemAsm.v` (NEW) | — | the general-`mm` toolkit, the bind context, the two memory nodes, the two RAM bricks |
+| `UserMemPt.v` | 14 | the PHYSICAL path: the two PMP grants, the two DATA `pmaCheck`s, the writable window pair, `checked_mem_read`/`mem_read`, `checked_mem_write`/`mem_write_value`, `mem_write_ea` |
+| `UserMemAccess.v` | 27 | the VMEM path: `vmem_read_addr`/`vmem_write_addr` aligned + misaligned + LR/SC + the fault and disjunctive arms, `translate_and_read_value`, the reservation pair; **plus 5 shared §0b helpers** (`goodmb_split_on_page_boundary`, `goodmb_translate_and_read_value_gen`, the three intra-page reductions the families are instances of) |
+| `UserMemMis.v` | 26 | the PER-PAGE SPLIT: the plan/exception arms, `read_ram_chunk`, the three `*_mis_U` composers, the six `vmem_*_split2*` straddles, the two `translate_and_*_value` twins |
+| `UserMemArms.v` | 15 | the EXECUTE arms: `vmem_read`/`vmem_write` and `execute_LOAD/STORE/LOADRES/STORECON/AMO`, ok + err + the three AMO fault arms |
+
+Chain verification, in dependency order, all clean and admit-free:
+`HartMemAsm` 1.9 s, `PtWalkCert` 10.6 s, `UserMemPt` 5.9 s, `UserMemAccess`
+7.8 s, `UserMemMis` 11.6 s, `UserMemArms` 8.5 s.  `Print Assumptions` across
+the families yields only `rv64d.plat_term_write`, `rv64d.load_reservation`,
+`rv64d.match_reservation` — all three already in the adequacy baseline — plus
+`ResvAxioms.load_reservation_term` where LR/SC is involved.  **No new axioms.**
+
+**A LAYER WITH NO MEMORY NODE OF ITS OWN OWES NEITHER PURE OBLIGATION.**
+`vmem_read_addr`, `vmem_write_addr`, `pmaCheck`, `pmpCheck`,
+`memory_exception` and `transform_effective_address` never make a byte access
+themselves — every one sits inside a `translateAddr` / `mem_read` /
+`mem_write_*` hypothesis, which arrives with its own certificate.  So
+`dev_addr pa = false` and `bytes_owned mm pa n = true` appear ONLY on the
+physical layer (`UserMemPt`, `UserMemMis`'s chunk reads) and would be dead
+weight higher up.  Read that as the rule for any new row: **put the pure
+obligation where the node is, not where the address is.**
+
+**TWO TRAPS THE SWEEP ADDED.**  (i) `goodmb_split_on_page_boundary` cannot be
+unconditional — the off-page arm is an `assert_exp'` and `goodmb` of a `fail`
+node is `false`, so the twin takes the split's own `exec` fact.  (ii) **A
+NODE-FOR-NODE COPY OF AN EXEC PROOF IS NOT ALWAYS LITERAL ACROSS FILES.**
+`MemAccessGen.exec_vmem_write_addr_intra` steps past the dependent
+`if andb res (not (match_reservation …))` with a `match goal … change`; under
+an import set that pulls in `iris.proofmode` that `if` has ALREADY
+iota-reduced when the walk reaches it, so the `match` has no applicable
+clause and fails with a bare *"No matching clauses for match"* —
+indistinguishable from a wrong proof.  Wrap such a `change` in `try`.
+
+**WHAT THE SPLIT LANE HAD TO BUILD, and where it belongs at the fold-back.**
+The N-chunk split loop had no `goodmb` counterpart anywhere in the tree, so
+`UserMemMis.v` now also carries `gm_untilMT'_last` / `_step` / `_chain` (the
+twin of `MemAccessGen.execR_untilMT'_chain`; every iteration's certificate is
+read back at the ORIGINAL map by `goodmb_after_dom`, so a WRITING iteration
+costs no map bookkeeping), the three split composers
+`goodmb_checked_mem_read_split` / `_write_split` / `goodmb_mem_write_ea_split`,
+and `goodmb_mem_write_value_of_checked_plain` — the last one generic in the
+post state, which `UserMemPt`'s aligned `goodmb_mem_write_value_U` is not,
+because a misaligned chain lands on `wchain … N` rather than on
+`MState … (write_bytes …)`.  The `gm_untilMT'_*` trio belongs in
+`HartMemAsm`; the composers belong beside their exec twins.
+
+**TWO MORE SHAPE TRAPS.**  (i) **Sail's `>>` binds TIGHTER than `>>=`**, so a
+collapsed `returnR tt >> B` node left by a `pmpCheck` peel sits one bind IN,
+and the `execR_bind0_Some (execR_returnR_fwd tt s)` rewrite that works
+verbatim in `MemAccessGen` finds no subterm — one `change` covers all four
+cases (`exec`/`goodmb` × top-level/one-bind-in).  (ii) **`cbn beta zeta` is
+not enough after peeling `split_on_page_boundary` / `split_misaligned`**: the
+`let '(p, q) := …` is a `match`, so `cbn beta zeta match` is what exposes the
+next head to `gmm_lift`.  The exec proofs get away without it because
+`rewrite` works on subterms and the tactics do not.
+
+### §5.5 vs §5.3 ON THE DISPATCH TABLES: what "EMPTY diff" can and cannot mean
+
+§5.5 asks for an EMPTY `git diff` of `UserTotalU.v`'s two tables; §5.3 says
+the `arm_*` statements change shape so the tables' applications must be
+RETYPED.  Both cannot hold, and §5.3 is the one that is true: a pure arm
+takes `(t mm rsf va [mi] w)` where an Iris one took `(E sigma sigma_f va g
+w)`, and it owes a certificate the Iris one did not.
+
+**The checkable claim, and it is the one that matters, is that the CASE TREE
+does not move**: every `| _ = Some (CTOR ?p, _) =>` clause head and every
+payload `destruct` line is byte-identical — **104 lines in the base table and
+67 in the RVC table, verified mechanically against the pre-port commit.**
+Only the `fin`/`finm` argument lists differ.  Read §5.5's criterion that way.
+
+Two things kept the tables that stable, and they are worth copying:
+* **no dispatch-table entry ever names a `goodmb` twin.**  The certificate is
+  discharged by `u_gm1` inside `fin`/`finm`, off a hint database
+  (`u_gm`) holding P5's catalogue.  Naming twins per entry would have
+  touched all ~98 lines.
+* **`fin` may not mention the proof's hypotheses.**  `Local Ltac fin lem :=
+  apply (lem Hpins Hwf); …` does not compile: an `Ltac` body's identifiers
+  are resolved at DEFINITION time, where the proof's hypotheses do not exist.
+  Use `apply lem; solve [ assumption | u_gm1 ]` and let `assumption` name
+  them.  (This is the durable notes' trap about a tactic notation's `constr`
+  argument, one level down.)
