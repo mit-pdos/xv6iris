@@ -459,6 +459,23 @@ store arm (`RiscvLang.wr_node`'s comment), which is why
      commutation just built will need their `hsil2` counterparts, which are
      the same proofs.
 
+   **Progress**: the walker side is DONE (`92479b0d`, `015d7ea6`) --
+   `hsil_node2`/`hrun_silent2`/`hsil2` generalized to `M X` (free: no users
+   outside their file), the `hsil2` stepping API, `hsil2_hspan`,
+   `hsil2_mctx`, and `hrun_silent2_agree`.  What is left is
+   `hreg_frame_update_run2` and then restating the two rules.
+
+   **The one trap in `hreg_frame_update_run2`, met and recorded rather than
+   solved**: it cannot be obtained from `hreg_frame_update_run` by renaming.
+   That proof closes its per-node cases with a single `first [...]` whose
+   branches assume the SAME footprint decides the read and the write; under
+   `hsil_node2` they differ (`r ∈ Drw ∪ Dro` for a read, `r ∈ Drw` for a
+   write), so the RegRead and RegWrite branches need separate `case_decide`
+   handling.  The statement is otherwise a clean mirror, and the read-only
+   frame does not appear in it at all -- `hsil_node2` writes only in `Drw`,
+   so `hreg_frame_ro` is needed only at the CALL SITE, to supply the
+   `Drw ∪ Dro` agreement.
+
    Only then does the write-back twin become statable.  Its shape (following
    `exec_translate_TLB_hit_pt_upd`'s `Hu` assert, which inlines the same
    region): cached word, memory word and updated word as BINDERS pinned by
