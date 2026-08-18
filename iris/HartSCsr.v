@@ -542,6 +542,58 @@ Section HartSCsr.
               with "Hcert Hf Hrw Hro Hrdcsr").
   Qed.
 
+  (* the wrapper with BOTH openings: the check as an obligation and the read
+     value carried by [Q].  Supervisor's [csrr time] needs both -- its
+     legality is mcounteren.TM (owned, persistently) while scounteren is read
+     and ignored, so the check has no single [hval]; and mtime is owned by
+     nobody, so the value cannot be pinned before the step. *)
+  Lemma swp_execute_CSRReg_r_obl_p (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (m : regfile)
+      (csr : SailStdpp.Values.mword 12) (pr : Privilege)
+      (rd : SailStdpp.Values.mword 5)
+      (Q : SailStdpp.Values.mword 64 -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = pr ->
+    uint rd <> 0 ->
+    ext_check_CSR csr pr CSRRead = true ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    (forall x, csr_id_read_callback csr x = Defs.returnm tt) ->
+    gen_cert -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (check_CSR_result csr pr CSRRead)
+         (fun w => ⌜w = CSR_Check_OK tt⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_CSR csr)
+         (fun x => Q x ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (execute_CSRReg csr zreg (Regidx rd) CSRRS)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                ∃ x : SailStdpp.Values.mword 64, Q x ∗
+                gpr_file (<[Regidx rd := regval_into_reg x]> m) ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hrd Hext H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hchk Hrdcsr".
+    unfold execute_CSRReg.
+    replace (csr_access_type CSRRS (Instances.generic_eq (Regidx rd) zreg)
+               (Instances.generic_eq zreg zreg))
+      with CSRRead
+      by (replace (Instances.generic_eq zreg zreg) with true by reflexivity;
+          destruct (Instances.generic_eq (Regidx rd) zreg); reflexivity).
+    change zreg with (Regidx cli_rs1).
+    iApply (swp_bind_use (rX_bits (Regidx cli_rs1)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file cli_rs1 m with "Hcert Hf"). }
+    iIntros (v) "[-> Hf]".
+    iApply (swp_doCSR_r_obl_p Drw Dro Df rs m csr pr rd CSRRS _ Q
+              Hdisj HDpriv Hpriv Hrd Hext H344 H144 Hcb
+              with "Hcert Hf Hrw Hro Hchk Hrdcsr").
+  Qed.
+
   (* [csrw csr, rs1] -- CSRReg with the DESTINATION at x0, so the access is
      a plain write.  The written value is the source register's content. *)
   Lemma swp_execute_CSRReg_w_p (Drw Dro : gset register)
