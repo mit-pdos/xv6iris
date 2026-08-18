@@ -564,8 +564,12 @@ Definition ak_excl (ak : Interface.accessKind) : bool :=
 (* unchanged) -- a step, not a stuck state, so nobody's reducibility          *)
 (* depends on it.  Every [MemWrite] event clears the hart's own reservation  *)
 (* (so it never outlives the silent stretch it protects) and so does the     *)
-(* boundary; a fresh exclusive read overwrites it (the region begins at the  *)
-(* LAST exclusive read).  Plain reads are never blocked and never reserve.   *)
+(* boundary; a fresh exclusive read overwrites it, blocked or not (the       *)
+(* region begins at the LAST exclusive read).  A BLOCKED WRITE KEEPS its     *)
+(* reservation: releasing there would let the write's own arm run            *)
+(* unguarded, and then [resv_ok] is inductive only together with pairwise    *)
+(* disjointness of all reservations -- a second invariant nobody wants to    *)
+(* carry.  Plain reads are never blocked and never reserve.                  *)
 (*                                                                          *)
 (* STUCK IS FINE.  [GenericFail]/[Discard]/[ExtraOutcome] have no arm, and   *)
 (* there is deliberately NO shape or liveness predicate about the monad --   *)
@@ -625,13 +629,16 @@ Definition mnode_step (oth : gset Arch.pa) (s : mstate) (r : option resv)
                 m' = k (inl (w, None)) /\ s' = s /\ r' = r)
              \/
              (* THE EXCLUSIVE RAM READ: blocked (self-loop) while another
-                hart reserves any of its bytes; otherwise the same read, and
-                its snapshot becomes this hart's reservation, replacing any
-                stale one. *)
+                hart reserves any of its bytes -- and a hart that has reached
+                a NEW exclusive read has abandoned whatever it reserved before,
+                so the wait releases it (a waiting hart holds nothing, hence
+                no wait-for cycle through exclusive reads); otherwise the same
+                read, and its snapshot becomes this hart's reservation,
+                replacing any stale one. *)
              (ak_excl (Interface.ReadReq.access_kind req) = true /\
               ((~ (footprint (Interface.ReadReq.pa req) n ## oth) /\
                 m' = Interface.Next (Interface.MemRead n req) k /\
-                s' = s /\ r' = r)
+                s' = s /\ r' = None)
                \/
                (footprint (Interface.ReadReq.pa req) n ## oth /\
                 exists w : bv (8 * n),
@@ -1494,7 +1501,7 @@ Proof.
     + intros (w & d' & _ & _ & -> & ->) Hr. split; [exact Hr|done].
     + intros [(_ & w & _ & _ & -> & ->)
              |(_ & [(_ & _ & -> & ->) | (Hdisj & w & Hrd & _ & -> & ->)])] Hr;
-        try (by split; [exact Hr|done]).
+        try (by split; [exact Hr|done]); [by split; [discriminate|done]|].
       split; [|done]. intros rr [= <-]. exact (snap_of_sub _ _ _ _ Hrd).
   - (* MemWrite *)
     destruct (dev_addr _).

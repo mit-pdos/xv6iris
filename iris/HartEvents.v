@@ -169,7 +169,8 @@ Section events.
   (* RAM READ, EXCLUSIVE ([ak_excl = true]): the same read, the same       *)
   (* statement; the language also records the snapshot as this hart's     *)
   (* reservation (invisible here -- see the header) and self-loops while   *)
-  (* another hart reserves any of the bytes, which Löb absorbs.            *)
+  (* another hart reserves any of the bytes -- dropping the hart's own     *)
+  (* stale reservation as it waits -- which Löb absorbs.                   *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_hart_ram_read_excl {X : Type} (C : M X -> M unit)
       (n : N) (req : Interface.ReadReq.t n) (m : M X) :
@@ -221,7 +222,7 @@ Section events.
     - (* blocked: self-loop, premise intact *)
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
       iExists (Interface.Next (Interface.MemRead n req) (fun v => C (K v))),
-        σ, rv.
+        σ, None.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota.

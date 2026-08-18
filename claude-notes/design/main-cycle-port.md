@@ -150,11 +150,19 @@ device arms read `gresv` directly).  Initial/reset: all `None`.
 `mnode_step` arms (only these change; every other arm is untouched):
 
 - **RAM `MemRead`, `ak_excl = true`**: if any OTHER hart holds a
-  reservation overlapping `[pa, pa+n)` → SELF-LOOP (`m' = m`, `s' = s`);
-  else the ordinary read of `w` AND `gresv cpu := Some (pa, n, bytes of
-  w)` — unconditionally overwriting the hart's own stale reservation, so
-  the atomic region begins at the LAST exclusive read (a dangling PTE read
-  is simply superseded by the AMO's read).
+  reservation overlapping `[pa, pa+n)` → SELF-LOOP (`m' = m`, `s' = s`)
+  AND `gresv cpu := None` — a hart at a new exclusive read has abandoned
+  whatever it reserved, so a waiting hart holds nothing and no wait-for
+  cycle forms through exclusive reads; else the ordinary read of `w` AND
+  `gresv cpu := Some (pa, n, bytes of w)` — overwriting the hart's own
+  stale reservation, so the atomic region begins at the LAST exclusive
+  read (a dangling PTE read is simply superseded by the AMO's read).
+  (A BLOCKED WRITE, by contrast, KEEPS its reservation: releasing there
+  would need the RMW's own write to run unguarded, and then `resv_ok` is
+  inductive only together with pairwise disjointness of all reservations
+  — decided against, 2026-08-18.  The residual, accepted deadlock is two
+  harts each with a DANGLING reservation each blocked at a plain write
+  into the other's; DMA cannot close a cycle since it reserves nothing.)
 - **RAM `MemRead`, `ak_excl = false`**: unchanged, and NEVER blocked by
   anyone's reservation (a reader linearizes before the RMW; the reserving
   hart's stretch is register-only, so nothing observes the difference).
