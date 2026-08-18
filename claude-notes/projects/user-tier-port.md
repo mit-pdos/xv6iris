@@ -1523,3 +1523,88 @@ Two things kept the tables that stable, and they are worth copying:
   Use `apply lem; solve [ assumption | u_gm1 ]` and let `assumption` name
   them.  (This is the durable notes' trap about a tactic notation's `constr`
   argument, one level down.)
+
+## 13. THE TWO KERNEL-VISIBLE STATEMENT CHANGES, USER-APPROVED (2026-08-18, P7)
+
+Both changes below were held pending an explicit user ruling — the standing
+rule is that **no kernel-visible statement changes without one** — and both
+were **APPROVED**.  The reasons are recorded here because the alternatives
+that were rejected are the ones a later agent would otherwise re-propose.
+
+### 13.1 `userret_to_user_inv` gains three persistent premises — APPROVED
+
+```coq
+(R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
+(R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
+mhpmcounter                 ↦ᵣ□ mhpmcounter_v -∗
+```
+
+Values UNCONSTRAINED (a denied counter read is `Illegal_Instruction`, which
+the tier classifies).  Forced by §12: `counter_enabled` sits on
+`is_CSR_accessible` → `check_CSR` → `doCSR`, so **every** CSR instruction
+executed at User reads `mcounteren` and `scounteren`, and per-node stepping
+answers every read from what the hart OWNS.
+
+**The two rejected alternatives, and why:**
+
+* **Fold them into `hw_config`.**  Does not work, and not for cost reasons.
+  `mcounteren` is *not* a frozen boot cell: `timerinit` WRITES it
+  (`csrw mcounteren`, `CodeTimerinitAux.v:183`) to set TM, and only then is
+  it frozen — by `TimerCap.timer_cap_intro` (`BootChain.v:539`) into
+  `sstc_enabled = ∃ mcen, mcounteren ↦ᵣ□ mcen ∗ ⌜TM⌝`.  `hw_config_intro`
+  runs EARLIER (`BootChain.v:323`) and deliberately hands `mcounteren` out
+  mutably.  Persisting it there makes the kernel's own `csrw` unprovable.
+  Separately, `scounteren` and `mhpmcounter` are owned by **nobody** in the
+  tree (`WpSconfTimer.v:245` says so outright), so they would have to be
+  newly minted: adequacy's client-chosen `D : CPU -> gset register`
+  (`RiscvAdequacy.v:455`) widened by two and the cells threaded
+  `SpecEntry → ProofEntry → BootConfig → BootChain`.  And `hw_config` has
+  **110 elimination sites across 58 files** (one producer): appending three
+  conjuncts silently re-types the 66 that end in an 18-part pattern binding
+  the tail, and breaks the 6 that enumerate all 19.
+* **Serve the reads unowned**, as S-mode does with `swp_read_reg_any`
+  (`WpSconfTimer.v:349`, `WpGprCsrrB.v:349`).  Kills
+  `goodmb_execute_CSRReg_total_U` / `_CSRImm_total_U` — and with them
+  `arm_CSRReg` / `arm_CSRImm` — because a whole-instruction certificate
+  cannot contain an unowned read.
+
+**Because they are persistent, `user_trap_frame_open` does NOT hand them
+back** (the two `∃ … ↦ᵣ□` boxes at its end are gone; `user_cfg` still holds
+them and `user_trap_frame_intro` still asks for them there).  Whoever built
+the frame still has its own copies, and returning them would widen the
+opener's output — and every ipattern eliminating it — for nothing.
+
+### 13.2 `user_trap_frame_open` / `_intro` speak `pc_is` — APPROVED
+
+`pc_is x = PC ↦ᵣ x ∗ nextPC ↦ᵣ x ∗ minstret_res ∗ clock_res ∗ resv_any cpu_id`
+(`InstrBytes.v:696`).  The old two-cell shape is not a contract worth
+preserving: **it lost its backing when `minstret_inv` became `emp` and
+`clock_inv` was deleted.**  `clock_res` is EXCLUSIVE ownership of
+`mcycle`/`mtime`/`mip` and `minstret_res` of `minstret`/`minstret_increment`
+(`MinstretInv.v:349,359`); nothing else in the system owns them any more.
+Splitting `pc_is` and keeping only PC/nextPC does not "drop three riders" —
+it destroys five register cells and the reservation permanently, so no
+ported cycle rule could take another step and the *next*
+`userret_to_user_inv` would be unprovable (it already takes
+`pc_is (ret_pc sepc0)`).
+
+Three facts that made this the low-churn choice rather than the invasive one:
+
+* **`userret_to_user_inv` ALREADY took `pc_is` before the port**
+  (`git show 22f95761~1:iris/UserKernelBridge.v`, line 132).  Only
+  `user_trap_frame_open` used two cells.  The boundary was already
+  asymmetric; the port makes it symmetric.
+* **`pc_is` is the kernel's own currency**, not a U-tier import:
+  `BootChain.v:328` builds it and `ProofSysOpenParts` / `ProofSysOpenTails` /
+  `ProofSysLinkTails` state their specs in it throughout.
+* **Any other shape costs the same.**  Iris ipatterns bind the tail, so ANY
+  addition anywhere in the opener's output re-types both callers' patterns
+  identically.  `pc_is` REMOVES a conjunct, so it is one ipattern token in
+  each of `ProofUservec.v:118` and `ProofUserretClosed.v:111`
+  (`Hpcc & Hnpc` → `Hpc`) — the minimum, not the maximum.
+
+Note for whoever ports the trampoline tower: `wp_instr_tramp_pt`
+(`TrampStepPt.v:423`) is still pre-port — it takes `minstret_inv` and a bare
+`PC ↦ᵣ pc` — so today the two-cell breakage is LATENT.  When that tower is
+ported it will need exactly the riders, and the trap frame is their only
+carrier across the U→S boundary.

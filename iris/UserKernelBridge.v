@@ -246,10 +246,13 @@ Section UserKernelBridge.
       senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
-      (∃ mcenv scenv : mword 32,
-         (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv ∗
-         (R_bitvector_32 scounteren) ↦ᵣ□ scenv) ∗
-      (∃ hpm : type_of_register mhpmcounter, mhpmcounter ↦ᵣ□ hpm) ∗
+      (* THE THREE COUNTER-PERMISSION CELLS ARE NOT HANDED BACK.  They are
+         [box], so [user_cfg] holding them costs the kernel nothing to
+         RE-establish: whoever built this frame still has its own copies.
+         Returning them would only widen this opener's output -- and every
+         ipattern that eliminates it -- for resources the caller already
+         has.  (They are still inside [user_cfg], and [user_trap_frame_intro]
+         still asks for them there; this is the OPENER's output only.) *)
       Rut pt.
   Proof.
     iIntros "H".
@@ -260,11 +263,11 @@ Section UserKernelBridge.
     iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
     unfold user_cfg.
     iDestruct "Hcfg" as
-      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse & Hctr & Hhpm)".
+      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse & #Hctr & #Hhpm)".
     iExists ms_v, sc_v, stval_v, sepc_v, g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
             Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse
-            Hctr Hhpm Hrut".
+            Hrut".
     iPureIntro. split; [exact Hok | split; [exact Hcov | exact Hacc]].
   Qed.
 
