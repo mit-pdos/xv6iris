@@ -1020,3 +1020,68 @@ Proof.
     rewrite Heq. reflexivity.
   - exact Hdm.
 Qed.
+
+(* ===================================================================== *)
+(* 5. WHAT THE WRITE-BACK DOES *NOT* TOUCH, and the fetched word.         *)
+(* ===================================================================== *)
+
+(* the DATA half is untouched by a page-table write: that is the whole      *)
+(* content of the [ptree_bytes ##ₘ md] conjunct of [u_mem_wf], and it is    *)
+(* what lets the instruction read be justified at the POST-translate state. *)
+Lemma u_writeback_data (P : uptd) (t : ptree) (mm : pamap) (vpn : mword 27)
+    (p2 p1 p0 q : mword 64) (x : Arch.pa) :
+  u_mem_wf P t mm -> ptree_maps t vpn p2 p1 p0 -> x ∈ ud_data P ->
+  write_bytes mm (pt_addr0 p1 vpn) 8 q !! x = mm !! x.
+Proof.
+  intros Hwf Hmaps Hx.
+  pose proof Hwf as Hwf0.
+  destruct Hwf as (md & Hdisj & Hdj & Hmm & Hdm & _).
+  rewrite write_bytes_word.
+  destruct (word_bytes (pt_addr0 p1 vpn) q !! x) as [b|] eqn:Hw;
+    [| by rewrite (lookup_union_r _ mm x Hw) ].
+  exfalso.
+  destruct (word_bytes_is_Some (pt_addr0 p1 vpn) q p0 x (mk_is_Some _ _ Hw))
+    as [b0 Hb0].
+  pose proof (maps_disj_subseteq (pt_maps 2 t)
+                (word_bytes (pt_addr0 p1 vpn) p0) Hdisj
+                (ptree_maps_slot0 t vpn p2 p1 p0 Hmaps)) as Hsubt.
+  pose proof (lookup_weaken _ _ x b0 Hb0 Hsubt) as Hbt.
+  destruct (proj1 (Hdm x) Hx) as [bd Hbd].
+  exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 bd Hbt Hbd).
+Qed.
+
+(* the four instruction bytes are in the owned map, with SOME value *)
+Lemma u_fetch_bytes (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  exists iw : mword 32,
+    forall j : nat, (N.of_nat j < 4)%N ->
+      mm !! pa_add (u_walk_pa w va) j = Some (nth_byte iw j).
+Proof.
+  intros Hwf Hl Hal.
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & _).
+  set (pa := u_walk_pa w va).
+  assert (Hin : forall j : nat, (j < 4)%nat -> is_Some (mm !! pa_add pa j)).
+  { intros j Hj.
+    assert (Hd : pa_add pa j ∈ ud_data P).
+    { unfold pa. rewrite (u_walk_pa_window w va j Hal Hj).
+      exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+    destruct (proj1 (Hdm _) Hd) as [bd Hbd].
+    exists bd. rewrite Hmm.
+    destruct (ptree_bytes 2 t !! pa_add pa j) as [c|] eqn:Ht.
+    - exfalso.
+      exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj _ c bd Ht Hbd).
+    - by rewrite (lookup_union_r _ md _ Ht). }
+  destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
+  destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
+  destruct (Hin 2%nat ltac:(lia)) as [b2 Hb2].
+  destruct (Hin 3%nat ltac:(lia)) as [b3 Hb3].
+  exists (Z_to_bv 32 (assemble_bytes [b0; b1; b2; b3]) : mword 32).
+  intros j HjN.
+  assert (Hj : (j < 4)%nat) by lia.
+  rewrite (nth_byte_assemble4 [b0; b1; b2; b3] j eq_refl Hj).
+  destruct j as [ | [ | [ | [ | ] ] ] ]; try lia;
+    cbn [lookup_total list_lookup_total];
+    [ exact Hb0 | exact Hb1 | exact Hb2 | exact Hb3 ].
+Qed.
