@@ -5657,11 +5657,15 @@ Section ProofNamexMain.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID23)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ID.wp_idup_sconf gtl cn gfs gi cov logstart nib
+      (* idup's contract widened in increment IVe (iclaim-ledger.md §3.19):
+         its [ref++] is a ledger move, so it takes the region handle this
+         walk already carries -- persistent, and the same [Hireg] the iget
+         above was given. *)
+      iApply (ID.wp_idup_sconf gtl cn gfs gi cov logstart inodestart nib
                 ck (cq/2)%Qp dev cinum
                 B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hisl1 Hcshr").
+                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcshr").
       all: try lkbelow.
       iIntros (CIDid Hqid mid) "Hcg Hcnt Hpc %Hidp Hcshr (%qn & Href)".
       destruct Hidp as [Hcsid Hida0].

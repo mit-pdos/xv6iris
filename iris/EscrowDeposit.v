@@ -8,6 +8,26 @@
    so the fs-cone imports it needs ([DiskPtsto]/[LogInv]/[FsBlocks]/[DinodeEnc])
    do not disturb [EscrowInode]'s escrow proofs (import-order/instance hygiene,
    as in the EscrowRegionA de-risk).
+
+   ---- WHAT IT RETIRES, AND THE ONE THING IT DOES NOT (increment IVa) ------
+
+   Since iclaim-ledger.md §1.4 this accessor also RETIRES THE FREEZE: it takes
+   the [FrzPost] token the walk carries from iput+0x8a and steps the column to
+   [FrzOff] in the same region open that absorbs [dinode_at] and fills the
+   escrow.  It has to take a TOKEN and not a premise -- see the note at the
+   premise itself.
+
+   §3.12's RULING A″ additionally asks the retire to hand back a SOLE-HOLDER
+   WITNESS, parked by [InodeRegion.ireg_freeze_au] at the mint, so that a
+   foreign idup's up-count can refute a standing [FrzPre] by fraction
+   collision.  THAT WITNESS IS NOT HERE, and iclaim-ledger.md §3.13 records
+   why it cannot be: every resource that collides with a foreign holder's
+   supply is keyed by the itable SLOT [k] ([live_frac], [iref_frag],
+   [slh_tok (icfg_isl k)], the [ientry k] cells), while [ireg_slot] -- the
+   freeze arm -- is keyed by the INUM.  A parked [∃ k0, W k0] and a caller's
+   slice at [k] compose to a perfectly valid element of the same map, so there
+   is no validity goal to close.  The collision itself is right and already
+   proven ([IcacheInv.live_whole_share_absurd]); only its home is open.
    ========================================================================== *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -31,7 +51,7 @@ Section EscrowDeposit.
 
   Lemma ireg_free_deposit_au (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (ds : list dinode) (ge gr : gname) :
+      (ds : list dinode) (ge gr gd : gname) :
     ↑iregN ⊆ E ->
     ↑escAN (bv_unsigned inum) ⊆ E ∖ ↑iregN ->
     (bv_unsigned inum < 16 * Z.of_nat nib)%Z ->
@@ -40,8 +60,29 @@ Section EscrowDeposit.
     bv_unsigned (di_type dn') = 0 ->
     di_nlink_stable dn' dn ->
     ireg_inv γi γfs inodestart nib -∗
-    escA_inv ge gr γi (bv_unsigned inum) -∗
+    escA_inv ge gr gd γi (bv_unsigned inum) -∗
     dinode_at γi inum dn -∗
+    (* THE FREEZE, RETIRED HERE (iclaim-ledger.md §1.4, and [ireg_free_au]'s
+       own row in RULING A's mover table).  The deposit is a type-0 write over
+       a slot the pin constrains, so it cannot re-park an untouched f column:
+       it takes the [FrzPost] token the walk carries from iput+0x8a and steps
+       the column back to [FrzOff], so the pin's post arm DISSOLVES exactly as
+       the type goes to zero.  What comes back is [ifreeze_off], which is what
+       the parked pool entry wants ([IcacheEscrow.ipool_shape]'s pending arm).
+       WHY A TOKEN AND NOT A PREMISE: nothing in the depositor's hand refutes a
+       standing freeze at a LIVE record -- [dn] has a nonzero type and a zero
+       nlink, which is precisely what both frozen phases admit -- so the pin at
+       the old record is no help and the column has to be OWNED to be moved. *)
+    (* THE DEPOSIT TICKET, not the phase fragment (iclaim-ledger.md §3.16).
+       A⁗ moved the standing [ifreeze_post] into the ESCROW's own EMPTY state
+       -- it has to live somewhere the pool's await arm can be refuted from,
+       and the walk gave it up at iput+0x8a when it minted the escrow.  What
+       the depositor carries from +0x8a to +0xba instead is this ticket, which
+       is also what rules out a second deposit at the same escrow.  The retire
+       therefore happens INSIDE [escA_deposit_acc]'s opening: the token comes
+       out at [FrzPost], the column steps to [FrzOff], and the token goes back
+       in at [FrzOff] for whoever peels the pool entry next. *)
+    redeem_ticketA gd -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
       fsblock γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
@@ -49,7 +90,7 @@ Section EscrowDeposit.
                (diblk_bytes (<[islot inum := dn']> ds))
        ={E ∖ ↑iregN, E}=∗ committedA ge).
   Proof.
-    iIntros (HE Hesc_mask Hin Hwf Hdn' Hz Hnl) "#Hinv #Hesc Hdn".
+    iIntros (HE Hesc_mask Hin Hwf Hdn' Hz Hnl) "#Hinv #Hesc Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -70,7 +111,12 @@ Section EscrowDeposit.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    (* THE LEDGER's FULL ARITY since §2.2/§2.3: the [icnt] half, the two
+       in-transition pins and the f column's boot-shelter clause all ride in
+       the ∃ beside the seven original columns.  [ireg_free_au]'s pattern
+       verbatim -- this accessor IS that lemma with the closing action
+       swapped, and every consumer of the slot destructures it identically. *)
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
     iDestruct "Harm" as "[[Harm Hrf] | Hpend]"; [|iDestruct "Hpend" as "(_ & Hpz & _)"; iExFalso; iApply (dinode_at_excl with "Hpz Hdn")].
     iDestruct "Harm" as "[[%Hin1 Hfr] | [%Ht2 Hmk]]".
     { iExFalso.
@@ -98,6 +144,33 @@ Section EscrowDeposit.
       by exact (ireg_root_ok_ne _ dn _ Hrt Hnl0).
     assert (Hrt' : ireg_root_ok (bv_unsigned inum) dn' (wl + wdu + wdt))
       by exact (ireg_root_ok_nonroot _ dn' _ Hnr).
+    (* THE CLAIM PIN IS VACUOUS HERE (iclaim-ledger.md §2.4): the caller's own
+       [dinode_at] put this open on the MARKED arm, whose clause says
+       [cl = None].  The deposit is a byte-writing mover, so §2.4's "writes
+       cannot dent the pin" applies to it exactly as it does to
+       [ireg_free_au]: no premise, no obligation, nothing to re-establish. *)
+    assert (Hclm' : ireg_claim_ok cl (Some (Excl FrzOff)) dn')
+      by (rewrite (proj2 Ht2); exact I).
+    (* THE RETIRE (§1.4).  The token pins the column at [FrzPost]
+       ([link_freeze_agree]) and the fragment-side step hands it back at
+       [FrzOff]; the pin at the type-0 record about to be parked is then
+       vacuous, which is the whole reason the mover takes the token. *)
+    (* the escrow opens HERE, and its EMPTY state hands over the standing
+       freeze; it closes again three lines below the region's re-park, with
+       the marker and the retired token. *)
+    iMod (escA_deposit_acc (E ∖ ↑iregN) ge gr gd γi (bv_unsigned inum)
+            Hesc_mask with "Hesc Hdep") as "[Hfz Hescl]".
+    iDestruct (link_freeze_agree with "Hla Hfz") as %->.
+    (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
+       the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
+       [FrzPre], so the slot's receipt clause is on its [frzown] arm both
+       sides and this mover neither takes nor returns it. *)
+    iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl FrzPost))
+                 ltac:(discriminate) with "Hfrcp") as "[Hrcpt Hmr]".
+    iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzPost FrzOff with "Hla Hfz")
+      as "[Hla Hoff]".
+    assert (Hfrz' : ireg_frz_ok (Some (Excl FrzOff)) cn dn')
+      by exact (ireg_frz_ok_off cn dn').
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->
                   bv_unsigned (di_nlink (ds !!! islot inum)) = 0).
     { intros _. rewrite Hdeq. exact Hnl0. }
@@ -110,8 +183,7 @@ Section EscrowDeposit.
     iEval (rewrite /reg_full) in "Hrf".
     iDestruct "Hreg" as (mr) "[%Hcovr Hauthr]".
     iMod (ghost_map_update (ge, gr) with "Hauthr Hrf") as "[Hauthr Hrf]".
-    iMod (escA_deposit (E ∖ ↑iregN) ge gr γi (bv_unsigned inum) Hesc_mask
-            with "Hesc Hmk") as "#Hcom".
+    iMod ("Hescl" with "Hmk Hoff") as "#Hcom".
     iDestruct (reg_split (bv_unsigned inum) ge gr with "[Hrf]") as "[Hrh1 Hrh2]".
     { rewrite /reg_full. iExact "Hrf". }
     iAssert (ireg_registry nib) with "[Hauthr]" as "Hreg".
@@ -119,9 +191,9 @@ Section EscrowDeposit.
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
-    iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrh1 Hrh2]") as "_".
+    iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrh1 Hrh2 Hcnt Hrcpt Hmr]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
-      iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrh1 Hrh2]").
+      iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       { intros j i Hne Hi. rewrite /m' lookup_insert_ne; [done |].
         rewrite (ireg_key_split inum). intros Hc.
         destruct (ireg_key_inj (ireg_bi inum) j (islot inum) i Hsl Hi Hc)
@@ -143,11 +215,15 @@ Section EscrowDeposit.
           rewrite list_lookup_total_insert_ne; [| by apply not_eq_sym].
           exact (Hcp0 i Hi). }
       iSplitL "Hfsb'"; [iExact "Hfsb'" |].
-      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrh1 Hrh2]").
+      iApply ("Hslback" $! dn' with "[Hdn Hla Hep Hrh1 Hrh2 Hcnt Hrcpt Hmr]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) dn' wl wdu wdt gl cl rl pl
-                Hlok' Hrt' Hdir' Hwl0' Hpar
-                with "Hla Hep Hdisj").
+                (Some (Excl FrzOff)) cn
+                Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz'
+                with "Hla Hep Hdisj Hcnt [] [Hrcpt Hmr]").
+      { iLeft. iPureIntro. reflexivity. }
+      { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
+                  ltac:(discriminate) with "Hrcpt Hmr"). }
       iRight. iSplitR; [iPureIntro; exact Hz |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].

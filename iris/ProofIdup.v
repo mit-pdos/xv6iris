@@ -24,7 +24,28 @@
    THE INCREMENT'S SAFETY comes from outside the algebra: [iref_slot], one
    unit of [IrefSlots]' fixed supply, is what proves the incremented count
    is still an [int].  See [IrefSlots.v]'s header for why no axiom may do
-   that job instead.                                                       *)
+   that job instead.
+
+   ---- WHAT INCREMENT IVe CHANGED (iclaim-ledger.md §3.19) --------------
+
+   The store is a LEDGER move now, so its mover is
+   [IcacheInv.iref_upgrade_mir_store_au] and its hole is one namespace
+   wider ([↑iregN] as well as [↑icacheN]): the [ref] word and the ledger's
+   [icnt] column move together, and the region owns [icnt]'s other half.
+   That is why the contract takes a persistent [ireg_inv] -- SpecIget's
+   precedent, and see [SpecIdup.v]'s header for why the licence route this
+   file used to want is unavailable to a [idup(p->cwd)] caller.
+
+   WHAT STANDS IN FOR THE LICENCE is the caller's OWN SHARE.  The itable
+   lock's slot record carries the freeze mirror's half, which inside iput's
+   free window is the FROZEN PARK ([IcacheInv.frz_park], RULING A⁗): the bit
+   up, and beside it the dying reference's liveness slice and the escrow
+   arm's half.  A share against those is one slice past the unit, so
+   [IcacheInv.frz_park_shr_off] refutes the ON arm with no region open, no
+   token and no count restriction -- and the [false] half it yields is
+   exactly the mover's premise.  That refutation is this file's ONE new
+   fupd, and it happens before the load, under the lock this proof holds,
+   so nothing can re-freeze between it and the store.                      *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -60,6 +81,7 @@ Require Import CodeIdup.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIdup.
 From Kernel Require KernelSyms.
+Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 
 
@@ -90,7 +112,7 @@ Qed.
 Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -122,18 +144,18 @@ Section ProofIdup.
 
   Lemma wp_idup_sconf
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
+    : wp_idup_sconf_body γl cn γfs γi cov logstart inodestart nib k s dev inum
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
     intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
-    
+
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv Hislot Href Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Href Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -330,7 +352,12 @@ Section ProofIdup.
     destruct Hcik as [[cdev cinum] Hcik].
     iDestruct (islots2_acc_upd cn M ci k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /islot2 HMk Hcik) in "Hslot".
-    iDestruct "Hslot" as "(Hrest & Hiu & Hgid)".
+    (* FIVE conjuncts since RULING A⁗ (iclaim-ledger.md §3.16): the table's
+       retained identity, the slot's iref units, the identification ghost,
+       and -- the two this proof now needs -- the ledger's [icnt] half and
+       the FREEZE MIRROR's lock half, which inside iput's free window is the
+       frozen PARK. *)
+    iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hicnt & Hpark)".
     (* THE NEW REFERENCE'S IDENTITY SLICE COMES OUT OF THE TABLE'S RETAINED
        SHARE, exactly as iget's cache-hit arm mints one -- the caller brought
        a share, and a share's own fraction is the hole in its PARENT's slice,
@@ -343,6 +370,25 @@ Section ProofIdup.
     (* the table's values ARE the caller's: one entry, one identity *)
     iDestruct (inode_ident_agree with "Hrest Hrident") as %[Hcd Hcn].
     subst cdev cinum.
+    (* THE INUM IS IN THE REGION, and it is NOT a premise of this contract
+       (SpecIdup's header): the caller's share names a LIVE slot, so [ci]
+       speaks about it, and [IcacheEscrow.ic_ci_wf]'s third clause is exactly
+       the bound the region-coupled mover wants -- read off the very
+       [ci !! k] the mint already consulted. *)
+    assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib).
+    { destruct Hciwf as (_ & _ & Hrange & _). exact (Hrange k (dev, inum) Hcik). }
+    (* THE FROZEN PARK, DECIDED **OFF** BY THE CALLER'S OWN SHARE -- §2.6b's
+       sentence, and the whole reason this proof needs no licence
+       ([IcacheInv.frz_park_shr_off]).  If the park were UP it would hold the
+       freezer's whole outstanding slice plus the escrow arm's half, and this
+       thread's [inode_shr] would be one slice past the liveness unit.  So the
+       ON arm is refuted and what comes out is the [false] mirror half that
+       [iref_upgrade_mir_store_au] takes in place of an [iname]. *)
+    iApply fupd_wp.
+    iMod (frz_park_shr_off ⊤ M k (bv_unsigned inum) qt s cnt
+            ltac:(solve_ndisj) HMk with "Hinv Hhalf Hrlive Hpark")
+      as "(Hhalf & Hrlive & Hmir)".
+    iModIntro.
     assert (Hhalfsum : (1/2)%Qp = (qt + qr)%Qp) by (by apply Qp.sub_Some).
     assert (Hqv : (qt + qr/2 < 1/2)%Qp) by (by apply id_frac_lt1).
     (* the iref-slot conservation law: the caller's unit plus the ones the
@@ -424,19 +470,31 @@ Section ProofIdup.
               (mword_of_int 8 : mword 12) D2 (trap_res b + (K - 4))%nat
               (itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
                isl_slot (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k ∗
-               iref_tok k (qr/2)%Qp ∗ live_frac k s)%I
-              (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
+               iref_tok k (qr/2)%Qp ∗ live_frac k s ∗
+               frzm_h (bv_unsigned inum) false ∗
+               icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ cnt)))%I
+              (* the hole widens by [↑iregN]: the count move carries the
+                 ledger's [icnt] half and the region owns the other one.  The
+                 store rule's outer mask is hard-coded at [⊤ ∖ ↑minstretN] and
+                 the hole is ours subject to [↑kptN ⊆ Em], so this costs
+                 nothing (iclaim-ledger.md §2.9's structural mask verdict). *)
+              (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl]").
+              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl Hmir Hicnt]").
     { rewrite Hpa2 Hstv.
-      iMod (iref_upgrade_store_au (⊤ ∖ ↑minstretN) M k qt (qr/2)%Qp s cnt
-              ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive Hisl")
+      (* THE LICENCE-FREE UP-COUNT (iclaim-ledger.md §3.13/§3.19): the mirror
+         half decided [false] above stands in for the [iname] no cwd holder
+         can produce. *)
+      iMod (iref_upgrade_mir_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib
+              M k inum qt (qr/2)%Qp s cnt
+              ltac:(solve_ndisj) ltac:(solve_ndisj) Hinb HMk Hqv Hno
+              with "Hinv Hrinv Hhalf Hrlive Hisl Hmir Hicnt")
         as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback" with "Hcell") as "(Hhalf & Hisl & Ht1 & Hlv)".
+      iMod ("Hback" with "Hcell") as "(Hhalf & Hisl & Ht1 & Hlv & Hmir & Hicnt)".
       iModIntro. iFrame. }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive)".
+    iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive & Hmir & Hicnt)".
     (* the slot's share authority goes back into the lock's resource at the
        grown map *)
     iDestruct ("Hislback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M)
@@ -450,10 +508,14 @@ Section ProofIdup.
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrest") as "[Hid1 Hid2]".
     iDestruct ("Hback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ci
-                 with "[%] [%] [Hid1 Hiu Hgid]") as "Hslots".
+                 with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmir]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
-    { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid".
+    (* the ledger's [icnt] half goes back at the GROWN count, and the mirror
+       half goes back into [frz_park]'s OFF arm -- which is where this proof
+       found it, since the ON arm was refuted before the store. *)
+    { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid Hicnt".
+      iSplitR "Hmir"; [| rewrite /frz_park; by iLeft ].
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
     iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci.

@@ -3,6 +3,159 @@
    block of iput at the NEW CodeIput pin:  iput +0x5a .. +0xa6, whose fall-
    through target +0xa8 is EXACTLY [OfflockDev.ip_free_offlock]'s entry.
 
+   ---- STATUS (ledger-core-IVd, 2026-08-18): **Qed, ADMIT-FREE** ---------
+
+   [IcacheEscrow.ic_out]'s SECOND ALTERNATIVE landed (see that definition),
+   and with it the whole walk closes.  What IVd changed HERE:
+
+     * THE +0x5e WINDOW EXIT closes at [ic_out]'s frozen alternative
+       ([ic_close_out_frz]) under the descriptor [IcacheRef.DepFrz q dev
+       inum], depositing the reference MINUS its two live slices (they are in
+       [islot2]'s frozen park) plus the receipt -- and KEEPING the ½ dev and
+       inum cells, the whole valid cell and the payload, which is exactly
+       what [itrunc] and the +0x70 store need.
+     * THE +0x70 STORE IS THIS THREAD'S OWN, not an atomic update on the
+       escrow: OUT keeps no cells, so the valid word has been in hand across
+       itrunc.  The park follows the store
+       ([IcacheEscrow.ic_swap_park_frz]): OUT-frozen -> [ic_parked]-frozen,
+       the receipt never leaves, [ic_tok] comes back for releasesleep at
+       +0x76, and the count fragment and identity slice come home AT [q]
+       (which is why the descriptor names the fraction).
+     * THE +0x8a LAST CLOSE is the phase step
+       ([IcacheInv.iref_close_last_freeze_store_au]) and the eviction is
+       [ic_close_to_empty_frz] -- the EMPTY arm's raw cells peeled off the
+       bundle this thread never gave back.
+     * B2 IS PAID IN FULL.  The record is [di_trunc dn] LITERALLY, with its
+       [dinode_wf] and [nlink = 0] intact, and it rides to +0xa8.  The pool
+       entry is parked at the +0x94 release on the AWAIT arm
+       ([ipool_shape_await]) out of the last close's three outputs -- which
+       is FORCED: the reorder releases the itable lock BEFORE the +0xba
+       deposit, and [ic_ci_wf]'s [dom ci = dom M] already shows the inum
+       uncached there.  [OFF.ip_free_offlock] therefore no longer takes or
+       returns the pool bundle; it carries the escrow and its DEPOSIT ticket
+       only.  That is the one contract this increment moved, and it is
+       recorded at both ends.
+
+   ---- STATUS (ledger-core-IVc, 2026-08-18): THE ENTRY IS RE-BASED, B1 IS
+        PAID, AND WHAT IS LEFT IS ONE ESCROW-ARM WIDENING -----------------
+
+   RULING A⁗ (iclaim-ledger.md §3.16) landed in full on the ledger core, and
+   [IputFreeEntryDev] is GREEN WITH THE MINT: at +0x50 [ip_free_entry] now
+   calls [InodeRegion.ireg_freeze_au] and hands this lemma [ifreeze_pre] +
+   [frzown] + the mirror's half UP.  So (S1) below is CLOSED, and B1 and B2
+   both have their mechanisms proven.  What landed HERE:
+
+     * THE ENTRY IS RE-STATED.  IVa's two vacuous premises ([ifreeze_post]
+       and [icnt_half z 0]) are DELETED -- §3.15's THIRD FINDING acted on --
+       and the three the mint produces take their place.  The re-assembly wand
+       gained the FROZEN PARK as its third argument, matching Exit B.
+     * B1 IS PAID.  At the +0x82 re-acquire the walk reads the region's own
+       freeze pin ([IcacheInv.icnt_freeze_forces_one]: a [FrzPre] column has
+       in-core count ONE) and the [cnt2 <> 1] arm is REFUTED rather than
+       admitted -- the first admit is gone from the source.  The trace
+       design/fs-icache.md §17.6.1 certifies is not forbidden: the foreign
+       iget it describes now dies at its OWN up-count, on the frozen park
+       ([IcacheInv.frz_park], OPEN(2.6b)'s mechanism).
+     * B2 IS DISSOLVED at the design level.  [IcacheEscrow.ic_payload_arm]'s
+       tail gained a FROZEN alternative (the receipt alone), so the freer no
+       longer gives its payload back to the escrow at the +0x70 park: the
+       record, the block resources and [inode_raw] stay in its own hand, named
+       and un-existentialised, to +0xa8.  The eviction is split
+       ([ic_close_to_empty_frz] + [ipool_shape_await]) so that the close's
+       three ledger outputs can feed the pool bundle AFTER the store.
+     * THE +0x62 RE-PARK is written: the mint's mirror half and the two live
+       slices (the reference's [q] at the fresh generation and the escrow
+       arm's [1/2]) go into [islot2]'s frozen park, where they stay for
+       +0x66..+0x82 and where a foreign [idup] collides with them.
+
+   ---- WHAT IS STILL OWED, and it is ONE definition ----------------------
+
+   [IcacheEscrow.ic_out]'s tail needs A⁗'s second alternative -- the exact
+   shape is written out at that definition -- because the +0x5e window exit
+   must deposit NO live mass (it is parked) while ITRUNC STILL HOLDS THE
+   IDENTITY CELLS, and OUT is the only escrow arm that keeps no cells.
+
+   THE COMPILE STOPS AT :939, AND THAT IS THE FINGERPRINT: the +0x5e block
+   below closes the escrow at [ic_parked]'s FROZEN alternative, which owns
+   [i_dev]/[i_inum]/[i_valid] -- and three lines later the [itrunc] call wants
+   [Hidv] back, because it reads [ip->dev] for its own [bread].  With OUT's
+   second alternative the span +0x5e..+0x70 lives in the CELL-LESS arm exactly
+   as the ordinary path's does, the cells stay in the freer's hand across
+   itrunc, and the frozen [ic_parked] is entered at the +0x70 park (where the
+   ordinary path enters it too).  The six consumers the widening touches are
+   enumerated at [ic_out]'s note.
+
+   Nothing else in the walk is open: the +0x70 store (an AU over the frozen
+   park), the +0x82 reclaim, the +0x8a decision, the eviction
+   ([ic_close_to_empty_frz]) and the pool bundle ([ipool_shape_await]) all have
+   their lemmas proven and their call shapes written.
+
+   ---- STATUS (ledger-core-IVb, 2026-08-18): STOPS AT :1157, and it is the
+        SAME integration item IVa recorded, re-based on IVb's escrow -------
+
+   IVb repaired everything mechanical and everything the ledger core made
+   possible.  What LANDED here:
+     * the parked arm's token slot is [IcacheEscrow.ic_frz_park]
+       ([ifreeze_off z] OR the freeze RECEIPT [IcacheRef.frzown z]) -- §3.10's
+       DEVIATION 1, widened at last -- so the entry premise below is that
+       disjunction and the +0x70 MID-FREE park goes through
+       [IcacheEscrow.ic_swap_park_arm].  The slot arrives from
+       [IputFreeEntryDev]'s Exit B, peeled off its +0x3a window-entering read.
+     * IputFreeEntryDev is GREEN again (sp-migration phase D + §3.14's
+       walk-tier idiom), so the Exit-B -> entry hand-off is live.
+
+   WHAT IS STILL OWED, and why it is NOT proof engineering -- both are
+   recorded in full in iclaim-ledger.md's IVb as-built section:
+
+   (S1) THE MINT HAS NO HOME.  A‴'s custody line wants ip_free_entry to mint
+        the freeze at +0x50 so that the pin [FrzPre => icnt = 1] spans the
+        release/re-acquire and pays B1 at +0x82.  The mint needs
+        [ifreeze FrzOff], and the only freeze token a CACHED inum has is the
+        one in the payload's slot -- which is now the DISJUNCTION.  Its right
+        arm ("someone is already freezing this inum") is UNREACHABLE but not
+        REFUTABLE: at REF-1 with the payload checked out, this thread holds
+        exactly what a freezer holds, so no resource separates "I am the
+        freezer" from "someone else is".  The dual obligation appears at
+        +0x8a (the eviction must know it IS on the frozen arm), and the two
+        are the same wall seen from both ends.
+   (S2) B2 STANDS.  [ic_close_to_empty_await] does hand the freer an
+        [ipool_shape_np] back beside the pool's [ipool_shape], which is
+        exactly what (ii) below asked for -- but [ipool_shape_np]
+        existentially erases WHICH arm ([ipool_alloc] or [imark]) and WHICH
+        record, and the off-lock deposit needs [dinode_at] with
+        [di_nlink = 0].  IVa's structural fix ([islot2]'s (None, Some) arm)
+        is still the answer.
+
+   ---- STATUS (ledger-core-IVa, 2026-08-18): DOES NOT COMPILE, and where ----
+
+   This file is NOT in [iris/_CoqProject] (nor are IputOfflockDev and
+   IputFreeEntryDev), so the whole-tree gate never built it and its rot was
+   invisible behind [EscrowDeposit]'s red.  IVa repaired everything that was
+   MECHANICAL and stopped at the first thing that is not:
+
+     REPAIRED (sp-migration phase D, "the KT1 access path" -- this file never
+     received it): [sie_cap_gpr] / [trap_csrs_ext] / [arm_pay] gained a
+     leading [ktier]; [Acquire.wp_acquire_sconf] / [Release.wp_release_sconf]
+     likewise; the six frame slots are [↦₈[KT1]].
+     REPAIRED (RULING A-prime, iclaim-ledger.md 3.10): the +0x70 mid-free park
+     builds [ic_payload], which is now [ic_payload_np * ifreeze_off], so the
+     park owes the arm's token -- taken as the [ifreeze_off] premise below.
+     THREADED (iclaim-ledger.md 1.4 / 1.5): [ifreeze_post] and [icnt_half .. 0]
+     ride from here into [OFF.ip_free_offlock] and on into
+     [EscrowDeposit.ireg_free_deposit_au], which retires the freeze.
+
+   STOPS AT :1127, and that is the INTEGRATION's item, not a repair.  The
+   +0x8a eviction [IcacheEscrow.ic_close_to_empty] now consumes the uncached
+   ledger pair ([icnt_half z 0] and [ifreeze_off z]) and RETURNS the pool
+   bundle [ipool_shape] already assembled.  The walk still hands it the
+   [ic_id]/[icnt_half] pair bundled at count ONE, because the last close that
+   moves 1 -> 0 ([IcacheInv.iref_close_last_freeze_store_au], the phase step
+   FrzPre -> FrzPost) has not been spliced in.  That splice, the
+   [ip_free_entry] mint that makes the [ifreeze_post] premise satisfiable, and
+   DEVIATION 1's [ic_payload] widening (so a MID-FREE park may carry
+   [ifreeze_pre] and the [ifreeze_off] premise below can go away) are one
+   piece of work and it belongs to the iput integration.
+
    Developed as a functor over BREAD / LOG_WRITE / BRELSE (as OfflockDev is),
    so it compiles against the pre-built cone.  It instantiates OfflockDev with
    the same three params and DISCHARGES the +0xa8 fall-through by applying
@@ -406,10 +559,10 @@ Section FreeLockedDev.
     m !!! Regidx Rs4 = (sign_extend' 64 dev : mword 64) ->
     locks_below lks "log" ->
     "itable" ∉ lks ->
-    sie_cap_gpr m (trap_res eb + (K - 6))%nat false pj -∗
+    sie_cap_gpr KT1 m (trap_res eb + (K - 6))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-    arm_pay 0 eb pj -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb pj -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
     panic_env -∗
@@ -451,6 +604,13 @@ Section FreeLockedDev.
     ic_id cn k (1/2) true dev inum -∗
     (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
      ic_id cn k (1/2) true dev inum -∗
+     (* ...AND THE LIVE ARM's FIFTH CONJUNCT (iclaim-ledger.md §3.16, A⁗):
+        the FROZEN PARK, which this body builds at the +0x62 re-park out of
+        the mirror half the mint handed it and the two live slices it is
+        about to stop needing.  It cannot be built inside the wand: the mint
+        at +0x50 has already flipped the bit, so from that instant nothing
+        but the park itself satisfies [islot2]'s live arm. *)
+     frz_park k (bv_unsigned inum) q -∗
        ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
        IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
     (* the sleeplock for the acquiresleep at 0x5a *)
@@ -476,6 +636,46 @@ Section FreeLockedDev.
        with ic_open_held's half at the +0x70 ip->valid=0 store *)
     i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) -∗
     ireg_inv γi γfs inodestart nib -∗
+    (* ---- THE LEDGER's UNCACHED CAPITAL, threaded to the off-lock tail
+       (iclaim-ledger.md §1.4, and §1.5's cost table row for this file:
+       "[ifreeze] threaded through [ip_free_locked]'s entry -- statement
+       level").  [OFF.ip_free_offlock] hands them to
+       [EscrowDeposit.ireg_free_deposit_au], which retires the freeze against
+       its type-0 write, and to the pool entry the tail parks.
+
+       PASSED STRAIGHT THROUGH FOR NOW, and that is the recorded seam.  The
+       phase step this block owns (+0x8a's last close, FrzPre -> FrzPost via
+       [IcacheInv.iref_close_last_freeze_store_au]) and the [icnt] half that
+       close produces are the iput integration's; so is the mint that makes
+       the premise satisfiable ([IputFreeEntryDev]'s Exit-B) and the
+       [ic_payload] widening that lets a MID-FREE park carry [ifreeze_pre]
+       rather than [ifreeze_off] (iclaim-ledger.md §3.10, DEVIATION 1). *)
+    (* ---- WHAT THE MINT LEFT STANDING (iclaim-ledger.md §3.16, A⁗) ------
+
+       IVa's two premises are GONE, and their deletion is the THIRD FINDING
+       of §3.15 acted on: [ifreeze_post] and [icnt_half z 0] were VACUOUS
+       from +0x82 on -- the re-acquire's own live arm produces
+       [icnt_half z (Pos.to_nat cnt2)] with [cnt2 >= 1], and [icnt_agree]
+       against a passed-through zero is [False].  They are the +0x8a close's
+       OUTPUTS, not its inputs, and this body now produces them.
+
+       What arrives instead is the three things [ip_free_entry]'s mint
+       produced at +0x50, and each has exactly one job here:
+
+         [ifreeze_pre] -- kept IN HAND from the mint to +0x8a.  It decides
+           the escrow arm's tail at the +0x70 store and at the eviction
+           ([IcacheEscrow.ic_payload_arm_decide_frz]); it reclaims the frozen
+           park at +0x82 ([IcacheInv.frz_park_pre_reclaim]); it PINS THE
+           COUNT there ([IcacheInv.icnt_freeze_forces_one], which is B1's
+           whole answer); and it is what the last close steps to [FrzPost].
+         the RECEIPT -- parked in the escrow's frozen alternative at the
+           +0x5e window exit and taken home by the last close.
+         the MIRROR's half UP -- what the +0x62 re-park puts in [islot2]'s
+           FROZEN PARK, where a foreign [idup] collides with the mass beside
+           it (OPEN(2.6b)). *)
+    ifreeze_pre (bv_unsigned inum) -∗
+    frzown (bv_unsigned inum) -∗
+    frzm_h (bv_unsigned inum) true -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res γfs bmapstart cov logstart size used -∗
@@ -489,12 +689,12 @@ Section FreeLockedDev.
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
     log_opSe γ u Sb e0 -∗
     (* the 6-slot frame: ra/s0/s1 ride to the epilogue; s2/s3/s4 restored at 0x30 *)
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈ vra -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈ vs0 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈ vs1 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈ vs2 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ vs3 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ vs4 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[KT1] vs1 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[KT1] vs2 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
     (* THE CALLER'S CONTINUATION at 0x30 (iput's real post; ip_tail's shape) *)
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z) (w : bool),
@@ -504,9 +704,9 @@ Section FreeLockedDev.
         ⌜OFF.ipo_thr m mf /\ mf !!! Regidx csp_rs1 = sp0
           /\ mf !!! Regidx Rs2 = vs2 /\ mf !!! Regidx Rs3 = vs3
           /\ mf !!! Regidx Rs4 = vs4⌝ -∗
-        sie_cap_gpr (CID := CID) mf (K - 6)%nat eb pj -∗
+        sie_cap_gpr (CID := CID) KT1 mf (K - 6)%nat eb pj -∗
         cpu_own (CID := CID) 0 eb pj eb lks -∗
-        trap_csrs_ext (CID := CID) eb -∗
+        trap_csrs_ext (CID := CID) KT1 eb -∗
         cpu_claim_ext (CID := CID) eb pj -∗
         pc_is (CID := CID) (mword_of_int (KernelSyms.iput + 0x30) : mword 64) -∗
         p_pid pj ↦₄{dq} pidv -∗
@@ -514,8 +714,15 @@ Section FreeLockedDev.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         ⌜used'' ⊆ used⌝ -∗
         bitmap_res γfs bmapstart cov logstart size used'' -∗
-        (* the off-lock deposit's parked pool entry, on its pending arm *)
-        ipool_shape γfs γi cov logstart inum -∗
+        (* NO [ipool_shape] HERE (IVd).  Under the REORDER the itable lock goes
+           at +0x94, BEFORE the +0xba deposit, and [IcacheEscrow.ic_ci_wf]'s
+           [dom ci = dom M] then forces the evicted inum's pool entry into the
+           itable's own free pool AT THAT RELEASE -- the entry is parked on the
+           AWAIT arm ([ipool_shape_await]), which is exactly what that arm's
+           header describes ("the entry a FREER has parked ON ITS WAY TO the
+           off-lock deposit").  There is only one [icnt_half .. 0] and one
+           [frzm_h .. false] in existence, so nothing pool-shaped can leave
+           this lemma. *)
         bslots bn 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
@@ -523,12 +730,12 @@ Section FreeLockedDev.
         log_opS γ n'' Sb'' -∗
         iref_slot -∗
         (* frame ra/s0/s1 slots, still saved, for the epilogue *)
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈ vra -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈ vs0 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈ vs1 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈ vs2 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ vs3 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ vs4 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[KT1] vs1 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[KT1] vs2 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -537,7 +744,7 @@ Section FreeLockedDev.
            Hsp0 Ha0 Hs1v Hs2v Hs3v Hs4v Hlkbelow Hitnotin.
     iIntros "Hcg Hcnt Hpay Hextc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx
              #Hitlk #Hitinv #Hesc Htok Hhalf Hiauth Hipool Hpool %Hcik Hrtok Hgid Hwand
-             #Hslk Hpayl Hlvh Hvb #Hireg Hbms Hins Hbm Hppid
+             #Hslk Hpayl Hlvh Hvb #Hireg Hpre Hrcpt Hmirt Hbms Hins Hbm Hppid
              #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots #Hvlb Hcrd Hop
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     (* ===== +0x5a jal acquiresleep -- the ref-1 NON-BLOCKING lock ===== *)
@@ -609,30 +816,66 @@ Section FreeLockedDev.
     iAssert (live_frac k q) with "[Hlvq]" as "Hlvqf"; [ iExists ga'; iExact "Hlvq" |].
     iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
             Mt q ga' g1 dev inum dn bm ltac:(solve_ndisj) HMk1
-            with "Hitinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hpayl")
-      as "(Hhalf & Hfrg & Hlvq2 & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+            with "Hitinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hvb Hpayl")
+      as "(Hhalf & Hfrg & Hlvq2 & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
     (* ---- THE 586 SITE.  [ic_open_held] hands [i_inum] back WHOLE; itrunc
        keeps one half ([Hinh], with [Hidv]) and the SURPLUS half -- which this
        body used to drop on the floor -- is fed to the entry's re-assembly
-       wand together with the borrowed [ic_id].  Out come the islot2 list and
-       the reference's identity, i.e. exactly the two resources the entry
-       could not have asked for; the deposit's cells (q) then come off the
-       ident and the re-park's (qr) are already inside the rebuilt list. ---- *)
+       wand together with the borrowed [ic_id] and the FROZEN PARK. ---- *)
     iDestruct (word4_pointsto_half_split with "Hnfull") as "[Hinh Hnsurp]".
-    iDestruct ("Hwand" with "Hnsurp Hgid") as "[Hslots Hrident]".
-    iEval (rewrite /IcacheRef.inode_ident) in "Hrident".
-    iDestruct "Hrident" as "[Hrd Hrn]".
     iDestruct "Hlvq2" as (gr) "Hlvr".
     iDestruct (live_gen_agree with "Hlvr Hlvh") as %->.
-    iMod (ic_dep_checkout cn k (DepRef q dev inum ga') with "Hictok") as "[Hdepa Hdepk]".
-    iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hlvh Hrd Hrn Hmt Hgida]") as "_".
+    (* ================================================================
+       THE +0x62 RE-PARK (iclaim-ledger.md §3.16, RULING A⁗).  The itable
+       lock is about to go at +0x66, so this is the LAST instant at which
+       [islot2] is reachable -- and it is where the mint's mirror half and
+       the dying reference's two live slices (its own [q], now at the fresh
+       generation, and the escrow arm's [1/2]) go into the FROZEN PARK.
+
+       They stay there for the whole lock-free span +0x66..+0x82, which is
+       exactly the span in which a foreign [idup] can run: it takes this
+       lock, finds the park, and its own share is then one slice past the
+       slot's unit ([IcacheInv.live_whole_share_absurd]).  That is
+       [ProofIdup]'s OPEN(2.6b), closed by placement rather than by a
+       licence -- and it is also why NOTHING is deposited into the escrow's
+       OUT arm here: the freer keeps the count fragment and the identity in
+       its own hand and parks only the RECEIPT.
+       ================================================================ *)
+    iAssert (frz_park k (bv_unsigned inum) q) with "[Hmirt Hlvr Hlvh]" as "Hpark".
+    { iApply (frz_park_intro_on with "Hmirt [Hlvr] [Hlvh]");
+        [iExists ga'; iExact "Hlvr" | iExists ga'; iExact "Hlvh"]. }
+    iDestruct ("Hwand" with "Hnsurp Hgid Hpark") as "[Hslots Hrident]".
+    (* ================================================================
+       THE +0x5e WINDOW EXIT, at [IcacheEscrow.ic_out]'s SECOND
+       ALTERNATIVE (iclaim-ledger.md IVd).
+
+       What goes into the escrow is a reference MINUS its two live slices --
+       they are in the frozen park built two lines above and must STAY there
+       for the whole lock-free span -- i.e. the COUNT FRAGMENT and the
+       IDENTITY slice, plus the RECEIPT the mint produced.  The descriptor
+       is [DepFrz q dev inum]: it says what the arm holds, names the
+       fraction the +0x70 park will want back, and refutes this arm at every
+       ordinary parker and borrower (they all name a descriptor with a
+       generation).
+
+       WHAT STAYS IN THIS THREAD'S HAND is exactly what the next four
+       instructions need: the ½ dev and inum cells and the payload, because
+       [itrunc] reads ip->dev for its [bread] and writes ip->addrs/ip->size;
+       and the WHOLE valid cell, because the +0x70 store is this thread's
+       own, not an atomic update on the escrow.  OUT is the only escrow arm
+       that keeps no cells, which is why this span lives here and not at
+       [ic_parked]'s frozen alternative -- that one is entered at the +0x70
+       park, where the ordinary path enters it too.
+       ================================================================ *)
+    iDestruct "Hvldx" as (w0) "Hva".
+    iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
+    iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
+    iMod (ic_dep_checkout cn k (DepFrz q dev inum) with "Hictok")
+      as "[Hdep Hdepa]".
+    iMod ("Hclose" with "[Hdepa Hfrg Hrident Hrcpt Hmt Hgida]") as "_".
     { iApply bi.later_intro.
-      iApply (ic_close_out cn γfs γi cov logstart k (DepRef q dev inum ga') dev inum
-                with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
-      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
-      iSplitR "Hlvh"; [| iExact "Hlvh"].
-      iSplitR; [iPureIntro; exact (conj eq_refl eq_refl) |].
-      rewrite /IcacheRef.inode_ref_gen_bare /IcacheRef.inode_ident. iFrame. }
+      iApply (ic_close_out_frz cn γfs γi cov logstart k dev inum q
+                with "Hdepa Hfrg Hrident Hrcpt Hmt Hgida"). }
     iModIntro.
     iAssert (itable_res2 cn γfs γi cov logstart nib dev)
       with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
@@ -684,7 +927,7 @@ Section FreeLockedDev.
                        H3 !!! Regidx c = mfa !!! Regidx c).
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
@@ -801,70 +1044,58 @@ Section FreeLockedDev.
     assert (Hmfisp : mfi !!! Regidx csp_rs1 = sp0)
       by (rewrite (Hmfic csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmr1sp).
     iPoseProof (ipi_70 with "Htext") as "Hi70".
-    (* ===== +0x70 sw zero,64(s1) : ip->valid = 0 (plain store) ===== *)
-    iDestruct "Hvldx" as (w0) "Hva".
-    iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
-    iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
+    (* ===================================================================
+       +0x70 sw zero,64(s1) : ip->valid = 0.
+
+       SINCE IVd THIS IS THIS THREAD'S OWN CELL, and the store opens nothing:
+       from the +0x5e window exit the escrow sits on [IcacheEscrow.ic_out]'s
+       FROZEN alternative, which -- like every OUT arm -- owns NO cells at
+       all, so the whole valid word has been in this thread's hand across
+       [itrunc].  The atomic-update form is kept only because that is the
+       [sw] rule this pin uses; its update opens no invariant.
+
+       THE PARK FOLLOWS THE STORE, three lines below: [ic_swap_park_frz]
+       moves OUT's frozen alternative to [ic_parked]'s (the RECEIPT never
+       leaves the escrow), gives the cells back, rejoins the two descriptor
+       halves into the [ic_tok] releasesleep wants at +0x76, and returns the
+       count fragment and the identity slice AT THE [q] the window exit named
+       -- the eviction at +0x82/+0x8a reads the map off the fragment
+       ([IcacheInv.iref_frag_lookup]) and rebuilds [iref_tok k q].
+
+       WHAT IS *NOT* HERE ANY MORE, and it is B2's dissolution: the old body
+       re-parked the whole payload at [ic_swap_park_arm], handing the record
+       back into the escrow -- which is exactly why the +0x8a eviction then
+       had one bundle and two consumers.  It does not: [inode_raw], the
+       block resources and [dinode_at (di_trunc dn)] stay in this thread's
+       hand, named and un-existentialised, all the way to the +0xba deposit.
+       =================================================================== *)
     iDestruct (sie_cap_gpr_x0 mfi (K - 6)%nat eb pj Rz
                  ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0u Hcg]".
     assert (Hpa70 : add_vec (rget mfi Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                     = i_valid (ientry k)).
     { rewrite (rget_ne mfi Rs1 ltac:(nz)) Hmfis1. reflexivity. }
-    iEval (rewrite -Hpa70) in "Hvld".
-    iApply (wp_sw_s_sconf (mword_of_int (KernelSyms.iput + 0x70)) Rz Rs1
-              (mword_of_int 64 : mword 12) mfi (K - 6)%nat (valid_word true) eb
-              with "Hcg Hpc Hi70 Hvld").
-    iIntros (CIDsw Hssw) "Hcg Hpc Hvld".
-    iEval (rewrite Hpa70) in "Hvld".
     assert (Hsv70 : trunc32 (rget mfi Rz) = valid_word false).
     { rewrite (rget_ne mfi Rz ltac:(nz)) Hx0u. exact ip_trunc32_zero. }
-    iEval (rewrite Hsv70) in "Hvld".
+    iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iput + 0x70)) Rz Rs1
+              (mword_of_int 64 : mword 12) mfi (K - 6)%nat
+              (i_valid (ientry k) ↦₄ valid_word false)%I
+              (⊤ ∖ ↑minstretN) eb ltac:(solve_ndisj)
+              with "Hcg Hpc Hi70 [Hvld]").
+    { rewrite Hpa70 Hsv70.
+      iModIntro. iExists (valid_word true). iFrame "Hvld". iIntros "Hvld".
+      iModIntro. iExact "Hvld". }
+    iIntros (CIDsw Hssw) "Hcg Hpc Hvld".
+    (* ---- THE PARK: OUT's frozen alternative -> [ic_parked]'s (IVd) ---- *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbody" "Hclose".
+    iMod (ic_swap_park_frz cn γfs γi cov logstart k false q dev inum
+            with "Hbody Hdep Hidv Hinh Hvld")
+      as "(Hbody & Hictok & Hfrg & Hrident)".
+    iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
+    iModIntro.
     assert (Hpp74 : add_vec_int (mword_of_int (KernelSyms.iput + 0x70) : mword 64) 4
                     = mword_of_int (KernelSyms.iput + 0x74)) by pcw.
     iEval (rewrite Hpp74) in "Hpc".
-    (* ---- re-park the slot UNLOADED at the fresh generation ga', at the
-       ipool_alloc pool shape (record is di_trunc dn, type<>0, size 0 so all
-       dir facts are vacuous -- unlike ProofIput's post-iupdate imark) ---- *)
-    assert (Hsz0 : bv_unsigned (di_size (di_trunc dn)) = 0) by (vm_compute; reflexivity).
-    assert (Hnl0t : bv_unsigned (di_nlink (di_trunc dn)) = 0) by exact Hnl0.
-    iApply fupd_wp.
-    iInv "Hesc" as ">Hbody" "Hclose".
-    iDestruct "Hmap" as "[Haddrs Hind]".
-    iAssert (ic_payload γfs γi cov logstart k inum ga' false)
-      with "[Hmeta Haddrs Hdat Hind Hblks Hpend]" as "Hpayf".
-    { rewrite /ic_payload /ic_unloaded.
-      iSplitR "Hpend"; [| iExact "Hpend"].
-      iSplitR "Hdat Hind Hblks".
-      - rewrite /inode_raw. iSplitL "Hmeta"; [iExists (di_trunc dn); iExact "Hmeta" |].
-        iExists (bm_cells bm_empty).
-        iSplitR; [iPureIntro; vm_compute; reflexivity |]. iExact "Haddrs".
-      - rewrite /ipool_shape_np. iLeft. rewrite /ipool_alloc.
-        iExists (di_trunc dn), bm_empty, (fun _ => replicate BSIZE (bv_0 8)).
-        iSplitR.
-        { iPureIntro. rewrite /inode_ok. split_and!.
-          - exact (bm_empty_wf cov logstart).
-          - apply bm_covers_nonpos. rewrite Hsz0. lia.
-          - exact (di_trunc_addrs dn).
-          - change (di_type (di_trunc dn)) with (di_type dn). exact Hdtnz.
-          - rewrite Hsz0. pose proof (Nat2Z.is_nonneg MAXFILE);
-              pose proof (Nat2Z.is_nonneg BSIZE); nia.
-          - apply bm_empty_holes. intros i. reflexivity.
-          - exact inode_sized_zero. }
-        iSplitR; [iPureIntro; exact (dir_ok_size_zero icfg_nib (di_trunc dn) _ Hsz0) |].
-        iSplitR; [iPureIntro;
-                  exact (dir_dots_ix_orphan (bv_unsigned inum) (di_trunc dn) _ Hnl0t) |].
-        iSplitR; [iPureIntro; exact (dir_orphan_clean_size_zero (di_trunc dn) _ Hsz0) |].
-        iSplitR; [iPureIntro; exact (dir_uniq_size_zero (di_trunc dn) _ Hsz0) |].
-        iSplitR "Hdat Hind Hblks";
-          [iApply (dir_links_size_zero (bv_unsigned inum) (di_trunc dn)
-                     (fun _ => replicate BSIZE (bv_0 8)) Hsz0 ltac:(rewrite Hnl0t; lia)) |].
-        iFrame "Hdat Hind Hblks". }
-    iMod (ic_swap_park cn γfs γi cov logstart k (DepRef q dev inum ga') ga'
-            false dev inum eq_refl with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
-      as "(Hbody & Hictok & Hrefo)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
-    iModIntro.
-    iDestruct "Hrefo" as "[_ Href]".
     iPoseProof (ipi_74 with "Htext") as "Hi74".
     iPoseProof (ipi_76 with "Htext") as "Hi76".
     (* ===== +0x74 c.mv a0,s3 ; +0x76 jal releasesleep ===== *)
@@ -910,9 +1141,12 @@ Section FreeLockedDev.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
     { iEval (rewrite HJ6a0). iExact "Hspid". }
     iIntros (CIDrs Hsrs mrs) "%Hcsr Hcg Hcnt Hpc Hrslh".
-    iAssert (inode_ref k q dev inum) with "[Href Hrslh]" as "Href".
-    { rewrite inode_ref_gen_intro. iExists ga'.
-      rewrite inode_ref_gen_bare_split. iFrame. }
+    (* the sleeplock's share comes home, but NOT the live slice: that one is
+       in [islot2]'s frozen park until +0x82.  So what this thread holds
+       across the lock-free span is the REDUCED reference -- the count
+       fragment, the identity slice and the sleeplock share -- and the map
+       lookup at the re-acquire reads the fragment alone
+       ([IcacheInv.iref_frag_lookup]). *)
     assert (Hpc7a : ret_pc (J6 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x7a))
       by (rewrite HJ6ra; pcw).
     iEval (rewrite Hpc7a) in "Hpc".
@@ -970,7 +1204,7 @@ Section FreeLockedDev.
       rewrite /J8 upd_ne; [| regne]. rewrite /J7 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf gtl "itable"%string
+    iApply (Acquire.wp_acquire_sconf KT1 gtl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) J9
               0%nat eb pj (K - 6)%nat eb lks ltac:(lia) ltac:(lia) Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitlk]").
@@ -993,8 +1227,12 @@ Section FreeLockedDev.
     (* ===== the ref-- eviction (REF-1): 0x86 lw / 0x88 addiw / 0x8a sw_au ===== *)
     iDestruct "HRres2" as (Mt2 ci2)
       "(Hhalf & %Hwf2 & %Hciwf2 & Hiauth & Hipool & Hslots & Hpool)".
-    iDestruct "Href" as "[Hrtok Hrident]".
-    iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt2 & cnt2 & HMk2 & Hqt1 & Hone2 & Hone2').
+    (* the map is read off the BARE COUNT FRAGMENT (A⁗, §3.16): the live
+       slice this reference used to carry is in [islot2]'s frozen park, so
+       there is no [iref_tok] here to look it up with -- and there never
+       needed to be ([IcacheInv.iref_frag_lookup]). *)
+    iDestruct (iref_frag_lookup with "Hhalf Hfrg")
+      as %(qt2 & cnt2 & HMk2 & Hqt1 & Hone2 & Hone2').
     pose proof (icM_wf_count Mt2 k qt2 cnt2 Hwf2 HMk2) as Hcntb2.
     iPoseProof (ipi_86 with "Htext") as "Hi86".
     iPoseProof (ipi_88 with "Htext") as "Hi88".
@@ -1056,21 +1294,28 @@ Section FreeLockedDev.
     { rewrite (rget_ne F1 Rs1 ltac:(nz)) HF1s1. reflexivity. }
     assert (Hpp8c : add_vec_int (mword_of_int (KernelSyms.iput + 0x8a) : mword 64) 2
                     = mword_of_int (KernelSyms.iput + 0x8c)) by pcw.
-    destruct (decide (cnt2 = 1%positive)) as [Hcnt1 | Hcntne].
-    2: { (* ---- NOT the last close.  OPEN -- blocker (B1) at the head of the
-             file.  [Hone2'] gives [q <> qt2] here, so the STORE itself is
-             fine ([iref_close_store_au] with [qt2 - q = Some qrest]); what
-             is not fine is everything after it: the escrow stays PARKED,
-             [ic_open_auth_ref] refuses to open it without REF-1, so the
-             record the +0xba flush consumes is unreachable -- and the flush
-             would be freeing an inode a foreign referrer still holds.  The
-             re-acquire at +0x82 cannot re-establish REF-1 from anything this
-             lemma owns; see §17.6.1. ---- *)
-         admit. }
-    pose proof (Hone2 Hcnt1) as Hqq.
-    rewrite Hcnt1 in HMk2, Hstv2.
-    rewrite <- Hqq in HMk2.
-    (* ---- the slot's identity, popped from the table's list ---- *)
+    (* ===================================================================
+       B1 IS PAID HERE (iclaim-ledger.md §3.16, and it is the first of this
+       file's two admits gone).
+
+       IVa's wall: the reordered iput released itable.lock at +0x66 and
+       re-acquired it at +0x82, so the REF-1 fact the caller supplied is about
+       the OLD map, and the live arm's [cnt2] is about the new one.  Nothing
+       in the held resources forced [cnt2 = 1]: an iget in the window can
+       split a fresh reference out of the table's retained share, and
+       design/fs-icache.md §17.6.1 CERTIFIES that trace machine-reachable, so
+       no invariant may forbid it.
+
+       A⁗'s answer is not to forbid the trace but to make the WINDOW carry a
+       pin the whole way: the mint at +0x50 put this inum's f column at
+       [FrzPre], the region's own [ireg_frz_ok] says a [FrzPre] column has
+       in-core count ONE, and this thread has held [ifreeze_pre] since.  So
+       [cnt2 = 1] is a REGION FACT, read in one open
+       ([IcacheInv.icnt_freeze_forces_one]) -- and the foreign iget the trace
+       describes is refuted where it belongs, at its OWN up-count, by the
+       frozen park this window left in [islot2] (OPEN(2.6b)).
+       =================================================================== *)
+    (* ---- the slot's identity and its live arm, popped from the table ---- *)
     assert (Hcik2ex : exists di : mword 32 * mword 32, ci2 !! k = Some di).
     { destruct Hciwf2 as [Hdom2 _].
       assert (Hin : k ∈ dom ci2)
@@ -1079,12 +1324,32 @@ Section FreeLockedDev.
     destruct Hcik2ex as [[cdev2 cinum2] Hcik2].
     iDestruct (islots2_acc_upd cn Mt2 ci2 k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /islot2 HMk2 Hcik2) in "Hslot".
-    iDestruct "Hslot" as "(Hrest & Hiu & Hgid)".
+    iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hicnt & Hpark)".
     iDestruct (ip_rest_sum with "Hrest") as %[qr2 Hsum2].
     iAssert (⌜cdev2 = dev /\ cinum2 = inum⌝)%I as %[-> ->].
     { iEval (rewrite /islot_rest_at) in "Hrest".
-      destruct (1/2 - q)%Qp as [q'|] eqn:Et2; [| iDestruct "Hrest" as "[]"].
+      destruct (1/2 - qt2)%Qp as [q'|] eqn:Et2; [| iDestruct "Hrest" as "[]"].
       iApply (inode_ident_agree with "Hrest Hrident"). }
+    iApply fupd_wp.
+    iMod (icnt_freeze_forces_one ⊤ γi γfs inodestart nib inum (Pos.to_nat cnt2)
+            ltac:(solve_ndisj) Hnib with "Hireg Hpre Hicnt")
+      as "(%Hc1 & Hpre & Hicnt)".
+    assert (Hcnt1 : cnt2 = 1%positive).
+    { pose proof (Pos2Nat.is_pos cnt2) as Hp. lia. }
+    assert (Hpos1 : Pos.to_nat 1 = 1%nat) by reflexivity.
+    iEval (rewrite Hcnt1 Hpos1) in "Hicnt".
+    (* ---- and the FROZEN PARK comes home: the mint's mirror half and the two
+       live slices, which together with the invariant's retained (1/2 - q) are
+       the whole unit the last close surrenders (ZZProbeFrz P5) ---- *)
+    iMod (frz_park_pre_reclaim ⊤ γi γfs inodestart nib inum k qt2
+            ltac:(solve_ndisj) Hnib with "Hireg Hpre Hpark")
+      as "(Hpre & Hmirt & Hlvq & Hlvh)".
+    iModIntro.
+    pose proof (Hone2 Hcnt1) as Hqq.
+    rewrite Hcnt1 in HMk2, Hstv2.
+    rewrite <- Hqq in HMk2, Hsum2.
+    iAssert (iref_tok k q) with "[Hfrg Hlvq Hrslh]" as "Hrtok".
+    { rewrite /iref_tok. rewrite Hqq. iFrame. }
     assert (Hqhalf2 : (q ≤ 1/2)%Qp) by (rewrite Hsum2; apply Qp.le_add_l).
     (* ---- the eviction runs BEFORE the store ---- *)
     iApply fupd_wp.
@@ -1093,13 +1358,34 @@ Section FreeLockedDev.
             Mt2 q q dev inum ltac:(solve_ndisj) HMk2
             with "Hitinv Hbody Hhalf Hrtok Hrident")
       as "(Hhalf & Hrtok & Hrident & Harm & _)".
-    iDestruct "Harm" as (vv ga2) "(Hidv & Hinv2 & Hvld & Hpayl & Hlvh & Hmt & Hgida)".
+    iDestruct "Harm" as (vv ga2) "(Hidv & Hinv2 & Hvld & Harmt & Hmt & Hgida)".
+    (* THE ARM IS ON A⁗'s FROZEN ALTERNATIVE, decided by the [ifreeze_pre]
+       this thread has held since the mint at +0x50: what comes out is the
+       RECEIPT and nothing else, and the receipt goes home three lines below,
+       inside the last close's own phase step. *)
+    iDestruct (ic_payload_arm_decide_frz with "Hpre Harmt") as "[Hpre Hrcpt]".
     iDestruct (islot_rest_join k q dev inum Hqhalf2 with "Hrident [Hrest]")
       as "[Hdh Hinh]".
-    { rewrite /islot_rest. iExists dev, inum. iExact "Hrest". }
-    iMod (ic_close_to_empty cn γfs γi cov logstart k vv ga2 dev inum
-            with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hpayl Hmt")
-      as "(Hbody & Hgidf & Hbundle)".
+    (* the slot's retained share is stated at the map's [qt2], which REF-1 has
+       just identified with this reference's own [q] ([Hqq]) *)
+    { rewrite /islot_rest. iExists dev, inum. rewrite Hqq. iExact "Hrest". }
+    (* B2's DISSOLUTION, cashed: the payload never went back into the escrow
+       at the +0x70 park, so the EMPTY arm's raw cells are peeled off the
+       bundle THIS THREAD is still carrying -- itrunc handed [inode_meta] at
+       [di_trunc dn] and [inode_map] at [bm_empty] straight back -- and the
+       RECORD stays here, named, all the way to +0xa8. *)
+    iDestruct "Hmap" as "[Haddrs Hind]".
+    iAssert (inode_raw (ientry k)) with "[Hmeta Haddrs]" as "Hraw".
+    { rewrite /inode_raw. iSplitL "Hmeta".
+      - iExists (di_trunc dn). iExact "Hmeta".
+      - iExists (bm_cells bm_empty). iSplitR;
+          [iPureIntro; rewrite /bm_cells length_app
+             (blkmap_wf_dir_len cov logstart bm_empty (bm_empty_wf cov logstart));
+           reflexivity |].
+        iExact "Haddrs". }
+    iMod (ic_close_to_empty_frz cn γfs γi cov logstart k vv dev inum
+            with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hrcpt")
+      as "(Hbody & Hgidf & Hrcpt)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
     iModIntro.
     assert (Hinreg : bv_unsigned inum ∈ region_inums nib).
@@ -1114,18 +1400,27 @@ Section FreeLockedDev.
     iPoseProof (ipi_94 with "Htext") as "Hi94".
     iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x8a)) Ra5 Rs1
               (mword_of_int 8 : mword 12) F1 (trap_res eb + (K - 6))%nat
-              (itable_half (delete k Mt2) ∗ isl_slot (delete k Mt2) k)%I
-              (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi8a [Hhalf Hrtok Hlvh Hisl]").
+              (itable_half (delete k Mt2) ∗ isl_slot (delete k Mt2) k ∗
+               ifreeze_post (bv_unsigned inum) ∗
+               icnt_half (bv_unsigned inum) 0%nat ∗
+               frzm_h (bv_unsigned inum) false)%I
+              (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
+              with "Hcg Hpc Hi8a [Hhalf Hrtok Hlvh Hisl Hpre Hicnt Hrcpt Hmirt]").
     { rewrite Hpa8a Hstv2.
       replace (Z.pos 1 - 1)%Z with 0%Z by lia.
-      iMod (iref_close_last_store_au (⊤ ∖ ↑minstretN) Mt2 k q
-              ltac:(solve_ndisj) HMk2 with "Hitinv Hhalf Hrtok [Hlvh] Hisl")
+      (* THE LAST CLOSE IS THE PHASE STEP (A⁗): [FrzPre -> FrzPost], the
+         receipt back to the region, the mirror's lock half DOWN, and the
+         uncached ledger pair out -- the three outputs the pool bundle and the
+         off-lock deposit are built from. *)
+      iMod (iref_close_last_freeze_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart
+              nib Mt2 k inum q ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMk2
+              with "Hitinv Hireg Hhalf Hrtok Hlvh Hisl Hpre Hicnt Hrcpt Hmirt")
         as "[Hcell Hback2]".
-      { iExists ga2. iExact "Hlvh". }
       iModIntro. iExists (iref_word Mt2 k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback2" with "Hcell") as "[Hhalf Hisl]". iModIntro. iFrame. }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc [Hhalf Hisl]".
+      iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Hfzpost & Hcnt0 & Hfzp)".
+      iModIntro. iFrame. }
+    iApply wp_next_off_intro.
+    iIntros "Hcg Hpc (Hhalf & Hisl & Hfzpost & Hcnt0 & Hfzp)".
     iDestruct ("Hislback" $! (delete k Mt2) with "[%] Hisl") as "Hipool".
     { intros i0 Hi0. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
     iEval (rewrite Hpp8c) in "Hpc".
@@ -1138,7 +1433,7 @@ Section FreeLockedDev.
     { rewrite /islot2 !lookup_delete. rewrite /islot_empty.
       iExists dev, inum. iFrame. }
     assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
-    iEval (rewrite Hp1) in "Hiu".
+    iEval (rewrite Hcnt1 Hp1) in "Hiu".
     (* ===================================================================
        THE ONE OPEN DESIGN DEBT OF THE REORDER (see the blocker note at the
        head of the file).  The eviction hands back exactly ONE
@@ -1171,12 +1466,28 @@ Section FreeLockedDev.
        implement.  With it, (i) disappears (ci keeps the entry, the pool
        does not grow) and the record travels to +0xa8 unchallenged.
        =================================================================== *)
-    iAssert (∃ dn2 : dinode,
-               ⌜dinode_wf dn2⌝ ∗ ⌜bv_unsigned (di_nlink dn2) = 0⌝ ∗
-               dinode_at γi inum dn2 ∗
-               ipool_shape γfs γi cov logstart inum)%I
-      with "[Hbundle]" as (dn2) "(%Hdn2wf & %Hdn2nl & Hdn2 & Hgap)".
-    { admit. }
+    (* ---- THE RECORD, and only the record: B2's admit is HALF gone.  The
+       bundle never went back into the escrow, so [dn2] is [di_trunc dn]
+       LITERALLY -- no existential, no lost [nlink = 0]. ---- *)
+    set (dn2 := di_trunc dn).
+    assert (Hdn2wf : dinode_wf dn2) by (unfold dn2; apply di_trunc_wf).
+    assert (Hdn2nl : bv_unsigned (di_nlink dn2) = 0) by (unfold dn2; exact Hnl0).
+    iRename "Hdat" into "Hdn2".
+    (* ---- ...AND THE POOL ENTRY, WHICH IS PARKED HERE AND NOT BY THE TAIL.
+       This is the whole of what was left of B2, and the REORDER decides it:
+       the itable lock goes at +0x94, BEFORE the +0xba deposit, and
+       [ic_ci_wf]'s [dom ci = dom M] makes the evicted inum uncached AT THAT
+       RELEASE -- so its bundle must be in the itable's free pool by then.
+       The last close's three outputs are exactly the bundle's: the freeze
+       token mints the escrow the deposit will fill, and the count and mirror
+       halves ride beside it on the AWAIT arm.  The DEPOSIT ticket does not go
+       into the pool: it travels with the record to +0xa8. ---- *)
+    iApply fupd_wp.
+    iMod (escA_alloc ⊤ γi (bv_unsigned inum) with "Hfzpost")
+      as (ge gr gd) "(#Hescr & Htkr & Htkd)".
+    iModIntro.
+    iDestruct (ipool_shape_await γfs γi cov logstart inum ge gr gd
+                 with "Hcnt0 Hfzp Hescr Htkr") as "Hgap".
     iDestruct (ipool_insert γfs γi cov logstart
                  (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum)
                  ltac:(apply fl_notin_diff; exact Hincid) with "[Hgap] Hpool") as "Hpool".
@@ -1248,7 +1559,7 @@ Section FreeLockedDev.
                        G3 !!! Regidx c = F1 !!! Regidx c).
     { intros c Hcs. rewrite /G3 upd_ne; [| regne].
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
-    iApply (Release.wp_release_sconf gtl itable_lock "itable"%string
+    iApply (Release.wp_release_sconf KT1 gtl itable_lock "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
@@ -1338,7 +1649,11 @@ Section FreeLockedDev.
                      = sb_inodestart).
     { rgne. rewrite HP2a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hins".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.iput + 0xa0)) Ra1 Ra1
+    (* THE WALK-TIER IDIOM (iclaim-ledger.md §3.14): the ACCESS PATH is KT1
+       (sp-migration phase D) while the superblock cell stays at
+       [curktier_default]/KT0, exactly as the identity cells do. *)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0)
+              (mword_of_int (KernelSyms.iput + 0xa0)) Ra1 Ra1
               (mword_of_int 1236 : mword 12) P2 (K - 6)%nat
               (mword_of_int inodestart : mword 32) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia0 Hins").
@@ -1417,10 +1732,6 @@ Section FreeLockedDev.
     iPoseProof (log_opSe_lb with "Hop") as "#Hvlb2".
     iAssert (log_credit γ cru Sb' e0' (IBLOCK inum inodestart)) as "#Hcrd2".
     { iApply log_credit_own. intros _. exact Hibin'. }
-    (* the EMPTY escrow the +0xba deposit fills *)
-    iApply fupd_wp.
-    iMod (escA_alloc ⊤ γi (bv_unsigned inum)) as (ge gr) "[#Hescr Htk]".
-    iModIntro.
     (* the off-lock tail runs on two of our three bio slots *)
     iEval (rewrite (_ : 3%nat = (1 + 2)%nat); [| reflexivity]) in "Hbslots".
     iDestruct (bslots_op bn 1 2 with "Hbslots") as "[Hbs1 Hbs2]".
@@ -1433,7 +1744,7 @@ Section FreeLockedDev.
                  ltac:(wp_next_chain) with "Hclm") as "Hclm".
     (* ===== +0xa8 .. j 0x30 : OFF.ip_free_offlock ===== *)
     iApply (OFF.ip_free_offlock γs j γl γu γd γk pd pav pu bn γ γfs γi
-              cov logstart inodestart nib dev inum dn2 ge gr
+              cov logstart inodestart nib dev inum dn2 ge gr gd
               uoff Sb' cru e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks
               ltac:(lia) ltac:(lia) ltac:(lia)
@@ -1441,11 +1752,11 @@ Section FreeLockedDev.
               Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hj Hgl
               ltac:(exact (eq_sym HP5sp)) HP5a0 HP5a1 HP5s2 Hlkbelow
               with "Hcg Hcnt Hextc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hireg
-                    Hdn2 Hescr Htk Hppid Hprocs Hdevi Hdgeom Hdlock Hins Hbs2
+                    Hdn2 Hescr Htkd Hppid Hprocs Hdevi Hdgeom Hdlock Hins Hbs2
                     Hvlb2 Hcrd2 Hop Hra Hs0f Hs1f Hs2f Hs3f Hs4f [-]").
     (* ---- the continuation: offlock's post at 0x30, re-shaped into ours ---- *)
     iIntros (CIDf Hstf).
-    iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hpp Hbs2 Hop2 Hwit
+    iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hbs2 Hop2 Hwit
                   Hra Hs0f Hs1f Hs2f Hs3f Hs4f".
     (* the whole walk never touched a callee-saved register, so [P5] agrees
        with [m] on all of them and offlock's threading composes to ours *)
@@ -1469,15 +1780,20 @@ Section FreeLockedDev.
     iSpecialize ("Hcont" $! CIDf with "[]"); [iPureIntro; wp_next_chain |].
     iApply ("Hcont" $! mf (if cru then S uoff else uoff)
                        (used ∖ bm_blocks bm) (Sb' ∪ {[IBLOCK inum inodestart]}) wbm
-              with "[%] Hcg Hcnt Hextc Hclm Hpc Hppid Hbms Hins [%] Hbm Hpp Hbslots
+              with "[%] Hcg Hcnt Hextc Hclm Hpc Hppid Hbms Hins [%] Hbm Hbslots
                     [%] [%] [%] Hop2 Hiu Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
     { split_and!; [exact Hthrm | exact Hmfsp | exact Hmfs2 | exact Hmfs3 | exact Hmfs4]. }
     { exact (fl_diff_sub used (bm_blocks bm)). }
     { exact (union_subseteq_l' _ _ _ Hsub'). }
     { intros Hw. apply elem_of_union_l. exact (Hwbm' Hw). }
     { exact Hcrbw'. }
-  Admitted.
+  Qed.
 
 End FreeLockedDev.
+(* ---- IVd's ADMIT-FREEDOM CHECK (iclaim-ledger.md IVd as built): the
+   platform axioms, functional extensionality, and this file's OWN eight
+   functor parameters (bread / log_write / brelse / itrunc / acquire /
+   release / acquiresleep / releasesleep) -- and nothing else. *)
+Print Assumptions ip_free_locked.
 
 End FreeLockedDev.

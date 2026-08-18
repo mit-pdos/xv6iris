@@ -2217,16 +2217,20 @@ Section SyscallArms.
        [icfg_dev], so the tie is what bridges the two spellings. *)
     iDestruct "Hfsenv" as "(%Hdev & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                             _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic & _)".
+    (* the REGION handle comes out of the same bundle, one conjunct past
+       [ic_escrows]: idup's [ref++] is a ledger move since increment IVe
+       (iclaim-ledger.md §3.19), so [SpecSysFork] passes it down to kfork. *)
     iDestruct "Hic" as
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & _ & _)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & #Hireg & _)".
     iEval (rewrite Hdev) in "Hitable".
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
-              γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn) (fcn_nib fn)
+              γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
+              (fcn_inodestart fn) (fcn_nib fn)
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hkalloc Hpav Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }

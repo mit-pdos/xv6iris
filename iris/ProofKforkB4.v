@@ -76,6 +76,7 @@ Require Import SpecIdup.
 Require Import SpecSafestrcpy.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
+Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -193,7 +194,7 @@ End KforkB4Res.
 Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -215,7 +216,7 @@ Section KforkB4Proof.
      and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
       (γf γil γic : gname) (cn : ic_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (nib : nat)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
       (m : regfile) (rsv K lvl : nat) (eb : bool) (lks : gset string) :
@@ -243,6 +244,10 @@ Section KforkB4Proof.
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
+    (* THE INODE REGION -- pure pass-through to the [idup] below, whose
+       [ref++] became a ledger move in increment IVe (iclaim-ledger.md
+       §3.19).  Persistent; this block reads no dinode. *)
+    ireg_inv γic γfs inodestart nib -∗
     (* the child's iref units: the [1] is what [idup] spends here, and
        [IREFSPARE] rides through to the park. *)
     iref_slots (1 + IREFSPARE) -∗
@@ -270,7 +275,7 @@ Section KforkB4Proof.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hms5 Hms4 Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv Hir Hparent Hchild Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv #Hireg Hir Hparent Hchild Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".
@@ -362,14 +367,14 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
+    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart inodestart nib
               ck (cq/2)%Qp cdev cinum M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
                  its literal, and only the [rsv] slack is left for [lia]. *)
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
               Hfresh
-              with "Hcg Hown Htext Hpc Hitb Hitinv Hirs Hshr").
+              with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hshr").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".

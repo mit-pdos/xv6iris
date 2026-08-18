@@ -431,14 +431,20 @@ Section ProofIunlockMain.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
-                         i_valid (ientry k) ↦₄ valid_word true)%I)
+                         i_valid (ientry k) ↦₄ valid_word true ∗
+                         ic_deposit cn k (DepShr s dev inum g))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hvalid]").
+              with "Hcg Hpc Hi1c [Hvalid Hdep]").
     { rewrite Hrefadr Hipe.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbody Hvalid")
-        as "[Hvalid Hbor]".
+      (* IVd: the borrow names this holder's OWN descriptor half, which is
+         what rules out [ic_out]'s frozen alternative -- the free path's
+         window, which parks its live mass in [islot2] and deposits
+         a [DepFrz], so there would be no slice to borrow. *)
+      iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
+                   eq_refl with "Hbody Hvalid Hdep")
+        as "(Hvalid & Hdep & Hbor)".
       iDestruct "Hbor" as (sb) "[Hlv Hbback]".
       iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k sb
               ltac:(solve_ndisj) Hk with "Hitbl Hlv") as (v) "[Hcell Hcl]".
@@ -446,8 +452,8 @@ Section ProofIunlockMain.
       iMod ("Hcl" with "Hcell") as "[%Hb Hlv]".
       iMod ("Hclose" with "[Hbback Hlv]") as "_".
       { iNext. iApply ("Hbback" with "Hlv"). }
-      iModIntro. iFrame "Hvalid". iPureIntro. exact Hb. }
-    iIntros (refv CID14 Hq14) "Hcg Hpc [%Href Hvalid]".
+      iModIntro. iFrame "Hvalid Hdep". iPureIntro. exact Hb. }
+    iIntros (refv CID14 Hq14) "Hcg Hpc (%Href & Hvalid & Hdep)".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))
       by (rewrite /R7; apply upd_eq).

@@ -316,10 +316,10 @@ Section FreeEntryDev.
     M !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k) ->
     locks_below lks "log" ->
     "itable" ∉ lks ->
-    sie_cap_gpr M (trap_res eb + (K - 6))%nat false pj -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 6))%nat false pj -∗
     cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-    arm_pay 0 eb pj -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb pj -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x3a) : mword 64) -∗
@@ -339,6 +339,14 @@ Section FreeEntryDev.
     is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                      (slh_tok (icfg_isl k)) -∗
     ireg_inv γi γfs inodestart nib -∗
+    (* THE SEALED REGIME (fs-fragments.md §7.12, §2.3's boot-shelter clause),
+       new at A⁗ and forced by the MINT: [InodeRegion.ireg_freeze_au] takes
+       [ireg_open ∨ ireg_boot] because a RUNTIME freezer must exhibit the seal
+       that ireclaim's boot freeze exhibits with its exclusive token instead.
+       Persistent, so it costs the caller nothing but having it; RULING B
+       fires the seal once, after fsinit and before [kexec("/init")], so every
+       runtime iput has it. *)
+    ireg_open -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res γfs bmapstart cov logstart size used -∗
@@ -353,21 +361,21 @@ Section FreeEntryDev.
     log_opSe γ u Sb e0 -∗
     (* the 6-slot frame: ra/s0/s1 already saved by the prologue; 4/5/6 are
        the s2/s3/s4 slots, still holding prologue garbage *)
-    pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-    pa_stk sp0 4 ↦₈ vg4 -∗
-    pa_stk sp0 5 ↦₈ vg5 -∗
-    pa_stk sp0 6 ↦₈ vg6 -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+    pa_stk sp0 4 ↦₈[KT1] vg4 -∗
+    pa_stk sp0 5 ↦₈[KT1] vg5 -∗
+    pa_stk sp0 6 ↦₈[KT1] vg6 -∗
     (* ===== EXIT A: pc +0x20, the ip_tail seam (valid==0 OR nlink!=0);
        the bundle goes back UNTOUCHED, the payload is re-parked ===== *)
     (∀ (M' : regfile) (vg4' vg5' vg6' : mword 64),
        ⌜ipe_regs m M' spd k⌝ -∗
        ⌜M' !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)⌝ -∗
-       sie_cap_gpr M' (trap_res eb + (K - 6))%nat false pj -∗
+       sie_cap_gpr KT1 M' (trap_res eb + (K - 6))%nat false pj -∗
        cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-       arm_pay 0 eb pj -∗
-       trap_csrs_ext eb -∗
+       arm_pay KT1 0 eb pj -∗
+       trap_csrs_ext KT1 eb -∗
        cpu_claim_ext eb pj -∗
        pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
        locked gtl cpu_id -∗
@@ -385,12 +393,12 @@ Section FreeEntryDev.
        log_epoch_lb γ v -∗
        log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
        log_opSe γ u Sb e0 -∗
-       pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-       pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-       pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-       pa_stk sp0 4 ↦₈ vg4' -∗
-       pa_stk sp0 5 ↦₈ vg5' -∗
-       pa_stk sp0 6 ↦₈ vg6' -∗
+       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+       pa_stk sp0 4 ↦₈[KT1] vg4' -∗
+       pa_stk sp0 5 ↦₈[KT1] vg5' -∗
+       pa_stk sp0 6 ↦₈[KT1] vg6' -∗
        WP (Loop : expr riscv_lang)) -∗
     (* ===== EXIT B: pc +0x5a, byte-compatible with ip_free_locked's ENTRY
        (IputFreeLockedDev.v:247).  dn/bm/data/g1 are the body's discoveries
@@ -419,10 +427,10 @@ Section FreeEntryDev.
         M5 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) /\
         M5 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) /\
         M5 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)⌝ -∗
-       sie_cap_gpr M5 (trap_res eb + (K - 6))%nat false pj -∗
+       sie_cap_gpr KT1 M5 (trap_res eb + (K - 6))%nat false pj -∗
        cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
-       arm_pay 0 eb pj -∗
-       trap_csrs_ext eb -∗
+       arm_pay KT1 0 eb pj -∗
+       trap_csrs_ext KT1 eb -∗
        cpu_claim_ext eb pj -∗
        pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
        locked gtl cpu_id -∗
@@ -463,10 +471,33 @@ Section FreeEntryDev.
        ic_id cn k (1/2) true dev inum -∗
        (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
         ic_id cn k (1/2) true dev inum -∗
+        (* ...AND THE ARM's FIFTH CONJUNCT (A⁗, §3.16): the caller supplies
+           the FROZEN PARK it builds out of the mint's mirror half and the two
+           live slices it is about to stop needing.  It cannot be built here:
+           the mint has already flipped the bit, so nothing but the park
+           itself satisfies [islot2]'s live arm from +0x50 on. *)
+        frz_park k (bv_unsigned inum) q -∗
           ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
           IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
        ic_payload_at γfs γi cov logstart k inum g1 dn bm -∗
        live_gen k (1/2) g1 -∗
+       (* ---- WHAT THE MINT LEFT STANDING (iclaim-ledger.md §3.16, A⁗) ----
+          §3.14's token slot is gone from this seam: the free path no longer
+          hands the disjunction on unresolved, it hands on the THREE things
+          the mint at +0x50 produced.
+
+          [ifreeze_pre] is kept IN HAND all the way to +0x8a -- it decides the
+          escrow arm's tail at the +0x70 park and at the eviction
+          ([IcacheEscrow.ic_payload_arm_decide_frz]), it pins the count across
+          the lock-free span (B1, [IcacheInv.icnt_freeze_forces_one]) and it
+          is what [iref_close_last_freeze_store_au] steps.
+          The RECEIPT is what the +0x5e window exit parks in the escrow's
+          FROZEN alternative, and the last close takes it home.
+          The MIRROR's half UP is what [islot2]'s FROZEN PARK selects on --
+          the park the re-assembly wand above demands. *)
+       ifreeze_pre (bv_unsigned inum) -∗
+       frzown (bv_unsigned inum) -∗
+       frzm_h (bv_unsigned inum) true -∗
        i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -476,12 +507,12 @@ Section FreeEntryDev.
        log_epoch_lb γ v -∗
        log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
        log_opSe γ u Sb e0 -∗
-       pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
-       pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
-       pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
-       pa_stk sp0 4 ↦₈ (m !!! Regidx Rs2) -∗
-       pa_stk sp0 5 ↦₈ (m !!! Regidx Rs3) -∗
-       pa_stk sp0 6 ↦₈ (m !!! Regidx Rs4) -∗
+       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
+       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
+       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
+       pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx Rs2) -∗
+       pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx Rs3) -∗
+       pa_stk sp0 6 ↦₈[KT1] (m !!! Regidx Rs4) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -490,7 +521,7 @@ Section FreeEntryDev.
            Hlkbelow Hitnotin.
     iIntros "Hcg Hcnt Hpay Hextc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx
              #Hitlk #Hitinv #Hesc Htok Hhalf Hiauth Hipool Hslots Hpool Href
-             #Hslk #Hireg Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock
+             #Hslk #Hireg #Hropen Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock
              Hbslots #Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6 HcA HcB".
     pose proof Hregs as Hregs'.
     destruct Hregs' as (HMs1 & HMsp & _).
@@ -506,7 +537,21 @@ Section FreeEntryDev.
     destruct Hcikex as [[cdev cinum] Hcik].
     iDestruct (islots2_acc_upd cn Mt ci k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /islot2 HMk1 Hcik) in "Hslot".
-    iDestruct "Hslot" as "(Hrest & Hiu & Hgid)".
+    (* FOUR conjuncts, not three: [islot2]'s live arm carries the [icnt] slot
+       half beside the identification ghost since iclaim-ledger.md §2.2, and
+       the count half must be split out explicitly (IIIe's own observation at
+       the iget hit).  It rides UNMOVED through this whole span. *)
+    (* FIVE conjuncts since A⁗ (iclaim-ledger.md §3.16): the live arm also
+       carries the FREEZE MIRROR's lock half, on its ordinary alternative or
+       on a FROZEN PARK.  At REF-1 it cannot be the latter -- the park would
+       hold the whole outstanding share and the escrow arm's half, and this
+       thread's OWN share is then one slice too many -- so the walk decides it
+       here, with no region open and no token
+       ([IcacheInv.frz_park_ref1_off], xv6's REF-1 argument made available to
+       the proof).  The [false] half it yields is what takes the payload's
+       [ifreeze_off] out of the window-entering read below (P2) and what the
+       MINT at +0x50 flips. *)
+    iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hcnt1 & Hpark)".
     iDestruct (fe_rest_sum with "Hrest") as %[qr Hsum].
     iDestruct "Href" as "[Hrtok Hrident]".
     iAssert (⌜cdev = dev /\ cinum = inum⌝)%I as %[-> ->].
@@ -514,6 +559,15 @@ Section FreeEntryDev.
       destruct (1/2 - q)%Qp as [q'|] eqn:Et; [| iDestruct "Hrest" as "[]"].
       iApply (inode_ident_agree with "Hrest Hrident"). }
     assert (Ert : (1/2 - q)%Qp = Some qr) by (apply Qp.sub_Some; exact Hsum).
+    (* ---- THE REF-1 PARK DECISION (A⁗, §3.16) ---- *)
+    iDestruct "Hrtok" as "(Hrfrg0 & Hrlv0 & Hrslh0)".
+    iApply fupd_wp.
+    iMod (frz_park_ref1_off ⊤ Mt k (bv_unsigned inum) q
+            ltac:(solve_ndisj) HMk1 with "Hitinv Hhalf Hrlv0 Hpark")
+      as "(Hhalf & Hrlv0 & Hmirf)".
+    iModIntro.
+    iAssert (iref_tok k q) with "[Hrfrg0 Hrlv0 Hrslh0]" as "Hrtok";
+      [ rewrite /iref_tok; iFrame |].
     (* ===== +0x3a c.lw a4,64(s1) : the read that ENTERS the window ===== *)
     assert (Hpa3a : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                     = i_valid (ientry k)).
@@ -527,23 +581,40 @@ Section FreeEntryDev.
                         i_dev (ientry k) ↦₄{DfracOwn qr} dev ∗
                         i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
                         (∃ ga : gname,
-                           ic_payload γfs γi cov logstart k inum ga true ∗
+                           (* THE ARM's TAIL, DECIDED (A⁗, §3.16 / ZZProbeFrz
+                              P2).  The tail is a disjunction since §3.14's
+                              DEVIATION 1, widened by A⁗; its FROZEN
+                              alternative is the receipt, and the [false]
+                              mirror half this walk just extracted refutes it
+                              through the region's own receipt clause
+                              ([InodeRegion.ireg_frzown_off_absurd]).  So what
+                              comes out is the payload, the inum's UNFROZEN
+                              token -- which is exactly what the MINT at +0x50
+                              consumes -- and the arm's liveness half. *)
+                           ic_payload_np γfs γi cov logstart k inum ga true ∗
+                           ifreeze_off (bv_unsigned inum) ∗
                            live_gen k (1/2) ga)
                    else IcacheRef.inode_ident k (DfracOwn q) dev inum ∗
-                        islot_rest_at k q dev inum))%I)
+                        islot_rest_at k q dev inum) ∗
+                  frzm_h (bv_unsigned inum) false)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi3a [Hhalf Hrtok Hrident Hrest]").
+              with "Hcg Hpc Hi3a [Hhalf Hrtok Hrident Hrest Hmirf]").
     { rewrite Hpa3a.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_auth_ref cn γfs γi cov logstart k
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) Mt q q dev inum
               ltac:(solve_ndisj) HMk1 with "Hitinv Hbody Hhalf Hrtok Hrident")
         as "(Hhalf & Hrtok & Hrident & Harm & _)".
-      iDestruct "Harm" as (vld ga) "(Hidv & Hinh & Hvld & Hpayl & Hlvh & Hmt & Hgida)".
+      iDestruct "Harm" as (vld ga) "(Hidv & Hinh & Hvld & Hpayl & Hmt & Hgida)".
       iModIntro. iExists (valid_word vld). iFrame "Hvld". iIntros "Hvld".
       destruct vld.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
+        rewrite /ic_payload_arm.
+        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh) | Hrc]"; last first.
+        { iMod (ireg_frzown_off_absurd (⊤ ∖ ↑minstretN ∖ ↑icEscN)
+                  γi γfs inodestart nib inum ltac:(solve_ndisj) Hnib
+                  with "Hireg Hmirf Hrc") as "[]". }
         iDestruct "Hrident" as "[Hrd Hrn]".
         iEval (rewrite /islot_rest_at Ert) in "Hrest".
         iDestruct "Hrest" as "[Htd Htn]".
@@ -555,18 +626,20 @@ Section FreeEntryDev.
         iMod ("Hclose" with "[Hidv Hnfull Hva Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
-        iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb".
+        iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb Hmirf".
         iSplitR; [done |]. iExists ga.
-        iSplitL "Hpayl"; [iExact "Hpayl" | iExact "Hlvh"].
-      - (* UNLOADED: read-only, everything goes straight back *)
-        iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
+        iSplitL "Hpayl"; [iExact "Hpayl" |].
+        iSplitL "Hoff"; [iExact "Hoff" | iExact "Hlvh"].
+      - (* UNLOADED: read-only, everything goes straight back -- the tail is
+           re-parked exactly as it came out, undecided. *)
+        iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_parked.
-          iApply (ic_mk_parked cn γfs γi cov logstart k dev inum false ga
-                    with "Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida"). }
+          iApply (ic_mk_parked_arm cn γfs γi cov logstart k dev inum false ga
+                    with "Hidv Hinh Hvld Hpayl Hmt Hgida"). }
         iModIntro. iExists false. iFrame. done. }
     iIntros (wvld).
     iApply wp_next_off_intro. iIntros "Hcg Hpc HPsi".
-    iDestruct "HPsi" as (vv) "(%Hwv & Hhalf & Hrtok & Hrem)".
+    iDestruct "HPsi" as (vv) "(%Hwv & Hhalf & Hrtok & Hrem & Hmirf)".
     subst wvld.
     set (F1 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 (valid_word vv))]> M).
     assert (HF1a4 : F1 !!! Regidx Ra4 = (sign_extend' 64 (valid_word vv) : mword 64))
@@ -598,9 +671,11 @@ Section FreeEntryDev.
                        = mword_of_int (KernelSyms.iput + 0x20)) by pcw.
       iEval (rewrite Hpp20b) in "Hpc".
       iDestruct "Hrem" as "[Hrident Hrest]".
-      iDestruct ("Hback" $! Mt ci with "[%] [%] [Hrest Hiu Hgid]") as "Hslots";
+      iDestruct ("Hback" $! Mt ci with "[%] [%] [Hrest Hiu Hgid Hcnt1 Hmirf]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
-      { rewrite /islot2 HMk1 Hcik. iFrame. }
+      { rewrite /islot2 HMk1 Hcik. iFrame "Hiu Hgid Hcnt1".
+        iSplitL "Hrest"; [iExact "Hrest" |].
+        iApply (frz_park_intro_off with "Hmirf"). }
       iApply ("HcA" $! F1 vg4 vg5 vg6
                 with "[%] [%] Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool
                       Hslots Hpool [Hrtok Hrident] Hbms Hins Hbm Hppid Hbslots Hvlb
@@ -609,7 +684,7 @@ Section FreeEntryDev.
       { exact HF1a5. }
       { rewrite /IcacheRef.inode_ref. iFrame. } }
     (* ===== valid == 1: fall through, WITH the payload in hand ===== *)
-    iDestruct "Hrem" as "(Hrd & Htd & Hvb & (%ga & Hpayl & Hlvh))".
+    iDestruct "Hrem" as "(Hrd & Htd & Hvb & (%ga & Hpayl & Hoff & Hlvh))".
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x3c))
               (mword_of_int 242 : mword 8) (Cregidx (mword_of_int 6)) Ra4
               F1 (trap_res eb + (K - 6))%nat false
@@ -678,7 +753,13 @@ Section FreeEntryDev.
                     = i_dev (ientry k)).
     { rewrite (rget_ne F1 Rs1 ltac:(nz)) HF1s1. reflexivity. }
     iEval (rewrite -Hpa42) in "Hrd".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.iput + 0x42)) Rs4 Rs1
+    (* THE WALK-TIER IDIOM (iclaim-ledger.md §3.14; template ProofIget.v:1704
+       / :1776).  An identity-cell machine load instantiates the wp at
+       [(kt := KT1) (ktd := KT0)]: the ACCESS PATH is KT1 (sp-migration phase
+       D), while the icache's identity cells stay at [curktier_default]/KT0 --
+       [IcacheRef.inode_ident] is stated there and must NOT be retiered. *)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0)
+              (mword_of_int (KernelSyms.iput + 0x42)) Rs4 Rs1
               (mword_of_int 0 : mword 12) F1 (trap_res eb + (K - 6))%nat dev false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 Hrd").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrd".
@@ -708,8 +789,11 @@ Section FreeEntryDev.
     assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.iput + 0x42) : mword 64) 4
                     = mword_of_int (KernelSyms.iput + 0x46)) by pcw.
     iEval (rewrite Hpp46) in "Hpc".
-    (* the loaded bundle, at the record we are holding *)
-    iEval (rewrite /ic_payload) in "Hpayl".
+    (* the loaded bundle, at the record we are holding.  Since A⁗ the arm's
+       tail comes out DECIDED (see the +0x3a AU), so what is in hand is the
+       payload proper plus the inum's UNFROZEN token -- the one the mint at
+       +0x50 spends. *)
+    iEval (rewrite /ic_payload_np) in "Hpayl".
     iDestruct "Hpayl" as (dn bm) "Hpayl".
     iAssert (ic_payload_at γfs γi cov logstart k inum ga dn bm) with "[Hpayl]" as "Hpayl";
       [ rewrite /ic_payload_at; iExact "Hpayl" |].
@@ -733,16 +817,17 @@ Section FreeEntryDev.
               (mword_of_int 4 : mword 12) F2 (trap_res eb + (K - 6))%nat
               (fun w => (⌜w = inum⌝ ∗ itable_half Mt ∗ iref_frag k q ∗ live_frac k q ∗
                          live_gen k (1/2) ga ∗ ic_id cn k (1/2) true dev inum ∗
+                         i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
                          ic_payload_at γfs γi cov logstart k inum ga dn bm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi46 [Hhalf Hrfrg Hrlv Hlvh Hgid Hpayl]").
+              with "Hcg Hpc Hi46 [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑icEscN)
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
-              with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hpayl")
-        as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+              with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
+        as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iDestruct "Hvldx" as (w0) "Hva".
       iModIntro. iExists inum. iFrame "Hnfull". iIntros "Hnfull".
       iMod ("Hclose" with "[Hidv Hnfull Hva Hmt Hgida]") as "_".
@@ -751,7 +836,7 @@ Section FreeEntryDev.
       iModIntro. iFrame. done. }
     iIntros (winum).
     iApply wp_next_off_intro. iIntros "Hcg Hpc HPsi".
-    iDestruct "HPsi" as "(%Hwi & Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hpayl)".
+    iDestruct "HPsi" as "(%Hwi & Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl)".
     subst winum.
     set (F3 := <[Regidx Rs2 := regval_into_reg (sign_extend' 64 inum)]> F2).
     assert (HF3s2 : F3 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
@@ -792,7 +877,10 @@ Section FreeEntryDev.
                     = i_nlink (ientry k)).
     { rewrite (rget_ne F3 Rs1 ltac:(nz)) HF3s1. reflexivity. }
     iEval (rewrite -Hpa4a) in "Hmnl".
-    iApply (wp_lh_s_sconf (mword_of_int (KernelSyms.iput + 0x4a)) Ra4 Rs1
+    (* the WALK-TIER IDIOM again (§3.14): the metadata cells, like the
+       identity cells, stay at the DATA tier while the access path is KT1. *)
+    iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0)
+              (mword_of_int (KernelSyms.iput + 0x4a)) Ra4 Rs1
               (mword_of_int 74 : mword 12) F3 (trap_res eb + (K - 6))%nat (di_nlink dn) false
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a Hmnl").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hmnl".
@@ -858,11 +946,14 @@ Section FreeEntryDev.
         iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
-              with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hpayl")
-        as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+              with "Hitinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
+        as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
       iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
       { rewrite /iref_tok. iFrame. }
-      iDestruct (ic_payload_at_pack with "Hpayl") as "Hpayl".
+      (* re-park at the ARM's tail, on its ORDINARY alternative: the token the
+         +0x3a read took goes straight back in (this exit never freezes), and
+         so does the arm's liveness half (A⁗, §3.16). *)
+      iDestruct (ic_payload_at_pack_np with "Hpayl") as "Hpayl".
       iDestruct "Hvldx" as (w0) "Hva".
       iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
       iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
@@ -871,15 +962,17 @@ Section FreeEntryDev.
       iEval (rewrite Hsum) in "Hn2".
       iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
-      iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida]") as "_".
+      iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hoff Hlvh Hmt Hgida]") as "_".
       { iApply bi.later_intro. iApply ic_close_parked.
-        iApply (ic_mk_parked cn γfs γi cov logstart k dev inum true ga
-                  with "Hidv Hinh Hvld Hpayl Hlvh Hmt Hgida"). }
+        iApply (ic_mk_parked_arm cn γfs γi cov logstart k dev inum true ga
+                  with "Hidv Hinh Hvld [Hpayl Hoff Hlvh] Hmt Hgida").
+        rewrite /ic_payload_arm. iLeft. iFrame "Hpayl Hoff Hlvh". }
       iModIntro.
-      iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid]") as "Hslots";
+      iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid Hcnt1 Hmirf]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
-      { rewrite /islot2 HMk1 Hcik. rewrite /islot_rest_at Ert /IcacheRef.inode_ident.
-        iFrame. }
+      { rewrite /islot2 HMk1 Hcik. iFrame "Hiu Hgid Hcnt1".
+        iSplitR "Hmirf"; [| iApply (frz_park_intro_off with "Hmirf")].
+        rewrite /islot_rest_at Ert /IcacheRef.inode_ident. iFrame. }
       (* ===== +0xcc c.ldsp s2,16(sp) ; +0xce c.ldsp s4,0(sp) ===== *)
       iPoseProof (ipi_cc with "Htext") as "Hicc".
       iPoseProof (ipi_ce with "Htext") as "Hice".
@@ -952,6 +1045,35 @@ Section FreeEntryDev.
     assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.iput + 0x4e) : mword 64) 2
                     = mword_of_int (KernelSyms.iput + 0x50)) by pcw.
     iEval (rewrite Hpp50) in "Hpc".
+    (* ===================================================================
+       THE MINT (iclaim-ledger.md §3.16, RULING A⁗; §1.4/§2.3's f-column
+       mover).  The C at +0x50 only saves [s3]; this is the GHOST step that
+       rides with it, and +0x50 is the ONE instant at which it can happen --
+       the itable lock is HELD (so the mirror's lock half is reachable, and
+       [frzm_update] wants both halves), the region can be opened, the walk
+       has just DECIDED [ip->nlink == 0] off the payload it is holding, and
+       the count is REF-1's ONE.
+
+       What it spends: the payload's [ifreeze_off], the mirror's [false] half
+       (peeled at +0x3a), the record (borrowed) and the [icnt] half.  What it
+       yields: [ifreeze_pre] -- kept IN HAND to +0x8a, where it decides the
+       escrow arm and pays [iref_close_last_freeze_store_au] -- the freeze
+       RECEIPT (which the +0x5e window exit parks in the escrow's frozen
+       alternative), and the mirror's half UP, which the +0x62 park puts in
+       [islot2]'s FROZEN PARK.  From here to +0x8a the column reads [FrzPre],
+       and that is what pins the count across the lock-free span (B1) and
+       kills a foreign [idup] (2.6b).
+       =================================================================== *)
+    assert (Hp1nat : Pos.to_nat 1 = 1%nat) by reflexivity.
+    iEval (rewrite Hp1nat) in "Hcnt1".
+    iApply fupd_wp.
+    iMod (ireg_freeze_au ⊤ γi γfs inodestart nib inum dn
+            ltac:(solve_ndisj) Hnib (fe_nlink_zero (di_nlink dn) Hnl0) Htyne
+            with "Hireg [] Hdat Hoff Hcnt1 Hmirf")
+      as "(Hdat & Hpre & Hcnt1 & Hrcpt & Hmirt)";
+      [ iLeft; iExact "Hropen" |].
+    iModIntro.
+    iEval (rewrite -Hp1nat) in "Hcnt1".
     iPoseProof (ipi_50 with "Htext") as "Hi50".
     iPoseProof (ipi_52 with "Htext") as "Hi52".
     iPoseProof (ipi_56 with "Htext") as "Hi56".
@@ -1057,24 +1179,25 @@ Section FreeEntryDev.
     { rewrite /iref_tok. iFrame. }
     iAssert (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
              ic_id cn k (1/2) true dev inum -∗
+             frz_park k (bv_unsigned inum) q -∗
                ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
                IcacheRef.inode_ident k (DfracOwn q) dev inum)%I
-      with "[Htd Hiu Hback Hrd]" as "Hwand".
-    { iIntros "Hn2 Hgid2".
+      with "[Htd Hiu Hback Hrd Hcnt1]" as "Hwand".
+    { iIntros "Hn2 Hgid2 Hpk".
       iEval (rewrite Hsum) in "Hn2".
       iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
-      iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid2]") as "Hslots";
+      iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid2 Hcnt1 Hpk]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
-      { rewrite /islot2 HMk1 Hcik. rewrite /islot_rest_at Ert /IcacheRef.inode_ident.
-        iFrame. }
+      { rewrite /islot2 HMk1 Hcik. iFrame "Hiu Hgid2 Hcnt1 Hpk".
+        rewrite /islot_rest_at Ert /IcacheRef.inode_ident. iFrame. }
       iSplitL "Hslots"; [iExact "Hslots" |].
       rewrite /IcacheRef.inode_ident. iFrame. }
     iApply ("HcB" $! F7 ga dn bm data
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool Hpool
-                    [%] Hrtok Hgid Hwand Hpayl Hlvh Hvb Hbms Hins Hbm Hppid Hbslots
-                    Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
+                    [%] Hrtok Hgid Hwand Hpayl Hlvh Hpre Hrcpt Hmirt Hvb Hbms Hins Hbm
+                    Hppid Hbslots Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
     { exact Htyne. }
     { exact (fe_nlink_zero (di_nlink dn) Hnl0). }
     { exact (fe_dinode_wf cov logstart dn bm Hbmwf Hdiaddrs). }
@@ -1092,3 +1215,8 @@ Section FreeEntryDev.
   Qed.
 
 End FreeEntryDev.
+
+(* ---- IVb's ADMIT-FREEDOM CHECK (iclaim-ledger.md §3.14 as built) ------
+   Platform axioms (rv64d reservation / plat_term_write) and functional
+   extensionality, and nothing else. *)
+Print Assumptions ip_free_entry.

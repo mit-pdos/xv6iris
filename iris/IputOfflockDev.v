@@ -130,15 +130,18 @@ Section OfflockDev.
        - a0 = dev, a1 = the IBLOCK word, s2 = inum (sign-extended);
        - s1 will be overwritten with bp; s3/s4 ride the frame;
        - the loaded record [dinode_at gi inum dn] with di_nlink dn = 0;
-       - the EMPTY escrow minted at 0x86: [escA_inv ge gr gi inum] +
-         [redeem_ticketA gr];  [ireg_inv];
+       - the EMPTY escrow minted at the +0x8a last close, [escA_inv ge gr gd
+         gi inum], and its DEPOSIT ticket [redeem_ticketA gd];  [ireg_inv].
+         NOT the pool bundle: under the reorder [ip_free_locked] has already
+         parked that at the +0x94 release (IVd, see the entry note);
        - bread/log_write/brelse fabric (bio_ctx, log_ctx, disk, procs);
        - the 6-slot frame (ra,s0,s1 held through; s2,s3,s4 restored here).
 
      POST (at pc = iput+0x30, handed to the iput-return epilogue):
        - the machine restored (s2/s3/s4 <- saved frame values), sp unchanged;
-       - the freshly PARKED pool entry [ipool_shape .. inum] on its pending arm
-         (region side parked into [ireg_inv] by the deposit);
+       - the region side parked into [ireg_inv] by the deposit, and the
+         escrow left FILLED for whoever redeems it (no pool entry: it was
+         parked at +0x94);
        - log ledger grown by the inode block; the frame still held.
      ====================================================================== *)
   Lemma ip_free_offlock `{GEN : GenId} `{CID0 : CpuId}
@@ -149,7 +152,7 @@ Section OfflockDev.
       (γ : log_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat)
       (dev : mword 32) (inum : mword 32) (dn : dinode)
-      (ge gr : gname)
+      (ge gr gd : gname)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqs : dfrac)
       (sp0 vra vs0 vs1 vs2 vs3 vs4 : mword 64)
@@ -173,9 +176,9 @@ Section OfflockDev.
     m !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64) ->
     m !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64) ->
     locks_below lks "log" ->
-    sie_cap_gpr m K b pj -∗
+    sie_cap_gpr KT1 m K b pj -∗
     cpu_own 0 eb pj b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KernelSyms.iput + 0xa8) : mword 64) -∗
     panic_env -∗
@@ -183,8 +186,31 @@ Section OfflockDev.
     log_ctx γ bn γfs cov logstart dev -∗
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    escA_inv ge gr γi (bv_unsigned inum) -∗
-    redeem_ticketA gr -∗
+    (* ---- THE LEDGER's UNCACHED CAPITAL IS NOT HERE (iclaim-ledger.md IVd),
+       and under the REORDER it cannot be.  The count half at zero, the
+       mirror's half DOWN and the escrow's REDEEM ticket are the evicted
+       inum's POOL BUNDLE, and the reordered iput releases the itable lock at
+       +0x94 -- BEFORE this tail runs.  At that release
+       [IcacheEscrow.ic_ci_wf]'s [dom ci = dom M] already shows the inum
+       uncached, so its bundle must be in the itable's free pool by then, and
+       [ip_free_locked] parks it there on the AWAIT arm
+       ([IcacheEscrow.ipool_shape_await]) out of the last close's own three
+       outputs.  There is exactly one [icnt_half .. 0] and one
+       [frzm_h .. false] in the system, so this tail can neither take them nor
+       hand one back: the pending arm's [committedA] upgrade belongs to
+       whoever later redeems the escrow, not to the depositor.
+
+       WHAT THE DEPOSITOR STILL CARRIES is the escrow itself (persistent) and
+       its DEPOSIT ticket, below -- the two things the +0xba fill needs. *)
+    escA_inv ge gr gd γi (bv_unsigned inum) -∗
+    (* THE DEPOSIT TICKET (A⁗, §3.16), in place of IVa's [ifreeze_post].  The
+       standing freeze now lives in the ESCROW's EMPTY state -- it has to,
+       because that is the only place from which a RECYCLER peeling the pool's
+       await arm can find it and its licence refute it (§1.3) -- so the
+       depositor carries the ticket that opens that state instead, and
+       [EscrowInode.escA_deposit_acc] hands it the token, takes the retired
+       one back, and rules out a second deposit. *)
+    redeem_ticketA gd -∗
     p_pid pj ↦₄{dq} pidv -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
@@ -196,37 +222,37 @@ Section OfflockDev.
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
     log_opSe γ (S u) Sb e0 -∗
     (* the frame: ra/s0/s1 ride through to the epilogue; s2/s3/s4 restored here *)
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈ vra -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈ vs0 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈ vs1 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈ vs2 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ vs3 -∗
-    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ vs4 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[KT1] vs1 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[KT1] vs2 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
+    add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
     (* THE CALLER'S CONTINUATION at 0x30 *)
     wp_next true pj (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜ipo_thr m mf /\ mf !!! Regidx csp_rs1 = sp0
           /\ mf !!! Regidx Rs2 = vs2 /\ mf !!! Regidx Rs3 = vs3
           /\ mf !!! Regidx Rs4 = vs4⌝ -∗
-        sie_cap_gpr (CID := CID) mf K b pj -∗
+        sie_cap_gpr (CID := CID) KT1 mf K b pj -∗
         cpu_own (CID := CID) 0 eb pj b lks -∗
-        trap_csrs_ext (CID := CID) eb -∗
+        trap_csrs_ext (CID := CID) KT1 eb -∗
         cpu_claim_ext (CID := CID) eb pj -∗
         pc_is (CID := CID) (mword_of_int (KernelSyms.iput + 0x30) : mword 64) -∗
         p_pid pj ↦₄{dq} pidv -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        (* the parked pool entry (pending arm), for the itable free pool *)
-        ipool_shape γfs γi cov logstart inum -∗
+        (* no pool entry: [ip_free_locked] parked it at the +0x94 release,
+           on the AWAIT arm -- see the entry note above *)
         bslots bn 2 -∗
         log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
         (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
         (* the frame ra/s0/s1 slots, still saved, for the epilogue *)
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈ vra -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈ vs0 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈ vs1 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈ vs2 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ vs3 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ vs4 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[KT1] vs1 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[KT1] vs2 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -257,7 +283,7 @@ Section OfflockDev.
     assert (Hnlst : di_nlink_stable dn' dn).
     { rewrite /di_nlink_stable /dn' /set_ditype0 /=. split; [reflexivity | intros _; exact Hnl0]. }
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hireg Hdn
-             #Hesc Htk Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsb Hsl #Hvlb #Hcrd0 Hop
+             #Hesc Hdep Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsb Hsl #Hvlb #Hcrd0 Hop
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
@@ -481,13 +507,13 @@ Section OfflockDev.
                     = add_vec_int (mword_of_int (KernelSyms.iput + 0xba) : mword 64) 4)
       by (rewrite /R5; apply upd_eq).
     (* ---- the deposit's AU, adapted to log_write's anchor form ---- *)
-    iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn' ds ge gr
+    iPoseProof (ireg_free_deposit_au ⊤ γi γfs inodestart nib inum dn dn' ds ge gr gd
                   ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hdswf Hdn'wf Hdn'ty Hnlst
-                  with "Hireg Hesc Hdn") as "Hau0".
+                  with "Hireg Hesc Hdn Hdep") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
     iDestruct (lw_au_lb0 γ γfs (uint bno) (⊤ ∖ ↑iregN)
                  (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds)
-                 (committedA ge) e0 with "Hau0") as "Hau".
+                 (committedA ge)%I e0 with "Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -498,7 +524,7 @@ Section OfflockDev.
       [rewrite Hbno; iExact "Hcrd0" |].
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
-              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge)
+              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge)%I
               R5 0%nat eb pj K b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -507,10 +533,11 @@ Section OfflockDev.
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.
     iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS #Hcom Hlk Hsl".
-    (* ---- assemble the parked pool entry ---- *)
-    iAssert (ipool_shape γfs γi cov logstart inum) with "[Htk]" as "Hpp".
-    { rewrite /ipool_shape. iRight. rewrite /pool_pending. iExists ge, gr.
-      iFrame "Hesc Hcom Htk". }
+    (* NO POOL ENTRY IS ASSEMBLED HERE (IVd).  The bundle was parked at the
+       +0x94 release on the AWAIT arm, which is the arm's own stated purpose;
+       the [committedA] the deposit just produced is not needed to state it
+       (the await arm is [pool_pending] minus exactly that fragment) and the
+       upgrade, if anyone ever wants it, belongs to the redeemer. *)
     (* ---- the log ledger, in the public form ---- *)
     iEval (rewrite Hbno) in "HopS".
     iDestruct (log_opSwe_opSw with "HopS") as "HopS".
@@ -668,10 +695,13 @@ Section OfflockDev.
     iDestruct (wp_next_shift (b := true) (CIDa := CID24) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iSpecialize ("Hcont" $! CID29 with "[]"); [iPureIntro; wp_next_chain |].
-    iApply ("Hcont" $! P3 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hsb Hpp Hsl Hop Hwit
+    iApply ("Hcont" $! P3 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hsb Hsl Hop Hwit
                                 Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
     { split_and!; [exact Hthr | exact HP3sp | exact HP3s2 | exact HP3s3 | exact HP3s4]. }
   Qed.
 
 End OfflockDev.
+(* ---- IVb's ADMIT-FREEDOM CHECK (iclaim-ledger.md §3.14 as built) ---- *)
+Print Assumptions ip_free_offlock.
+
 End OfflockDev.

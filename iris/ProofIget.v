@@ -1306,6 +1306,7 @@ Section ProofIget.
                           they come out of the pool bundle here and are spent
                           at +0x78's 0 -> 1 ([iref_alloc_store_au]) *)
                        icnt_half (bv_unsigned inum) 0%nat ∗
+                       frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
                        iname γi γfs inum l)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
@@ -1331,16 +1332,17 @@ Section ProofIget.
                  +0x78; the payload is not touched. *)
               iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑icEscN) γfs γi inodestart nib
                       cov logstart inum l
-                      ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
-                      with "Hrinv Hlic Hbundle") as "(Hlic & Hbundle & Hicnt0 & Hfoff)".
+                      ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib
+                      with "Hrinv Hlic Hbundle")
+                as "(Hlic & Hbundle & Hicnt0 & Hmir0 & Hfoff)".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
                           with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
-              iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hfoff Hlic". }
+              iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hmir0 Hfoff Hlic". }
             iApply wp_next_off_intro.
-            iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt & Hicnt0 & Hfoff & Hlic)".
+            iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt & Hicnt0 & Hmir0 & Hfoff & Hlic)".
             assert (Hpp76 : add_vec_int (mword_of_int (KernelSyms.iget + 0x72) : mword 64) 4
                             = mword_of_int (KernelSyms.iget + 0x76)) by pcw.
             iEval (rewrite Hpp76) in "Hpc".
@@ -1457,7 +1459,7 @@ Section ProofIget.
             assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
             iDestruct ("Hback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
                          (<[e := (dev, inum)]> ci)
-                         with "[%] [%] [Hid1 Hislot Hgid2 Hicnt1]") as "Hslots".
+                         with "[%] [%] [Hid1 Hislot Hgid2 Hicnt1 Hmir0]") as "Hslots".
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
             { rewrite /islot2 !lookup_insert Hp1.
@@ -1466,7 +1468,9 @@ Section ProofIget.
               (* the peeled half, now at 1: the recycle is where an inum's
                  [icnt] column moves from the POOL's custody to this slot's
                  live arm (§2.2's "pool + live = every region inum"). *)
-              iFrame "Hidd Hidn Hgid2 Hicnt1". iExact "Hislot". }
+              iFrame "Hidd Hidn Hgid2 Hicnt1".
+              iSplitR "Hmir0";
+                [iExact "Hislot" | iApply (frz_park_intro_off with "Hmir0")]. }
             iAssert (itable_res2 cn γfs γi cov logstart nib dev)
               with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
             { iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M), (<[e := (dev, inum)]> ci).
@@ -1692,7 +1696,15 @@ Section ProofIget.
            [icnt] half at this slot's own count (§2.2), and the [ref++] below
            is a LEDGER move that has to present it.  The three MISS exits put
            it straight back unmoved. *)
-        iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hicnt)".
+        (* FIVE conjuncts since A⁗ (iclaim-ledger.md §3.16): the live arm also
+           carries the FREEZE MIRROR's lock half, on its ordinary alternative
+           or on the free path's FROZEN PARK.  The hit re-parks at a LARGER
+           [q] (it mints a reference out of the table's retained share), which
+           the frozen alternative cannot follow -- so the arm is decided ONCE,
+           here, from the licence this iget already carries: §2.6's table puts
+           the column at [FrzOff], and the region's mirror bit is therefore
+           DOWN.  The three MISS exits re-park the bare bit. *)
+        iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hicnt & Hpark)".
         destruct (1/2 - qj)%Qp as [qj'|] eqn:Eqj; last first.
         { iEval (rewrite /islot_rest_at Eqj) in "Hrest". iDestruct "Hrest" as "[]". }
         iEval (rewrite /islot_rest_at /inode_ident Eqj) in "Hrest".
@@ -1744,9 +1756,9 @@ Section ProofIget.
                     with "Hcg Hpc Hi4c").
           iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt3c) in "Hpc".
-          iDestruct ("Hback" $! M ci with "[%] [%] [Hdcell Hncell Hiu Hgid Hicnt]") as "Hslots";
+          iDestruct ("Hback" $! M ci with "[%] [%] [Hdcell Hncell Hiu Hgid Hicnt Hpark]") as "Hslots";
             [ done | done | | ].
-          { rewrite /islot2 HMj Hcij. iFrame "Hiu Hgid Hicnt".
+          { rewrite /islot2 HMj Hcij. iFrame "Hiu Hgid Hicnt Hpark".
             rewrite /islot_rest_at /inode_ident Eqj. iFrame. }
           iApply ("Hstep" $! L2 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hlic Hcont2").
           - split; [exact HL2s1|]. split; [exact HL2a3|]. split; [exact HL2s2|].
@@ -1819,9 +1831,9 @@ Section ProofIget.
                     with "Hcg Hpc Hi52").
           iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt3c2) in "Hpc".
-          iDestruct ("Hback" $! M ci with "[%] [%] [Hdcell Hncell Hiu Hgid Hicnt]") as "Hslots";
+          iDestruct ("Hback" $! M ci with "[%] [%] [Hdcell Hncell Hiu Hgid Hicnt Hpark]") as "Hslots";
             [ done | done | | ].
-          { rewrite /islot2 HMj Hcij. iFrame "Hiu Hgid Hicnt".
+          { rewrite /islot2 HMj Hcij. iFrame "Hiu Hgid Hicnt Hpark".
             rewrite /islot_rest_at /inode_ident Eqj. iFrame. }
           iApply ("Hstep" $! L3 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hlic Hcont2").
           - split; [exact HL3s1|]. split; [exact HL3a3|]. split; [exact HL3s2|].
@@ -1835,6 +1847,19 @@ Section ProofIget.
           - rewrite HL3s3. exact Hemp. }
         (* ===== THE CACHE HIT (+0x56 .. +0x68) ===== *)
         subst ij.
+        (* A⁗ (iclaim-ledger.md §3.16): the live arm's FIFTH conjunct is the
+           mirror's lock half, on its ordinary alternative or on the free
+           path's FROZEN PARK, and the hit re-parks at a LARGER [q] (it mints
+           a reference out of the table's retained share) -- which the frozen
+           alternative cannot follow.  The arm is decided HERE, where the scan
+           has just proved this slot IS the wanted inum, from the licence this
+           iget already carries: §2.6's table puts the column at [FrzOff], so
+           the region's bit is DOWN and the frozen alternative dies on
+           [frzm_agree].  The three MISS exits above re-park it untouched. *)
+        iApply fupd_wp.
+        iMod (frz_park_lic_off ⊤ γi γfs inodestart nib inum l j qj
+                ltac:(solve_ndisj) Hnib with "Hrinv Hlic Hpark") as "[Hlic Hmirj]".
+        iModIntro.
         iPoseProof (igi_56 with "Htext") as "Hi56".
         iPoseProof (igi_58 with "Htext") as "Hi58".
         iPoseProof (igi_5a with "Htext") as "Hi5a".
@@ -1919,10 +1944,12 @@ Section ProofIget.
         iDestruct ("Hsplit" with "[Hdcell Hncell]") as "[Hid1 Hid2]";
           [ rewrite /inode_ident; iFrame | ].
         iDestruct ("Hback" $! (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ci
-                     with "[%] [%] [Hid1 Hiu Hgid Hicnt]") as "Hslots".
+                     with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmirj]") as "Hslots".
         { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
         { intros i Hi. reflexivity. }
         { rewrite /islot2 lookup_insert Hcij. iFrame "Hiu Hgid Hicnt".
+          iSplitR "Hmirj";
+            [| iApply (frz_park_intro_off with "Hmirj")].
           rewrite /islot_rest_at (ig_frac_rest qj qj' ltac:(by apply Qp.sub_Some)).
           rewrite /inode_ident. iFrame. }
         iAssert (itable_res2 cn γfs γi cov logstart nib dev)
