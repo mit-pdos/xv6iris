@@ -1663,7 +1663,7 @@ Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
 Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
-    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     `{CID : CpuId} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
@@ -1679,9 +1679,9 @@ Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
            (R_bitvector_64 nextPC) ↦ᵣ npc ∗
            resv_any cpu_id ∗ clock_res ∗
            sconf_at_priv ms' ∗ sie_cap kt m' av' b' p ∗
-           gpr_file (tp_pin m') ∗ R npc ms' m' av'))
+           gpr_file (tp_pin m') ∗ R CID npc ms' m' av'))
    ∗ (∀ (npc ms' : mword 64) (m' : regfile) (av' : nat),
-        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R npc ms' m' av' -∗
+        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R CID npc ms' m' av' -∗
         WP (Loop : expr riscv_lang)))%I.
 
 (* ...and the CLOCK-FREE reading, for the leaves that never touch a clock
@@ -1689,7 +1689,7 @@ Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
 Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
-    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     `{CID : CpuId} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
@@ -1704,9 +1704,9 @@ Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
            (R_bitvector_64 nextPC) ↦ᵣ npc ∗
            resv_any cpu_id ∗
            sconf_at_priv ms' ∗ sie_cap kt m' av' b' p ∗
-           gpr_file (tp_pin m') ∗ R npc ms' m' av'))
+           gpr_file (tp_pin m') ∗ R CID npc ms' m' av'))
    ∗ (∀ (npc ms' : mword 64) (m' : regfile) (av' : nat),
-        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R npc ms' m' av' -∗
+        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R CID npc ms' m' av' -∗
         WP (Loop : expr riscv_lang)))%I.
 
 (* WHAT THE INSTRUCTION HANDS BACK BESIDE THE FRAMES.  The cycle body owes
@@ -1722,7 +1722,7 @@ Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
    two halves talking about the same cells. *)
 Definition intr_ret `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (p : mword 64) (b' : bool)
-    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
   (∃ (m' : regfile) (av' : nat),
      ghost_var sie_gname (1/2)
@@ -1731,11 +1731,11 @@ Definition intr_ret `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
      strans_res_at (register_lookup satp rs2) (register_lookup tlb rs2) ∗
      sie_cap_rest kt m' av' b' p ∗
      gpr_file (tp_pin m') ∗ resv_any cpu_id ∗
-     R (register_lookup (R_bitvector_64 nextPC) rs2)
+     R CID (register_lookup (R_bitvector_64 nextPC) rs2)
        (register_lookup mstatus rs2) m' av' ∗
      (∀ (npc0 ms0 : mword 64) (m0 : regfile) (av0 : nat),
         sie_cap_gpr_at kt ms0 m0 av0 b' p -∗ pc_is npc0 -∗
-        R npc0 ms0 m0 av0 -∗ WP (Loop : expr riscv_lang)))%I.
+        R CID npc0 ms0 m0 av0 -∗ WP (Loop : expr riscv_lang)))%I.
 
 (* the CYCLE'S RIDER, keyed on the file the body landed on ([rs2]): its
    [nextPC] is the pc the cycle commits, so both arms name their landing pc
@@ -1744,7 +1744,7 @@ Definition intr_ret `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
 Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
-    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
   ((* --- RETIRE: the bundles, re-formed from the cells the landing frame
         gave back.  [cur_privilege] is NOT here: that cell stays in the
@@ -1759,10 +1759,11 @@ Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
                    mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv' ∗ menvcfg ↦ᵣ MENVCFG_S ∗
                    sie_cap kt m' av' b' p ∗ gpr_file (tp_pin m') ∗
                    resv_any cpu_id ∗
-                   R (register_lookup (R_bitvector_64 nextPC) rs2) ms' m' av' ∗
+                   R CID (register_lookup (R_bitvector_64 nextPC) rs2)
+                     ms' m' av' ∗
                    (∀ (npc0 ms0 : mword 64) (m0 : regfile) (av0 : nat),
                       sie_cap_gpr_at kt ms0 m0 av0 b' p -∗ pc_is npc0 -∗
-                      R npc0 ms0 m0 av0 -∗ WP (Loop : expr riscv_lang)))
+                      R CID npc0 ms0 m0 av0 -∗ WP (Loop : expr riscv_lang)))
                 ∨
                 (* --- TRAP: the entry package, minus what the frame holds --- *)
                 (∃ (sc mstT mdvT : mword 64),
@@ -1786,7 +1787,7 @@ Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
 Lemma wp_exec_step_intr_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
-    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
   ret_pc pc0 = pc0 ->
   sie_cap_gpr kt m av true p -∗
   pc_is pc0 -∗
@@ -2267,7 +2268,7 @@ Qed.
 Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
-    (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
   ret_pc pc0 = pc0 ->
   sie_cap_gpr kt m av true p -∗
   pc_is pc0 -∗

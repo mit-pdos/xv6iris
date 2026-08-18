@@ -115,7 +115,7 @@ Section WpSmodeIntr.
      cannot be written without them. *)
   Lemma wp_instr_s_intr_clock (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     ret_pc pc = pc ->
     sie_cap_gpr kt m n true p -∗
     pc_is pc -∗
@@ -127,7 +127,7 @@ Section WpSmodeIntr.
 
   Lemma wp_instr_s_intr (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     ret_pc pc = pc ->
     sie_cap_gpr kt m n true p -∗
     pc_is pc -∗
@@ -152,7 +152,7 @@ Section WpSmodeIntr.
   (* =================================================================== *)
   Definition sconf_step_obl_clock (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
       (CID : CpuId) : iProp Σ :=
     ((sconf -∗
       sie_cap kt m n b p -∗
@@ -168,14 +168,14 @@ Section WpSmodeIntr.
              (R_bitvector_64 nextPC) ↦ᵣ npc ∗
              resv_any cpu_id ∗ clock_res ∗
              sconf_at_priv ms' ∗ sie_cap kt m' n' b' p ∗
-             gpr_file (tp_pin m') ∗ R npc ms' m' n'))
+             gpr_file (tp_pin m') ∗ R CID npc ms' m' n'))
      ∗ (∀ (npc ms' : mword 64) (m' : regfile) (n' : nat),
-          sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R npc ms' m' n' -∗
+          sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R CID npc ms' m' n' -∗
           WP (Loop : expr riscv_lang)))%I.
 
   Definition sconf_step_obl (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
       (CID : CpuId) : iProp Σ :=
     ((sconf -∗
       sie_cap kt m n b p -∗
@@ -190,9 +190,9 @@ Section WpSmodeIntr.
              (R_bitvector_64 nextPC) ↦ᵣ npc ∗
              resv_any cpu_id ∗
              sconf_at_priv ms' ∗ sie_cap kt m' n' b' p ∗
-             gpr_file (tp_pin m') ∗ R npc ms' m' n'))
+             gpr_file (tp_pin m') ∗ R CID npc ms' m' n'))
      ∗ (∀ (npc ms' : mword 64) (m' : regfile) (n' : nat),
-          sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R npc ms' m' n' -∗
+          sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗ R CID npc ms' m' n' -∗
           WP (Loop : expr riscv_lang)))%I.
 
   (* the landing family of the SIE=0 arm: the tower at whatever the
@@ -244,7 +244,7 @@ Section WpSmodeIntr.
          tower and the non-cell residue rides beside them. *)
   Lemma wp_instr_s_sconf_off_clock (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     sie_cap_gpr kt m n false p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
@@ -508,7 +508,7 @@ Section WpSmodeIntr.
   Lemma wp_instr_s_sconf_clock
       (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
@@ -540,7 +540,7 @@ Section WpSmodeIntr.
   Lemma wp_instr_s_sconf
       (m : regfile) (n : nat) (b b' : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (R : mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
@@ -637,7 +637,7 @@ Section WpSmodeIntr.
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
     iApply (wp_instr_s_sconf m n b b pc true base
-              (fun npc ms' m' n' => ⌜npc = add_vec_int pc 2⌝ ∗
+              (fun _ npc ms' m' n' => ⌜npc = add_vec_int pc 2⌝ ∗
                                 ⌜m' = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
                                 ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hex Hcont]").
@@ -717,7 +717,7 @@ Section WpSmodeIntr.
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
     iApply (wp_instr_s_sconf m n b b pc false base
-              (fun npc ms' m' n' => ⌜npc = add_vec_int pc 4⌝ ∗
+              (fun _ npc ms' m' n' => ⌜npc = add_vec_int pc 4⌝ ∗
                                 ⌜m' = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
                                 ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hex Hcont]").
