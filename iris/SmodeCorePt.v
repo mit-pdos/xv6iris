@@ -3327,4 +3327,197 @@ Section SmodeCorePt.
                 with "Hpcfg Hpaddr").
   Qed.
 
+  (* ==================================================================== *)
+  (* THE [sr_inv R] SURFACE.                                              *)
+  (*                                                                      *)
+  (* Everything above takes the regime's four CELLS and a residue family   *)
+  (* [Res], which is what the swp engine needs and what no LEAF can carry: *)
+  (* a leaf carries [SRegime.sr_inv R].  These two wrappers restore that   *)
+  (* surface, using the record's bundle face ([sr_swp_open] /              *)
+  (* [sr_swp_close], added with this layer): open it into the cells and    *)
+  (* the (satp,tlb)-indexed residue on the way in, close it back on the    *)
+  (* way out at the tlb value the fetch's walk landed on.                  *)
+  (*                                                                      *)
+  (* satp / pmpcfg_n / pmpaddr_n come back UNCHANGED (the leaf returns     *)
+  (* them at the values it got), so [sr_swp_close]'s two pure premises are *)
+  (* the very facts [sr_swp_open] produced -- which is why the regime is   *)
+  (* re-formed without the caller ever naming a satp value.                *)
+  (* ==================================================================== *)
+  Lemma wp_instr_s_config_sr (R : s_regime) (RS : s_regime_swp R)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (mstatus1 mie1 mdv1 menvcfg1 : mword 64)
+      (Rl : iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    instr pc is_rvc i -∗
+    (* the regime's fetch translation, at whatever cell values the bundle
+       turns out to hold *)
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n),
+       ⌜ sr_swp_satp_ok R RS satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       spt_fetch_tr (s_Df_mix dq) (sr_swp_res_at R RS satp0) pc mstatus0
+         satp0 mie_v mdv0 menvcfg0 pcfg paddr) -∗
+    (* THE LEAF'S OBLIGATION, at the bundle's cells and the walk's landing
+       tlb value *)
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ sr_swp_res_at R RS satp0 tv' -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mstatus ↦ᵣ{ dq } mstatus1 ∗
+                   mie ↦ᵣ{ dq } mie1 ∗
+                   mideleg ↦ᵣ{ dq } mdv1 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
+                   sr_swp_res_at R RS satp0 tv' ∗
+                   (∃ npc : mword 64,
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
+                   resv_any cpu_id ∗ Rl)) -∗
+    ▷ (∀ npc : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } mstatus1 -∗
+         mie ↦ᵣ{ dq } mie1 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg1 -∗
+         sr_inv R -∗
+         pc_is npc -∗ Rl -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval.
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+             Hinstr Htr Hex Hcont".
+    iDestruct (sr_swp_open R RS with "Hinv") as (satp0 tlbv pcfg paddr)
+      "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
+    destruct Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
+    iApply (wp_instr_s_config_regime (sr_swp_res_at R RS satp0) pc is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mstatus1 mie1 mdv1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [Htr] [Hex] [Hcont]").
+    - iApply ("Htr" $! satp0 pcfg paddr with "[%] [%]");
+        [ exact Hsatpok
+        | unfold pmp_ent0_ok; split_and!; assumption ].
+    - iApply ("Hex" $! satp0 pcfg paddr).
+    - iNext. iIntros (npc tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+      iApply (sr_swp_close R RS satp0 tv1 pcfg paddr Hsatpok
+                ltac:(unfold pmp_ent0_ok; split_and!; assumption)
+                with "Hsatp Htlbc Hpcfg Hpaddr HRes").
+  Qed.
+
+  (* the bundle twin, on [SmodeCore.smode_config] *)
+  (* NOTE: the leaf's obligation is ∀ over the config values because
+     [smode_config] quantifies them, exactly as [wp_instr_s_regime] does. *)
+  Lemma wp_instr_s_sr (R : s_regime) (RS : s_regime_swp R) (γ : gname)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (Rl : iProp Σ) {dq : dfrac} :
+    smode_config γ dq -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    instr pc is_rvc i -∗
+    (∀ (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
+       (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n),
+       ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ -∗
+       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ -∗
+       ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
+       ⌜ menvcfg0 = MENVCFG_S ⌝ -∗
+       ⌜ sr_swp_satp_ok R RS satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       spt_fetch_tr (s_Df_mix dq) (sr_swp_res_at R RS satp0) pc mstatus0
+         satp0 mie_v mdv0 menvcfg0 pcfg paddr) -∗
+    (∀ (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
+       (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ sr_swp_res_at R RS satp0 tv' -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mstatus ↦ᵣ{ dq } mstatus0 ∗
+                   mie ↦ᵣ{ dq } mie_v ∗
+                   mideleg ↦ᵣ{ dq } mdv0 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg0 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗ tlb ↦ᵣ tv' ∗
+                   sr_swp_res_at R RS satp0 tv' ∗
+                   (∃ npc : mword 64,
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc) ∗
+                   resv_any cpu_id ∗ Rl)) -∗
+    ▷ (∀ npc : mword 64,
+         smode_config γ dq -∗ sr_inv R -∗ pc_is npc -∗ Rl -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "Hsm Hinv Hpc Hinstr Htr Hex Hcont".
+    iDestruct (smode_config_unbundle with "Hsm")
+      as "(#Hhw & #Hminv & Hhs & Hpriv & Hmst & Hmiebundle & Hmenvbundle)".
+    iDestruct "Hmst" as (mstatus0)
+      "(Hmstatus & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmiebundle" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
+    iDestruct "Hmenvbundle" as (menvcfg0)
+      "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
+    iApply (wp_instr_s_config_sr R RS pc is_rvc i mstatus0 mie_v mdv0 menvcfg0
+              mstatus0 mie_v mdv0 menvcfg0 Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+                    Hinstr [Htr] [Hex] [Hcont Hsie]").
+    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
+      iApply ("Htr" $! mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr
+                with "[%] [%] [%] [%] [%] [%]");
+        [ exact HSIE | exact HSXL | exact Hmm | exact Hmenvval
+        | exact Hsok | exact Hpok ].
+    - iIntros (satp0 pcfg paddr tv').
+      iApply ("Hex" $! mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tv').
+    - iNext. iIntros (npc)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc HRl".
+      iApply ("Hcont" $! npc with
+                "[Hhs Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] Hinv Hpc HRl").
+      iApply (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval
+                with "Hhw Hminv Hhs Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc").
+  Qed.
+
 End SmodeCorePt.
