@@ -1278,6 +1278,47 @@ Section VtDevRam.
               (uint (pa_add (pa_add pu (vt_uoff p)) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add.
       exact (Hcanu (vt_uoff p + j)%nat (vt_uoff_add_lt p j Hj)). }
+    (* THE ADDRESS CLAIM, off the used ELEMENT's own points-to.  The leaf
+       wants it BESIDE the atomic update (per node the access translates
+       several nodes before the memory node where the update is opened), and
+       [virtio_proto_reclaim_acc]'s closer is one-shot -- it spends the
+       receipt -- so the peek goes through the read-only
+       [VirtioProto.virtio_proto_used_peek], which hands everything back. *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+    iInv "Hvinv" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_used_peek γd vstp np c p sl pin Hpc0
+                 with "Hprotop Hpub Hrcpt Hlbc") as "(#Hcfgvp & Hw4p & Hbackp)".
+    iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
+    assert (Haddrp : (pa_add pu (vt_uoff p) : Arch.pa) = used_elem_pa (v_cfg vstp) p)
+      by (rewrite Hceqp; reflexivity).
+    (* COPIES, not [rewrite ... in]: the body below re-opens the invariant at
+       its OWN [vst], and rewriting the three shared facts to THIS peek's
+       [vstp] would leave them unusable there. *)
+    assert (Halignp : is_aligned_paddr
+                        (Physaddr (used_elem_pa (v_cfg vstp) p)) 4 = true)
+      by (rewrite -Haddrp; exact Halign).
+    assert (Hst4p : forall j, (j < 4)%nat ->
+              kmap_static (svpn_of (pa_add (used_elem_pa (v_cfg vstp) p) j)) KP_rw)
+      by (rewrite -Haddrp; exact Hst4).
+    assert (Hcan4p : forall j, (j < 4)%nat ->
+              (uint (pa_add (used_elem_pa (v_cfg vstp) p) j
+                     : SailStdpp.Values.mword 64) < 274877906944)%Z)
+      by (rewrite -Haddrp; exact Hcan4).
+    iDestruct (phys_to_word4 (used_elem_pa (v_cfg vstp) p)
+                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+                 Halignp Hst4p Hcan4p with "Hkm Hw4p") as "Hcellp".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (used_elem_pa (v_cfg vstp) p)
+                 (DfracOwn 1) (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+                 ltac:(lia) with "Hcellp") as "#Hclaim0".
+    iDestruct (word4_to_phys (used_elem_pa (v_cfg vstp) p)
+                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) Hst4p
+                 with "Hkm Hcellp") as "Hw4p".
+    iDestruct ("Hbackp" with "Hw4p") as "(Hprotop & Hpub & Hrcpt & _)".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
     iApply (wp_load_s_sconf_au (CID:=CID) (kt := KT1) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
               (fun w => (⌜w = (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
@@ -1296,16 +1337,9 @@ Section VtDevRam.
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hrcpt] [Hcont]").
-    (* BLOCKED, and deliberately left so: this leaf needs the used-ELEMENT
-       word's [wordw_claim] before the atomic update, and that cell is
-       reachable only through [VirtioProto.virtio_proto_reclaim_acc], whose
-       closing wand is a ONE-SHOT update -- it spends the receipt and bumps
-       [disk_done_lb], so there is no read-only peek to take the claim off.
-       The static-map derivation is forbidden (user ruling), so this wants a
-       read-only used-element accessor in VirtioProto.v.  See the report. *)
-    { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
-      iInv "Hvinv" as ">Hdbody" "Hdclose".
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hrcpt] [Hcont]").
+    { rewrite Hea Haddrp. iExact "Hclaim0". }
+    { iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       iDestruct (virtio_proto_reclaim_acc γd vst np c p sl pin Hpc0
                    with "Hproto Hpub Hrcpt Hlbc")

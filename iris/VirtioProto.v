@@ -2085,6 +2085,82 @@ Section VirtioProto.
      the pin bytes exactly as deposited, the status byte at 0, the buffer
      (for a read request) holding the block's bytes, and the disk
      fragments at the block's current contents. *)
+  (* ------------------------------------------------------------------- *)
+  (* THE USED-ELEMENT WORD, READ-ONLY.                                     *)
+  (*                                                                      *)
+  (* [virtio_proto_reclaim_acc]'s closing wand is a ONE-SHOT update: it     *)
+  (* SPENDS the receipt, bumps [disk_done_lb] and hands out the payoff      *)
+  (* map.  A caller that only needs the element's ADDRESS CLAIM cannot use  *)
+  (* it -- and under per-node stepping every such caller needs exactly      *)
+  (* that, because [WpSconfMem.wordw_claim] must arrive BESIDE the atomic   *)
+  (* update rather than inside it (the access translates several nodes      *)
+  (* before the memory node where the update is opened).  Deriving the      *)
+  (* claim from the static map instead is forbidden (the standing ruling:   *)
+  (* every address claim comes off the accessed bytes' own points-to), so   *)
+  (* this is the same walk down to the word, stopping at the [dma_own]      *)
+  (* borrow and handing everything straight back.                          *)
+  (*                                                                      *)
+  (* Invariant-internal by construction: no leaf and no spec statement      *)
+  (* changes, which is the shape the ruling of 2026-08-18 asked for.        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma virtio_proto_used_peek (γ : disk_names) (v : virtio_state)
+      (np c p : nat) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
+    (p < c)%nat ->
+    virtio_proto γ v -∗ disk_pub γ np -∗
+    disk_receipt γ p sl pin -∗ disk_done_lb γ c -∗
+    (* the config, so the caller can identify the element's ADDRESS: it is
+       persistent, so handing it out costs the invariant nothing *)
+    disk_cfg γ (v_cfg v) ∗
+    phys_word4 (used_elem_pa (v_cfg v) p)
+               (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) ∗
+    (phys_word4 (used_elem_pa (v_cfg v) p)
+                (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) -∗
+       virtio_proto γ v ∗ disk_pub γ np ∗ disk_receipt γ p sl pin ∗
+       disk_done_lb γ c).
+  Proof.
+    intros Hpc. iIntros "Hp Hpub Hrecpt Hlb".
+    rewrite /virtio_proto /disk_pub /disk_receipt /disk_done_lb.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+      iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
+      exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+        Hslot & Hnc & Hnp & Hpend & Hdone)".
+    iDestruct (ghost_map_lookup with "Hslot Hrecpt") as %Hspin.
+    destruct (vp_spins_lookup pr p sl pin Hspin) as [Hs Hpin].
+    iDestruct (mono_nat_lb_own_valid with "Hnc Hlb") as %[_ Hcle].
+    assert (Hpnc : (p < vp_nc pr)%nat) by lia.
+    assert (Hpendnone : vp_pend pr !! p = None).
+    { apply not_elem_of_dom. rewrite (vpo_pend_dom _ _ _ Hok). intro Hc'.
+      apply elem_of_set_seq in Hc'. lia. }
+    assert (Hdone : vp_done pr !! p = Some sl).
+    { unfold vp_slots in Hs.
+      rewrite (lookup_union_r (vp_pend pr) (vp_done pr) p Hpendnone) in Hs.
+      exact Hs. }
+    iDestruct (big_sepM_delete _ (vp_done pr) p sl Hdone with "Hdone")
+      as "[Hdres Hdone]".
+    iDestruct "Hdres" as (bs) "(%Hbslen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hdone0)".
+    assert (HEMsub : range_map (used_elem_pa (v_cfg v) p) 4
+                       (nth_byte (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))))
+                     ⊆ dma).
+    { apply range_map_sub; [lia|]. intros j Hj.
+      apply (read_bytes_spec dma (used_elem_pa (v_cfg v) p) 4 _ Hre). lia. }
+    iDestruct (dma_own_acc_same _ dma HEMsub with "Hdma") as "[Hem Hback]".
+    rewrite !phys_word4_map.
+    iSplitR; [iExact "Hcfg" |].
+    iFrame "Hem". iIntros "Hem".
+    iDestruct ("Hback" with "Hem") as "Hdma".
+    iFrame "Hpub Hrecpt Hlb".
+    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend".
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iApply (big_sepM_delete _ (vp_done pr) p sl Hdone).
+    iSplitR "Hdone"; [| iExact "Hdone"].
+    iExists bs. iFrame "Hbs Hdone0".
+    all: try (iPureIntro; split_and!; assumption).
+  Qed.
+
   Lemma virtio_proto_reclaim_acc (γ : disk_names) (v : virtio_state)
       (np c p : nat) (sl : vslot) (pin : gmap Arch.pa (bv 8)) :
     (p < c)%nat ->
