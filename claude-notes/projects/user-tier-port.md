@@ -1428,3 +1428,29 @@ not enough after peeling `split_on_page_boundary` / `split_misaligned`**: the
 `let '(p, q) := …` is a `match`, so `cbn beta zeta match` is what exposes the
 next head to `gmm_lift`.  The exec proofs get away without it because
 `rewrite` works on subterms and the tactics do not.
+
+### §5.5 vs §5.3 ON THE DISPATCH TABLES: what "EMPTY diff" can and cannot mean
+
+§5.5 asks for an EMPTY `git diff` of `UserTotalU.v`'s two tables; §5.3 says
+the `arm_*` statements change shape so the tables' applications must be
+RETYPED.  Both cannot hold, and §5.3 is the one that is true: a pure arm
+takes `(t mm rsf va [mi] w)` where an Iris one took `(E sigma sigma_f va g
+w)`, and it owes a certificate the Iris one did not.
+
+**The checkable claim, and it is the one that matters, is that the CASE TREE
+does not move**: every `| _ = Some (CTOR ?p, _) =>` clause head and every
+payload `destruct` line is byte-identical — **104 lines in the base table and
+67 in the RVC table, verified mechanically against the pre-port commit.**
+Only the `fin`/`finm` argument lists differ.  Read §5.5's criterion that way.
+
+Two things kept the tables that stable, and they are worth copying:
+* **no dispatch-table entry ever names a `goodmb` twin.**  The certificate is
+  discharged by `u_gm1` inside `fin`/`finm`, off a hint database
+  (`u_gm`) holding P5's catalogue.  Naming twins per entry would have
+  touched all ~98 lines.
+* **`fin` may not mention the proof's hypotheses.**  `Local Ltac fin lem :=
+  apply (lem Hpins Hwf); …` does not compile: an `Ltac` body's identifiers
+  are resolved at DEFINITION time, where the proof's hypotheses do not exist.
+  Use `apply lem; solve [ assumption | u_gm1 ]` and let `assumption` name
+  them.  (This is the durable notes' trap about a tactic notation's `constr`
+  argument, one level down.)
