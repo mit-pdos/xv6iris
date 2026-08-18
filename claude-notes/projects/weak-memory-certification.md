@@ -38,11 +38,25 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
 - **S-track — the RMW split** (design:
   [`../design/weak-memory-rmw-split.md`](../design/weak-memory-rmw-split.md),
   user-confirmed; gates D8-2's final shape and the L2 vocabulary):
-  - **S0 — validation pass**: check the design against the tree; produce the
-    per-slice file/lemma inventory; flag any spec mismatch (esp. the
-    `ak_latest`/`ak_excl` decoupling's consumers and `w_res`'s place
-    relative to `ws_le`).  **Status: IN FLIGHT (2026-08-18).**
-  - **S1–S5** per the design file's §8.
+  - **S0 — validation pass: DONE (2026-08-18)**, design revised from it.
+    Size: ≈3,150 lines / ~40 files / ≈2,070 semantic.  Riskiest three:
+    `WeakRobustSim.excl_ok_pf` (~230 ln, the pf-replay window straddles two
+    events), the §5 retry arm's WP rule, `WeakRobustProv`'s `l_res` mirror
+    (~150 ln).  Free: `WeakKpt*`/`WeakWalk*`/`WeakDeps`/litmus (zero
+    change); net deletions: `fused_blk` + the `menvcfg.ADUE = 0` escape
+    hatch + the `own_coh` dovetail.
+  - **S0.5 — exhaustivise the 22 catch-all `wlabel` matches** (~150 ln,
+    no semantic change; the 6 critical absorbers: `WeakEvInst.elab_log`/
+    `edlab_log`/`pcls_ev`, `WeakSailLTS2.lbl_class`,
+    `WeakRobustBlocks.lb_writes`/`lb_loads`; full site list in the S0
+    report — sites at `WeakRobustGraph.v:111,121`, `WeakRobustL2.v:82`,
+    `WeakRobustMain.v:140`, `WeakRobustAcyc.v:114,124,408`,
+    `WeakRobustDisc.v:122`, `WeakRobustBlocks.v:90,94,100`,
+    `WeakRobustOrd.v:217`, `WeakSailLTS2.v:316,370`, `WeakSailCone.v:419`,
+    `WeakEvInst.v:158,500,559`, `WeakPromise.v:182`,
+    `WeakPromiseFact.v:58`).  **Status: IN FLIGHT (2026-08-18).**
+  - **S1–S6** per the design file's §8 (expand/contract; S1 additive with
+    `LRmw` still present; S6 the contract).
 - **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
   (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
   wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
