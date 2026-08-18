@@ -54,7 +54,8 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartSpan HartSpanChar.
+Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
+        HartSpanChar.
 Require Import ColdBoot.
 Local Open Scope Z_scope.
 
@@ -258,3 +259,101 @@ End STower.
    25-deep [register_set] chain in every conversion check it does afterwards,
    and the lookups above are the whole interface. *)
 Global Opaque s_rs.
+
+(* ===================================================================== *)
+(* The frame splits.  [HartMFrame]'s [mm_Df] / [mm_rw_split] / [mm_ro_split] *)
+(* one for one, over the larger footprint.                                *)
+(* ===================================================================== *)
+Section SFrames.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  (* the persistent cells are exactly M-mode's: the hw_config pins plus the
+     two counter-config cells.  Everything S-mode ADDS (satp, tlb, mie,
+     mideleg, menvcfg) is OWNED, since a bundle hands it over. *)
+  Definition s_Df (dq : dfrac) : register -> dfrac := fun r =>
+    if decide (r = (misa : register)) then DfracDiscarded
+    else if decide (r = (mseccfg : register)) then DfracDiscarded
+    else if decide (r = (pma_regions : register)) then DfracDiscarded
+    else if decide (r = (htif_tohost_base : register)) then DfracDiscarded
+    else if decide (r = (elp : register)) then DfracDiscarded
+    else if decide (r = (senvcfg : register)) then DfracDiscarded
+    else if decide (r = (R_bitvector_32 mcountinhibit : register))
+    then DfracDiscarded
+    else if decide (r = (R_bitvector_64 minstretcfg : register))
+    then DfracDiscarded
+    else dq.
+
+  Lemma s_Df_misa (dq : dfrac) : s_Df dq misa = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_sec (dq : dfrac) : s_Df dq mseccfg = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_pma (dq : dfrac) : s_Df dq pma_regions = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_htif (dq : dfrac) : s_Df dq htif_tohost_base = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_elp (dq : dfrac) : s_Df dq elp = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_senv (dq : dfrac) : s_Df dq senvcfg = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_mc (dq : dfrac) :
+    s_Df dq (R_bitvector_32 mcountinhibit) = DfracDiscarded.
+  Proof. reflexivity. Qed.
+  Lemma s_Df_micfg (dq : dfrac) :
+    s_Df dq (R_bitvector_64 minstretcfg) = DfracDiscarded.
+  Proof. reflexivity. Qed.
+
+  Lemma s_rw_split (rs : regstate) :
+    (hreg_frame rs s_Drw : iProp Σ) ⊣⊢
+    ((R_bitvector_64 PC) ↦ᵣ register_lookup (R_bitvector_64 PC) rs ∗
+     (R_bitvector_64 nextPC) ↦ᵣ register_lookup (R_bitvector_64 nextPC) rs ∗
+     (R_bitvector_64 minstret) ↦ᵣ
+       register_lookup (R_bitvector_64 minstret) rs ∗
+     (R_bool minstret_increment) ↦ᵣ
+       register_lookup (R_bool minstret_increment) rs ∗
+     (R_bitvector_64 mcycle) ↦ᵣ register_lookup (R_bitvector_64 mcycle) rs ∗
+     (R_bitvector_64 mtime) ↦ᵣ register_lookup (R_bitvector_64 mtime) rs ∗
+     (R_bitvector_64 mip) ↦ᵣ register_lookup (R_bitvector_64 mip) rs ∗
+     tlb ↦ᵣ register_lookup tlb rs)%I.
+  Proof.
+    rewrite /hreg_frame /s_Drw.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma s_ro_split (dq : dfrac) (rs : regstate) :
+    (hreg_frame_ro (s_Df dq) rs s_Dro : iProp Σ) ⊣⊢
+    (reg_pointsto cur_privilege dq (register_lookup cur_privilege rs) ∗
+     reg_pointsto mstatus dq (register_lookup mstatus rs) ∗
+     reg_pointsto hart_state dq (register_lookup hart_state rs) ∗
+     reg_pointsto pmpcfg_n dq (register_lookup pmpcfg_n rs) ∗
+     reg_pointsto pmpaddr_n dq (register_lookup pmpaddr_n rs) ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded
+       (register_lookup (R_bitvector_32 mcountinhibit) rs) ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded
+       (register_lookup (R_bitvector_64 minstretcfg) rs) ∗
+     reg_pointsto misa DfracDiscarded (register_lookup misa rs) ∗
+     reg_pointsto mseccfg DfracDiscarded (register_lookup mseccfg rs) ∗
+     reg_pointsto pma_regions DfracDiscarded
+       (register_lookup pma_regions rs) ∗
+     reg_pointsto htif_tohost_base DfracDiscarded
+       (register_lookup htif_tohost_base rs) ∗
+     reg_pointsto elp DfracDiscarded (register_lookup elp rs) ∗
+     reg_pointsto senvcfg DfracDiscarded (register_lookup senvcfg rs) ∗
+     reg_pointsto satp dq (register_lookup satp rs) ∗
+     reg_pointsto mie dq (register_lookup mie rs) ∗
+     reg_pointsto mideleg dq (register_lookup mideleg rs) ∗
+     reg_pointsto menvcfg dq (register_lookup menvcfg rs))%I.
+  Proof.
+    rewrite /hreg_frame_ro /s_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite !(s_Df_misa dq) !(s_Df_sec dq) !(s_Df_pma dq) !(s_Df_htif dq)
+      !(s_Df_elp dq) !(s_Df_senv dq) !(s_Df_mc dq) !(s_Df_micfg dq).
+    unfold s_Df.
+    repeat (rewrite decide_False; [|discriminate]).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+End SFrames.
