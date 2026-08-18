@@ -1265,3 +1265,417 @@ Section UserWalkFault.
   Qed.
 
 End UserWalkFault.
+
+(* ===================================================================== *)
+(* THE SAME WALK WITH AN EXISTENTIAL LEAF (worklist item 2b).             *)
+(*                                                                       *)
+(* On a page table that is opened PER READ NODE -- the shared kernel      *)
+(* table -- the leaf slot's A/D bits are not pinned across the walk's     *)
+(* three openings, so the level-0 read cannot be stated at a VALUE.  This *)
+(* section is [UserWalk] with [pte0] replaced by a PREDICATE [P0] (at the *)
+(* kpt instance [P0 w := pte_canon w = pte_canon p0]): the level-0 read    *)
+(* obligation is the [_ex] shape and every conclusion carries the word     *)
+(* that was actually read under an existential.  Levels 2 and 1 are        *)
+(* UNCHANGED -- [PtTree.ptree_maps_canon] is exact there -- so their        *)
+(* hypotheses are the pinned ones verbatim.                                *)
+(*                                                                        *)
+(* The walk's OUTPUT ppn is [PPN_of_PTE] of the word read, which the        *)
+(* consumer resolves through [P0] ([PtAdBits.pte_set_ad_ppn]: A/D variants  *)
+(* share a PPN); only the INSTALLED TLB ENTRY has to carry the word.        *)
+(* ===================================================================== *)
+Section UserWalkEx.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (vpn : mword 27) (root : mword 44).
+  Context (pte2 pte1 : mword 64).
+  Context (P0 : mword 64 -> Prop).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
+
+  Let addr2 : mword 64 := u_pte_addr root (subrange_vec_dec vpn 26 18).
+  Let addr1 : mword 64 := u_pte_addr (u_next_base pte2) (subrange_vec_dec vpn 17 9).
+  Let addr0 : mword 64 := u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0).
+
+  (* levels 2 and 1: pinned, exactly as in [UserWalk] *)
+  Hypothesis H2i : forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                                     (ext_bits_of_PTE pte2)) s = Some (false, s).
+  Hypothesis H2nl : pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte2 7 0)) = true.
+  Hypothesis H1i : forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                                     (ext_bits_of_PTE pte1)) s = Some (false, s).
+  Hypothesis H1nl : pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte1 7 0)) = true.
+  (* level 0: the SAME six facts, at every word [P0] admits *)
+  Hypothesis H0i : forall w, P0 w -> forall s,
+    exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+            (ext_bits_of_PTE w)) s = Some (false, s).
+  Hypothesis H0nl : forall w, P0 w ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = false.
+  Hypothesis Hchk0 : forall w, P0 w -> forall s,
+    exec (check_PTE_permission acc p mxr do_sum
+            (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+            (ext_bits_of_PTE w) tt) s = Some (PTE_Check_Success tt, s).
+  Hypothesis H0N : forall w, P0 w ->
+    eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE w)) ('b"1") = false.
+
+  Hypothesis H1ig : forall (Db : register -> bool) s,
+    goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                (ext_bits_of_PTE pte1)) s = true.
+  Hypothesis H2ig : forall (Db : register -> bool) s,
+    goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                (ext_bits_of_PTE pte2)) s = true.
+  Hypothesis H0ig : forall w, P0 w -> forall (Db : register -> bool) s,
+    goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                (ext_bits_of_PTE w)) s = true.
+  Hypothesis Hchk0g : forall w, P0 w -> forall (Db : register -> bool) s,
+    goodb Db (check_PTE_permission acc p mxr do_sum
+                (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                (ext_bits_of_PTE w) tt) s = true.
+
+  Lemma swp_rec_walk_leaf_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (g : bool) (menvcfg0 : mword 64)
+      (wfacc : Acc (Zwf 0) 0) :
+    Drw ## Dro ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr0) 8)
+         (fun r => ∃ q0, ⌜r = Values.Ok q0⌝ ∗ ⌜P0 q0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte1) 0 g tt 0 wfacc)
+      (fun r => ∃ q0, ⌜P0 q0⌝ ∗
+                ⌜r = Values.Ok
+                       ({| PTW_Output_ppn := autocast (T := mword)
+                             ((autocast (T := mword) (PPN_of_PTE q0)) : mword 44);
+                           PTW_Output_pte := autocast (T := mword) q0;
+                           PTW_Output_pteAddr := Physaddr addr0;
+                           PTW_Output_level := 0;
+                           PTW_Output_pbmt := PBMT_PMA;
+                           PTW_Output_global := orb g (u_gbit q0) |}, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hag Hmisa Hmenv HPBMTE.
+    iIntros "#Hcert Hrw Hro Hrd".
+    destruct wfacc as [a0].
+    cbn [_rec_pt_walk].
+    change (0 >=? 0) with true.
+    unfold Defs.assert_exp'. cbn match. rewrite mbind_ret. cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    cbn match. rewrite mbind_ret. cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with addr0 by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    iApply (swp_bind_use (read_pte (Physaddr addr0) 8) _ _ _
+              with "[Hrw Hro Hrd] [-]").
+    { iApply ("Hrd" with "Hrw Hro"). }
+    iIntros (v) "(%q0 & -> & %HP & Hrw & Hro)". cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      set (Anl := Defs.and_boolM A B) end.
+    assert (Hinner : exec (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec q0 7 0))
+                             (ext_bits_of_PTE q0))
+                             (fun w => Defs.returnm (negb w))) dst
+                     = Some (true, dst)).
+    { rewrite (exec_bind_Some _ _ _ _ _ (H0i q0 HP dst)). cbn match beta.
+      apply exec_returnm. }
+    assert (Hinnerg : goodb D_leafchk (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec q0 7 0))
+                             (ext_bits_of_PTE q0))
+                             (fun w => Defs.returnm (negb w))) dst = true).
+    { rewrite (goodb_bind D_leafchk _ _ dst false (H0ig q0 HP D_leafchk dst)
+                 (H0i q0 HP dst)). reflexivity. }
+    assert (Hnl : exec Anl dst = Some (false, dst)).
+    { subst Anl. unfold Defs.and_boolM.
+      rewrite (exec_bind_Some _ _ _ _ _ Hinner). cbn match beta.
+      change (0 >? 0) with false. rewrite andb_false_r. apply exec_returnm. }
+    assert (Hnlg : goodb D_leafchk Anl dst = true).
+    { subst Anl. unfold Defs.and_boolM.
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind D_leafchk _ E dst true Hinnerg Hinner) end.
+      reflexivity. }
+    iApply (swp_bind_use Anl _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Anl false Hdisj
+                (hval_of_goodb D_leafchk (Drw ∪ Dro) Drw Anl dst rs false
+                   HD Hag Hnlg Hnl)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta.
+    iApply (swp_bind_use (check_leaf_pte 39 vpn acc p mxr do_sum q0
+                            (Physaddr addr0) 0 tt) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_check_leaf_pte_leaf0 vpn q0 acc p mxr do_sum
+                   (H0i q0 HP) (H0nl q0 HP) (Hchk0 q0 HP) (H0N q0 HP)
+                   (H0ig q0 HP) (Hchk0g q0 HP) (Drw ∪ Dro) Drw rs dst
+                   (Physaddr addr0) menvcfg0 HD Hag Hmisa Hmenv HPBMTE)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta zeta.
+    iApply swp_ret. iExists q0. by iFrame.
+  Qed.
+
+  Lemma swp_rec_walk_l1_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (g : bool) (menvcfg0 : mword 64)
+      (wfacc : Acc (Zwf 0) 1) :
+    Drw ## Dro ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr1) 8)
+         (fun r => ⌜r = Values.Ok pte1⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr0) 8)
+         (fun r => ∃ q0, ⌜r = Values.Ok q0⌝ ∗ ⌜P0 q0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte2) 1 g tt 1 wfacc)
+      (fun r => ∃ q0, ⌜P0 q0⌝ ∗
+                ⌜r = Values.Ok
+                       ({| PTW_Output_ppn := autocast (T := mword)
+                             ((autocast (T := mword) (PPN_of_PTE q0)) : mword 44);
+                           PTW_Output_pte := autocast (T := mword) q0;
+                           PTW_Output_pteAddr := Physaddr addr0;
+                           PTW_Output_level := 0;
+                           PTW_Output_pbmt := PBMT_PMA;
+                           PTW_Output_global :=
+                             orb (orb g (u_gbit pte1)) (u_gbit q0) |}, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hag Hmisa Hmenv HPBMTE.
+    iIntros "#Hcert Hrw Hro Hrd1 Hrd0".
+    destruct wfacc as [a1].
+    cbn [_rec_pt_walk].
+    change (1 >=? 0) with true.
+    unfold Defs.assert_exp'. cbn match. rewrite mbind_ret. cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    cbn match. rewrite mbind_ret. cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with addr1 by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    iApply (swp_bind_use (read_pte (Physaddr addr1) 8) _ _ _
+              with "[Hrw Hro Hrd1] [-]").
+    { iApply ("Hrd1" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      set (Anl := Defs.and_boolM A B) end.
+    assert (Hinner : exec (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                             (ext_bits_of_PTE pte1))
+                             (fun w => Defs.returnm (negb w))) dst
+                     = Some (true, dst)).
+    { rewrite (exec_bind_Some _ _ _ _ _ (H1i dst)). cbn match beta.
+      apply exec_returnm. }
+    assert (Hinnerg : goodb D_leafchk (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                             (ext_bits_of_PTE pte1))
+                             (fun w => Defs.returnm (negb w))) dst = true).
+    { rewrite (goodb_bind D_leafchk _ _ dst false (H1ig D_leafchk dst)
+                 (H1i dst)). reflexivity. }
+    assert (Hnl : exec Anl dst = Some (true, dst)).
+    { subst Anl. unfold Defs.and_boolM.
+      rewrite (exec_bind_Some _ _ _ _ _ Hinner). cbn match beta.
+      rewrite H1nl. change (1 >? 0) with true. cbn [andb].
+      apply exec_returnm. }
+    assert (Hnlg : goodb D_leafchk Anl dst = true).
+    { subst Anl. unfold Defs.and_boolM.
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind D_leafchk _ E dst true Hinnerg Hinner) end.
+      reflexivity. }
+    iApply (swp_bind_use Anl _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Anl true Hdisj
+                (hval_of_goodb D_leafchk (Drw ∪ Dro) Drw Anl dst rs true
+                   HD Hag Hnlg Hnl)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta.
+    match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (1 - 1)] =>
+      change (1 - 1) with 0 end.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_rec_walk_leaf_ex Drw Dro Df rs dst _ menvcfg0 _ Hdisj HD Hag
+                   Hmisa Hmenv HPBMTE with "Hcert Hrw Hro Hrd0") ].
+    iIntros (v) "(%q0 & %HP & -> & Hrw & Hro)". cbn.
+    iExists q0. by iFrame.
+  Qed.
+
+  Lemma swp_pt_walk_user_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (menvcfg0 : mword 64) :
+    Drw ## Dro ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr2) 8)
+         (fun r => ⌜r = Values.Ok pte2⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr1) 8)
+         (fun r => ⌜r = Values.Ok pte1⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr0) 8)
+         (fun r => ∃ q0, ⌜r = Values.Ok q0⌝ ∗ ⌜P0 q0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (pt_walk 39 vpn acc p mxr do_sum root 2 false tt)
+      (fun r => ∃ q0, ⌜P0 q0⌝ ∗
+                ⌜r = Values.Ok
+                       ({| PTW_Output_ppn := autocast (T := mword)
+                             ((autocast (T := mword) (PPN_of_PTE q0)) : mword 44);
+                           PTW_Output_pte := autocast (T := mword) q0;
+                           PTW_Output_pteAddr := Physaddr addr0;
+                           PTW_Output_level := 0;
+                           PTW_Output_pbmt := PBMT_PMA;
+                           PTW_Output_global := u_global pte2 pte1 q0 |}, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hag Hmisa Hmenv HPBMTE.
+    iIntros "#Hcert Hrw Hro Hrd2 Hrd1 Hrd0".
+    unfold pt_walk.
+    destruct (Defs.Zwf_guarded _) as [a2].
+    cbn [_rec_pt_walk].
+    change (2 >=? 0) with true.
+    unfold Defs.assert_exp'. cbn match. rewrite mbind_ret. cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    cbn match. rewrite mbind_ret. cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with addr2 by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    iApply (swp_bind_use (read_pte (Physaddr addr2) 8) _ _ _
+              with "[Hrw Hro Hrd2] [-]").
+    { iApply ("Hrd2" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      set (Anl := Defs.and_boolM A B) end.
+    assert (Hinner : exec (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                             (ext_bits_of_PTE pte2))
+                             (fun w => Defs.returnm (negb w))) dst
+                     = Some (true, dst)).
+    { rewrite (exec_bind_Some _ _ _ _ _ (H2i dst)). cbn match beta.
+      apply exec_returnm. }
+    assert (Hinnerg : goodb D_leafchk (Defs.bind (pte_is_invalid
+                             (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                             (ext_bits_of_PTE pte2))
+                             (fun w => Defs.returnm (negb w))) dst = true).
+    { rewrite (goodb_bind D_leafchk _ _ dst false (H2ig D_leafchk dst)
+                 (H2i dst)). reflexivity. }
+    assert (Hnl : exec Anl dst = Some (true, dst)).
+    { subst Anl. unfold Defs.and_boolM.
+      rewrite (exec_bind_Some _ _ _ _ _ Hinner). cbn match beta.
+      rewrite H2nl. change (2 >? 0) with true. cbn [andb].
+      apply exec_returnm. }
+    assert (Hnlg : goodb D_leafchk Anl dst = true).
+    { subst Anl. unfold Defs.and_boolM.
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind D_leafchk _ E dst true Hinnerg Hinner) end.
+      reflexivity. }
+    iApply (swp_bind_use Anl _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Anl true Hdisj
+                (hval_of_goodb D_leafchk (Drw ∪ Dro) Drw Anl dst rs true
+                   HD Hag Hnlg Hnl)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta.
+    match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (2 - 1)] =>
+      change (2 - 1) with 1 end.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_rec_walk_l1_ex Drw Dro Df rs dst _ menvcfg0 _ Hdisj HD Hag
+                   Hmisa Hmenv HPBMTE with "Hcert Hrw Hro Hrd1 Hrd0") ].
+    iIntros (v) "(%q0 & %HP & -> & Hrw & Hro)". cbn.
+    iExists q0. by iFrame.
+  Qed.
+
+  (* THE MISS with an existential leaf, on the arm where NO word [P0] admits
+     needs the A/D update -- the write-back arm needs [PtTreeAdue]'s
+     [swp_update_and_write_pte_ex], which cannot be named here (PtTreeAdue
+     sits ABOVE this file), so it is assembled in [HartSTrans]. *)
+  Lemma swp_translate_TLB_miss_user_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (dst : mstate)
+      (asid : mword 16) (menvcfg0 : mword 64) :
+    Drw ## Dro ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    (tlb : register) ∈ Drw ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    (forall w, P0 w ->
+       update_PTE_Bits (autocast (T := mword) w : mword 64) acc = None) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr2) 8)
+         (fun r => ⌜r = Values.Ok pte2⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr1) 8)
+         (fun r => ⌜r = Values.Ok pte1⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr addr0) 8)
+         (fun r => ∃ q0, ⌜r = Values.Ok q0⌝ ∗ ⌜P0 q0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt)
+      (fun r => ∃ q0, ⌜P0 q0⌝ ∗
+                ⌜r = Values.Ok (autocast (T := mword)
+                       ((autocast (T := mword) (PPN_of_PTE q0)) : mword 44),
+                     PBMT_PMA, tt)⌝ ∗
+                hreg_frame (register_set tlb
+                    (vec_update_dec (register_lookup tlb rs)
+                       (tlb_hash (__id 39) vpn)
+                       (Some (u_walk_entry vpn pte2 pte1 q0 asid))) rs) Drw ∗
+                hreg_frame_ro Df (register_set tlb
+                    (vec_update_dec (register_lookup tlb rs)
+                       (tlb_hash (__id 39) vpn)
+                       (Some (u_walk_entry vpn pte2 pte1 q0 asid))) rs) Dro).
+  Proof.
+    intros Hdisj HD Hag HWtlb Hmisa Hmenv HPBMTE Hnoupd.
+    iIntros "#Hcert Hrw Hro Hrd2 Hrd1 Hrd0".
+    unfold translate_TLB_miss. cbn zeta.
+    iApply (swp_bind_use (pt_walk 39 vpn acc p mxr do_sum root 2 false tt)
+              _ _ _ with "[Hrw Hro Hrd2 Hrd1 Hrd0] [-]").
+    { iApply (swp_pt_walk_user_ex Drw Dro Df rs dst menvcfg0 Hdisj HD Hag
+                Hmisa Hmenv HPBMTE with "Hcert Hrw Hro Hrd2 Hrd1 Hrd0"). }
+    iIntros (v) "(%q0 & %HP & -> & Hrw & Hro)". cbn match.
+    match goal with |- context[update_and_write_pte ?w ?vp ?a ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      set (Aupd := update_and_write_pte w vp a pv lv ac pr mx ds e) end.
+    assert (Hupde : exec Aupd dst = Some (Values.Ok (None, tt), dst)).
+    { subst Aupd. unfold update_and_write_pte.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        change w with 64 end.
+      rewrite (Hnoupd q0 HP). cbn match. apply exec_returnm. }
+    assert (Hupdg : goodb D_leafchk Aupd dst = true).
+    { subst Aupd. unfold update_and_write_pte.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        change w with 64 end.
+      rewrite (Hnoupd q0 HP). reflexivity. }
+    iApply (swp_bind_use Aupd _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Aupd _ Hdisj
+                (hval_of_goodb D_leafchk (Drw ∪ Dro) Drw Aupd dst rs _
+                   HD Hag Hupdg Hupde)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 4 Drw Dro Df rs _ _ _ Hdisj
+                (hfrun_add_to_TLB_user vpn pte2 pte1 q0 (Drw ∪ Dro) Drw rs asid
+                   ltac:(set_solver) HWtlb)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    iApply swp_ret. iExists q0. by iFrame.
+  Qed.
+
+End UserWalkEx.
