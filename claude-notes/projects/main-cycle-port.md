@@ -259,12 +259,24 @@ So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
    the lookup finds is a legitimate one for the installed tree — the S-mode
    analogue of what `instr` does for the text bytes.  `kpt_inv` in the same
    bundle is what will discharge the walk's PTE-read obligations on a MISS.
-2. `s_frames_intro` / `_elim` — bundle ⇄ frames, the only place the S-mode
-   resource algebra is touched;
-3. `s_cycle` = `HartMCycle.swp_exec_step_decode_execute` at that tower (the
-   rule is already privilege-agnostic, so this is instantiation);
-4. `wp_instr_s` = `s_cycle` + `WpInstrRun.swp_run_hart_active_instr`'s S-mode
-   sibling over `HartSTrans.swp_fetch_S`.
+2. ~~`s_frames_intro` / `_elim`~~ — **DONE** (`WpSFrames`).  Four owners in,
+   the tower out.  What comes back out UNUSED is the point: the SIE ghost,
+   `sret_tie`, `tlb_snap_ok` and `kpt_inv` are not cells, so they are
+   returned untouched — and must be, since `tlb_snap_ok` is what a later TLB
+   HIT needs and `kpt_inv` is what a MISS needs.
+3. ~~`s_cycle`~~ — **DONE** (`WpSFrames`), plus `s_rs_agree` (25 cells),
+   `s_tick_agree`, `s_pre_agree`, `s_rw_ext` / `s_ro_ext`.  It came in at the
+   size `mm_cycle`'s header predicted, and adds nothing to the generic rule
+   but the two bridges.
+4. `wp_instr_s` = `s_cycle` + the fetch-shape dispatch over
+   `HartSTrans.swp_fetch_S`.  **ONE CAVEAT, found while scoping it:**
+   `swp_fetch_S` covers the 4-ALIGNED BASE shape only.  The other three
+   (`base2`, `rvc`, `rvc2`) each need an S-mode `fetch_bytes` instance the
+   way `swp_fetch_bytes_S` is one — the halfword reads at the TRANSLATED
+   address.  They are mechanical (each is `swp_fetch_bytes_M2`'s twin with
+   `Physaddr pa` for `Physaddr gs`), but they are four lemmas, not one.  A
+   `wp_instr_s` restricted to the base shape is provable today and is worth
+   doing first, as the end-to-end demonstration that the stack composes.
 
 Only then do `wp_exec_step_retire_or_intr` and `wp_exec_step_intr` convert,
 and `WpSmodeIntr`'s call site with them.
