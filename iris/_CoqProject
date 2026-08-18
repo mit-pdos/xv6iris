@@ -32,6 +32,7 @@ HartSFrame.v
 WpSFrames.v
 HartMCycle.v
 HartStepAny.v
+HartStepFull.v
 HartMPmp.v
 HartMFetch.v
 HartMDecode.v
