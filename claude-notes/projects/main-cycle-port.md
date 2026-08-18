@@ -549,7 +549,29 @@ a conditional write is a plain store, as before.
    RELEASES the hart's own reservation (a blocked write keeps it -- design
    §3a says why); GCP build green modulo the same nine red roots.
 
-   What is left of this item, with the shape DECIDED (2026-08-18):
+   **(b) LANDED (2026-08-18, `3f97829c`..): `resv_frag`/`resv_any` in
+   `RiscvPtsto` (the other agent's ghost map + `resv_ok` in `era_interp`,
+   plus `resv_map_none`, `resv_any`, `resv_any_intro`); `wp_hart_step_resv`
+   (frag form) beside the preserving `wp_hart_step`; `wp_hart_restart` /
+   `swp_loop` / `wp_loop_cycle` / `swp_exec_step_any` / `s_cycle_any` /
+   `mm_cycle` / `mc_cycle` / `s_cycle` and the four S-mode base wrappers
+   (`s_body_frag`) take `resv_any cpu_id` and hand the body `resv_frag None`;
+   `pc_is` carries `resv_any cpu_id` (WHY `resv_any` and not `None`: pc_is is
+   rebuilt at the end of cycle k, one step BEFORE cycle k+1's restart drops
+   the reservation, so it holds whatever the leaf left -- `Some` for a leaf
+   that ended with a dangling exclusive read); the bridges
+   (`mm_/mc_/s_/sm_frames_intro/elim`) move it; the store engine
+   (`HartMStore`, six lemmas), `PtTreeAdue`'s two PTE-write nodes, the pilot
+   and `HartPilot` take `resv_frag cpu_id rr` and return it at `None`; both
+   adequacy sites allocate the mirror at the all-`None` map and hand out
+   `resv_frag c None` per hart (`power_boot_res`, `boot_shared_alloc`, the
+   single-generation bundle with its new `Hresv0` hypothesis).  Leaves'
+   obligations are UNCHANGED (the wrapper holds the frag aside); a store
+   leaf that needs it will get a `_w` wrapper variant.  `BootChain`/
+   `SystemAdequacy` (above the red line) do not thread it into the boot
+   harts yet.**
+
+   What is left of this item:
    - **(b) the ghost.**  Per-ERA, like the register cells: a
      `ghost_mapG Σ CPU (option resv)` instance in `riscvFixedGS`, an
      `era_resv_name : gname` in `riscvEraGS`; `era_interp` gains
