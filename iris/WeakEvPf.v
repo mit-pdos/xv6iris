@@ -258,19 +258,22 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
       wglog σ' = wglog σ /\
       wgws σ' c = load_post_run (wgws σ c) aq base tvs.*1
   | LStore rl base data asrc vsrc =>
-      asrc = [] /\ vsrc = [] /\
       (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]) /\
       data <> [] /\
-      wgws σ' c = store_post_run (wgws σ c) rl base (length data)
+      wgws σ' c = store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
+                    (srcs_view (wgws σ c) vsrc) base (length data)
                     (S (length (wglog σ)))
   | LRmw aq rl base tvs data asrc vsrc =>
-      asrc = [] /\ vsrc = [] /\
       data <> [] /\ length tvs = length data /\
-      read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
+      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
+        (srcs_view (wgws σ c) asrc) /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ))) /\
       (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]) /\
-      wgws σ' c = store_post_run (load_post_run (wgws σ c) aq base tvs.*1)
-                    rl base (length data) (S (length (wglog σ)))
+      wgws σ' c = store_post_run_d
+                    (load_post_run_d (wgws σ c) aq (srcs_view (wgws σ c) asrc)
+                       base tvs.*1)
+                    rl (srcs_view (wgws σ c) asrc) (srcs_view (wgws σ c) vsrc)
+                    base (length data) (S (length (wglog σ)))
   | LFence pr pw sr sw =>
       wglog σ' = wglog σ /\ wgws σ' c = fence_post (wgws σ c) pr pw sr sw
   (* THE FABRIC MARKER (M5): [LSilent]'s twin.  A hart's MMIO access and
@@ -278,8 +281,17 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
      [pdev] can only see that in the label — so they will be relabelled
      [LDev].  The memory effect is the silent one, verbatim. *)
   | LDev => wglog σ' = wglog σ /\ wgws σ' c = wgws σ c
-  (* the three dependency-only labels: the D2 language emits none *)
-  | LRegW _ _ | LCtrl _ | LInstr => False
+  (* D3-2: the three dependency-only labels are REAL now — [PARM]'s
+     [step_assign], [step_if] and the instruction start.  Each moves the
+     hart's view and nothing else, so each is [LSilent]'s clause with the
+     view equation replaced. *)
+  | LRegW rd srcs =>
+      wglog σ' = wglog σ /\
+      wgws σ' c = regw_post (wgws σ c) rd (srcs_view (wgws σ c) srcs)
+  | LCtrl srcs =>
+      wglog σ' = wglog σ /\
+      wgws σ' c = ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)
+  | LInstr => wglog σ' = wglog σ /\ wgws σ' c = instr_post (wgws σ c)
   end.
 
 (** The disk agent's version.  Since M5 the disk is an ORDINARY weak-memory
@@ -552,6 +564,13 @@ Proof.
   destruct oc; simpl;
     try (intros (_ & ->); exists LSilent; by split);
     try (by intros []).
+  - (* D3-2: THE REGISTER WRITE.  Its label is its classification's
+       ([LSilent] / [LRegW] / [LCtrl]) and its σ-effect is that label's,
+       by construction — one [destruct] over the three kinds. *)
+    intros (_ & ->). eexists (erw_label (erw_of (edeps σ c) reg)).
+    destruct (erw_of (edeps σ c) reg); simpl;
+      (split; [reflexivity|]);
+      solve [reflexivity|apply gws_insert_eq].
   - (* MemRead *)
     destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). exists LDev. by split.
@@ -561,21 +580,21 @@ Proof.
       * eexists (LLoad _ false _ tvs []).
         split_and!;
           [reflexivity|reflexivity|exact Hrd|reflexivity|apply gws_insert_eq].
-      * eexists (LRmw _ rl _ tvs data [] []).
+      * eexists (LRmw _ rl _ tvs data _ _).
         split_and!;
-          [reflexivity|reflexivity|exact Hne|exact Hlend|exact Hrd|exact Hex
-          | |].
+          [exact Hne|exact Hlend|exact Hrd|exact Hex| |].
         { exists WCexcl. reflexivity. }
         apply gws_insert_eq.
   - (* MemWrite *)
     destruct (dev_addr _).
     + intros (d' & _ & _ & ->). exists LDev. by split.
-    + intros (Hn & _ & ->). eexists (LStore _ _ _ [] []). split_and!.
-      * reflexivity.
-      * reflexivity.
+    + intros (Hn & _ & ->). eexists (LStore _ _ _ _ _). split_and!.
       * eexists. reflexivity.
       * by apply wbytes_ne.
       * rewrite wbytes_length. apply gws_insert_eq.
+  - (* D3-2: THE ANNOUNCE — [LInstr], the instruction start *)
+    intros (_ & ->). exists LInstr.
+    split; [reflexivity|apply gws_insert_eq].
   - (* Barrier *)
     intros (_ & ->). destruct b;
       [ eexists (LFence _ _ _ _) | eexists (LFence _ _ _ _)

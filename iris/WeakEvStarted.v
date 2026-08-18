@@ -202,19 +202,23 @@ Section started_ev.
     (* ---------------- the FETCH event ---------------- *)
     iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
               eq_refl Hnf Hdevf Hcohf Hlatf with "Htext Hws Hrf").
-    iNext. iIntros "Hws Hrf".
-    set (wsf := efetch_ws ws
+    iNext. iIntros (ws0) "%Hd0 Hws Hrf".
+    set (wsf := efetch_ws ws0
                   (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
                   (pa_z (Interface.ReadReq.pa reqf)) nf).
-    have Hle_f : ws_le ws wsf by apply efetch_ws_le.
-    have Hrelpf : w_relp wsf = true by rewrite /wsf efetch_ws_relp.
+    have Hle_f : ws_le ws wsf.
+    { etrans; [by apply ws_depmove_le|apply efetch_ws_le]. }
+    have Hrelpf : w_relp wsf = true.
+    { rewrite /wsf efetch_ws_relp. by rewrite (ws_depmove_relp _ _ Hd0). }
     iDestruct (vwp_hold_mono P ws wsf Hle_f with "HP") as "HP".
     (* ---------------- the STORE event ---------------- *)
     iApply (ewp_ev_seq_store 0%nat c D n2
               (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) 4 reqw wsf
               eq_refl Hnw Hdevw ltac:(done) ltac:(by rewrite Hpaw)
               with "Hws Hrf").
-    iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
+    iIntros (wsf') "%Hdf'". iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
+    iDestruct (vwp_hold_mono P wsf wsf' (ws_depmove_le _ _ Hdf') with "HP")
+      as "HP".
     iInv wstartedN as "Hbody" "Hclose".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask". iNext.
     iMod "Hmask" as "_".
@@ -226,32 +230,45 @@ Section started_ev.
     iAssert (wstarted_body a P) with "[Hw0 Hhist]" as "Hbody".
     { iExists t0, v0. iFrame "Hw0". iExact "Hhist". }
     (* the successor's hart state, in the escrow's own vocabulary *)
-    set (kcl := wm_class_of (classify (Interface.WriteReq.access_kind reqw)) wsf).
+    set (kcl := wm_class_of (classify (Interface.WriteReq.access_kind reqw))
+                  wsf').
     set (msg := wwrite_msg (Some (fin_to_nat c)) kcl
                   (Interface.WriteReq.pa reqw) 4 (Interface.WriteReq.value reqw)).
-    set (wsw := store_post_run wsf
-                  (ak_sync (classify (Interface.WriteReq.access_kind reqw)))
-                  (pa_z (Interface.WriteReq.pa reqw)) (N.to_nat 4)
-                  (S (length (wglog σ2)))).
-    set (σm' := WMState (wgregs σ2 c) (wgimg σ2) (wglog σ2 ++ [msg]) wsw
-                  (wgdev σ2)).
-    have HQ : wQ_store (Some (fin_to_nat c)) a lock_one (whart_view σ2 c) σm'.
-    { rewrite /wQ_store /wQ_store_w. split_and!.
+    (* D3-2: the store's post-view carries the ADDRESS and DATA operand views
+       into the forward bank (PARM's [FwdItem]).  The leaf does not know
+       them — [ewp_ev_seq_store] hands them over universally quantified — and
+       does not need to: every fact it takes off the post-state ([ws_le],
+       [wV_store_w]) holds at ANY [va]/[vd]. *)
+    set (wsw := fun va vd =>
+                  store_post_run_d wsf'
+                    (ak_sync (classify (Interface.WriteReq.access_kind reqw)))
+                    va vd
+                    (pa_z (Interface.WriteReq.pa reqw)) (N.to_nat 4)
+                    (S (length (wglog σ2)))).
+    set (σm' := fun va vd =>
+                  WMState (wgregs σ2 c) (wgimg σ2) (wglog σ2 ++ [msg])
+                    (wsw va vd) (wgdev σ2)).
+    have Hrelpf' : w_relp wsf' = true.
+    { by rewrite (ws_depmove_relp _ _ Hdf'). }
+    have HQ : forall va vd,
+      wQ_store (Some (fin_to_nat c)) a lock_one (whart_view σ2 c) (σm' va vd).
+    { intros va vd. rewrite /wQ_store /wQ_store_w. split_and!.
       - reflexivity.
       - exists kcl. split.
         + rewrite /σm' /msg /= Hpaw Hvalw. reflexivity.
         + intros _. rewrite /kcl. by apply wm_class_of_relp.
-      - rewrite /σm' /wsw /=. rewrite Hws2. apply store_post_run_le.
+      - rewrite /σm' /wsw /=. rewrite Hws2. apply store_post_run_d_le.
       - rewrite /wV_store_w /σm' /wsw /=. intros j Hj.
         rewrite /whart_view /=. rewrite -Hpaw /acc_addr.
-        by apply flr_store_post_run. }
+        by apply flr_store_post_run_d. }
     have Hrelp2 : w_relp (wm_ws (whart_view σ2 c)) = true.
-    { rewrite /whart_view. cbn [wm_ws]. rewrite Hws2. exact Hrelpf. }
+    { rewrite /whart_view. cbn [wm_ws]. rewrite Hws2. exact Hrelpf'. }
     have Hbnd2' : ws_bounded (wm_ws (whart_view σ2 c))
                     (length (wm_log (whart_view σ2 c))).
     { rewrite /whart_view. cbn [wm_ws wm_log]. rewrite Hws2. exact Hbnd2. }
-    iMod (wstarted_set a P (Some (fin_to_nat c)) (whart_view σ2 c) σm'
-            HQ Hrelp2 Hbnd2' with "[Hlb2] [Hlat2] Hbody [HP]")
+    iMod (wstarted_set a P (Some (fin_to_nat c)) (whart_view σ2 c)
+            (σm' 0%nat 0%nat) (HQ 0%nat 0%nat) Hrelp2 Hbnd2'
+            with "[Hlb2] [Hlat2] Hbody [HP]")
       as "[Hlat2 Hat]".
     { rewrite /whart_view. cbn [wm_log]. iExact "Hlb2". }
     { rewrite /whart_view. cbn [wm_img wm_log]. iExact "Hlat2". }
@@ -261,14 +278,16 @@ Section started_ev.
     iModIntro. iSplitR.
     { iPureIntro. intros j Hj. rewrite Hpaw. by apply Hnvok. }
     rewrite /σm' /=. iFrame "Hlat2".
-    iIntros "Hws Hrf".
+    iIntros (va vd) "Hws Hrf".
     (* ---------------- the TAIL: back to the boundary ---------------- *)
     iApply (ewp_ev_seq_ret 0%nat c D n3
               (ecur_write (esil n2 D
                  (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
-              eq_refl Htag with "Hrf").
-    iIntros "Hrf". iApply ("Hcont" $! wsw with "[%] Hws Hrf").
-    rewrite /wsw. etrans; [exact Hle_f|apply store_post_run_le].
+              (wsw va vd) eq_refl Htag with "Hws Hrf").
+    iIntros (ws3) "%Hd3 Hws Hrf". iApply ("Hcont" $! ws3 with "[%] Hws Hrf").
+    etrans; [|by apply ws_depmove_le]. rewrite /wsw.
+    etrans; [exact Hle_f|]. etrans; [by apply ws_depmove_le|].
+    apply store_post_run_d_le.
   Qed.
 
 (* ====================================================================== *)
@@ -323,6 +342,18 @@ Section started_ev.
                    nv_ok (wglog σ) c a0⌝ ∗
                 wlat_interp (wgimg σ) (wglog σ)))%I.
 
+  (** D3-2: the receipt arm travels with the view, exactly as [ev_rcpt]
+      does — needed because the tail's silent stretch may now move the
+      hart's view (PARM's [step_assign] on the load's own [rd]). *)
+  Lemma ev_rcpt_arm_mono P `{!Persistent P} (ws ws' : wstate) (w : bv 32) :
+    ws_le ws ws' ->
+    (⌜w = lock_zero⌝ ∨ ⌜w <> lock_zero⌝ ∗ ev_rcpt P ws) -∗
+    (⌜w = lock_zero⌝ ∨ ⌜w <> lock_zero⌝ ∗ ev_rcpt P ws').
+  Proof.
+    intros Hle. iIntros "[H|[H Hr]]"; [by iLeft|].
+    iRight. iFrame "H". by iApply (ev_rcpt_mono P ws ws' Hle).
+  Qed.
+
   Lemma ewp_ev_started_load (a : Arch.pa) P `{!Persistent P} (c : CPU)
       (D : gset register) (m : M unit) (ws : wstate) (rs : regstate)
       (n1 n2 n3 : nat) (x1 x2 : ecur)
@@ -362,17 +393,20 @@ Section started_ev.
     (* ---------------- the FETCH event ---------------- *)
     iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
               eq_refl Hnf Hdevf Hcohf Hlatf with "Htext Hws Hrf").
-    iNext. iIntros "Hws Hrf".
-    set (wsf := efetch_ws ws
-                  (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
-                  (pa_z (Interface.ReadReq.pa reqf)) nf).
-    have Hle_f : ws_le ws wsf by apply efetch_ws_le.
-    iDestruct ("Hflag" $! wsf with "[//]") as "Hflag".
+    iNext. iIntros (ws0) "%Hd0 Hws Hrf".
+    set (wsf0 := efetch_ws ws0
+                   (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
+                   (pa_z (Interface.ReadReq.pa reqf)) nf).
+    have Hle_f0 : ws_le ws wsf0.
+    { etrans; [by apply ws_depmove_le|apply efetch_ws_le]. }
     (* ---------------- the FLAG event, escrow open ---------------- *)
     iApply (ewp_ev_seq_load 0%nat c D n2
-              (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) 4 reql wsf
+              (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) 4 reql wsf0
               eq_refl Hnl Hdevl Hcohl Hlatl with "Hws Hrf").
-    iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
+    iIntros (wsf) "%Hdf". iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
+    have Hle_f : ws_le ws wsf.
+    { etrans; [exact Hle_f0|by apply ws_depmove_le]. }
+    iDestruct ("Hflag" $! wsf with "[//]") as "Hflag".
     iInv wstartedN as "Hbody" "Hclose".
     iMod ("Hflag" $! σ2 with "[//] [//] [//] Hlb2 Hlat2")
       as "(%Hen2 & %Himg & %Hunw & Hfk2)".
@@ -438,8 +472,12 @@ Section started_ev.
     iApply (ewp_ev_seq_ret 0%nat c D n3
               (ecur_read (bv_unsigned w)
                  (esil n2 D (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
-              eq_refl (Htag w) with "Hrf").
-    iIntros "Hrf". iApply ("Hcont" $! wsl w with "[%] Harm Hws Hrf").
+              wsl eq_refl (Htag w) with "Hws Hrf").
+    iIntros (ws3) "%Hd3 Hws Hrf".
+    iDestruct (ev_rcpt_arm_mono P wsl ws3 w (ws_depmove_le _ _ Hd3) with "Harm")
+      as "Harm".
+    iApply ("Hcont" $! ws3 w with "[%] Harm Hws Hrf").
+    etrans; [|by apply ws_depmove_le].
     rewrite /wsl /eread_ws. etrans; [exact Hle_f|apply load_post_run_le].
   Qed.
 
@@ -483,26 +521,29 @@ Section started_ev.
     (* ---------------- the FETCH event ---------------- *)
     iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
               eq_refl Hnf Hdevf Hcohf Hlatf with "Htext Hws Hrf").
-    iNext. iIntros "Hws Hrf".
-    set (wsf := efetch_ws ws
+    iNext. iIntros (ws0) "%Hd0 Hws Hrf".
+    set (wsf := efetch_ws ws0
                   (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
                   (pa_z (Interface.ReadReq.pa reqf)) nf).
-    have Hle_f : ws_le ws wsf by apply efetch_ws_le.
+    have Hle_f : ws_le ws wsf.
+    { etrans; [by apply ws_depmove_le|apply efetch_ws_le]. }
     iDestruct (ev_rcpt_mono P ws wsf Hle_f with "Hrcpt") as "Hrcpt".
     (* ---------------- the BARRIER event ---------------- *)
     iApply (ewp_ev_seq_barrier 0%nat c D n2
               (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) b wsf
               eq_refl Hnb with "Hws Hrf").
-    iNext. iIntros "Hws Hrf".
+    iNext. iIntros (ws1) "%Hd1 Hws Hrf".
+    iDestruct (ev_rcpt_mono P wsf ws1 (ws_depmove_le _ _ Hd1) with "Hrcpt")
+      as "Hrcpt".
     (* the barrier's post-view IS [barrier_post], since nothing is parked *)
-    have Hbp : efence_apply wsf (ebar_now b) = barrier_post wsf b.
-    { rewrite -(efence_barrier_post wsf b) Hpark. reflexivity. }
-    set (wsb := efence_apply wsf (ebar_now b)).
-    have Hle_b : ws_le wsf wsb by apply efence_apply_le.
+    have Hbp : efence_apply ws1 (ebar_now b) = barrier_post ws1 b.
+    { rewrite -(efence_barrier_post ws1 b) Hpark. reflexivity. }
+    set (wsb := efence_apply ws1 (ebar_now b)).
+    have Hle_b : ws_le ws1 wsb by apply efence_apply_le.
     (* THE DELIVERY — [WeakStarted.wstarted_deliver_gen], verbatim *)
     iAssert (vwp_hold P wsb) with "[Hrcpt]" as "HP".
     { iDestruct "Hrcpt" as (T) "[%HT HP0]".
-      iApply (wstarted_deliver_gen P (WMState rs ∅ [] wsf dev0_state) wsb T b
+      iApply (wstarted_deliver_gen P (WMState rs ∅ [] ws1 dev0_state) wsb T b
                 Hacq HT with "HP0").
       rewrite /wV_fence. cbn [wm_ws]. rewrite /wsb Hbp. reflexivity. }
     rewrite Hpark.
@@ -510,9 +551,13 @@ Section started_ev.
     iApply (ewp_ev_seq_ret 0%nat c D n3
               (ecur_bar (esil n2 D
                  (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
-              eq_refl Htag with "Hrf").
-    iIntros "Hrf". iApply ("Hcont" $! wsb with "[%] HP Hws Hrf").
-    etrans; [exact Hle_f|exact Hle_b].
+              wsb eq_refl Htag with "Hws Hrf").
+    iIntros (ws2) "%Hd2 Hws Hrf".
+    iDestruct (vwp_hold_mono P wsb ws2 (ws_depmove_le _ _ Hd2) with "HP")
+      as "HP".
+    iApply ("Hcont" $! ws2 with "[%] HP Hws Hrf").
+    etrans; [|by apply ws_depmove_le].
+    etrans; [exact Hle_f|]. etrans; [by apply ws_depmove_le|exact Hle_b].
   Qed.
 
 End started_ev.
@@ -958,7 +1003,7 @@ Section calib.
 
   Lemma calib_naive_8 (c : CPU) (D : gset register)
       (rs0 rs1 rs2 rs3 rs4 rs5 rs6 rs7 rs8 : regstate)
-      (m0 m1 m2 m3 m4 m5 m6 m7 m8 : M unit) :
+      (m0 m1 m2 m3 m4 m5 m6 m7 m8 : M unit) (ws : wstate) :
     esil_node D rs0 m0 = Some (rs1, m1) ->
     esil_node D rs1 m1 = Some (rs2, m2) ->
     esil_node D rs2 m2 = Some (rs3, m3) ->
@@ -967,36 +1012,49 @@ Section calib.
     esil_node D rs5 m5 = Some (rs6, m6) ->
     esil_node D rs6 m6 = Some (rs7, m7) ->
     esil_node D rs7 m7 = Some (rs8, m8) ->
-    ereg_frame c rs0 D -∗
-    ▷ (ereg_frame c rs8 D -∗ EWP (ECycle 0%nat c m8 None) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c rs0 D -∗
+    ▷ (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+         ereg_frame c rs8 D -∗ EWP (ECycle 0%nat c m8 None) @ ⊤) -∗
     EWP (ECycle 0%nat c m0 None) @ ⊤.
   Proof.
-    iIntros (H1 H2 H3 H4 H5 H6 H7 H8) "Hrf H".
-    iApply (ewp_ev_sil_node 0%nat c D rs0 m0 m1 rs1 eq_refl H1 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs1 m1 m2 rs2 eq_refl H2 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs2 m2 m3 rs3 eq_refl H3 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs3 m3 m4 rs4 eq_refl H4 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs4 m4 m5 rs5 eq_refl H5 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs5 m5 m6 rs6 eq_refl H6 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs6 m6 m7 rs7 eq_refl H7 with "Hrf").
-    iNext. iIntros "Hrf".
-    iApply (ewp_ev_sil_node 0%nat c D rs7 m7 m8 rs8 eq_refl H8 with "Hrf").
-    iNext. iIntros "Hrf". by iApply "H".
+    iIntros (H1 H2 H3 H4 H5 H6 H7 H8) "Hws Hrf H".
+    iApply (ewp_ev_sil_node 0%nat c D rs0 m0 m1 rs1 _ eq_refl H1
+              with "Hws Hrf").
+    iNext. iIntros (w1) "%Hd1 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs1 m1 m2 rs2 _ eq_refl H2
+              with "Hws Hrf").
+    iNext. iIntros (w2) "%Hd2 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs2 m2 m3 rs3 _ eq_refl H3
+              with "Hws Hrf").
+    iNext. iIntros (w3) "%Hd3 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs3 m3 m4 rs4 _ eq_refl H4
+              with "Hws Hrf").
+    iNext. iIntros (w4) "%Hd4 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs4 m4 m5 rs5 _ eq_refl H5
+              with "Hws Hrf").
+    iNext. iIntros (w5) "%Hd5 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs5 m5 m6 rs6 _ eq_refl H6
+              with "Hws Hrf").
+    iNext. iIntros (w6) "%Hd6 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs6 m6 m7 rs7 _ eq_refl H7
+              with "Hws Hrf").
+    iNext. iIntros (w7) "%Hd7 Hws Hrf".
+    iApply (ewp_ev_sil_node 0%nat c D rs7 m7 m8 rs8 _ eq_refl H8
+              with "Hws Hrf").
+    iNext. iIntros (w8) "%Hd8 Hws Hrf".
+    iApply ("H" $! w8 with "[%] Hws Hrf").
+    repeat (etrans; [|by eassumption]). reflexivity.
   Qed.
 
-  Lemma calib_batched_8 (c : CPU) (D : gset register) (x : ecur) :
-    ereg_frame c x.1 D -∗
-    (ereg_frame c (esil 8 D x).1 D -∗
+  Lemma calib_batched_8 (c : CPU) (D : gset register) (x : ecur) (ws : wstate) :
+    hart_ws c ws -∗ ereg_frame c x.1 D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c (esil 8 D x).1 D -∗
        EWP (ECycle 0%nat c (esil 8 D x).2 None) @ ⊤) -∗
     EWP (ECycle 0%nat c x.2 None) @ ⊤.
   Proof.
-    iIntros "Hrf H". by iApply (ewp_ev_batch 0%nat c D 8 x eq_refl with "Hrf").
+    iIntros "Hws Hrf H".
+    by iApply (ewp_ev_batch 0%nat c D 8 x ws eq_refl with "Hws Hrf").
   Qed.
 
 End calib.

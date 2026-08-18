@@ -231,6 +231,18 @@ Proof.
   rewrite /store_post_run. lia.
 Qed.
 
+(** D3-2: the same, for the DEPENDENCY-CARRYING store.  The operand views go
+    into the forward bank and into [w_vcap]; the coherence floors are the
+    dependency-free ones, so the window's post-view fact is unchanged. *)
+Lemma flr_store_post_run_d ws rl vaddr vdata base (n : nat) t (j : nat) :
+  (j < n)%nat ->
+  (t <= flr (ws_view (store_post_run_d ws rl vaddr vdata base n t))
+          (base + Z.of_nat j))%nat.
+Proof.
+  intros Hj. rewrite flr_ws_view.
+  pose proof (store_post_run_d_coh ws rl vaddr vdata base n t j Hj). lia.
+Qed.
+
 (** The two projections of the interpreter's own write post-state that this
     file needs (the log one is [WeakInterp.wwrite_post_log]). *)
 Lemma wwrite_post_img tid (s : wmstate) ak (pa : Arch.pa) (n : N)

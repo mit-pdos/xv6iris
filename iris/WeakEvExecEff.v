@@ -296,17 +296,31 @@ Section rule.
 
   (** The mid-monad form: the run ends at the monad's own [Ret], which is
       where the caller's next certificate picks up. *)
+  (** D3-2 — THE ACCEPTANCE-TEST CASUALTY, and the reason is exact.
+
+      [epure] means "this stretch has NO MEMORY EFFECT": no RAM access, no
+      device access, no barrier.  Under D3 that is no longer the same as
+      "no effect on the hart's weak state": PARM's [step_assign] fires at
+      the instruction's architectural destination register, so a stretch
+      that contains e.g. [lui]'s write of [rd] MOVES [w_regv], and the
+      announce moves [w_ldv].  A pure-register bridge therefore has to own
+      [hart_ws] — and this rule, and every rule derived from it
+      ([ewp_ev_exec_eff_pure], [ewp_ev_exec_eff_cert], [ewp_ev_lui_tail]),
+      GAINS TWO ARGUMENTS.  What it hands back is still only
+      [WeakMem.ws_depmove], so no ORDERING fact the client had is lost. *)
   Lemma ewp_ev_epure (gen : nat) (c : CPU) (D : gset register)
-      (m : M unit) (t t' : mstate) (y : unit) :
+      (m : M unit) (t t' : mstate) (y : unit) (ws : wstate) :
     gen = 0%nat ->
     epure D m t = Some (y, t') ->
-    ereg_frame c (sregs t) D -∗
-    (ereg_frame c (sregs t') D -∗ EWP (ECycle gen c (Interface.Ret y) None) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c (sregs t) D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c (sregs t') D -∗
+       EWP (ECycle gen c (Interface.Ret y) None) @ ⊤) -∗
     EWP (ECycle gen c m None) @ ⊤.
   Proof.
     intros Hgen Hep.
     exact (ewp_ev_sil_rtc gen c D (m, sregs t) (Interface.Ret y, sregs t')
-             Hgen (epure_esilD D m t y t' Hep)).
+             ws Hgen (epure_esilD D m t y t' Hep)).
   Qed.
 
   (** THE BOUNDARY FORM, which is the one a leaf wants: [Ret] IS [ELoop]
@@ -315,16 +329,18 @@ Section rule.
       client back at the instruction boundary with no step and no later
       spent. *)
   Theorem ewp_ev_exec_eff_pure (gen : nat) (c : CPU) (D : gset register)
-      (m : M unit) (t t' : mstate) (y : unit) :
+      (m : M unit) (t t' : mstate) (y : unit) (ws : wstate) :
     gen = 0%nat ->
     epure D m t = Some (y, t') ->
-    ereg_frame c (sregs t) D -∗
-    (ereg_frame c (sregs t') D -∗ EWP (ELoop gen c) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c (sregs t) D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c (sregs t') D -∗ EWP (ELoop gen c) @ ⊤) -∗
     EWP (ECycle gen c m None) @ ⊤.
   Proof.
-    intros Hgen Hep. iIntros "Hrf H".
-    iApply (ewp_ev_epure gen c D m t t' y Hgen Hep with "Hrf").
-    iIntros "Hrf". iApply (ewp_ev_ret gen c y Hgen). by iApply "H".
+    intros Hgen Hep. iIntros "Hws Hrf H".
+    iApply (ewp_ev_epure gen c D m t t' y ws Hgen Hep with "Hws Hrf").
+    iIntros (ws') "%Hd Hws Hrf". iApply (ewp_ev_ret gen c y Hgen).
+    by iApply ("H" $! ws' with "[//] Hws").
   Qed.
 
   (** THE FORM STATED AGAINST AN [exec_eff] CERTIFICATE, for a client whose
@@ -333,19 +349,20 @@ Section rule.
       what a leaf's [wcert_*] already owns, the [epure] equation is the
       footprint/device-freedom declaration on top of it. *)
   Corollary ewp_ev_exec_eff_cert (gen : nat) (c : CPU) (D : gset register)
-      (m : M unit) (t t' : mstate) (es : list weff) :
+      (m : M unit) (t t' : mstate) (es : list weff) (ws : wstate) :
     gen = 0%nat ->
     exec_eff m t = Some (tt, t', es) ->
     (exists y t'', epure D m t = Some (y, t'')) ->
-    ereg_frame c (sregs t) D -∗
-    (ereg_frame c (sregs t') D -∗ EWP (ELoop gen c) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c (sregs t) D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c (sregs t') D -∗ EWP (ELoop gen c) @ ⊤) -∗
     EWP (ECycle gen c m None) @ ⊤.
   Proof.
     intros Hgen Hee (y & t'' & Hep).
     destruct (exec_eff_epure D m t tt t' es y t'' Hee Hep)
       as (Hx & Ht & Hes & _ & _).
     subst t'.
-    exact (ewp_ev_exec_eff_pure gen c D m t t'' y Hgen Hep).
+    exact (ewp_ev_exec_eff_pure gen c D m t t'' y ws Hgen Hep).
   Qed.
 
 End rule.
@@ -670,17 +687,23 @@ Qed.
 Section app.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
+  (** D3-2 (see [ewp_ev_epure]): [lui] WRITES ITS DESTINATION REGISTER, so
+      the tail is a [step_assign] and this rule owns [hart_ws] now.  The
+      register-file postcondition is byte-identical; the two new arguments
+      are the whole delta. *)
   Lemma ewp_ev_lui_tail (gen : nat) (c : CPU) (D : gset register)
-      (rd : mword 5) (imm : mword 20) (s : mstate) :
+      (rd : mword 5) (imm : mword 20) (s : mstate) (ws : wstate) :
     gen = 0%nat ->
     (forall n : Z, R_bitvector_64 (gpr_of_Z n) ∈ D) ->
     (PC : register) ∈ D -> (nextPC : register) ∈ D ->
+    hart_ws c ws -∗
     (ereg_frame c s.(sregs) D : iProp Σ) -∗
-    (ereg_frame c
-       (let s1 := if Z.eqb (uint rd) 0 then s
-                  else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                         (regval_into_reg (luival imm)) in
-        (set_reg s1 PC (register_lookup nextPC s1.(sregs))).(sregs)) D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c
+         (let s1 := if Z.eqb (uint rd) 0 then s
+                    else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                           (regval_into_reg (luival imm)) in
+          (set_reg s1 PC (register_lookup nextPC s1.(sregs))).(sregs)) D -∗
        EWP (ELoop gen c) @ ⊤) -∗
     EWP (ECycle gen c
            (Defs.bind (execute (UTYPE (imm, Regidx rd, LUI)))
@@ -688,7 +711,7 @@ Section app.
            None) @ ⊤.
   Proof.
     intros Hgen HD HPC HnPC.
-    exact (ewp_ev_exec_eff_pure gen c D _ s _ tt Hgen
+    exact (ewp_ev_exec_eff_pure gen c D _ s _ tt ws Hgen
              (epure_lui_tail D rd imm s HD HPC HnPC)).
   Qed.
 

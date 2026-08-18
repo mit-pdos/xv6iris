@@ -1346,6 +1346,56 @@ Proof.
   - pose proof (ws_bounded_ldv ws n Hb). lia.
 Qed.
 
+(* ------------------------------------------------------------------ *)
+(** ** D3: THE DEPENDENCY-ONLY MOVE
+
+    The three labels [LRegW]/[LCtrl]/[LInstr] move the view state, but ONLY
+    through the three dependency components — every ordering component
+    ([coh], the four frontiers, [w_vRel], the forward bank, [w_pub],
+    [w_relp]) is untouched, and [w_vcap] only rises.  [ws_depmove] is that
+    fact as a relation.  It is what the WP tier's batched silent-node rule
+    hands its caller in place of an equation: a leaf that owns [hart_ws c ws]
+    and runs a stretch of pure nodes gets back [hart_ws c ws'] for some
+    [ws'] with [ws_depmove ws ws'], from which it can still read off every
+    ordering fact it had (in particular [coh], [w_relp] and [ws_le]). *)
+Definition ws_depmove (w1 w2 : wstate) : Prop :=
+  w_coh w2 = w_coh w1 ∧
+  w_vrOld w2 = w_vrOld w1 ∧ w_vwOld w2 = w_vwOld w1 ∧
+  w_vrNew w2 = w_vrNew w1 ∧ w_vwNew w2 = w_vwNew w1 ∧
+  w_vRel w2 = w_vRel w1 ∧ w_fwd w2 = w_fwd w1 ∧
+  w_pub w2 = w_pub w1 ∧ w_relp w2 = w_relp w1 ∧
+  (w_vcap w1 ≤ w_vcap w2)%nat.
+
+Global Instance ws_depmove_refl : Reflexive ws_depmove.
+Proof. intros w. rewrite /ws_depmove. split_and!; auto with lia. Qed.
+
+Global Instance ws_depmove_trans : Transitive ws_depmove.
+Proof.
+  intros w1 w2 w3 (?&?&?&?&?&?&?&?&?&?) (?&?&?&?&?&?&?&?&?&?).
+  rewrite /ws_depmove. split_and!; try congruence. lia.
+Qed.
+
+Lemma ws_depmove_coh w1 w2 a : ws_depmove w1 w2 → coh w2 a = coh w1 a.
+Proof. intros (H & _). by rewrite /coh H. Qed.
+
+Lemma ws_depmove_relp w1 w2 : ws_depmove w1 w2 → w_relp w2 = w_relp w1.
+Proof. by intros (?&?&?&?&?&?&?&?&?&?). Qed.
+
+Lemma ws_depmove_le w1 w2 : ws_depmove w1 w2 → ws_le w1 w2.
+Proof.
+  intros (Hc&?&?&?&?&?&?&?&?&?). rewrite /ws_le. split_and!; try lia.
+  intros a. rewrite /coh Hc. lia.
+Qed.
+
+Lemma regw_post_depmove ws rd v : ws_depmove ws (regw_post ws rd v).
+Proof. rewrite /ws_depmove /regw_post /=. split_and!; auto with lia. Qed.
+
+Lemma ctrl_post_depmove ws v : ws_depmove ws (ctrl_post ws v).
+Proof. rewrite /ws_depmove /ctrl_post /=. split_and!; auto with lia. Qed.
+
+Lemma instr_post_depmove ws : ws_depmove ws (instr_post ws).
+Proof. rewrite /ws_depmove /instr_post /=. split_and!; auto with lia. Qed.
+
 Lemma ws_bounded_init n : ws_bounded ws_init n.
 Proof.
   rewrite /ws_bounded. split_and!; try (simpl; lia).

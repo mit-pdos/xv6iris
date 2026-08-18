@@ -120,6 +120,7 @@ Require Import DevModel.
 (* required BEFORE [WeakInterpProj]: see [WeakEvLang]'s note on [wbytes] *)
 Require Import VirtioProg.
 Require Import WeakMem.
+Require Import WeakDeps.
 Require Import WeakPromise.
 Require Import WeakPromiseFact.
 Require Import WeakInterp.
@@ -212,8 +213,12 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
        | Interface.RegRead r _ => fun k =>
            l = LSilent /\ m' = k (register_lookup r rs) /\ ors = None /\
            fn' = None /\ d' = d /\ oib = None
+       (* D3-2: PARM's [step_assign] at the instruction's architectural
+          destination, PARM's [step_if] at [nextPC], [LSilent] elsewhere —
+          all three are [WeakEvLang.erw_label] of the classification. *)
        | Interface.RegWrite r _ v => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = Some (register_set r v rs) /\
+           l = erw_label (erw_of (deps_of_ib ib) r) /\
+           m' = k tt /\ ors = Some (register_set r v rs) /\
            fn' = None /\ d' = d /\ oib = None
        | Interface.MemRead n req => fun k =>
            if dev_addr (Interface.ReadReq.pa req)
@@ -248,7 +253,8 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
                  esilent_run (k (inl (w, None)), rs) (m1, rs1) /\
                  ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2 /\
                  l = LRmw (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                       rl (pa_z (Interface.ReadReq.pa req)) tvs data [] [] /\
+                       rl (pa_z (Interface.ReadReq.pa req)) tvs data
+                       (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
                  m' = m2 /\ ors = Some rs1 /\ fn' = None /\ d' = d /\
                  oib = None))
        | Interface.MemWrite n req => fun k =>
@@ -262,7 +268,8 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
              n <> 0%N /\
              l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
                    (pa_z (Interface.WriteReq.pa req))
-                   (wbytes n (Interface.WriteReq.value req)) [] [] /\
+                   (wbytes n (Interface.WriteReq.value req))
+                   (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
              m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
              oib = None
        | Interface.Barrier b => fun k =>
@@ -271,7 +278,9 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
        (* D3: THE ANNOUNCE RECORDS THE BITS.  Silent for the log, the
           views and the register file — a σ-write of [wgib] alone. *)
        | Interface.InstrAnnounce ob => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           (* D3-2: the instruction START — [LInstr] resets the load-result
+              bank (PARM's [res]) and the node records the bits. *)
+           l = LInstr /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
            oib = Some (Some (ib_of_bvn ob))
        | Interface.BranchAnnounce _ _ => fun k =>
            l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
@@ -442,16 +451,18 @@ Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
   | LLoad aq lat base tvs asrc =>
       asrc = [] /\
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq lat base tvs
-  | LStore _ _ data asrc vsrc => asrc = [] /\ vsrc = [] /\ data <> []
+  (* D3-2: the operand lists are REAL now, so the pins are gone and the
+     RMW's read half is admissible at ITS OWN address view (PARM's
+     [Local.read]: [view_pre ⊒ view(addr)]).  The LOAD arm keeps its pin —
+     that IS deviation D-8. *)
+  | LStore _ _ data asrc vsrc => data <> []
   | LRmw aq rl base tvs data asrc vsrc =>
-      asrc = [] /\ vsrc = [] /\
       data <> [] /\ length tvs = length data /\
-      read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
+      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
+        (srcs_view (wgws σ c) asrc) /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ)))
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
-  (* D2: the language emits none of these; the slot is [True] so that
-     [WeakEvCapstone.pf_ok_hart] stays a conversion. *)
   | LRegW _ _ | LCtrl _ | LInstr => True
   end.
 
@@ -467,12 +478,16 @@ Definition elab_ws (σ : wgstate) (c : CPU) (l : wlabel) : CPU -> wstate :=
   | LSilent => wgws σ
   | LLoad aq lat base tvs _ =>
       <[c := load_post_run (wgws σ c) aq base tvs.*1]> (wgws σ)
-  | LStore rl base data _ _ =>
-      <[c := store_post_run (wgws σ c) rl base (length data)
+  | LStore rl base data asrc vsrc =>
+      <[c := store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
+               (srcs_view (wgws σ c) vsrc) base (length data)
                (S (length (wglog σ)))]> (wgws σ)
-  | LRmw aq rl base tvs data _ _ =>
-      <[c := store_post_run (load_post_run (wgws σ c) aq base tvs.*1)
-               rl base (length data) (S (length (wglog σ)))]> (wgws σ)
+  | LRmw aq rl base tvs data asrc vsrc =>
+      <[c := store_post_run_d
+               (load_post_run_d (wgws σ c) aq (srcs_view (wgws σ c) asrc)
+                  base tvs.*1)
+               rl (srcs_view (wgws σ c) asrc) (srcs_view (wgws σ c) vsrc)
+               base (length data) (S (length (wglog σ)))]> (wgws σ)
   | LFence pr pw sr sw => <[c := fence_post (wgws σ c) pr pw sr sw]> (wgws σ)
   | LDev => wgws σ              (* the fabric marker: [LSilent]'s twin *)
   | LRegW rd srcs =>
@@ -593,19 +608,40 @@ Lemma elab_apply_fence σ c k pr pw sr sw :
   = ewg_ws σ c (fence_post (wgws σ c) pr pw sr sw).
 Proof. reflexivity. Qed.
 
-Lemma elab_apply_store σ c k rl base data :
-  elab_apply σ c (LStore rl base data [] []) k None None (wgdev σ)
+Lemma elab_apply_store σ c k rl base data asrc vsrc :
+  elab_apply σ c (LStore rl base data asrc vsrc) k None None (wgdev σ)
   = ewg_store σ c
-      (store_post_run (wgws σ c) rl base (length data) (S (length (wglog σ))))
+      (store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
+         (srcs_view (wgws σ c) vsrc) base (length data)
+         (S (length (wglog σ))))
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
 Proof. reflexivity. Qed.
 
-Lemma elab_apply_rmw σ c k aq rl base tvs data rs1 :
-  elab_apply σ c (LRmw aq rl base tvs data [] []) k (Some rs1) None (wgdev σ)
+Lemma elab_apply_rmw σ c k aq rl base tvs data asrc vsrc rs1 :
+  elab_apply σ c (LRmw aq rl base tvs data asrc vsrc) k (Some rs1) None
+    (wgdev σ)
   = ewg_rmw σ c rs1
-      (store_post_run (load_post_run (wgws σ c) aq base tvs.*1) rl base
+      (store_post_run_d
+         (load_post_run_d (wgws σ c) aq (srcs_view (wgws σ c) asrc) base
+            tvs.*1)
+         rl (srcs_view (wgws σ c) asrc) (srcs_view (wgws σ c) vsrc) base
          (length data) (S (length (wglog σ))))
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
+Proof. reflexivity. Qed.
+
+(** D3-2: THE REGISTER WRITE, all three kinds at once — the label and the
+    σ-effect are [WeakEvLang.erw_label] / [ewg_rw] of the SAME
+    classification, so this one conversion covers [LSilent], [LRegW] and
+    [LCtrl]. *)
+Lemma elab_apply_rw σ c k rs' (w : erw_kind) :
+  elab_apply σ c (erw_label w) k (Some rs') None (wgdev σ)
+  = ewg_rw σ c rs' w.
+Proof. by destruct w. Qed.
+
+(** ... and the announce: [LInstr]'s view effect plus the bits. *)
+Lemma elab_apply_instr σ c k v :
+  elab_apply σ c LInstr k None (Some v) (wgdev σ)
+  = ewg_ibws σ c v (instr_post (wgws σ c)).
 Proof. reflexivity. Qed.
 
 (** D3: THE ANNOUNCE AND THE BOUNDARY — a σ-write of [wgib] and nothing
@@ -707,14 +743,16 @@ Proof.
               & (tick & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
       exists tick. split; [reflexivity|by rewrite elab_apply_ib]. }
   destruct oc; simpl; try esil_case; try estuck_case.
-  - (* RegWrite *)
+  - (* RegWrite — D3-2: the label is the classification's, and [elab_ok] of
+       all three kinds is [True] *)
     split.
     + intros (-> & ->). do 6 eexists. efac4;
-        [reflexivity|split_and!; reflexivity|exact I
-        |by rewrite elab_apply_reg].
+        [reflexivity|split_and!; reflexivity
+        |by destruct (erw_of _ _)
+        |by rewrite elab_apply_rw].
     + intros (l & m' & ors & fn' & d' & oib & He & Hp & _ & Hs).
       destruct Hp as (-> & -> & -> & -> & -> & ->). subst.
-      split; [reflexivity|by rewrite elab_apply_reg].
+      split; [reflexivity|by rewrite elab_apply_rw].
   - (* MemRead *)
     destruct (dev_addr _).
     + (* MMIO READ — the fabric answers (P1) *)
@@ -747,9 +785,7 @@ Proof.
              exists w, tvs, data, rl, m1, m2, rs1;
              split_and!; [exact Hlen|exact Hby|exact Hne|exact Hlend
                          |exact Hsil|exact Hwr|reflexivity..]
-            |split_and!;
-               [reflexivity|reflexivity|exact Hne|exact Hlend|exact Hrd
-               |exact Hex]
+            |split_and!; [exact Hne|exact Hlend|exact Hrd|exact Hex]
             |by rewrite elab_apply_rmw]. }
       * intros (l & m' & ors & fn' & d' & oib & He &
                 (Hcoh & [(Hlat & w & tvs & Hlen & Hby & -> & -> & -> & -> & ->
@@ -761,7 +797,7 @@ Proof.
           exists w, tvs. split_and!;
             [exact Hlen|exact Hby|by destruct Hok as (_ & Hrd)|reflexivity
             |by rewrite elab_apply_load]. }
-        { destruct Hok as (_ & _ & _ & _ & Hrd & Hex).
+        { destruct Hok as (_ & _ & Hrd & Hex).
           split; [exact Hcoh|]. right. split; [exact Hlat|].
           exists w, tvs, data, rl, m1, m2, rs1.
           split_and!; [exact Hlen|exact Hby|exact Hrd|exact Hex|exact Hne
@@ -781,23 +817,22 @@ Proof.
     + split.
       * intros (Hn & -> & ->). do 6 eexists. efac4;
           [reflexivity|split_and!; [exact Hn|reflexivity..]
-          |split_and!; [reflexivity|reflexivity|by apply wbytes_ne]|].
+          |by apply wbytes_ne|].
         rewrite elab_apply_store /= wbytes_length. reflexivity.
       * intros (l & m' & ors & fn' & d' & oib & He
                 & (Hn & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
         split; [exact Hn|]. split; [reflexivity|].
         rewrite elab_apply_store /= wbytes_length. reflexivity.
-  - (* D3: THE ANNOUNCE — a σ-write of [wgib] and nothing else.  It is the
-       ONE arm whose [oib] is not [None], which is why it does not fall to
-       [esil_case]; its label, log, views and register file are [LSilent]'s
-       verbatim, so [weak_state_interp] cannot see it (acceptance test). *)
+  - (* D3: THE ANNOUNCE — the instruction start.  It writes the bits ([oib],
+       which is why it does not fall to [esil_case]) and, since D3-2, emits
+       [LInstr]: the load-result bank is reset, and nothing else moves. *)
     split.
     + intros (-> & ->). do 6 eexists. efac4;
         [reflexivity|split_and!; reflexivity|exact I
-        |by rewrite elab_apply_ib].
+        |by rewrite elab_apply_instr].
     + intros (l & m' & ors & fn' & d' & oib & He
               & (-> & -> & -> & -> & -> & ->) & _ & Hs); subst.
-      split; [reflexivity|by rewrite elab_apply_ib].
+      split; [reflexivity|by rewrite elab_apply_instr].
   - (* Barrier — the inert [fence.i] label is deviation (D2) *)
     split.
     + intros (-> & ->). do 6 eexists. efac4;
@@ -1020,7 +1055,9 @@ Lemma pnode_step_lat_free m rs ib d aq base tvs m' ors fn' d' oib :
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
-  destruct oc; simpl; try (by intros (? & _)); try (by intros []).
+  destruct oc; simpl; try (by intros (? & _));
+    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
     + intros (_ & [(_ & w & tvs0 & _ & _ & Hl & _)
@@ -1067,8 +1104,8 @@ Lemma pstep_disk_lat_free dp d aq base tvs dp' d' :
 Proof. intros [H|(_ & Hl & _)]; [by eapply pdisk_prog_lat_free|done]. Qed.
 
 (** ... and no disk arm ever emits an [LRmw]. *)
-Lemma pstep_disk_no_rmw dp d aq rl base tvs data dp' d' :
-  ~ pstep_disk dp d (LRmw aq rl base tvs data [] []) dp' d'.
+Lemma pstep_disk_no_rmw dp d aq rl base tvs data asrc vsrc dp' d' :
+  ~ pstep_disk dp d (LRmw aq rl base tvs data asrc vsrc) dp' d'.
 Proof.
   intros [[(_ & Hl & _)
           |[(pa & n & aq0 & k & tvs0 & _ & _ & Hl & _)
@@ -1129,7 +1166,9 @@ Lemma pnode_step_ts_load m rs ib d aq base tvs tvs' m' ors fn' d' oib :
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
-  destruct oc; simpl; try (by intros (? & _)); try (by intros []).
+  destruct oc; simpl; try (by intros (? & _));
+    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
     + intros (Hcoh & [(Hlat & w & tvs0 & Hlen & Hby & Hl & Hrest)
@@ -1148,14 +1187,16 @@ Proof.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
 
-Lemma pnode_step_ts_rmw m rs ib d aq rl base tvs tvs' data m' ors fn' d' oib :
-  pnode_step m rs ib d (LRmw aq rl base tvs data [] []) m' ors fn' d' oib ->
+Lemma pnode_step_ts_rmw m rs ib d aq rl base tvs tvs' data asrc vsrc m' ors fn' d' oib :
+  pnode_step m rs ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib ->
   tvs'.*2 = tvs.*2 ->
-  pnode_step m rs ib d (LRmw aq rl base tvs' data [] []) m' ors fn' d' oib.
+  pnode_step m rs ib d (LRmw aq rl base tvs' data asrc vsrc) m' ors fn' d' oib.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
-  destruct oc; simpl; try (by intros (? & _)); try (by intros []).
+  destruct oc; simpl; try (by intros (? & _));
+    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
     + intros (Hcoh & [(_ & w & tvs0 & _ & _ & Hl & _)
@@ -1187,10 +1228,10 @@ Proof.
   - apply pnode_step_ts_load.
 Qed.
 
-Lemma pstep_node_ts_rmw cpu m rs fn ib d aq rl base tvs tvs' data m' ors fn' d' oib :
-  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs data [] []) m' ors fn' d' oib ->
+Lemma pstep_node_ts_rmw cpu m rs fn ib d aq rl base tvs tvs' data asrc vsrc m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib ->
   tvs'.*2 = tvs.*2 ->
-  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs' data [] []) m' ors fn' d' oib.
+  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs' data asrc vsrc) m' ors fn' d' oib.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
@@ -1211,10 +1252,10 @@ Proof.
   - apply pstep_disk_ts_load.
 Qed.
 
-Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data p' d' :
-  pstep_ev p d (LRmw aq rl base tvs data [] []) p' d' ->
+Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data asrc vsrc p' d' :
+  pstep_ev p d (LRmw aq rl base tvs data asrc vsrc) p' d' ->
   tvs'.*2 = tvs.*2 ->
-  pstep_ev p d (LRmw aq rl base tvs' data [] []) p' d'.
+  pstep_ev p d (LRmw aq rl base tvs' data asrc vsrc) p' d'.
 Proof.
   rewrite /pstep_ev.
   destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
@@ -1325,24 +1366,35 @@ Proof.
     split; [reflexivity|]. intros d0. apply Hall.
 Qed.
 
-(** THE D2 DEPENDENCY-FREEDOM OF THE INSTANCE.  Every label the event
-    language emits carries EMPTY operand lists, and none of the three
-    dependency-only labels is ever emitted — [deps_of_bits] (D3) is what
-    will change that.  This is the fact the capstone's uniform-shape
-    inversion ([WeakEvCapstone.wp_pf_step_inv]) takes as its premise, and
-    it is what makes every [_d] step function in the machine's arms collapse
-    to its dependency-free instance BY CONVERSION. *)
-Lemma pnode_step_depfree m rs ib d l m' ors fn' d' oib :
-  pnode_step m rs ib d l m' ors fn' d' oib -> lb_depfree l.
+(** D3-2: THE **LOAD**-DEPENDENCY-FREEDOM OF THE INSTANCE.
+
+    D2's [pstep_ev_depfree] is FALSE now — that is the whole point of the
+    stage: stores and the fused RMW carry [deps_asrc]/[deps_vsrc], and the
+    three dependency-only labels are emitted at the announce, at [nextPC]
+    and at the architectural destination register.  What SURVIVES is the
+    pin on LOADS ([WeakPromise.lb_ldepfree]), and that is deviation D-8: a
+    load's data read and the page walker's PTE read are indistinguishable at
+    the node, so attaching the base register to a read would be a
+    STRENGTHENING beyond RVWMO's syntactic dependencies (the wrong
+    polarity).  It is exactly the premise the capstone's uniform-shape
+    inversion ([WeakEvCapstone.wp_pf_step_inv]) still needs.
+
+    THE DISK is unchanged: [pstep_disk_depfree] below still gives the FULL
+    [lb_depfree] (deviation D-6 — [virtio_prog] is not an ISA program and
+    its ordering is aq/fence-based). *)
+Lemma pnode_step_ldepfree m rs ib d l m' ors fn' d' oib :
+  pnode_step m rs ib d l m' ors fn' d' oib -> lb_ldepfree l.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & -> & _). }
-  destruct oc; simpl; try (by intros (-> & _)); try done.
+  destruct oc; simpl; try (by intros (-> & _));
+    try (intros (-> & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try done.
   - (* MemRead *)
     destruct (dev_addr _); [by intros (? & _ & -> & _)|].
     intros (_ & [(_ & w & tvs & _ & _ & -> & _)
                 |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                  _ & _ & _ & _ & _ & _ & -> & _)]); by split.
+                  _ & _ & _ & _ & _ & _ & -> & _)]); done.
   - (* MemWrite *)
     destruct (dev_addr _); [by intros (_ & -> & _)|].
     by intros (_ & -> & _).
@@ -1350,22 +1402,22 @@ Proof.
   - (* Choose *) by intros (ch & -> & _).
 Qed.
 
-Lemma pstep_node_depfree cpu m rs fn ib d l m' ors fn' d' oib :
-  pstep_node cpu m rs fn ib d l m' ors fn' d' oib -> lb_depfree l.
+Lemma pstep_node_ldepfree cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d l m' ors fn' d' oib -> lb_ldepfree l.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (-> & _).
-  - apply pnode_step_depfree.
+  - apply pnode_step_ldepfree.
 Qed.
 
-Lemma pstep_plic_depfree cpu m rs fn ib d l m' ors fn' d' oib :
-  pstep_plic cpu m rs fn ib d l m' ors fn' d' oib -> lb_depfree l.
+Lemma pstep_plic_ldepfree cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_plic cpu m rs fn ib d l m' ors fn' d' oib -> lb_ldepfree l.
 Proof. rewrite /pstep_plic. by intros (-> & _). Qed.
 
-Lemma pstep_hart_depfree cpu m rs fn ib d l m' ors fn' d' oib :
-  pstep_hart cpu m rs fn ib d l m' ors fn' d' oib -> lb_depfree l.
+Lemma pstep_hart_ldepfree cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_hart cpu m rs fn ib d l m' ors fn' d' oib -> lb_ldepfree l.
 Proof.
-  intros [H|H]; [by eapply pstep_node_depfree|by eapply pstep_plic_depfree].
+  intros [H|H]; [by eapply pstep_node_ldepfree|by eapply pstep_plic_ldepfree].
 Qed.
 
 Lemma pstep_disk_depfree dp d l dp' d' :
@@ -1383,11 +1435,11 @@ Proof.
          |(_ & -> & _)]; by (exact I || split).
 Qed.
 
-Theorem pstep_ev_depfree p d l p' d' : pstep_ev p d l p' d' -> lb_depfree l.
+Theorem pstep_ev_ldepfree p d l p' d' : pstep_ev p d l p' d' -> lb_ldepfree l.
 Proof.
   rewrite /pstep_ev.
   destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
     try (by intros []).
-  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_depfree.
-  - apply pstep_disk_depfree.
+  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_ldepfree.
+  - intros H. by apply lb_depfree_ldepfree, (pstep_disk_depfree _ _ _ _ _ H).
 Qed.

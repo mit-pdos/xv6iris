@@ -171,6 +171,20 @@ Definition lb_depfree (l : wlabel) : Prop :=
   | LRegW _ _ | LCtrl _ | LInstr => False
   end.
 
+(** D3-2: THE WEAKER PIN THE EVENT INSTANCE ACTUALLY SATISFIES.
+
+    Once the event language emits real operand lists, [lb_depfree] is false
+    of it — but its LOADS still carry none (deviation D-8: a load's data read
+    and the page walker's PTE read are indistinguishable at the node, so
+    attaching the base register to a read would be a STRENGTHENING beyond
+    RVWMO's syntactic dependencies).  That one pin is all the instance's
+    uniform-shape inversion needs, so it gets its own name. *)
+Definition lb_ldepfree (l : wlabel) : Prop :=
+  match l with LLoad _ _ _ _ asrc => asrc = [] | _ => True end.
+
+Lemma lb_depfree_ldepfree l : lb_depfree l → lb_ldepfree l.
+Proof. destruct l; simpl; by try (intros ->). Qed.
+
 (* ------------------------------------------------------------------ *)
 (** ** Per-agent state and configurations *)
 

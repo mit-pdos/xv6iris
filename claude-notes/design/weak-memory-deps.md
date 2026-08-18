@@ -515,6 +515,147 @@ register file, so `ecfg_of_init` still needs only `wglog σ = []` and
 byte-identical to `e1b67ace`; `Print Assumptions` unchanged (five `rv64d`
 axioms / closed); `lemma_diff --ref e1b67ace` CLEAN.
 
+### 2.7 D3-2 LANDED (2026-08-18) — THE OPERAND LISTS, and THE ANSWER TO
+   "do per-register views leak into WP-level reasoning?"
+
+**THE ANSWER, in one line: yes, but at exactly ONE altitude — the batched
+SILENT-NODE rule — and it does NOT reach the leaf statements.**  Nine of the
+ten lemmas the stage brief names re-check BYTE-IDENTICAL; the tenth
+(`WeakEvExecEff.ewp_ev_lui_tail`) changes, and the reason is a theorem, not
+an accident.
+
+#### What the language emits
+
+| node | label | view effect |
+|---|---|---|
+| `InstrAnnounce ob` | `LInstr` | `instr_post` (`w_ldv := 0`, PARM's `res` bank) **and** `wgib c := Some (ib_of_bvn ob)` |
+| `RegWrite r` with `r` = the instruction's architectural `rd` | `LRegW rd srcs` | `regw_post` — PARM's `step_assign`, an OVERWRITE |
+| `RegWrite nextPC` | `LCtrl (deps_ctrl role)` | `ctrl_post` — PARM's `step_if` |
+| every other `RegWrite` (CSRs, `PC`, `minstret`, a non-`rd` GPR) | `LSilent` | none (D-4) |
+| RAM `MemWrite` | `LStore rl base data (deps_asrc role) (deps_vsrc role)` | `store_post_run_d` |
+| fused RMW | `LRmw aq rl base tvs data (deps_asrc) (deps_vsrc)` | `store_post_run_d ∘ load_post_run_d` |
+| plain RAM `MemRead` | `LLoad aq false base tvs []` | `load_post_run` — **D-8** |
+| `BranchAnnounce`, fences, MMIO, the disk | unchanged | unchanged |
+
+The classification is `WeakEvLang.erw_of : op_roles → register → erw_kind`,
+the JOIN of `WeakDeps.deps_rd` (which architectural register the instruction
+writes) with `ereg_gpr_num` (which Sail register the node targets:
+`x1..x31` are `num_of_register_bitvector_64` `16..46`, and the model has no
+`x0` register at all, which is why `x0` can never be a destination).  Six
+`vm_compute` `Example`s in `WeakEvLang` pin it down NON-VACUOUSLY —
+`lw a5,0(a5)` gives `ERWreg 15 [DLdRes]` at `x15` and `ERWnone` at `x14` and
+at `mstatus`; `beq a5,zero` gives `ERWctrl [DReg 15]` at `nextPC` and
+`addi` gives `ERWctrl []` there.
+
+**DEVIATION D-9 (new): the control view is raised at `RegWrite nextPC`, not
+at the announce.**  The brief asked for `LInstr (ctrl : list dsrc)` — a
+Layer-1 label change, which would have re-opened `WeakPromise`, the bridge,
+the replay and the whole robustness tower.  It is unnecessary: D2's
+`LCtrl srcs` is exactly PARM's `Local.control`, and `riscv_step`'s decode
+preamble writes `nextPC` UNCONDITIONALLY and BEFORE `execute` — on the taken
+and the not-taken arm of every branch, and before every memory access of the
+instruction.  So `LCtrl` at that node is PARM's `step_if` position exactly,
+and for a non-branch instruction `deps_ctrl` is `[]`, making the arm a no-op.
+**The D2 label vocabulary was already right; nothing in Layer 1 moved.**
+
+**DEVIATION D-8 (as briefed): a plain load carries NO address sources.**  A
+load's data read and the page walker's PTE read are indistinguishable at the
+node (both `AK_explicit` plain, `va = None`; the model emits no
+`TranslationStart`/`TranslationEnd`), so attaching `rs1` to a read would
+attach it to a PTE read too — a STRENGTHENING beyond RVWMO's syntactic
+dependencies, i.e. the wrong polarity.  ppo 9 is therefore modelled for
+STORES and the fused RMW (whose nodes are unambiguous) and not for loads.
+Upgrade path: make the fork emit `sail_translation_start/end`, or give the
+hart a "walking" phase; either makes the read arms separable and D-8 dies.
+`WeakPromise.lb_ldepfree` is the pin that survives, and it is the only
+premise the capstone's uniform-shape inversion still needs.
+
+#### THE ACCEPTANCE TEST — the table
+
+| lemma | outcome |
+|---|---|
+| `WeakEvStarted.ewp_ev_started_set` | **UNCHANGED** (proof only) |
+| `WeakEvStarted.ewp_ev_started_load` | **UNCHANGED** (proof only) |
+| `WeakEvStarted.ewp_ev_started_fence` | **UNCHANGED** (proof only) |
+| `WeakEvStarted.ewp_ev_started_wait_seq` | **UNCHANGED** (not even the proof) |
+| `WeakEvStarted.ewp_ev_started_set_at_main` | **UNCHANGED**, and NO `vm_cast` node count moved |
+| `WeakEvFunnel.ewp_lui_leaf_ev` | **UNCHANGED** (proof only) |
+| `WeakEvWire.ewp_plic` | **UNCHANGED** (not even the proof) |
+| `WeakEvDisk.*` | **UNCHANGED** — the file has an EMPTY diff (D-6) |
+| `WeakEvExecEff.ewp_ev_lui_tail` | **CHANGED**: gains `hart_ws c ws` in and `∀ ws', ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws'` out |
+
+**WHY THE LEAVES SURVIVE.**  They already speak in the
+`∀ ws', ⌜ws_le ws ws'⌝ -∗ hart_ws c ws'` idiom — the shape the M1c leaf
+discipline settled on long before D3 — so a stretch that moves the view
+monotonically is invisible to them.  What the batched rule hands back is not
+`ws_le` but the stronger `WeakMem.ws_depmove`: **every ordering component
+(`coh`, the four frontiers, `w_vRel`, the forward bank, `w_pub`, `w_relp`) is
+UNCHANGED and only `w_vcap` rises.**  That is what lets
+`ewp_ev_started_set` still read `w_relp = true` off its moved view (a fact
+`ws_le` does NOT carry — `w_relp` toggles and is deliberately outside it) and
+`ewp_ev_started_load` still read its `coh` payment.  `ws_depmove` is the
+D3 contribution to the leaf-facing vocabulary, and it is why the leak is
+one level deep instead of all the way down.
+
+**WHY `ewp_ev_lui_tail` CANNOT SURVIVE — the finding.**  `WeakEvExecEff.epure`
+means "this stretch has NO MEMORY EFFECT": no RAM access, no MMIO, no
+barrier.  Under D3 that is no longer the same as "no effect on the hart's
+weak state", because PARM's `step_assign` fires at the architectural
+destination register — and `lui` WRITES ITS DESTINATION REGISTER.  A
+register-only bridge is therefore a weak-memory event now, and since
+`hart_ws` is a `ghost_var` at fraction ½ (`WeakGhost`, §3c), the rule
+*cannot* move the authority without the client's half.  The whole
+`epure`/`erun` family (`ewp_ev_epure`, `ewp_ev_exec_eff_pure`,
+`ewp_ev_exec_eff_cert`, `ewp_ev_lui_tail`) gains the two arguments.  THE M4
+BRIDGE'S NOTION OF "PURE" IS WHAT D3 BREAKS, and there is no way to restore
+it short of moving `w_regv` out of the leaf-pinned `wstate` — which would
+mean changing `WeakGhost.weak_state_interp`, explicitly out of scope.
+
+#### The other WP-tier statements that moved (none is a leaf)
+
+- `WeakEvLift.ewp_ev_sil_node` / `ewp_ev_sil_rtc` / `ewp_ev_batch` and the
+  five `ewp_ev_seq_*` combinators — the leak itself: they own `hart_ws` and
+  return `ws_depmove`;
+- `WeakEvLift.ewp_ev_store` and `ewp_ev_seq_store` — their post-view is
+  `store_post_run_d ws rl va vd …` with `va`/`vd` UNIVERSALLY QUANTIFIED,
+  because the operand views are computed from `wgib`, which the client
+  cannot see.  This is PARM's `FwdItem` view (deviation D-7's fix landing
+  for real).  `ewp_ev_rmw` keeps its statement because its views hide inside
+  `ermw_ok`/`ermw_ws`, which are already σ-parameterised;
+- `WeakEvFunnel.ewp_ev_node2` / `ewp_ev_walk` / `ewp_ev_one_fetch` /
+  `ewp_instr_pure` and `WeakEvWire.ewp_ewrun_nil` / `ewp_ewrun_fetch` /
+  `ewp_instr` — the same threading, with the fetch-crossing forms weakened
+  from a NAMED post-view to `∀ ws', ⌜ws_le ws ws'⌝` (which is all their
+  clients ever used).
+
+#### Layer 1 and the machine
+
+`WeakMem` gains `ws_depmove` (+ reflexivity, transitivity, `_coh`, `_relp`,
+`_le`, and the three `*_post_depmove` instances) and
+`coh_store_post_run_d_moved` / `flr_store_post_run_d` land in `WeakEvLift` /
+`WeakStore`.  `WeakEvCapstone.pf_ok`/`pf_ws` drop the store/RMW pins and use
+`read_ok_d`/`store_post_run_d`/`load_post_run_d`; `wp_pf_step_inv`'s premise
+weakens from `lb_depfree` to `lb_ldepfree`; `elab_apply_elabel_ok` LOSES its
+`lb_depfree` premise outright, because the three dependency-only labels now
+have real `elabel_ok` images.  `xv6_ev_weak_robust`, `robust_main` and
+`xv6_weak_robust` are BYTE-IDENTICAL and `Print Assumptions` is unchanged
+(five `rv64d` axioms / closed / closed).
+
+**`lemma_diff --ref e1b67ace` reports exactly five GONE lemmas**, all
+intended and all in `WeakEvInst`: `pnode_step_depfree`,
+`pstep_node_depfree`, `pstep_plic_depfree`, `pstep_hart_depfree`,
+`pstep_ev_depfree`.  They are FALSE now — that is the point of the stage —
+and each is replaced by its `_ldepfree` twin (D-8's surviving pin).  The
+DISK keeps the full `lb_depfree` (`pstep_disk_depfree`, D-6).
+
+#### What D3-2 does NOT do
+
+`WeakPromiseBridge`'s axiomatic projection (D2's one residue) is still
+restricted to `lb_depfree`, and the event instance no longer satisfies it —
+so the residue is no longer even vacuously discharged at this instance.  It
+was never consumed outside `WeakPromiseBridge`, and closing it is §3's
+"`WeakAxiomatic*` gains ppo 9–11".  Nothing else in the tree changes.
+
 ## 3. Layer-1 proof impact (what re-lands, what is new)
 
 - **W1 (machine) / front-loading (`WeakPromiseFact`)**: `wp_swap` and the

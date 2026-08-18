@@ -109,6 +109,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import DevModel.
 Require Import WeakMem.
+Require Import WeakDeps.
 Require Import WeakPromise.
 Require Import WeakInterp.
 Require Import WeakInterpProj.
@@ -157,6 +158,55 @@ Lemma coh_store_post_run_moved (ws : wstate) (rl : bool) (base : Z)
 Proof.
   rewrite /store_post_run /store_post_bytes store_fold_map. intros Hc.
   destruct (coh_store_fold_nat rl t base (seq 0 cnt) ws a Hc) as (j & Hj & ->).
+  apply elem_of_seq in Hj. exists j. split; [lia|reflexivity].
+Qed.
+
+(** D3-2: THE COHERENCE FLOORS ARE DEPENDENCY-BLIND.  [store_post_d] writes
+    the same [coh] cell as [store_post] (the operand view goes into the
+    FORWARD BANK, PARM's [FwdItem], and into [w_vcap] — never into [coh]),
+    and [ctrl_post] writes no [coh] at all.  So the φ obligation a store
+    event hands its caller is EXACTLY the dependency-free one, which is why
+    [ewp_ev_store]'s φ clause does not move. *)
+Lemma store_fold_d_map (rl : bool) (vf t : nat) (base : Z) (l : list nat)
+    (ws : wstate) :
+  foldl (fun w a0 => store_post_d w rl vf a0 t) ws
+        (map (fun j : nat => base + Z.of_nat j) l)
+  = foldl (fun w j => store_post_d w rl vf (base + Z.of_nat j) t) ws l.
+Proof.
+  revert ws. induction l as [|j l IH]; intros ws; [reflexivity|]. simpl.
+  by rewrite IH.
+Qed.
+
+Lemma coh_store_post_d_ne ws rl vf a' t a :
+  a <> a' -> coh (store_post_d ws rl vf a' t) a = coh ws a.
+Proof. intros Hne. rewrite /store_post_d /coh /= lookup_insert_ne //. Qed.
+
+Lemma coh_store_fold_d_nat (rl : bool) (vf t : nat) (base : Z) (l : list nat)
+    (ws : wstate) (a : Z) :
+  (coh ws a <
+   coh (foldl (fun w j => store_post_d w rl vf (base + Z.of_nat j) t) ws l)
+     a)%nat ->
+  exists j : nat, j ∈ l /\ a = base + Z.of_nat j.
+Proof.
+  revert ws. induction l as [|j l IH]; intros ws Hc; [simpl in Hc; lia|].
+  simpl in Hc. destruct (decide (a = base + Z.of_nat j)) as [->|Hne].
+  - exists j. split; [apply elem_of_cons; by left|reflexivity].
+  - destruct (IH (store_post_d ws rl vf (base + Z.of_nat j) t))
+      as (j' & Hj' & ->).
+    { rewrite (coh_store_post_d_ne ws rl vf (base + Z.of_nat j) t a Hne).
+      exact Hc. }
+    exists j'. split; [apply elem_of_cons; by right|reflexivity].
+Qed.
+
+Lemma coh_store_post_run_d_moved (ws : wstate) (rl : bool) (vaddr vdata : nat)
+    (base : Z) (cnt t : nat) (a : Z) :
+  (coh ws a < coh (store_post_run_d ws rl vaddr vdata base cnt t) a)%nat ->
+  exists j : nat, (j < cnt)%nat /\ a = base + Z.of_nat j.
+Proof.
+  rewrite /store_post_run_d /store_post_bytes_d.
+  rewrite /ctrl_post /coh /=. rewrite store_fold_d_map. intros Hc.
+  destruct (coh_store_fold_d_nat rl (Nat.max vaddr vdata) t base (seq 0 cnt)
+              ws a Hc) as (j & Hj & ->).
   apply elem_of_seq in Hj. exists j. split; [lia|reflexivity].
 Qed.
 
@@ -218,6 +268,12 @@ Proof. apply load_post_fold_relp_ev. Qed.
 (** The [wstate] twin of [RiscvPtsto.gregs_interp_acc_at] — [WeakGhost]'s
     [wws_interp_acc] is stated at the AMBIENT [cpu_id] and every rule here
     names its hart explicitly. *)
+Lemma wws_interp_ext `{!riscvGS Σ, !weakGS Σ} (f g : CPU -> wstate) :
+  (forall c, f c = g c) -> wws_interp f ⊣⊢ wws_interp g.
+Proof.
+  intros H. rewrite /wws_interp. apply big_sepS_proper. intros c _. by rewrite H.
+Qed.
+
 Lemma wws_interp_acc_at `{!riscvGS Σ, !weakGS Σ} (c : CPU) (f : CPU -> wstate) :
   wws_interp f ⊢ wws_auth c (f c) ∗
     (∀ ws', wws_auth c ws' -∗ wws_interp (<[c := ws']> f)).
@@ -321,6 +377,78 @@ Section interp.
       - intros c0 Hne. by rewrite gws_insert_ne.
       - rewrite gws_insert_eq -Hms. exact Hnvh. }
     iSplitR; [by iPureIntro|]. iFrame "Hlog Hlat Hws".
+  Qed.
+
+  (** D3-2: THE POINTWISE REBUILD.  [weak_state_interp] reads the register
+      map and the view map POINTWISE (both are big-ops over [CPU], and the
+      two pure conjuncts quantify over harts) and does not read [wgib] at
+      all — so a σ whose register/view maps agree pointwise and whose bits
+      differ arbitrarily carries the same interpretation.  This is what
+      lets the three shapes of a silent node close against ONE closing wand
+      without any use of functional extensionality. *)
+  Lemma weak_state_interp_ptwise (σ : wgstate) (gr : CPU -> regstate)
+      (f : CPU -> wstate) (ib : CPU -> oib32) :
+    (forall c, gr c = wgregs σ c) -> (forall c, f c = wgws σ c) ->
+    weak_state_interp σ -∗
+    weak_state_interp (WGState gr (wgimg σ) (wglog σ) f (wgdev σ) (wggen σ)
+                         (wgpow σ) ib).
+  Proof.
+    intros Hg Hf. rewrite /weak_state_interp /wgen_pin /=.
+    iIntros "(%Hpin & %Hbnd & %Hnv & %Hwf & Hgr & $ & $ & $ & Hws)".
+    iSplitR; [by iPureIntro|].
+    iSplitR; [iPureIntro; intros c; rewrite Hf; apply Hbnd|].
+    iSplitR.
+    { iPureIntro. rewrite /no_violation. intros p mm c a H1 H2 H3 H4 H5 c' Hne.
+      rewrite Hf. by eapply Hnv. }
+    iSplitR; [by iPureIntro|].
+    iSplitL "Hgr"; [by rewrite (gregs_interp_ext gr (wgregs σ) Hg)|].
+    by rewrite (wws_interp_ext f (wgws σ) Hf).
+  Qed.
+
+  (** The combined accessor: [weak_state_interp_regs] and
+      [weak_state_interp_mem] at ONCE, closing at [ewg_rmw] — which is the
+      only σ-update shape that moves registers, views and the log together. *)
+  Lemma weak_state_interp_rmw (σ : wgstate) (c : CPU) :
+    weak_state_interp σ ⊢
+      ⌜forall c' : CPU, ws_bounded (wgws σ c') (length (wglog σ))⌝ ∗
+      ⌜no_violation (wglog σ) (wgws σ)⌝ ∗ ⌜wlog_wf (wglog σ)⌝ ∗
+      reg_interp_at (cpu_reg_name c) (wgregs σ c) ∗
+      wlog_auth (wglog σ) ∗ wlat_interp (wgimg σ) (wglog σ) ∗
+      wws_auth c (wgws σ c) ∗
+      (∀ (rs' : regstate) (ws' : wstate) (lg' : list wmsg),
+         ⌜(length (wglog σ) ≤ length lg')%nat⌝ -∗
+         ⌜ws_bounded ws' (length lg')⌝ -∗
+         ⌜nv_hart lg' c ws'⌝ -∗
+         ⌜exists ms, lg' = (wglog σ ++ ms)%list /\
+                (forall m, m ∈ ms -> wm_tid m = Some (fin_to_nat c))⌝ -∗
+         ⌜wlog_wf lg'⌝ -∗
+         reg_interp_at (cpu_reg_name c) rs' -∗
+         wlog_auth lg' -∗ wlat_interp (wgimg σ) lg' -∗ wws_auth c ws' -∗
+         weak_state_interp (ewg_rmw σ c rs' ws' lg')).
+  Proof.
+    rewrite /weak_state_interp /ewg_rmw.
+    cbn [wgregs wgimg wglog wgws wgdev wggen wgpow].
+    iIntros "(%Hpin & %Hbnd & %Hnv & %Hwf & Hgr & $ & Hlog & Hlat & Hws)".
+    iDestruct (gregs_interp_acc_at c with "Hgr") as "[$ Hgrcl]".
+    iDestruct (wws_interp_acc_at c with "Hws") as "[Hwsc Hwscl]".
+    iFrame "Hlog Hlat Hwsc". iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iIntros (rs' ws' lg') "%Hlen %Hb' %Hnvh %Hown %Hwf' Hrs Hlog Hlat Hwsc".
+    iDestruct ("Hgrcl" with "Hrs") as "Hgr".
+    iDestruct ("Hwscl" with "Hwsc") as "Hws".
+    iSplitR; [by iPureIntro|].
+    iSplitR.
+    { iPureIntro. intros c0. destruct (decide (c0 = c)) as [->|Hne].
+      - rewrite gws_insert_eq. exact Hb'.
+      - rewrite gws_insert_ne; [|done].
+        exact (ws_bounded_mono _ _ _ (Hbnd c0) Hlen). }
+    iSplitR.
+    { iPureIntro. destruct Hown as (ms & Hms & Hms2). rewrite Hms.
+      apply (no_violation_step (wglog σ) ms (wgws σ) _ c Hnv Hbnd Hms2).
+      - intros c0 Hne. by rewrite gws_insert_ne.
+      - rewrite gws_insert_eq -Hms. exact Hnvh. }
+    iSplitR; [by iPureIntro|].
+    rewrite /insert /greg_insert. iFrame "Hgr Hlog Hlat Hws".
   Qed.
 
 End interp.
@@ -544,8 +672,9 @@ Qed.
     announce as silent (so no [vm_cast] node count moves). *)
 Definition esil_sigma (σ : wgstate) (c : CPU) (rs' : regstate) (σ' : wgstate)
     : Prop :=
-  σ' = ewg_reg σ c rs'
-  \/ (rs' = wgregs σ c /\ exists v : oib32, σ' = ewg_ib σ c v)
+  (exists k : erw_kind, σ' = ewg_rw σ c rs' k)
+  \/ (rs' = wgregs σ c /\
+      exists v : oib32, σ' = ewg_ibws σ c v (instr_post (wgws σ c)))
   \/ (rs' = wgregs σ c /\ σ' = σ).
 
 (** THE SEMANTIC BRIDGE: a silent node IS an arm of [ecycle_step], and its
@@ -564,7 +693,7 @@ Proof.
     solve [ eexists; (split; [by split|]);
               right; left; (split; [reflexivity|by eexists])
           | eexists; (split; [by split|]); right; right; by split
-          | eexists; (split; [by split|]); left; reflexivity ].
+          | eexists; (split; [by split|]); left; by eexists ].
 Qed.
 
 Lemma esil_node_ecycle_inv (gen : nat) (σ : wgstate) (c : CPU)
@@ -580,7 +709,32 @@ Proof.
     injection Hnode as <- <-; destruct Hcy as (-> & ->);
     (split; [reflexivity|]);
     solve [ right; left; (split; [reflexivity|by eexists])
-          | right; right; by split | by left ].
+          | right; right; by split | left; by eexists ].
+Qed.
+
+(** THE VIEW MOVE OF A SILENT NODE.  The three shapes are [erw_ws] of a
+    classification, [instr_post], and the identity — all three are
+    [ws_depmove]s, and that is EXACTLY what the batched rule hands its
+    caller. *)
+Lemma esil_sigma_depmove σ c rs' σ' :
+  esil_sigma σ c rs' σ' -> ws_depmove (wgws σ c) (wgws σ' c).
+Proof.
+  intros [(k & ->)|[(-> & (v & ->))|(-> & ->)]].
+  - rewrite ewg_rw_ws. apply erw_ws_depmove.
+  - rewrite /ewg_ibws /= gws_insert_eq. apply instr_post_depmove.
+  - reflexivity.
+Qed.
+
+Lemma esil_sigma_log σ c rs' σ' : esil_sigma σ c rs' σ' -> wglog σ' = wglog σ.
+Proof. intros [(k & ->)|[(_ & (v & ->))|(_ & ->)]]; by [rewrite ewg_rw_log| |]. Qed.
+
+Lemma esil_sigma_img σ c rs' σ' : esil_sigma σ c rs' σ' -> wgimg σ' = wgimg σ.
+Proof. intros [(k & ->)|[(_ & (v & ->))|(_ & ->)]]; by [rewrite ewg_rw_img| |]. Qed.
+
+Lemma esil_sigma_regs σ c rs' σ' : esil_sigma σ c rs' σ' -> wgregs σ' c = rs'.
+Proof.
+  intros [(k & ->)|[(-> & (v & ->))|(-> & ->)]];
+    [by rewrite ewg_rw_regs greg_insert_eq|reflexivity|reflexivity].
 Qed.
 
 (* ====================================================================== *)
@@ -841,18 +995,37 @@ Section batch.
         | injection Hnode as <- <-; exists rs2; by split ].
   Qed.
 
-  (** ONE silent node.  Callers do not use this: they use [ewp_ev_batch]. *)
+  (** D3-2, THE ONE PLACE THE DEPENDENCY VIEWS LEAK INTO THE WP TIER.
+
+      A silent node is no longer σ-silent: a [RegWrite] to the instruction's
+      architectural destination is PARM's [step_assign], a [RegWrite] to
+      [nextPC] is PARM's [step_if], and the announce resets the load-result
+      bank.  All three move the hart's own [wstate], and [hart_ws] is a
+      [ghost_var] at fraction 1/2 — so the rule CANNOT move it without the
+      caller's half.  Hence the two new arguments.
+
+      WHAT THE CALLER GETS BACK is deliberately NOT an equation but
+      [WeakMem.ws_depmove]: the ordering components ([coh], the four
+      frontiers, [w_vRel], the forward bank, [w_pub], [w_relp]) are
+      UNCHANGED and [w_vcap] only rises.  Every leaf-facing fact — [coh],
+      [w_relp], [ws_le], [vwp_hold]'s monotonicity — therefore survives a
+      silent stretch verbatim, which is why NO LEAF STATEMENT moves.
+
+      Callers do not use this: they use [ewp_ev_batch]. *)
   Lemma ewp_ev_sil_node (gen : nat) (c : CPU) (D : gset register)
-      (rs : regstate) (m m1 : M unit) (rs1 : regstate) :
+      (rs : regstate) (m m1 : M unit) (rs1 : regstate) (ws : wstate) :
     gen = 0%nat ->
     esil_node D rs m = Some (rs1, m1) ->
-    ereg_frame c rs D -∗
-    ▷ (ereg_frame c rs1 D -∗ EWP (ECycle gen c m1 None) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c rs D -∗
+    ▷ (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+         ereg_frame c rs1 D -∗ EWP (ECycle gen c m1 None) @ ⊤) -∗
     EWP (ECycle gen c m None) @ ⊤.
   Proof.
-    iIntros (Hgen Hnode) "Hrf H". iApply (ewp_ecycle gen c m None Hgen).
+    iIntros (Hgen Hnode) "Hws Hrf H". iApply (ewp_ecycle gen c m None Hgen).
     iIntros (σ) "Hσ".
-    iDestruct (weak_state_interp_regs σ c with "Hσ") as "[Hri Hcl]".
+    iDestruct (weak_state_interp_rmw σ c with "Hσ") as
+      "(%Hbnd & %Hnv & %Hwf & Hri & Hlog & Hlat & Hwsa & Hcl)".
+    iDestruct (hart_ws_agree with "Hwsa Hws") as %->.
     iDestruct (ereg_frame_agree c rs D (wgregs σ c) with "Hri Hrf") as %Hag.
     destruct (esil_node_agree D rs (wgregs σ c) m m1 rs1 Hag Hnode)
       as (rs2 & Hnode2 & Hag2).
@@ -864,6 +1037,10 @@ Section batch.
     iNext. iIntros (e' σ') "%Hcy". iMod "Hmask" as "_".
     destruct (esil_node_ecycle_inv gen σ c D rs2 m1 m e' σ' Hnode2 Hcy)
       as (-> & Hσ').
+    have Hdm := esil_sigma_depmove σ c rs2 σ' Hσ'.
+    have Hlg := esil_sigma_log σ c rs2 σ' Hσ'.
+    have Hrg := esil_sigma_regs σ c rs2 σ' Hσ'.
+    (* the register half is D2's, verbatim *)
     iAssert (|==> reg_interp_at (cpu_reg_name c) rs2 ∗ ereg_frame c rs1 D)%I
       with "[Hri Hrf]" as ">[Hri Hrf]".
     { destruct m as [y|T oc k]; [by simpl in Hnode|].
@@ -886,34 +1063,122 @@ Section batch.
           | injection Hnode as Hq1 Hq2; simpl in Hnode2;
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
             iModIntro; iFrame "Hri"; by iApply (ereg_frame_ext c rs rs D) ]. }
-    iModIntro. destruct Hσ' as [->|[[-> (v & ->)]|[-> ->]]].
-    - iSplitL "Hri Hcl"; [by iApply "Hcl"|]. by iApply "H".
-    - (* D3: THE ANNOUNCE.  [weak_state_interp (ewg_ib σ c v)] IS
-         [weak_state_interp σ] — a conversion, so the very same proof term
-         that closed the σ-identity arm closes this one. *)
-      iSplitL "Hri Hcl".
-      { iApply weak_state_interp_reg_id. by iApply "Hcl". }
-      by iApply "H".
-    - iSplitL "Hri Hcl".
-      { iApply weak_state_interp_reg_id. by iApply "Hcl". }
-      by iApply "H".
+    (* ONE closing wand, three shapes.  In each the successor's view is the
+       concrete [erw_ws] / [instr_post] / identity, and the successor state
+       is the closing wand's [ewg_rmw] POINTWISE — [weak_state_interp_ptwise]
+       is what says the difference (a pointwise-identity insert, and [wgib])
+       is invisible. *)
+    iAssert (|==> ∃ ws' : wstate, ⌜ws_depmove (wgws σ c) ws'⌝ ∗
+                    weak_state_interp σ' ∗ hart_ws c ws')%I
+      with "[Hri Hlog Hlat Hwsa Hws Hcl]" as ">(%ws' & %Hdm' & Hσ & Hws)".
+    { destruct Hσ' as [(k & ->)|[(Hr & (v & ->))|(Hr & ->)]].
+      - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (erw_ws (wgws σ c) k)
+                with "Hwsa Hws") as "[Hwsa Hws]".
+        iDestruct ("Hcl" $! rs2 (erw_ws (wgws σ c) k) (wglog σ)
+                     with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa") as "Hσ0".
+        { lia. }
+        { destruct k; simpl;
+            [exact (Hbnd c)
+            |apply regw_post_bounded;
+               [exact (Hbnd c)|by apply srcs_view_bounded]
+            |apply ctrl_post_bounded;
+               [exact (Hbnd c)|by apply srcs_view_bounded]]. }
+        { apply (nv_hart_coh_step (wglog σ) c (wgws σ c));
+            [exact (no_violation_hart _ _ c Hnv)|].
+          intros a Hlt. exfalso.
+          rewrite (ws_depmove_coh _ _ a (erw_ws_depmove (wgws σ c) k)) in Hlt.
+          lia. }
+        { exists []. rewrite app_nil_r. split; [reflexivity|].
+          intros mm Hmm. by apply elem_of_nil in Hmm. }
+        { exact Hwf. }
+        iModIntro. iExists (erw_ws (wgws σ c) k). iFrame "Hws".
+        iSplitR; [iPureIntro; apply erw_ws_depmove|].
+        destruct k;
+          [iApply (weak_state_interp_ptwise
+                     (ewg_rmw σ c rs2 (wgws σ c) (wglog σ))
+                     (<[c := rs2]> (wgregs σ)) (wgws σ) (wgib σ) with "[Hσ0]")
+          |by rewrite /ewg_rmw /ewg_regws /=..].
+        + reflexivity.
+        + intros c0. rewrite /ewg_rmw /=.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite gws_insert_eq|by rewrite gws_insert_ne].
+        + iExact "Hσ0".
+      - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (instr_post (wgws σ c))
+                with "Hwsa Hws") as "[Hwsa Hws]".
+        iDestruct ("Hcl" $! rs2 (instr_post (wgws σ c)) (wglog σ)
+                     with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa") as "Hσ0".
+        { lia. }
+        { by apply instr_post_bounded, (Hbnd c). }
+        { apply (nv_hart_coh_step (wglog σ) c (wgws σ c));
+            [exact (no_violation_hart _ _ c Hnv)|].
+          intros a Hlt. exfalso.
+          rewrite (ws_depmove_coh _ _ a (instr_post_depmove (wgws σ c)))
+            in Hlt. lia. }
+        { exists []. rewrite app_nil_r. split; [reflexivity|].
+          intros mm Hmm. by apply elem_of_nil in Hmm. }
+        { exact Hwf. }
+        iModIntro. iExists (instr_post (wgws σ c)). iFrame "Hws".
+        iSplitR; [iPureIntro; apply instr_post_depmove|].
+        rewrite /ewg_ibws.
+        iApply (weak_state_interp_ptwise
+                  (ewg_rmw σ c rs2 (instr_post (wgws σ c)) (wglog σ))
+                  (wgregs σ) (<[c := instr_post (wgws σ c)]> (wgws σ))
+                  (<[c := v]> (wgib σ)) with "[Hσ0]").
+        + intros c0. rewrite /ewg_rmw /= Hr.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
+        + reflexivity.
+        + iExact "Hσ0".
+      - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (wgws σ c)
+                with "Hwsa Hws") as "[Hwsa Hws]".
+        iDestruct ("Hcl" $! rs2 (wgws σ c) (wglog σ)
+                     with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa") as "Hσ0".
+        { lia. }
+        { exact (Hbnd c). }
+        { exact (no_violation_hart _ _ c Hnv). }
+        { exists []. rewrite app_nil_r. split; [reflexivity|].
+          intros mm Hmm. by apply elem_of_nil in Hmm. }
+        { exact Hwf. }
+        iModIntro. iExists (wgws σ c). iFrame "Hws".
+        iSplitR; [iPureIntro; reflexivity|].
+        destruct σ as [gr img lg f dv gn pw ib0]. simpl in Hr.
+        iApply (weak_state_interp_ptwise
+                  (ewg_rmw (WGState gr img lg f dv gn pw ib0) c rs2 (f c) lg)
+                  gr f ib0 with "[Hσ0]").
+        + intros c0. rewrite /ewg_rmw /= Hr.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
+        + intros c0. rewrite /ewg_rmw /=.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite gws_insert_eq|by rewrite gws_insert_ne].
+        + iExact "Hσ0". }
+    iModIntro. iSplitL "Hσ"; [iExact "Hσ"|].
+    by iApply ("H" $! ws' with "[//] Hws Hrf").
   Qed.
 
-  (** THE BATCHED RULE.  The induction is HERE, not at the call site. *)
+  (** THE BATCHED RULE.  The induction is HERE, not at the call site.
+
+      D3-2: [ws_depmove] is TRANSITIVE, which is why the induction still
+      composes into a single obligation for the caller. *)
   Lemma ewp_ev_sil_rtc (gen : nat) (c : CPU) (D : gset register)
-      (x y : M unit * regstate) :
+      (x y : M unit * regstate) (ws : wstate) :
     gen = 0%nat ->
     rtc (esilD D) x y ->
-    ereg_frame c x.2 D -∗
-    (ereg_frame c y.2 D -∗ EWP (ECycle gen c y.1 None) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c x.2 D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c y.2 D -∗ EWP (ECycle gen c y.1 None) @ ⊤) -∗
     EWP (ECycle gen c x.1 None) @ ⊤.
   Proof.
-    intros Hgen Hrtc. induction Hrtc as [x|x y0 z Hxy _ IH].
-    - iIntros "Hrf H". by iApply "H".
+    intros Hgen Hrtc. revert ws. induction Hrtc as [x|x y0 z Hxy _ IH];
+      intros ws.
+    - iIntros "Hws Hrf H". iApply ("H" $! ws with "[%] Hws Hrf").
+      reflexivity.
     - destruct x as [m0 rs0], y0 as [m1 rs1]. simpl in Hxy |- *.
-      iIntros "Hrf H".
-      iApply (ewp_ev_sil_node gen c D rs0 m0 m1 rs1 Hgen Hxy with "Hrf").
-      iNext. iIntros "Hrf". by iApply (IH with "Hrf").
+      iIntros "Hws Hrf H".
+      iApply (ewp_ev_sil_node gen c D rs0 m0 m1 rs1 ws Hgen Hxy with "Hws Hrf").
+      iNext. iIntros (ws1) "%Hd1 Hws Hrf".
+      iApply (IH ws1 with "Hws Hrf"). iIntros (ws2) "%Hd2 Hws Hrf".
+      iApply ("H" $! ws2 with "[%] Hws Hrf"). by etrans.
   Qed.
 
   (** THE CALL-SITE FORM (the finding-F8 shape, §3b): a whole stretch of
@@ -923,16 +1188,17 @@ Section batch.
       design's "reflective batching is MANDATORY" section asks for, and it is
       what a leaf uses. *)
   Lemma ewp_ev_batch (gen : nat) (c : CPU) (D : gset register) (n : nat)
-      (x : ecur) :
+      (x : ecur) (ws : wstate) :
     gen = 0%nat ->
-    ereg_frame c x.1 D -∗
-    (ereg_frame c (esil n D x).1 D -∗
+    hart_ws c ws -∗ ereg_frame c x.1 D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c (esil n D x).1 D -∗
        EWP (ECycle gen c (esil n D x).2 None) @ ⊤) -∗
     EWP (ECycle gen c x.2 None) @ ⊤.
   Proof.
     intros Hgen.
     exact (ewp_ev_sil_rtc gen c D (x.2, x.1) ((esil n D x).2, (esil n D x).1)
-             Hgen
+             ws Hgen
              (erun_silent_sound n D x.1 x.2 (esil n D x).1 (esil n D x).2
                 (surjective_pairing (erun_silent n D x.1 x.2)))).
   Qed.
@@ -1002,12 +1268,14 @@ Section ram.
             [wwrite_msg (Some (fin_to_nat c))
                (wm_class_of (classify (Interface.WriteReq.access_kind req)) ws)
                (Interface.WriteReq.pa req) n (Interface.WriteReq.value req)]) ∗
-         (hart_ws c
-            (store_post_run ws
-               (ak_sync (classify (Interface.WriteReq.access_kind req)))
-               (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
-               (S (length (wglog σ)))) -∗
-          EWP (ECycle gen c (K (inl None)) None) @ ⊤)) -∗
+         (∀ va vd : nat,
+            hart_ws c
+              (store_post_run_d ws
+                 (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                 va vd
+                 (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
+                 (S (length (wglog σ)))) -∗
+            EWP (ECycle gen c (K (inl None)) None) @ ⊤)) -∗
     EWP (ECycle gen c (Interface.Next (Interface.MemWrite n req) K) None) @ ⊤.
   Proof.
     iIntros (Hgen Hdev Hn Hacc) "Hws Hk".
@@ -1021,24 +1289,34 @@ Section ram.
     { iPureIntro. do 2 eexists. simpl. rewrite Hdev. by split_and!. }
     iNext. iIntros (e' σ') "%Hcy". simpl in Hcy. rewrite Hdev in Hcy.
     destruct Hcy as (_ & -> & ->).
+    set (va := srcs_view (wgws σ c) (deps_asrc (edeps σ c))).
+    set (vd := srcs_view (wgws σ c) (deps_vsrc (edeps σ c))).
     iMod "Hk" as "(%Hnvok & Hlat & Hcont)".
     iMod (wlog_update (wglog σ) _ with "Hlog") as "Hlog".
     iMod (hart_ws_update c (wgws σ c) (wgws σ c)
-            (store_post_run (wgws σ c)
+            (store_post_run_d (wgws σ c)
                (ak_sync (classify (Interface.WriteReq.access_kind req)))
+               va vd
                (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
                (S (length (wglog σ)))) with "Hwsa Hws") as "[Hwsa Hws]".
-    iModIntro. iSplitR "Hws Hcont"; [|by iApply "Hcont"].
+    iModIntro. iSplitR "Hws Hcont"; [|by iApply ("Hcont" $! va vd)].
     iApply ("Hcl" with "[%] [%] [%] [%] [%] Hlog Hlat Hwsa").
     - rewrite length_app /=. lia.
-    - eapply store_post_run_bounded;
-        [exact (Hbnd c)|rewrite length_app /=; lia|rewrite length_app /=; lia].
+    - eapply store_post_run_d_bounded;
+        [exact (Hbnd c)|rewrite length_app /=; lia|rewrite length_app /=; lia
+        |rewrite length_app /=;
+         pose proof (srcs_view_bounded (wgws σ c) (length (wglog σ))
+                       (deps_asrc (edeps σ c)) (Hbnd c)); lia
+        |rewrite length_app /=;
+         pose proof (srcs_view_bounded (wgws σ c) (length (wglog σ))
+                       (deps_vsrc (edeps σ c)) (Hbnd c)); lia].
     - apply (nv_hart_coh_step _ c (wgws σ c)).
       + apply nv_hart_app_own; [exact (no_violation_hart _ _ c Hnv)|].
         intros mm Hmm. apply elem_of_list_singleton in Hmm as ->. reflexivity.
       + intros a Hlt. apply nv_byte_of_ok.
-        destruct (coh_store_post_run_moved (wgws σ c)
+        destruct (coh_store_post_run_d_moved (wgws σ c)
                     (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                    va vd
                     (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
                     (S (length (wglog σ))) a Hlt) as (j & Hj & ->).
         intros n0. apply (nv_byte_app_own (wglog σ) _ c _ n0 (Hnvok j Hj n0)).
@@ -1385,9 +1663,14 @@ Definition ermw_ok (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n
     (rl : bool) (m1 m2 : M unit) (rs1 : regstate) : Prop :=
   length tvs = N.to_nat n /\
   (forall j : nat, (j < N.to_nat n)%nat -> tvs.*2 !! j = Some (nth_byte w j)) /\
-  read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c)
+  (* D3-2: the read half is admissible at ITS OWN address view (PARM's
+     [Local.read]: [view_pre ⊒ view(addr)]).  The operand lists are hidden
+     inside this definition, which is why [ewp_ev_rmw]'s STATEMENT does not
+     move. *)
+  read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c)
     (ak_sync (classify (Interface.ReadReq.access_kind req))) false
-    (pa_z (Interface.ReadReq.pa req)) tvs /\
+    (pa_z (Interface.ReadReq.pa req)) tvs
+    (srcs_view (wgws σ c) (deps_asrc (edeps σ c))) /\
   excl_ok (wglog σ) (fin_to_nat c) (pa_z (Interface.ReadReq.pa req)) tvs
     (S (length (wglog σ))) /\
   data <> [] /\ length tvs = length data /\
@@ -1397,11 +1680,14 @@ Definition ermw_ok (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n
 (** The successor's view: the load's post-state, then the store's. *)
 Definition ermw_ws (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
     (tvs : list (nat * bv 8)) (data : list (bv 8)) (rl : bool) : wstate :=
-  store_post_run
-    (load_post_run (wgws σ c)
+  store_post_run_d
+    (load_post_run_d (wgws σ c)
        (ak_sync (classify (Interface.ReadReq.access_kind req)))
+       (srcs_view (wgws σ c) (deps_asrc (edeps σ c)))
        (pa_z (Interface.ReadReq.pa req)) tvs.*1)
-    rl (pa_z (Interface.ReadReq.pa req)) (length data) (S (length (wglog σ))).
+    rl (srcs_view (wgws σ c) (deps_asrc (edeps σ c)))
+    (srcs_view (wgws σ c) (deps_vsrc (edeps σ c)))
+    (pa_z (Interface.ReadReq.pa req)) (length data) (S (length (wglog σ))).
 
 Definition ermw_msg (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
     (data : list (bv 8)) : wmsg :=
@@ -1410,51 +1696,6 @@ Definition ermw_msg (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t 
 Section rmw.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
-  (** The combined accessor: [weak_state_interp_regs] and
-      [weak_state_interp_mem] at ONCE, closing at [ewg_rmw] — which is the
-      only σ-update shape that moves registers, views and the log together. *)
-  Lemma weak_state_interp_rmw (σ : wgstate) (c : CPU) :
-    weak_state_interp σ ⊢
-      ⌜forall c' : CPU, ws_bounded (wgws σ c') (length (wglog σ))⌝ ∗
-      ⌜no_violation (wglog σ) (wgws σ)⌝ ∗ ⌜wlog_wf (wglog σ)⌝ ∗
-      reg_interp_at (cpu_reg_name c) (wgregs σ c) ∗
-      wlog_auth (wglog σ) ∗ wlat_interp (wgimg σ) (wglog σ) ∗
-      wws_auth c (wgws σ c) ∗
-      (∀ (rs' : regstate) (ws' : wstate) (lg' : list wmsg),
-         ⌜(length (wglog σ) ≤ length lg')%nat⌝ -∗
-         ⌜ws_bounded ws' (length lg')⌝ -∗
-         ⌜nv_hart lg' c ws'⌝ -∗
-         ⌜exists ms, lg' = (wglog σ ++ ms)%list /\
-                (forall m, m ∈ ms -> wm_tid m = Some (fin_to_nat c))⌝ -∗
-         ⌜wlog_wf lg'⌝ -∗
-         reg_interp_at (cpu_reg_name c) rs' -∗
-         wlog_auth lg' -∗ wlat_interp (wgimg σ) lg' -∗ wws_auth c ws' -∗
-         weak_state_interp (ewg_rmw σ c rs' ws' lg')).
-  Proof.
-    rewrite /weak_state_interp /ewg_rmw.
-    cbn [wgregs wgimg wglog wgws wgdev wggen wgpow].
-    iIntros "(%Hpin & %Hbnd & %Hnv & %Hwf & Hgr & $ & Hlog & Hlat & Hws)".
-    iDestruct (gregs_interp_acc_at c with "Hgr") as "[$ Hgrcl]".
-    iDestruct (wws_interp_acc_at c with "Hws") as "[Hwsc Hwscl]".
-    iFrame "Hlog Hlat Hwsc". iSplitR; [by iPureIntro|].
-    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iIntros (rs' ws' lg') "%Hlen %Hb' %Hnvh %Hown %Hwf' Hrs Hlog Hlat Hwsc".
-    iDestruct ("Hgrcl" with "Hrs") as "Hgr".
-    iDestruct ("Hwscl" with "Hwsc") as "Hws".
-    iSplitR; [by iPureIntro|].
-    iSplitR.
-    { iPureIntro. intros c0. destruct (decide (c0 = c)) as [->|Hne].
-      - rewrite gws_insert_eq. exact Hb'.
-      - rewrite gws_insert_ne; [|done].
-        exact (ws_bounded_mono _ _ _ (Hbnd c0) Hlen). }
-    iSplitR.
-    { iPureIntro. destruct Hown as (ms & Hms & Hms2). rewrite Hms.
-      apply (no_violation_step (wglog σ) ms (wgws σ) _ c Hnv Hbnd Hms2).
-      - intros c0 Hne. by rewrite gws_insert_ne.
-      - rewrite gws_insert_eq -Hms. exact Hnvh. }
-    iSplitR; [by iPureIntro|].
-    rewrite /insert /greg_insert. iFrame "Hgr Hlog Hlat Hws".
-  Qed.
 
   (** *** The register accounting of ONE silent node, factored out of
       [ewp_ev_sil_node] so that the fused RMW's window can reuse it at the
@@ -1586,9 +1827,15 @@ Section rmw.
     iModIntro. iSplitR "Hws Hrf Hcont"; [|by iApply ("Hcont" with "Hws Hrf")].
     iApply ("Hcl" with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa").
     - rewrite length_app /=. lia.
-    - rewrite /ermw_ws. eapply store_post_run_bounded;
-        [apply load_post_run_bounded;
-           [exact (Hbnd c)|by eapply read_ok_ts_bounded]
+    - rewrite /ermw_ws.
+      have Hva := srcs_view_bounded (wgws σ c) (length (wglog σ))
+                    (deps_asrc (edeps σ c)) (Hbnd c).
+      have Hvd := srcs_view_bounded (wgws σ c) (length (wglog σ))
+                    (deps_vsrc (edeps σ c)) (Hbnd c).
+      eapply store_post_run_d_bounded;
+        [apply load_post_run_d_bounded;
+           [exact (Hbnd c)|exact Hva|by eapply read_ok_d_ts_bounded]
+        |rewrite length_app /=; lia|rewrite length_app /=; lia
         |rewrite length_app /=; lia|rewrite length_app /=; lia].
     - apply (nv_hart_coh_step _ c (wgws σ c)).
       + apply nv_hart_app_own; [exact (no_violation_hart _ _ c Hnv)|].
@@ -1695,18 +1942,24 @@ Section adapter.
       effects; the register footprint [D] is threaded once and the residual is
       never named. *)
 
+  (** D3-2: every combinator now threads [hart_ws] through its stretch,
+      because a stretch may contain a dependency-carrying register write or
+      an announce.  What it hands back is [ws_depmove], from which the
+      caller reads off [coh], [w_relp] and [ws_le] unchanged. *)
   Lemma ewp_ev_seq_ret (gen : nat) (c : CPU) (D : gset register) (nn : nat)
-      (x : ecur) :
+      (x : ecur) (ws : wstate) :
     gen = 0%nat ->
     enode_tag (esil nn D x).2 = 0%nat ->
-    ereg_frame c x.1 D -∗
-    (ereg_frame c (esil nn D x).1 D -∗ EWP (ELoop gen c) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_frame c x.1 D -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_frame c (esil nn D x).1 D -∗ EWP (ELoop gen c) @ ⊤) -∗
     EWP (ECycle gen c x.2 None) @ ⊤.
   Proof.
-    iIntros (Hgen Htag) "Hrf H".
-    iApply (ewp_ev_batch gen c D nn x Hgen with "Hrf").
-    iIntros "Hrf". destruct (enode_tag_ret _ Htag) as [u Hu]. rewrite Hu.
-    iApply (ewp_ev_ret gen c u Hgen). by iApply "H".
+    iIntros (Hgen Htag) "Hws Hrf H".
+    iApply (ewp_ev_batch gen c D nn x ws Hgen with "Hws Hrf").
+    iIntros (ws') "%Hd Hws Hrf".
+    destruct (enode_tag_ret _ Htag) as [u Hu]. rewrite Hu.
+    iApply (ewp_ev_ret gen c u Hgen). by iApply ("H" $! ws' with "[//] Hws").
   Qed.
 
   Lemma ewp_ev_seq_barrier (gen : nat) (c : CPU) (D : gset register) (nn : nat)
@@ -1714,17 +1967,18 @@ Section adapter.
     gen = 0%nat ->
     ebar_at (esil nn D x).2 = Some b ->
     hart_ws c ws -∗ ereg_frame c x.1 D -∗
-    ▷ (hart_ws c (efence_apply ws (ebar_now b)) -∗
+    ▷ (∀ ws0 : wstate, ⌜ws_depmove ws ws0⌝ -∗
+         hart_ws c (efence_apply ws0 (ebar_now b)) -∗
          ereg_frame c (esil nn D x).1 D -∗
          EWP (ECycle gen c (ecur_bar (esil nn D x)).2 (ebar_park b)) @ ⊤) -∗
     EWP (ECycle gen c x.2 None) @ ⊤.
   Proof.
     iIntros (Hgen Hbar) "Hws Hrf H".
     destruct (ebar_at_inv _ _ Hbar) as (K & HK & Hres).
-    iApply (ewp_ev_batch gen c D nn x Hgen with "Hrf").
-    iIntros "Hrf". rewrite /ecur_bar /= Hres HK.
-    iApply (ewp_ev_barrier gen c b K ws Hgen with "Hws").
-    iNext. iIntros "Hws". by iApply ("H" with "Hws Hrf").
+    iApply (ewp_ev_batch gen c D nn x ws Hgen with "Hws Hrf").
+    iIntros (ws0) "%Hd Hws Hrf". rewrite /ecur_bar /= Hres HK.
+    iApply (ewp_ev_barrier gen c b K ws0 Hgen with "Hws").
+    iNext. iIntros "Hws". by iApply ("H" $! ws0 with "[//] Hws Hrf").
   Qed.
 
   Lemma ewp_ev_seq_store (gen : nat) (c : CPU) (D : gset register) (nn : nat)
@@ -1735,9 +1989,9 @@ Section adapter.
     n <> 0%N ->
     acc_wf (Interface.WriteReq.pa req) n ->
     hart_ws c ws -∗ ereg_frame c x.1 D -∗
-    (∀ σ : wgstate,
-       ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
-       ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+    (∀ (ws0 : wstate), ⌜ws_depmove ws ws0⌝ -∗ ∀ σ : wgstate,
+       ⌜wgws σ c = ws0⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
+       ⌜ws_bounded ws0 (length (wglog σ))⌝ -∗
        wlog_lb (wglog σ) -∗
        wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
        ▷ |={∅,⊤}=>
@@ -1746,26 +2000,30 @@ Section adapter.
          wlat_interp (wgimg σ)
            (wglog σ ++
             [wwrite_msg (Some (fin_to_nat c))
-               (wm_class_of (classify (Interface.WriteReq.access_kind req)) ws)
+               (wm_class_of (classify (Interface.WriteReq.access_kind req)) ws0)
                (Interface.WriteReq.pa req) n (Interface.WriteReq.value req)]) ∗
-         (hart_ws c
-            (store_post_run ws
-               (ak_sync (classify (Interface.WriteReq.access_kind req)))
-               (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
-               (S (length (wglog σ)))) -∗
-          ereg_frame c (esil nn D x).1 D -∗
-          EWP (ECycle gen c (ecur_write (esil nn D x)).2 None) @ ⊤)) -∗
+         (∀ va vd : nat,
+            hart_ws c
+              (store_post_run_d ws0
+                 (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                 va vd
+                 (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
+                 (S (length (wglog σ)))) -∗
+            ereg_frame c (esil nn D x).1 D -∗
+            EWP (ECycle gen c (ecur_write (esil nn D x)).2 None) @ ⊤)) -∗
     EWP (ECycle gen c x.2 None) @ ⊤.
   Proof.
     iIntros (Hgen Hnode Hdev Hn Hacc) "Hws Hrf Hk".
     destruct (ewrite_req_at_inv _ _ _ Hnode) as (K & HK & Hres).
-    iApply (ewp_ev_batch gen c D nn x Hgen with "Hrf").
-    iIntros "Hrf". rewrite /ecur_write /= Hres HK.
-    iApply (ewp_ev_store gen c n req K ws Hgen Hdev Hn Hacc with "Hws").
+    iApply (ewp_ev_batch gen c D nn x ws Hgen with "Hws Hrf").
+    iIntros (ws0) "%Hd Hws Hrf". rewrite /ecur_write /= Hres HK.
+    iApply (ewp_ev_store gen c n req K ws0 Hgen Hdev Hn Hacc with "Hws").
     iIntros (σ) "%Hws %Hwf %Hbnd #Hlb Hlat".
+    iDestruct ("Hk" $! ws0 with "[//]") as "Hk".
     iMod ("Hk" $! σ with "[//] [//] [//] Hlb Hlat") as "Hk". iModIntro. iNext.
     iMod "Hk" as "(%Hpay & Hlat & Hcont)". iModIntro. iFrame "Hlat".
-    iSplitR; [by iPureIntro|]. iIntros "Hws". by iApply ("Hcont" with "Hws Hrf").
+    iSplitR; [by iPureIntro|]. iIntros (va vd) "Hws".
+    by iApply ("Hcont" $! va vd with "Hws Hrf").
   Qed.
 
   Lemma ewp_ev_seq_load (gen : nat) (c : CPU) (D : gset register) (nn : nat)
@@ -1776,35 +2034,35 @@ Section adapter.
     ak_coh (classify (Interface.ReadReq.access_kind req)) = false ->
     ak_latest (classify (Interface.ReadReq.access_kind req)) = false ->
     hart_ws c ws -∗ ereg_frame c x.1 D -∗
-    (∀ σ : wgstate,
-       ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
-       ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+    (∀ (ws0 : wstate), ⌜ws_depmove ws ws0⌝ -∗ ∀ σ : wgstate,
+       ⌜wgws σ c = ws0⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
+       ⌜ws_bounded ws0 (length (wglog σ))⌝ -∗
        wlog_lb (wglog σ) -∗
        wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
        ⌜exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
           length tvs = N.to_nat n /\
           (forall j : nat, (j < N.to_nat n)%nat ->
              tvs.*2 !! j = Some (nth_byte w j)) /\
-          read_ok (img_z (wgimg σ)) (wglog σ) ws
+          read_ok (img_z (wgimg σ)) (wglog σ) ws0
             (ak_sync (classify (Interface.ReadReq.access_kind req)))
             false (pa_z (Interface.ReadReq.pa req)) tvs⌝ ∗
        ▷ (∀ (w : bv (8 * n)) (tvs : list (nat * bv 8)),
             ⌜length tvs = N.to_nat n⌝ -∗
             ⌜forall j : nat, (j < N.to_nat n)%nat ->
                tvs.*2 !! j = Some (nth_byte w j)⌝ -∗
-            ⌜read_ok (img_z (wgimg σ)) (wglog σ) ws
+            ⌜read_ok (img_z (wgimg σ)) (wglog σ) ws0
                (ak_sync (classify (Interface.ReadReq.access_kind req)))
                false (pa_z (Interface.ReadReq.pa req)) tvs⌝
             ={∅,⊤}=∗
               ⌜forall a : Z,
-                 (coh ws a <
-                  coh (load_post_run ws
+                 (coh ws0 a <
+                  coh (load_post_run ws0
                          (ak_sync (classify (Interface.ReadReq.access_kind req)))
                          (pa_z (Interface.ReadReq.pa req)) tvs.*1) a)%nat ->
                  nv_ok (wglog σ) c a⌝ ∗
               wlat_interp (wgimg σ) (wglog σ) ∗
               (hart_ws c
-                 (load_post_run ws
+                 (load_post_run ws0
                     (ak_sync (classify (Interface.ReadReq.access_kind req)))
                     (pa_z (Interface.ReadReq.pa req)) tvs.*1) -∗
                ereg_frame c (esil nn D x).1 D -∗
@@ -1814,10 +2072,11 @@ Section adapter.
   Proof.
     iIntros (Hgen Hnode Hdev Hcoh Hlat) "Hws Hrf Hk".
     destruct (eread_req_at_inv _ _ _ Hnode) as (K & HK & Hres).
-    iApply (ewp_ev_batch gen c D nn x Hgen with "Hrf").
-    iIntros "Hrf". rewrite HK.
-    iApply (ewp_ev_load gen c n req K ws Hgen Hdev Hcoh Hlat with "Hws").
+    iApply (ewp_ev_batch gen c D nn x ws Hgen with "Hws Hrf").
+    iIntros (ws0) "%Hd Hws Hrf". rewrite HK.
+    iApply (ewp_ev_load gen c n req K ws0 Hgen Hdev Hcoh Hlat with "Hws").
     iIntros (σ) "%Hws %Hwf %Hbnd #Hlb Hlat0".
+    iDestruct ("Hk" $! ws0 with "[//]") as "Hk".
     iMod ("Hk" $! σ with "[//] [//] [//] Hlb Hlat0") as "[%Hen Hk]".
     iModIntro. iSplitR; [by iPureIntro|]. iNext.
     iIntros (w tvs) "%H1 %H2 %H3".
@@ -1841,7 +2100,8 @@ Section adapter.
     ak_latest (classify (Interface.ReadReq.access_kind req)) = false ->
     etext_word (pa_z (Interface.ReadReq.pa req)) n w -∗
     hart_ws c ws -∗ ereg_frame c x.1 D -∗
-    ▷ (hart_ws c (efetch_ws ws
+    ▷ (∀ ws0 : wstate, ⌜ws_depmove ws ws0⌝ -∗
+       hart_ws c (efetch_ws ws0
                     (ak_sync (classify (Interface.ReadReq.access_kind req)))
                     (pa_z (Interface.ReadReq.pa req)) n) -∗
        ereg_frame c (esil nn D x).1 D -∗
@@ -1851,11 +2111,11 @@ Section adapter.
   Proof.
     iIntros (Hgen Hnode Hdev Hcoh Hlat) "#Ht Hws Hrf H".
     destruct (eread_req_at_inv _ _ _ Hnode) as (K & HK & Hres).
-    iApply (ewp_ev_batch gen c D nn x Hgen with "Hrf").
-    iIntros "Hrf". rewrite HK.
-    iApply (ewp_ev_fetch gen c n req K w ws Hgen Hdev Hcoh Hlat with "Ht Hws").
+    iApply (ewp_ev_batch gen c D nn x ws Hgen with "Hws Hrf").
+    iIntros (ws0) "%Hd Hws Hrf". rewrite HK.
+    iApply (ewp_ev_fetch gen c n req K w ws0 Hgen Hdev Hcoh Hlat with "Ht Hws").
     iNext. iIntros "Hws". rewrite /ecur_read /= Hres.
-    by iApply ("H" with "Hws Hrf").
+    by iApply ("H" $! ws0 with "[//] Hws Hrf").
   Qed.
 
 End adapter.

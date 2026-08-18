@@ -115,18 +115,19 @@ Section pf_uniform.
     | LSilent => True
     | LDev => True
     | LFence _ _ _ _ => True
-    (* D2: the operand lists are PINNED to [[]] — this is the shape
-       [WeakEvInst.elab_ok] has, and [pf_ok_hart] must stay a conversion.
-       The pin is discharged from [WeakEvInst.pstep_ev_depfree] wherever
-       [wp_pf_step_inv] is used. *)
+    (* D3-2: the STORE and RMW operand lists are real, so their pins are
+       gone.  THE LOAD KEEPS ITS PIN — that is deviation D-8 (a load's data
+       read and the walker's PTE read are indistinguishable at the node), and
+       it is the one thing [wp_pf_step_inv] still needs to know, now under
+       the weaker name [WeakPromise.lb_ldepfree]. *)
     | LLoad aq lat base tvs asrc =>
         asrc = [] /\
         read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq lat base tvs
-    | LStore _ _ data asrc vsrc => asrc = [] /\ vsrc = [] /\ data <> []
+    | LStore _ _ data asrc vsrc => data <> []
     | LRmw aq rl base tvs data asrc vsrc =>
-        asrc = [] /\ vsrc = [] /\
         data <> [] /\ length tvs = length data /\
-        read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs /\
+        read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
+          (srcs_view (pa_ws ag) asrc) /\
         excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg)))
     | LRegW _ _ | LCtrl _ | LInstr => True
     end.
@@ -149,11 +150,15 @@ Section pf_uniform.
   Definition pf_ws (cfg : wpcfg P D) (ag : wpagent P) (l : wlabel) : wstate :=
     match l with
     | LLoad aq lat base tvs _ => load_post_run (pa_ws ag) aq base tvs.*1
-    | LStore rl base data _ _ =>
-        store_post_run (pa_ws ag) rl base (length data)
+    | LStore rl base data asrc vsrc =>
+        store_post_run_d (pa_ws ag) rl (srcs_view (pa_ws ag) asrc)
+          (srcs_view (pa_ws ag) vsrc) base (length data)
           (S (length (pc_log cfg)))
-    | LRmw aq rl base tvs data _ _ =>
-        store_post_run (load_post_run (pa_ws ag) aq base tvs.*1) rl base
+    | LRmw aq rl base tvs data asrc vsrc =>
+        store_post_run_d
+          (load_post_run_d (pa_ws ag) aq (srcs_view (pa_ws ag) asrc) base
+             tvs.*1)
+          rl (srcs_view (pa_ws ag) asrc) (srcs_view (pa_ws ag) vsrc) base
           (length data) (S (length (pc_log cfg)))
     | LFence pr pw sr sw => fence_post (pa_ws ag) pr pw sr sw
     | LRegW rd srcs => regw_post (pa_ws ag) rd (srcs_view (pa_ws ag) srcs)
@@ -180,17 +185,10 @@ Section pf_uniform.
     - destruct Hok as (-> & Hrd). rewrite /pf_ws /pf_log.
       rewrite -(load_post_run_d_0 (pa_ws ag) aq base (tvs.*1)).
       by apply (PFLoad pstep pcls i cfg ag aq lat base tvs [] st' d').
-    - destruct Hok as (-> & -> & Hne). rewrite /pf_ws /pf_log.
-      rewrite -(store_post_run_d_0 (pa_ws ag) rl base (length data)
-                  (S (length (pc_log cfg)))).
-      by apply (PFStore pstep pcls i cfg ag rl base data [] [] _ st' d').
-    - destruct Hok as (-> & -> & Hne & Hlen & Hrd & Hex).
-      rewrite /pf_ws /pf_log.
-      rewrite -(load_post_run_d_0 (pa_ws ag) aq base (tvs.*1))
-              -(store_post_run_d_0
-                  (load_post_run_d (pa_ws ag) aq 0%nat base (tvs.*1))
-                  rl base (length data) (S (length (pc_log cfg)))).
-      by apply (PFRmw pstep pcls i cfg ag aq rl base tvs data [] [] _
+    - rewrite /pf_ws /pf_log.
+      by apply (PFStore pstep pcls i cfg ag rl base data asrc vsrc _ st' d').
+    - destruct Hok as (Hne & Hlen & Hrd & Hex). rewrite /pf_ws /pf_log.
+      by apply (PFRmw pstep pcls i cfg ag aq rl base tvs data asrc vsrc _
                   st' d').
     - by apply (PFFence pstep pcls i cfg ag pr pw sr sw st' d').
     - by apply (PFDev pstep pcls i cfg ag st' d').
@@ -199,11 +197,12 @@ Section pf_uniform.
     - by apply (PFInstr pstep pcls i cfg ag st' d').
   Qed.
 
-  (** THE DEPENDENCY-FREE PREMISE (D2).  [pf_ok] pins the operand lists,
-      so the inversion needs to know the step emitted none — which is
-      [WeakEvInst.pstep_ev_depfree] at the instance. *)
+  (** THE LOAD PIN (D3-2, weakening D2's).  [pf_ok] pins the LOAD's operand
+      list — deviation D-8 — so the inversion needs to know the step emitted
+      none THERE; everywhere else the lists are free.  At the instance the
+      premise is [WeakEvInst.pstep_ev_ldepfree]. *)
   Lemma wp_pf_step_inv i l cfg c' :
-    lb_depfree l ->
+    lb_ldepfree l ->
     wp_pf_step pstep pcls i l cfg c' ->
     exists ag st' d', pc_ags cfg !! i = Some ag /\
       pstep (pa_st ag) (pc_dev cfg) l st' d' /\
@@ -336,13 +335,20 @@ Lemma pf_ws_hart P σ (c : CPU) l :
   pf_ws (ecfg_of P σ) (ehart_ag P σ c) l = elab_ws σ c l c.
 Proof. destruct l; rewrite //= gws_insert_eq //. Qed.
 
+(** THE DISK stays fully dependency-free (D-6), so its two projections take
+    [lb_depfree] and collapse the machine's [_d] step functions back to
+    their dependency-free instances. *)
 Lemma pf_ok_disk P σ l :
   lb_depfree l ->
-  (forall aq rl base tvs data, l <> LRmw aq rl base tvs data [] []) ->
+  (forall aq rl base tvs data asrc vsrc,
+     l <> LRmw aq rl base tvs data asrc vsrc) ->
   pf_ok (ecfg_of P σ) n_disk (edisk_ag P) l -> edlab_ok σ (ep_dws P) l.
 Proof.
   intros Hdf Hnr. destruct l; simpl in Hdf; try done.
-  destruct Hdf as (-> & ->). by destruct (Hnr _ _ _ _ _ eq_refl).
+  - (* LStore: [pf_ok] no longer pins the operand lists, [edlab_ok] does *)
+    destruct Hdf as [Ha Hb]. rewrite Ha Hb. by intros Hc.
+  - (* LRmw: the device has no atomic read-modify-write *)
+    by destruct (Hnr _ _ _ _ _ _ _ eq_refl).
 Qed.
 
 Lemma pf_log_disk P σ l :
@@ -351,8 +357,15 @@ Lemma pf_log_disk P σ l :
 Proof. by destruct l. Qed.
 
 Lemma pf_ws_disk P σ l :
+  lb_depfree l ->
   pf_ws (ecfg_of P σ) (edisk_ag P) l = edlab_ws σ (ep_dws P) l.
-Proof. by destruct l. Qed.
+Proof.
+  intros Hdf. destruct l; simpl in Hdf; try done.
+  - destruct Hdf as [Ha Hb]. rewrite Ha Hb. apply store_post_run_d_0.
+  - destruct Hdf as [Ha Hb]. rewrite Ha Hb.
+    rewrite /edlab_ws /pf_ws /=.
+    by rewrite load_post_run_d_0 store_post_run_d_0.
+Qed.
 
 (** ... and the four shapes of a projected configuration after one step. *)
 Lemma ecfg_of_hart_upd P σ (c : CPU) (h' : ehst) l k ors oib d' :
@@ -427,34 +440,35 @@ Qed.
     [pf_violation_free_hart].  Every arm, no exception: since M5 the disk
     reads through its label like everybody else. *)
 
+(** D3-2: THE [lb_depfree] PREMISE IS GONE.  The three dependency-only
+    labels now have real [elabel_ok] images (each moves the hart's view and
+    nothing else), so the bracket holds for EVERY label the language emits.
+    What remains is the lat-free side condition, which is about the machine
+    (a [lat = true] read is [latest_ts]-indexed) and not about
+    dependencies. *)
 Lemma elab_apply_elabel_ok σ c l k ors oib d' :
   elab_ok σ c l ->
   (forall aq base tvs, l <> LLoad aq true base tvs []) ->
-  (* D2: the three dependency-only labels have no [elabel_ok] image, so the
-     bracket needs to know the step emitted none. *)
-  lb_depfree l ->
   elabel_ok σ c l (elab_apply σ c l k ors oib d').
 Proof.
-  intros Hok Hlat Hdf.
+  intros Hok Hlat.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
-    rewrite /elabel_ok /elab_apply /=; simpl in Hdf.
+    rewrite /elabel_ok /elab_apply /=.
   - by split.
   - destruct Hok as (-> & Hrd).
     destruct lat; [by destruct (Hlat aq base tvs eq_refl)|].
     split_and!;
       [reflexivity|reflexivity|exact Hrd|reflexivity|by rewrite gws_insert_eq].
-  - destruct Hok as (-> & -> & Hne).
-    split_and!;
-      [reflexivity|reflexivity|by eexists|exact Hne|by rewrite gws_insert_eq].
-  - destruct Hok as (-> & -> & Hne & Hlen & Hrd & Hex).
-    split_and!; [reflexivity|reflexivity|exact Hne|exact Hlen|exact Hrd
+  - split_and!; [by eexists|exact Hok|by rewrite gws_insert_eq].
+  - destruct Hok as (Hne & Hlen & Hrd & Hex).
+    split_and!; [exact Hne|exact Hlen|exact Hrd
                 |exact Hex|by eexists|by rewrite gws_insert_eq].
   - by split; [|rewrite gws_insert_eq].
   - by split.
-  - by destruct Hdf.
-  - by destruct Hdf.
-  - by destruct Hdf.
+  - by split; [|rewrite gws_insert_eq].
+  - by split; [|rewrite gws_insert_eq].
+  - by split; [|rewrite gws_insert_eq].
 Qed.
 
 (** The hart's program half assembles into an [epf_step]: at a boundary
@@ -474,8 +488,7 @@ Proof.
   set k := pcls_ev (pa_st (ehart_ag P σ c)) l (wgws σ c).
   have Hlat : forall aq base tvs, l <> LLoad aq true base tvs [].
   { intros aq base tvs ->. by eapply pstep_node_lat_free. }
-  have Hdf : lb_depfree l by eapply pstep_node_depfree.
-  have Hlbl := elab_apply_elabel_ok σ c l k ors oib d' Hok Hlat Hdf.
+  have Hlbl := elab_apply_elabel_ok σ c l k ors oib d' Hok Hlat.
   have Hcy : ecycle_step (ep_gen P) σ c (ehart_m (ep_h P c))
                (ehart_fn (ep_h P c)) (Sail (ep_gen P) c m' fn')
                (elab_apply σ c l k ors oib d').
@@ -533,8 +546,8 @@ Theorem wp_pf_step_epf_step i l P σ c' :
   exists P' σ', epf_step i l (P, σ) (P', σ') /\ ecfg_of P' σ' = c'.
 Proof.
   intros Hlive Hstep.
-  have Hdf : lb_depfree l.
-  { destruct Hstep; by eapply pstep_ev_depfree. }
+  have Hdf : lb_ldepfree l.
+  { destruct Hstep; by eapply pstep_ev_ldepfree. }
   apply (wp_pf_step_inv _ _ i l _ _ Hdf) in Hstep
     as (ag & st' & d' & Hlk & Hps & Hok & ->).
   rewrite /ecfg_of /= in Hlk.
@@ -554,14 +567,17 @@ Proof.
   - (* THE DISK AGENT *)
     rewrite /= in Hps.
     destruct st' as [cpu' m' rs' fn' ib'|dp']; [by destruct Hps|].
-    have Hnr : forall aq rl base tvs data,
-                 l <> LRmw aq rl base tvs data [] [].
-    { intros aq rl base tvs data ->. by eapply pstep_disk_no_rmw. }
-    have Hok' := pf_ok_disk P σ l Hdf Hnr Hok.
+    have Hnr : forall aq rl base tvs data asrc vsrc,
+                 l <> LRmw aq rl base tvs data asrc vsrc.
+    { intros aq rl base tvs data asrc vsrc ->. by eapply pstep_disk_no_rmw. }
+    (* THE DISK is still FULLY dependency-free (D-6), so it keeps the D2
+       premise while the harts moved to [lb_ldepfree]. *)
+    have Hdfd : lb_depfree l by eapply pstep_disk_depfree.
+    have Hok' := pf_ok_disk P σ l Hdfd Hnr Hok.
     destruct Hps as [Hprog|(-> & -> & Hu)].
     + eexists _, _. split; [by apply epf_step_of_disk|].
       rewrite ecfg_of_disk_upd /pf_cfg /=.
-      by rewrite ?pf_log_disk ?pf_ws_disk.
+      by rewrite ?pf_log_disk ?(pf_ws_disk _ _ _ Hdfd).
     + eexists P, (ewg_dev σ d'). split.
       { apply (EPFUart P σ (ewg_dev σ d')); [exact Hlive|by exists d']. }
       have Hid : <[n_disk := WPAgent (PDisk (ep_dp P))
@@ -604,7 +620,7 @@ Qed.
 
 Lemma edlab_ok_pf_ok P σ l :
   edlab_ok σ (ep_dws P) l -> pf_ok (ecfg_of P σ) n_disk (edisk_ag P) l.
-Proof. by destruct l. Qed.
+Proof. destruct l; simpl; try done. by intros (_ & _ & Hne). Qed.
 
 Theorem epf_step_wp_pf_step i l ρ ρ' :
   epf_step i l ρ ρ' ->
@@ -654,11 +670,12 @@ Proof.
     apply edisk_step_factor in Hst
       as (l1 & dp1 & d1 & He & Hps & Hok & ->). simplify_eq.
     exists l1.
+    have Hdfd : lb_depfree l1 by eapply pstep_disk_depfree; left; exact Hps.
     have Hstep := wp_pf_step_intro pstep_ev pcls_ev n_disk l1
                     (ecfg_of P σ) (edisk_ag P) (PDisk dp1) d1
                     (eags_disk P σ).
     rewrite ecfg_of_disk_upd.
-    rewrite /pf_cfg pf_log_disk pf_ws_disk in Hstep.
+    rewrite /pf_cfg pf_log_disk (pf_ws_disk _ _ _ Hdfd) in Hstep.
     apply Hstep; [|by apply edlab_ok_pf_ok].
     rewrite /pstep_ev /= /edisk_ag /=. by left.
   - (* the UART thread *)
@@ -763,8 +780,8 @@ Qed.
 Lemma pstep_ev_lat_free_prog : lat_free_prog pstep_ev.
 Proof.
   intros p d aq base tvs asrc p' d' Hs.
-  have Hdf : lb_depfree (LLoad aq true base tvs asrc)
-    by eapply pstep_ev_depfree.
+  have Hdf : lb_ldepfree (LLoad aq true base tvs asrc)
+    by eapply pstep_ev_ldepfree.
   simpl in Hdf. rewrite Hdf in Hs. by eapply pstep_ev_lat_free.
 Qed.
 
@@ -772,15 +789,14 @@ Lemma pstep_ev_ts_oblivious : ts_oblivious pstep_ev.
 Proof.
   split.
   - intros p d aq lat base tvs tvs' asrc p' d' Hts Hs.
-    have Hdf : lb_depfree (LLoad aq lat base tvs asrc)
-      by eapply pstep_ev_depfree.
+    have Hdf : lb_ldepfree (LLoad aq lat base tvs asrc)
+      by eapply pstep_ev_ldepfree.
     simpl in Hdf. rewrite Hdf in Hs |- *. destruct lat.
     + by destruct (pstep_ev_lat_free p d aq base tvs p' d' Hs).
     + by eapply pstep_ev_ts_load.
-  - intros p d aq rl base tvs tvs' data asrc vsrc p' d' Hts Hs.
-    have Hdf : lb_depfree (LRmw aq rl base tvs data asrc vsrc)
-      by eapply pstep_ev_depfree.
-    destruct Hdf as (-> & ->).
+  - (* D3-2: the RMW's operand lists are REAL, so this clause is discharged
+       at ARBITRARY [asrc]/[vsrc] — [pstep_ev_ts_rmw] was generalised. *)
+    intros p d aq rl base tvs tvs' data asrc vsrc p' d' Hts Hs.
     by eapply pstep_ev_ts_rmw.
 Qed.
 

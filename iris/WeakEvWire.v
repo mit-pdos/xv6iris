@@ -408,27 +408,31 @@ Section wrun.
       [W ## Dr]: the hart owns nothing at a wire. *)
   Lemma ewp_ewrun_nil (gen : nat) (c : CPU) (Dr Dw W : gset register)
       (q : register -> dfrac) (m mf : M unit) (t tf : mstate)
-      (es : list weff) :
+      (es : list weff) (ws : wstate) :
     gen = 0%nat -> Dw ⊆ Dr -> (forall r, r ∈ Dw -> q r = DfracOwn 1) ->
     W ## Dr -> es = [] ->
     ewrun Dr Dw W m t mf tf es ->
-    ereg_fr c (sregs t) Dr q -∗
-    (ereg_fr c (sregs tf) Dr q -∗ EWP (ECycle gen c mf None) @ ⊤) -∗
+    hart_ws c ws -∗ ereg_fr c (sregs t) Dr q -∗
+    (∀ ws' : wstate, ⌜ws_depmove ws ws'⌝ -∗ hart_ws c ws' -∗
+       ereg_fr c (sregs tf) Dr q -∗ EWP (ECycle gen c mf None) @ ⊤) -∗
     EWP (ECycle gen c m None) @ ⊤.
   Proof.
-    intros Hgen Hsub Hq Hdisj Hes Hrun. revert Hes.
+    intros Hgen Hsub Hq Hdisj Hes Hrun. revert ws Hes.
     induction Hrun as [m t | m m' mf t tf rs' es Hnode Hrun IH
                       | r direct k t mf tf es Hr Hrun IH
                       | n req K t w mf tf es Hdev Hrd Hrun IH];
-      intros Hes.
-    - iIntros "Hrf H". by iApply "H".
-    - iIntros "Hrf H".
-      iApply (ewp_ev_node2 gen c Dr Dw q (sregs t) m m' rs' Hgen Hsub Hq Hnode
-                with "Hrf").
-      iNext. iIntros "Hrf". iApply (IH Hes with "[Hrf] H"). iExact "Hrf".
-    - iIntros "Hrf H".
+      intros ws Hes.
+    - iIntros "Hws Hrf H". iApply ("H" $! ws with "[%] Hws Hrf"). reflexivity.
+    - iIntros "Hws Hrf H".
+      iApply (ewp_ev_node2 gen c Dr Dw q (sregs t) m m' rs' ws
+                Hgen Hsub Hq Hnode with "Hws Hrf").
+      iNext. iIntros (ws1) "%Hd1 Hws Hrf".
+      iApply (IH ws1 Hes with "Hws [Hrf] [H]"); [iExact "Hrf"|].
+      iIntros (ws2) "%Hd2 Hws Hrf".
+      iApply ("H" $! ws2 with "[%] Hws Hrf"). by etrans.
+    - iIntros "Hws Hrf H".
       iApply (ewp_ev_reg_read_free gen c r direct k Hgen).
-      iNext. iIntros (v). iApply (IH v Hes with "[Hrf] H").
+      iNext. iIntros (v). iApply (IH v ws Hes with "Hws [Hrf] H").
       assert (Hnin : r ∉ Dr) by set_solver.
       rewrite /= (ereg_fr_set_ne c (sregs t) Dr q r v Hnin). iExact "Hrf".
     - discriminate Hes.
@@ -448,26 +452,29 @@ Section wrun.
     etext_word (pa_z pa) n w -∗
     ereg_fr c (sregs t) Dr q -∗
     hart_ws c ws -∗
-    (ereg_fr c (sregs tf) Dr q -∗
-     hart_ws c (efetch_ws ws (ak_sync ak) (pa_z pa) n) -∗
+    (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗
+     ereg_fr c (sregs tf) Dr q -∗ hart_ws c ws' -∗
      EWP (ECycle gen c mf None) @ ⊤) -∗
     EWP (ECycle gen c m None) @ ⊤.
   Proof.
-    intros Hgen Hsub Hq Hdisj Hes Hcoh Hlat Hrun. revert Hes.
+    intros Hgen Hsub Hq Hdisj Hes Hcoh Hlat Hrun. revert ws Hes.
     induction Hrun as [m t | m m' mf t tf rs' es Hnode Hrun IH
                       | r direct k t mf tf es Hr Hrun IH
                       | n0 req K t w0 mf tf es Hdev Hrd Hrun IH];
-      intros Hes Hw.
+      intros ws Hes Hw.
     - discriminate Hes.
     - iIntros "#Ht Hrf Hws H".
-      iApply (ewp_ev_node2 gen c Dr Dw q (sregs t) m m' rs' Hgen Hsub Hq Hnode
-                with "Hrf").
-      iNext. iIntros "Hrf".
-      iApply (IH Hes Hw with "Ht [Hrf] Hws H"). iExact "Hrf".
+      iApply (ewp_ev_node2 gen c Dr Dw q (sregs t) m m' rs' ws
+                Hgen Hsub Hq Hnode with "Hws Hrf").
+      iNext. iIntros (ws1) "%Hd1 Hws Hrf".
+      iApply (IH ws1 Hes Hw with "Ht [Hrf] Hws [H]"); [iExact "Hrf"|].
+      iIntros (ws2) "%Hle2 Hrf Hws".
+      iApply ("H" $! ws2 with "[%] Hrf Hws").
+      etrans; [by apply ws_depmove_le|exact Hle2].
     - iIntros "#Ht Hrf Hws H".
       iApply (ewp_ev_reg_read_free gen c r direct k Hgen).
       iNext. iIntros (v).
-      iApply (IH v Hes Hw with "Ht [Hrf] Hws H").
+      iApply (IH v ws Hes Hw with "Ht [Hrf] Hws H").
       assert (Hnin : r ∉ Dr) by set_solver.
       rewrite /= (ereg_fr_set_ne c (sregs t) Dr q r v Hnin). iExact "Hrf".
     - injection Hes as Hak Hpa Hn Hes0. subst n.
@@ -479,8 +486,10 @@ Section wrun.
       { by rewrite Hpa. }
       iNext. iIntros "Hws". rewrite Hpa Hak.
       iApply (ewp_ewrun_nil gen c Dr Dw W q (K (inl (w, None))) mf t tf es
-                Hgen Hsub Hq Hdisj Hes0 Hrun with "Hrf").
-      iIntros "Hrf". by iApply ("H" with "Hrf Hws").
+                (efetch_ws ws (ak_sync ak) (pa_z pa) n0)
+                Hgen Hsub Hq Hdisj Hes0 Hrun with "Hws Hrf").
+      iIntros (ws3) "%Hd3 Hws Hrf". iApply ("H" $! ws3 with "[%] Hrf Hws").
+      etrans; [apply efetch_ws_le|by apply ws_depmove_le].
   Qed.
 
   (** *** THE FUNNEL, WITH THE WIRES OUT OF THE FOOTPRINT.
@@ -500,9 +509,9 @@ Section wrun.
     etext_word (pa_z pa) n w -∗
     ereg_fr c (sregs t) Dr q -∗
     hart_ws c ws -∗
-    ▷ (∀ tick : bool,
+    ▷ (∀ (tick : bool) (ws' : wstate), ⌜ws_le ws ws'⌝ -∗
          ereg_fr c (sregs (tp tick)) Dr q -∗
-         hart_ws c (efetch_ws ws (ak_sync ak) (pa_z pa) n) -∗
+         hart_ws c ws' -∗
          EWP (ELoop gen c) @ ⊤) -∗
     EWP (ELoop gen c) @ ⊤.
   Proof.
@@ -513,8 +522,8 @@ Section wrun.
               (Interface.Ret tt) t (tp tick) [WEread ak pa n] ak pa n w ws
               Hgen Hsub Hq Hdisj eq_refl Hcoh Hlat (Hcert tick) Hw
               with "Ht Hrf Hws").
-    iIntros "Hrf Hws". iApply (ewp_ev_ret gen c tt Hgen).
-    by iApply ("H" with "Hrf Hws").
+    iIntros (ws') "%Hle Hrf Hws". iApply (ewp_ev_ret gen c tt Hgen).
+    by iApply ("H" $! tick ws' with "[//] Hrf Hws").
   Qed.
 
 End wrun.

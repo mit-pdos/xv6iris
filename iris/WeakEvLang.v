@@ -84,6 +84,7 @@ Require Import DevModel.
    wins. *)
 Require Import VirtioProg.
 Require Import WeakMem.
+Require Import WeakDeps.
 Require Import WeakPromise.
 Require Import WeakInterp.
 Require Import WeakInterpProj.
@@ -200,6 +201,188 @@ Lemma ewg_ib_at σ c v : wgib (ewg_ib σ c v) c = v.
 Proof. apply gib_insert_eq. Qed.
 Lemma ewg_ib_ne σ c v c' : c' ≠ c -> wgib (ewg_ib σ c v) c' = wgib σ c'.
 Proof. apply gib_insert_ne. Qed.
+
+(** *** D3-2: the two COMBINED shapes the dependency labels need.
+
+    A hart's register write may now ALSO move its view (PARM's
+    [step_assign]: the destination register inherits the join of its
+    sources' views), and the announce moves both the bits and the view (it
+    RESETS [w_ldv], PARM's [res] bank, at every instruction start). *)
+Definition ewg_regws (σ : wgstate) (c : CPU) (rs : regstate) (ws : wstate)
+    : wgstate :=
+  WGState (<[c := rs]> (wgregs σ)) (wgimg σ) (wglog σ) (<[c := ws]> (wgws σ))
+          (wgdev σ) (wggen σ) (wgpow σ) (wgib σ).
+
+Definition ewg_ibws (σ : wgstate) (c : CPU) (v : oib32) (ws : wstate)
+    : wgstate :=
+  WGState (wgregs σ) (wgimg σ) (wglog σ) (<[c := ws]> (wgws σ)) (wgdev σ)
+          (wggen σ) (wgpow σ) (<[c := v]> (wgib σ)).
+
+(* ====================================================================== *)
+(** ** 2b. D3-2: WHICH REGISTER WRITE CARRIES A DEPENDENCY
+
+    [WeakDeps.deps_of_bits] says which ARCHITECTURAL register the current
+    instruction writes and which sources it inherits.  The Sail node stream
+    says which SAIL register a [RegWrite] node targets.  This section is the
+    join of the two, and it is the whole of the "which node emits [LRegW]"
+    question.
+
+    THREE KINDS, and the classification is TOTAL:
+      [ERWreg rd srcs] — this node writes the instruction's architectural
+        destination [rd]; the label is [LRegW rd srcs] and the view effect is
+        PARM's [step_assign] ([regw_post], an OVERWRITE);
+      [ERWctrl srcs] — this node writes [nextPC].  THE CONTROL VIEW GOES
+        HERE, not at [BranchAnnounce] (which the taken arm alone emits) and
+        not at the announce (which would need [LInstr] to carry an operand
+        list, i.e. a Layer-1 label change).  [write_reg nextPC] is emitted by
+        [riscv_step]'s decode preamble BEFORE [execute], unconditionally and
+        on both arms of every branch, so it is exactly PARM's [step_if]
+        position — and for a non-branch instruction [deps_ctrl] is [[]], so
+        the arm is a no-op.  Recorded as deviation D-9.
+      [ERWnone] — every other register write (CSRs, [PC], [minstret], and a
+        GPR write that is not the architectural [rd], e.g. the walker's or a
+        trap's): [LSilent], the safe under-approximation (D-4). *)
+Inductive erw_kind :=
+| ERWnone
+| ERWreg (rd : wreg) (srcs : list dsrc)
+| ERWctrl (srcs : list dsrc).
+
+(** The Sail register name of an architectural GPR.  [x1 .. x31] are
+    [num_of_register_bitvector_64] [16 .. 46] — the model has NO [x0]
+    register (it is hardwired), which is exactly why [x0] can never be a
+    dependency destination. *)
+Definition ereg_gpr_num (r : register) : option wreg :=
+  match r with
+  | R_bitvector_64 rb =>
+      let n := num_of_register_bitvector_64 rb in
+      if decide (16 <= n /\ n <= 46)%Z then Some (Z.to_nat (n - 15)) else None
+  | _ => None
+  end.
+
+Definition erw_of (role : op_roles) (r : register) : erw_kind :=
+  if register_beq r (R_bitvector_64 nextPC) then ERWctrl (deps_ctrl role)
+  else
+    match deps_rd role with
+    | Some (rd, srcs) =>
+        match ereg_gpr_num r with
+        | Some n => if decide (n = rd) then ERWreg rd srcs else ERWnone
+        | None => ERWnone
+        end
+    | None => ERWnone
+    end.
+
+(** The label and the view effect of a classified register write — one
+    function each, shared by the language and the instance. *)
+Definition erw_label (k : erw_kind) : wlabel :=
+  match k with
+  | ERWnone => LSilent
+  | ERWreg rd srcs => LRegW rd srcs
+  | ERWctrl srcs => LCtrl srcs
+  end.
+
+Definition erw_ws (ws : wstate) (k : erw_kind) : wstate :=
+  match k with
+  | ERWnone => ws
+  | ERWreg rd srcs => regw_post ws rd (srcs_view ws srcs)
+  | ERWctrl srcs => ctrl_post ws (srcs_view ws srcs)
+  end.
+
+Lemma erw_ws_depmove ws k : ws_depmove ws (erw_ws ws k).
+Proof.
+  destruct k; simpl;
+    [reflexivity|apply regw_post_depmove|apply ctrl_post_depmove].
+Qed.
+
+(** THE σ-EFFECT of a register write.  [ERWnone] must NOT go through
+    [ewg_regws] with an unchanged view: [<[c := wgws σ c]> (wgws σ) = wgws σ]
+    is pointwise, not syntactic, and this tree assumes no functional
+    extensionality — hence the explicit split. *)
+Definition ewg_rw (σ : wgstate) (c : CPU) (rs : regstate) (k : erw_kind)
+    : wgstate :=
+  match k with
+  | ERWnone => ewg_reg σ c rs
+  | _ => ewg_regws σ c rs (erw_ws (wgws σ c) k)
+  end.
+
+Lemma ewg_rw_img σ c rs k : wgimg (ewg_rw σ c rs k) = wgimg σ.
+Proof. by destruct k. Qed.
+Lemma ewg_rw_log σ c rs k : wglog (ewg_rw σ c rs k) = wglog σ.
+Proof. by destruct k. Qed.
+Lemma ewg_rw_dev σ c rs k : wgdev (ewg_rw σ c rs k) = wgdev σ.
+Proof. by destruct k. Qed.
+Lemma ewg_rw_pow σ c rs k : wgpow (ewg_rw σ c rs k) = wgpow σ.
+Proof. by destruct k. Qed.
+Lemma ewg_rw_gen σ c rs k : wggen (ewg_rw σ c rs k) = wggen σ.
+Proof. by destruct k. Qed.
+Lemma ewg_rw_ib σ c rs k : wgib (ewg_rw σ c rs k) = wgib σ.
+Proof. by destruct k. Qed.
+Lemma ewg_rw_ws σ c rs k : wgws (ewg_rw σ c rs k) c = erw_ws (wgws σ c) k.
+Proof. destruct k; simpl; [reflexivity|by rewrite gws_insert_eq..]. Qed.
+Lemma ewg_rw_ws_ne σ c rs k c' :
+  c' <> c -> wgws (ewg_rw σ c rs k) c' = wgws σ c'.
+Proof.
+  intros Hne. destruct k; simpl; [reflexivity|by rewrite gws_insert_ne..].
+Qed.
+Lemma ewg_rw_regs σ c rs k : wgregs (ewg_rw σ c rs k) = <[c := rs]> (wgregs σ).
+Proof. by destruct k. Qed.
+
+(** *** NON-VACUITY, by [vm_compute] on real encodings.
+
+    These are the join in action: the decoder's architectural [rd] against
+    the Sail register the node targets.  Without them a silent regression
+    (a wrong bit field, a wrong [num_of_register_bitvector_64] window) would
+    turn every [LRegW] back into [LSilent] and the whole dependency track
+    into a no-op that still builds. *)
+
+(* [lw a5,0(a5)] = 0x0007a783: the write of x15 IS the destination, and it
+   inherits the LOAD RESULT (PARM's [res]) — this is the ppo 9/10/11 chain's
+   first link. *)
+Example erw_of_lw_rd :
+  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 x15)
+  = ERWreg 15 [DLdRes].
+Proof. vm_compute. reflexivity. Qed.
+
+(* ... and a write of any OTHER GPR in the same instruction is silent *)
+Example erw_of_lw_other :
+  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 x14) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* a CSR write is silent, whatever the instruction (deviation D-4) *)
+Example erw_of_csr :
+  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 mstatus) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* [beq a5,zero,.] = 0x00078063: [nextPC] carries the CONTROL view — PARM's
+   [step_if], on the taken and the not-taken arm alike (deviation D-9) *)
+Example erw_of_beq_nextpc :
+  erw_of (deps_of_bits (dbits 0x00078063)) (R_bitvector_64 nextPC)
+  = ERWctrl [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* an ALU instruction's [nextPC] write carries NO control source *)
+Example erw_of_addi_nextpc :
+  erw_of (deps_of_bits (dbits 0x00178793)) (R_bitvector_64 nextPC)
+  = ERWctrl [].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [addi a5,a5,1]: the destination inherits its ALU source *)
+Example erw_of_addi_rd :
+  erw_of (deps_of_bits (dbits 0x00178793)) (R_bitvector_64 x15)
+  = ERWreg 15 [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE OPERAND LISTS a memory node carries, from the announced bits.
+
+    D-8: A PLAIN LOAD CARRIES NO ADDRESS SOURCES.  The walker's PTE read and
+    a load's data read are indistinguishable at the node (both [AK_explicit]
+    plain with [va = None]; the model emits no
+    [TranslationStart]/[TranslationEnd]), so attaching [rs1] to a read would
+    also attach it to a PTE read, which is a STRENGTHENING beyond RVWMO's
+    syntactic dependencies — the wrong polarity.  Stores and the fused RMW
+    are unambiguous (the walker's A/D update is itself the fused arm), so
+    they carry theirs. *)
+Definition edeps (σ : wgstate) (c : CPU) : op_roles :=
+  deps_of_ib (wgib σ c).
 
 (* ====================================================================== *)
 (** ** 3. The fused-RMW ingredients
@@ -330,9 +513,13 @@ Section hart.
         (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
          | Interface.RegRead r _ => fun k =>
              e' = ECycle gen c (k (register_lookup r rs0)) None /\ σ' = σ
+         (* D3-2: a register write MAY carry a dependency — PARM's
+            [step_assign] for the instruction's architectural [rd], and
+            PARM's [step_if] (the control view) at [nextPC]; every other
+            register write is silent (D-4). *)
          | Interface.RegWrite r _ v => fun k =>
              e' = ECycle gen c (k tt) None /\
-             σ' = ewg_reg σ c (register_set r v rs0)
+             σ' = ewg_rw σ c (register_set r v rs0) (erw_of (edeps σ c) r)
          | Interface.MemRead n req => fun k =>
              if dev_addr (Interface.ReadReq.pa req)
              then (* MMIO: the SHARED fabric answers, partially (D1) *)
@@ -374,9 +561,10 @@ Section hart.
                    length tvs = N.to_nat n /\
                    (forall j : nat, (j < N.to_nat n)%nat ->
                       tvs.*2 !! j = Some (nth_byte w j)) /\
-                   read_ok (img_z (wgimg σ)) lg0 ws0
+                   read_ok_d (img_z (wgimg σ)) lg0 ws0
                      (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                     false (pa_z (Interface.ReadReq.pa req)) tvs /\
+                     false (pa_z (Interface.ReadReq.pa req)) tvs
+                     (srcs_view ws0 (deps_asrc (edeps σ c))) /\
                    excl_ok lg0 (fin_to_nat c) (pa_z (Interface.ReadReq.pa req))
                      tvs (S (length lg0)) /\
                    data <> [] /\ length tvs = length data /\
@@ -384,11 +572,14 @@ Section hart.
                    ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2 /\
                    e' = ECycle gen c m2 None /\
                    σ' = ewg_rmw σ c rs1
-                          (store_post_run
-                             (load_post_run ws0
+                          (store_post_run_d
+                             (load_post_run_d ws0
                                 (ak_sync (classify (Interface.ReadReq.access_kind req)))
+                                (srcs_view ws0 (deps_asrc (edeps σ c)))
                                 (pa_z (Interface.ReadReq.pa req)) tvs.*1)
-                             rl (pa_z (Interface.ReadReq.pa req)) (length data)
+                             rl (srcs_view ws0 (deps_asrc (edeps σ c)))
+                             (srcs_view ws0 (deps_vsrc (edeps σ c)))
+                             (pa_z (Interface.ReadReq.pa req)) (length data)
                              (S (length lg0)))
                           (lg0 ++ [WMsg (pa_z (Interface.ReadReq.pa req)) data
                                      (Some (fin_to_nat c)) WCexcl])))
@@ -403,8 +594,10 @@ Section hart.
                n <> 0%N /\
                e' = ECycle gen c (k (inl None)) None /\
                σ' = ewg_store σ c
-                      (store_post_run ws0
+                      (store_post_run_d ws0
                          (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                         (srcs_view ws0 (deps_asrc (edeps σ c)))
+                         (srcs_view ws0 (deps_vsrc (edeps σ c)))
                          (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
                          (S (length lg0)))
                       (lg0 ++ [WMsg (pa_z (Interface.WriteReq.pa req))
@@ -422,7 +615,10 @@ Section hart.
             downstream is [WeakDeps.deps_of_bits] of this word.  The node is
             otherwise silent: no log, no view, no register. *)
          | Interface.InstrAnnounce ob => fun k =>
-             e' = ECycle gen c (k tt) None /\ σ' = ewg_ib σ c (Some (ib_of_bvn ob))
+             e' = ECycle gen c (k tt) None /\
+             (* D3-2: the announce is ALSO the instruction start, so it
+                RESETS the load-result bank ([LInstr] / PARM's [res]). *)
+             σ' = ewg_ibws σ c (Some (ib_of_bvn ob)) (instr_post ws0)
          (* [BranchAnnounce] STAYS SILENT: it fires only on the TAKEN arm of a
             redirect, whereas RVWMO ppo 11 (and PARM's [step_if]) order after
             a branch whether or not it is taken.  The control view is raised
@@ -768,7 +964,8 @@ Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { by intros (_ & ->). }
   destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
-  destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
+  destruct oc; simpl; try (by intros (_ & ->));
+    try (intros (_ & ->); apply ewg_rw_img); try (by intros []).
   - (* MemRead *)
     destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
@@ -788,7 +985,9 @@ Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { by intros (_ & ->). }
   destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
-  destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
+  destruct oc; simpl; try (by intros (_ & ->));
+    try (intros (_ & ->); by rewrite ewg_rw_pow ewg_rw_gen);
+    try (by intros []).
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
@@ -833,6 +1032,7 @@ Proof.
     [intros (? & _ & ->); exists []; by rewrite app_nil_r|].
   destruct oc; simpl;
     try (intros (_ & ->); exists []; by rewrite app_nil_r);
+    try (intros (_ & ->); exists []; by rewrite ewg_rw_log app_nil_r);
     try (by intros []).
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). exists []. by rewrite app_nil_r.
@@ -855,7 +1055,10 @@ Proof.
   { intros (_ & ->). by rewrite /ewg_ws /= gws_insert_ne. }
   destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
   destruct oc; simpl;
-    try (by intros (_ & ->)); try (by intros []).
+    try (by intros (_ & ->));
+    try (intros (_ & ->); by apply ewg_rw_ws_ne);
+    try (intros (_ & ->); rewrite /ewg_ibws /=; by rewrite gws_insert_ne);
+    try (by intros []).
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
@@ -865,7 +1068,8 @@ Proof.
   - destruct (dev_addr _).
     + by intros (d' & _ & _ & ->).
     + intros (_ & _ & ->). rewrite /ewg_store /=. by rewrite gws_insert_ne.
-  - (* Barrier *) intros (_ & ->). rewrite /ewg_ws /=. by rewrite gws_insert_ne.
+  (* the Barrier arm is now closed by the generic [ewg_ibws] branch above:
+     its σ' is [ewg_ws], whose [gws_insert_ne] is the same one. *)
   - intros (ch & _ & ->). reflexivity.
 Qed.
 
@@ -875,7 +1079,12 @@ Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { intros (_ & ->). rewrite /ewg_ws /= gws_insert_eq. apply fence_post_le. }
   destruct m as [y|T oc k]; [intros (? & _ & ->); reflexivity|].
-  destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
+  destruct oc; simpl; try (by intros (_ & ->));
+    try (intros (_ & ->); rewrite ewg_rw_ws;
+         by apply ws_depmove_le, erw_ws_depmove);
+    try (intros (_ & ->); rewrite /ewg_ibws /= gws_insert_eq;
+         by apply instr_post_le);
+    try (by intros []).
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). reflexivity.
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
@@ -883,11 +1092,11 @@ Proof.
                     _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]).
       * rewrite /ewg_ws /= gws_insert_eq. apply load_post_run_le.
       * rewrite /ewg_rmw /= gws_insert_eq.
-        etrans; [apply load_post_run_le|apply store_post_run_le].
+        etrans; [apply load_post_run_d_le|apply store_post_run_d_le].
   - destruct (dev_addr _).
     + intros (d' & _ & _ & ->). reflexivity.
     + intros (_ & _ & ->). rewrite /ewg_store /= gws_insert_eq.
-      apply store_post_run_le.
+      apply store_post_run_d_le.
   - (* Barrier *) intros (_ & ->). rewrite /ewg_ws /= gws_insert_eq.
     apply efence_apply_le.
   - intros (ch & _ & ->). reflexivity.
