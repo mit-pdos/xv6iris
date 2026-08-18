@@ -367,12 +367,25 @@ Section ProofIdup.
     assert (Hpa : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                   = i_ref (ientry k)).
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
+    (* THE ADDRESS CLAIM, off the ref word's OWN points-to (the standing rule:
+       never from a static bundle).  One peek-open of the itable accessor
+       produces the cell, [wordw_claim_of] reads the claim off it, and the
+       cell goes straight back -- the claim is persistent. *)
+    iApply fupd_wp.
+    iMod (iref_load_locked_au ⊤ M k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+      as "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) (iref_word M k) ltac:(lia) with "Hcellp")
+      as "#Hclaim0".
+    iMod ("Hbackp" with "Hcellp") as "Hhalf".
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
               (mword_of_int 8 : mword 12) macq (trap_res b + (K - 4))%nat
               (fun v => (⌜v = iref_word M k⌝ ∗ itable_half M)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi18 [Hhalf]").
+              with "Hcg Hpc Hi18 [] [Hhalf]").
+    { rewrite Hpa. iExact "Hclaim0". }
     { rewrite Hpa.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) M k ltac:(solve_ndisj) Hk
               with "Hinv Hhalf") as "[Hcell Hback]".
@@ -427,7 +440,8 @@ Section ProofIdup.
                iref_tok k (qr/2)%Qp ∗ live_frac k s)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl]").
+              with "Hcg Hpc Hi1c [] [Hhalf Hrlive Hisl]").
+    { rewrite Hpa2. iExact "Hclaim0". }
     { rewrite Hpa2 Hstv.
       iMod (iref_upgrade_store_au (⊤ ∖ ↑minstretN) M k qt (qr/2)%Qp s cnt
               ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive Hisl")

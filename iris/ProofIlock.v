@@ -2219,13 +2219,23 @@ Section ProofIlockMain.
     iDestruct "Href" as "(Hrid & Hrt & Hrs)".
     (* the share's SLEEPLOCK slice is what the lock will hold while ilock has
        the entry checked out; the arm keeps the other two slices. *)
+    (* the address claim, off the ref word's OWN points-to: one peek-open of
+       the liveness accessor, [wordw_claim_of], and the cell straight back *)
+    iApply fupd_wp.
+    iMod (iref_live_gen_load_au ⊤ k s g ltac:(solve_ndisj) Hk
+            with "Hitbl Hrt") as (vp) "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) vp ltac:(lia) with "Hcellp") as "#Hclaim0".
+    iMod ("Hbackp" with "Hcellp") as "[%Hbp Hrt]".
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.ilock + 0x0e)) Ra5 Ra0
               (mword_of_int 8 : mword 12) R3 (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
                          live_gen k s g)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi0e [Hrt]").
+              with "Hcg Hpc Hi0e [] [Hrt]").
+    { rewrite Hrefadr Hipe. iExact "Hclaim0". }
     { rewrite Hrefadr Hipe.
       iMod (iref_live_gen_load_au (⊤ ∖ ↑minstretN) k s g
               ltac:(solve_ndisj) Hk with "Hitbl Hrt") as (v) "[Hcell Hback]".

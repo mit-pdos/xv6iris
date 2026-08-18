@@ -917,12 +917,22 @@ Section IputTail.
     assert (Hpa : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                   = i_ref (ientry k)).
     { rewrite (rget_ne M Rs1 ltac:(nz)) HMs1. reflexivity. }
+    (* the address claim, off the ref word's OWN points-to *)
+    iApply fupd_wp.
+    iMod (iref_load_locked_au ⊤ Mt k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+      as "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) (iref_word Mt k) ltac:(lia) with "Hcellp")
+      as "#Hclaim0".
+    iMod ("Hbackp" with "Hcellp") as "Hhalf".
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x20)) Ra5 Rs1
               (mword_of_int 8 : mword 12) M (trap_res eb + (K - 4))%nat
               (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi20 [Hhalf]").
+              with "Hcg Hpc Hi20 [] [Hhalf]").
+    { rewrite Hpa. iExact "Hclaim0". }
     { rewrite Hpa.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt k
               ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback2]".
@@ -1002,7 +1012,8 @@ Section IputTail.
                 (mword_of_int 8 : mword 12) D2 (trap_res eb + (K - 4))%nat
                 (itable_half (delete k Mt) ∗ isl_slot (delete k Mt) k)%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [Hhalf Hrtok Hlvh Hisl]").
+                with "Hcg Hpc Hi24 [] [Hhalf Hrtok Hlvh Hisl]").
+      { rewrite Hpa2. iExact "Hclaim0". }
       { rewrite Hpa2 Hstv.
         replace (Z.pos 1 - 1)%Z with 0%Z by lia.
         (* THE RETIREMENT, under the restated ledger (design 17.3 (A)): the
@@ -1076,7 +1087,8 @@ Section IputTail.
                 (itable_half (<[k := (qrest, npred)]> Mt) ∗
                  isl_slot (<[k := (qrest, npred)]> Mt) k)%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [Hhalf Hrtok Hisl]").
+                with "Hcg Hpc Hi24 [] [Hhalf Hrtok Hisl]").
+      { rewrite Hpa2. iExact "Hclaim0". }
       { rewrite Hpa2 Hstv Hzs.
         iMod (iref_close_store_au (⊤ ∖ ↑minstretN) Mt k q qt qrest npred
                 ltac:(solve_ndisj) HMk' Hqrest with "Hinv Hhalf Hrtok Hisl")
@@ -1417,12 +1429,22 @@ Section ProofIput.
     assert (Hpa18 : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                     = i_ref (ientry k)).
     { rewrite (rget_ne macq Rs1 ltac:(nz)) Hms1. reflexivity. }
+    (* the address claim, off the ref word's OWN points-to *)
+    iApply fupd_wp.
+    iMod (iref_load_locked_au ⊤ Mt k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+      as "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) (iref_word Mt k) ltac:(lia) with "Hcellp")
+      as "#Hclaim18".
+    iMod ("Hbackp" with "Hcellp") as "Hhalf".
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x18)) Ra4 Rs1
               (mword_of_int 8 : mword 12) macq (trap_res eb + (K - 4))%nat
               (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi18 [Hhalf]").
+              with "Hcg Hpc Hi18 [] [Hhalf]").
+    { rewrite Hpa18. iExact "Hclaim18". }
     { rewrite Hpa18.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt k
               ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback2]".
@@ -1526,6 +1548,25 @@ Section ProofIput.
     assert (Hpa3c : add_vec (rget E2 Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                     = i_valid (ientry k)).
     { rewrite (rget_ne E2 Rs1 ltac:(nz)) HE2s1. reflexivity. }
+    (* the address claim for the VALID word, off its own points-to: one peek
+       of the escrow (open, read the claim, re-park unchanged).  The arm
+       comes back exactly as it went in -- [ic_mk_parked] is generic in [v],
+       so the peek does not have to case-split the way the read below does. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iMod (ic_open_auth_ref cn gfs gi cov logstart k
+            (⊤ ∖ ↑icEscN) Mt q q dev inum
+            ltac:(solve_ndisj) HMk with "Hinv Hbodyp Hhalf Hrtok Hrident")
+      as "(Hhalf & Hrtok & Hrident & Harmp & _)".
+    iDestruct "Harmp" as (vp gap) "(Hidvp & Hinhp & Hvldp & Hpaylp & Hlvhp & Hmtp & Hgidap)".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry k))
+                 (DfracOwn 1) (valid_word vp) ltac:(lia) with "Hvldp")
+      as "#Hclaim3c".
+    iMod ("Hclosep" with "[Hidvp Hinhp Hvldp Hpaylp Hlvhp Hmtp Hgidap]") as "_".
+    { iApply bi.later_intro. iApply ic_close_parked.
+      iApply (ic_mk_parked cn gfs gi cov logstart k dev inum vp gap
+                with "Hidvp Hinhp Hvldp Hpaylp Hlvhp Hmtp Hgidap"). }
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x3c)) Ra5 Rs1
               (mword_of_int 64 : mword 12) E2 (trap_res eb + (K - 4))%nat
               (fun w => (∃ v : bool, ⌜w = valid_word v⌝ ∗
@@ -1541,7 +1582,8 @@ Section ProofIput.
                         islot_rest_at k q dev inum))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi3c [Hhalf Hrtok Hrident Hrest]").
+              with "Hcg Hpc Hi3c [] [Hhalf Hrtok Hrident Hrest]").
+    { rewrite Hpa3c. iExact "Hclaim3c". }
     { rewrite Hpa3c.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_auth_ref cn gfs gi cov logstart k
