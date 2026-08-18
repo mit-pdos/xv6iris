@@ -234,6 +234,28 @@ Definition post_fetch_cfg (σf : mstate) (va : mword 64) (miσ : bool) : Prop :=
 (* ===================================================================== *)
 (* §4 The frames and the capstone.                                         *)
 (* ===================================================================== *)
+(* ---------------------------------------------------------------------- *)
+(* THE TWO FROZEN COUNTER CELLS, OUT OF [hw_config].                        *)
+(*                                                                          *)
+(* [RiscvFetchExec] defines [counter_caps] and appends it to [hw_config] but *)
+(* has no proofmode import, so the accessor lives here -- the U tier is its  *)
+(* only consumer.  [mcounteren] is NOT among them: timerinit writes it after *)
+(* [hw_config] is frozen, so its persistent form is [TimerCap.sstc_enabled], *)
+(* which the trap loop takes out of the residue instead.                     *)
+(* ---------------------------------------------------------------------- *)
+Section HwCounters.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma hw_config_counters : hw_config -∗ counter_caps.
+  Proof.
+    iIntros "H". rewrite /hw_config.
+    iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & _ & $)".
+  Qed.
+End HwCounters.
+
 Section UserExec.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

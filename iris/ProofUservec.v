@@ -77,6 +77,7 @@ Section UservecAllPt.
   Definition usertrap_res_bare := UT.usertrap_res_bare.
   Definition usertrap_res_tf_open := UT.usertrap_res_tf_open.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
+  Definition usertrap_res_sstc := UT.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := UT.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tlb_close := UT.usertrap_res_tlb_close.
   Definition usertrap_res_tlb_open := UT.usertrap_res_tlb_open.
@@ -116,7 +117,7 @@ Section UservecAllPt.
     iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe #Hkfr Hures Hcont".
     (* ============ open the trapped machine ============ *)
     iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
-      "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hfile &
+      "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hfile &
         Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmie & Hmdl & Hmedl &
         Hmenv & Hsenv & Hmse & Hsse & Hrut)".
     pose proof Hok as Hok2.
@@ -137,8 +138,8 @@ Section UservecAllPt.
     (* the pc: stvec's direct base is the trampoline base *)
     assert (Hsb : stvec_base (uc_stvec C) = uva 0x00).
     { rewrite Hstvec. apply bv_eq; vm_compute; reflexivity. }
-    iEval (rewrite Hsb) in "Hpcc".
-    iEval (rewrite Hsb) in "Hnpc".
+    (* [pc_is], one resource post-port (worklist 13.2), so ONE rewrite *)
+    iEval (rewrite Hsb) in "Hpc".
     (* ============ open usertrap_res for the SAVE walk's own cells ======= *)
     (* the trapframe page AND [sscratch] come out of the residue together:
        the save walk and the sscratch swap overlap, and the residue is
@@ -179,7 +180,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb [$Hpcc $Hnpc] Hfile Hi_csrw_ss").
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile Hi_csrw_ss").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile".
     iClear "Hi_csrw_ss".
     assert (Hpcx_0x00 : add_vec_int (uva 0x00) (if false then 2 else 4) = uva 0x04)

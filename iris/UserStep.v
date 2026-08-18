@@ -626,7 +626,7 @@ Section UserStepWaitArm.
     iDestruct "Hhpmb" as (hpm) "#Hhpm".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & _ &
-        _ & _ & _ & _ & %Hmisaeq & %Hseceq & _ & #Hcert)".
+        _ & _ & _ & _ & %Hmisaeq & %Hseceq & _ & #Hcert & _)".
     iDestruct (user_pt_inv_bytes pt with "Hupt") as (t mm usatp tlbvec)
       "(%Hwf & %Hsatpok & %Htlbok & (Hsatp & Htlb & Hpmp) & #Hclaims & Hbytes
         & Hclose)".

@@ -234,7 +234,7 @@ Section UserStepFull.
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenvhw &
         _ & _ & _ & _ & %Hpmaall & _ & _ & %Helpne & _ &
-        %Hmisaeq & %Hseceq & _ & #Hcert)".
+        %Hmisaeq & %Hseceq & _ & #Hcert & _)".
     iDestruct (user_pt_inv_bytes pt with "Hupt") as (t mm usatp tlbvec)
       "(%Hwf & %Hsatpok & %Htlbok & (Hsatp & Htlb & Hpmp) & #Hclaims & Hbytes
         & Hclose)".

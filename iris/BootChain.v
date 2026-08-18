@@ -302,7 +302,8 @@ Section BootChain.
       "(HPC & HnPC & Hpriv & Hhs & Hmh & Hms & Hmisa & Hsec & Hmenv & Hhtif & Help &
         Hpma & Hpmpc & Hpmpa & Hmepc & Hsatp & Hmede & Hmdl & Hmie & Hmcen & Hstc &
         Hmst & Hminc & Hmcy & Hmt & Hmip & Hseip & Hmeip & Htlb & Hstvec &
-        Hsepc & Hscause & Hstval & Hsenv & Hssc & Hmse & Hsse & Hgprs)".
+        Hsepc & Hscause & Hstval & Hsenv & Hssc & Hmse & Hsse & Hscen & Hhpm &
+        Hgprs)".
     (* the pinned cells, at their pinned values *)
     iEval (rewrite Hpc0 boot_pc_entry) in "HPC".
     iEval (rewrite Hnpc0 boot_pc_entry) in "HnPC".
@@ -320,7 +321,8 @@ Section BootChain.
     (* this hart's two register invariants, and the frozen config bundle *)
     iMod (minstret_inv_alloc E _ _ _ _ _
             with "Hcert Hmst Hminc Hmcy Hmt Hmip") as "#Hmin".
-    iMod (hw_config_intro with "Hmisa Hsec Hpma Hhtif Help Hsenv Hcl") as "#Hhw".
+    iMod (hw_config_intro _ _ with "Hmisa Hsec Hpma Hhtif Help Hsenv Hscen Hhpm
+                                    Hcl") as "#Hhw".
     iModIntro.
     iSplitL "Hhs Hpriv Hms".
     { iApply (mmode_config_intro (DfracOwn 1) with "Hhw Hmin Hhs Hpriv Hms"). }

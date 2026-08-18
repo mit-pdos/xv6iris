@@ -967,7 +967,7 @@ Section InstrBytes.
   Proof.
     iIntros "H". iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-        _ & #Hc)".
+        _ & #Hc & _)".
     iExact "Hc".
   Qed.
 

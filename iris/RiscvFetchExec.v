@@ -274,6 +274,17 @@ Section HwConfig.
      mseccfg/elp): like mseccfg it is a board obligation ([RiscvLang.reset_regs]),
      never written again -- xv6 has no line that touches senvcfg -- so it is the
      sixth frozen cell, held the same way [htif_tohost_base] is. *)
+  (* the two frozen counter-permission cells, as one named conjunct so that
+     appending them to [hw_config] adds no top-level existential binder --
+     every existing [iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0) "..."]
+     keeps its four. *)
+  Definition counter_caps : iProp Σ :=
+    (∃ (scen : mword 32) (hpm : type_of_register mhpmcounter),
+       (R_bitvector_32 scounteren) ↦ᵣ□ scen ∗ mhpmcounter ↦ᵣ□ hpm)%I.
+
+  Global Instance counter_caps_persistent : Persistent counter_caps.
+  Proof. apply _. Qed.
+
   Definition hw_config : iProp Σ :=
     (∃ (misa0 mseccfg0 : mword 64) (pmar0 : list PMA_Region) (elp0 : mword 1),
      misa ↦ᵣ□ misa0 ∗ mseccfg ↦ᵣ□ mseccfg0 ∗
@@ -303,10 +314,29 @@ Section HwConfig.
         [mmode_config] and the S-mode bundles alike, so neither has to carry
         its own copy (it used to arrive bundled inside [minstret_inv], which
         is gone). *)
-     gen_cert)%I.
+     gen_cert ∗
+     (* THE TWO COUNTER-PERMISSION CELLS.  A U-mode [csrr] of a counter CSR
+        reads scounteren unconditionally and the hpm path reads mhpmcounter;
+        under per-node stepping every read the cycle makes must be answerable
+        from an OWNED cell, so both are in the U tier's read footprint
+        ([UserTotalU.Du_r_scen] / [Du_r_hpm]).  Nothing in the tree or in the
+        kernel writes either -- there is no [csrw scounteren] anywhere -- so
+        [↦ᵣ□] is sound and they ride the bundle both modes already carry
+        rather than being threaded (ruled 2026-08-18; the alternative,
+        parking them in [IntrDefs.hart_csrs], would have made every caller
+        between boot and userret carry them).  Their VALUES are existential:
+        the U-mode CSR arm is total whatever the permission bits say, since a
+        denied counter read is Illegal_Instruction, a [u_result_ok] outcome.
+        [mcounteren] is deliberately NOT here -- timerinit WRITES it, so it
+        cannot be frozen at [hw_config_intro] time; its persistent form is
+        [TimerCap.sstc_enabled], minted after timerinit. *)
+     counter_caps)%I.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.
+
+  (* the accessor lives in [UserExec] ([hw_config_counters]): this file has no
+     proofmode import, and the only consumer is the U tier. *)
 End HwConfig.
 
 
