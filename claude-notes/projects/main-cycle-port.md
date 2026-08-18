@@ -2034,8 +2034,15 @@ re-exports) carry the approved `wordw_claim` premise; 11 call sites updated.
 - tail-1: DONE except the three ruling items above (hw_config-tail fixed in
   21 files; BootBridge/WpStartNew fixed; wordw_claim redone from points-to
   everywhere -- no static-map derivation remains).
-- trampoline: user-table per-node translation (via `swp_hmrun_of_exec` +
-  PtWalkCert/UserBytes) + the four uservec/userret files + the two
+- trampoline: DONE `TrampStepPt` (bytes-own-claim route, bbef6a52) and
+  `UptWalkPt.v` (per-node `translateAddr` over the OWNED user table:
+  `swp_translate_upt`, `utramp_fetch_tr`, `utf_translate`; 39c572bc,
+  b497ebe6).  LEFT: (a) the switch-window walk for `TransPt.tlb_inv_pt2_
+  kcur/_kprev` (needs the goodmb twin of `TransPt.ptree2_translateAddr_cases`
+  -- blocks UserretEntryPt/UservecExitPt); (b) the four files' own leaves
+  (UservecPt/UserretPt unblocked now; recipe in the notes: `wp_usd_pt`/
+  `wp_uld_pt` = `wp_sd_s_r_t`/`wp_ld_s_r_t` with `utf_translate` +
+  `upt_swp_open/close`; sscratch/alu/sret register-only); (c) the two
   `user_trap_frame_open` ipattern edits.
 - P4b: UserMemClassify(+Amo) arms onto the pure pair; then P7's
   UserActiveClass §5 assembly (interface written in user-tier-port.md §14).
