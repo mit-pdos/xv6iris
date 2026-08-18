@@ -157,6 +157,14 @@ Section ProofBrelse.
     sie_cap_gpr KT1 m0 av b pme -∗
     pc_is pc -∗
     instr pc true (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) -∗
+    (* THE ADDRESS CLAIM the per-node store asks for
+       ([WpSconfMem.wordw_claim]): per node the access TRANSLATES before it
+       writes, so the window's mapping must arrive BEFORE the (linear) atomic
+       update is opened.  It is persistent and says nothing about the VALUE,
+       so the caller reads it straight off the frame slot it is about to
+       deposit ([wordw_claim_of], which leaves the points-to behind). *)
+    wordw_claim (KTR := KT1) 8
+      (add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000")))) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 64,
        add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) ↦₈[KT1] vold ∗
        (add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000")))
@@ -180,15 +188,16 @@ Section ProofBrelse.
     { apply rget_ne. intro He. injection He as He2. vm_compute in He2. congruence. }
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
+    iIntros "Hcg Hpc Hinstr #Hcl HAU Hcont".
     iApply (wp_store_s_sconf_au (CID := CID0) (p := pme) 8 true pc rs2 csp_rs1
               (zero_extend' 12 (concat_vec uimm ('b"000"))) m0 av
               (rget m0 rs2) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget (CID := CID0) m0 rs2)) HkptEm
-              with "Hcg Hpc Hinstr [HAU] Hcont").
-    rewrite Hsp. iExact "HAU".
+              with "Hcg Hpc Hinstr [] [HAU] Hcont").
+    { rewrite Hsp. iExact "Hcl". }
+    { rewrite Hsp. iExact "HAU". }
   Qed.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
@@ -629,6 +638,13 @@ Section ProofBrelse.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     (* ===== +0x02 sd ra,24(sp) -- THE PARK ===== *)
+    (* the store's ADDRESS CLAIM, read straight off the frame slot that is
+       about to be deposited: [wordw_claim_of]'s conclusion is persistent, so
+       [Hr24] is still here for the atomic update below. *)
+    iDestruct (wordw_claim_of (KTR := KT1) 8
+                 (add_vec (R1 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
+                 (DfracOwn 1) vr24 ltac:(lia) with "Hr24") as "#Hclr24".
     iApply (wp_csdsp_au_s_sconf (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
               R1 (K - 4)%nat
               ((add_vec (R1 !!! Regidx csp_rs1)
@@ -639,7 +655,8 @@ Section ProofBrelse.
                   b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗ bown bn k))%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) b p
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi02 [Hr24 Hvalid Hbdev Hbuf Hbpayload]").
+              with "Hcg Hpc Hi02 [] [Hr24 Hvalid Hbdev Hbuf Hbpayload]").
+    { iExact "Hclr24". }
     (* The escrow body is NOT timeless any more: the parked arm's [buf_pay]
        carries the view's opaque payload ([bv_clean] / [bv_dirty]), so the
        [▷] the [iInv] hands out cannot be stripped up front.  It does not
