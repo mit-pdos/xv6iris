@@ -75,7 +75,7 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExec.
 Require Import HartSwp HartLift HartSpan.
-Require Import WpGpr.
+Require Import WpGpr MinstretInv InstrBytes.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -761,3 +761,77 @@ Section UFrames.
   Qed.
 
 End UFrames.
+
+(* ===================================================================== *)
+(* 8. [u_regs]: the per-step mutable cells as ONE bundle.                 *)
+(*                                                                       *)
+(* This is [UserExec.user_regs] AFTER the port, spelled here because it   *)
+(* mentions neither [ucfg] nor [uptd] and so does not have to wait for    *)
+(* [UserExec.v] (which is red across the port and belongs to the tier     *)
+(* package).  Three riders are NEW relative to the pre-port definition:   *)
+(* [minstret_res], [clock_res] and [resv_any cpu_id].  They are here      *)
+(* because there is no longer a clock invariant to borrow mip from -- the *)
+(* user tier owns mip, mcycle and mtime outright, which is what lets      *)
+(* [UserExec.clock_mip_acc] and every [iInv "Hwinv"] in the U-mode step   *)
+(* engines be DELETED.                                                    *)
+(*                                                                       *)
+(* WHY NOT JUST [pc_is]: [InstrBytes.pc_is x] bundles                     *)
+(* [PC to x * nextPC to x * minstret_res * clock_res * resv_any], i.e. it *)
+(* FORCES PC = nextPC.  The WAITING hart decouples them (the enter-wait   *)
+(* step skips the tick), so [u_regs] keeps PC and nextPC separate and     *)
+(* [u_regs_pc_is] is the bridge back for the two boundaries -- userret in *)
+(* and uservec out -- that still speak [pc_is].                            *)
+(* ===================================================================== *)
+
+Section URegs.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Definition u_regs (hs : HartState)
+      (ms_v sc_v stval_v sepc_v va va' : mword 64) (g : regfile) : iProp Σ :=
+    (hart_state ↦ᵣ hs ∗
+     cur_privilege ↦ᵣ User ∗
+     mstatus ↦ᵣ ms_v ∗
+     scause ↦ᵣ sc_v ∗
+     stval ↦ᵣ stval_v ∗
+     sepc ↦ᵣ sepc_v ∗
+     PC ↦ᵣ va ∗
+     nextPC ↦ᵣ va' ∗
+     minstret_res ∗ clock_res ∗ resv_any cpu_id ∗
+     gpr_file g)%I.
+
+  Lemma u_regs_pc_is (hs : HartState) (ms sc stv sep va : mword 64)
+      (g : regfile) :
+    u_regs hs ms sc stv sep va va g ⊣⊢
+      hart_state ↦ᵣ hs ∗ cur_privilege ↦ᵣ User ∗ mstatus ↦ᵣ ms ∗
+      scause ↦ᵣ sc ∗ stval ↦ᵣ stv ∗ sepc ↦ᵣ sep ∗ pc_is va ∗ gpr_file g.
+  Proof.
+    rewrite /u_regs /pc_is. iSplit.
+    - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & HPC & HnPC & Hmr &
+                Hcr & Hresv & Hg)". iFrame.
+    - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep &
+                (HPC & HnPC & Hmr & Hcr & Hresv) & Hg)". iFrame.
+  Qed.
+
+  (* unpacked, for the frames bridge *)
+  Lemma u_regs_open (hs : HartState) (ms sc stv sep va va' : mword 64)
+      (g : regfile) :
+    u_regs hs ms sc stv sep va va' g ⊣⊢
+      hart_state ↦ᵣ hs ∗ cur_privilege ↦ᵣ User ∗ mstatus ↦ᵣ ms ∗
+      scause ↦ᵣ sc ∗ stval ↦ᵣ stv ∗ sepc ↦ᵣ sep ∗
+      PC ↦ᵣ va ∗ nextPC ↦ᵣ va' ∗ gpr_file g ∗
+      (∃ (mst : mword 64) (mi : bool) (mc : mword 32) (micfg : mword 64),
+         minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi ∗
+         (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc ∗
+         (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg) ∗
+      (∃ cy ti ip : mword 64, mcycle ↦ᵣ cy ∗ mtime ↦ᵣ ti ∗ mip ↦ᵣ ip) ∗
+      resv_any cpu_id.
+  Proof.
+    rewrite /u_regs /minstret_res /clock_res. iSplit.
+    - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & HPC & HnPC & Hmr &
+                Hcr & Hresv & Hg)". iFrame.
+    - iIntros "(Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & HPC & HnPC & Hg &
+                Hmr & Hcr & Hresv)". iFrame.
+  Qed.
+
+End URegs.
