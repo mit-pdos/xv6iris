@@ -993,50 +993,29 @@ Section WpIntrEngine.
   (* [reg_interp_set_same] lives in RiscvPtsto, where [reg_interp] does. *)
 
 
-  Lemma wp_exec_step_interrupt_inv {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ,
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (i : InterruptType) (p : Privilege) (s_trap : mstate),
-         ⌜ exec (run_hart_active 0) σ = Some (Step_Pending_Interrupt (i, p), σ) ⌝ ∗
-         ⌜ exec (handle_interrupt i p) σ = Some (tt, s_trap) ⌝ ∗
-         PC ↦ᵣ (register_lookup PC s_trap.(sregs)) ∗
-         mstate_interp s_trap ∗
-         ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-            PC ↦ᵣ (register_lookup nextPC s_trap.(sregs)) -∗
-            WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
-    iIntros (σ) "[Hreg Hmem] Hbody".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
-      as (i p s_trap) "(%Hha & %Hhi & Hpc & [Hreg Hmem] & Hcont)".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_trap.
-    assert (Hhart_a :
-      register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
-        = HART_ACTIVE tt).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-    iModIntro. iExists _. iSplitR.
-    { iPureIntro.
-      exact (exec_riscv_step_interrupt σ s_trap i p b
-               Hsi Hhart_a Hha Hhi Hhart_trap). }
-    iNext.
-    iMod (reg_update _ PC _ (register_lookup nextPC s_trap.(sregs)) with "Hreg Hpc")
-      as "[Hreg Hpc]".
-    iModIntro. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
-    iSplitL "Hmst Hmi".
-    { iExists mst, b. iFrame. }
-    iApply ("Hcont" with "Hhs Hpc").
-  Qed.
+  (* [wp_exec_step_interrupt_inv] WAS HERE, and is deleted rather than
+     ported: its shape is the one this port exists to remove.  It handed the
+     caller the whole machine state and asked for a successor in one fupd
+     ([exec (run_hart_active 0) σ = Some (Step_Pending_Interrupt (i,p), σ)]
+     plus [exec (handle_interrupt i p) σ = Some (tt, s_trap)]), which is
+     unsound per node: other harts step between an instruction's nodes, so a
+     successor computed from the σ you saw is stale unless you can name what
+     you depend on -- which is a footprint.
+
+     ITS REPLACEMENT IS THE CHAIN THIS FILE NOW ENDS WITH:
+
+       HartStepAny.swp_exec_step_any        -- the cycle, BOTH arms, with the
+                                               body's postcondition matching
+                                               on the step it reached
+        |- swp_run_hart_active_S (above)    -- the S-mode body
+           |- swp_dispatchInterrupt_S       -- wires ∀-bound
+           |- fetch obligation <- HartSTrans.swp_fetch_S
+
+     The trap arm's [handle_interrupt] rides in the dispatch's POSTCONDITION
+     (see [HartStepAny]'s header) rather than beside it, which is what
+     threads the frames without a second binder. *)
+
+
 
 End WpIntrEngine.
 
