@@ -2008,10 +2008,28 @@ platform ones + `functional_extensionality_dep` where inherited)
   on `instr`'s text-byte claim.
 - >5 min per file is a bug; no pkill of coqc; commit by explicit path only.
 
+### AWAITING USER RULING (tail-1 report, 2026-08-18 late)
+1. `SpecKvminithart.wp_kvminithart_sconf_body` still takes `tlb ↦ᵣ tlbvec0`,
+   but the boot tlb cell moved INTO `SRegime.bare_inv` (52f89133, approved
+   as part of the bare_inv fix) and out of `SpecMain.main_hart_raw`, so the
+   premise is unsatisfiable: DROP it (ProofKvminithart then sources the
+   cell from `strans_inv_acc_bare`).  Caller-visible (Spec file).
+2. `ProofVirtioDiskIntr.v` used-ELEMENT `lw` (~l.1300): the word lives only
+   inside `VirtioProto.virtio_proto_reclaim_acc` (one-shot closer), so no
+   points-to is reachable before the AU: needs a READ-ONLY used-element
+   accessor added to VirtioProto.v (invariant-internal, no leaf change).
+3. `UserretUser.wp_userret_user`: the three approved `↦ᵣ□` counter cells
+   for `userret_to_user_inv` have no source in `wp_userret_pt`'s
+   continuation; add them as persistent premises of `wp_userret_user`,
+   threaded from `ProofUserretClosed`'s Löb loop (or, alternatively, into
+   `hw_config` beside senvcfg -- touches every producer).
+Also flagged: `WpAu4.wp_lw_au_s_sconf`/`wp_sw_au_s_sconf` (thin width-4
+re-exports) carry the approved `wordw_claim` premise; 11 call sites updated.
+
 ### In flight at handoff (agents; all resumable from their transcripts)
-- tail-1: hw_config-tail (`#Hkmapb` binds `kmap_static_claims ∗ gen_cert`)
-  fixes across ~22 Proof*.v + BootBridge/WpStartNew/UserretUser/ProofMain*;
-  then the wordw_claim redo above.
+- tail-1: DONE except the three ruling items above (hw_config-tail fixed in
+  21 files; BootBridge/WpStartNew fixed; wordw_claim redone from points-to
+  everywhere -- no static-map derivation remains).
 - trampoline: user-table per-node translation (via `swp_hmrun_of_exec` +
   PtWalkCert/UserBytes) + the four uservec/userret files + the two
   `user_trap_frame_open` ipattern edits.
