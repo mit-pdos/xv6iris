@@ -702,3 +702,36 @@ re-derived from the promise run exactly as `robust_main_bundle` does.
   their COMPONENTS (only their on-cycle sets, `on_cyc_gdep3`).  Nothing needs
   it yet; a future segment argument on `gdep2` cycles that wants the `gdep3`
   replay would.
+
+
+## 10. Two open technical questions before D8 (2026-08-18, orchestrator)
+
+1. **Does `interference_certify` transfer to our machine, and what does it
+   depend on?**  PARM's `certify` runs are `state_step ∪ write_step`
+   (a `write_step` = promise-and-fulfil AT THE TOP, i.e. our pf store), so a
+   certifying run IS a `wp_pf`-style solo run — good.  But the naive
+   argument for "certification survives another agent's promise" fails on
+   the following shape: `i` promised `m` (ts_m) and its certifying run
+   makes a NEW store `s` po-before `m` with a `pw∧sw` fence between; `s`
+   lands at the top, so after `k` foreign appends `s`'s timestamp exceeds
+   `ts_m` and `m`'s EXT (`vwNew ⊒ ts_s`) fails.  PARM proves
+   `interference_certify` for RISC-V regardless (`CertifyProgressRiscV.v`,
+   ~1 200 lines, a `sim_eu` simulation), so their machine handles this —
+   probably through the RISC-V-specific view arithmetic (`RES = ts` for
+   exclusive writes feeding `vcap`) or a stronger promise-time invariant.
+   BEFORE D8 an investigation must read that proof and answer: which
+   components (`RES` view, `vcap`, exbank) it uses; whether our D2 machine
+   (no `RES` view — deviation D-2) admits the theorem; and what to add if
+   not.  If `interference_certify` is genuinely unavailable for our machine,
+   the certification route still works with certification checked at the
+   POINT OF USE (we only need: at the pf-real head state σ_h the promise `m`
+   is certifiable) — which is exactly what `certified_exec_complete` gives
+   for behaviors, once ported.
+2. **Speculative A-bit updates** (privileged spec: "updates of the A bit may
+   be performed as a result of speculation, but updates to the D bit must
+   be exact"): decide between the hardware-fidelity assumption "A-bit
+   updates are not observed early" (a MODEL assumption in the class of
+   no-icache, NOT a kernel side condition — record it as such if taken;
+   it lets the walker's CAS be append-at-fulfil in the full machine) and the
+   generalized exhibit (walker-idempotent replay).  Either way, no manual
+   condition on the kernel.
