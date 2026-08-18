@@ -571,6 +571,18 @@ a conditional write is a plain store, as before.
    `SystemAdequacy` (above the red line) do not thread it into the boot
    harts yet.**
 
+   **Also landed: the CONDITIONAL-WRITE RULE**
+   (`HartEvents.wp/swp_hart_ram_write_cond`: caller holds `resv_frag cpu_id
+   (Some (snap_of pa n w))`, learns `read_bytes σ.mem pa n = Some w` in its
+   callback via `snap_of_read_bytes` -- the snapshot bridge, needing only
+   `Z.of_N n < 2^64` -- and gets the frag back at `None`; its blocked arm is
+   absorbed by Löb with the frag unchanged), and in `PtTreeAdue` the two
+   PTE-node twins the write-back is assembled from:
+   `swp_checked_mem_read_pte8_excl` (the re-read, `res = true`,
+   `mread_req8_res`; returns the frag at `Some (snap_of pa 8 bytes)`) and
+   `swp_checked_mem_write_pte8_cond` (the write on that frag, callback told
+   the word memory holds).
+
    What is left of this item:
    - **(b) the ghost.**  Per-ERA, like the register cells: a
      `ghost_mapG Σ CPU (option resv)` instance in `riscvFixedGS`, an
@@ -596,7 +608,17 @@ a conditional write is a plain store, as before.
      the frag unchanged (a blocked write keeps `r`), so no disjointness is
      ever needed.  The exclusive-read rule with frag: `iLöb … forall r0`
      (its blocked arm releases).
-   - (d) the acquire; (e) the write-back twin.
+   - (d) the acquire; (e) the write-back twin: `swp_update_and_write_pte_S`
+     in `PtTreeAdue` = `swp_read_pte_S`-style wrapper over
+     `swp_checked_mem_read_pte8_excl` → `swp_span` over
+     `CommonWalk.hval_check_leaf_pte_leaf0` at the RE-READ word → pure
+     `update_PTE_Bits` → `swp_write_pte_conditional_S` over
+     `swp_checked_mem_write_pte8_cond` (returns `Ok (Some pte', tt)`), then
+     `swp_translate_hit_upd` / `swp_translate_miss_upd` in `HartSTrans`
+     mirroring `exec_translate_TLB_hit_pt_upd` (the `Hu` assert there is
+     the same region, inlined) -- and the `kptN` seam for the write, which
+     the worklist item 2 below describes.  The frontier of the swp port is
+     exactly here.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
