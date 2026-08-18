@@ -1953,9 +1953,13 @@ text bytes' claim inside `instr` (`code_text`).  Only the KT1 WITNESS
 (`sr_ktier_wit R KT1`: "the table is installed") comes from the capability,
 because no byte can carry it.  Never from static bundles
 (`kmap_static_claims`, `tramp_window_static`) or an ambient `CurKtier`
-default -- those are equivalent facts, but not the principle; the two
-producers that took that shortcut (`spt_tr_obl_of_regime`,
-`TrampStepPt.tramp_phys_id`) are to be restated on `instr`'s claim.
+default -- those are equivalent facts, but not the principle; the fetch
+producer `spt_tr_obl_of_regime` is to be restated on `instr`'s claim.
+**EXCEPTION (user, 2026-08-18, told directly to the trampoline agent): the
+TRAMPOLINE is special -- its window claim (`TrampStepPt.tramp_phys_id`) MAY
+be derived from something other than the points-to (the static trampoline
+mapping), because the trampoline va is not identity-mapped and its bytes
+are described physically.**
 
 ## CHECKPOINT 2026-08-18 (late) -- HANDOFF STATE (read this first when resuming)
 
