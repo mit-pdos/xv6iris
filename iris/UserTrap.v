@@ -65,12 +65,6 @@ Import Defs.
 (* ===================================================================== *)
 Require Import HartMemRun.
 
-Ltac gm_rr r H :=
-  erewrite goodmb_bind_empty;
-    [ | etransitivity; [ apply goodmb_read_reg | exact H ]
-      | apply (exec_read_reg r) ].
-Ltac gm_pure :=
-  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnm ].
 
 (* ONE PEEL FOR EVERY BIND SHAPE the generated code produces: [bind0], the
    outermost [bind], and -- because Sail's [>>]/[>>=] are LEFT associative --
@@ -87,47 +81,9 @@ Ltac gm_pure :=
    is [projects/main-cycle-port.md]'s habit 1 -- "the bind equations must be
    GIVEN their left operand" -- and it is what makes a trap tower one line per
    node. *)
-Ltac gm_peel Hg He :=
-  first
-    [ erewrite (goodmb_bind0_empty _ _ _ _ _ _ Hg He)
-    | erewrite (goodmb_bind_empty _ _ _ _ _ _ _ Hg He)
-    | erewrite goodmb_bind0_empty; [ | exact Hg | exact He ]
-    | erewrite goodmb_bind_empty;  [ | exact Hg | exact He ]
-    | ( unfold Defs.bind0;
-        first [ erewrite goodmb_bind_nest_empty; [ | exact Hg | exact He ]
-              | erewrite goodmb_bind_empty;      [ | exact Hg | exact He ] ] ) ].
 
-Ltac gm_peel_w r H :=
-  first
-    [ erewrite goodmb_bind0_empty;
-        [ | etransitivity; [ apply goodmb_write_reg | exact H ]
-          | apply (exec_write_reg r _) ]
-    | erewrite goodmb_bind_empty;
-        [ | etransitivity; [ apply goodmb_write_reg | exact H ]
-          | apply (exec_write_reg r _) ]
-    | ( unfold Defs.bind0;
-        first
-          [ erewrite goodmb_bind_nest_empty;
-              [ | etransitivity; [ apply goodmb_write_reg | exact H ]
-                | apply (exec_write_reg r _) ]
-          | erewrite goodmb_bind_empty;
-              [ | etransitivity; [ apply goodmb_write_reg | exact H ]
-                | apply (exec_write_reg r _) ] ] ) ].
 
-Ltac gm_last_w r H := etransitivity; [ apply goodmb_write_reg | exact H ].
 
-Ltac gm_peel_r r H :=
-  first
-    [ erewrite goodmb_bind_empty;
-        [ | etransitivity; [ apply goodmb_read_reg | exact H ]
-          | apply (exec_read_reg r) ]
-    | erewrite goodmb_bind0_empty;
-        [ | etransitivity; [ apply goodmb_read_reg | exact H ]
-          | apply (exec_read_reg r) ]
-    | ( unfold Defs.bind0;
-        erewrite goodmb_bind_nest_empty;
-          [ | etransitivity; [ apply goodmb_read_reg | exact H ]
-            | apply (exec_read_reg r) ] ) ].
 
 Lemma goodmb_hartSupports_Zicfilp (Dr Dw : register -> bool) (s : mstate) mm :
   goodmb Dr Dw (hartSupports Ext_Zicfilp) s mm = true.

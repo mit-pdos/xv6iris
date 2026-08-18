@@ -1403,6 +1403,69 @@ Proof.
   all: first [ by apply (IH tt s mm1 mm2) | by apply (IH 0%Z s mm1 mm2) ].
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE ASSEMBLY TACTICS.  One definition, because every twin in the tree    *)
+(* peels the same four shapes and Sail's LEFT associativity means a naive   *)
+(* [erewrite] picks the wrong head.                                         *)
+(*                                                                         *)
+(* [gm_peel Hg He] -- peel a bind whose head has certificate [Hg] and exec  *)
+(* fact [He] (exec_bind_Some's argument order).  It tries, in order: the    *)
+(* head GIVEN (which makes the match go through conversion and peels the    *)
+(* leftmost node out of a nest), the head matched syntactically, and the    *)
+(* one-level-in [goodmb_bind_nest_empty].  Deeper nests than that are built *)
+(* inside-out and peeled once.                                              *)
+(* [gm_peel_r r H] / [gm_peel_w r H] -- the same at a register read/write   *)
+(* node, taking the footprint fact directly.  [gm_last_w] closes on a write *)
+(* that ends the stretch.                                                    *)
+(* ---------------------------------------------------------------------- *)
+Ltac gm_pure :=
+  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnm ].
+Ltac gm_pure0 :=
+  erewrite goodmb_bind0_empty; [ | apply goodmb_returnm | apply exec_returnm ].
+
+Ltac gm_peel Hg He :=
+  first
+    [ erewrite (goodmb_bind0_empty _ _ _ _ _ _ Hg He)
+    | erewrite (goodmb_bind_empty _ _ _ _ _ _ _ Hg He)
+    | erewrite goodmb_bind0_empty; [ | exact Hg | exact He ]
+    | erewrite goodmb_bind_empty;  [ | exact Hg | exact He ]
+    | ( unfold Defs.bind0;
+        first [ erewrite goodmb_bind_nest_empty; [ | exact Hg | exact He ]
+              | erewrite goodmb_bind_empty;      [ | exact Hg | exact He ] ] ) ].
+
+Ltac gm_peel_r r H :=
+  first
+    [ erewrite goodmb_bind_empty;
+        [ | etransitivity; [ apply goodmb_read_reg | exact H ]
+          | apply (exec_read_reg r) ]
+    | erewrite goodmb_bind0_empty;
+        [ | etransitivity; [ apply goodmb_read_reg | exact H ]
+          | apply (exec_read_reg r) ]
+    | ( unfold Defs.bind0;
+        erewrite goodmb_bind_nest_empty;
+          [ | etransitivity; [ apply goodmb_read_reg | exact H ]
+            | apply (exec_read_reg r) ] ) ].
+Ltac gm_rr r H := gm_peel_r r H.
+
+Ltac gm_peel_w r H :=
+  first
+    [ erewrite goodmb_bind0_empty;
+        [ | etransitivity; [ apply goodmb_write_reg | exact H ]
+          | apply (exec_write_reg r _) ]
+    | erewrite goodmb_bind_empty;
+        [ | etransitivity; [ apply goodmb_write_reg | exact H ]
+          | apply (exec_write_reg r _) ]
+    | ( unfold Defs.bind0;
+        first
+          [ erewrite goodmb_bind_nest_empty;
+              [ | etransitivity; [ apply goodmb_write_reg | exact H ]
+                | apply (exec_write_reg r _) ]
+          | erewrite goodmb_bind_empty;
+              [ | etransitivity; [ apply goodmb_write_reg | exact H ]
+                | apply (exec_write_reg r _) ] ] ) ].
+
+Ltac gm_last_w r H := etransitivity; [ apply goodmb_write_reg | exact H ].
+
 (* ====================================================================== *)
 (* 5. THE COMPOSITE RULE: an [exec] fact plus its certificate, in [swp].    *)
 (*                                                                         *)

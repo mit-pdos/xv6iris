@@ -52,14 +52,6 @@ Import Defs.
 (* certificate, the head's [exec] fact), in that order.                    *)
 (* ===================================================================== *)
 
-Ltac gm_rr r H :=
-  erewrite goodmb_bind_empty;
-    [ | etransitivity; [ apply goodmb_read_reg | exact H ]
-      | apply (exec_read_reg r) ].
-Ltac gm_pure :=
-  erewrite goodmb_bind_empty; [ | apply goodmb_returnm | apply exec_returnm ].
-Ltac gm_pure0 :=
-  erewrite goodmb_bind0_empty; [ | apply goodmb_returnm | apply exec_returnm ].
 
 Lemma exec_execute_ECALL_U (s : mstate) (va : mword 64) :
   register_lookup cur_privilege s.(sregs) = User ->
