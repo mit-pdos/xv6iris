@@ -372,6 +372,233 @@ Section strans.
     iApply swp_ret. by iFrame.
   Qed.
 
+  (* the walk's TLB fill, at ARBITRARY arguments (the write-back's fill
+     carries the UPDATED word) *)
+  Local Lemma hfrun_add_to_TLB_pt (D Drw : gset register) (rs : regstate)
+      (asid : mword 16) (vpn : mword 27) (pp : mword 44) (pte : mword 64)
+      (ptea : physaddr) (g : bool) :
+    (tlb : register) ∈ D -> (tlb : register) ∈ Drw ->
+    hfrun 4 D Drw rs (add_to_TLB 39 asid vpn pp pte ptea 0 g)
+    = Some (tt, register_set tlb
+                  (vec_update_dec (register_lookup tlb rs) (tlb_hash (__id 39) vpn)
+                     (Some (pt_fill_ent asid vpn pp pte ptea g))) rs).
+  Proof.
+    intros HD HW. unfold add_to_TLB. cbn zeta.
+    cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+      Defs.write_reg Defs.returnm returnM].
+    rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+    rewrite hfrun_write (bool_decide_eq_true_2 _ HW).
+    rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+    apply hfrun_ret.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* [translate] on a MISS whose leaf NEEDS the A/D update: the walk, the  *)
+  (* write-back (design §3a item (e)), the fill with the UPDATED word.     *)
+  (* Mirrors [PtTreeAdue.exec_translate_TLB_miss_pt_upd].                  *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_translate_miss_upd (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate)
+      (vpn : mword 27) (root : mword 44) (asid : mword 16)
+      (pte2 pte1 pte0 q0g m0 m0' : mword 64) (menvcfg0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (slot : option TLB_Entry)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (R : iProp Σ) (rr : option resv) :
+    (* the walk's own hypotheses, in the section's order *)
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                      (ext_bits_of_PTE pte2)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte2 7 0)) = true ->
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                      (ext_bits_of_PTE pte1)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte1 7 0)) = true ->
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                      (ext_bits_of_PTE pte0)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte0 7 0)) = false ->
+    (forall s, exec (check_PTE_permission acc p mxr do_sum
+                       (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                       (ext_bits_of_PTE pte0) tt) s
+               = Some (PTE_Check_Success tt, s)) ->
+    eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE pte0)) ('b"1") = false ->
+    (forall Db s, goodb Db (pte_is_invalid
+                     (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                     (ext_bits_of_PTE pte1)) s = true) ->
+    (forall Db s, goodb Db (pte_is_invalid
+                     (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                     (ext_bits_of_PTE pte2)) s = true) ->
+    (forall Db s, goodb Db (pte_is_invalid
+                     (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                     (ext_bits_of_PTE pte0)) s = true) ->
+    (forall Db s, goodb Db (check_PTE_permission acc p mxr do_sum
+                     (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                     (ext_bits_of_PTE pte0) tt) s = true) ->
+    Drw ## Dro ->
+    (tlb : register) ∈ Drw ∪ Dro ->
+    (tlb : register) ∈ Drw ->
+    register_lookup tlb rs = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = slot ->
+    match slot with
+    | None => True
+    | Some e => match_TLB_Entry e asid (sign_extend' (57 - 12) vpn) = false
+    end ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
+    (* the walked leaf needs the update; the RE-READ word (an A/D variant of
+       it) is a valid leaf that passes the check and needs it too *)
+    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = Some q0g ->
+    (exists a2 d2 : mword 1, m0 = pte_set_ad pte0 a2 d2) ->
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                       (ext_bits_of_PTE m0)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec m0 7 0)) = false ->
+    (forall s, exec (check_PTE_permission acc p mxr do_sum
+                       (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                       (ext_bits_of_PTE m0) tt) s
+               = Some (PTE_Check_Success tt, s)) ->
+    eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE m0)) ('b"1") = false ->
+    (forall (Db' : register -> bool) s,
+       goodb Db' (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                    (ext_bits_of_PTE m0)) s = true) ->
+    (forall (Db' : register -> bool) s,
+       goodb Db' (check_PTE_permission acc p mxr do_sum
+                    (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                    (ext_bits_of_PTE m0) tt) s = true) ->
+    update_PTE_Bits (autocast (T := mword) m0 : mword 64) acc = Some m0' ->
+    (* the leaf slot's PMP/PMA facts *)
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec paddr 0)) 4)
+      (uint (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)))
+      (uint (to_bits 64 8)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
+    pma_allows_ram pmar0 ->
+    pma_ram_access (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8 ->
+    addr_is_ram (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) ->
+    is_aligned_paddr
+      (Physaddr (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0))) 8 = true ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8)
+         (fun r => ⌜r = Values.Ok pte2⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr (u_pte_addr (u_next_base pte2)
+                        (subrange_vec_dec vpn 17 9))) 8)
+         (fun r => ⌜r = Values.Ok pte1⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_pte (Physaddr (u_pte_addr (u_next_base pte1)
+                        (subrange_vec_dec vpn 8 0))) 8)
+         (fun r => ⌜r = Values.Ok pte0⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (* the write-back's re-read witness and its write *)
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
+           = Some m0⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ, ⌜read_bytes σ.(mem) (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
+             = Some m0⌝ -∗
+        mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem)
+                   (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0)) 8
+                   (Interface.WriteReq.value
+                      (mwrite_req8_con
+                         (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0))
+                         (autocast (T := mword) m0'))))
+                σ.(mdev)) ∗ R)) -∗
+    swp (translate 39 asid root vpn acc p mxr do_sum tt)
+      (fun r => ⌜r = Values.Ok (autocast (T := mword)
+                       ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44),
+                     PBMT_PMA, tt)⌝ ∗
+                hreg_frame (register_set tlb
+                    (vec_update_dec (register_lookup tlb rs)
+                       (tlb_hash (__id 39) vpn)
+                       (Some (u_walk_entry vpn pte2 pte1 m0' asid))) rs) Drw ∗
+                hreg_frame_ro Df (register_set tlb
+                    (vec_update_dec (register_lookup tlb rs)
+                       (tlb_hash (__id 39) vpn)
+                       (Some (u_walk_entry vpn pte2 pte1 m0' asid))) rs) Dro ∗
+                R ∗ resv_frag cpu_id None).
+  Proof.
+    intros H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N H1ig H2ig H0ig Hchk0g
+      Hdisj HDtlb HWtlb Htlb Hvec Hslot HD Hag Hmisa Hmenv HPBMTE HADUE
+      Hupd0 Hvar Hm0i Hm0nl Hchkm H0Nm Hm0ig Hchkmg Hupd
+      HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr HA Hord Hrange HR HW
+      Hpallow Hacc Hram Hpa.
+    iIntros "#Hcert Hfrag Hrw Hro Hrd2 Hrd1 Hrd0 Hrdx Hwr".
+    unfold translate.
+    iApply (swp_bind_use (lookup_TLB 39 asid vpn) _ _ _ with "[Hrw Hro] [-]").
+    { destruct slot as [e |].
+      - iApply (swp_hfrun 2 Drw Dro Df rs rs _ _ Hdisj
+                  (hfrun_lookup_TLB_nomatch (Drw ∪ Dro) Drw rs vpn asid e tlbvec
+                     HDtlb Htlb Hvec Hslot)
+                  with "Hcert Hrw Hro").
+      - iApply (swp_hfrun 2 Drw Dro Df rs rs _ _ Hdisj
+                  (hfrun_lookup_TLB_empty (Drw ∪ Dro) Drw rs vpn asid tlbvec
+                     HDtlb Htlb Hvec)
+                  with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    unfold translate_TLB_miss. cbn zeta.
+    (* the walk *)
+    iApply (swp_bind_use (pt_walk 39 vpn acc p mxr do_sum root 2 false tt)
+              _ _ _ with "[Hrw Hro Hrd2 Hrd1 Hrd0] [-]").
+    { iApply (swp_pt_walk_user vpn root pte2 pte1 pte0 acc p mxr do_sum
+                H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N H1ig H2ig H0ig Hchk0g
+                Drw Dro Df rs dst menvcfg0 Hdisj HD Hag Hmisa Hmenv HPBMTE
+                with "Hcert Hrw Hro Hrd2 Hrd1 Hrd0"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    (* the write-back *)
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok (Some (autocast (T := mword) m0'), tt)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                         resv_frag cpu_id None)%I) _
+              with "[Hrw Hro Hfrag Hrdx Hwr] [-]").
+    { iApply (swp_update_and_write_pte_upd Drw Dro Df rs dst vpn _
+                (autocast (T := mword) pte0) q0g m0 m0'
+                menvcfg0 acc p mxr do_sum pmar0 pcfg paddr R rr
+                Hm0i Hm0nl Hchkm H0Nm Hm0ig Hchkmg Hdisj HD Hag Hmisa Hmenv
+                HPBMTE HADUE ltac:(first [exact Hupd0 | by rewrite autocast_id]) Hupd HDpma HDcfg HDaddr HDhtif Hhtif Hpma
+                Hpcfg Hpaddr HA Hord Hrange HR HW Hpallow Hacc Hram Hpa
+                with "Hcert Hfrag Hrw Hro Hrdx Hwr"). }
+    iIntros (v) "(-> & Hrw & Hro & HR & Hfrag)". cbn match.
+    (* the fill, with the UPDATED word *)
+    destruct Hvar as (a2 & d2 & Hm0).
+    destruct (update_PTE_Bits_set_ad _ _ _ Hupd) as (a & d & Hq).
+    assert (Hqc : m0' = pte_set_ad pte0 a d)
+      by (rewrite Hq; rewrite Hm0; apply pte_set_ad_absorb).
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 4 Drw Dro Df rs _ _ _ Hdisj
+                (hfrun_add_to_TLB_pt (Drw ∪ Dro) Drw rs asid vpn _ _ _ _
+                   HDtlb HWtlb)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    match goal with |- context[pt_fill_ent ?asx ?vpx ?ppx ?ptx ?pax ?gx] =>
+      assert (Hent : pt_fill_ent asx vpx ppx ptx pax gx
+                     = u_walk_entry vpn pte2 pte1 m0' asid)
+        by exact (pt_fill_ent_uwe vpn pte2 pte1 pte0 m0' asid a d Hqc) end.
+    rewrite Hent.
+    iApply swp_ret. by iFrame.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* [translate] on a MISS.  Assembly only: the lookup is the footprinted  *)
   (* node above, the walk and the install are CommonWalk's converted        *)
