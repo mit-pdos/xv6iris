@@ -1265,6 +1265,80 @@ Proof.
     all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE PEEL ONE LEVEL IN, IN THE PLAIN MONAD.  Sail's [>>]/[>>=] are LEFT   *)
+(* associative and the generated code leans on that, so a chain reads as    *)
+(* [bind (bind m g) f] and the outer bind equation would ask for [exec] of  *)
+(* the composite [bind m g] -- which is not what a proof has: it has the    *)
+(* INNERMOST head's facts.  This peels that head and leaves the nest.       *)
+(* (Spell [Defs.bind0] out with [unfold] where the nest sits under one.)    *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_bind_nest (Dr Dw : register -> bool) {X Y Z : Type}
+    (m : M X) (g : X -> M Y) (f : Y -> M Z)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) (x : X) :
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (x, s') ->
+  goodmb Dr Dw (Defs.bind (Defs.bind m g) f) s mm
+  = goodmb Dr Dw (Defs.bind (g x) f) s' (mm_after m s mm).
+Proof.
+  revert s mm. induction m as [y | T oc k IH]; intros s mm Hg He.
+  - cbn [exec] in He. injection He as <- <-. reflexivity.
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb exec mm_after Defs.bind Interface.iMon_bind] in Hg, He |- *;
+      try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+      rewrite Hfp. cbn [negb andb] in Hg2 |- *.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma goodmb_bind_nest_empty (Dr Dw : register -> bool) {X Y Z : Type}
+    (m : M X) (g : X -> M Y) (f : Y -> M Z) (s s' : mstate) (x : X) :
+  goodmb Dr Dw m s ∅ = true ->
+  exec m s = Some (x, s') ->
+  goodmb Dr Dw (Defs.bind (Defs.bind m g) f) s ∅
+  = goodmb Dr Dw (Defs.bind (g x) f) s' ∅.
+Proof.
+  intros Hg He. rewrite (goodmb_bind_nest Dr Dw m g f s s' ∅ x Hg He).
+  by rewrite (mm_after_empty Dr Dw m s Hg).
+Qed.
+
+(* the two SHORT-CIRCUITING boolean connectives, in [exec_and_boolM_Some]'s
+   shape: the model builds every extension gate out of them. *)
+Lemma goodmb_and_boolM_empty (Dr Dw : register -> bool) (l r : M bool)
+    (s sl : mstate) (bl : bool) :
+  goodmb Dr Dw l s ∅ = true ->
+  exec l s = Some (bl, sl) ->
+  goodmb Dr Dw (Defs.and_boolM l r) s ∅
+  = (if bl then goodmb Dr Dw r sl ∅ else true).
+Proof.
+  intros Hg He. unfold Defs.and_boolM.
+  rewrite (goodmb_bind_empty Dr Dw l _ s sl bl Hg He). by destruct bl.
+Qed.
+
+Lemma goodmb_or_boolM_empty (Dr Dw : register -> bool) (l r : M bool)
+    (s sl : mstate) (bl : bool) :
+  goodmb Dr Dw l s ∅ = true ->
+  exec l s = Some (bl, sl) ->
+  goodmb Dr Dw (Defs.or_boolM l r) s ∅
+  = (if bl then true else goodmb Dr Dw r sl ∅).
+Proof.
+  intros Hg He. unfold Defs.or_boolM.
+  rewrite (goodmb_bind_empty Dr Dw l _ s sl bl Hg He). by destruct bl.
+Qed.
+
 Lemma goodmb_cer_bind_nest_empty (Dr Dw : register -> bool) {X Y Z : Type}
     (m : Defs.monadR X exception Y) (g : Y -> Defs.monadR X exception Z)
     (f : Z -> Defs.monadR X exception X) (s s' : mstate) (y : Y) :
