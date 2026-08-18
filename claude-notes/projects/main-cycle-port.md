@@ -2030,6 +2030,21 @@ platform ones + `functional_extensionality_dep` where inherited)
 Also flagged: `WpAu4.wp_lw_au_s_sconf`/`wp_sw_au_s_sconf` (thin width-4
 re-exports) carry the approved `wordw_claim` premise; 11 call sites updated.
 
+### HOW TO RESUME (for a fresh session/agent)
+1. `git log` on `hart-node-port`; read this section, "LEAF-STATEMENT CHANGES:
+   THE RULE", "THE S-MODE WRAPPER SHAPES", "MACHINERY INVENTORY", "Traps…",
+   and claude-notes/projects/user-tier-port.md §8-§14.
+2. Get the user's rulings on the three "AWAITING USER RULING" items, then
+   apply them (small, mechanical).
+3. Finish the two open lanes (below): P4b + UserActiveClass §5; the
+   trampoline leftovers (a)(b)(c).
+4. Rerun `./gcp-rocq/run-on-gcp make -k -j36 proofs` from the repo root
+   (last log: scratchpad gcp-build-1.log); fix the tail (rules: no
+   leaf/spec statement change without the user; every address claim from
+   `mem_pointsto_claim`/`wordw_claim_of`; per-file <5 min; explicit-path
+   commits; never pkill coqc / stash / reset / amend / leave staged).
+5. Then the "Not started" list, then PUSH (nothing is pushed yet).
+
 ### In flight at handoff (agents; all resumable from their transcripts)
 - tail-1: DONE except the three ruling items above (hw_config-tail fixed in
   21 files; BootBridge/WpStartNew fixed; wordw_claim redone from points-to
@@ -2044,8 +2059,13 @@ re-exports) carry the approved `wordw_claim` premise; 11 call sites updated.
   `wp_uld_pt` = `wp_sd_s_r_t`/`wp_ld_s_r_t` with `utf_translate` +
   `upt_swp_open/close`; sscratch/alu/sret register-only); (c) the two
   `user_trap_frame_open` ipattern edits.
-- P4b: UserMemClassify(+Amo) arms onto the pure pair; then P7's
-  UserActiveClass §5 assembly (interface written in user-tier-port.md §14).
+- P4b (agent may still be running; resumable): UserMemClassify(+Amo) arms
+  onto the pure pair -- `UserMemCert`/`UserMemArmsBase`/`UserFaultCert`
+  landed (b49e01a1, 7f34ff8e, a98c99e2, 30e156b0); the `arm_*_u` memory
+  arms and then P7's UserActiveClass §5 assembly (interface in
+  user-tier-port.md §14: fetch composer `u_fetch_pure` + fault composer
+  `u_fetch_fault_pure`, execute via `base_exec_total_u_holds`, the four
+  `UTrapReduce` instantiations, `swp_run_hart_active_U`) remain.
 
 ### Not started
 - `u_fetch_pure_2` (2-aligned/straddle fetch: width-2 goodmb twins,
