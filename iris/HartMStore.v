@@ -107,36 +107,41 @@ Proof.
   apply hfrun_ret.
 Qed.
 
-Local Lemma clint_gt_local (x : Z) : 2147483648 <= x -> 34340864 < x + 4.
+(* WIDTH-GENERIC, as [HartMFetch]'s read twins already are: the page walk's
+   A/D write-back is an 8-byte store, so the store side carries the width for
+   the same reason the fetch side does. *)
+Local Lemma clint_gt_local (x n : Z) : 0 <= n -> 2147483648 <= x -> 34340864 < x + n.
 Proof. lia. Qed.
 
-Local Lemma clint_false_local (a : SailStdpp.Values.mword 64) :
+Local Lemma clint_false_local (a : SailStdpp.Values.mword 64) (n : Z) :
+  0 <= n ->
   addr_is_ram a ->
   andb (Z.leb (uint plat_clint_base) (uint a))
-       (Z.leb (Z.add (uint a) (__id 4))
+       (Z.leb (Z.add (uint a) (__id n))
               (Z.add (uint plat_clint_base) (uint plat_clint_size)))
   = false.
 Proof.
-  intros [Hlo _]. unfold ram_base in Hlo.
+  intros Hn [Hlo _]. unfold ram_base in Hlo.
   assert (Hsum : Z.add (uint plat_clint_base) (uint plat_clint_size)
                  = 34340864) by (vm_compute; reflexivity).
   rewrite Hsum. unfold __id.
   apply andb_false_intro2. apply Z.leb_gt.
-  exact (clint_gt_local (uint a) Hlo).
+  exact (clint_gt_local (uint a) n Hn Hlo).
 Qed.
 
 Lemma hfrun_within_mmio_w_ram (D Drw : gset register) (rs : regstate)
-    (pa : SailStdpp.Values.mword 64) :
+    (pa : SailStdpp.Values.mword 64) (n : Z) :
+  0 <= n ->
   (htif_tohost_base : register) ∈ D ->
   register_lookup htif_tohost_base rs = None ->
   addr_is_ram pa ->
-  hfrun 12 D Drw rs (within_mmio_writable (Physaddr pa) 4) = Some (false, rs).
+  hfrun 12 D Drw rs (within_mmio_writable (Physaddr pa) n) = Some (false, rs).
 Proof.
-  intros HD Hhtif Hram.
+  intros Hn HD Hhtif Hram.
   unfold within_mmio_writable, within_clint, within_sig,
     within_htif_readable, within_htif_writable.
   s_cbn.
-  rewrite (clint_false_local pa Hram). s_cbn.
+  rewrite (clint_false_local pa n Hn Hram). s_cbn.
   s_read. rewrite Hhtif. s_cbn.
   apply hfrun_ret.
 Qed.
@@ -184,6 +189,68 @@ Qed.
 Lemma hwrite_resume_write_ram (pa : SailStdpp.Values.mword 64)
     (v : SailStdpp.Values.mword 32) :
   hwrite_resume (write_ram Write_plain (Physaddr pa) 4 v tt)
+  = Interface.Ret true.
+Proof.
+  unfold write_ram, Defs.sail_mem_write.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_size
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_value].
+  cbn [hwrite_resume]. reflexivity.
+Qed.
+
+
+(* THE 8-BYTE WRITE TWINS, for the page walk's A/D write-back.  A third
+   concrete instance rather than a width parameter, for the reason
+   [HartMFetch]'s 2-byte read twins already record: [WriteReq.t n] and
+   [bv (8 * n)] are TYPE indices and a parameterised version does not reduce
+   at a call site. *)
+Definition mwrite_req8 (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 64) : Interface.WriteReq.t 8 :=
+  {| Interface.WriteReq.pa := pa;
+     Interface.WriteReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_explicit
+         {| SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety
+              := SailStdpp.ConcurrencyInterfaceTypes.AV_plain;
+            SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_strength
+              := SailStdpp.ConcurrencyInterfaceTypes.AS_normal |};
+     Interface.WriteReq.value :=
+       TypeCasts.cast_N v (Defs.sail_mem_write_subproof 8);
+     Interface.WriteReq.va := None;
+     Interface.WriteReq.translation := tt;
+     Interface.WriteReq.tag := None |}.
+
+Lemma hwrite_req_at_write_ram8 (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 64) :
+  hwrite_req_at 8 (write_ram Write_plain (Physaddr pa) 8 v tt)
+  = Some (mwrite_req8 pa v).
+Proof.
+  unfold write_ram, Defs.sail_mem_write.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_size
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_write_request_value].
+  cbn [hwrite_req_at].
+  destruct (decide (8%N = 8%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hwrite_resume_write_ram8 (pa : SailStdpp.Values.mword 64)
+    (v : SailStdpp.Values.mword 64) :
+  hwrite_resume (write_ram Write_plain (Physaddr pa) 8 v tt)
   = Interface.Ret true.
 Proof.
   unfold write_ram, Defs.sail_mem_write.
@@ -371,8 +438,8 @@ Section store.
     iApply (swp_use_cer3 (within_mmio_writable (Physaddr pa) 4)
               _ _ _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_within_mmio_w_ram (Drw ∪ Dro) Drw rs pa HDhtif Hhtif
-                   Hram) with "Hcert Hrw Hro"). }
+                (hfrun_within_mmio_w_ram (Drw ∪ Dro) Drw rs pa 4
+                   ltac:(lia) HDhtif Hhtif Hram) with "Hcert Hrw Hro"). }
     iIntros (v0) "(-> & Hrw & Hro)". s_glue.
     change (8 * (0 + 1) * 4 - 1) with 31. change (8 * 0 * 4) with 0.
     rewrite subrange_full_32 autocast_id.
