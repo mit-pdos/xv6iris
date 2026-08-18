@@ -1279,6 +1279,602 @@ Section smem.
     iIntros (u) "Hf". iApply swp_ret. by iFrame.
   Qed.
 
+  (* ==================================================================== *)
+  (* THE SAME CHAIN WITH THE LOADED WORD EXISTENTIAL.                       *)
+  (*                                                                       *)
+  (* An atomic-update leaf -- a lock word, a device register -- learns the   *)
+  (* value it loads by opening an invariant INSIDE the read node's own       *)
+  (* callback, so it cannot name [bytes] before the step.  The read node is  *)
+  (* therefore a parameter here too, but in its existential form: [Mex] is   *)
+  (* whatever the leaf hands the node, [Rr] the value-indexed rider it gets  *)
+  (* back, and [Hnode_ex] the leaf's own node fact.  The value-known chain   *)
+  (* above is the instance [Rr b := ⌜b = bytes⌝ ∗ R].                        *)
+  (* ==================================================================== *)
+  Lemma swp_checked_mem_read_S_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) (Mex : iProp Σ) :
+    Drw ## Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    Pma pmar0 ->
+    Acls pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    (⊢ gen_cert -∗ Mex -∗
+       swp (read_ram Read_plain (Physaddr pa) width false)
+         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                     ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes)) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    Mex -∗
+    swp (checked_mem_read (Load Data) PBMT_PMA Supervisor
+           (Physaddr pa) width false false false false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ Rr bytes).
+  Proof.
+    intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
+      HA Hord HR Hcov Hpallow Hram Hpa Hnode_ex.
+    pose proof w_pos as Hw0. pose proof w_le8 as Hw8.
+    pose proof (Hpmprange pa (vec_access_dec paddr 0) Hram Hpa Hcov) as Hrange.
+    iIntros "#Hcert Hrw Hro Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold checked_mem_read.
+    iApply (swp_use_cer
+              (check_pma_with_pmp_priority (Load Data) PBMT_PMA
+                 Supervisor (Physaddr pa) width false) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
+                (Hpma_load (Drw ∪ Dro) Drw rs pa pmar0
+                   HDpma Hpma Hpallow Hram Hpa)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind_ret. cbn beta iota zeta.
+    cbn [Phys_Mem_Access_Info_granule_size_exp Phys_Mem_Access_Info_splittable].
+    cbn beta iota zeta delta [split_misaligned misaligned_order
+      sys_misaligned_order_decreasing read_kind_of_flags].
+    change (Instances.generic_eq CannotSplit CannotSplit) with true.
+    cbn beta iota.
+    rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
+    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
+      Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
+    cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
+    rewrite mliftR_ret mbind_ret. cbn beta iota.
+    replace (0 * width)%Z with 0%Z by lia. rewrite avi0.
+    iApply (swp_use_cer3
+              (pmpCheck (Physaddr pa) width (Load Data) Supervisor)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_pmpCheck_S (Load Data) Drw Dro Df rs pcfg paddr
+                pa width Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange
+                ltac:(unfold pmpCheckRWX; cbn match; rewrite HR; reflexivity)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind0_ret.
+    iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) width)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
+                (Hmmio_r (Drw ∪ Dro) Drw rs pa HDhtif Hhtif Hram)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) width false)
+              (fun r => (∃ bytes : SailStdpp.Values.mword (8 * width),
+                         ⌜r = (bytes, default_meta)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                         Rr bytes)%I)
+              _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_mono (read_ram Read_plain (Physaddr pa) width false)
+                (fun r => (∃ bytes : SailStdpp.Values.mword (8 * width),
+                           ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes)%I)
+                with "[Hrw Hro] [Hmem]").
+      - iIntros (r) "(%bs & -> & HR)". iExists bs. by iFrame.
+      - iApply (Hnode_ex with "Hcert Hmem"). }
+    iIntros (v) "(%bytes & -> & Hrw & Hro & HR)". cbn beta iota zeta.
+    rewrite mbind_ret. cbn beta.
+    change (0 =? 1 - 1) with true. cbn beta iota zeta.
+    replace (update_subrange_vec_dec (zeros' (8 * 1 * width))
+               (8 * (0 + 1) * width - 1) (8 * 0 * width)
+               (autocast (T := mword) bytes))
+      with (update_subrange_vec_dec (zeros' (8 * width)) (8 * width - 1) 0
+              (autocast (T := mword) bytes))
+      by (f_equal; lia).
+    rewrite (usvd_zeros_full_gen (8 * width) bytes ltac:(lia)).
+    kill_autocast.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (Values.Ok (bytes, tt))). iExists bytes. by iFrame.
+  Qed.
+
+  Lemma swp_mem_read_S_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pa : physaddr)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
+      = returnM Supervisor ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (checked_mem_read (Load Data) PBMT_PMA Supervisor pa width
+              false false false false)
+         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                   ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ Rr bytes)) -∗
+    swp (mem_read (Load Data) PBMT_PMA pa width false false false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                ⌜r = Values.Ok bytes⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ Rr bytes).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv Hep.
+    iIntros "#Hcert Hrw Hro Hcmr".
+    unfold mem_read.
+    iApply (swp_bind_use (Defs.read_reg mstatus) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
+    rewrite Hep. rewrite mbind_ret.
+    unfold mem_read_priv, mem_read_priv_meta.
+    cbn beta iota.
+    iApply (swp_bind_use _ _
+              (fun r => (∃ bytes : SailStdpp.Values.mword (8 * width),
+                         ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                         Rr bytes)%I) _
+              with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_bind_use _ _
+                (fun r => (∃ bytes : SailStdpp.Values.mword (8 * width),
+                           ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                           Rr bytes)%I) _
+                with "[Hrw Hro Hcmr] [-]").
+      - iApply ("Hcmr" with "Hrw Hro").
+      - iIntros (v) "(%bs & -> & Hrw & Hro & HR)". iApply swp_ret.
+        iExists bs. by iFrame. }
+    iIntros (v) "(%bs & -> & Hrw & Hro & HR)". iApply swp_ret.
+    cbn [MemoryOpResult_drop_meta]. iExists bs. by iFrame.
+  Qed.
+
+  Lemma swp_translate_and_read_value_S_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (ea pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) (Mex : iProp Σ)
+      (Rt : regstate -> iProp Σ) (rr : option resv) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
+      = returnM Supervisor ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    Pma pmar0 ->
+    Acls pa ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    (⊢ gen_cert -∗ Mex -∗
+       swp (read_ram Read_plain (Physaddr pa) width false)
+         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                     ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes)) ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    Rt rs -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (resv_frag cpu_id rr -∗ Rt rs -∗
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr ea) (Load Data))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate,
+                     ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                     hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                     Rt rsf ∗ resv_any cpu_id)) -∗
+    Mex -∗
+    swp (translate_and_read_value (Virtaddr ea) width (Load Data)
+           false false false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                ⌜r = Values.Ok (Physaddr pa, bytes)⌝ ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                  Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
+  Proof.
+    intros Hdisj HDmst HDpriv HDpma HDcfg HDaddr HDhtif Hpriv Hhtif Hpma
+      Hpcfg Hpaddr Hep HA Hord HR Hcov Hpallow Hram Hpa Hnode_ex.
+    iIntros "#Hcert Hfrag Hres Hrw Hro Htr Hmem".
+    unfold translate_and_read_value.
+    iApply (swp_bind_use (translateAddr (Virtaddr ea) (Load Data)) _ _ _
+              with "[Hfrag Hres Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hfrag Hres Hrw Hro"). }
+    iIntros (v) "(-> & Hland)". cbn beta iota.
+    iDestruct "Hland" as (rsf) "(%Hland & Hrw & Hro & Hres & Hany)".
+    assert (Hpriv' : register_lookup cur_privilege rsf = Supervisor)
+      by (rewrite (sland_lookup rs rsf Hland cur_privilege eq_refl); exact Hpriv).
+    assert (Hmst' : register_lookup mstatus rsf = register_lookup mstatus rs)
+      by (apply (sland_lookup rs rsf Hland mstatus eq_refl)).
+    assert (Hhtif' : register_lookup htif_tohost_base rsf = None)
+      by (rewrite (sland_lookup rs rsf Hland htif_tohost_base eq_refl); exact Hhtif).
+    assert (Hpma' : register_lookup pma_regions rsf = pmar0)
+      by (rewrite (sland_lookup rs rsf Hland pma_regions eq_refl); exact Hpma).
+    assert (Hpcfg' : register_lookup pmpcfg_n rsf = pcfg)
+      by (rewrite (sland_lookup rs rsf Hland pmpcfg_n eq_refl); exact Hpcfg).
+    assert (Hpaddr' : register_lookup pmpaddr_n rsf = paddr)
+      by (rewrite (sland_lookup rs rsf Hland pmpaddr_n eq_refl); exact Hpaddr).
+    iApply (swp_bind_use _ _
+              (fun r => (∃ bytes : SailStdpp.Values.mword (8 * width),
+                         ⌜r = Values.Ok bytes⌝ ∗
+                         hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                         Rr bytes)%I) _
+              with "[Hrw Hro Hmem] [Hres Hany]").
+    { iApply (swp_mem_read_S_ex Drw Dro Df rsf (Physaddr pa) Rr Hdisj
+                HDmst HDpriv Hpriv' ltac:(rewrite Hmst'; exact Hep)
+                with "Hcert Hrw Hro [Hmem]").
+      iIntros "Hrw Hro".
+      iApply (swp_checked_mem_read_S_ex Drw Dro Df rsf pa pmar0 pcfg paddr
+                Rr Mex Hdisj HDpma HDcfg HDaddr HDhtif Hhtif' Hpma' Hpcfg'
+                Hpaddr' HA Hord HR Hcov Hpallow Hram Hpa Hnode_ex
+                with "Hcert Hrw Hro Hmem"). }
+    iIntros (v) "(%bytes & -> & Hrw & Hro & HR)". cbn beta iota.
+    iApply swp_ret. iExists bytes. iSplitR; [done|].
+    iExists rsf. iFrame. done.
+  Qed.
+
+  Lemma swp_vmem_read_addr_S_gen_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (ea pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) (Mex : iProp Σ)
+      (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (satp : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
+    effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
+      = returnM Supervisor ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    Pma pmar0 ->
+    Acls pa ->
+    is_aligned_vaddr (Virtaddr ea) width = true ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    (⊢ gen_cert -∗ Mex -∗
+       swp (read_ram Read_plain (Physaddr pa) width false)
+         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                     ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes)) ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    Rt rs -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (resv_frag cpu_id rr -∗ Rt rs -∗
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr ea) (Load Data))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate,
+                     ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                     hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                     Rt rsf ∗ resv_any cpu_id)) -∗
+    Mex -∗
+    swp (vmem_read_addr (Virtaddr ea) width (Load Data) false false false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                ⌜r = Values.Ok bytes⌝ ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                  Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
+  Proof.
+    intros Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif Hpriv Hhtif
+      Hpma Hpcfg Hpaddr HSXL Hmode Hep HA Hord HR Hcov Hpallow Hram Hva Hpa
+      Hnode_ex.
+    pose proof w_pos as Hw0. pose proof w_le8 as Hw8.
+    iIntros "#Hcert Hfrag Hres Hrw Hro Htr Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold vmem_read_addr.
+    rewrite Hva. sm_glue.
+    rewrite mbind0_ret.
+    rewrite (split_on_page_boundary_aligned_w ea width Hvw Hva).
+    rewrite /returnM mliftR_ret mbind_ret. sm_glue.
+    iApply (swp_use_cer (Defs.read_reg mstatus) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)".
+    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". rewrite Hpriv.
+    rewrite Hep.
+    rewrite mliftR_ret mbind_ret. sm_glue.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (translationMode Supervisor) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hmode
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". sm_glue.
+    rewrite mbindR_ret.
+    match goal with
+    | |- context [ if Instances.generic_neq md Bare then ?x else ?y ] =>
+        replace (if Instances.generic_neq md Bare then x else y) with x
+          by (destruct (Instances.generic_neq md Bare); reflexivity)
+    end.
+    sm_glue.
+    change (Z.gtb 0 0) with false. sm_glue.
+    change (sys_misaligned_order_decreasing && false) with false. sm_glue.
+    rewrite mbindR_ret. sm_glue.
+    iApply (swp_use_cer
+              (translate_and_read_value (Virtaddr ea) width (Load Data)
+                 false false false) _ _ C HC
+              with "[Hfrag Hres Hrw Hro Htr Hmem] [-]").
+    { iApply (swp_translate_and_read_value_S_ex Drw Dro Df rs ea pa pmar0 pcfg
+                paddr Rr Mex Rt rr Hdisj HDmst HDpriv HDpma HDcfg HDaddr
+                HDhtif Hpriv Hhtif Hpma Hpcfg Hpaddr Hep HA Hord HR Hcov
+                Hpallow Hram Hpa Hnode_ex
+                with "Hcert Hfrag Hres Hrw Hro Htr Hmem"). }
+    iIntros (v0) "(%bytes & -> & Hland)". cbn beta iota. sm_glue.
+    rewrite mbind0R_ret. sm_glue.
+    rewrite mbindR_ret. sm_glue.
+    change (not sys_misaligned_order_decreasing && false) with false. sm_glue.
+    rewrite mbindR_ret. sm_glue.
+    rewrite (usvd_zeros_full_gen (8 * width) bytes ltac:(lia)).
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (Values.Ok bytes)). iExists bytes. iFrame. done.
+  Qed.
+
+  Lemma swp_vmem_read_S_gen_ex (Drw Dro : gset register)
+      (Df : register -> dfrac)
+      (rs : regstate) (i : SailStdpp.Values.mword 5) (m : regfile)
+      (offset pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) (Mex : iProp Σ)
+      (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
+    let ea := add_vec (m !!! Regidx i) offset in
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (menvcfg : register) ∈ Drw ∪ Dro ->
+    (satp : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    eq_vec (_get_Mstatus_MXR (register_lookup mstatus rs)) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
+      = PMM_Disabled ->
+    _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address (Virtaddr ea) (Load Data))
+      (Virtaddr ea) rs ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
+    effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
+      = returnM Supervisor ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    Pma pmar0 ->
+    Acls pa ->
+    is_aligned_vaddr (Virtaddr ea) width = true ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    (⊢ gen_cert -∗ Mex -∗
+       swp (read_ram Read_plain (Physaddr pa) width false)
+         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                     ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes)) ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    Rt rs -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (resv_frag cpu_id rr -∗ Rt rs -∗
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr ea) (Load Data))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate,
+                     ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                     hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                     Rt rsf ∗ resv_any cpu_id)) -∗
+    Mex -∗
+    swp (vmem_read (Regidx i) offset width (Load Data) false false false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                ⌜r = Values.Ok bytes⌝ ∗ gpr_file m ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                  Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
+  Proof.
+    intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
+      Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR
+      Hcov Hpallow Hram Hva Hpa Hnode_ex.
+    iIntros "#Hcert Hfrag Hres Hf Hrw Hro Htr Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold vmem_read.
+    iApply (swp_use_cer
+              (get_transformed_data_addr (Regidx i) offset (Load Data) width)
+              _ _ C HC with "[Hf Hrw Hro] [-]").
+    { iApply (swp_get_transformed_data_addr_S_gen Drw Dro Df rs i m offset
+                (Load Data) Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
+                ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
+                Hmxr Hpmm HSXL Htf with "Hcert Hf Hrw Hro"). }
+    iIntros (v0) "(-> & Hf & Hrw & Hro)". cbn beta iota. sm_glue.
+    rewrite mbindR_ret. sm_glue.
+    iApply (swp_use_cer0
+              (vmem_read_addr (Virtaddr ea) width (Load Data) false false false)
+              _ C HC with "[Hfrag Hres Hrw Hro Htr Hmem] [-]").
+    { iApply (swp_vmem_read_addr_S_gen_ex Drw Dro Df rs ea pa pmar0 pcfg paddr
+                Rr Mex Rt rr md Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr
+                HDhtif Hpriv Hhtif Hpma Hpcfg Hpaddr HSXL Hmode Hep HA Hord HR
+                Hcov Hpallow Hram Hva Hpa Hnode_ex
+                with "Hcert Hfrag Hres Hrw Hro Htr Hmem"). }
+    iIntros (v0) "(%bytes & -> & Hland)".
+    iApply ("Hcont" $! (Values.Ok bytes)). iExists bytes.
+    iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma swp_execute_LOAD_S_gen_ex (Drw Dro : gset register)
+      (Df : register -> dfrac)
+      (rs : regstate) (imm : SailStdpp.Values.mword 12)
+      (rs1 rd : SailStdpp.Values.mword 5) (is_unsigned : bool)
+      (m : regfile) (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) (Mex : iProp Σ)
+      (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (menvcfg : register) ∈ Drw ∪ Dro ->
+    (satp : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    eq_vec (_get_Mstatus_MXR (register_lookup mstatus rs)) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
+      = PMM_Disabled ->
+    _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address (Virtaddr ea) (Load Data))
+      (Virtaddr ea) rs ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
+    effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
+      = returnM Supervisor ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    Pma pmar0 ->
+    Acls pa ->
+    is_aligned_vaddr (Virtaddr ea) width = true ->
+    is_aligned_paddr (Physaddr pa) width = true ->
+    uint rd <> 0 ->
+    (⊢ gen_cert -∗ Mex -∗
+       swp (read_ram Read_plain (Physaddr pa) width false)
+         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                     ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes)) ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    Rt rs -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (resv_frag cpu_id rr -∗ Rt rs -∗
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr ea) (Load Data))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate,
+                     ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                     hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                     Rt rsf ∗ resv_any cpu_id)) -∗
+    Mex -∗
+    swp (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned width)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                ∃ bytes : SailStdpp.Values.mword (8 * width),
+                gpr_file (<[Regidx rd
+                            := regval_into_reg (extend_value is_unsigned bytes)]> m) ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                  Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
+  Proof.
+    intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
+      Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR
+      Hcov Hpallow Hram Hva Hpa Hrd Hnode_ex.
+    pose proof w_le8 as Hw8.
+    iIntros "#Hcert Hfrag Hres Hf Hrw Hro Htr Hmem".
+    unfold execute_LOAD.
+    replace (Z.leb width xlen_bytes) with true
+      by (change xlen_bytes with 8; symmetry; apply Z.leb_le; exact Hw8).
+    cbn beta iota zeta delta [Defs.assert_exp'].
+    rewrite /returnM mbind_ret. sm_glue.
+    iApply (swp_bind_use _ _
+              (fun r => (∃ bytes : SailStdpp.Values.mword (8 * width),
+                         ⌜r = Values.Ok bytes⌝ ∗ gpr_file m ∗
+                         ∃ rsf : regstate,
+                           ⌜ rsf = rs \/
+                             exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                           hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                           Rt rsf ∗ resv_any cpu_id ∗ Rr bytes)%I) _
+              with "[Hfrag Hres Hf Hrw Hro Htr Hmem] [-]").
+    { iApply (swp_vmem_read_S_gen_ex Drw Dro Df rs rs1 m (sign_extend' 64 imm)
+                pa pmar0 pcfg paddr Rr Mex Rt rr md Hdisj HDmst HDpriv HDmenv
+                HDsatp HDpma HDcfg HDaddr HDhtif Hpriv Hhtif Hpma Hpcfg
+                Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR Hcov Hpallow
+                Hram Hva Hpa Hnode_ex
+                with "Hcert Hfrag Hres Hf Hrw Hro Htr Hmem"). }
+    iIntros (v0) "(%bytes & -> & Hf & Hland)". cbn beta iota.
+    iApply (swp_bind0_use (wX_bits (Regidx rd) (extend_value is_unsigned bytes))
+              _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m (extend_value is_unsigned bytes) Hrd
+                with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. iSplitR; [done|].
+    iExists bytes. by iFrame.
+  Qed.
+
 End smem.
 
 (* ====================================================================== *)
@@ -1407,6 +2003,91 @@ Section snodes.
     intro Hdev.
     node_read (mread_req8 pa) (hread_req_at_read_ram8 pa)
       (hread_resume_read_ram8 pa bytes).
+  Qed.
+
+  (* THE SAME FOUR NODES WITH THE READ VALUE EXISTENTIAL.  A leaf whose
+     target cell lives in an INVARIANT (a lock word, a device register)
+     cannot name the bytes before the step -- it learns them by opening the
+     invariant inside this very callback.  The node already chooses the word
+     inside [swp_hart_ram_read]'s own existential, so each [_ex] form costs
+     only its statement. *)
+  Local Ltac node_read_ex req Hproj Hres :=
+    let Hb := fresh in let Hcl := fresh in let bs := fresh "bs" in
+    iIntros "#Hcert Hmem";
+    iApply (swp_hart_ram_read _ req _ _ Hproj ltac:(assumption)
+              ltac:(reflexivity) with "Hcert [Hmem]");
+    iIntros (s) "Hs"; iMod ("Hmem" $! _ with "Hs") as (bs) "[%Hb Hcl]";
+    iModIntro; iExists bs;
+    iSplitR; [ iPureIntro; by apply read_bytes_of_bytes | ];
+    iNext; iMod "Hcl" as "[Hs HR]"; iModIntro; iFrame "Hs";
+    rewrite (Hres bs); iApply swp_ret; iExists bs; by iFrame.
+
+  Lemma swp_read_ram_node1_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 1) -> iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ bytes : SailStdpp.Values.mword (8 * 1),
+          ⌜mem_bytes_at σ pa 1 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 1 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
+                  ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intro Hdev.
+    node_read_ex (mread_req1 pa) (hread_req_at_read_ram1 pa)
+      (hread_resume_read_ram1 pa).
+  Qed.
+
+  Lemma swp_read_ram_node2_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 2) -> iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ bytes : SailStdpp.Values.mword (8 * 2),
+          ⌜mem_bytes_at σ pa 2 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 2 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 2),
+                  ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intro Hdev.
+    node_read_ex (mread_req2 pa) (hread_req_at_read_ram2 pa)
+      (hread_resume_read_ram2 pa).
+  Qed.
+
+  Lemma swp_read_ram_node4_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 4) -> iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ bytes : SailStdpp.Values.mword (8 * 4),
+          ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 4 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
+                  ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intro Hdev.
+    node_read_ex (mread_req pa) (hread_req_at_read_ram pa)
+      (hread_resume_read_ram pa).
+  Qed.
+
+  Lemma swp_read_ram_node8_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 8) -> iProp Σ) :
+    dev_addr pa = false ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ bytes : SailStdpp.Values.mword (8 * 8),
+          ⌜mem_bytes_at σ pa 8 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 8 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 8),
+                  ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intro Hdev.
+    node_read_ex (mread_req8 pa) (hread_req_at_read_ram8 pa)
+      (hread_resume_read_ram8 pa).
   Qed.
 
 End snodes.
@@ -2627,6 +3308,51 @@ Section sdevnodes.
     rewrite hread_resume_read_ram. iApply swp_ret. by iFrame.
   Qed.
 
+  (* the two DEVICE read nodes with the value existential: an MMIO read's
+     value comes from the device, not from a points-to, so no leaf can name
+     it before the step. *)
+  Lemma swp_dev_read_node1_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 1) -> iProp Σ) :
+    dev_addr pa = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ (bytes : SailStdpp.Values.mword (8 * 1)) (d' : dev_state),
+        ⌜dev_read σ.(mdev) pa 1 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ Rr bytes)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 1 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
+                  ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hmem".
+    iApply (swp_hart_dev_read 1 (mread_req1 pa) _ _
+              (hread_req_at_read_ram1 pa) Hdev with "Hcert [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (bs d0) "[%Hdr Hcl]".
+    iModIntro. iExists bs, d0. iSplitR; [ done | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    rewrite hread_resume_read_ram1. iApply swp_ret. iExists bs. by iFrame.
+  Qed.
+
+  Lemma swp_dev_read_node4_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 4) -> iProp Σ) :
+    dev_addr pa = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ (bytes : SailStdpp.Values.mword (8 * 4)) (d' : dev_state),
+        ⌜dev_read σ.(mdev) pa 4 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗ Rr bytes)) -∗
+    swp (read_ram Read_plain (Physaddr pa) 4 false)
+      (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
+                  ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intro Hdev. iIntros "#Hcert Hmem".
+    iApply (swp_hart_dev_read 4 (mread_req pa) _ _
+              (hread_req_at_read_ram pa) Hdev with "Hcert [Hmem]").
+    iIntros (s) "Hs". iMod ("Hmem" $! s with "Hs") as (bs d0) "[%Hdr Hcl]".
+    iModIntro. iExists bs, d0. iSplitR; [ done | ].
+    iNext. iMod "Hcl" as "[Hs HR]". iModIntro. iFrame "Hs".
+    rewrite hread_resume_read_ram. iApply swp_ret. iExists bs. by iFrame.
+  Qed.
+
   Lemma swp_dev_write_node1 (pa : SailStdpp.Values.mword 64)
       (v : SailStdpp.Values.mword (8 * 1)) (R : iProp Σ) (rr : option resv) :
     dev_addr pa = true ->
@@ -2797,6 +3523,109 @@ Section instances.
       (fun pa v R rr H => swp_write_ram_node8 pa v R rr
                             (addr_is_ram_not_dev pa H)).
 
+  (* ---- THE WIDTH-GENERIC RAM NODE AND ENGINES.  The node is the ONE
+     thing that cannot be width-generic (its request record is a TYPE
+     index), but [vmem_width] is a four-way disjunction of LITERALS, so a
+     leaf stated at a symbolic width recovers it by destructing that
+     premise -- which is exactly what the width-generic memory leaves
+     ([WpSconfMem]'s two atomic-update forms) need. ---- *)
+  Lemma swp_read_ram_node_w (width : Z) (pa : SailStdpp.Values.mword 64)
+      (bytes : SailStdpp.Values.mword (8 * width)) (R : iProp Σ) :
+    vmem_width width ->
+    dev_addr pa = false ->
+    gen_cert -∗
+    Mobl_ram width pa bytes R -∗
+    swp (read_ram Read_plain (Physaddr pa) width false)
+      (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R).
+  Proof.
+    intros [-> | [-> | [-> | ->]]] Hdev;
+      [ exact (swp_read_ram_node1 pa bytes R Hdev)
+      | exact (swp_read_ram_node2 pa bytes R Hdev)
+      | exact (swp_read_ram_node4 pa bytes R Hdev)
+      | exact (swp_read_ram_node8 pa bytes R Hdev) ].
+  Qed.
+
+  Lemma swp_write_ram_node_w (width : Z) (pa : SailStdpp.Values.mword 64)
+      (v : SailStdpp.Values.mword (8 * width)) (R : iProp Σ)
+      (rr : option resv) :
+    vmem_width width ->
+    dev_addr pa = false ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    Wobl_ram width pa v R -∗
+    swp (write_ram Write_plain (Physaddr pa) width v tt)
+      (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
+  Proof.
+    intros [-> | [-> | [-> | ->]]] Hdev;
+      [ exact (swp_write_ram_node1 pa v R rr Hdev)
+      | exact (swp_write_ram_node2 pa v R rr Hdev)
+      | exact (swp_write_ram_node4 pa v R rr Hdev)
+      | exact (swp_write_ram_node8 pa v R rr Hdev) ].
+  Qed.
+
+  Definition swp_execute_LOAD_ram_Sw (width : Z) (Hvw : vmem_width width)
+      (Hdvd : (width | 4096)) (Huintw : uint (to_bits 64 width) = width) :=
+    swp_execute_LOAD_S_gen width Hvw addr_is_ram pma_allows_ram
+      (ram_pma_load width Hvw Hdvd) (ram_mmio_r width Hvw)
+      (ram_pmprange width Hvw Hdvd Huintw) (Mobl_ram width)
+      (fun pa bytes R H => swp_read_ram_node_w width pa bytes R Hvw
+                             (addr_is_ram_not_dev pa H)).
+
+  Definition swp_execute_STORE_ram_Sw (width : Z) (Hvw : vmem_width width)
+      (Hdvd : (width | 4096)) (Huintw : uint (to_bits 64 width) = width) :=
+    swp_execute_STORE_S_gen width Hvw addr_is_ram pma_allows_ram
+      (ram_pma_store width Hvw Hdvd) (ram_mmio_w width Hvw)
+      (ram_pmprange width Hvw Hdvd Huintw) (Wobl_ram width)
+      (fun pa v R rr H => swp_write_ram_node_w width pa v R rr Hvw
+                            (addr_is_ram_not_dev pa H)).
+
+  (* ---- THE EXISTENTIAL-VALUE OBLIGATIONS AND ENGINES ---- *)
+  Definition Mobl_ram_ex (width : Z) (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ bytes : SailStdpp.Values.mword (8 * width),
+          ⌜mem_bytes_at σ pa width bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes))%I.
+
+  Definition Mobl_dev1_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 1) -> iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ (bytes : SailStdpp.Values.mword (8 * 1)) (d' : dev_state),
+        ⌜dev_read σ.(mdev) pa 1 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗
+                     Rr bytes))%I.
+
+  Definition Mobl_dev4_ex (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * 4) -> iProp Σ) : iProp Σ :=
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ (bytes : SailStdpp.Values.mword (8 * 4)) (d' : dev_state),
+        ⌜dev_read σ.(mdev) pa 4 = Some (bytes, d')⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp (MState σ.(sregs) σ.(mem) d') ∗
+                     Rr bytes))%I.
+
+  Lemma swp_read_ram_node_w_ex (width : Z) (pa : SailStdpp.Values.mword 64)
+      (Rr : SailStdpp.Values.mword (8 * width) -> iProp Σ) :
+    vmem_width width ->
+    dev_addr pa = false ->
+    ⊢ gen_cert -∗
+      Mobl_ram_ex width pa Rr -∗
+      swp (read_ram Read_plain (Physaddr pa) width false)
+        (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
+                    ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes).
+  Proof.
+    intros [-> | [-> | [-> | ->]]] Hdev;
+      [ exact (swp_read_ram_node1_ex pa Rr Hdev)
+      | exact (swp_read_ram_node2_ex pa Rr Hdev)
+      | exact (swp_read_ram_node4_ex pa Rr Hdev)
+      | exact (swp_read_ram_node8_ex pa Rr Hdev) ].
+  Qed.
+
+  Definition swp_execute_LOAD_ram_Sw_ex (width : Z) (Hvw : vmem_width width)
+      (Hdvd : (width | 4096)) (Huintw : uint (to_bits 64 width) = width) :=
+    swp_execute_LOAD_S_gen_ex width Hvw addr_is_ram pma_allows_ram
+      (ram_pma_load width Hvw Hdvd) (ram_mmio_r width Hvw)
+      (ram_pmprange width Hvw Hdvd Huintw).
+
   (* ---- the MMIO engines (widths 1 and 4) ---- *)
   Definition swp_execute_LOAD_dev_S1 :=
     swp_execute_LOAD_S_gen 1 vmw1 (dev_cls 1) pma_allows_io
@@ -2818,6 +3647,15 @@ Section instances.
       (dev_pma_store 4) (dev_mmio_w 4 vmw4) (dev_pmprange 4 vmw4 uintw4)
       Wobl_dev4
       (fun pa v R rr H => swp_dev_write_node4 pa v R rr (dev_cls_dev 4 pa H)).
+
+
+  (* ---- the two MMIO LOAD engines with the value existential ---- *)
+  Definition swp_execute_LOAD_dev_S1_ex :=
+    swp_execute_LOAD_S_gen_ex 1 vmw1 (dev_cls 1) pma_allows_io
+      (dev_pma_load 1) (dev_mmio_r 1 vmw1) (dev_pmprange 1 vmw1 uintw1).
+  Definition swp_execute_LOAD_dev_S4_ex :=
+    swp_execute_LOAD_S_gen_ex 4 vmw4 (dev_cls 4) pma_allows_io
+      (dev_pma_load 4) (dev_mmio_r 4 vmw4) (dev_pmprange 4 vmw4 uintw4).
 
 End instances.
 
@@ -3868,13 +4706,14 @@ Section samo.
   (* quantifies it.  [swp_execute_AMOSWAP_S] is the instance in which the  *)
   (* caller already knows the word.                                        *)
   (* ==================================================================== *)
-  Lemma swp_execute_AMOSWAP_S_ex (Drw Dro : gset register) (Df : register -> dfrac)
+  Lemma swp_execute_AMOSWAP_S_ex_mode (Drw Dro : gset register)
+      (Df : register -> dfrac)
       (rs : regstate) (rs2 rs1 rd : SailStdpp.Values.mword 5) (m : regfile)
       (pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
       (Rr R : SailStdpp.Values.mword (8 * 4) -> iProp Σ)
-      (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (Rt : regstate -> iProp Σ) (rr : option resv) (md : SATPMode) :
     let ea := add_vec (m !!! Regidx rs1) (zeros' 64) in
     let sv := sign_extend' (Z.mul 8 (__id 4))
                 (trunc (Z.mul (__id 4) 8) (m !!! Regidx rs2)) in
@@ -3896,8 +4735,8 @@ Section samo.
     pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
       = PMM_Disabled ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    satpMode_of_bits RV64
+      (_get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))) = Some md ->
     effectivePrivilege amoacc (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -3964,7 +4803,8 @@ Section samo.
                 (zeros' 64) amoacc Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Hmxr Hpmm HSXL
-                (hval_transform_effective_address_S (Drw ∪ Dro) Drw rs _ amoacc
+                (hval_transform_effective_address_S_mode (Drw ∪ Dro) Drw rs
+                   _ amoacc md
                    HDmst HDpriv HDmenv HDsatp Hpriv Hep
                    ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                    Hmxr Hpmm HSXL Hmode)
@@ -4055,5 +4895,98 @@ Section samo.
     iApply ("Hcont" $! RETIRE_SUCCESS). iSplitR; [done|].
     iExists bytes. iSplitL "Hf"; [ iExact "Hf" | ].
     iExists rsf. iFrame. done.
+  Qed.
+
+  (* the Sv39 instance -- the statement before the mode generalization, kept
+     for a caller whose regime is the kernel table outright. *)
+  Lemma swp_execute_AMOSWAP_S_ex (Drw Dro : gset register)
+      (Df : register -> dfrac)
+      (rs : regstate) (rs2 rs1 rd : SailStdpp.Values.mword 5) (m : regfile)
+      (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (Rr R : SailStdpp.Values.mword (8 * 4) -> iProp Σ)
+      (Rt : regstate -> iProp Σ) (rr : option resv) :
+    let ea := add_vec (m !!! Regidx rs1) (zeros' 64) in
+    let sv := sign_extend' (Z.mul 8 (__id 4))
+                (trunc (Z.mul (__id 4) 8) (m !!! Regidx rs2)) in
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (menvcfg : register) ∈ Drw ∪ Dro ->
+    (satp : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Mstatus_MXR (register_lookup mstatus rs)) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
+      = PMM_Disabled ->
+    _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
+      = ('b"1000" : mword 4) ->
+    effectivePrivilege amoacc (register_lookup mstatus rs) Supervisor
+      = returnM Supervisor ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    is_aligned_vaddr (Virtaddr ea) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    uint rd <> 0 ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    Rt rs -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (resv_frag cpu_id rr -∗ Rt rs -∗
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr ea) amoacc)
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate,
+                     ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                     hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                     Rt rsf ∗ resv_any cpu_id)) -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ∃ bytes : SailStdpp.Values.mword (8 * 4),
+          ⌜mem_bytes_at σ pa 4 bytes⌝ ∗
+          ▷ (|={∅,⊤}=> mstate_interp σ ∗ Rr bytes)) -∗
+    (∀ bytes : SailStdpp.Values.mword (8 * 4),
+       Rr bytes -∗ ∀ σ, ⌜read_bytes σ.(mem) pa 4 = Some bytes⌝ -∗
+        mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs) (write_bytes σ.(mem) pa 4 sv) σ.(mdev))
+             ∗ R bytes)) -∗
+    swp (execute_AMO AMOSWAP true false (Regidx rs2) (Regidx rs1) 4 (Regidx rd))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                ∃ bytes : SailStdpp.Values.mword (8 * 4),
+                gpr_file (<[Regidx rd
+                            := regval_into_reg
+                                 (sign_extend' 64
+                                    (autocast (T := mword) bytes
+                                     : mword (4 * 8)))]> m) ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                  Rt rsf ∗ R bytes ∗ resv_frag cpu_id None).
+  Proof.
+    intros ea sv Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
+      Hpriv Hpma Hpcfg Hpaddr Hhtif Hmxr Hpmm HSXL Hmode Hep HA Hord HR HW
+      Hcov Hpallow Hram Hva Hpa Hrd.
+    exact (swp_execute_AMOSWAP_S_ex_mode Drw Dro Df rs rs2 rs1 rd m pa pmar0
+             pcfg paddr Rr R Rt rr Sv39 Hdisj HDmst HDpriv HDmenv HDsatp HDpma
+             HDcfg HDaddr HDhtif Hpriv Hpma Hpcfg Hpaddr Hhtif Hmxr Hpmm HSXL
+             ltac:(rewrite Hmode; vm_compute; reflexivity)
+             Hep HA Hord HR HW Hcov Hpallow Hram Hva Hpa Hrd).
   Qed.
 End samo.
