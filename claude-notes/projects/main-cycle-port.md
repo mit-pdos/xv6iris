@@ -433,55 +433,34 @@ store arm (`RiscvLang.wr_node`'s comment), which is why
 
 #### What is left, in order
 
-1. **DISCHARGING THE FUSED RULE'S WINDOW PREMISE -- the one open design
-   choice, costed below.**  (Everything else the write-back needs is DONE:
-   `swp_hart_amo` with its `hsil`/context commutation, and the per-value facts
-   moved inside the fupd -- `4d0f3c2b`, `4a64cb4a`, `0e1eafce`.)
+1. **DISCHARGE THE FUSED RULE'S WINDOW for the write-back.**  The
+   INFRASTRUCTURE for this is now DONE; what is left is the per-lemma work.
 
-   The premise is
-   `hwrite_req_at nw (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)`
-   -- "from the resumed exclusive read, `k` footprinted silent steps land on
-   the conditional write."  For the A/D write-back that walk is INHERENTLY
-   LONG (~40-60 nodes): `checked_mem_read`'s wrap-up, the callback,
-   `check_leaf_pte` (which reads `misa`/`menvcfg`), `update_PTE_Bits`, then
-   the whole of `write_pte_conditional`'s PMA check, PMP check and mmio check
-   before its `write_ram`.  It cannot be made short, and `k = 0` is not
-   available.
+   The costed choice recorded in `bc82a625` is settled, and by route **(a)**,
+   not the recommended (c).  Building the `hsil` stepping API turned out cheap
+   once `hsil_add` replaced the feared composition lemma: a window crossing
+   model-function boundaries is split by ADDING FUEL, not by re-walking the
+   callee inline, so `hfrun_bind`'s expensive shape was never needed.  Built
+   (`7dec0474`):
 
-   **What is missing is a walker that runs to a MEMORY node and NAMES it.**
-   Neither layer has one:
+   - `HartLift`: `hsil_ret`, `hsil_read_in`, `hsil_write_in`, `hsil_stuck`,
+     `hsil_add`.  The stepping lemmas SPLIT ON MEMBERSHIP rather than carrying
+     an `if decide` -- a rewrite-chain always knows whether the register is in
+     the footprint, and the `if` form cannot be closed by `reflexivity` the way
+     `hfrun_read`'s `bool_decide` one can.  Three attempts died on that before
+     the split form worked.
+   - `HartAmo`: `hsil_node_hspani` / `hsil_hspan` -- every deterministic `hsil`
+     step is an `hspan` step (`hsil_node`'s guards are strictly stronger and
+     interference is reflexive).  Kept even though route (a) won, because it is
+     what lets any swp-side characterization apply to the wp-side rule's
+     deterministic walk.
 
-   - `hsil` (the wp layer's, and the one the premise is stated with) has NO
-     reduction lemmas at all -- no `hsil_read` / `hsil_write` / `hsil_ret`,
-     nothing like the `hfrun_read` / `hfrun_write` / `hfrun_ret` family, and
-     no composition lemma like `hfrun_bind`.  Stepping it symbolically
-     through 50 nodes at a symbolic file is not currently possible.
-   - `hspan` (the swp layer's) STOPS at memory nodes -- exactly the window's
-     shape -- and the port's whole bridge machinery is built on it.  But its
-     two characterization forms, `hval` and `hvalE`, both require the landing
-     to be `Interface.Ret x`; neither can say "lands at a write node".
-
-   Three ways, and the third is the one to take:
-
-   - **(a) Build the `hsil` API**: four reduction lemmas (each a
-     `reflexivity`, cheap) PLUS a composition lemma `hsil_bind`.  The
-     composition is the expensive part and the reason to avoid this: without
-     it every model function's window fact has to be re-walked inline at each
-     call site, which is precisely the trap `hfrun_bind`'s comment warns
-     about.
-   - **(b) Reformulate `wp_hart_amo`'s window relationally** (over
-     `rtc (hsilD D)` instead of the computable `hsil`).  Its proof already
-     goes through `hrun_silent_sound` in that direction and
-     `hsil_node_silent1_det` supplies the determinism, but this changes a
-     proved rule's statement for a second time.
-   - **(c) GENERALIZE `hvalE` to a landing PREDICATE** -- "every maximal
-     interfered span from `m` lands on a node satisfying `P`, with the file
-     agreeing" -- plus one bridge `hspan`-landing → `hsil`-landing (sound
-     because `hspani` is the INTERFERED superset of the deterministic step,
-     so a `∀`-chains fact pins the deterministic walk).  This reuses every
-     composition lemma the port already has (`hfrun_bind`, `swp_span`, the
-     `goodb` bridge), which is why it wins: the window then gets discharged
-     in exactly the style `hfrun_check_pma_pte` and friends already use.
+   So the window is now dischargeable in the same rewrite-chain style as
+   `hfrun_check_pma_pte`: step through `checked_mem_read`'s wrap-up, the
+   callback, `check_leaf_pte`'s two register reads, `update_PTE_Bits`, then
+   `write_pte_conditional`'s PMA/PMP/mmio checks, landing on its `write_ram`.
+   The branch points are all pinned -- the PTE checks by the re-read word's
+   premises (now inside the fupd) and the PMP/PMA tests by the caller's cells.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
