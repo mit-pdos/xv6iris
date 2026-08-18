@@ -333,6 +333,72 @@ it.  The general two-armed `s_cycle_any` is for `WpIntrInv`'s engine, where
 SIE is symbolic.  Neither rule is redundant; they serve the two different
 callers.
 
+### THE S-MODE FETCH: what is built, and the chain that is left
+
+The one blocker both red roots share (see above).  Built and committed so far,
+all in `HartSTrans.v` unless noted, all `Print Assumptions`-clean against the
+same axiom set as the established M-mode twins (the Sail model's own
+uninterpreted platform primitives -- the reservation trio and
+`plat_term_write`):
+
+| lemma | what it is |
+|---|---|
+| `pmpMatchAddr_TOR_match_pure` | `SmodePte.exec_pmpMatchAddr_TOR_match` with the state dropped; a footprint peel can only rewrite with the pure equation |
+| `spmp_hval_grant` | the Supervisor PMP walk, footprinted |
+| `swp_pmpCheck_S` | its `swp` face (one `swp_span`) |
+| `hfrun_check_pma_pte` | the PMA check at `Load PageTableEntry` |
+| `mread_req8` / `hread_req_at_read_ram8` / `hread_resume_read_ram8` (`HartMFetch`) | the 8-byte twins |
+| `swp_checked_mem_read_pte8` | the PTE read as a NODE |
+| `swp_read_pte_S` | `read_pte` on top of it |
+
+Two things learned building them, both worth not re-learning:
+
+**`goodb` CANNOT CARRY A PMP WALK.**  It looked like it should -- the walk
+makes no memory event and writes no register -- but `goodb`'s match has no
+`ExtraOutcome` case, and an early return IS an `ExtraOutcome` node.  So
+`goodb Db m s = true` and "`m` early-returns" are contradictory: any
+`goodb_bindR_inl`-style lemma for the case is VACUOUS.  *Reads confined to the
+frame is not the same property as event-free.*  Walks that early-return get
+peeled at the `hspan` level, the way `HartMPmp` peels its own.
+
+**THE SUPERVISOR PMP PROOF IS SHORTER THAN THE MACHINE ONE, and the reason is
+the DEFAULT, not the privilege argument.**  At Machine a walk matching no
+entry falls through to ALLOW -- which is why `mpmp_hval` is a 16-entry loop
+induction.  At Supervisor the fall-through is DENY, so a granting walk must
+actually MATCH, and the xv6 configuration grants through entry 0 (TOR, base
+0) -- so the walk early-returns on the FIRST iteration and needs no loop
+invariant.  The one real difference in the peel: `pmpaddr_n` must be peeled
+D-PINNED rather than value-dead, because at Supervisor the match's outcome is
+load-bearing.
+
+#### What is left, in order
+
+1. **The `kptN` per-node seam** -- the next unit, and the one with real design
+   in it.  `swp_read_pte_S`'s memory obligation is an ATOMIC-STEP fupd, so the
+   invariant is opened inside ONE node and closed before the next; that is
+   sound because the table is read-only after boot (the reason it is shareable
+   at all).  What it needs from the exec side, which already has all of it:
+   `KptShare.kpt_body`'s `ptree_own` holds each slot as
+   `u_pte_addr … ↦ₚ₈{dq} …` (`PtTree.pt_page_own`), `pt_slot_mem` is the
+   per-byte form, and `pt_read_pte_slot` is the exec fact built from it.
+   Two gaps: (a) a PURE `read_bytes` converse (per-byte facts →
+   `read_bytes mm pa n = Some w`) -- it does NOT exist; `HartLift2.text_read_bytes`
+   and `HartPilot.phys_read_bytes` both bundle it with their resource step, and
+   the pure tail they share is `read_bytes_ne` + `read_bytes_spec` +
+   `bv_eq_of_bytes`; (b) the values read at the three levels must be the SAME
+   across three separate openings -- that is what `kpt_lb` / `kpt_lb_agree`
+   (canonical agreement against a persistent snapshot) is for, and it is the
+   same mechanism `tlb_res_pt_translateAddr_at` uses to reconcile the hart's
+   TLB snapshot with the live tree.  **Watch `kmap_at`'s persistence**: it is
+   needed at three nodes, so if it is not persistent it has to be threaded.
+2. **`swp_translate_kpt`** -- assembly: `PtTreeAdue.swp_translateAddr_pt_front`
+   into (`swp_translate_hit` | `swp_translate_miss`), the arm picked by
+   destructing the slot in `tlbv`, which the caller holds in its own frame.
+3. **The regime field** `sr_swp_translate` (shape recorded above) + its two
+   instances.
+4. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
+   `WpSmodeIntr.wp_instr_s_intr` the same way at the kpt instance.
+
 ### What `WpIntrInv` actually needs
 
 Its two rules are the last whole-cycle-shaped ones in the interrupt path:
