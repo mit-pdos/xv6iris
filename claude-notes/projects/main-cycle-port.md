@@ -433,37 +433,55 @@ store arm (`RiscvLang.wr_node`'s comment), which is why
 
 #### What is left, in order
 
-1. **`HartAmo.wp_hart_amo`'s WINDOW PREMISE MUST MOVE INSIDE THE FUPD.**
-   (The `swp` face itself is DONE -- `swp_hart_amo`, with the `hsil`/context
-   commutation it needed; see `4d0f3c2b` and `4a64cb4a`.)
+1. **DISCHARGING THE FUSED RULE'S WINDOW PREMISE -- the one open design
+   choice, costed below.**  (Everything else the write-back needs is DONE:
+   `swp_hart_amo` with its `hsil`/context commutation, and the per-value facts
+   moved inside the fupd -- `4d0f3c2b`, `4a64cb4a`, `0e1eafce`.)
 
-   The fused rule currently demands its window fact **for every possible read
-   value**:
+   The premise is
+   `hwrite_req_at nw (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)`
+   -- "from the resumed exclusive read, `k` footprinted silent steps land on
+   the conditional write."  For the A/D write-back that walk is INHERENTLY
+   LONG (~40-60 nodes): `checked_mem_read`'s wrap-up, the callback,
+   `check_leaf_pte` (which reads `misa`/`menvcfg`), `update_PTE_Bits`, then
+   the whole of `write_pte_conditional`'s PMA check, PMP check and mmio check
+   before its `write_ram`.  It cannot be made short, and `k = 0` is not
+   available.
 
-   ```
-   (forall w, hwrite_req_at nw (hsil k D (rs, hread_resume (bv_unsigned w) m)).2
-              = Some (wreq w)) ->
-   ```
+   **What is missing is a walker that runs to a MEMORY node and NAMES it.**
+   Neither layer has one:
 
-   That is too strong here, and not by a technicality.  The A/D write-back's
-   window runs `check_leaf_pte` on the RE-READ word; a word failing its checks
-   EARLY-RETURNS, so the walk never reaches the conditional write and
-   `hwrite_req_at` is `None`.  (The same `w` also breaks `swp_hart_amo`'s
-   `hsil_opaque` side condition, for the same reason -- an early return is
-   exactly what both exclude.)  So the premise is false for bad `w`, and no
-   caller can discharge it.
+   - `hsil` (the wp layer's, and the one the premise is stated with) has NO
+     reduction lemmas at all -- no `hsil_read` / `hsil_write` / `hsil_ret`,
+     nothing like the `hfrun_read` / `hfrun_write` / `hfrun_ret` family, and
+     no composition lemma like `hfrun_bind`.  Stepping it symbolically
+     through 50 nodes at a symbolic file is not currently possible.
+   - `hspan` (the swp layer's) STOPS at memory nodes -- exactly the window's
+     shape -- and the port's whole bridge machinery is built on it.  But its
+     two characterization forms, `hval` and `hvalE`, both require the landing
+     to be `Interface.Ret x`; neither can say "lands at a write node".
 
-   The exec side does not have this problem because
-   `exec_translate_TLB_hit_pt_upd` takes the re-read word `m0` as a BINDER and
-   pins it with `pte_valid m0 -> pte_leaf m0 -> pte_no_napot m0 ->
-   pte_check_ok … m0 -> update_PTE_Bits m0 acc = Some m0'`.
+   Three ways, and the third is the one to take:
 
-   The patch, and it is a rearrangement rather than a reproof: move the
-   per-`w` facts (the window, the write's `dev_addr`, its `ak_excl`, and the
-   `hsil_opaque` condition) INSIDE the caller's fupd, next to
-   `⌜read_bytes mm … = Some w⌝` where `w` is the ACTUAL value.  The rule's
-   own proof already builds its witness at the actual `w`, and the conclusion
-   already mentions `wreq w` only inside the fupd, so nothing else moves.
+   - **(a) Build the `hsil` API**: four reduction lemmas (each a
+     `reflexivity`, cheap) PLUS a composition lemma `hsil_bind`.  The
+     composition is the expensive part and the reason to avoid this: without
+     it every model function's window fact has to be re-walked inline at each
+     call site, which is precisely the trap `hfrun_bind`'s comment warns
+     about.
+   - **(b) Reformulate `wp_hart_amo`'s window relationally** (over
+     `rtc (hsilD D)` instead of the computable `hsil`).  Its proof already
+     goes through `hrun_silent_sound` in that direction and
+     `hsil_node_silent1_det` supplies the determinism, but this changes a
+     proved rule's statement for a second time.
+   - **(c) GENERALIZE `hvalE` to a landing PREDICATE** -- "every maximal
+     interfered span from `m` lands on a node satisfying `P`, with the file
+     agreeing" -- plus one bridge `hspan`-landing → `hsil`-landing (sound
+     because `hspani` is the INTERFERED superset of the deterministic step,
+     so a `∀`-chains fact pins the deterministic walk).  This reuses every
+     composition lemma the port already has (`hfrun_bind`, `swp_span`, the
+     `goodb` bridge), which is why it wins: the window then gets discharged
+     in exactly the style `hfrun_check_pma_pte` and friends already use.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
