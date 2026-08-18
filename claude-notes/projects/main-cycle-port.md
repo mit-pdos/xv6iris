@@ -2116,6 +2116,64 @@ shape, and the per-node engine hands them `swp (execute i)` instead, so
 each data access becomes a `HartSMem` instantiation over the user table's
 data translation.
 
+## THE DOWNSTREAM COMPILE TAIL (2026-08-18) -- what it took, and the two
+## things it is BLOCKED on
+
+The `make -k` red roots below the engines were three mechanical causes and
+two real ones.
+
+**Mechanical, all fixed:** (a) `hw_config`'s tail conjunct is a PAIR now
+(`kmap_static_claims ∗ gen_cert`), so 25 `iDestruct` patterns in 21 proof
+files bound `#Hkmapb` to the pair -- split the tail, no statement moved;
+(b) `minstret_inv` is `emp`, so `iFrame` closes goals a follow-up tactic
+then cannot find (`BootBridge`, "No such goal") and `mmode_config_unbundle`
+yields FOUR components, not five (`WpStartNew`, "iIntuitionistic:
+hart_state not persistent" -- mint the leaves' `minstret_inv` premise from
+`minstret_inv_intro`); (c) the AU leaves' approved `wordw_claim` premise at
+their last unconverted call sites.
+
+**THE CLAIM RULE (user, binding).** Every `wordw_claim` a caller supplies is
+derived from THAT CALLER'S OWN points-to of the accessed bytes --
+`WpSconfMem.wordw_claim_of`, or `mem_pointsto_claim` on byte 0 plus the
+alignment. NEVER from `kmap_static_claims` / `kdata_svpn_class` / `pa_of_id`
+(a "the address is statically mapped kernel data, so here is its claim"
+lemma is exactly what must not exist). The four shapes that discharge it,
+all now in the tree:
+1. **The owner reads it off the word it is about to put in the update** --
+   `ProofBrelse`'s frame slot, `ProofBread`'s dev/blockno halves,
+   `ProofIget`'s inum half. `wordw_claim_of`'s conclusion is persistent, so
+   the points-to survives for the update. Cheapest; look for it first.
+2. **One peek of a RESTORING accessor**, `WpSconfLock.lock_claims`' pattern:
+   `ProofMain`/`ProofMainSecondary` (`inv_acc` on `started_inv`),
+   `ProofVirtioDisk{RwD,Intr}` (the read-only avail/used-INDEX accessors),
+   `ProofIget`/`ProofIunlock` (`iref_load_locked_au`, `ic_open_out`).
+3. **An updating accessor run at a NO-OP value**, when open/close is the only
+   pair there is: `ProofIget`'s `+0x6e` runs `ic_open_empty_dev` at
+   `devN := devT`, so the ghost re-tag is the identity. Likewise the
+   open/close pairs `ic_open_mid`/`ic_close_mid`,
+   `escrow_open_mid`/`escrow_close_mid`.
+4. **Hoist the ghost move out of the AU**, when the accessor hands the
+   invariant's body straight back: `ProofBread`'s `+0xb4` runs
+   `escrow_swap_checkout` one fupd BEFORE the load, closes the escrow, and
+   the load's update is then over a cell the thread holds. Sound because
+   nothing stays open across the step.
+
+**BLOCKED (1): `SpecKvminithart` still takes `tlb ↦ᵣ tlbvec0`.** 52f89133
+moved that cell INTO `SRegime.bare_inv`, which sits in `IntrDefs.strans_inv`'s
+Bare arm and is carried by the hart's own `sie_cap`; `main_hart_raw` dropped
+it accordingly. So no caller can produce it and the premise is now
+unsatisfiable. `ProofMain`, `ProofMainSecondary` (and the boot cone behind
+them) are red on exactly this. Dropping the premise is a caller-visible spec
+change and `ProofKvminithart` -- which would then source the cell from
+`strans_inv_acc_bare` -- is itself blocked on the trampoline lane.
+
+**BLOCKED (2): `ProofVirtioDiskIntr`'s used-ELEMENT `lw`.** Its word is
+reachable only through `VirtioProto.virtio_proto_reclaim_acc`, whose closing
+wand is a ONE-SHOT update (it spends the receipt and bumps `disk_done_lb`),
+so there is no peek of shape 2/3/4 above and the caller owns nothing at that
+address. It wants a read-only used-element accessor in `VirtioProto.v`. The
+call site carries a comment saying so.
+
 ## Left, in order
 
 1. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
