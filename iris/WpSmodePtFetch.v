@@ -30,6 +30,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import RegFile WpGpr InstrBytes MinstretInv.
 Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame WpDecodeBridge.
+Require Import WpSmodePtEngine.
 Require Import Ktier CommonWalk.
 Require Import SmodeCore SRegime KptShare SmodeCorePt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -64,7 +65,6 @@ Qed.
 Section SPtFetch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context `{KTR : CurKtier}.
 
   Lemma spt_fetch_tr_of_regime (R : s_regime) (dq : dfrac)
       (pc mst0 satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
@@ -110,3 +110,111 @@ Section SPtFetch.
   Qed.
 
 End SPtFetch.
+
+
+(* ===================================================================== *)
+(* §2  THE DATA-SIDE TRANSLATION, at the leaf's own footprint.            *)
+(*                                                                       *)
+(* [HartSMem]'s LOAD/STORE engines take the translation as an obligation   *)
+(* whose shape is [SRegime.sr_swp_translate]'s conclusion verbatim -- so    *)
+(* this is that field, at [sda_Drw]/[sda_Dro] and with every premise        *)
+(* discharged off the tower.  The reference state is THIS HART'S OWN FILE,  *)
+(* which is what makes the two agreement premises [reflexivity], and the    *)
+(* regime's two remaining obligations come from the fold's producer fields  *)
+(* ([sr_adm_of_pin], [sr_swp_side_ok]).  Nothing here names a regime.       *)
+(* ===================================================================== *)
+Lemma spf_Db_in_sda (r : register) : spf_Db r = true -> r ∈ sda_Drw ∪ sda_Dro.
+Proof.
+  unfold spf_Db. intros Hr.
+  apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
+    [exact sda_in_mst | exact sda_in_satp].
+Qed.
+
+Lemma spf_leafchk_in_sda (r : register) :
+  D_leafchk r = true -> r ∈ sda_Drw ∪ sda_Dro.
+Proof.
+  unfold D_leafchk. intros Hr.
+  apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
+    [exact sda_in_misa | exact sda_in_menv].
+Qed.
+
+Section SPtData.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma sda_translate (R : s_regime) (dq : dfrac)
+      (acc : MemoryAccessType mem_payload) (kp : kperm)
+      (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
+      (va : SailStdpp.Values.mword 64) (ppn : SailStdpp.Values.mword 44)
+      (rr : option resv) :
+    s_acc_ok acc ->
+    kperm_allows kp acc ->
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    sr_swp_satp_ok R satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pma_allows_ram pmar0 ->
+    (uint va < 274877906944)%Z ->
+    ktier_pin cur_ktier ppn va ->
+    kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+    sr_swp_res R (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) -∗
+    hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drw -∗
+    hreg_frame_ro (sda_Df dq)
+      (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro -∗
+    swp (translateAddr (Virtaddr va) acc)
+      (fun r => ⌜r = Values.Ok (Physaddr (pa_of ppn va), PBMT_PMA,
+                                init_ext_ptw)⌝ ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv \/
+                    exists tv, rsf = register_set tlb tv
+                                 (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr
+                                    tlbv) ⌝ ∗
+                  hreg_frame rsf sda_Drw ∗
+                  hreg_frame_ro (sda_Df dq) rsf sda_Dro ∗
+                  sr_swp_res R rsf ∗ resv_any cpu_id).
+  Proof.
+    intros Hacc Hallow Hmenv HSXL HMPRV Hsok Hpmp Hpma Hlt Hpin.
+    exact (sr_swp_translate R acc sda_Drw sda_Dro (sda_Df dq)
+             (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+             (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
+                dev0_state)
+             spf_Db va (pa_of ppn va) ppn kp rr
+             sda_disj Hacc Hallow
+             sda_in_mst sda_in_priv sda_in_satp sda_w_tlb sda_in_pma
+             sda_in_pcfg sda_in_paddr sda_in_htif
+             spf_Db_in_sda (fun r _ => eq_refl)
+             spf_leafchk_in_sda (fun r _ => eq_refl)
+             (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _) eq_refl
+             ltac:(cbn [sregs]; apply sda_rs_misa)
+             ltac:(cbn [sregs]; rewrite sda_rs_menv; exact Hmenv)
+             ltac:(rewrite sda_rs_mst; exact HSXL)
+             (s_eff_exec acc
+                (register_lookup mstatus
+                   (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv))
+                Supervisor _
+                ltac:(rewrite sda_rs_mst; exact HMPRV))
+             (s_eff_goodb acc
+                (register_lookup mstatus
+                   (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv))
+                Supervisor spf_Db _
+                ltac:(rewrite sda_rs_mst; exact HMPRV))
+             (s_acc_ssa_exec acc _ Hacc) (s_acc_ssa_goodb acc spf_Db _ Hacc)
+             (lo_canonical va Hlt) eq_refl
+             (sr_adm_of_pin R va ppn Hpin)
+             (sr_swp_side_ok R acc va ppn kp spf_Db sda_Drw sda_Dro
+                (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+                (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
+                   dev0_state) Hacc
+                ltac:(rewrite sda_rs_satp; exact Hsok)
+                ltac:(rewrite sda_rs_pcfg sda_rs_paddr; exact Hpmp)
+                ltac:(rewrite sda_rs_pma; exact Hpma)
+                ltac:(rewrite sda_rs_mst; exact HMPRV)
+                spf_Db_mst spf_Db_satp
+                ltac:(cbn [sregs]; rewrite sda_rs_mst; exact HSXL)
+                ltac:(cbn [sregs]; reflexivity))).
+  Qed.
+
+End SPtData.
