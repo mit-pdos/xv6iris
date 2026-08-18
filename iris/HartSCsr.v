@@ -347,7 +347,7 @@ Section HartSCsr.
      is asked for at every value instead of at one. *)
   Lemma swp_doCSR_w_ex_p (Drw Dro : gset register) (Df : register -> dfrac)
       (rs rs' : regstate) (csr : SailStdpp.Values.mword 12) (pr : Privilege)
-      (op : csrop) (rs1_val wval : SailStdpp.Values.mword 64) :
+      (op : csrop) (rs1_val wval : SailStdpp.Values.mword 64) (Q : iProp Σ) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
     register_lookup cur_privilege rs = pr ->
@@ -370,10 +370,10 @@ Section HartSCsr.
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
        swp (write_CSR csr wval)
          (fun x => (∃ cf : SailStdpp.Values.mword 64, ⌜x = Values.Ok cf⌝) ∗
-                   hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)) -∗
+                   Q ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)) -∗
     swp (doCSR csr rs1_val zreg op CSRWrite)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+                Q ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
   Proof.
     intros Hdisj HDpriv Hpriv Hext H344 H144 Hwv Hcb.
     iIntros "#Hcert Hrw Hro Hchk Hwr".
@@ -412,17 +412,65 @@ Section HartSCsr.
     rewrite Hwv.
     iApply (swp_bind_use (write_CSR csr wval) _ _ _ with "[Hwr Hrw Hro] [-]").
     { iApply ("Hwr" with "Hrw Hro"). }
-    iIntros (wres) "((%cf & ->) & Hrw & Hro)". cbn match.
+    iIntros (wres) "((%cf & ->) & HQ & Hrw & Hro)". cbn match.
     iApply (swp_bind0_use _ _
-              (fun _ => hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I _
-              with "[Hrw Hro] [-]").
+              (fun _ => Q ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I _
+              with "[HQ Hrw Hro] [-]").
     { iApply (swp_bind0_use _ _
-                (fun _ => hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I _
-                with "[Hrw Hro] [-]").
+                (fun _ => Q ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I _
+                with "[HQ Hrw Hro] [-]").
       { change (wX_bits zreg (zeros' 64)) with (Defs.returnm tt : M unit).
         iApply swp_ret. by iFrame. }
-      iIntros (u) "[Hrw Hro]". rewrite (Hcb cf). iApply swp_ret. by iFrame. }
-    iIntros (u2) "[Hrw Hro]". iApply swp_ret. by iFrame.
+      iIntros (u) "(HQ & Hrw & Hro)". rewrite (Hcb cf). iApply swp_ret.
+      by iFrame. }
+    iIntros (u2) "(HQ & Hrw & Hro)". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* [csrw csr, rs1] over the existential-result engine. *)
+  Lemma swp_execute_CSRReg_w_ex_p (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rs' : regstate) (m : regfile)
+      (csr : SailStdpp.Values.mword 12) (pr : Privilege)
+      (rs1 : SailStdpp.Values.mword 5) (Q : iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = pr ->
+    ext_check_CSR csr pr CSRWrite = true ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    (forall cf, csr_id_write_callback csr cf = Defs.returnm tt) ->
+    gen_cert -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (check_CSR_result csr pr CSRWrite)
+         (fun w => ⌜w = CSR_Check_OK tt⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (write_CSR csr (m !!! Regidx rs1))
+         (fun x => (∃ cf : SailStdpp.Values.mword 64, ⌜x = Values.Ok cf⌝) ∗
+                   Q ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)) -∗
+    swp (execute_CSRReg csr (Regidx rs1) zreg CSRRW)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m ∗ Q ∗
+                hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hext H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hchk Hwr".
+    unfold execute_CSRReg.
+    replace (csr_access_type CSRRW (Instances.generic_eq zreg zreg)
+               (Instances.generic_eq (Regidx rs1) zreg))
+      with CSRWrite
+      by (replace (Instances.generic_eq zreg zreg) with true by reflexivity;
+          reflexivity).
+    iApply (swp_bind_use (rX_bits (Regidx rs1)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file rs1 m with "Hcert Hf"). }
+    iIntros (v) "[-> Hf]".
+    iApply (swp_mono with "[Hf] [Hrw Hro Hchk Hwr]");
+      [| iApply (swp_doCSR_w_ex_p Drw Dro Df rs rs' csr pr CSRRW
+                   (m !!! Regidx rs1) (m !!! Regidx rs1) Q Hdisj HDpriv
+                   Hpriv Hext H344 H144 eq_refl Hcb
+                   with "Hcert Hrw Hro Hchk Hwr") ].
+    iIntros (e) "(-> & HQ & Hrw & Hro)". iSplitR; [done|]. iFrame.
   Qed.
 
   (* ================================================================== *)

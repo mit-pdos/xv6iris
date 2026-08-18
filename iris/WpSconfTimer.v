@@ -1,32 +1,34 @@
 (* ===================================================================== *)
-(* THE PER-NODE PORT: WHERE THIS FILE STANDS (2026-08-18).                *)
+(* THE PER-NODE PORT: THIS FILE IS DONE (2026-08-18).                     *)
 (*                                                                        *)
-(* [wp_csrr_time_s_sconf] is CONVERTED and verified, statement unchanged.  *)
-(* It needed one genuinely new shape, [swp_check_CSR_result_time_S] below: *)
-(* Supervisor's [time] check is the one CSR legality check in the tree     *)
-(* that mixes a PINNED read with an UNPINNED one -- mcounteren decides the *)
-(* answer and [TimerCap.sstc_enabled] pins it persistently, while          *)
-(* scounteren is read and only matters at User -- so it has no single      *)
-(* [goodb] certificate and no ∀-peel either.  At the [swp] layer the two   *)
-(* mix freely, which is what [HartSCsr.swp_doCSR_r_obl_p]'s check          *)
-(* OBLIGATION exists for.  The read value is existential (mtime is owned   *)
-(* by nobody and the tick moves it), which the Q-carrying wrapper returns  *)
-(* and the leaf's own ∀ absorbs.                                          *)
+(* Both leaves are converted, both statements unchanged, and each needed   *)
+(* one shape that is new in this port:                                     *)
 (*                                                                        *)
-(* [wp_csrw_stimecmp_s_sconf] is NOT converted, and it is blocked on the   *)
-(* RESOURCE, not on the wrapper.  [TimerCap.timer_cap] holds the deadline  *)
-(* cell in an INVARIANT, and the model's [write_CSR 0x14D v] touches that  *)
-(* cell THREE times across a long stretch -- read old, write legalized,    *)
-(* [clint_dispatch], read back -- with the CLINT refresh's own nodes (and  *)
-(* its mip write) in between.  A one-node seam is therefore not enough:    *)
-(* [HartSCsr.swp_write_reg_acc] opens an invariant around a SINGLE         *)
-(* register-write node, and there is no such shape for a stretch, because  *)
-(* an Iris invariant cannot stay open across a machine step.  The fix is   *)
-(* at the resource: [stimecmp_free] has to be THREADED (an exclusive cell  *)
-(* in and out, as [wp_csrw_stvec_s_sconf] threads stvec) rather than       *)
-(* sealed in [timerN] -- which changes [timer_cap] and hence both leaves'  *)
-(* statements, so it is a decision for the timer's owner and not a proof   *)
-(* detail.  The leaf keeps its pre-port proof; nothing here is [Admitted]. *)
+(* [wp_csrr_time_s_sconf]: Supervisor's [time] check is the one CSR        *)
+(* legality check in the tree that mixes a PINNED read with an UNPINNED    *)
+(* one -- mcounteren decides the answer and [TimerCap.sstc_enabled] pins   *)
+(* it persistently, while scounteren is read and only matters at User -- so*)
+(* it has no single [goodb] certificate ([hval_of_goodb] wants every read  *)
+(* register owned) and no ∀-peel either (that cannot pin the one that      *)
+(* matters).  At the [swp] layer the two mix freely, which is what          *)
+(* [HartSCsr.swp_doCSR_r_obl_p]'s check OBLIGATION is for.  The read value *)
+(* stays existential -- mtime is owned by nobody and the tick moves it --   *)
+(* so the Q-carrying wrapper returns it and the leaf's own ∀ absorbs it;    *)
+(* no clock cell and no [_clock] wrapper are needed.                       *)
+(*                                                                        *)
+(* [wp_csrw_stimecmp_s_sconf]: the deadline cell lives in [timerN] and the *)
+(* model's [write_CSR 0x14D] touches it THREE times across a long stretch  *)
+(* -- read old, write legalized, [clint_dispatch]'s own read, read back.   *)
+(* Nothing has to span that: the invariant carries NO value information,   *)
+(* so each touch is opened and closed on its own.  The two reads need no   *)
+(* seam at all (a read of a register the caller does not own is ungated,   *)
+(* [WpMmodeCsrSwp.swp_read_reg_any]) and the ONE write takes                *)
+(* [HartSCsr.swp_write_reg_cellinv], which opens [timerN] around exactly   *)
+(* that node.  What the leaf gives up is the ability to NAME the value the *)
+(* write returns, which is why the engine is the existential-result one    *)
+(* ([HartSCsr.swp_doCSR_w_ex_p]).  mip IS a clock cell, so this leaf takes *)
+(* the [_clock] wrapper and hands [clock_res] back at the mip the CLINT    *)
+(* refresh left.                                                          *)
 (* ===================================================================== *)
 (* WpSconfTimer.v -- the two Sstc timer leaves over [sconf]+[sie_cap]:
 
@@ -72,7 +74,7 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import HartSCsr HartSwp HartMFrame HartLift HartSpan HartSpanChar
         HartMCycle HartRegNode HartGoodb WpDecodeBridge WpMmodeJump
         WpMmodeCsrSwp WpGprCsrwA.
-Require Import TimerCap.
+Require Import TimerCap WpGprCsrwStimecmp MinstretInv.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -367,6 +369,397 @@ Section TimeCheck.
 
 End TimeCheck.
 
+(* ===================================================================== *)
+(* THE stimecmp WRITE AT SUPERVISOR, AND THE SEAM THE SEALED CELL NEEDS.  *)
+(*                                                                        *)
+(* [TimerCap] keeps the deadline cell in an invariant, and the model's     *)
+(* [write_CSR 0x14D] touches it THREE times across a long stretch: read    *)
+(* old, write legalized, [clint_dispatch]'s own reads, read back.  Per     *)
+(* node that is not a problem and needs no threading -- the invariant      *)
+(* carries NO value information, so each touch is opened and closed on its *)
+(* own: the two reads need nothing at all (a read of a register the caller *)
+(* does not own is ungated, [WpMmodeCsrSwp.swp_read_reg_any]) and the one  *)
+(* write takes [HartSCsr.swp_write_reg_cellinv].  What the leaf loses is   *)
+(* the ability to NAME the value the write returns, which is why the       *)
+(* engine here is [HartSCsr.swp_doCSR_w_ex_p].                             *)
+(*                                                                        *)
+(* [clint_dispatch] is [WpGprCsrwStimecmp.swp_clint_dispatch_false] one    *)
+(* privilege over: the only thing in it that is not privilege-blind is the *)
+(* three goodb transports, which are re-run at [dstateS] below.            *)
+(* ===================================================================== *)
+Section StimecmpSwp.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Local Lemma hval_cE_Sstc_S (D Drw : gset register) (rs : regstate) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    hval D Drw rs (currentlyEnabled Ext_Sstc) true rs.
+  Proof.
+    intros HD1 HD2 HD3 Hp Hs Hm.
+    apply (hval_of_goodb D_m D Drw _ dstateS rs true
+             (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm)).
+    - vm_compute. reflexivity.
+    - apply exec_currentlyEnabled_Sstc.
+  Qed.
+
+  Local Lemma hval_cE_S_S (D Drw : gset register) (rs : regstate) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    hval D Drw rs (currentlyEnabled Ext_S) true rs.
+  Proof.
+    intros HD1 HD2 HD3 Hp Hs Hm.
+    apply (hval_of_goodb D_m D Drw _ dstateS rs true
+             (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm)).
+    - vm_compute. reflexivity.
+    - rewrite (exec_currentlyEnabled_S dstateS).
+      replace (eq_vec (_get_Misa_S (register_lookup misa dstateS.(sregs)))
+                 ('b"1")) with true by (vm_compute; reflexivity).
+      reflexivity.
+  Qed.
+
+  Local Lemma hval_cb_mip_S (D Drw : gset register) (rs : regstate)
+      (V : mword 64) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    hval D Drw rs (csr_name_write_callback "mip" V) tt rs.
+  Proof.
+    intros HD1 HD2 HD3 Hp Hs Hm.
+    apply (hval_of_goodb D_m D Drw _ dstateS rs tt
+             (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm)).
+    - vm_compute. reflexivity.
+    - apply exec_csr_name_write_callback_mip.
+  Qed.
+
+  (* the CLINT refresh, ∀-peeled, at Supervisor.  Character-for-character
+     [WpGprCsrwStimecmp.swp_clint_dispatch_false] with the three transports
+     above in place of the Machine ones. *)
+  Lemma swp_clint_dispatch_false_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (ip : mword 64) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mseccfg : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    gen_cert -∗
+    (R_bitvector_64 mip) ↦ᵣ ip -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (clint_dispatch false)
+      (fun _ => (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa.
+    iIntros "#Hcert Hip Hrw Hro".
+    unfold clint_dispatch.
+    iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+    { iApply (swp_read_reg_any (R_bitvector_64 mip) with "Hcert").
+      by iIntros (?). }
+    iIntros (old_mip) "_".
+    iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+    { iApply (swp_read_reg_any (R_bitvector_64 mip) with "Hcert").
+      by iIntros (?). }
+    iIntros (w0) "_".
+    iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+    { iApply (swp_read_reg_any (R_bitvector_64 mtimecmp) with "Hcert").
+      by iIntros (?). }
+    iIntros (w1) "_".
+    iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+    { iApply (swp_read_reg_any (R_bitvector_64 mtime) with "Hcert").
+      by iIntros (?). }
+    iIntros (w2) "_".
+    iApply (swp_bind_use _ _
+              (fun _ => (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+              with "[Hip Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => ∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z)%I _
+                with "[Hip] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_reg_cell (R_bitvector_64 mip) ip _
+                       with "Hcert Hip") ].
+        iIntros (u) "Hip". by iExists _. }
+      iIntros (u) "Hip".
+      unfold Defs.and_boolM.
+      iApply (swp_bind_use _ _
+                (fun b => ⌜b = true⌝ ∗ hreg_frame rs Drw ∗
+                          hreg_frame_ro Df rs Dro)%I _ with "[Hrw Hro] [-]").
+      { iApply (swp_span Drw Dro Df rs rs _ true Hdisj
+                  (hval_cE_Sstc_S (Drw ∪ Dro) Drw rs HDpriv HDsec HDmisa
+                     Hpriv Hsec Hmisa) with "Hcert Hrw Hro"). }
+      iIntros (b) "(-> & Hrw & Hro)". cbn match.
+      iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+      { iApply (swp_read_reg_any (R_bitvector_64 menvcfg) with "Hcert").
+        by iIntros (?). }
+      iIntros (w4) "_". iApply swp_ret. iFrame. }
+    iIntros (w5) "(Hip & Hrw & Hro)".
+    iApply (swp_bind_use _ _
+              (fun _ => (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+              with "[Hip Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+                with "[Hip Hrw Hro] [-]").
+      { iApply (swp_bind0_use _ _
+                  (fun _ => ∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z)%I _
+                  with "[Hip] [-]").
+        { destruct w5.
+          - iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+            { iApply (swp_read_reg_any (R_bitvector_64 mip) with "Hcert").
+              by iIntros (?). }
+            iIntros (w6) "_".
+            iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+            { iApply (swp_read_reg_any (R_bitvector_64 stimecmp) with "Hcert").
+              by iIntros (?). }
+            iIntros (w7) "_".
+            iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+            { iApply (swp_read_reg_any (R_bitvector_64 mtime) with "Hcert").
+              by iIntros (?). }
+            iIntros (w8) "_".
+            iDestruct "Hip" as (z1) "Hip".
+            iApply (swp_mono with "[] [-]");
+              [| iApply (swp_write_reg_cell (R_bitvector_64 mip) z1 _
+                           with "Hcert Hip") ].
+            iIntros (u2) "Hip". by iExists _.
+          - iApply swp_ret. iExact "Hip". }
+        iIntros (u2) "Hip".
+        change (get_config_print_clint tt) with false. cbn match.
+        iApply swp_ret. iFrame. }
+      iIntros (u3) "(Hip & Hrw & Hro)".
+      unfold Defs.or_boolM.
+      iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+      { iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+        { iApply (swp_read_reg_any (R_bitvector_64 mip) with "Hcert").
+          by iIntros (?). }
+        iIntros (w10) "_". iApply swp_ret. done. }
+      iIntros (b2) "_". destruct b2; iApply swp_ret; iFrame. }
+    iIntros (w11) "(Hip & Hrw & Hro)".
+    destruct w11.
+    - unfold read_mip.
+      iApply (swp_bind_use _ _
+                (fun _ => hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+        { iApply (swp_read_reg_any (R_bitvector_64 mip) with "Hcert").
+          by iIntros (?). }
+        iIntros (w12) "_".
+        unfold external_interrupts_pending.
+        iApply (swp_bind_use _ _
+                  (fun _ => hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+          { iApply (swp_read_reg_any (R_bitvector_1 sig_meip) with "Hcert").
+            by iIntros (?). }
+          iIntros (w13) "_".
+          iApply (swp_bind_use _ _
+                    (fun b => ⌜b = true⌝ ∗ hreg_frame rs Drw ∗
+                              hreg_frame_ro Df rs Dro)%I _
+                    with "[Hrw Hro] [-]").
+          { iApply (swp_span Drw Dro Df rs rs _ true Hdisj
+                      (hval_cE_S_S (Drw ∪ Dro) Drw rs HDpriv HDsec HDmisa
+                         Hpriv Hsec Hmisa) with "Hcert Hrw Hro"). }
+          iIntros (b) "(-> & Hrw & Hro)". cbn match.
+          iApply (swp_bind_use _ _ (fun _ => True)%I _ with "[] [-]").
+          { iApply (swp_read_reg_any (R_bitvector_1 sig_seip) with "Hcert").
+            by iIntros (?). }
+          iIntros (w14) "_". iApply swp_ret. iFrame. }
+        iIntros (w15) "(Hrw & Hro)". iApply swp_ret. iFrame. }
+      iIntros (w16) "(Hrw & Hro)".
+      iApply (swp_mono with "[Hip] [Hrw Hro]");
+        [| iApply (swp_span Drw Dro Df rs rs _ tt Hdisj
+                     (hval_cb_mip_S (Drw ∪ Dro) Drw rs w16 HDpriv HDsec HDmisa
+                        Hpriv Hsec Hmisa) with "Hcert Hrw Hro") ].
+      iIntros (u4) "(_ & Hrw & Hro)". iFrame.
+    - iApply swp_ret. iFrame.
+  Qed.
+
+  (* the CSRWrite check at Supervisor: Ext_S and Ext_Sstc ride the goodb
+     transports, and the two bits that actually gate the write -- mcounteren
+     TM and menvcfg STCE -- are PINNED reads out of the five-cell frame. *)
+  Lemma swp_check_CSR_result_stimecmp_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (mcen : mword 32) :
+    Drw ## Dro ->
+    (R_bitvector_32 mcounteren : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 menvcfg : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mseccfg : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_32 mcounteren) rs = mcen ->
+    register_lookup (R_bitvector_64 menvcfg) rs = MENVCFG_S ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    eq_vec (_get_Counteren_TM mcen) ('b"1") = true ->
+    gen_cert -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (check_CSR_result csr_stimecmp Supervisor CSRWrite)
+      (fun w => ⌜w = CSR_Check_OK tt⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmc HDme HDpriv HDsec HDmisa Lmc Lme Lpriv Lsec Lmisa HTM.
+    assert (HSTCE : eq_vec (_get_MEnvcfg_STCE MENVCFG_S) ('b"1") = true)
+      by (vm_compute; reflexivity).
+    iIntros "#Hcert Hrw Hro".
+    unfold check_CSR_result.
+    iApply (swp_bind_use _ _
+              (fun w : bool => ⌜w = true⌝ ∗
+                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+              _ with "[Hrw Hro] [-]").
+    { unfold check_CSR, Defs.and_boolM.
+      assert (H1 : check_CSR_priv csr_stimecmp Supervisor = returnM true)
+        by (vm_compute; reflexivity).
+      rewrite H1.
+      iApply (swp_bind_use _ _
+                (fun w : bool => ⌜w = true⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply swp_ret. by iFrame. }
+      iIntros (x1) "(-> & Hrw & Hro)". cbn match.
+      replace (check_CSR_access csr_stimecmp CSRWrite) with true
+        by (vm_compute; reflexivity).
+      iApply (swp_bind_use _ _
+                (fun w : bool => ⌜w = true⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { iApply swp_ret. by iFrame. }
+      iIntros (x2) "(-> & Hrw & Hro)". cbn match.
+      assert (Hred : is_CSR_accessible csr_stimecmp Supervisor CSRWrite
+                     = is_stimecmp_accessible Supervisor) by csr_dispatch_eq.
+      rewrite Hred.
+      iApply (swp_bind_use _ _
+                (fun w : bool => ⌜w = true⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                _ with "[Hrw Hro] [-]").
+      { unfold is_stimecmp_accessible, Defs.and_boolM.
+        iApply (swp_bind_use _ _
+                  (fun w : bool => ⌜w = true⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_span Drw Dro Df rs rs _ true Hdisj
+                    (hval_cE_S_S (Drw ∪ Dro) Drw rs HDpriv HDsec HDmisa
+                       Lpriv Lsec Lmisa) with "Hcert Hrw Hro"). }
+        iIntros (y1) "(-> & Hrw & Hro)". cbn match.
+        iApply (swp_bind_use _ _
+                  (fun w : bool => ⌜w = true⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_span Drw Dro Df rs rs _ true Hdisj
+                    (hval_cE_Sstc_S (Drw ∪ Dro) Drw rs HDpriv HDsec HDmisa
+                       Lpriv Lsec Lmisa) with "Hcert Hrw Hro"). }
+        iIntros (y2) "(-> & Hrw & Hro)". cbn match.
+        (* the mcounteren TM bit *)
+        iApply (swp_bind_use _ _
+                  (fun w : bool => ⌜w = true⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_bind_use _ _
+                    (fun mc : mword 32 => ⌜mc = mcen⌝ ∗
+                       hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                    _ with "[Hrw Hro] [-]").
+          { iApply (swp_mono with "[] [-]");
+              [| iApply (swp_read_reg_pinned Drw Dro Df rs
+                           (R_bitvector_32 mcounteren) Hdisj HDmc
+                           with "Hcert Hrw Hro") ].
+            iIntros (mc) "(-> & Hrw & Hro)". rewrite Lmc. by iFrame. }
+          iIntros (mc) "(-> & Hrw & Hro)".
+          rewrite HTM. iApply swp_ret. by iFrame. }
+        iIntros (y3) "(-> & Hrw & Hro)". cbn match.
+        (* the menvcfg STCE bit *)
+        iApply (swp_bind_use _ _
+                  (fun me : mword 64 => ⌜me = MENVCFG_S⌝ ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                  _ with "[Hrw Hro] [-]").
+        { iApply (swp_mono with "[] [-]");
+            [| iApply (swp_read_reg_pinned Drw Dro Df rs
+                         (R_bitvector_64 menvcfg) Hdisj HDme
+                         with "Hcert Hrw Hro") ].
+          iIntros (me) "(-> & Hrw & Hro)". rewrite Lme. by iFrame. }
+        iIntros (me) "(-> & Hrw & Hro)".
+        rewrite HSTCE. iApply swp_ret. by iFrame. }
+      iIntros (x3) "(-> & Hrw & Hro)". cbn match.
+      assert (H4 : stateen_allows_CSR_access csr_stimecmp Supervisor CSRWrite
+                   = returnM true) by (vm_compute; reflexivity).
+      rewrite H4. iApply swp_ret. by iFrame. }
+    iIntros (w) "(-> & Hrw & Hro)". cbn match.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+  (* the whole write: the three cell touches are opened and closed one at a
+     time, and the value the read-back returns is therefore existential. *)
+  Lemma swp_write_CSR_stimecmp_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (ip v : mword 64) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mseccfg : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    stimecmp_inv -∗
+    gen_cert -∗
+    (R_bitvector_64 mip) ↦ᵣ ip -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (write_CSR csr_stimecmp v)
+      (fun x => (∃ cf : mword 64, ⌜x = Ok cf⌝) ∗
+         (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv HDsec HDmisa Hpriv Hsec Hmisa.
+    iIntros "#Hinv #Hcert Hip Hrw Hro".
+    rewrite write_CSR_stimecmp_red.
+    (* 1. the old deadline: an UNOWNED read, so the value is arbitrary *)
+    iApply (swp_bind_use _ _ (fun _ : mword 64 => True)%I _ with "[] [-]").
+    { iApply (swp_read_reg_any (R_bitvector_64 stimecmp) with "Hcert").
+      by iIntros (?). }
+    iIntros (o) "_".
+    (* 2. the write, the CLINT refresh and the read-back *)
+    iApply (swp_bind_use _ _
+              (fun c : mword 64 =>
+                 (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+              with "[Hip Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+                with "[Hip Hrw Hro] [-]").
+      { iApply (swp_bind0_use _ _
+                  (fun _ => (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I _
+                  with "[Hip Hrw Hro] [-]").
+        { (* the ONE node that needs the seam *)
+          iApply (swp_write_reg_cellinv timerN (R_bitvector_64 stimecmp)
+                    (stimecmp_legalized o v) with "[] Hcert [Hip Hrw Hro]").
+          { rewrite /stimecmp_inv /stimecmp_free. iExact "Hinv". }
+          iFrame "Hrw Hro". iExists ip. iExact "Hip". }
+        iIntros (u) "(Hip & Hrw & Hro)".
+        iDestruct "Hip" as (z) "Hip".
+        iApply (swp_clint_dispatch_false_S Drw Dro Df rs z Hdisj HDpriv HDsec
+                  HDmisa Hpriv Hsec Hmisa with "Hcert Hip Hrw Hro"). }
+      iIntros (u2) "(Hip & Hrw & Hro)".
+      iApply (swp_read_reg_any (R_bitvector_64 stimecmp)
+                (fun _ : mword 64 =>
+                   (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z) ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I
+                with "Hcert").
+      iIntros (c). iFrame. }
+    iIntros (c) "(Hip & Hrw & Hro)".
+    iApply swp_ret. iSplitR; [iExists _; done|]. iFrame.
+  Qed.
+
+End StimecmpSwp.
+
 Section WpSconfTimer.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -523,91 +916,120 @@ Section WpSconfTimer.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1) "#Htcap Hcg Hpc Hinstr Hcont".
-    iDestruct "Htcap" as "[Hen #Hsinv]".
+    iDestruct "Htcap" as "[Hen #Hstci]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf m n false pc false
+    assert (Hok : cw2_ok (R_bitvector_64 menvcfg) (R_bitvector_32 mcounteren)).
+    { rewrite /cw2_ok /cw_fresh.
+      split_and!; try (vm_compute; reflexivity). discriminate. }
+    (* THE CLOCK VARIANT: [clint_dispatch] writes mip, which is a clock cell,
+       so the wrapper lends [clock_res] for the instruction and takes it
+       back. *)
+    iApply (wp_instr_s_sconf_clock m n false false pc false
               (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW))
-              with "Hcg Hpc Hinstr").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic obligation
-       is discharged by [wp_next]'s OWN introduction rule at the ambient hart. *)
-    iApply wp_next_off_intro.
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
-        %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) timerN with "Hsinv") as "[Hbody Hclose]";
-      [solve_ndisj|].
-    iDestruct "Hbody" as (sc0) ">Hstc".
-    (* the CSR write runs [clint_dispatch], which refreshes mip; mip lives in
-       [clock_inv], value-agnostically, so open it here and re-seal it below *)
-    iPoseProof "Hminv" as "#Hminvc".
-    iDestruct "Hminvc" as "(_ & #Hclk & _)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN ∖ ↑timerN) clockN with "Hclk") as "[Hcbody Hcloseclk]";
-      [solve_ndisj|].
-    iDestruct "Hcbody" as (c0 t0 p0) ">(Hc & Ht & Hp)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid    with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid    with "Hreg Hstc")  as %Lstc.
-    iDestruct (reg_valid_dq with "Hreg Hmcen") as %Lmcen.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmenv_spc : register_lookup menvcfg s_pc.(sregs) = menvcfg0)
-      by (unfold s_pc; tmig; exact Lmenv).
-    assert (Lstc_spc : register_lookup stimecmp s_pc.(sregs) = sc0)
-      by (unfold s_pc; tmig; exact Lstc).
-    assert (Lmcen_spc : register_lookup mcounteren s_pc.(sregs) = mcen)
-      by (unfold s_pc; tmig; exact Lmcen).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    (* the rs1 value: the PINNED gpr file gives it in the step state ([rs1] is a
-       variable index, so the fact is stated at [rget m rs1] -- the value
-       [tp_pin] actually pins into the register file -- rather than
-       [m !!! Regidx rs1], which would be wrong should [rs1] name tp. *)
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
-    iDestruct ("Hfb" with "Hr1c") as "Hfile".
-    assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                   = rget m rs1).
-    { rewrite /rget rf_lookup -Lva.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
-    destruct (exec_execute_csrw_stimecmp_S rs1 s_pc Hrs1 Lpriv_spc
-                ltac:(rewrite Lmisa_spc; exact HmisaS)
-                ltac:(rewrite Lmcen_spc; exact HTM)
-                ltac:(rewrite Lmenv_spc Hmenvval; vm_compute; reflexivity))
-      as [mp Hex].
-    rewrite Lstc_spc Lrs1 in Hex.
-    iMod (reg_update _ stimecmp _ (stimecmp_legalized sc0 (rget m rs1))
-            with "Hreg Hstc") as "[Hreg Hstc]".
-    iMod (reg_update _ mip _ mp with "Hreg Hp") as "[Hreg Hp]".
-    iMod ("Hcloseclk" with "[Hc Ht Hp]") as "_".
-    { iNext. iExists c0, t0, mp. iFrame "Hc Ht Hp". }
-    iMod ("Hclose" with "[Hstc]") as "_".
-    { iNext. iApply (stimecmp_free_intro with "Hstc"). }
-    iModIntro.
-    iExists (set_reg (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))) mip mp).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc. exact Hex. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))) mip mp).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' [Hpriv Hmsx Hmiex Hmenv] Hcap Hfile") as "Hcg".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro.
-      repeat split; assumption. }
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+              (fun (_ : CpuId) npc ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
+              with "Hcg Hpc Hinstr [Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl_clock.
+    iSplitR "Hcont".
+    - (* ---- the instruction ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".
+      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct "Hclk" as (cy ti ip) "(Hcy & Hti & Hip)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      iDestruct (pw2_frames_in Supervisor (DfracOwn 1) DfracDiscarded
+                   (R_bitvector_64 menvcfg) MENVCFG_S
+                   (R_bitvector_32 mcounteren) mcen Hok
+                   with "Hmenv Hmcen Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)))
+        with (execute_CSRReg csr_stimecmp (Regidx rs1) zreg CSRRW).
+      iApply (swp_mono with
+                "[Hcap Hms Hhalf Hspp Hmie Hmdl Hcy Hti HPC HnPC Hresv]
+                 [Hrw Hro Hfile Hip]");
+        [| iApply (swp_execute_CSRReg_w_ex_p
+                     (cw_Drw (R_bitvector_64 menvcfg))
+                     (cw2_Dro (R_bitvector_32 mcounteren))
+                     (cw2_Df (DfracOwn 1) DfracDiscarded
+                        (R_bitvector_32 mcounteren))
+                     (pw2_rs Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                        (R_bitvector_32 mcounteren) mcen)
+                     (pw2_rs Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                        (R_bitvector_32 mcounteren) mcen)
+                     (tp_pin m) csr_stimecmp Supervisor rs1
+                     (∃ z : mword 64, (R_bitvector_64 mip) ↦ᵣ z)%I
+                     (cw2_disj _ _ Hok) (cw2_in_priv _ _)
+                     (pw2_rs_priv Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                        (R_bitvector_32 mcounteren) mcen Hok)
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     ltac:(by vm_compute) ltac:(intro; by vm_compute)
+                     with "Hcert Hfile Hrw Hro [Hcert] [Hcert Hip]") ].
+      + iIntros (e) "(-> & Hf & Hipz & Hrw & Hro)".
+        iDestruct (pw2_frames_out Supervisor (DfracOwn 1) DfracDiscarded
+                     (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok with "[$Hrw $Hro]")
+          as "(Hmenv & _ & Hpriv & _ & _)".
+        iDestruct "Hipz" as (z) "Hip".
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4), ms0, m, n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hcy Hti Hip". { iExists cy, ti, z. iFrame "Hcy Hti Hip". }
+        iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        { rewrite /sconf_at_priv. iExists mdv0.
+          iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          iPureIntro. split; [exact Hmsf | exact Hmm]. }
+        iFrame "Hcap Hf".
+        iSplitR; [done|]. iSplitR; [done|]. done.
+      + (* the legality check *)
+        iIntros "Hrw Hro".
+        iApply (swp_check_CSR_result_stimecmp_S
+                  (cw_Drw (R_bitvector_64 menvcfg))
+                  (cw2_Dro (R_bitvector_32 mcounteren))
+                  (cw2_Df (DfracOwn 1) DfracDiscarded
+                     (R_bitvector_32 mcounteren))
+                  (pw2_rs Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen) mcen
+                  (cw2_disj _ _ Hok) (cw2_in_r2 _ _) (cw2_in_r _ _)
+                  (cw2_in_priv _ _) (cw2_in_sec _ _) (cw2_in_misa _ _)
+                  (pw2_rs_r2 Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen)
+                  (pw2_rs_r Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  (pw2_rs_priv Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  (pw2_rs_sec Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  (pw2_rs_misa Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  HTM with "Hcert Hrw Hro").
+      + (* the write: the sealed cell, opened and closed one node at a time *)
+        iIntros "Hrw Hro".
+        iApply (swp_write_CSR_stimecmp_S
+                  (cw_Drw (R_bitvector_64 menvcfg))
+                  (cw2_Dro (R_bitvector_32 mcounteren))
+                  (cw2_Df (DfracOwn 1) DfracDiscarded
+                     (R_bitvector_32 mcounteren))
+                  (pw2_rs Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen) ip _
+                  (cw2_disj _ _ Hok) (cw2_in_priv _ _) (cw2_in_sec _ _)
+                  (cw2_in_misa _ _)
+                  (pw2_rs_priv Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  (pw2_rs_sec Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  (pw2_rs_misa Supervisor (R_bitvector_64 menvcfg) MENVCFG_S
+                     (R_bitvector_32 mcounteren) mcen Hok)
+                  with "Hstci Hcert Hip Hrw Hro").
+    - (* ---- the continuation ---- *)
+      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hpc'"). done.
   Qed.
 
 End WpSconfTimer.
