@@ -2587,6 +2587,153 @@ Section PtFront.
     by iFrame.
   Qed.
 
+
+  (* THE SAME HEAD, POST-GENERIC.  [swp_translateAddr_pt_front] pins the
+     landing FILE [rsf], which the shared kernel table cannot do: whether the
+     walk fills the TLB is decided by the tree it reads, per node.  So the
+     translate obligation's carried resource is an arbitrary [Psi] and the
+     pinned form is the instance [Psi := hreg_frame rsf Drw ∗
+     hreg_frame_ro Df rsf Dro].  Nothing in the head touches the frames after
+     the walk returns, which is why this costs one binder and no proof. *)
+  Lemma swp_translateAddr_pt_front_ex (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (dst : mstate) (Psi : iProp Σ)
+      (Db : register -> bool) (vpn : mword 27) (root : mword 44)
+      (ppnv : mword 44) (satp0 va pa : mword 64) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (satp : register) ∈ Drw ∪ Dro ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup cur_privilege rs = p ->
+    register_lookup satp rs = satp0 ->
+    register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+    (* the three monadic ingredients: exec fact + footprint certificate *)
+    exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) p) dst
+      = Some (p, dst) ->
+    goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) p)
+      dst = true ->
+    exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+    goodb Db (is_shadow_stack_access acc) dst = true ->
+    exec (translationMode p) dst = Some (Sv39, dst) ->
+    goodb Db (translationMode p) dst = true ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64))
+      = root ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
+      = (mword_of_int 0 : mword 16) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                          (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)
+      (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec ppnv
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+         (Z.sub pagesize_bits 1) 0)) = pa ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ mxr do_sum : bool,
+       hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translate 39 (mword_of_int 0 : mword 16) root vpn acc p mxr do_sum tt)
+         (fun r => ⌜r = Values.Ok (ppnv, PBMT_PMA, tt)⌝ ∗ Psi)) -∗
+    swp (translateAddr (Virtaddr va) acc)
+      (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗ Psi).
+  Proof.
+    intros Hdisj HDmst HDpriv HDsatp HDb Hag Hcp Hsatp Hmstag
+      Heff Heffg Hss Hssg Htm Htmg Hppn Hasid Hcanon Hvpn_def Hident.
+    iIntros "#Hcert Hrw Hro Htr".
+    unfold translateAddr.
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    (* mstatus, then cur_privilege *)
+    iApply (swp_use_cer (Defs.read_reg mstatus) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hcp.
+    (* the three carried ingredients *)
+    rewrite Hmstag.
+    iApply (swp_use_cer
+              (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) p)
+              _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw _ dst rs _ HDb Hag Heffg Heff)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_use_cer (translationMode p) _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw _ dst rs _ HDb Hag Htmg Htm)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_use_cer (is_shadow_stack_access acc) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw _ dst rs _ HDb Hag Hssg Hss)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    (* not a shadow-stack access, and the mode is not Bare *)
+    (* not a shadow-stack access, and the mode is not Bare: both tests are
+       already decided by the values the peels returned *)
+    cbn match. rewrite mbind0_ret.
+    (* the width is a constant *)
+    replace (satp_mode_width_forwards Sv39)
+      with (Defs.returnm (E := exception) 39) by (cbn; reflexivity).
+    rewrite mliftR_ret mbind_ret. cbn beta.
+    (* satp, through [get_satp]'s assert.  Small closed stretch, so the
+       narrow whitelist is enough -- the only node is the satp read. *)
+    assert (Hgs : hfrun 3 (Drw ∪ Dro) Drw rs (get_satp 39)
+                  = Some (autocast (T := mword) satp0, rs)).
+    { unfold get_satp.
+      replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true
+        by (vm_compute; reflexivity).
+      cbn beta iota zeta delta [Defs.assert_exp' Defs.bind
+        Interface.iMon_bind Defs.read_reg Defs.returnm returnM autocast_m].
+      rewrite hfrun_read (bool_decide_eq_true_2 _ HDsatp).
+      rewrite Hsatp.
+      cbn beta iota zeta delta [Defs.returnm returnM autocast].
+      apply hfrun_ret. }
+    iApply (swp_use_cer (get_satp 39) _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 3 Drw Dro Df rs rs _ _ Hdisj Hgs
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true
+      by (vm_compute; reflexivity).
+    unfold Defs.assert_exp'. cbn match. rewrite mliftR_ret.
+    rewrite mbind_ret. cbn beta zeta.
+    rewrite Hcanon. cbn match.
+    (* mxr and do_sum, both off mstatus *)
+    iApply (swp_use_cer (Defs.read_reg mstatus) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_use_cer (Defs.read_reg mstatus) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    (* THE WALK, as the caller's obligation *)
+    match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+      replace vpnx with vpn by (symmetry; exact Hvpn_def);
+      replace bppn with root by (symmetry; exact Hppn);
+      replace asidx with (mword_of_int 0 : mword 16)
+        by (symmetry; exact Hasid) end.
+    iApply (swp_use_cer (translate 39 (mword_of_int 0 : mword 16) root vpn acc p
+                           _ _ tt) _ _ C HC with "[Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hrw Hro"). }
+    iIntros (v) "(-> & HPsi)". cbn match.
+    rewrite mcer_ret.
+    match goal with |- context[Physaddr ?e] =>
+      replace e with pa by (symmetry; exact Hident) end.
+    iApply ("Hcont" $! (Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw))).
+    by iFrame.
+  Qed.
   (* the same head over a FAILED [translate] outcome: the PTW error maps
      through [translationException] and surfaces as the page-fault
      exception, state unchanged (fault walks write nothing). *)

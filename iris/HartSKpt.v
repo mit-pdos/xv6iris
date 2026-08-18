@@ -41,7 +41,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
         RiscvFetchExec.
 Require Import SmodePte PtAdBits Pt4kWalk PtTree PtTreeAdue KptPt KMap KptTree.
 Require Import KptGhost KptShare.
-Require Import HartSwp HartLift HartRegNode HartSpan HartGoodb HartEvents.
+Require Import HartSwp HartLift HartRegNode HartSpan HartGoodb HartEvents HartMStore.
 Require Import CommonWalk HartSTrans.
 Local Open Scope Z_scope.
 
@@ -407,6 +407,155 @@ Section kptnode.
               HR Hallow (kpt_addr_ok_ram a Hok)
               (proj1 Hok) (proj2 (proj2 Hok))
               with "Hcert Hrw Hro Hmem").
+  Qed.
+
+  (* the [tlb] cell's read-after-write, which the tree did not have (only the
+     idempotence/collapse laws) and which the landing snapshot needs *)
+  Lemma register_lookup_set_tlb (rs : regstate) (v : type_of_register tlb) :
+    register_lookup tlb (register_set tlb v rs) = v.
+  Proof.
+    destruct rs. unfold register_set, register_lookup. cbn. reflexivity.
+  Qed.
+
+  (* the LEAF seam, re-keyed on the CLAIM's word.  [kpt_leaf_node] states the
+     variance against the SNAPSHOT's leaf (an A/D variant of the claim's);
+     [pte_canon_set_ad] collapses that to the claim's own word, which is the
+     predicate every [_ex] lemma above is indexed by. *)
+  Lemma kpt_leaf_node_canon (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (p2 p1 leaf0 : mword 64) (a0 d0 : mword 1) :
+    ptree_maps t0 vpn p2 p1 (pte_set_ad leaf0 a0 d0) ->
+    kpt_lb t0 -∗ kpt_inv root_ppn -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        (∃ w : mword 64, ⌜read_bytes σ.(mem) (pt_addr0 p1 vpn) 8 = Some w⌝ ∗
+                         ⌜pte_canon w = pte_canon leaf0⌝) ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)).
+  Proof.
+    intros Hmaps. iIntros "#Hlb0 #Hkinv" (σ) "Hσ".
+    iPoseProof (kpt_leaf_node root_ppn t0 vpn p2 p1 _ Hmaps with "Hlb0 Hkinv")
+      as "H".
+    iMod ("H" $! σ with "Hσ") as "[Hex Hcl]".
+    iDestruct "Hex" as (w) "[%Hrb %Hc]".
+    iModIntro. iFrame "Hcl". iExists w. iPureIntro.
+    split; [exact Hrb |]. rewrite Hc. apply pte_canon_set_ad.
+  Qed.
+
+  (* the LEAF READ at the frame, predicate-indexed: [swp_read_pte_kpt]'s twin
+     over [PtTreeAdue.swp_checked_mem_read_pte8_ex]. *)
+  Lemma swp_read_pte_kpt_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (a : mword 64) (P : mword 64 -> Prop)
+      (pmar0 : list PMA_Region)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
+    Drw ## Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    pma_allows_ram pmar0 ->
+    kpt_addr_ok a ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        (∃ w, ⌜read_bytes σ.(mem) a 8 = Some w⌝ ∗ ⌜P w⌝) ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    swp (read_pte (Physaddr a) 8)
+      (fun r => ∃ w, ⌜r = Values.Ok w⌝ ∗ ⌜P w⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr HA Hord HR
+      Hcov Hallow Hok.
+    iIntros "#Hcert Hrw Hro Hmem".
+    iApply (swp_read_pte_S_ex Drw Dro Df rs a P with "Hcert Hrw Hro").
+    iIntros "Hrw Hro".
+    iApply (swp_checked_mem_read_pte8_ex Drw Dro Df rs a pmar0 pcfg paddr P
+              Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr HA Hord
+              (kpt_addr_ok_pmp a (vec_access_dec paddr 0) Hok Hcov)
+              HR Hallow (kpt_addr_ok_ram a Hok)
+              (proj1 Hok) (proj2 (proj2 Hok))
+              with "Hcert Hrw Hro Hmem").
+  Qed.
+
+  (* ================================================================== *)
+  (* THE WRITE SEAM.  A read seam is PURE -- [pt_slot_mem] is a fact      *)
+  (* about [σ.(mem)] -- so it opens and closes the invariant with          *)
+  (* nothing held.  A WRITE is not: it must take [ptree_own] out of        *)
+  (* [kptN], update the leaf slot, and put a DIFFERENT tree back, all      *)
+  (* inside the one node.  What makes that sound is exactly what makes     *)
+  (* the exec-side absorption sound: the Svadu write-back only ever sets   *)
+  (* A/D, so the CANONICAL table does not move                            *)
+  (* ([PtTree.ptree_canon_set_leaf]) -- the snapshot is re-derived by a    *)
+  (* rewrite, with no ghost update -- and the mapping spec survives        *)
+  (* ([KptTree.kpt_tree_spec_gen_set_leaf]).                               *)
+  (*                                                                      *)
+  (* The node is told the word MEMORY holds (the conditional-write rule    *)
+  (* learns it from the reservation); it does not need it -- the tree's    *)
+  (* own [↦ₚ₈] names the live leaf -- but the obligation's shape carries   *)
+  (* it, so it is taken and dropped.                                      *)
+  (* ================================================================== *)
+  Lemma kpt_leaf_write_node (root_ppn : mword 44) (t0 : ptree) (vpn : mword 27)
+      (ppn : mword 44) (kp : kperm) (p2 p1 : mword 64) (a0 d0 : mword 1)
+      (m0 m0' : mword 64) :
+    ptree_maps t0 vpn p2 p1 (pte_set_ad (mk_pte ppn (kperm_flags kp)) a0 d0) ->
+    (exists a d : mword 1,
+       m0' = pte_set_ad (mk_pte ppn (kperm_flags kp)) a d) ->
+    kmap_at vpn ppn kp -∗ kpt_lb t0 -∗ kpt_inv root_ppn -∗
+    (∀ σ, ⌜read_bytes σ.(mem) (pt_addr0 p1 vpn) 8 = Some m0⌝ -∗
+        mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) (pt_addr0 p1 vpn) 8
+                   (Interface.WriteReq.value
+                      (mwrite_req8_con (pt_addr0 p1 vpn)
+                         (autocast (T := mword) m0'))))
+                σ.(mdev)) ∗ True)).
+  Proof.
+    intros Hmaps Hvar.
+    iIntros "#Hat #Hlb0 #Hkinv" (σ) "%Hrb (Hreg & Hgh & Hdev)".
+    iMod (inv_acc ⊤ kptN with "Hkinv") as "[>Hbody Hclose]"; [ solve_ndisj | ].
+    iEval (rewrite /kpt_body) in "Hbody".
+    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
+    iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
+    destruct (kpt_maps_across t0 t vpn p2 p1 _ Hcan Hmaps) as (q0 & Hm' & Hq).
+    destruct (pte_canon_inv (mk_pte ppn (kperm_flags kp)) q0
+                ltac:(rewrite Hq; apply pte_canon_set_ad)) as (a1 & d1 & Hq0).
+    destruct Hvar as (a & d & Hm0').
+    assert (Hset : m0' = pte_set_ad q0 a d)
+      by (rewrite Hq0 pte_set_ad_absorb; exact Hm0').
+    (* the live leaf slot, at full ownership *)
+    iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn p2 p1 q0 Hm' with "Ht")
+      as "(Hs2 & Hs1 & Hs0 & Hback)".
+    iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 p1 vpn) q0 m0'
+            with "Hgh Hs0") as "[Hgh Hs0]".
+    iDestruct ("Hback" $! m0' with "Hs2 Hs1 Hs0") as "Ht".
+    (* the canonical table does not move, so the snapshot is a rewrite *)
+    assert (Hcan' : ptree_canon (ptree_set_leaf t vpn m0') = ptree_canon t).
+    { rewrite Hset. exact (ptree_canon_set_leaf t vpn p2 p1 q0 a d Hm'). }
+    iDestruct (kpt_lb_canon t (ptree_set_leaf t vpn m0') (eq_sym Hcan')
+                 with "Hlbt") as "#Hlb'".
+    assert (Hspec' : kpt_tree_spec_gen root_ppn M (ptree_set_leaf t vpn m0')).
+    { rewrite Hset.
+      apply (kpt_tree_spec_gen_set_leaf root_ppn M t vpn (ppn, kp) p2 p1 q0 a d
+               Hspec Hm' HMlk).
+      exists a1, d1. exact Hq0. }
+    iMod ("Hclose" with "[Ht HM]") as "_".
+    { iNext. iExists (ptree_set_leaf t vpn m0'), M.
+      iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
+    iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback2"; [ set_solver | ].
+    iModIntro. iNext. iMod "Hback2" as "_". iModIntro.
+    iSplitL; [| done].
+    cbn [Interface.WriteReq.value mwrite_req8_con].
+    rewrite TypeCasts.cast_N_refl autocast_id.
+    iFrame "Hreg Hgh Hdev".
   Qed.
 
 End kptnode.
