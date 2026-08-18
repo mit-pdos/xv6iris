@@ -609,7 +609,7 @@ Proof.
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ _ γtie (Pc γswap γreg γstart) γswap)
+                  _ _ _ γtie (Pc γswap γreg γstart) γswap)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
      layer's boot client has the same raw inputs at a fresh era and reuses

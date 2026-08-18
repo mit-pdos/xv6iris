@@ -512,8 +512,8 @@ Section store.
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
                            R ∗ resv_frag cpu_id None)%I)
-                (hwrite_req_at_write_ram pa v)
-                (addr_is_ram_not_dev pa Hram) rr with "Hcert Hfrag [Hrw Hro Hmem]").
+                rr (hwrite_req_at_write_ram pa v)
+                (addr_is_ram_not_dev pa Hram) with "Hcert Hfrag [Hrw Hro Hmem]").
       iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "[Hσ HR]". iModIntro.
       iFrame "Hσ". iIntros "Hfrag".

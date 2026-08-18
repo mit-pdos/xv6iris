@@ -771,7 +771,7 @@ Section ptewrite.
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (R : iProp Σ) :
+      (paddr : type_of_register pmpaddr_n) (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (pma_regions : register) ∈ Drw ∪ Dro ->
     (pmpcfg_n : register) ∈ Drw ∪ Dro ->
@@ -793,6 +793,7 @@ Section ptewrite.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -804,11 +805,12 @@ Section ptewrite.
     swp (checked_mem_write (Physaddr pa) 8 v (Store PageTableEntry) PBMT_PMA
            Supervisor tt false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hpma Hpcfg Hpaddr Hhtif
       HA Hord Hrange HW Hpallow Hacc Hram Hpa.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold checked_mem_write.
     iApply (swp_use_cer
@@ -853,14 +855,14 @@ Section ptewrite.
     { iApply (swp_hart_ram_write 8 (mwrite_req8 pa v) _
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           R)%I)
-                (hwrite_req_at_write_ram8 pa v)
-                (addr_is_ram_not_dev pa Hram) with "Hcert [Hrw Hro Hmem]").
+                           R ∗ resv_frag cpu_id None)%I)
+                rr (hwrite_req_at_write_ram8 pa v)
+                (addr_is_ram_not_dev pa Hram) with "Hcert Hfrag [Hrw Hro Hmem]").
       iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "[Hσ HR]". iModIntro.
-      iFrame "Hσ".
+      iFrame "Hσ". iIntros "Hfrag".
       rewrite hwrite_resume_write_ram8. iApply swp_ret. by iFrame. }
-    iIntros (v0) "(-> & Hrw & Hro & HR)". spte_glue.
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". spte_glue.
     change (0 =? 1 - 1) with true. spte_glue.
     rewrite mbind_ret. spte_glue.
     rewrite mcer_ret.
@@ -878,7 +880,7 @@ Section ptewrite.
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (R : iProp Σ) :
+      (paddr : type_of_register pmpaddr_n) (R : iProp Σ) (rr : option resv) :
     Drw ## Dro ->
     (pma_regions : register) ∈ Drw ∪ Dro ->
     (pmpcfg_n : register) ∈ Drw ∪ Dro ->
@@ -900,6 +902,7 @@ Section ptewrite.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
     gen_cert -∗
+    resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
@@ -911,11 +914,12 @@ Section ptewrite.
     swp (checked_mem_write (Physaddr pa) 8 v (Store PageTableEntry) PBMT_PMA
            Supervisor tt false false true)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
   Proof.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hpma Hpcfg Hpaddr Hhtif
       HA Hord Hrange HW Hpallow Hacc Hram Hpa.
-    iIntros "#Hcert Hrw Hro Hmem".
+    iIntros "#Hcert Hfrag Hrw Hro Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold checked_mem_write.
     iApply (swp_use_cer
@@ -960,14 +964,14 @@ Section ptewrite.
     { iApply (swp_hart_ram_write 8 (mwrite_req8_con pa v) _
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           R)%I)
-                (hwrite_req_at_write_ram8_con pa v)
-                (addr_is_ram_not_dev pa Hram) with "Hcert [Hrw Hro Hmem]").
+                           R ∗ resv_frag cpu_id None)%I)
+                rr (hwrite_req_at_write_ram8_con pa v)
+                (addr_is_ram_not_dev pa Hram) with "Hcert Hfrag [Hrw Hro Hmem]").
       iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "[Hσ HR]". iModIntro.
-      iFrame "Hσ".
+      iFrame "Hσ". iIntros "Hfrag".
       rewrite hwrite_resume_write_ram8_con. iApply swp_ret. by iFrame. }
-    iIntros (v0) "(-> & Hrw & Hro & HR)". spte_glue.
+    iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". spte_glue.
     change (0 =? 1 - 1) with true. spte_glue.
     rewrite mbind_ret. spte_glue.
     rewrite mcer_ret.
