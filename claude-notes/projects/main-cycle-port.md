@@ -889,7 +889,12 @@ in statements consumed by ProofSwtch/VcGenS/WpSconfSret/WpSmodePtAlu/
 WpSmodePtMemWrap.  The LEAF obligation gets the OPENED form -- the
 satp/tlb/pmpcfg_n/pmpaddr_n cells + a tlb-keyed residue + the pure facts --
 via new `s_regime_swp` fields `sr_swp_open` / `sr_swp_close` (proved for
-both instances), and returns it at the landing tlb value.  Fetch translation is
+both instances), and returns it at the landing tlb value.  **DECIDED 2026-08-18: the swp face is FOLDED INTO `s_regime`**
+(the `s_regime_swp` fields become fields of `s_regime`; instances bare /
+kpt_share / `IntrDefs.strans_regime` carry them; the fetch-translation
+producer `spt_fetch_tr_of_regime` is generic in `R`), because the
+regime-generic leaves and their consumers (VcGenS, ProofSwtch) are stated
+on `(R : s_regime)` alone and may not gain a binder.  Fetch translation is
 `SRegime.sr_swp_translate` at `InstructionFetch`; data translation inside a
 leaf is the same field at the data access.
 
