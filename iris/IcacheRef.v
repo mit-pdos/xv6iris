@@ -447,6 +447,74 @@ Definition lreg_half (pv : Z) : dfrac_agreeR (leibnizO Z) :=
    forces every count move to reach the region's half (§2.2). *)
 Definition icntUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO nat)).
 
+(* ---- THE TWO BOOT LITERALS (iclaim-ledger.md §2.2/§2.3, increment IIIa) ---
+
+   [icfg_alloc] hands the ledger's two per-inum maps over as ARGUMENTS ([LM]
+   and [CM]), because their contents are a fact about the boot state that
+   [IcacheRef] knows nothing about.  These are the values a boot client
+   actually passes, and the two [_split] lemmas below (in [Section
+   IcacheLink], where the ambient gnames are in scope) are what turn the raw
+   [own] back into the per-inum fragments [IcacheBoot] and [InodeRegion]
+   demand.  Keyed by an arbitrary [P : gset Z] rather than by
+   [IcacheEscrow.region_inums] because that set is defined ABOVE this file;
+   the boot client instantiates [P := region_inums nib].
+
+   THE COUNT MAP is one WHOLE element per inum at zero -- "no inode is cached
+   at boot" -- which [icnt_split] then cuts into the region's half and the
+   free pool's half (§2.2, as amended by increment II: the uncached halves
+   ride the POOL, not [islot_empty]).
+
+   THE LINK MAP is the all-plain authority every landed boot lemma already
+   names, WITH ITS f-COLUMN FRAGMENT CO-RESIDENT: [● a ⋅ ◯ a] at
+   [a = lelemf 0 .. (Some (Excl FrzOff))].  The auth half is [ireg_alloc]'s
+   premise (it already says [Some (Excl FrzOff)] since increment I); the
+   fragment half is [ifreeze_off z], the "right to freeze" that increment
+   IIIa parks in the free pool.  Nothing else in the element is fragmented:
+   every other column starts at its unit, so [◯ a] is exactly the f token
+   and no w/c/r/p fragment escapes at boot. *)
+Definition icnt_boot_map (P : gset Z) : icntUR :=
+  gset_to_gmap (to_frac_agree 1 (0%nat : leibnizO nat)) P.
+
+Definition lelem_boot : linkElemUR :=
+  lelemf 0 0 0 0 None 0 None (Some (Excl FrzOff)).
+
+Definition link_boot_map (P : gset Z) : linkUR :=
+  gset_to_gmap (● lelem_boot ⋅ ◯ lelem_boot) P.
+
+(* a constant [gset_to_gmap] IS the pointwise big-op of its singletons -- the
+   one fact both [_split] lemmas below need, so that [big_opS_own_1] can turn
+   one [own] of the whole map into the per-inum big-op. *)
+Lemma gset_to_gmap_singletons {A : cmra} (x : A) (P : gset Z) :
+  (gset_to_gmap x P : gmap Z A) ≡ [^op set] z ∈ P, ({[ z := x ]} : gmap Z A).
+Proof.
+  induction P as [| z P Hz IH] using set_ind_L.
+  - by rewrite gset_to_gmap_empty big_opS_empty.
+  - rewrite gset_to_gmap_union_singleton big_opS_insert; [| exact Hz].
+    rewrite -IH insert_singleton_op //.
+    by rewrite lookup_gset_to_gmap_None.
+Qed.
+
+Lemma icnt_boot_map_valid (P : gset Z) : ✓ (icnt_boot_map P).
+Proof.
+  intros i. rewrite /icnt_boot_map lookup_gset_to_gmap.
+  destruct (decide (i ∈ P)) as [Hi | Hi].
+  - rewrite option_guard_True //.
+  - rewrite option_guard_False //.
+Qed.
+
+Lemma lelem_boot_valid : ✓ lelem_boot.
+Proof. rewrite /lelem_boot /lelemf /lelem0. by split_and!. Qed.
+
+Lemma link_boot_map_valid (P : gset Z) : ✓ (link_boot_map P).
+Proof.
+  intros i. rewrite /link_boot_map lookup_gset_to_gmap.
+  destruct (decide (i ∈ P)) as [Hi | Hi].
+  - rewrite option_guard_True //. apply Some_valid.
+    apply auth_both_valid_2; [exact lelem_boot_valid |].
+    exists ε. by rewrite right_id.
+  - rewrite option_guard_False //.
+Qed.
+
 Inductive ic_dep : Type :=
   | DepNone
   | DepRef (q : Qp) (dev inum : mword 32) (g : gname)
@@ -1626,6 +1694,46 @@ Section IcacheLink.
   Lemma icnt_join (z : Z) (n : nat) :
     icnt_half z n -∗ icnt_half z n -∗ icnt_full z n.
   Proof. iIntros "H1 H2". rewrite icnt_split. iFrame. Qed.
+
+  (* ===================================================================== *)
+  (*  THE TWO BOOT SPLITS (increment IIIa)                                  *)
+  (* ===================================================================== *)
+
+  (* [icfg_alloc]'s [CM] argument, taken apart: one whole element per inum at
+     zero becomes the REGION's half ([InodeRegion.ireg_slot], via
+     [IcacheBoot.ireg_alloc]'s big-op premise) and the free POOL's half
+     ([IcacheEscrow.ipool_shape]).  This is the fraction discipline named in
+     §2.2 -- [icnt_half] is 1/2, the two halves are the only two shares that
+     exist, and their sum is the whole element boot minted. *)
+  Lemma icnt_boot_split (P : gset Z) :
+    own icfg_icnt (icnt_boot_map P) ⊢
+      [∗ set] z ∈ P, icnt_half z 0%nat ∗ icnt_half z 0%nat.
+  Proof.
+    rewrite /icnt_boot_map (gset_to_gmap_singletons (A := dfrac_agreeR (leibnizO nat))).
+    rewrite big_opS_own_1. iIntros "H".
+    iApply (big_sepS_mono with "H"). intros z _.
+    iIntros "H". rewrite -icnt_split /icnt_full /icnt_at. iExact "H".
+  Qed.
+
+  (* ...and [LM], likewise: the all-plain ledger authority every landed boot
+     lemma already takes, and beside it the f column's fragment -- the
+     inum's "right to freeze" ([ifreeze_off]), which increment IIIa parks in
+     the free pool so that a recycler can present it to
+     [IcacheInv.iref_upgrade_store_au].  ONE token per inum, minted here and
+     nowhere else; the auth's [Some (Excl FrzOff)] is what
+     [InodeRegion.ireg_frz_ok]'s vacuous arm reads. *)
+  Lemma link_boot_split (P : gset Z) :
+    own icfg_link (link_boot_map P) ⊢
+      [∗ set] z ∈ P,
+        link_auth z 0 0 0 0 None 0 None (Some (Excl FrzOff)) ∗ ifreeze_off z.
+  Proof.
+    rewrite /link_boot_map (gset_to_gmap_singletons (A := authR linkElemUR)).
+    rewrite big_opS_own_1. iIntros "H".
+    iApply (big_sepS_mono with "H"). intros z _.
+    iIntros "H".
+    rewrite /link_auth /ifreeze_off /ifreeze /link_auth_e /link_frag_e /lelem_boot.
+    rewrite -own_op singleton_op. iExact "H".
+  Qed.
 
 End IcacheLink.
 

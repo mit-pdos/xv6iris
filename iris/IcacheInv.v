@@ -54,7 +54,7 @@
    [ref]-word invariant -- and nothing above them.                         *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import auth gmap frac numbers.
+From iris.algebra Require Import auth gmap frac numbers excl.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -64,6 +64,25 @@ Require Import WpLock SleepLock.
 Require Import LogInv.
 Require Export IcacheRef.   (* the geometry, the algebra, [inode_ref] *)
 Require Import InodeInv.
+(* THE COUNT COUPLING (iclaim-ledger.md §2.2) is why this file now knows the
+   inode REGION: every count move has to reach the [icnt] half that rides in
+   [InodeRegion.ireg_slot], so the five [*_store_au] wrappers below take
+   [ireg_inv] and nest an [↑iregN] open inside their [↑icacheN] one (the
+   ZZProbeIcnt probe's proven pattern, §2.9's structural mask verdict).  The
+   dependency is new but acyclic -- [InodeRegion] requires [IcacheRef],
+   [EscrowDefs] and [LogInv], none of which requires this file -- and the
+   lemmas that need it live in their own section at the end, so no landed
+   consumer of [Section IcacheRefInv] gains a typeclass premise. *)
+(* THE THREE CLASSES THAT ARE NOT WHERE THEY LOOK ([ProofFilewrite]'s note,
+   one tier up): [diskGhostG], [fsLogG] and [iregG] live in [DiskPtsto],
+   [FsBlocks] and [InodeRegion], and none of them is re-exported by anything
+   else here -- without these lines the section [Context] below invents FRESH
+   variables of those names and every [ireg_inv] in the file comes out an
+   unresolved evar. *)
+Require Import DiskPtsto.
+Require Import DinodeEnc.  (* [islot]/[islot_lt]: the inum's slot in its block *)
+Require Import FsBlocks.    (* [fs_names], which [ireg_inv] is keyed by *)
+Require Import InodeRegion.
 Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -1152,128 +1171,12 @@ Section IcacheRefInv.
     iModIntro. iFrame.
   Qed.
 
-  (* THE WRITE.  The [sw] and the ghost step happen in the SAME invariant
-     opening, which is the whole reason the read-modify-write is atomic in
-     the proof: the lock's half stops any other thread moving [M], and the
-     two halves meet only here, which is exactly the moment the physical
-     word changes.  [Hno] -- that the incremented count is still an [int] --
-     is what re-establishes [icM_wf]; it is NOT provable here and comes from
-     the caller's [IrefSlots.iref_slots_no_overflow]. *)
-  Lemma iref_dup_store_au (Eo : coPset) 
-      (M : gmap nat (Qp * positive)) (k : nat) (q qt : Qp) (n : positive) :
-    ↑icacheN ⊆ Eo ->
-    M !! k = Some (qt, n) ->
-    (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    (* THE SLOT'S SHARE AUTHORITY comes from the CALLER, not from the
-       invariant: it lives in the itable LOCK's resource, and every step that
-       moves it runs under that lock.  iput is why -- it has to hold the
-       authoritative zero across a whole [acquiresleep] call, which no
-       invariant can survive (claude-notes/projects/iput-acquiresleep.md). *)
-    itable_inv -∗ itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
-    |={Eo, Eo ∖ ↑icacheN}=>
-      i_ref (ientry k) ↦₄ iref_word M k ∗
-      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
-         ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (<[k := (qt, Pos.succ n)]> M) ∗
-         isl_slot (<[k := (qt, Pos.succ n)]> M) k ∗
-         iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp).
-  Proof.
-    iIntros (HE HMk Hno) "#Hinv Hhalf Htok Hislot".
-    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
-    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
-    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
-    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
-    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_dup_step M k q qt n HMk with "Hauth Htok Hislot")
-      as "(Hauth & Hislot & Ht1 & Ht2)".
-    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iAssert (live_slot (<[k := (qt, Pos.succ n)]> M) k) with "[Hslot]" as "Hslot".
-    { iDestruct (live_slot_some_inv M k qt n HMk with "Hslot")
-        as (c) "[%Ec Hc]".
-      by rewrite (live_slot_some (<[k := (qt, Pos.succ n)]> M) k qt (Pos.succ n) c
-                    (lookup_insert M k (qt, Pos.succ n)) Ec). }
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
-    { iNext. iExists (<[k := (qt, Pos.succ n)]> M). iFrame "Ha".
-      iSplitR.
-      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
-        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
-          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
-        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
-            injection Hj as _ Hn. subst nj. exact Hno.
-          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
-            by apply (Hcnt j qj). }
-      iSplitL "Hcell Hback".
-      { iApply ("Hback" $! (qt, Pos.succ n)).
-        rewrite /iref_word lookup_insert. iExact "Hcell". }
-      iApply ("Hpback" $! (<[k := (qt, Pos.succ n)]> M) with "[%] Hslot").
-      intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-    iModIntro. iFrame.
-  Qed.
+  (* THE TWO INCREMENT WRITES ([iref_dup_store_au], [iref_incr_store_au])
+     MOVED to [Section IcacheRefInvReg] at the end of this file: since
+     iclaim-ledger.md §2.2 every count move opens the inode REGION as well
+     as the itable, and that needs typeclass context this section does not
+     carry (and that its other consumers must not be made to carry). *)
 
-  (* THE SAME WRITE, FOR AN INCREMENTER THAT HOLDS NO REFERENCE.
-     [iref_dup_store_au] above is idup's shape: a caller token goes in and
-     two halves come out.  [iget]'s cache-HIT arm has no token of its own --
-     it found the entry by SCANNING -- so the new reference cannot be split
-     off anything the opener brought, and is minted from the share the TABLE
-     retained instead ([islot_rest_at], design §13.1b/§13.1e).  That is
-     exactly [iref_incr_step] rather than [iref_dup_step], and it is why the
-     entry's outstanding fraction GROWS by [qn] here where it stayed put in
-     idup.  BioInv's [bio_incr_step] and its store wrapper are the precedent.
-
-     Both side conditions are the CALLER's, for the same reasons as above:
-     [✓ (qt + qn)] is the fraction budget (the caller takes [qn] out of the
-     table's [1/2 - qt], so the sum never passes 1/2), and [Hno] -- that the
-     incremented count is still an [int] -- comes from
-     [IrefSlots.iref_slots_no_overflow] exactly as in ProofIdup. *)
-  Lemma iref_incr_store_au (Eo : coPset) 
-      (M : gmap nat (Qp * positive)) (k : nat) (qt qn : Qp) (n : positive) :
-    ↑icacheN ⊆ Eo ->
-    M !! k = Some (qt, n) ->
-    (qt + qn < 1/2)%Qp ->
-    (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv -∗ itable_half M -∗ isl_slot M k -∗
-    |={Eo, Eo ∖ ↑icacheN}=>
-      i_ref (ientry k) ↦₄ iref_word M k ∗
-      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
-         ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
-         isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
-         iref_tok k qn).
-  Proof.
-    iIntros (HE HMk Hq Hno) "#Hinv Hhalf Hislot".
-    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
-    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
-    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
-    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
-    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_incr_step M k qt n qn HMk Hq with "Hauth Hslot Hislot")
-      as "(Hauth & Hslot & Hislot & Htok)".
-    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
-    { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
-      iSplitR.
-      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
-        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
-          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
-        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
-            injection Hj as _ Hn. subst nj. exact Hno.
-          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
-            by apply (Hcnt j qj). }
-      iSplitL "Hcell Hback".
-      { iApply ("Hback" $! ((qt + qn)%Qp, Pos.succ n)).
-        rewrite /iref_word lookup_insert. iExact "Hcell". }
-      iApply ("Hpback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%] Hslot").
-      intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-    iModIntro. iFrame.
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  The two halves of iput's [ref--] (design §13.9)                     *)
@@ -1306,105 +1209,10 @@ Section IcacheRefInv.
     rewrite /iref_word lookup_delete_ne; [iExact "H" | exact Hxk].
   Qed.
 
-  (* iput's [ref--] WHEN IT IS NOT THE LAST: the count goes [Pos.succ n] to
-     [n] and the departing reference's fraction [q] rejoins the outstanding
-     total, leaving [qr] with [qt = q + qr].  The [sw] and the ghost step
-     are in ONE invariant opening, exactly as in [iref_dup_store_au] and
-     for the same reason -- the lock's half pins [M] across the
-     [lw; addiw; sw], and the two halves meet only here.
+  (* THE TWO CLOSE WRITES ([iref_close_store_au], [iref_close_last_store_au])
+     MOVED to [Section IcacheRefInvReg] at the end of this file -- same
+     reason as the two increments above (iclaim-ledger.md §2.2/§2.3). *)
 
-     There is no [Hno] side condition and there cannot be one: the count
-     goes DOWN, so [icM_wf]'s bound is re-established from the bound the
-     invariant already carried ([icM_wf_count] at [Pos.succ n]).  That
-     asymmetry with the two increment wrappers is the whole difference. *)
-  Lemma iref_close_store_au (Eo : coPset) 
-      (M : gmap nat (Qp * positive)) (k : nat) (q qt qr : Qp) (n : positive) :
-    ↑icacheN ⊆ Eo ->
-    M !! k = Some (qt, Pos.succ n) ->
-    (qt - q)%Qp = Some qr ->
-    itable_inv -∗ itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
-    |={Eo, Eo ∖ ↑icacheN}=>
-      i_ref (ientry k) ↦₄ iref_word M k ∗
-      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos n) : mword 32)
-         ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (<[k := (qr, n)]> M) ∗ isl_slot (<[k := (qr, n)]> M) k).
-  Proof.
-    iIntros (HE HMk Hsub) "#Hinv Hhalf Htok Hislot".
-    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
-    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
-    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
-    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
-    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_close_step M k q qt n qr HMk Hsub with "Hauth Htok Hslot Hislot")
-      as "(Hauth & Hslot & Hislot)".
-    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
-    { iNext. iExists (<[k := (qr, n)]> M). iFrame "Ha".
-      iSplitR.
-      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
-        - intros i Hi. destruct (decide (i = k)) as [->|Hne]; [exact Hk|].
-          rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
-        - intros i qi ni Hi. destruct (decide (i = k)) as [->|Hne].
-          + rewrite lookup_insert in Hi. apply Some_inj in Hi.
-            injection Hi as _ Hn. subst ni.
-            pose proof (Hcnt k qt (Pos.succ n) HMk) as Hb. lia.
-          + rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
-            by apply (Hcnt i qi). }
-      iSplitL "Hcell Hback".
-      { iApply ("Hback" $! (qr, n)).
-        rewrite /iref_word lookup_insert. iExact "Hcell". }
-      iApply ("Hpback" $! (<[k := (qr, n)]> M) with "[%] Hslot").
-      intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-    iModIntro. iFrame.
-  Qed.
-
-  (* iput's [ref--] WHEN IT IS THE LAST: the slot leaves [M] entirely and
-     the word goes to zero, which is [iref_word]'s [None] branch -- i.e.
-     the free-slot shape iget's scan looks for.  The closer must present
-     the WHOLE outstanding share [qt]; REF-1 ([iref_lookup] at count one)
-     is what tells it that its own [q] is that share. *)
-  Lemma iref_close_last_store_au (Eo : coPset) 
-      (M : gmap nat (Qp * positive)) (k : nat) (qt : Qp) :
-    ↑icacheN ⊆ Eo ->
-    M !! k = Some (qt, 1%positive) ->
-    itable_inv -∗ itable_half M -∗ iref_tok k qt -∗ live_frac k (1/2)%Qp -∗
-    isl_slot M k -∗
-    |={Eo, Eo ∖ ↑icacheN}=>
-      i_ref (ientry k) ↦₄ iref_word M k ∗
-      (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
-         ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (delete k M) ∗ isl_slot (delete k M) k).
-  Proof.
-    iIntros (HE HMk) "#Hinv Hhalf Htok Hh Hislot".
-    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
-    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
-    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
-    iDestruct (iref_cells_acc_del M k Hk with "Hcells") as "[Hcell Hback]".
-    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_close_last_step M k qt HMk with "Hauth Htok Hh Hslot Hislot")
-      as "(Hauth & Hslot & Hislot)".
-    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
-    { iNext. iExists (delete k M). iFrame "Ha".
-      iSplitR.
-      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
-        - intros i Hi. apply Hdom.
-          destruct Hi as [e He]. exists e.
-          rewrite lookup_delete_Some in He. apply He.
-        - intros i qi ni Hi.
-          rewrite lookup_delete_Some in Hi. destruct Hi as [_ Hi].
-          by apply (Hcnt i qi). }
-      iSplitL "Hcell Hback"; [iApply ("Hback" with "Hcell") |].
-      iApply ("Hpback" $! (delete k M) with "[%] Hslot").
-      intros j Hj. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
-    iModIntro. iFrame.
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE SHARE'S SIDE (design §14.6; C8/B2's ilock, B3's idup)          *)
@@ -1597,6 +1405,574 @@ Section IcacheRefInv.
     iModIntro. by iFrame.
   Qed.
 
+  (* THE UPGRADE ([iref_upgrade_store_au]) MOVED to
+     [Section IcacheRefInvReg] at the end of this file with the increment
+     write it wraps (iclaim-ledger.md §2.2). *)
+
+
+End IcacheRefInv.
+
+(* ===================================================================== *)
+(*  5b. THE COUNT MOVES, COUPLED TO THE INODE REGION                      *)
+(*      (iclaim-ledger.md §2.2/§2.3, ZZProbeIcnt §2b/§2c)                  *)
+(* ===================================================================== *)
+
+(* WHY THESE FIVE LIVE IN THEIR OWN SECTION.  Since §2.2 every count move
+   has to reach the [icnt] half that rides in [InodeRegion.ireg_slot], so
+   these wrappers -- and only these -- need the region's typeclass context
+   ([iregG], [fsLogG], [diskGhostG], [logG]).  Keeping them apart is what
+   stops every landed consumer of [iref_load_au] / [iref_share_lookup_au] /
+   [live_slot_regen] from gaining four instance premises it has no use for.
+
+   THE MASK, AND WHY IT COSTS NOTHING (§2.9, probed).  Every count move in
+   the tree is a [ref]-word store through [WpAu4.wp_sw_au_s_sconf], whose
+   outer mask is HARD-CODED at [⊤ ∖ ↑minstretN] and whose hole [Em] is the
+   caller's to choose subject to [↑kptN ⊆ Em].  So [↑iregN] is available at
+   every site by the store rule's own signature, and no invariant can be held
+   open across one of these instructions (the rule concludes a WP at the full
+   mask).  The hole widens from [⊤ ∖ ↑minstretN ∖ ↑icacheN] to
+   [⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN] and every side condition still goes
+   by [solve_ndisj].  The §13.1-style lock-held-auth indirection is NOT
+   needed and is strictly worse (probe §2e).
+
+   WHAT THE REGION OPEN HAS TO GIVE BACK is one pure clause,
+   [InodeRegion.ireg_frz_ok f m] at the NEW count -- §2.3's phased freeze
+   pin.  Three of these five discharge it from a token the mover already has
+   to hold, one discharges it from arithmetic, and the fifth STEPS the phase:
+
+     [iref_dup_store_au] / [iref_incr_store_au] / [iref_upgrade_store_au]
+       count goes UP, so [FrzPre] (which pins it at one) is not refutable by
+       arithmetic and has to be refuted by exclusivity: the mover presents
+       the inum's "right to freeze" [ifreeze_off], which pins f at [FrzOff],
+       at which the clause is vacuous.  That token is §2.6's currency and it
+       comes back out untouched.
+     [iref_close_store_au]
+       count goes from [Pos.succ n >= 2] DOWN, and both frozen phases pin it
+       at one or zero -- so f is [None] or [FrzOff] by arithmetic alone
+       ([ireg_frz_ok_ge2]) and the mover needs no token at all.
+     [iref_close_last_store_au]
+       the 1 -> 0 move, the ONLY one that runs with a freeze possibly HELD
+       (iput's free path mints at +0x50 and retires at the deposit, so +0x8a
+       is strictly inside the window -- this is exactly what refuted §2.3's
+       original strict [icnt = 1] clause).  It threads the freeze token and
+       steps its phase [FrzPre -> FrzPost] inside the region open it already
+       takes, which re-establishes the pin at zero.  [FrzOff] passes through
+       unchanged, which is what lets the ORDINARY last close (ref 1, nlink
+       nonzero -- no freeze anywhere) use the same lemma. *)
+
+Section IcacheRefInvReg.
+  (* [InodeRegion]'s own context plus [lockG] -- and every one of these
+     classes has to be IN SCOPE (see the preamble's import note), or the
+     backtick generalisation quietly invents a same-named variable instead. *)
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
+            !logG Σ, !lockG Σ}.
+  Context `{ICFG : icfg}.
+  Context `{GEN : GenId}.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE PIN's TWO PURE FACTS                                           *)
+  (* ------------------------------------------------------------------ *)
+
+  (* AT TWO OR MORE REFERENCES NO FREEZE IS STANDING, so the pin says
+     nothing and survives any move of the count.  This is the whole reason
+     [iref_close_store_au] needs no token: [FrzPre] pins the count at one
+     and [FrzPost] at zero, and the not-last close comes in at
+     [Pos.succ n >= 2]. *)
+  Local Lemma ireg_frz_ok_ge2 (f : frzUR) (a b : nat) :
+    (2 <= a)%nat -> ireg_frz_ok f a -> ireg_frz_ok f b.
+  Proof.
+    intros Ha Hok. unfold ireg_frz_ok in *.
+    destruct f as [[ph |] |]; [destruct ph | |];
+      try exact I; try lia; try (exfalso; exact Hok).
+  Qed.
+
+  (* THE PHASE THE LAST CLOSE LEAVES BEHIND (§2.3's [FrzPre -> FrzPost]).
+     Identity on the two phases that are not the window's first half, so
+     the ordinary (unfrozen) last close threads [FrzOff] through it. *)
+  Definition frz_close (ph : frz) : frz :=
+    match ph with
+    | FrzPre => FrzPost
+    | _ => ph
+    end.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE REGION's SIDE OF A COUNT MOVE, AS AN ACCESSOR                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ONE [↑iregN] OPEN, the slot's [icnt] half in, the moved half out.  The
+     shape is an accessor rather than an [InodeRegion]-style AU because it
+     nests INSIDE the [↑icacheN] opening the count move already does: the
+     caller opens the itable, calls this at [Eo ∖ ↑icacheN], hands out the
+     [ref] cell, takes it back, moves the itable ghost, then closes the
+     REGION first (inner mask first) and the itable after.  That is
+     [ZZProbeIcnt.iref_close_last_freeze_store_au]'s choreography verbatim.
+
+     The [f] column comes out EXISTENTIALLY with the pin it currently
+     satisfies, and the closing continuation demands the pin at the new
+     count.  Nothing else about the slot moves -- the record, the ledger's
+     six other columns, the claim pin, both boot-shelter clauses and the
+     whole registry/pending arm go back exactly as they came. *)
+  Lemma ireg_icnt_acc (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (n : nat) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    icnt_half (bv_unsigned inum) n
+    ={E, E ∖ ↑iregN}=∗
+      ∃ f : frzUR,
+        ⌜ireg_frz_ok f n⌝ ∗
+        (∀ m : nat, ⌜ireg_frz_ok f m⌝ -∗
+           |={E ∖ ↑iregN, E}=> icnt_half (bv_unsigned inum) m).
+  Proof.
+    iIntros (HE Hin) "#Hinv Hhalf".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
+    iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iModIntro. iExists fz. iSplitR; [iPureIntro; exact Hfrz |].
+    iIntros (m) "%Hfrz'".
+    iMod (icnt_update (bv_unsigned inum) n m with "Hcnt Hhalf") as "[Hcnt Hhalf]".
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj]")
+      as "_".
+    { iNext. iExists mrg. iFrame "Ha Hreg".
+      iApply ("Hback" $! mrg with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj]");
+        [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl fz m
+                Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz'
+                with "Hla Hep Hdisj Hcnt Hfdisj Harm"). }
+    iModIntro. iExact "Hhalf".
+  Qed.
+
+  (* THE SAME OPEN, WITH THE FREEZE TOKEN IN HAND.  Holding [ifreeze ph]
+     pins the f column at [Some (Excl ph)] ([link_freeze_agree]), so the pin
+     comes out as a fact about a KNOWN phase and the continuation may also
+     STEP that phase ([link_freeze_step], fragment-side -- no new mask).
+
+     The second premise of the continuation is §2.3's boot-shelter clause,
+     discharged from what the arm already holds: at [ph' = FrzOff] the
+     clause's own left disjunct is free, and at [ph <> FrzOff] the arm's
+     left disjunct is contradictory, so its [ireg_open ∨ ireg_boot] is in
+     hand and rides straight back.  The one combination it refuses --
+     minting a freeze at a slot whose column was [FrzOff] -- is
+     [InodeRegion.ireg_freeze_au]'s, which takes the shelter as a premise
+     because it has to. *)
+  Lemma ireg_icnt_frz_acc (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (ph : frz) (n : nat) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    ifreeze ph (bv_unsigned inum) -∗
+    icnt_half (bv_unsigned inum) n
+    ={E, E ∖ ↑iregN}=∗
+      ⌜ireg_frz_ok (Some (Excl ph)) n⌝ ∗
+      (∀ (ph' : frz) (m : nat),
+         ⌜ireg_frz_ok (Some (Excl ph')) m⌝ -∗
+         ⌜ph' = FrzOff \/ ph <> FrzOff⌝ -∗
+         |={E ∖ ↑iregN, E}=>
+           ifreeze ph' (bv_unsigned inum) ∗ icnt_half (bv_unsigned inum) m).
+  Proof.
+    iIntros (HE Hin) "#Hinv Hfz Hhalf".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart mrg nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Harm) Hep]".
+    iDestruct (link_freeze_agree with "Hla Hfz") as %->.
+    iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iModIntro. iSplitR; [iPureIntro; exact Hfrz |].
+    iIntros (ph' m) "%Hfrz' %Hsh".
+    iMod (icnt_update (bv_unsigned inum) n m with "Hcnt Hhalf") as "[Hcnt Hhalf]".
+    iMod (link_freeze_step _ _ _ _ _ _ _ _ ph ph' with "Hla Hfz") as "[Hla Hfz]".
+    iAssert (⌜Some (Excl ph') = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot)%I
+      with "[Hfdisj]" as "Hfdisj'".
+    { destruct Hsh as [-> | Hne].
+      - iLeft. iPureIntro. reflexivity.
+      - iDestruct "Hfdisj" as "[%Heq | Hr]"; [| iRight; iExact "Hr"].
+        exfalso. apply Hne. by simplify_eq. }
+    iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj']")
+      as "_".
+    { iNext. iExists mrg. iFrame "Ha Hreg".
+      iApply ("Hback" $! mrg with "[%] [Hfsb Harm Hla Hep Hslback Hcnt Hfdisj']");
+        [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep Hcnt Hfdisj']").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl (Some (Excl ph')) m
+                Hlok Hrt Hdir Hwl0 Hpar Hclm Hfrz'
+                with "Hla Hep Hdisj Hcnt Hfdisj' Harm"). }
+    iModIntro. iFrame "Hfz Hhalf".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE FIVE COUNT MOVES                                               *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE WRITE.  The [sw] and the ghost step happen in the SAME invariant
+     opening, which is the whole reason the read-modify-write is atomic in
+     the proof: the lock's half stops any other thread moving [M], and the
+     two halves meet only here, which is exactly the moment the physical
+     word changes.  [Hno] -- that the incremented count is still an [int] --
+     is what re-establishes [icM_wf]; it is NOT provable here and comes from
+     the caller's [IrefSlots.iref_slots_no_overflow].
+
+     SINCE §2.2 the LEDGER moves in the same breath: the slot's [icnt] half
+     goes in at [Pos.to_nat n] and comes back at [Pos.to_nat (Pos.succ n)],
+     the region's half moves with it inside a nested [↑iregN] open, and the
+     "right to freeze" [ifreeze_off] is what pins the f column so the phased
+     freeze pin is vacuous across the move (see the section header). *)
+  Lemma iref_dup_store_au (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
+      (q qt : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    M !! k = Some (qt, n) ->
+    (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
+    (* THE SLOT'S SHARE AUTHORITY comes from the CALLER, not from the
+       invariant: it lives in the itable LOCK's resource, and every step that
+       moves it runs under that lock.  iput is why -- it has to hold the
+       authoritative zero across a whole [acquiresleep] call, which no
+       invariant can survive (claude-notes/projects/iput-acquiresleep.md).
+       The [icnt] half and the freeze token ride there for the same reason. *)
+    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
+         ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
+         itable_half (<[k := (qt, Pos.succ n)]> M) ∗
+         isl_slot (<[k := (qt, Pos.succ n)]> M) k ∗
+         iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp ∗
+         ifreeze_off (bv_unsigned inum) ∗
+         icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n))).
+  Proof.
+    iIntros (HE HER Hin HMk Hno) "#Hinv #Hrinv Hhalf Htok Hislot Hoff Hcnt".
+    rewrite /ifreeze_off.
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
+    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
+    (* ---- region: the SECOND open, nested inside the icache's hole ---- *)
+    iMod (ireg_icnt_frz_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
+            FrzOff (Pos.to_nat n) ltac:(solve_ndisj) Hin
+            with "Hrinv Hoff Hcnt") as "[_ Hrback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_dup_step M k q qt n HMk with "Hauth Htok Hislot")
+      as "(Hauth & Hislot & Ht1 & Ht2)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iAssert (live_slot (<[k := (qt, Pos.succ n)]> M) k) with "[Hslot]" as "Hslot".
+    { iDestruct (live_slot_some_inv M k qt n HMk with "Hslot")
+        as (c) "[%Ec Hc]".
+      by rewrite (live_slot_some (<[k := (qt, Pos.succ n)]> M) k qt (Pos.succ n) c
+                    (lookup_insert M k (qt, Pos.succ n)) Ec). }
+    (* ---- region: the ledger count moves in step with the word, and the
+       region closes FIRST (inner mask first) ---- *)
+    iMod ("Hrback" $! FrzOff (Pos.to_nat (Pos.succ n)) with "[%] [%]")
+      as "[Hoff Hcnt]"; [exact I | by left |].
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
+    { iNext. iExists (<[k := (qt, Pos.succ n)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
+        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
+        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+            injection Hj as _ Hn. subst nj. exact Hno.
+          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
+            by apply (Hcnt' j qj). }
+      iSplitL "Hcell Hback".
+      { iApply ("Hback" $! (qt, Pos.succ n)).
+        rewrite /iref_word lookup_insert. iExact "Hcell". }
+      iApply ("Hpback" $! (<[k := (qt, Pos.succ n)]> M) with "[%] Hslot").
+      intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
+    iModIntro. iFrame.
+  Qed.
+
+  (* THE SAME WRITE, FOR AN INCREMENTER THAT HOLDS NO REFERENCE.
+     [iref_dup_store_au] above is idup's shape: a caller token goes in and
+     two halves come out.  [iget]'s cache-HIT arm has no token of its own --
+     it found the entry by SCANNING -- so the new reference cannot be split
+     off anything the opener brought, and is minted from the share the TABLE
+     retained instead ([islot_rest_at], design §13.1b/§13.1e).  That is
+     exactly [iref_incr_step] rather than [iref_dup_step], and it is why the
+     entry's outstanding fraction GROWS by [qn] here where it stayed put in
+     idup.  BioInv's [bio_incr_step] and its store wrapper are the precedent.
+
+     Both side conditions are the CALLER's, for the same reasons as above:
+     [✓ (qt + qn)] is the fraction budget (the caller takes [qn] out of the
+     table's [1/2 - qt], so the sum never passes 1/2), and [Hno] -- that the
+     incremented count is still an [int] -- comes from
+     [IrefSlots.iref_slots_no_overflow] exactly as in ProofIdup.
+
+     THE LEDGER SIDE is [iref_dup_store_au]'s verbatim: half in, half out,
+     the freeze token pinning the f column across the increment. *)
+  Lemma iref_incr_store_au (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
+      (qt qn : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    M !! k = Some (qt, n) ->
+    (qt + qn < 1/2)%Qp ->
+    (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
+    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ isl_slot M k -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
+         ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
+         itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
+         isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
+         iref_tok k qn ∗
+         ifreeze_off (bv_unsigned inum) ∗
+         icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n))).
+  Proof.
+    iIntros (HE HER Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hislot Hoff Hcnt".
+    rewrite /ifreeze_off.
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
+    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
+    iMod (ireg_icnt_frz_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
+            FrzOff (Pos.to_nat n) ltac:(solve_ndisj) Hin
+            with "Hrinv Hoff Hcnt") as "[_ Hrback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_incr_step M k qt n qn HMk Hq with "Hauth Hslot Hislot")
+      as "(Hauth & Hslot & Hislot & Htok)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hrback" $! FrzOff (Pos.to_nat (Pos.succ n)) with "[%] [%]")
+      as "[Hoff Hcnt]"; [exact I | by left |].
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
+    { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
+        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
+        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+            injection Hj as _ Hn. subst nj. exact Hno.
+          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
+            by apply (Hcnt' j qj). }
+      iSplitL "Hcell Hback".
+      { iApply ("Hback" $! ((qt + qn)%Qp, Pos.succ n)).
+        rewrite /iref_word lookup_insert. iExact "Hcell". }
+      iApply ("Hpback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%] Hslot").
+      intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
+    iModIntro. iFrame.
+  Qed.
+
+  (* iput's [ref--] WHEN IT IS NOT THE LAST: the count goes [Pos.succ n] to
+     [n] and the departing reference's fraction [q] rejoins the outstanding
+     total, leaving [qr] with [qt = q + qr].  The [sw] and the ghost step
+     are in ONE invariant opening, exactly as in [iref_dup_store_au] and
+     for the same reason -- the lock's half pins [M] across the
+     [lw; addiw; sw], and the two halves meet only here.
+
+     There is no [Hno] side condition and there cannot be one: the count
+     goes DOWN, so [icM_wf]'s bound is re-established from the bound the
+     invariant already carried ([icM_wf_count] at [Pos.succ n]).  That
+     asymmetry with the two increment wrappers is the whole difference.
+
+     AND THERE IS NO FREEZE TOKEN EITHER, for a second asymmetry with them:
+     this close comes in at [Pos.succ n >= 2], where BOTH phases of §2.3's
+     pin are already refuted by arithmetic ([ireg_frz_ok_ge2]).  A slot at
+     two or more references is not frozen and cannot become frozen under the
+     lock the mover is holding, so the region clause re-establishes itself. *)
+  Lemma iref_close_store_au (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
+      (q qt qr : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    M !! k = Some (qt, Pos.succ n) ->
+    (qt - q)%Qp = Some qr ->
+    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
+    icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos n) : mword 32)
+         ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
+         itable_half (<[k := (qr, n)]> M) ∗ isl_slot (<[k := (qr, n)]> M) k ∗
+         icnt_half (bv_unsigned inum) (Pos.to_nat n)).
+  Proof.
+    iIntros (HE HER Hin HMk Hsub) "#Hinv #Hrinv Hhalf Htok Hislot Hcnt".
+    assert (Hge2 : (2 <= Pos.to_nat (Pos.succ n))%nat).
+    { rewrite Pos2Nat.inj_succ. pose proof (Pos2Nat.is_pos n). lia. }
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
+    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
+    iMod (ireg_icnt_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
+            (Pos.to_nat (Pos.succ n)) ltac:(solve_ndisj) Hin
+            with "Hrinv Hcnt") as (fz) "[%Hfrz Hrback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_close_step M k q qt n qr HMk Hsub with "Hauth Htok Hslot Hislot")
+      as "(Hauth & Hslot & Hislot)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hrback" $! (Pos.to_nat n) with "[%]") as "Hcnt";
+      [exact (ireg_frz_ok_ge2 fz _ _ Hge2 Hfrz) |].
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
+    { iNext. iExists (<[k := (qr, n)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
+        - intros i Hi. destruct (decide (i = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
+        - intros i qi ni Hi. destruct (decide (i = k)) as [->|Hne].
+          + rewrite lookup_insert in Hi. apply Some_inj in Hi.
+            injection Hi as _ Hn. subst ni.
+            pose proof (Hcnt' k qt (Pos.succ n) HMk) as Hb. lia.
+          + rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
+            by apply (Hcnt' i qi). }
+      iSplitL "Hcell Hback".
+      { iApply ("Hback" $! (qr, n)).
+        rewrite /iref_word lookup_insert. iExact "Hcell". }
+      iApply ("Hpback" $! (<[k := (qr, n)]> M) with "[%] Hslot").
+      intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
+    iModIntro. iFrame.
+  Qed.
+
+  (* iput's [ref--] WHEN IT IS THE LAST: the slot leaves [M] entirely and
+     the word goes to zero, which is [iref_word]'s [None] branch -- i.e.
+     the free-slot shape iget's scan looks for.  The closer must present
+     the WHOLE outstanding share [qt]; REF-1 ([iref_lookup] at count one)
+     is what tells it that its own [q] is that share.
+
+     THE ONE COUNT MOVE THAT RUNS INSIDE A FREEZE WINDOW (§2.3, the probe's
+     correction).  iput's free path mints the freeze in [ip_free_entry]'s
+     span at +0x50 and retires it only at the +0xba deposit, so +0x8a's last
+     close is strictly inside -- which is exactly why §2.3's original strict
+     [icnt = 1] clause is FALSE, and why the phase is PHASED.  The token
+     comes in at [ph] and goes out at [frz_close ph]: [FrzPre -> FrzPost]
+     re-establishes the pin at zero, and [FrzOff] passes through, which is
+     what lets the ORDINARY last close (an unfrozen slot at ref 1) use this
+     same lemma with nothing new to find. *)
+  Lemma iref_close_last_store_au (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (qt : Qp)
+      (ph : frz) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    M !! k = Some (qt, 1%positive) ->
+    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ iref_tok k qt -∗ live_frac k (1/2)%Qp -∗
+    isl_slot M k -∗
+    ifreeze ph (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
+         ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
+         itable_half (delete k M) ∗ isl_slot (delete k M) k ∗
+         ifreeze (frz_close ph) (bv_unsigned inum) ∗
+         icnt_half (bv_unsigned inum) 0%nat).
+  Proof.
+    iIntros (HE HER Hin HMk) "#Hinv #Hrinv Hhalf Htok Hh Hislot Hfz Hcnt".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_del M k Hk with "Hcells") as "[Hcell Hback]".
+    iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
+    iMod (ireg_icnt_frz_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
+            ph 1%nat ltac:(solve_ndisj) Hin
+            with "Hrinv Hfz Hcnt") as "[_ Hrback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_close_last_step M k qt HMk with "Hauth Htok Hh Hslot Hislot")
+      as "(Hauth & Hslot & Hislot)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hrback" $! (frz_close ph) 0%nat with "[%] [%]") as "[Hfz Hcnt]";
+      [destruct ph; exact I || reflexivity
+      | destruct ph; [by left | by right | by right] |].
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
+    { iNext. iExists (delete k M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
+        - intros i Hi. apply Hdom.
+          destruct Hi as [e He]. exists e.
+          rewrite lookup_delete_Some in He. apply He.
+        - intros i qi ni Hi.
+          rewrite lookup_delete_Some in Hi. destruct Hi as [_ Hi].
+          by apply (Hcnt' i qi). }
+      iSplitL "Hcell Hback"; [iApply ("Hback" with "Hcell") |].
+      iApply ("Hpback" $! (delete k M) with "[%] Hslot").
+      intros j Hj. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
+    iModIntro. iFrame.
+  Qed.
+
+  (* THE FREE PATH's INSTANCE, named as the probe named it: the phase steps
+     [FrzPre -> FrzPost] at iput+0x8a and the freeze stays standing for the
+     off-lock deposit to retire (§1.4). *)
+  Lemma iref_close_last_freeze_store_au (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (qt : Qp) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    M !! k = Some (qt, 1%positive) ->
+    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ iref_tok k qt -∗ live_frac k (1/2)%Qp -∗
+    isl_slot M k -∗
+    ifreeze_pre (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
+         ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
+         itable_half (delete k M) ∗ isl_slot (delete k M) k ∗
+         ifreeze_post (bv_unsigned inum) ∗
+         icnt_half (bv_unsigned inum) 0%nat).
+  Proof.
+    iIntros (HE HER Hin HMk) "#Hinv #Hrinv Hhalf Htok Hh Hislot Hfz Hcnt".
+    rewrite /ifreeze_pre /ifreeze_post.
+    iApply (iref_close_last_store_au Eo γi γfs inodestart nib M k inum qt FrzPre
+              HE HER Hin HMk with "Hinv Hrinv Hhalf Htok Hh Hislot Hfz Hcnt").
+  Qed.
+
   (* THE UPGRADE (share -> reference), for B3's idup -- AND WHAT IT IS NOT.
 
      Origin's [iref_upgrade_step] moved a count-0 fragment to count 1 at the
@@ -1622,29 +1998,38 @@ Section IcacheRefInv.
      the new reference, and kfork's parent gathers it back
      ([IcacheRef.inode_ref_gather]) instead of losing it. *)
   Lemma iref_upgrade_store_au (Eo : coPset)
-      (M : gmap nat (Qp * positive)) (k : nat) (qt qn s : Qp) (n : positive) :
-    ↑icacheN ⊆ Eo ->
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32)
+      (qt qn s : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv -∗ itable_half M -∗ live_frac k s -∗ isl_slot M k -∗
-    |={Eo, Eo ∖ ↑icacheN}=>
+    itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ live_frac k s -∗ isl_slot M k -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
-         ={Eo ∖ ↑icacheN, Eo}=∗
+         ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
          itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
          isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
-         iref_tok k qn ∗ live_frac k s).
+         iref_tok k qn ∗ live_frac k s ∗
+         ifreeze_off (bv_unsigned inum) ∗
+         icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n))).
   Proof.
-    iIntros (HE HMk Hq Hno) "#Hinv Hhalf Hlv Hislot".
-    iMod (iref_incr_store_au Eo M k qt qn n HE HMk Hq Hno with "Hinv Hhalf Hislot")
+    iIntros (HE HER Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hlv Hislot Hoff Hcnt".
+    iMod (iref_incr_store_au Eo γi γfs inodestart nib M k inum qt qn n
+            HE HER Hin HMk Hq Hno with "Hinv Hrinv Hhalf Hislot Hoff Hcnt")
       as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iMod ("Hback" with "Hcell") as "(Hhalf & Hislot & Htok)".
+    iMod ("Hback" with "Hcell") as "(Hhalf & Hislot & Htok & Hoff & Hcnt)".
     iModIntro. iFrame.
   Qed.
 
-End IcacheRefInv.
+End IcacheRefInvReg.
 
 (* ===================================================================== *)
 (*  6.  THE itable LOCK'S RESOURCE: dev / inum, AND WHAT A REFERENCE IS   *)

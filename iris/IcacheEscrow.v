@@ -485,33 +485,146 @@ Section IcacheEscrow.
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (ipool_alloc γfs γi cov logstart inum ∨ imark γi (bv_unsigned inum))%I.
 
+  (* THE AWAIT ARM (iclaim-ledger.md §1.2/§1.3): the entry a FREER has parked
+     on its way to the off-lock deposit.  It is the whole point of B2's
+     resolution that it does NOT contain [dinode_at] -- the freer keeps the
+     record, with its identity intact and no existential, all the way to
+     [OFF.ip_free_offlock]'s entry.  What it carries instead is the escrow the
+     freer minted ([EscrowInode.escA_alloc], mask-only) and that escrow's
+     exclusive redemption ticket, i.e. exactly [pool_pending] MINUS the
+     [committedA] the deposit has not yet produced.
+
+     ...AND THE FREEZE, which §1.2 does not name and which is here for §1.3's
+     sake.  §1.3 requires a pre-deposit consumer -- a fill or a recycle of
+     THIS inum -- to be refutable, and the refutation the design gives is
+     §2.6's exclusivity, not an arithmetic one.  Parking the freer's
+     [ifreeze_post] here is what makes it a two-line refutation
+     ([IcacheRef.ifreeze_excl]) against the "right to freeze" [ifreeze_off]
+     that the consumer must present: one exclusive cell, two holders.  The
+     cost is that §1.4's retire (f Some -> None) reads the token back out of
+     the POOL at the await-redeem rather than out of the depositor's hand; the
+     pin it carries ([FrzPost => icnt = 0], InodeRegion.ireg_frz_ok) is
+     undisturbed across the wider window, because the inum is uncached
+     throughout it.
+
+     WHERE IT SITS, AND WHY THAT IS A DEVIATION FROM §1.2 (recorded).  §1.2
+     puts the arm inside [ipool_shape_np].  It cannot go there: [escA_inv] is
+     an [inv] and therefore not Timeless, [ipool_shape_np] is what
+     [ic_unloaded] wraps, and [ic_unloaded_timeless] is what
+     [ic_escrow_body_timeless] -- hence every [iInv "Hesc" as ">"] in the tree
+     -- is built out of.  This is EscrowDefs' own trade, made there for the
+     region and quoted at [region_pending]: "[esc_inv] (not Timeless) rides
+     the POOL side, so this stays Timeless".  So the await arm rides the pool
+     side too, beside [pool_pending], and §1.2's park at iput+0x70 needs a
+     Timeless stand-in of its own (the A-walk's item, not this increment's). *)
+  Definition pool_await (γi : gname) (z : Z) : iProp Σ :=
+    (∃ ge gr, escA_inv ge gr γi z ∗ redeem_ticketA gr ∗ ifreeze_post z)%I.
+
   (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
      which is LOCK-HELD (never [iInv .. as ">"], verified), so the non-Timeless
      [pool_pending] (an [esc_inv]) is fine here.  A pending entry has disk
      type=0 and is provably never filled ([ireg_withdraw] needs type<>0), hence
-     never enters the escrow's [ipool_shape_np] side. *)
+     never enters the escrow's [ipool_shape_np] side.  Since §1.2 the AWAIT arm
+     rides here for the same reason and with the same consequence.
+
+     ---- THE UNCACHED LEDGER RESOURCES (increment IIIa) ------------------
+
+     THE COUNT HALF, at the bundle level and above the arms.  §2.2 puts one
+     [icnt] half in [InodeRegion.ireg_slot] and the other wherever the inum's
+     identity is parked; increment II proved the "not-cached arms" reading of
+     that ruling FALSE at [islot_empty] (fifty slots, one key: fraction 25)
+     and deferred the true home to here.  This IS the true home: the pool's
+     domain is [region_inums nib ∖ ci_inums ci], i.e. exactly the complement
+     of the live arms' inums, so one half per POOL ENTRY is one half per
+     UNCACHED inum, which is what the fraction discipline demands.  The value
+     is the literal 0: an inum in the free pool is, by the pool's own
+     definition, in no [ci] entry, so its in-core count is zero.  It rides
+     ABOVE the disjunction because all three arms are uncached and agree on
+     it -- and because that keeps the two movers' peel one line long.
+
+     THE FREEZE TOKEN, per ARM and NOT above them.  [ifreeze] is one
+     exclusive ledger cell ([ifreeze_excl] refutes ANY two fragments at one
+     inum, equal phases included), so a bundle-level copy beside
+     [pool_await]'s [ifreeze_post] would make the await arm unreachable --
+     which is exactly the arm §1.3 needs.  So: the two ORDINARY arms carry
+     the unfrozen token [ifreeze_off], the "right to freeze" that
+     [IcacheInv.iref_upgrade_store_au] demands of a recycler and that
+     [InodeRegion.ireg_freeze_au] swaps for [ifreeze_pre]; the AWAIT arm
+     carries the freer's [ifreeze_post] inside [pool_await], where increment
+     II already filed it.  One token per inum on every arm, never two. *)
   Definition ipool_shape (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
-    (ipool_shape_np γfs γi cov logstart inum
-     ∨ pool_pending γi (bv_unsigned inum))%I.
+    (icnt_half (bv_unsigned inum) 0%nat ∗
+     (ipool_shape_np γfs γi cov logstart inum ∗ ifreeze_off (bv_unsigned inum)
+      ∨ pool_pending γi (bv_unsigned inum) ∗ ifreeze_off (bv_unsigned inum)
+      ∨ pool_await γi (bv_unsigned inum)))%I.
 
   (* OPTION A (b)(ii): turn a pending-CAPABLE pool shape into the Timeless
      [ipool_shape_np] the escrow's unloaded arm needs, REDEEMING a genuine
      pending entry to its [imark] pool-locally.  This is what lets the iget
      recycle and the ilock fill convert [ipool_acc]'s full shape without the
      region invariant.  Walk-stable: it discharges real deposits, not just the
-     flip-gate's empty pool. *)
+     flip-gate's empty pool.
+
+     THE AWAIT CASE (§1.3) IS A REFUTATION, NOT A CONVERSION, and the licence
+     premise §1.3 asks for is spelled here as [ifreeze_off]: the caller of a
+     fill or a recycle at this inum presents the inum's "right to freeze", the
+     parked arm holds the freer's [ifreeze_post], and the two are one
+     exclusive ledger cell ([IcacheRef.ifreeze_excl]).  The token goes back
+     out untouched on every arm, so the premise costs a caller nothing beyond
+     having it -- which, per §2.9's third honest risk, is new plumbing the
+     iget/ilock cone owns (increment 4).
+
+     ---- WHY THE PREMISE CHANGES SHAPE IN INCREMENT IIIa (recorded) ------
+
+     Increment II spelled §1.3's "caller's licence" as a caller-held
+     [ifreeze_off].  That spelling is no longer AVAILABLE to a caller: since
+     the pool is now where an uncached inum's freeze token lives, a second
+     copy in the caller's hand would collide with the pool's own on the two
+     ordinary arms ([ifreeze_excl] does not care that both are [FrzOff]), and
+     the lemma would be vacuous rather than usable.  So the premise is
+     restated as the REFUTATION it was only ever used for --
+     [ipool_await_refuter], i.e. "no [ifreeze_post] stands at this inum".
+     It is strictly WEAKER than II's version ([ipool_await_refuter_off] is
+     the one-line derivation from an [ifreeze_off] a caller does hold, e.g.
+     a CACHED-side mover's), it keeps §1.3's discharge exactly as II proved
+     it, and it leaves the real §2.6 argument -- a licence's [nlink <> 0]
+     against the freeze pin's [nlink = 0] -- as the discharge increment 4
+     will supply at the two call sites (ProofIget, ProofIlock).
+
+     WHAT COMES OUT is now the pool's own [icnt] half and [ifreeze_off]
+     alongside the [ipool_shape_np]: the recycler that takes an inum OUT of
+     the pool takes its uncached ledger resources with it, which is exactly
+     the pair [IcacheInv.iref_upgrade_store_au] then consumes (count 0 -> 1
+     under the standing [FrzOff] pin). *)
+  Definition ipool_await_refuter (z : Z) : iProp Σ :=
+    (ifreeze_post z -∗ False)%I.
+
+  (* the cached-side spelling: increment II's premise still discharges it *)
+  Lemma ipool_await_refuter_off (z : Z) :
+    ifreeze_off z -∗ ipool_await_refuter z.
+  Proof.
+    iIntros "Hoff Hpost". rewrite /ifreeze_off /ifreeze_post.
+    iDestruct (ifreeze_excl with "Hoff Hpost") as "[]".
+  Qed.
+
   Lemma ipool_shape_to_np E γfs γi cov logstart (inum : mword 32) :
     ↑escAN (bv_unsigned inum) ⊆ E ->
+    ipool_await_refuter (bv_unsigned inum) -∗
     ipool_shape γfs γi cov logstart inum ={E}=∗
-    ipool_shape_np γfs γi cov logstart inum.
+    ipool_shape_np γfs γi cov logstart inum ∗
+    icnt_half (bv_unsigned inum) 0%nat ∗ ifreeze_off (bv_unsigned inum).
   Proof.
-    iIntros (HE) "H". rewrite /ipool_shape. iDestruct "H" as "[Hnp | Hpp]".
-    - by iModIntro.
+    iIntros (HE) "Href H". rewrite /ipool_shape.
+    iDestruct "H" as "[Hcnt [[Hnp Hoff] | [[Hpp Hoff] | Haw]]]".
+    - iModIntro. iFrame "Hnp Hcnt Hoff".
     - iDestruct "Hpp" as (ge gr) "(#Hesc & #Hcom & Htk)".
       iMod (escA_redeem E ge gr γi (bv_unsigned inum) HE with "Hesc Htk Hcom")
         as "Hmk".
-      iModIntro. rewrite /ipool_shape_np. iRight. iExact "Hmk".
+      iModIntro. iFrame "Hcnt Hoff". rewrite /ipool_shape_np. iRight. iExact "Hmk".
+    - iDestruct "Haw" as (ge gr) "(_ & _ & Hpost)".
+      rewrite /ipool_await_refuter.
+      iDestruct ("Href" with "Hpost") as "[]".
   Qed.
 
   Global Instance ipool_alloc_timeless γfs γi cov logstart inum :
@@ -1484,9 +1597,32 @@ Section IcacheEscrow.
      pool's allocated shape is about the ON-DISK record -- transfers with no
      re-reading.  The metadata and addrs CELLS drop out of the bundle and
      become the empty arm's [inode_raw]; their thirteen-element length comes
-     from [blkmap_wf], which [inode_ok] carries. *)
-  Lemma ic_close_to_empty cn γfs γi cov logstart k (v : bool) (g : gname)
-      (dev inum : mword 32) :
+     from [blkmap_wf], which [inode_ok] carries.
+
+     ---- THE TWO CLOSE FLAVOURS (increment IIIa) -------------------------
+
+     The insertion contract is the mirror of what [IcacheInv]'s last close
+     hands back, so it comes in the same two flavours [frz_close ph] fuses:
+
+       ORDINARY last close (ref 1, nlink nonzero, no freeze anywhere):
+         [iref_close_last_store_au] threaded [FrzOff] through unchanged and
+         drove the count 1 -> 0, so the closer surrenders
+         [icnt_half z 0 ∗ ifreeze_off z] and the pool takes a NORMAL arm.
+         That is [ic_close_to_empty] below, unchanged but for the two new
+         premises.
+
+       FREE path (iput's +0x8a, strictly inside the freeze window): the same
+         AU stepped [FrzPre -> FrzPost], so what the closer holds is
+         [icnt_half z 0 ∗ ifreeze_post z] and the pool must take the AWAIT
+         arm instead.  That is [ic_close_to_empty_await]; it also hands the
+         displaced [ipool_shape_np] BACK to the freer, which is §1.2's whole
+         point -- the freer keeps [dinode_at] (with its identity intact) and
+         the block resources across releasesleep, and parks only the escrow.
+
+     Both share [ic_close_to_empty_core], which is the eviction argument
+     proper; only the arm the pool ends on differs. *)
+  Local Lemma ic_close_to_empty_core cn γfs γi cov logstart k (v : bool)
+      (g : gname) (dev inum : mword 32) :
     ic_id cn k (1/2) true dev inum -∗
     ic_id cn k (1/2) true dev inum -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
@@ -1497,7 +1633,7 @@ Section IcacheEscrow.
     ic_mid cn k -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
-         ipool_shape γfs γi cov logstart inum.
+         ipool_shape_np γfs γi cov logstart inum.
   Proof.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
@@ -1505,15 +1641,14 @@ Section IcacheEscrow.
     iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     (* the payload splits into the cells the empty arm keeps and the bundle
        the pool takes back *)
-    iAssert (inode_raw (ientry k) ∗ ipool_shape γfs γi cov logstart inum)%I
+    iAssert (inode_raw (ientry k) ∗ ipool_shape_np γfs γi cov logstart inum)%I
       with "[Hpay]" as "[Hraw Hpool]".
     (* THE GENERATION'S ONE-SHOT DIES HERE, unspent or spent (design §17.6
        (7)): an evicted slot leaves [M], its whole unit goes back to the free
        arm, and the next recycle bumps again -- so a free slot carries no
        obligation and dropping the token is exactly right. *)
     { destruct v;
-        [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr";
-           rewrite /ipool_shape; iLeft; iExact "Hp" ].
+        [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr"; iExact "Hp" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
         "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind &
@@ -1526,7 +1661,7 @@ Section IcacheEscrow.
       { rewrite /inode_raw. iSplitL "Hmeta"; [by iExists dn |].
         iExists (bm_cells bm). iSplitR; [iPureIntro; exact Hcelllen |].
         iExact "Haddrs". }
-      rewrite /ipool_shape /ipool_shape_np /ipool_alloc. iLeft. iLeft. iExists dn, bm, data.
+      rewrite /ipool_shape_np /ipool_alloc. iLeft. iExists dn, bm, data.
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
       (* the eviction moves no byte and no field: the clause goes back to the
@@ -1543,6 +1678,73 @@ Section IcacheEscrow.
     iSplitR "Hgf2 Hpool"; [| iSplitL "Hgf2"; [iExact "Hgf2" | iExact "Hpool"]].
     iApply ic_close_empty. rewrite /ic_empty_arm.
     iExists dev, inum, (valid_word v). iFrame.
+  Qed.
+
+  (* FLAVOUR 1: the ORDINARY last close.  The closer surrenders the uncached
+     ledger pair its [iref_close_last_store_au] just produced -- the count at
+     zero and the still-unfrozen token -- and the pool takes a normal arm. *)
+  Lemma ic_close_to_empty cn γfs γi cov logstart k (v : bool) (g : gname)
+      (dev inum : mword 32) :
+    ic_id cn k (1/2) true dev inum -∗
+    ic_id cn k (1/2) true dev inum -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_mid cn k -∗
+    icnt_half (bv_unsigned inum) 0%nat -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    |==> ic_escrow_body cn γfs γi cov logstart k ∗
+         ic_id cn k (1/2) false dev inum ∗
+         ipool_shape γfs γi cov logstart inum.
+  Proof.
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt Hcnt Hoff".
+    iMod (ic_close_to_empty_core cn γfs γi cov logstart k v g dev inum
+            with "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt") as "(Hbody & Hgf2 & Hnp)".
+    iModIntro.
+    iSplitL "Hbody"; [iExact "Hbody" |].
+    iSplitL "Hgf2"; [iExact "Hgf2" |].
+    rewrite /ipool_shape. iSplitL "Hcnt"; [iExact "Hcnt" |].
+    iLeft. iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
+  Qed.
+
+  (* FLAVOUR 2: the FREE path's eviction (§1.3).  Same eviction, but the
+     freeze is standing at [FrzPost], so the pool takes the AWAIT arm and the
+     bundle the loaded/unloaded payload was carrying goes back to the FREER
+     rather than into the pool -- which is exactly B2's resolution: the
+     record keeps its identity, no existential, all the way to the off-lock
+     deposit.  The escrow and its ticket are the freer's own
+     ([EscrowInode.escA_alloc], mask-only, minted before the park). *)
+  Lemma ic_close_to_empty_await cn γfs γi cov logstart k (v : bool)
+      (g ge gr : gname) (dev inum : mword 32) :
+    ic_id cn k (1/2) true dev inum -∗
+    ic_id cn k (1/2) true dev inum -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_mid cn k -∗
+    icnt_half (bv_unsigned inum) 0%nat -∗
+    ifreeze_post (bv_unsigned inum) -∗
+    escA_inv ge gr γi (bv_unsigned inum) -∗
+    redeem_ticketA gr -∗
+    |==> ic_escrow_body cn γfs γi cov logstart k ∗
+         ic_id cn k (1/2) false dev inum ∗
+         ipool_shape γfs γi cov logstart inum ∗
+         ipool_shape_np γfs γi cov logstart inum.
+  Proof.
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt Hcnt Hpost #Hesc Htk".
+    iMod (ic_close_to_empty_core cn γfs γi cov logstart k v g dev inum
+            with "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt") as "(Hbody & Hgf2 & Hnp)".
+    iModIntro.
+    iSplitL "Hbody"; [iExact "Hbody" |].
+    iSplitL "Hgf2"; [iExact "Hgf2" |].
+    iSplitR "Hnp"; [| iExact "Hnp"].
+    rewrite /ipool_shape. iSplitL "Hcnt"; [iExact "Hcnt" |].
+    iRight. iRight. rewrite /pool_await. iExists ge, gr.
+    iSplitR; [iExact "Hesc" |]. iSplitL "Htk"; [iExact "Htk" | iExact "Hpost"].
   Qed.
 
   (* (e) THE RECYCLER'S RE-OPEN AT ITS VALID STORE (iget, +0x7c)
@@ -2071,13 +2273,34 @@ Section IcacheEscrow.
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        ic_id cn k (1/2) false dev inum)%I.
 
+  (* THE COUNT COUPLING's SLOT HALF (iclaim-ledger.md §2.2) rides on the LIVE
+     arm, at this slot's own count: [icnt_half (bv_unsigned inum)
+     (Pos.to_nat n)].  It is what every count-move lemma takes as an argument
+     and hands back moved ([IcacheInv]'s five [*_store_au]s), and it is
+     lock-held for the reason the rest of this record is -- iput has to hold
+     it across an [acquiresleep] and no invariant survives that.  The REGION
+     holds the other half ([InodeRegion.ireg_slot]), which is why a count move
+     needs an [↑iregN] open (the probe's structural mask verdict).
+
+     THE NOT-LIVE ARM DOES NOT GAIN ONE, and that is a recorded DEVIATION
+     from §2.2 ("[islot_empty] gains it at 0").  It cannot: [islot_empty]'s
+     [inum] is the value of the slot's own inum CELL, and at boot every one of
+     the fifty cells reads ZERO ([IcacheBoot.itable_boot]'s zeroed BSS), so
+     §2.2's ruling asks for fifty copies of [icnt_half 0 0] -- fraction 25 at
+     one key, i.e. FALSE, and [IcacheBoot] would not close.  The uncached
+     inums' halves have exactly one coherent home, the free POOL (whose domain
+     [region_inums nib ∖ ci_inums ci] is precisely the complement of the live
+     arms' inums, so pool ⊎ live = every region inum, one half each); wiring
+     it is the recycle/eviction increment's, together with the boot premise
+     that supplies them. *)
   Definition islot2 (cn : ic_names) (M : gmap nat (Qp * positive))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) : iProp Σ :=
     match M !! k, ci !! k with
     | None, None => islot_empty cn k
     | Some (q, n), Some (dev, inum) =>
         (islot_rest_at k q dev inum ∗ iref_slots (Pos.to_nat n) ∗
-         ic_id cn k (1/2) true dev inum)%I
+         ic_id cn k (1/2) true dev inum ∗
+         icnt_half (bv_unsigned inum) (Pos.to_nat n))%I
     | _, _ => False%I
     end.
 

@@ -717,11 +717,46 @@ Section IcacheBootPool.
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
-  (* THE FREE ARM IS A BARE MARKER since §16.4 -- no record, no type premise *)
+  (* THE POOL'S KEYS ARE THE [mword] ROUND TRIP, and the ledger's are plain
+     [Z]: [ipool] indexes [ipool_shape] at [mword_of_int z], so its [icnt] and
+     [ifreeze] conjuncts sit at [bv_unsigned (mword_of_int z)], while
+     [IcacheRef.icnt_boot_split] / [IcacheRef.link_boot_split] hand a boot
+     client its big-ops at [z].  Over [region_inums] the two agree
+     ([region_inum_faithful]) and this is the bridge -- stated once, over an
+     arbitrary [Phi], so the two ledger columns and any future third share
+     it. *)
+  Lemma region_key_shift (nib : nat) (Phi : Z -> iProp Σ) :
+    16 * Z.of_nat nib <= 2 ^ 32 ->
+    ([∗ set] z ∈ region_inums nib, Phi z) -∗
+    ([∗ set] z ∈ region_inums nib, Phi (bv_unsigned (mword_of_int z : mword 32))).
+  Proof.
+    iIntros (Hnib) "H". iApply (big_sepS_mono with "H"). intros z Hz.
+    rewrite (region_inum_faithful nib z Hnib Hz) //.
+  Qed.
+
+  (* THE FREE ARM IS A BARE MARKER since §16.4 -- no record, no type premise.
+
+     WHAT INCREMENT IIIa ADDS: the two UNCACHED LEDGER RESOURCES the pool now
+     carries (iclaim-ledger.md §2.2/§2.3).  Both are PREMISES, and for
+     [ireg_alloc]'s reason spelled at its own count-halves premise: the gnames
+     are the ambient class's, so only the [own_alloc] that minted them can
+     hand them over -- [IcacheRef.icnt_boot_split] for the count half (from
+     [icfg_alloc]'s [CM := icnt_boot_map (region_inums nib)]) and
+     [IcacheRef.link_boot_split] for the freeze token (from
+     [LM := link_boot_map (region_inums nib)], whose auth half is the very
+     [link_auth z .. (Some (Excl FrzOff))] big-op [ireg_alloc] already takes).
+     Boot's count is the literal 0 and boot's phase is [FrzOff]: no inode is
+     cached and no inum is in transition before userspace exists. *)
   Lemma ipool_shape_free (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) :
+    icnt_half (bv_unsigned inum) 0%nat -∗
+    ifreeze_off (bv_unsigned inum) -∗
     imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
-  Proof. iIntros "Hmk". rewrite /ipool_shape /ipool_shape_np. iLeft. iRight. iExact "Hmk". Qed.
+  Proof.
+    iIntros "Hcnt Hoff Hmk". rewrite /ipool_shape /ipool_shape_np.
+    iSplitL "Hcnt"; [iExact "Hcnt" |].
+    iLeft. iSplitR "Hoff"; [iRight; iExact "Hmk" | iExact "Hoff"].
+  Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
      image-wf family for exactly the reason [inode_ok] did: it is a fact
@@ -752,12 +787,16 @@ Section IcacheBootPool.
     dir_dots_ix (bv_unsigned inum) dn data ->
     dir_orphan_clean dn data ->
     dir_uniq dn data ->
+    icnt_half (bv_unsigned inum) 0%nat -∗
+    ifreeze_off (bv_unsigned inum) -∗
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok Hdok Hddix Hdoc Hduq) "Hdlk Hdn Hind Hblk".
-    rewrite /ipool_shape /ipool_shape_np. iLeft. iLeft.
+    iIntros (Hok Hdok Hddix Hdoc Hduq) "Hcnt Hoff Hdlk Hdn Hind Hblk".
+    rewrite /ipool_shape /ipool_shape_np.
+    iSplitL "Hcnt"; [iExact "Hcnt" |].
+    iLeft. iSplitR "Hoff"; [| iExact "Hoff"]. iLeft.
     iExists dn, bm, data.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
@@ -786,6 +825,13 @@ Section IcacheBootPool.
   Lemma ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (R A : gset Z) :
     A ⊆ R ->
+    (* the uncached ledger pair, one per POOLED inum and over the WHOLE of
+       [R] -- both arms of the split need it, the allocated one no less than
+       the free one, because §2.2's halves are about cachedness and not about
+       allocatedness.  Keyed the way [ipool] keys its shapes; see
+       [region_key_shift] for the bridge from the boot splits' plain [z]. *)
+    ([∗ set] z ∈ R, icnt_half (bv_unsigned (mword_of_int z : mword 32)) 0%nat) -∗
+    ([∗ set] z ∈ R, ifreeze_off (bv_unsigned (mword_of_int z : mword 32))) -∗
     ([∗ set] z ∈ A,
        ∃ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
          ⌜inode_ok cov logstart dn bm data⌝ ∗
@@ -800,16 +846,27 @@ Section IcacheBootPool.
        imark γi (bv_unsigned (mword_of_int z : mword 32))) -∗
     ipool γfs γi cov logstart R.
   Proof.
-    iIntros (Hsub) "Ha Hf".
+    iIntros (Hsub) "Hcnts Hoffs Ha Hf".
+    (* the ledger pair splits along the same subset the pool does *)
+    rewrite (union_difference_L A R Hsub) !big_sepS_union; [| set_solver ..].
+    iDestruct "Hcnts" as "[HcA HcF]". iDestruct "Hoffs" as "[HoA HoF]".
+    rewrite -(union_difference_L A R Hsub).
     iApply (ipool_split γfs γi cov logstart R A Hsub).
-    iSplitL "Ha".
-    - rewrite /ipool. iApply (big_sepS_mono with "Ha"). intros z _.
-      iIntros "(%dn & %bm & %data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdn
-                & Hind & Hblk)".
+    iSplitL "Ha HcA HoA".
+    - rewrite /ipool.
+      iDestruct (big_sepS_sep_2 with "HcA HoA") as "Hlg".
+      iDestruct (big_sepS_sep_2 with "Hlg Ha") as "Ha".
+      iApply (big_sepS_mono with "Ha"). intros z _.
+      iIntros "[[Hcnt Hoff] (%dn & %bm & %data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq
+                & Hdlk & Hdn & Hind & Hblk)]".
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok Hddix Hdoc Hduq
-                with "Hdlk Hdn Hind Hblk").
-    - rewrite /ipool. iApply (big_sepS_mono with "Hf"). intros z _.
-      iIntros "Hmk". iApply (ipool_shape_free with "Hmk").
+                with "Hcnt Hoff Hdlk Hdn Hind Hblk").
+    - rewrite /ipool.
+      iDestruct (big_sepS_sep_2 with "HcF HoF") as "Hlg".
+      iDestruct (big_sepS_sep_2 with "Hlg Hf") as "Hf".
+      iApply (big_sepS_mono with "Hf"). intros z _.
+      iIntros "[[Hcnt Hoff] Hmk]".
+      iApply (ipool_shape_free with "Hcnt Hoff Hmk").
   Qed.
 
   (* ...and the case that needs no image theory at all: an image whose inodes
@@ -820,16 +877,30 @@ Section IcacheBootPool.
      leave the region at all. *)
   Lemma ipool_alloc_all_free (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (dss : list (list dinode)) (nib : nat) :
+    16 * Z.of_nat nib <= 2 ^ 32 ->
     (forall z : Z, z ∈ region_inums nib ->
        bv_unsigned (di_type (image_dinode dss z)) = 0) ->
+    (* the uncached ledger pair, exactly as [IcacheRef.icnt_boot_split] and
+       [IcacheRef.link_boot_split] hand it over at [P := region_inums nib] --
+       so an all-free image's pool is still stocked in one line from the boot
+       maps, with no key arithmetic at the client (that is what the [nib]
+       range hypothesis buys, via [region_key_shift]) *)
+    ([∗ set] z ∈ region_inums nib, icnt_half z 0%nat) -∗
+    ([∗ set] z ∈ region_inums nib, ifreeze_off z) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool γfs γi cov logstart (region_inums nib).
   Proof.
-    iIntros (H0) "H". rewrite /ipool.
+    iIntros (Hnib H0) "Hcnts Hoffs H". rewrite /ipool.
+    iDestruct (region_key_shift nib (fun z => icnt_half z 0%nat) Hnib
+                with "Hcnts") as "Hcnts".
+    iDestruct (region_key_shift nib (fun z => ifreeze_off z) Hnib
+                with "Hoffs") as "Hoffs".
+    iDestruct (big_sepS_sep_2 with "Hcnts Hoffs") as "Hlg".
+    iDestruct (big_sepS_sep_2 with "Hlg H") as "H".
     iApply (big_sepS_mono with "H"). intros z Hz.
-    iIntros "Hout".
-    iApply ipool_shape_free.
+    iIntros "[[Hcnt Hoff] Hout]".
+    iApply (ipool_shape_free with "Hcnt Hoff").
     iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
               (image_dinode dss z) (H0 z Hz) with "Hout").
   Qed.

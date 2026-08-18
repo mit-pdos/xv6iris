@@ -1298,8 +1298,16 @@ Section IreclaimOrphan.
         it here. *)
     iEval (rewrite /bio_locked) in "Hlk".
     iDestruct (ds_held_L with "Hlk") as "[HpL Hlkback]".
-    iAssert (iname γi γfs inum (BufL (uint bno) ds)) with "[HpL]" as "Hlic".
-    { rewrite /iname /fsblock -Hbseq. iFrame "HpL". iPureIntro.
+    (* ...AND THE BOOT SHELTER RIDES WITH IT (iclaim-ledger.md §2.6, landed
+       in [IgetLic]'s [BufL] arm).  Licence (e) is now BOOT-GATED: the
+       presenter lends [ireg_boot] alongside the block half, which is what
+       makes (e) unpresentable after the seal fires and therefore refutable
+       at an in-transition box.  This walk is the ONE site in the tree that
+       presents (e) and it is a boot-thread proof, so the token is simply
+       [Hboot], threaded here and taken straight back below -- BORROWED,
+       exactly like the block half beside it. *)
+    iAssert (iname γi γfs inum (BufL (uint bno) ds)) with "[HpL Hboot]" as "Hlic".
+    { rewrite /iname /fsblock -Hbseq. iFrame "HpL Hboot". iPureIntro.
       split; [exact Hdswf | exact Htnz]. }
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
               (BufL (uint bno) ds)
@@ -1315,7 +1323,7 @@ Section IreclaimOrphan.
        not in scope in this file, and writing the target proposition out
        would import it for one line. *)
     iEval (rewrite /iname /fsblock -Hbseq) in "Hlic".
-    iDestruct "Hlic" as "(HpL & _ & _)".
+    iDestruct "Hlic" as "(HpL & _ & _ & Hboot)".
     iDestruct ("Hlkback" with "HpL") as "Hlk".
     iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0)
       with "[Hlk]" as "Hlk"; [rewrite /bio_locked; iExact "Hlk" |].
