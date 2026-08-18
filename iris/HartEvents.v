@@ -56,7 +56,7 @@ Proof.
             mm !! pa_add pa j = Some (nth_byte w j)).
   { intros j Hj.
     pose proof (VirtioQueue.write_bytes_lookup ∅ pa n w j Hn Hj) as Hhit.
-    exact (map_subseteq_spec _ _ Hsub _ _ Hhit). }
+    eapply map_subseteq_spec; [exact Hsub|exact Hhit]. }
   destruct (read_bytes mm pa n) as [w'|] eqn:Hrb.
   - f_equal. apply bv_eq_of_bytes. intros j Hj.
     pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
