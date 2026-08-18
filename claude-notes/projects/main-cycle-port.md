@@ -889,7 +889,20 @@ in statements consumed by ProofSwtch/VcGenS/WpSconfSret/WpSmodePtAlu/
 WpSmodePtMemWrap.  The LEAF obligation gets the OPENED form -- the
 satp/tlb/pmpcfg_n/pmpaddr_n cells + a tlb-keyed residue + the pure facts --
 via new `s_regime_swp` fields `sr_swp_open` / `sr_swp_close` (proved for
-both instances), and returns it at the landing tlb value.  **DECIDED 2026-08-18: the swp face is FOLDED INTO `s_regime`**
+both instances), and returns it at the landing tlb value.  **DONE (1b070fb5): the swp face IS FOLDED INTO `s_regime`** -- fields
+`sr_swp_res/_side/_translate/_res_at/_satp_ok/_res_agree/_open/_close`
+plus the two producers `sr_adm_of_pin` (at the ambient CurKtier = KT0
+identity pin; KT1 claims go the `sr_kwit` route) and `sr_swp_side_ok`;
+`s_regime_swp` is gone; `strans_swp_*` live in IntrDefs beside
+`strans_regime`.  The fetch-translation producer is
+`SmodeCorePt.spt_tr_obl_of_regime (R)` (pure config facts only), the
+data-side dischargers are `SRegime.bare_swp_side_intro`/`kpt_swp_side_intro`
+(access-generic), and the three PTE-test `goodb` certificates are PROVED in
+`KptGoodb.v` (the internal-level one as previously stated was FALSE -- a
+non-leaf word with PBMT='b"11" reads misa; validity, not pointer-ness, is
+what kills that branch) and discharged inside `HartSKpt.swp_translate_kpt`.
+The five wrappers' rider is `Rl : mword 64 -> iProp Σ`, keyed on the
+landing pc.  Superseded text below kept for the reasoning:
 (the `s_regime_swp` fields become fields of `s_regime`; instances bare /
 kpt_share / `IntrDefs.strans_regime` carry them; the fetch-translation
 producer `spt_fetch_tr_of_regime` is generic in `R`), because the
