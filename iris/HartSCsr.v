@@ -36,7 +36,7 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
+From iris.base_logic.lib Require Import gen_heap ghost_map invariants.
 From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
@@ -336,6 +336,92 @@ Section HartSCsr.
       { change (wX_bits zreg (zeros' 64)) with (Defs.returnm tt : M unit).
         iApply swp_ret. by iFrame. }
       iIntros (u) "[Hrw Hro]". rewrite Hcb. iApply swp_ret. by iFrame. }
+    iIntros (u2) "[Hrw Hro]". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* the EXISTENTIAL-RESULT reading of the same engine.  A CSR whose write
+     ends in a READ-BACK of a cell the leaf does not own -- stimecmp, whose
+     cell lives in [TimerCap]'s invariant and is therefore only visible one
+     node at a time -- cannot name the value the write returns, so the
+     obligation hands it back existentially and the id callback's equation
+     is asked for at every value instead of at one. *)
+  Lemma swp_doCSR_w_ex_p (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rs' : regstate) (csr : SailStdpp.Values.mword 12) (pr : Privilege)
+      (op : csrop) (rs1_val wval : SailStdpp.Values.mword 64) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = pr ->
+    ext_check_CSR csr pr CSRWrite = true ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    match op with
+    | CSRRW => rs1_val
+    | CSRRS => or_vec (zeros' 64) rs1_val
+    | CSRRC => and_vec (zeros' 64) (not_vec rs1_val)
+    end = wval ->
+    (forall cf, csr_id_write_callback csr cf = Defs.returnm tt) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (check_CSR_result csr pr CSRWrite)
+         (fun w => ⌜w = CSR_Check_OK tt⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (write_CSR csr wval)
+         (fun x => (∃ cf : SailStdpp.Values.mword 64, ⌜x = Values.Ok cf⌝) ∗
+                   hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)) -∗
+    swp (doCSR csr rs1_val zreg op CSRWrite)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hext H344 H144 Hwv Hcb.
+    iIntros "#Hcert Hrw Hro Hchk Hwr".
+    unfold doCSR.
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs cur_privilege Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (p0) "(-> & Hrw & Hro)". rewrite Hpriv.
+    iApply (swp_bind_use (check_CSR_result csr pr CSRWrite) _ _ _
+              with "[Hchk Hrw Hro] [-]").
+    { iApply ("Hchk" with "Hrw Hro"). }
+    iIntros (w1) "(-> & Hrw & Hro)". cbn match.
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs cur_privilege Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (p2) "(-> & Hrw & Hro)". rewrite Hpriv Hext.
+    change (Riscv.rv64d.not true) with false. cbn match.
+    replace (if Instances.generic_neq CSRWrite CSRWrite then read_CSR csr
+             else returnM (zeros' 64))
+      with (returnM (zeros' 64) : M (SailStdpp.Values.mword 64)) by reflexivity.
+    iApply (swp_bind_use (returnM (zeros' 64) : M (SailStdpp.Values.mword 64)) _
+              (fun x => ⌜x = zeros' 64⌝ ∗ hreg_frame rs Drw ∗
+                        hreg_frame_ro Df rs Dro)%I _ with "[Hrw Hro] [-]").
+    { iApply swp_ret. by iFrame. }
+    iIntros (rv) "(-> & Hrw & Hro)".
+    rewrite H344 H144.
+    iApply (swp_bind_use (returnM (zeros' 64) : M (SailStdpp.Values.mword 64)) _
+              (fun x => ⌜x = zeros' 64⌝ ∗ hreg_frame rs Drw ∗
+                        hreg_frame_ro Df rs Dro)%I _ with "[Hrw Hro] [-]").
+    { iApply swp_ret. by iFrame. }
+    iIntros (rv2) "(-> & Hrw & Hro)".
+    replace (Instances.generic_eq CSRWrite CSRRead) with false
+      by reflexivity. cbn match.
+    rewrite Hwv.
+    iApply (swp_bind_use (write_CSR csr wval) _ _ _ with "[Hwr Hrw Hro] [-]").
+    { iApply ("Hwr" with "Hrw Hro"). }
+    iIntros (wres) "((%cf & ->) & Hrw & Hro)". cbn match.
+    iApply (swp_bind0_use _ _
+              (fun _ => hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I _
+                with "[Hrw Hro] [-]").
+      { change (wX_bits zreg (zeros' 64)) with (Defs.returnm tt : M unit).
+        iApply swp_ret. by iFrame. }
+      iIntros (u) "[Hrw Hro]". rewrite (Hcb cf). iApply swp_ret. by iFrame. }
     iIntros (u2) "[Hrw Hro]". iApply swp_ret. by iFrame.
   Qed.
 
@@ -1027,6 +1113,61 @@ Section HartSCsr.
   (* σ-callback with the ⊤→∅→⊤ dance, so this is that rule with the state  *)
   (* interpretation consumed on the caller's behalf.                       *)
   (* ================================================================== *)
+  Lemma swp_read_reg_acc (r : register) (E : coPset)
+      (Φ : type_of_register r -> iProp Σ) :
+    gen_cert -∗
+    (|={⊤,E}=> ∃ v0 : type_of_register r,
+        reg_pointsto r (DfracOwn 1) v0 ∗
+        (reg_pointsto r (DfracOwn 1) v0 ={E,⊤}=∗ Φ v0)) -∗
+    swp (Defs.read_reg r) Φ.
+  Proof.
+    iIntros "#Hcert Hacc".
+    iApply (swp_hart_regread with "Hcert").
+    { cbn [hregread_at]. apply bool_decide_eq_true_2. reflexivity. }
+    iIntros (σ) "Hsi". rewrite /mstate_interp.
+    iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
+    iMod "Hacc" as (v0) "[Hpt Hcl]".
+    iDestruct (reg_valid with "Hreg Hpt") as %Lv.
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hclose". iNext. iMod "Hclose" as "_".
+    iMod ("Hcl" with "Hpt") as "HΦ". iModIntro.
+    iSplitL "Hreg Hmem Hdev"; [by iFrame|].
+    rewrite hregread_resume_red Lv. iApply swp_ret. iExact "HΦ".
+  Qed.
+
+  (* THE SHAPE A SEALED CELL ACTUALLY NEEDS.  An [inv N (∃ d, r ↦ᵣ d)] hands
+     its content out under a LATER, and the accessor form above consumes its
+     argument at the ⊤→∅ step, BEFORE the node rule's later -- so it cannot
+     take an invariant.  This one opens the invariant itself, strips the
+     later where [swp_hart_regwrite] provides one, and closes at the new
+     value.  Reads of such a cell need nothing at all: a read of a register
+     the caller does not own is ungated ([WpMmodeCsrSwp.swp_read_reg_any]),
+     which is why only the WRITE has a seam. *)
+  Lemma swp_write_reg_cellinv (N : namespace) (r : register)
+      (w : type_of_register r) (Φ : unit -> iProp Σ) :
+    inv N (∃ d : type_of_register r, reg_pointsto r (DfracOwn 1) d) -∗
+    gen_cert -∗ Φ tt -∗ swp (Defs.write_reg r w) Φ.
+  Proof.
+    iIntros "#Hinv #Hcert HΦ".
+    iApply (swp_hart_regwrite r w with "Hcert").
+    { cbn [hregwrite_val_at Defs.write_reg].
+      destruct (decide _) as [Heq|Hne]; [|congruence].
+      assert (Heq = eq_refl) as -> by apply proof_irrel. reflexivity. }
+    iIntros (σ) "Hsi". rewrite /mstate_interp.
+    iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
+    iInv "Hinv" as "Hd" "Hcl".
+    iApply fupd_mask_intro; [set_solver|].
+    iIntros "Hclose". iNext.
+    iDestruct "Hd" as (d) "Hpt".
+    iMod (reg_update _ r _ w with "Hreg Hpt") as "[Hreg Hpt]".
+    iMod "Hclose" as "_".
+    iMod ("Hcl" with "[Hpt]") as "_"; [iNext; iExists w; iExact "Hpt"|].
+    iModIntro.
+    iSplitL "Hreg Hmem Hdev";
+      [rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg; by iFrame|].
+    rewrite hregwrite_resume_red. iApply swp_ret. iExact "HΦ".
+  Qed.
+
   Lemma swp_write_reg_acc (r : register) (w : type_of_register r)
       (E : coPset) (Φ : unit -> iProp Σ) :
     gen_cert -∗
