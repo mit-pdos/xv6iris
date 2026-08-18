@@ -1239,9 +1239,12 @@ dependents; an additive change to either costs that cone on every iteration
 and breaks every sibling lane's single-file `coqc` loop.  This is the
 durable-notes rule and the call `HartStepFull.v` made against
 `HartStepAny.v`.  **FOLD BACK at the milestone**: section 0 into
-`HartMemAsm.v`, section 1 into `SmodePte.v`, sections 2–3 into
-`CommonWalk.v`, sections 4–7 into `PtTreeAdue.v` / `PtTree.v`, and
-`UserFetchCert` sections 1–2 into `UserMem.v` / `UserFetch.v`.
+`HartMemAsm.v`, section 0b into `PtTree.v` (beside `pte_valid`, with its
+four borrowed `goodb` structural rules going into `WpDecodeBridge.v`),
+section 1 into `SmodePte.v`, sections 2–3 into `CommonWalk.v`, sections
+4–7 into `PtTreeAdue.v` / `PtTree.v`, and `UserFetchCert` sections 1–2
+into `UserMem.v` / `UserFetch.v`, its section 6 leaf check into
+`UserPtTree.v` and its section 7 (`u_fetch_pure`) into `UserFetchPt.v`.
 
 **WHAT `HartMemAsm` DID NOT HAVE, and every memory family will want it.**
 `bindR_ret` / `bindm_ret` (a `returnm`/`returnR` head is a CONVERSION, so a
@@ -1262,56 +1265,102 @@ becomes `match goal with |- context[F ?X] => replace (F X) with <rhs> by
 `update_and_write_pte` (whose two occurrences do not even carry the same
 width argument).
 
-### WHAT `u_fetch_pure` IS STILL WAITING ON
-
-`UserFetchCert.v` now carries everything the composer of §4.2 needs EXCEPT
-one lemma and the ~150-line assembly:
-
-* the fetch's own halves — `goodmb_checked_mem_read_ram_4_U`,
-  `goodmb_mem_read_fetch_4_U`, `goodmb_fetch_bytes_ok`, `goodmb_fetch_ok_4`,
-  and the three `translateAddr` ingredients (`goodb_effectivePrivilege_fetch`
-  / `_is_shadow_stack_fetch` / `_translationMode_U`);
-* the `u_mem_wf` projections the walk asks for
-  (`ptree_maps_slot2/1/0` → `u_slot_mem_at` / `u_slot_owned`);
-* **the byte-level ADUE absorption, which was the real blocker and is
-  PROVED**: `ptree_bytes_set_leaf` (writing the leaf slot IS setting the
-  leaf in the tree) and, on top of it, `u_mem_step_writeback` — so all
-  three conjuncts of `u_mem_step` have a supplier on the write-back arm;
-* `u_writeback_data` (a page-table write does not touch the data half) and
-  `u_fetch_bytes` (the four instruction bytes are in the owned map with
-  SOME value), which is what justifies the instruction read at the POST-
-  translate state.
-
-**THE ONE LEMMA LEFT IS `goodb_pte_is_invalid`**, the EVENT-FREENESS of the
-PTE validity test:
+### `u_fetch_pure` IS LANDED — `UserFetchCert.v` section 7
 
 ```coq
-Lemma goodb_pte_is_invalid (Db : register -> bool) (q : mword 64) (s : mstate) :
-  Db misa = true -> Db menvcfg = true ->
-  goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec q 7 0))
-              (ext_bits_of_PTE q)) s = true.
+Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (w va : mword 64) (mi : bool) :
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (InstructionFetch tt) w ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr va)) (sign_extend' 64 (...)) = false ->
+  post_fetch_cfg (u_state rsf mm) va mi ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
+    exec (fetch tt) (u_state rsf mm)
+      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               then F_RVC (...) else F_Base (...)), u_state rsf' mm') /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+    (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    u_mem_step P t t' mm mm'.
 ```
 
-`CommonWalk`'s `H0ig`/`H1ig`/`H2ig` and `PtWalkCert`'s copies take it as a
-hypothesis, meant to be discharged per instance at a CONCRETE flag byte.
-The user tier cannot do that: the walk's two POINTER words are abstract
-(`ptree_maps` pins only `pte_valid`/`pte_ptr`), so the fact has to be proved
-once, at an arbitrary word.  It IS true — the test's only register read is
-`currentlyEnabled Ext_Svrsw60t59b` (in the reserved-bit arm), which reads
-`misa` — but **it does NOT fall to `vm_compute`**: unlike
-`currentlyEnabled Ext_Svadu`, the Svrsw gate does not reduce to a closed
-boolean at an abstract state (measured: no answer in 2 min).  It wants the
-same `and_boolM`/`or_boolM` peel every other gate gets, with the extension
-probe supplied by name.  Its home is `PtTree.v` beside `pte_valid`.
+The successor is spelled `u_state rsf' mm'` rather than an opaque `sf`,
+because that is what `base_exec_total_u` / `rvc_exec_total_u` are stated
+over: the caller feeds this straight into them with NO state algebra in
+between.  The `mdev` half never moves, so nothing is lost by pinning it.
 
-With it, `u_fetch_pure` is the assembly: `upt_spec_maps` for the path, the
-section-3 projections for the three slots,
-`KptTree.ptree_translateAddr_cases` and
-`PtWalkCert.goodmb_ptree_translateAddr` for the translation (its three
-outcome arms giving `t'` by `tlb_ok_pt_fill_self` /
-`UptTree.upt_tree_spec_set_leaf` and `u_mem_step` by `u_mem_step_refl` /
-`u_mem_step_writeback`), `u_fetch_bytes` + `u_writeback_data` for the
-instruction read, and `exec_fetch_ok_4` / `goodmb_fetch_ok_4` on top.
+**THE THREE `translateAddr` OUTCOMES ARE COLLAPSED ONCE**, in an
+intermediate `Hland` that exhibits `(rsf', mm', t')` for each arm — hit
+(nothing moves, `u_mem_step_refl`), fill (`tlb` written,
+`tlb_ok_pt_fill_self`), Svadu write-back (both, plus the tree moving by
+`ptree_set_leaf`: `u_mem_step_writeback` + `UptTree.upt_tree_spec_set_leaf`
++ `tlb_ok_pt_fill_self` ∘ `tlb_ok_pt_set_leaf`).  **Nothing after `Hland`
+looks at which arm ran** — that is what keeps the composer ~150 lines.
+
+Two things the assembly settled, both reusable by every other memory
+composer of this tier:
+
+* **THE CERTIFICATE'S MAP IS THE *PRE* MAP, THE EXEC FACT'S IS THE POST
+  MAP, AND `u_fetch_bytes` SUPPLIES BOTH.**  `goodmb … (fetch tt) s mm`
+  carries ONE map through the whole stretch, so the instruction read's
+  `bytes_owned` obligation is at `mm` while its `exec` premise needs the
+  byte VALUES at `sf.(mem)`.  Apply `u_fetch_bytes` twice — at `(t, mm)`
+  for ownership and at `(t', mm')` (reached by `u_mem_step_wf`) for the
+  values.  Do NOT try to push `u_writeback_data` through instead; the
+  domains are equal and that is all the certificate ever asks.
+* **THE POST-TRANSLATE FILE DIFFERS FROM `rsf` ONLY AT `tlb`**, so every
+  ambient pin the read consults (the two PMP cells, `pma_regions`,
+  `htif_tohost_base`, `cur_privilege`, `mstatus`) transports with one
+  `irrelevant_register_set` helper built from the landing disjunct.  That
+  helper is the whole reason the landing conjunct is stated as a
+  disjunction of shapes rather than as an agreement predicate.
+
+**ONLY THE 4-ALIGNED FETCH IS DONE.**  The 2-aligned split fetch (a
+compressed instruction at an odd halfword, and the 2+2 straddle that
+translates TWICE) has its exec facts in `UserFetch`
+(`exec_fetch_rvc_2` / `exec_fetch_base_2` / the two fault arms) and its
+Iris composer in `UserFetchPt.user_pt_fetch_instr_2`, but **no `goodmb`
+twin of either exists**: `UserFetchCert` section 2 certifies `fetch_bytes`
+and `fetch` at width 4 only.  A `u_fetch_pure_2` needs those two twins
+first; everything else it wants — the walk certificate, the `u_mem_wf`
+projections, the landing algebra — is width-independent and is already
+there, so it is the section-7 script run TWICE with the second
+translation's `u_mem_step` composed by transitivity.
+
+**THE TWO INPUTS IT WAS WAITING ON ARE ALSO LANDED**, both as
+register-free certificates so they meet the walk's `forall Db s0`
+premises unchanged:
+
+* `PtWalkCert` section 0b (fold-back: `PtTree.v` beside `pte_valid`) —
+  `goodb_pte_is_invalid` at ANY word (read set `{misa, menvcfg}`), and
+  `goodb_pte_is_invalid_valid`, which needs NO footprint at all because
+  `pte_valid`, read at `PtTree.pte_s0`, already forces N / PBMT / RSW /
+  reserved to zero and rules out the R=0,W=1,X=0 encoding — and every
+  register-reading arm of the test is guarded by exactly one of those.
+  **Neither falls to `vm_compute`** (the Svrsw60t59b / Svnapot / Svpbmt
+  gates recurse through `Ext_S`, which reads `misa`); both are the
+  ordinary `and_boolM`/`or_boolM` peel, with the gate lemmas proved by
+  opening the `Acc` guard (`destruct (Defs.Zwf_guarded _)`, then
+  `destruct` the recursive call's `_limit_reduces_bool _ _`) and applying
+  `DecodeTotalU`'s generic `goodb_bind_forall` / `_and_boolM` / `_or_boolM`
+  / `_bind_read_reg`.  Those four belong in `WpDecodeBridge` beside
+  `goodb_bind`; the borrow is the only reason `PtWalkCert` Requires
+  `DecodeTotalU`.
+* `UserFetchCert.goodb_check_PTE_permission_fetch` (fold-back:
+  `UserPtTree.v` beside `uleaf_ok`) — the leaf PERMISSION check is
+  register-free at any leaf the fetch is permitted on.  It is not
+  register-free in general: the R=0,W=1,X=0 encoding reads `menvcfg` and
+  then ASSERTS on menvcfg.SSE (which no abstract state decides), and the
+  leading `assert_exp (W -> (R || !X))` is an error node on W=1,R=0,X=1.
+  `pte_check_ok` rules both out — read at `dstateM` each would make `exec`
+  answer something other than `PTE_Check_Success`.
+
+Chain verification, admit-free: `PtWalkCert` 12 s, `UserFetchCert` 6.5 s;
+`Print Assumptions u_fetch_pure` yields `rv64d.plat_term_write` alone, and
+the three new `goodb` lemmas are closed under the global context.
 
 ## 11. THE CERTIFICATE OF A READ-ONLY GATE IS FREE — compute it at `dstateU` and transport it (found 2026-08-18, P7)
 
