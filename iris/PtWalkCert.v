@@ -1080,3 +1080,455 @@ Section WalkCert.
   Qed.
 
 End WalkCert.
+
+(* ===================================================================== *)
+(* 3. THE FAULT WALKS ([CommonWalk] section UserWalkFault's twins).        *)
+(*                                                                        *)
+(* Same shape as section 2, and the same two new premises per lemma: the   *)
+(* [goodb] companion of each pure PTE test (which the tier's instances     *)
+(* already have, being [vm_compute]s at a concrete flag byte) and the      *)
+(* [goodmb] of each PTE read.  The [check_leaf_pte] arms THROW, so they    *)
+(* keep the [catch_early_return] wrapper on and end at                     *)
+(* [HartMemAsm.mcer_early_return]'s conversion.                            *)
+(* ===================================================================== *)
+Section WalkFaultCert.
+  Context (vpn : mword 27).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
+  Context (Dr Dw : register -> bool).
+
+  Lemma goodmb_check_leaf_pte_invalid (pte : mword 64) (pa : physaddr) (lvl : Z)
+      (s : mstate) (mm : pamap) :
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                        (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    goodmb Dr Dw (check_leaf_pte 39 vpn acc p mxr do_sum pte pa lvl tt) s mm = true.
+  Proof.
+    intros Hinvg Hinv. unfold check_leaf_pte.
+    erewrite gm_cer_liftR_seq;
+      [ | apply (goodmb_of_goodb Dr Dw _ s mm); apply Hinvg | apply Hinv ].
+    cbv iota beta. reflexivity.
+  Qed.
+
+  Lemma goodmb_check_leaf_pte_noperm0 (pte : mword 64) (pa : physaddr)
+      (f : pte_check_failure) (s : mstate) (mm : pamap) :
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                        (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = false ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (check_PTE_permission acc p mxr do_sum
+                   (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte) tt) s0 = true) ->
+    (forall s0, exec (check_PTE_permission acc p mxr do_sum
+                        (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                        (ext_bits_of_PTE pte) tt) s0
+       = Some (PTE_Check_Failure (tt, f), s0)) ->
+    goodmb Dr Dw (check_leaf_pte 39 vpn acc p mxr do_sum pte pa 0 tt) s mm = true.
+  Proof.
+    intros Hinvg Hinv Hnl Hchkg Hchk. unfold check_leaf_pte.
+    erewrite gm_cer_liftR_seq;
+      [ | apply (goodmb_of_goodb Dr Dw _ s mm); apply Hinvg | apply Hinv ].
+    cbv iota beta.
+    match goal with |- context[pte_is_non_leaf ?X] =>
+      replace (pte_is_non_leaf X) with false by (symmetry; exact Hnl) end.
+    cbv iota beta.
+    change (0 >? 0) with false. cbv iota beta.
+    match goal with |- context[Defs.bind0 ?A ?B] =>
+      assert (HAB : execR (Defs.bind0 A B) s = Some (inr (PTE_Check_Failure (tt, f)), s));
+      [ | assert (HABg : goodmb Dr Dw (Defs.bind0 A B) s mm = true) ] end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR.
+      match goal with |- context[check_PTE_permission ?a ?b ?c ?d ?e ?g ?h] =>
+        replace (check_PTE_permission a b c d e g h)
+          with (check_PTE_permission acc p mxr do_sum
+                  (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                  (ext_bits_of_PTE pte) tt) by reflexivity end.
+      rewrite (Hchk s). cbn match. reflexivity. }
+    { erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+      apply goodmb_liftR. apply (goodmb_of_goodb Dr Dw _ s mm). apply Hchkg. }
+    erewrite gm_cer_bind; [ | exact HABg | exact HAB ].
+    cbv iota beta. cbn match. reflexivity.
+  Qed.
+
+  (* level 0: the leaf slot holds an INVALID pte *)
+  Lemma goodmb_rec_walk_leaf_invalid (base : mword 44) (pte : mword 64)
+      (g : bool) (wfacc : Acc (Zwf 0) 0) (s : mstate) (mm : pamap) :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok pte, s) ->
+    goodmb Dr Dw (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 8)
+      s mm = true ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    goodmb Dr Dw (_rec_pt_walk 39 vpn acc p mxr do_sum base 0 g tt 0 wfacc) s mm = true.
+  Proof.
+    intros Hrd Hrdg Hinvg Hinv.
+    destruct wfacc as [a0].
+    cbn [_rec_pt_walk]. change (0 >=? 0) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 8 0)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    gmm_peel Hrdg Hrd. cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec (Defs.and_boolM A B) s = Some (false, s));
+      [ | assert (Habg : goodmb Dr Dw (Defs.and_boolM A B) s mm = true) ] end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta. apply exec_returnM. }
+    { apply (goodmb_of_goodb Dr Dw _ s mm). unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hvg : goodb Dr (Defs.bind (pte_is_invalid a b) k1) s = true);
+        [ | assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s)) ] end.
+      { rewrite (goodb_bind Dr _ _ s true (Hinvg Dr s) (Hinv s)). reflexivity. }
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind Dr _ E s false Hvg Hv) end.
+      reflexivity. }
+    gmm_peel Habg Hab. cbn match beta.
+    gmm_peel (goodmb_check_leaf_pte_invalid pte
+                (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 0 s mm
+                Hinvg Hinv)
+             (exec_check_leaf_pte_invalid vpn acc p mxr do_sum pte
+                (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 0 s Hinv).
+    cbn match beta zeta. apply goodmb_returnm.
+  Qed.
+
+  (* level 0: a valid leaf that FAILS the permission check (e.g. U = 0) *)
+  Lemma goodmb_rec_walk_leaf_noperm (base : mword 44) (pte : mword 64)
+      (g : bool) (f : pte_check_failure) (wfacc : Acc (Zwf 0) 0)
+      (s : mstate) (mm : pamap) :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok pte, s) ->
+    goodmb Dr Dw (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 8)
+      s mm = true ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = false ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (check_PTE_permission acc p mxr do_sum
+                   (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte) tt) s0 = true) ->
+    (forall s0, exec (check_PTE_permission acc p mxr do_sum
+                        (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                        (ext_bits_of_PTE pte) tt) s0
+       = Some (PTE_Check_Failure (tt, f), s0)) ->
+    goodmb Dr Dw (_rec_pt_walk 39 vpn acc p mxr do_sum base 0 g tt 0 wfacc) s mm = true.
+  Proof.
+    intros Hrd Hrdg Hinvg Hinv Hnl Hchkg Hchk.
+    destruct wfacc as [a0].
+    cbn [_rec_pt_walk]. change (0 >=? 0) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 8 0)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    gmm_peel Hrdg Hrd. cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec (Defs.and_boolM A B) s = Some (false, s));
+      [ | assert (Habg : goodmb Dr Dw (Defs.and_boolM A B) s mm = true) ] end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta.
+      match goal with |- context[pte_is_non_leaf ?X] =>
+        replace (pte_is_non_leaf X) with false by (symmetry; exact Hnl) end.
+      cbn [andb]. apply exec_returnM. }
+    { apply (goodmb_of_goodb Dr Dw _ s mm). unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hvg : goodb Dr (Defs.bind (pte_is_invalid a b) k1) s = true);
+        [ | assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s)) ] end.
+      { rewrite (goodb_bind Dr _ _ s false (Hinvg Dr s) (Hinv s)). reflexivity. }
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind Dr _ E s true Hvg Hv) end.
+      reflexivity. }
+    gmm_peel Habg Hab. cbn match beta.
+    gmm_peel (goodmb_check_leaf_pte_noperm0 pte
+                (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) f s mm
+                Hinvg Hinv Hnl Hchkg Hchk)
+             (exec_check_leaf_pte_noperm0 vpn acc p mxr do_sum pte
+                (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) f s
+                Hinv Hnl Hchk).
+    cbn match beta zeta. apply goodmb_returnm.
+  Qed.
+
+  (* level 1: the mid slot holds an INVALID pte *)
+  Lemma goodmb_rec_walk_l1_invalid (base : mword 44) (pte : mword 64)
+      (g : bool) (wfacc : Acc (Zwf 0) 1) (s : mstate) (mm : pamap) :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 8) s
+      = Some (Ok pte, s) ->
+    goodmb Dr Dw (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 8)
+      s mm = true ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    goodmb Dr Dw (_rec_pt_walk 39 vpn acc p mxr do_sum base 1 g tt 1 wfacc) s mm = true.
+  Proof.
+    intros Hrd Hrdg Hinvg Hinv.
+    destruct wfacc as [a1].
+    cbn [_rec_pt_walk]. change (1 >=? 0) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 17 9)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    gmm_peel Hrdg Hrd. cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec (Defs.and_boolM A B) s = Some (false, s));
+      [ | assert (Habg : goodmb Dr Dw (Defs.and_boolM A B) s mm = true) ] end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta. apply exec_returnM. }
+    { apply (goodmb_of_goodb Dr Dw _ s mm). unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hvg : goodb Dr (Defs.bind (pte_is_invalid a b) k1) s = true);
+        [ | assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s)) ] end.
+      { rewrite (goodb_bind Dr _ _ s true (Hinvg Dr s) (Hinv s)). reflexivity. }
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind Dr _ E s false Hvg Hv) end.
+      reflexivity. }
+    gmm_peel Habg Hab. cbn match beta.
+    gmm_peel (goodmb_check_leaf_pte_invalid pte
+                (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 1 s mm
+                Hinvg Hinv)
+             (exec_check_leaf_pte_invalid vpn acc p mxr do_sum pte
+                (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 1 s Hinv).
+    cbn match beta zeta. apply goodmb_returnm.
+  Qed.
+
+  (* level 1: a valid non-leaf step whose LEVEL-0 sub-walk is certified *)
+  Lemma goodmb_rec_walk_l1_sub (base : mword 44) (pte : mword 64) (g : bool)
+      (wfacc : Acc (Zwf 0) 1) (s : mstate) (mm : pamap) :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 8) s
+      = Some (Ok pte, s) ->
+    goodmb Dr Dw (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 8)
+      s mm = true ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = true ->
+    (forall (g' : bool) (a : Acc (Zwf 0) 0),
+       goodmb Dr Dw (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte) 0 g' tt 0 a)
+         s mm = true) ->
+    goodmb Dr Dw (_rec_pt_walk 39 vpn acc p mxr do_sum base 1 g tt 1 wfacc) s mm = true.
+  Proof.
+    intros Hrd Hrdg Hinvg Hinv Hnl Hsubg.
+    destruct wfacc as [a1].
+    cbn [_rec_pt_walk]. change (1 >=? 0) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 17 9)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    gmm_peel Hrdg Hrd. cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec (Defs.and_boolM A B) s = Some (true, s));
+      [ | assert (Habg : goodmb Dr Dw (Defs.and_boolM A B) s mm = true) ] end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta.
+      match goal with |- context[pte_is_non_leaf ?X] =>
+        replace (pte_is_non_leaf X) with true by (symmetry; exact Hnl) end.
+      change (1 >? 0) with true. cbn [andb]. apply exec_returnM. }
+    { apply (goodmb_of_goodb Dr Dw _ s mm). unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hvg : goodb Dr (Defs.bind (pte_is_invalid a b) k1) s = true);
+        [ | assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s)) ] end.
+      { rewrite (goodb_bind Dr _ _ s false (Hinvg Dr s) (Hinv s)). reflexivity. }
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind Dr _ E s true Hvg Hv) end.
+      reflexivity. }
+    gmm_peel Habg Hab. cbn match beta.
+    match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (1 - 1)] =>
+      change (1 - 1) with 0 end.
+    apply Hsubg.
+  Qed.
+
+  (* level 2 (= the full [pt_walk]): the root slot holds an INVALID pte *)
+  Lemma goodmb_pt_walk_user_l2_invalid (root : mword 44) (pte : mword 64)
+      (s : mstate) (mm : pamap) :
+    exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s
+      = Some (Ok pte, s) ->
+    goodmb Dr Dw (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8)
+      s mm = true ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    goodmb Dr Dw (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s mm = true.
+  Proof.
+    intros Hrd Hrdg Hinvg Hinv.
+    unfold pt_walk. destruct (Defs.Zwf_guarded _) as [a2].
+    cbn [_rec_pt_walk]. change (2 >=? 0) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr root (subrange_vec_dec vpn 26 18)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    gmm_peel Hrdg Hrd. cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec (Defs.and_boolM A B) s = Some (false, s));
+      [ | assert (Habg : goodmb Dr Dw (Defs.and_boolM A B) s mm = true) ] end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta. apply exec_returnM. }
+    { apply (goodmb_of_goodb Dr Dw _ s mm). unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hvg : goodb Dr (Defs.bind (pte_is_invalid a b) k1) s = true);
+        [ | assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s)) ] end.
+      { rewrite (goodb_bind Dr _ _ s true (Hinvg Dr s) (Hinv s)). reflexivity. }
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind Dr _ E s false Hvg Hv) end.
+      reflexivity. }
+    gmm_peel Habg Hab. cbn match beta.
+    gmm_peel (goodmb_check_leaf_pte_invalid pte
+                (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 2 s mm
+                Hinvg Hinv)
+             (exec_check_leaf_pte_invalid vpn acc p mxr do_sum pte
+                (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 2 s Hinv).
+    cbn match beta zeta. apply goodmb_returnm.
+  Qed.
+
+  (* level 2: a valid non-leaf step whose LEVEL-1 sub-walk is certified *)
+  Lemma goodmb_pt_walk_user_sub (root : mword 44) (pte : mword 64)
+      (s : mstate) (mm : pamap) :
+    exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s
+      = Some (Ok pte, s) ->
+    goodmb Dr Dw (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8)
+      s mm = true ->
+    (forall (Db : register -> bool) s0,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                   (ext_bits_of_PTE pte)) s0 = true) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = true ->
+    (forall (g' : bool) (a : Acc (Zwf 0) 1),
+       goodmb Dr Dw (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte) 1 g' tt 1 a)
+         s mm = true) ->
+    goodmb Dr Dw (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s mm = true.
+  Proof.
+    intros Hrd Hrdg Hinvg Hinv Hnl Hsubg.
+    unfold pt_walk. destruct (Defs.Zwf_guarded _) as [a2].
+    cbn [_rec_pt_walk]. change (2 >=? 0) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    change ((39 =? 32) || (xlen =? 64)) with true.
+    gmm_peelT ltac:(apply goodmb_assert_exp'_true)
+              ltac:(apply exec_assert_exp'_true). cbn beta zeta.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr root (subrange_vec_dec vpn 26 18)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    gmm_peel Hrdg Hrd. cbn match beta zeta.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec (Defs.and_boolM A B) s = Some (true, s));
+      [ | assert (Habg : goodmb Dr Dw (Defs.and_boolM A B) s mm = true) ] end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s)) end.
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta.
+      match goal with |- context[pte_is_non_leaf ?X] =>
+        replace (pte_is_non_leaf X) with true by (symmetry; exact Hnl) end.
+      change (2 >? 0) with true. cbn [andb]. apply exec_returnM. }
+    { apply (goodmb_of_goodb Dr Dw _ s mm). unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hvg : goodb Dr (Defs.bind (pte_is_invalid a b) k1) s = true);
+        [ | assert (Hv : exec (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s)) ] end.
+      { rewrite (goodb_bind Dr _ _ s false (Hinvg Dr s) (Hinv s)). reflexivity. }
+      { rewrite (exec_bind_Some _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_returnM. }
+      match goal with |- goodb _ (Defs.bind _ ?E) _ = true =>
+        rewrite (goodb_bind Dr _ E s true Hvg Hv) end.
+      reflexivity. }
+    gmm_peel Habg Hab. cbn match beta.
+    match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (2 - 1)] =>
+      change (2 - 1) with 1 end.
+    apply Hsubg.
+  Qed.
+
+  (* a faulting walk propagates through [translate_TLB_miss] unchanged --
+     no TLB write on the fault path, so no register is written at all *)
+  Lemma goodmb_translate_TLB_miss_user_walk_err (asid : mword 16) (root : mword 44)
+      (f : PTW_Error) (s : mstate) (mm : pamap) :
+    exec (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s = Some (Err (f, tt), s) ->
+    goodmb Dr Dw (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s mm = true ->
+    goodmb Dr Dw (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s mm = true.
+  Proof.
+    intros Hwalk Hwalkg. unfold translate_TLB_miss. cbn zeta.
+    gmm_peel Hwalkg Hwalk. cbn match. apply goodmb_returnm.
+  Qed.
+
+  (* the TLB lookup itself: one read of [tlb], whatever it answers *)
+  Lemma goodmb_lookup_TLB (asid : mword 16) (s : mstate) (mm : pamap) :
+    Dr tlb = true -> goodmb Dr Dw (lookup_TLB 39 asid vpn) s mm = true.
+  Proof.
+    intros HD. unfold lookup_TLB. gmm_rr tlb HD. apply goodmb_returnm.
+  Qed.
+
+  (* ...and through [translate], given a TLB miss (empty or colliding slot) *)
+  Lemma goodmb_translate_walk_user_err (asid : mword 16) (root : mword 44)
+      (s : mstate) (mm : pamap) :
+    Dr tlb = true ->
+    exec (lookup_TLB 39 asid vpn) s = Some (None, s) ->
+    goodmb Dr Dw (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s mm = true ->
+    goodmb Dr Dw (translate 39 asid root vpn acc p mxr do_sum tt) s mm = true.
+  Proof.
+    intros HD Hlk Hmiss. unfold translate.
+    gmm_peel (goodmb_lookup_TLB asid s mm HD) Hlk. cbn match. exact Hmiss.
+  Qed.
+
+End WalkFaultCert.
