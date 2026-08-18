@@ -2012,22 +2012,22 @@ platform ones + `functional_extensionality_dep` where inherited)
   on `instr`'s text-byte claim.
 - >5 min per file is a bug; no pkill of coqc; commit by explicit path only.
 
-### AWAITING USER RULING (tail-1 report, 2026-08-18 late)
+### RULINGS ON THE TAIL-1 ITEMS (all decided 2026-08-18; each is TO DO)
 1. **RULED (user, 2026-08-18): the tlb cell lives in `bare_inv`;
    `SpecKvminithart.wp_kvminithart_sconf_body` drops its `tlb ↦ᵣ tlbvec0`
    premise and requires the `bare_inv` (via the Bare arm) instead** --
    ProofKvminithart sources the cell from `strans_inv_acc_bare`.  (The
    companion `SpecMain.main_hart_raw` change, 52f89133, is thereby approved
    too.)  TO DO.
-2. `ProofVirtioDiskIntr.v` used-ELEMENT `lw` (~l.1300): the word lives only
-   inside `VirtioProto.virtio_proto_reclaim_acc` (one-shot closer), so no
-   points-to is reachable before the AU: needs a READ-ONLY used-element
-   accessor added to VirtioProto.v (invariant-internal, no leaf change).
-3. `UserretUser.wp_userret_user`: the three approved `↦ᵣ□` counter cells
-   for `userret_to_user_inv` have no source in `wp_userret_pt`'s
-   continuation; add them as persistent premises of `wp_userret_user`,
-   threaded from `ProofUserretClosed`'s Löb loop (or, alternatively, into
-   `hw_config` beside senvcfg -- touches every producer).
+2. **RULED (user, 2026-08-18): APPROVED** -- add a READ-ONLY used-element
+   accessor to `VirtioProto.v` (invariant-internal, no leaf change) so
+   `ProofVirtioDiskIntr.v`'s used-ELEMENT `lw` (~l.1300) can take its
+   `wordw_claim` off the element's own points-to before the AU.  TO DO.
+3. **RULED (user, 2026-08-18): APPROVED** -- `UserretUser.wp_userret_user`
+   gains the three persistent `↦ᵣ□` counter cells (mcounteren/scounteren/
+   mhpmcounter) as premises, threaded from `ProofUserretClosed`'s Löb loop
+   (NOT into hw_config).  TO DO.
+All three ruling items are now decided; nothing else awaits the user.
 Also flagged: `WpAu4.wp_lw_au_s_sconf`/`wp_sw_au_s_sconf` (thin width-4
 re-exports) carry the approved `wordw_claim` premise; 11 call sites updated.
 
