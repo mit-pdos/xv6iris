@@ -1901,6 +1901,26 @@ identical is necessary, not sufficient.  Known exposure: 6 files DESTRUCTURE
 each needs the one-line fix `ProofSpin` needed, because `pc_is` now carries
 `minstret_res ∗ clock_res`.
 
+## LEAF-STATEMENT CHANGES: THE RULE, AND THE ONE APPROVED CHANGE
+
+**Rule (user, 2026-08-18): no caller-visible leaf statement changes without
+the user's explicit approval.**  Engine-level premise changes with no
+consumer outside their own file (`wp_gpr_write_s_sconf(_base)`,
+`wp_csrr_ro_s_sconf`, `wp_gpr_write_s_config_regime`,
+`wp_rvc_gpr_write_s_r`: exec fact -> swp obligation) were reviewed and
+accepted; everything else is byte-identical, checked mechanically per file.
+
+**APPROVED (user, 2026-08-18): `wp_load_s_sconf_au` / `wp_store_s_sconf_au`
+take one extra premise `wordw_claim (KTR := ktd) width ea` before the AU.**
+Not an artifact of the proof approach but a requirement of the finer
+atomicity: per node the access TRANSLATES several nodes before the memory
+node where the one-shot atomic update is opened, so the walk needs the
+window's mapping (`kmap_at (svpn ea) ppn KP_rw`), alignment, canonicality
+(`uint ea < 2^38`), RAM-ness of the target and the tier pin up front --
+exactly `mem_pointsto` minus the physical ownership, so every caller has it
+from the same points-to it puts inside the AU (`wordw_claim_of`; invariant
+callers via `WpSconfLock.lock_claims`).  ~24 call sites in 10 files updated.
+
 ## CHECKPOINT 2026-08-18 (evening) -- where the fan-out stands
 
 Landed, admit-free: reservation semantics+logic; M-mode leaves; S-mode
