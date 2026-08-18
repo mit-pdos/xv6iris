@@ -903,6 +903,74 @@ joined into the frame), flips the SIE ghost, assembles `ihs_entry_of` and
 runs the handler contract exactly as today, then re-enters the Löb; the
 RETIRE arm hands the leaf's swp obligation the cells.
 
+### THE S-MODE WRAPPER IS TOO RIGID FOR THREE FAMILIES OF LEAF (found 2026-08-18, during the CSR/SRET/timer sweep)
+
+`WpSmodeIntr.sconf_step_obl` fixes THREE things across the instruction that
+some S-mode leaves have to move, and each is a one-parameter generalization
+of the SAME definition (and of `WpIntrInv.wp_exec_step_intr`, which the
+`b = true` arm is an `exact` of).  Nothing below is a design problem; all
+three are decided by the statement and nothing in either proof uses the
+rigidity.
+
+1. **THE ARM INDEX `b` IS THE SAME ON THE WAY IN AND ON THE WAY OUT.**  The
+   obligation takes `sie_cap kt m n b p` and must give back
+   `sie_cap kt m' n' b p`, and the continuation is at `b` too.  Every leaf
+   that MOVES the SIE arm is therefore unprovable, and unprovable in the
+   strong sense: after a csrci the ghost half inside `sconf` is at `'b"0"`
+   while `sie_arm true p` holds a quarter at `'b"1"`, so the pair the
+   obligation asks for is FALSE, not merely unreachable.  Blocked:
+   `WpSconfCsr.wp_csrci_sstatus_s_sconf`, `wp_csrsi_sstatus_x0_s_sconf`,
+   `wp_csrsi_sstatus_x0_enable_s_sconf`, `wp_csrci_sstatus_x0_s_sconf`, and
+   `WpSconfSret.wp_sret_s_sconf` -- i.e. every instruction in the tree that
+   turns interrupts on or off.
+2. **`sconf` HIDES mstatus BEHIND AN EXISTENTIAL, BOTH WAYS.**  A leaf whose
+   POSTCONDITION ties the mstatus VALUE to another resource cannot be
+   proved: the value is erased when the bundle is handed back and cannot be
+   recovered, because `P ⊢ Q ∗ (Q -∗ P)` is false when `P` carries strictly
+   more than `Q`.  Blocked: `wp_csrr_sstatus_s_sconf`, whose continuation
+   wants `sconf_at ms` at the SAME `ms` the rd value `sstatus_read ms` came
+   from.  (The two `csrw sstatus` leaves are NOT blocked by this: they also
+   hold the `sret_bits` TRAVELLING half, so they can name the landing
+   mstatus by ghost agreement against the reopened bundle instead.)
+3. Both are the same edit: give the obligation a SECOND arm index `b'` and
+   an mstatus witness, i.e.
+
+   ```
+   swp (execute i) (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+      ∃ npc ms' m' n', PC ↦ᵣ pc ∗ nextPC ↦ᵣ npc ∗ resv_any cpu_id ∗
+        sconf_at ms' ∗ sie_cap kt m' n' b' p ∗ gpr_file (tp_pin m') ∗
+        R npc ms' m' n')
+   ∗ (∀ npc ms' m' n', sie_cap_gpr_at kt ms' m' n' b' p -∗ pc_is npc -∗
+        R npc ms' m' n' -∗ WP Loop)
+   ```
+
+   The present shapes are the instances `b' := b`, `R` ignoring `ms'` and
+   the post closed with `sconf_at_close` / opened with `sie_cap_gpr_at_open`.
+   The engine passes the capability straight through -- it re-forms
+   `sie_cap_gpr` out of `sconf`/`sie_cap`/`gpr_file`/`hart_state` and never
+   reads the arm after the instruction -- so this costs the Löb proof
+   nothing.
+
+### WHAT THE S-MODE CSR SWEEP LANDED (`HartSCsr.v`)
+
+`WpMmodeCsrSwp`'s `doCSR` walk, privilege-generic.  Two things are worth
+carrying forward:
+
+- **`goodb D_m (check_CSR_result csr Supervisor at_) dstateS = true` for
+  every S CSR the kernel touches** (measured, not guessed): the stateen gate
+  that would read menvcfg is off at `MENVCFG_S`, so the check reads the SAME
+  three cells at Supervisor as at Machine.  That is why the entire `cw_*` /
+  `cr_*` footprint kit carries over unchanged and only the reference TOWER
+  needs the privilege as a parameter (`HartSCsr.pw_rs`).  satp is the one
+  exception -- `check_TVM_SATP` reads mstatus.TVM -- and its certificate has
+  to be assembled rather than computed.
+- **the exec-fact premise of a generic leaf has to become an swp
+  obligation**, the same forced change `wp_gpr_write_s_sconf` made:
+  `WpSconfCsr.wp_csrr_ro_s_sconf`'s `forall s, exec (execute …) s = …`
+  premise is unusable per node and is now a frame-generic
+  `swp (read_CSR csrn)` obligation.  Its three instances (scause / stval /
+  sepc) keep their statements byte-identical.
+
 ### THE RIDER MUST BE KEYED ON THE POST-FILE (found 2026-08-18)
 
 `HartStepAny.swp_exec_step_any` / `HartMCycle.wp_loop_cycle` carry the body's
@@ -1254,6 +1322,7 @@ Evidence:
 | `HartMStore.swp_vmem_write_gen` | `vmem_write` with the address computation as an obligation + an abstract rider `Q` | an `hfrun` premise only discharges at CONCRETE operands; `Q` carries `gpr_file` through |
 | `InstrBytes.mmode_config_cert` | `gen_cert` out of the bundle without consuming it | every leaf's obligation needs it and the bundle is gone by then |
 | `MinstretInv.minstret_inv := emp` | a persistent no-op | so three upstream leaves keep their statements; **delete when green** |
+| `HartSCsr.v` | the S-MODE (privilege-generic) CSR engines: `swp_doCSR_r_p` / `_w_p` / `_rw_p`, the two `execute`-level wrappers, the `pw_*` frame kit at a parametric privilege, and `hval_check_CSR_result_S` | `WpMmodeCsrSwp` with the privilege, the certificate's read set and its reference state as PARAMETERS.  The measured fact that makes it cheap: `goodb D_m (check_CSR_result csr Supervisor at_) dstateS = true` for every S CSR the kernel touches, so the whole `cw_*`/`cr_*` footprint kit carries over and only the reference TOWER needed the privilege.  Three engines rather than one because `doCSR` branches on the access type twice and both branches are conversions at a concrete one |
 | `HartSMem.v` | the S-MODE DATA-ACCESS engines: `swp_execute_LOAD_S`, `swp_execute_STORE_S`, `swp_execute_AMOSWAP_S`, and the twelve instantiations | `HartMLoad`/`HartMStore` one privilege over.  THREE things change and nothing else does: the TRANSLATION is an obligation whose conclusion is `SRegime.sr_swp_translate`'s verbatim (so the engine is regime-agnostic and everything after it runs at the landing file `rsf`), the PMP check is `PtTreeAdue.swp_pmpCheck_S` at the kernel's TOR entry 0, and the WIDTH is a parameter.  RAM and MMIO are ONE tower: the sections are parametric in an address class (`Acls`/`Pma` plus the five facts derived from it) and in the memory obligation (`Mobl`/`Wobl`), so a device access -- which still goes through `read_ram`/`write_ram`, since `within_mmio_readable` is FALSE outside the CLINT, and is routed to the device by the STEP RELATION -- is the same proof at a different instantiation |
 
 ### THE S-MODE DATA ENGINES ARE BUILT (`HartSMem.v`), and three things about them recur
