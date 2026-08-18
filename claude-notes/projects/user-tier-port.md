@@ -640,6 +640,40 @@ work in the port: every twin sits BESIDE its exec lemma, takes the SAME
 hypotheses, and its proof is that lemma's proof with `exec_bind_Some` replaced by
 `goodmb_bind`.
 
+**THE REGISTER-ONLY ROWS ARE DONE** (`UserCsr.v` +811, `UserExecFacts.v` +1 095,
+`UserTrap.v` +475, `UserCompute.v` nil — it has no `exec_X` fact), and four
+things they settled apply to every remaining row:
+
+1. **STATE EVERY REGISTER-ONLY TWIN AT `mm := ∅`, and nothing is lost.**
+   `HartMemRun.goodmb_map_mono` lifts an ∅-certificate to ANY map (only
+   `dom mm` is consulted and `bytes_owned` is monotone in it), so a caller
+   standing on the whole user image can use it unchanged.
+2. **SAIL'S `>>`/`>>=` ARE LEFT ASSOCIATIVE, AND AN `erewrite` OF A BIND
+   EQUATION WITH AN OPEN LEFT OPERAND DECOMPOSES A CHAIN SYNTACTICALLY** —
+   picking `(A >> B) >> C` as the head of `((A >> B) >> C) >> D`, which is not
+   what any proof has facts about, and the error is a bare "no applicable
+   tactic". GIVE the head (pass the head's certificate and `exec` fact as
+   ARGUMENTS, not as side goals): the match then goes through CONVERSION,
+   which peels the leftmost node out of one level of nesting.  `HartMemRun`'s
+   `gm_peel` / `gm_peel_r` / `gm_peel_w` do this and fall back to
+   `goodmb_bind_nest_empty`; deeper than one nest (four consecutive register
+   writes, `track_trap`'s callback chain) build the prefixes' facts
+   inside-out and peel the top once.  This is habit 1 of
+   `projects/main-cycle-port.md` and it costs a day to re-learn.
+3. **AN EARLY-RETURN REGION THAT THROWS CANNOT USE `goodmb_cer` AT ALL.**
+   `goodmb` refuses an `ExtraOutcome` node, so a body that early-returns has
+   no certificate; the wrapper must stay ON while the chain is peeled
+   (`goodmb_cer_bind_empty`, and `goodmb_cer_bind_nest_empty` where an
+   `and_boolM`/`or_boolM` guard puts the throw one level in).  The walk ends
+   at the thrown tail, where `catch_early_return` absorbs the throw and the
+   certificate is `reflexivity`.
+4. **A TACTIC-DRIVEN EXEC TRAVERSAL MIRRORS FOR FREE.**  `is_CSR_accessible`'s
+   200-clause dispatch has PURE guards, so `gm_csr_step` is `csr_step` with
+   the `∃ _, exec _ = Some _ ∧ _` pattern replaced by `goodmb _ _ _ _ _ = true`
+   and the per-clause RESULT obligations DELETED — a certificate does not
+   depend on the outcome.  The dead branches die on the same three facts.
+   Expect the same for `UserTotalU`'s dispatch tables.
+
 ### 4.4 What CANNOT get a `goodmb` twin, and what to do instead
 
 1. **`load_reservation` / `cancel_reservation`** — opaque `M` axioms; no
