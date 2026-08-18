@@ -1052,3 +1052,117 @@ bottom-of-tree edit to `HartMemRun`, so it should wait for a second client.
 P5 twins (`UserExecFacts.v`, `UserCsr.v`) returns nothing — a U-mode EXECUTE
 never writes `elp` (the Zicfilp gate is off at U), so the execute families
 instantiate at `Du_w` unchanged.
+
+## 10. P4a — THE DATA-ACCESS TWINS, AND THE TOOLKIT THEY FORCED (2026-08-18)
+
+### `HartMemAsm.v` — the general-`mm` assembly toolkit (new leaf file)
+
+`HartMemRun` §4b's four `_empty` combinators collapse the `mm_after`
+argument by `mm := ∅`, which is what a REGISTER-ONLY twin needs and exactly
+what a MEMORY twin cannot have.  Writing `mm_after` into every intermediate
+goal makes each proof unreadable and stops it matching the `exec` proof it
+mirrors.
+
+**The observation that removes all of it: `goodmb` consults the map only
+through its DOMAIN (`goodmb_dom`), and a CERTIFIED stretch preserves that
+domain** — every write it makes is inside the owned bytes, which is exactly
+what its own certificate says (`HartMemAsm.mm_after_dom`).  So the
+continuation's certificate is always read back at the ORIGINAL map, and the
+whole family is `HartMemRun`'s with `mm_after m s mm` rewritten to `mm`:
+
+    exec_bind_Some / exec_bind0_Some   -> gm_bind      / gm_bind0
+    execR_bind_Some / execR_bind0_Some -> gm_bindR     / gm_bind0R
+    execR_liftR_seq                    -> gm_liftR_seq / gm_liftR_seq0
+    exec_and_boolM_Some/_or_boolM_Some -> gm_and_boolM / gm_or_boolM
+    execR_untilMT_1                    -> gm_untilMT_1 (PtWalkCert)
+
+**A MEMORY TWIN'S PROOF IS THE EXEC PROOF, NODE FOR NODE.**  Also there: the
+two memory NODES as reduction equations (`gm_MemRead` / `gm_MemWrite`) and
+the two RAM bricks (`goodmb_read_ram` / `goodmb_write_ram`), both
+WIDTH-GENERIC — the certificate never scrutinises the value, so the
+dependent `mword (8*width)` that forces four `exec` instances costs nothing.
+
+### THE GENERAL BIND CONTEXT beats a family indexed by nesting depth
+
+Sail's `>>`/`>>=` are LEFT associative, so a region reads as
+`bind (bind (bind m g) h) f` and the depth GROWS as a walk descends into a
+branch's own chain — `pmpCheck`'s first peel is already at depth 3.  A
+`_nest` lemma per depth is the wrong shape.  What every one of them needs of
+its context is two equations — `Φ` takes a `Ret` to the continuation and
+commutes with a `Next` node — and EVERY composition of binds satisfies both,
+at any depth.  `gm_ctx` / `gm_ctxR` / `gm_cer_ctx` take those as premises;
+`gmx` / `gmxR` / `gmxc` / `gmxl` / `gmxlR` are the peel tactics over them,
+taking the head out of the certificate hypothesis' own statement.
+
+**Three traps, each of which presents as a hang:**
+
+1. **THE SHAPE OBLIGATION MUST NOT BE CLOSED BY `reflexivity`.**  It *is* a
+   conversion, but the context carries the region's whole tail — for
+   `pmpCheck` a `foreach_ZM_up'` over 64 entries under an `Acc` guard — and
+   the conversion checker unfolds THAT rather than noticing the two sides
+   differ only at the head (measured: >30 s, killed, on the FIRST peel).
+   `gm_shape` rewrites with `mbind_Ret`/`mbind_Next`/`mbind0_Ret`/
+   `mbind0_Next` — the same conversion at a GENERIC term, where it is free —
+   so the tail is never looked at.
+2. **THE ABSTRACTION MUST BE `pattern h at 1`, NOT `pattern h`.**  A loop
+   whose first iteration is unrolled contains the head TWICE (the unrolled
+   copy and the residual body); abstracting both makes the node equation
+   FALSE, and the only symptom is trap 1 never returning.
+3. **An `ltac:(reflexivity)` in ARGUMENT position with a still-evar `G`
+   diverges** (the durable notes' hole-with-an-evar-goal trap).  Every
+   hypothesis is a PREMISE and the tactics pass `G := fun y => F (Ret y)`
+   explicitly.
+
+### THE RAM READ BRICK MUST BE KEYED ON THE EXEC FACT
+
+`goodmb_read_ram` asks for `read_bytes … <> None`.  At a SYMBOLIC width that
+is NOT interchangeable with the caller's byte hypothesis: `read_bytes`'
+value index is `bv (8 * Z.to_N k)` and the model's is
+`mword (8*k) = bv (MachineWord.Z_idx (8*k))` — the same number spelled two
+ways, and the error prints two types that look identical.
+`UserMemPt.read_bytes_ne_of_exec_read_ram` / `goodmb_read_ram_of_exec` read
+the non-`None` out of the read's own `exec` fact, which every caller holds by
+the pair convention, and the index never appears.  **FOLD BACK into
+`HartMemAsm` at the milestone.**
+
+### THE CERTIFICATE IS WIDTH-GENERIC WHERE THE EXEC FACT IS NOT
+
+`UserMemPt` §5 closes over two width-TYPED RAM bricks because `mword (8*k)`
+resists abstraction inside `sail_mem_read`'s cast.  The certificate never
+scrutinises the value, so §5b (the twins) needs neither brick — which is why
+it is its own section rather than more of §5.
+
+### REUSE THE WALK LAYER'S BRICKS; DO NOT RESTATE THEM
+
+`PtWalkCert.goodmb_pmpCheck_grant` is GENERIC in the access type and the
+privilege, so the U-mode grants are two lines each off it; so are
+`goodmb_check_pma_with_pmp_priority`, the MMIO window tests and
+`gm_untilMT_1`, and `pr_good_chk` is a fully worked `checked_mem_read`.  P4
+had to add only the two DATA `pmaCheck`s and the WRITABLE window pair — the
+PTE ones with the field and the access type moved.  P3 and P4 converged on
+`HartMemAsm` without being asked to; the duplicate `gm_cer_bind_nest2` /
+`gmm_lift2` / `bindR_ret` in `PtWalkCert` should fold into `HartMemAsm` at
+the milestone.
+
+### THE INTERFACE, CHECKED END TO END
+
+The twins are stated at ABSTRACT `Dr`/`Dw` with one `Dr r = true` per
+register read, and `UserFrame`'s `Du_r`/`Du_w` are `bool_decide (r ∈ list)`,
+so the specialisation is one `vm_compute; reflexivity` per hypothesis and
+`goodmb_mono` is not needed at all.  The two memory obligations really are
+`u_mem_wf` projections (`UserBytes.u_mem_wf_owned` / `u_mem_wf_not_dev`).
+**What `UserBytes` is still missing for P4b is the DATA-page counterpart of
+`u_mem_wf_owned`** — `bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true` from
+`udata_cov` plus `UserMemPt.u_walk_pa_window_div`, which is the argument
+`udata_read_word_g` already runs.
+
+### P4b IS BLOCKED ON `UserTotalU`, NOT ON `UserClassifyAsm`
+
+`base_exec_total_u` / `rvc_exec_total_u` landed pure in `39c36b49`, but
+`UserMemClassify.v` also requires `UserTotalU.v`, which is red while P7
+rebuilds it — so the `arm_*` conversions cannot be started, let alone
+compiled.  The shape they must close is `UserClassifyAsm.base_post` /
+`rvc_post`; the engines (`mem_exec_load_k`, `mem_exec_store_k`,
+`mem_exec_lr_k`, `mem_exec_sc_k`, the AMO pair) become pure `Prop`s whose
+conclusion is exactly `base_post`'s execute-and-after half, and the
+composers' `user_pt_inv` absorption becomes `u_mem_wf` / `u_mem_step`.
