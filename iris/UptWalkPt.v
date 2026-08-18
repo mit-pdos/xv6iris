@@ -25,7 +25,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore SmodePte.
-Require Import PtreeType PtTree PtBytes PtBuild KptTree UptTree UserPtTree.
+Require Import PtreeType PtTree PtBytes PtBuild KptTree UptTree UserPtTree TrampPt.
 Require Import CommonWalk Pt4kWalk KptPt PtAdBits PtTreeAdue SRegime.
 Require Import UserBytes UserFetchCert PtWalkCert UserClassifyAsm.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame HartMemRun.
@@ -753,3 +753,136 @@ Section UptTramp.
   Qed.
 
 End UptTramp.
+
+(* ===================================================================== *)
+(* 6. THE TRAPFRAME DATA ACCESS.                                          *)
+(*                                                                        *)
+(* [HartSMem]'s LOAD/STORE engines take the translation as an obligation   *)
+(* whose shape is [SRegime.sr_swp_translate]'s conclusion at an ABSTRACT   *)
+(* residue [Rt : regstate -> iProp Sigma] -- so they are regime-AGNOSTIC   *)
+(* and the user table feeds them directly, with                            *)
+(* [Rt := fun rs => upt_res_pt uroot tfp um (register_lookup tlb rs)].     *)
+(* These two corollaries are [swp_translate_upt] at the trapframe leaf,    *)
+(* in exactly that shape, with the leaf's permission check and its         *)
+(* footprint certificate discharged.                                      *)
+(* ===================================================================== *)
+
+(* [UservecPt]'s [tf_variant_check_store] lives here now: the store side of
+   the trapframe leaf is needed BELOW that file. *)
+Lemma tf_variant_check_store (tfp : mword 44) (a d : mword 1) (mxr do_sum : bool) :
+  pte_check_ok (Store Data) Supervisor mxr do_sum (pte_set_ad (pte_tf tfp) a d).
+Proof.
+  intros s. unfold Mk_PTE_Flags.
+  rewrite tf_variant_flags. rewrite tf_variant_ext.
+  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+    destruct mxr, do_sum; vm_compute; reflexivity.
+Qed.
+
+(* the two [goodb] twins, same proof as the [exec] ones *)
+Lemma tf_variant_goodb_check_load (tfp : mword 44) (a d : mword 1)
+    (mxr do_sum : bool) (Db : register -> bool) (s : mstate) :
+  goodb Db (check_PTE_permission (Load Data) Supervisor mxr do_sum
+              (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad (pte_tf tfp) a d) 7 0))
+              (ext_bits_of_PTE (pte_set_ad (pte_tf tfp) a d)) tt) s = true.
+Proof.
+  unfold Mk_PTE_Flags.
+  rewrite tf_variant_flags tf_variant_ext.
+  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+    destruct mxr, do_sum; vm_compute; reflexivity.
+Qed.
+
+Lemma tf_variant_goodb_check_store (tfp : mword 44) (a d : mword 1)
+    (mxr do_sum : bool) (Db : register -> bool) (s : mstate) :
+  goodb Db (check_PTE_permission (Store Data) Supervisor mxr do_sum
+              (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad (pte_tf tfp) a d) 7 0))
+              (ext_bits_of_PTE (pte_set_ad (pte_tf tfp) a d)) tt) s = true.
+Proof.
+  unfold Mk_PTE_Flags.
+  rewrite tf_variant_flags tf_variant_ext.
+  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+    destruct mxr, do_sum; vm_compute; reflexivity.
+Qed.
+
+Section UptData.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma utf_translate (acc : MemoryAccessType mem_payload)
+      (Drw Dro : gset register) (Df : register -> dfrac) (rs : regstate)
+      (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (va pa satp0 mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (pmar0 : list PMA_Region) (rr : option resv) :
+    (acc = Load Data \/ acc = Store Data) ->
+    Drw ## Dro ->
+    (forall r : register, upt_Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, upt_Dw r = true -> r ∈ Drw) ->
+    register_lookup misa rs = MISA_C ->
+    register_lookup menvcfg rs = MENVCFG_S ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mstatus rs = mst0 ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    register_lookup satp rs = satp0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    register_lookup pma_regions rs = pmar0 ->
+    upt_satp_ok_pt uroot satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pma_allows_all pmar0 ->
+    svpn_of va = tf_vpn ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                          (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec tfp
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    upt_res_pt uroot tfp um (register_lookup tlb rs) -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (translateAddr (Virtaddr va) acc)
+      (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                ∃ rsf : regstate,
+                  ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                  hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                  upt_res_pt uroot tfp um (register_lookup tlb rsf) ∗
+                  resv_any cpu_id).
+  Proof.
+    intros Hacc Hdisjf HDr HDw Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV Hsatp
+           Hpcfg Hpaddr Hpma Hsatpok Hpmpok Hall Hvpn Hcanon Hid.
+    assert (Hout : zero_extend' 64 (concat_vec
+        ((autocast (T := mword) ((autocast (T := mword)
+            (PPN_of_PTE (pte_tf tfp : mword 64))) : mword 44)) : mword 44)
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa).
+    { rewrite <- (tf_variant_ppn tfp ('b"1") ('b"1")) in Hid.
+      rewrite pte_set_ad_ppn in Hid. exact Hid. }
+    iIntros "#Hcert Hfrag Hres Hrw Hro".
+    destruct Hacc as [-> | ->].
+    - iApply (swp_translate_upt (Load Data) Drw Dro Df rs uroot tfp um
+                va pa satp0 (pte_tf tfp) mst0 (register_lookup tlb rs)
+                pcfg paddr pmar0 rr Hdisjf HDr HDw
+                (or_intror (or_introl eq_refl))
+                Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV Hsatp eq_refl Hpcfg
+                Hpaddr Hpma Hsatpok Hpmpok Hall
+                (or_intror (or_introl (conj Hvpn eq_refl)))
+                (fun a d mxr do_sum => tf_variant_check_load tfp a d mxr do_sum)
+                (fun a d mxr do_sum Db s0 =>
+                   tf_variant_goodb_check_load tfp a d mxr do_sum Db s0)
+                Hcanon Hout with "Hcert Hfrag Hres Hrw Hro").
+    - iApply (swp_translate_upt (Store Data) Drw Dro Df rs uroot tfp um
+                va pa satp0 (pte_tf tfp) mst0 (register_lookup tlb rs)
+                pcfg paddr pmar0 rr Hdisjf HDr HDw
+                (or_intror (or_intror (or_introl eq_refl)))
+                Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV Hsatp eq_refl Hpcfg
+                Hpaddr Hpma Hsatpok Hpmpok Hall
+                (or_intror (or_introl (conj Hvpn eq_refl)))
+                (fun a d mxr do_sum => tf_variant_check_store tfp a d mxr do_sum)
+                (fun a d mxr do_sum Db s0 =>
+                   tf_variant_goodb_check_store tfp a d mxr do_sum Db s0)
+                Hcanon Hout with "Hcert Hfrag Hres Hrw Hro").
+  Qed.
+
+End UptData.
