@@ -559,6 +559,7 @@ Proof.
   destruct (u_walk_pure (Store Data) P t mm rs w va
               (or_intror (or_intror (or_introl eq_refl))) Hl Hleaf Hcanon Hcfg Hpins Hwf)
     as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
+  pose proof Hcfg' as Hcfg0. pose proof Hpins' as Hpins0.
   set (pa := u_walk_pa w va).
   set (s' := u_state rs' mm').
   destruct (u_data_ram P t' mm' k w va Hk Hkdvd Hal Hwf' Hl) as (Hram0 & Hramk).
@@ -737,12 +738,14 @@ Lemma u_load_pure_page (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
             false false false) (u_state rs' mm') mm' = true /\
     (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
-    u_mem_step P t t' mm mm'.
+    u_mem_step P t t' mm mm' /\
+    u_data_cfg rs' /\ u_exec_pins P t' rs' /\ u_mem_wf P t' mm'.
 Proof.
   intros Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf.
   destruct (u_walk_pure (Load Data) P t mm rs w va
               (or_intror (or_introl eq_refl)) Hl Hleaf Hcanon Hcfg Hpins Hwf)
     as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
+  pose proof Hcfg' as Hcfg0. pose proof Hpins' as Hpins0.
   pose proof (u_page_window P t' mm' k w va Hk Hp Hwf' Hl) as Hwin.
   assert (Hown : bytes_owned mm' (u_walk_pa w va) (Z.to_N k) = true)
     by exact (u_page_owned P t' mm' k w va Hk Hp Hwf' Hl).
@@ -757,7 +760,8 @@ Proof.
               Lmprv Lcp HR (fun j Hj => proj1 (Hwin j Hj)))
     as (dv & Hmr).
   exists dv, rs', mm', t'. split_and!;
-    [ exact Htr | exact Htrg | exact Hmr | | exact Hfile | exact Htlbok' | exact Hstep ].
+    [ exact Htr | exact Htrg | exact Hmr | | exact Hfile | exact Htlbok' | exact Hstep
+    | exact Hcfg0 | exact Hpins0 | exact Hwf' ].
   exact (goodmb_mem_read_mis_U (u_walk_pa w va) k (u_state rs' mm') Hk Hk8
            HA Hord Hcovp Hhtif Hall (fun j Hj => proj1 (proj2 (Hwin j Hj)))
            Du_r Du_w mm'
@@ -797,8 +801,11 @@ Lemma u_load_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     u_mem_step P t t' mm mm'.
 Proof.
   intros Hk Hk8 Hkdvd Hal Hl Hleaf Hcanon Hcfg Hpins Hwf.
-  exact (u_load_pure_page P t mm rs k w va Hk Hk8
-           (in_one_page_aligned va k Hk Hkdvd Hal) Hl Hleaf Hcanon Hcfg Hpins Hwf).
+  destruct (u_load_pure_page P t mm rs k w va Hk Hk8
+              (in_one_page_aligned va k Hk Hkdvd Hal) Hl Hleaf Hcanon Hcfg Hpins Hwf)
+    as (dv & rs' & mm' & t' & H1 & H2 & H3 & H4 & H5 & H6 & H7 & _ & _ & _).
+  exists dv, rs', mm', t'. split_and!;
+    [ exact H1 | exact H2 | exact H3 | exact H4 | exact H5 | exact H6 | exact H7 ].
 Qed.
 
 (* --------------------------------------------------------------------- *)
@@ -894,12 +901,14 @@ Lemma u_store_pure_page (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
     u_mem_step P t t' mm mm' /\
-    u_mem_step P t t' mm mm2.
+    u_mem_step P t t' mm mm2 /\
+    u_data_cfg rs' /\ u_exec_pins P t' rs'.
 Proof.
   intros Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf.
   destruct (u_walk_pure (Store Data) P t mm rs w va
               (or_intror (or_intror (or_introl eq_refl))) Hl Hleaf Hcanon Hcfg Hpins Hwf)
     as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
+  pose proof Hcfg' as Hcfg0. pose proof Hpins' as Hpins0.
   set (pa := u_walk_pa w va).
   set (s' := u_state rs' mm').
   pose proof (u_page_window P t' mm' k w va Hk Hp Hwf' Hl) as Hwin.
@@ -945,7 +954,7 @@ Proof.
   exists rs', mm', (wchain pa k s' bytes v N).(mem), t'. split_and!;
     [ exact Htr | exact Htrg | exact Hea | exact Heag
     | rewrite <- Hpost; exact Hwv | exact Hwrg
-    | exact Hfile | exact Htlbok' | exact Hstep |].
+    | exact Hfile | exact Htlbok' | exact Hstep | | exact Hcfg0 | exact Hpins0 ].
   exact (u_mem_step_wchain P t t' mm pa k bytes N s' v Hbpos Hwidth
            (fun j Hj => proj2 (proj2 (Hwin j Hj)))
            (fun j Hj => proj1 (proj2 (Hwin j Hj))) Hstep N ltac:(lia)).
@@ -1051,4 +1060,391 @@ Proof.
   intros (Hs1 & _ & _) (Hs2 & Hspec & md & Hrest).
   split_and!; [ exact (pt_same_shape_trans 2 t1 t2 t3 Hs1 Hs2) | exact Hspec |].
   exists md. exact Hrest.
+Qed.
+
+(* ===================================================================== *)
+(* 9. THE PAGE-STRADDLING LOAD AND STORE.                                 *)
+(*                                                                       *)
+(* The model splits a straddling access in two and translates TWICE, so   *)
+(* both pages must be MAPPED and the two walks' [u_mem_step]s compose.    *)
+(* The general shape is "two in-one-page accesses in a row" -- stated as  *)
+(* [u_load_pure_two] / [u_store_pure_two], which know nothing about page  *)
+(* boundaries -- and the straddle itself is that at the geometry          *)
+(* [UserMemMis.exec_split_on_page_boundary_straddle] computes.            *)
+(*                                                                       *)
+(* BOTH certificates are read back at the ORIGINAL map [mm], which is what *)
+(* [UserMemMis.goodmb_vmem_read_addr_split2] / [_write_addr_split2] ask   *)
+(* for: the first access's [u_mem_step] keeps the domain, so              *)
+(* [HartMemRun.goodmb_dom] transports the second one.                     *)
+(* ===================================================================== *)
+
+(* the two read-only probes the vmem level runs before the split, pure *)
+Lemma u_effectivePrivilege_pure (acc : MemoryAccessType mem_payload)
+    (rs : regstate) (mm : pamap) :
+  u_data_cfg rs ->
+  exec (effectivePrivilege acc (register_lookup mstatus (u_state rs mm).(sregs))
+          (register_lookup cur_privilege (u_state rs mm).(sregs))) (u_state rs mm)
+    = Some (User, u_state rs mm).
+Proof.
+  intros (Lcp & (Lsxl & Lmprv & _) & _). cbn [u_state sregs].
+  rewrite Lcp. exact (exec_effectivePrivilege_mprv0 acc _ User (u_state rs mm) Lmprv).
+Qed.
+
+Lemma u_goodmb_effectivePrivilege_pure (acc : MemoryAccessType mem_payload)
+    (rs : regstate) (mm mb : pamap) :
+  u_data_cfg rs ->
+  goodmb Du_r Du_w (effectivePrivilege acc
+          (register_lookup mstatus (u_state rs mm).(sregs))
+          (register_lookup cur_privilege (u_state rs mm).(sregs))) (u_state rs mm) mb
+    = true.
+Proof.
+  intros (Lcp & (Lsxl & Lmprv & _) & _).
+  exact (goodmb_effectivePrivilege_mprv0 Du_r Du_w acc _ _ (u_state rs mm) mb Lmprv).
+Qed.
+
+Lemma u_translationMode_pure (P : uptd) (t : ptree) (rs : regstate) (mm : pamap) :
+  u_data_cfg rs -> u_exec_pins P t rs ->
+  exec (translationMode User) (u_state rs mm) = Some (Sv39, u_state rs mm).
+Proof.
+  intros (_ & (Lsxl & _) & _) (_ & _ & ((usatp & (Hmode & _) & Hsatp) & _) & _).
+  exact (exec_translationMode_U_sv39 usatp (u_state rs mm) Lsxl Hsatp Hmode).
+Qed.
+
+Lemma u_goodmb_translationMode_pure (P : uptd) (t : ptree) (rs : regstate)
+    (mm mb : pamap) :
+  u_data_cfg rs -> u_exec_pins P t rs ->
+  goodmb Du_r Du_w (translationMode User) (u_state rs mm) mb = true.
+Proof.
+  intros (_ & (Lsxl & _) & _) (_ & _ & ((usatp & (Hmode & _) & Hsatp) & _) & _).
+  apply goodmb_of_goodb.
+  exact (goodb_translationMode_U Du_r usatp (u_state rs mm)
+           ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+           Lsxl Hsatp Hmode).
+Qed.
+
+(* --- the in-one-page [translate_and_read_value], pure --- *)
+Lemma u_tarv_page (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w va : mword 64) :
+  0 < k -> k <= 8 -> in_one_page va k ->
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (Load Data) w ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (dv : mword (8 * k)) (rs' : regstate) (mm' : pamap) (t' : ptree),
+    exec (translate_and_read_value (Virtaddr va) k (Load Data) false false false)
+      (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), dv), u_state rs' mm') /\
+    goodmb Du_r Du_w
+      (translate_and_read_value (Virtaddr va) k (Load Data) false false false)
+      (u_state rs mm) mm = true /\
+    u_tlb_only rs rs' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
+    u_mem_step P t t' mm mm' /\
+    u_data_cfg rs' /\ u_exec_pins P t' rs' /\ u_mem_wf P t' mm'.
+Proof.
+  intros Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf.
+  destruct (u_load_pure_page P t mm rs k w va Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf)
+    as (dv & rs' & mm' & t' & Htr & Htrg & Hmr & Hmrg & Hfile & Htlbok' & Hstep
+        & Hcfg' & Hpins' & Hwf').
+  exists dv, rs', mm', t'. split_and!;
+    [ exact (exec_translate_and_read_value_gen k va (u_walk_pa w va) (Load Data)
+               false false false PBMT_PMA dv (u_state rs mm) (u_state rs' mm')
+               (u_state rs' mm') Htr Hmr)
+    | | exact (u_tlb_only_land rs rs' Hfile) | exact Htlbok' | exact Hstep
+    | exact Hcfg' | exact Hpins' | exact Hwf' ].
+  apply (goodmb_translate_and_read_value_gen Du_r Du_w k va (u_walk_pa w va)
+           (Load Data) false false false PBMT_PMA dv (u_state rs mm) (u_state rs' mm')
+           (u_state rs' mm') mm Htr Htrg Hmr).
+  rewrite (goodmb_dom Du_r Du_w _ (u_state rs' mm') mm mm').
+  - exact Hmrg.
+  - symmetry. exact (u_mem_step_dom P t t' mm mm' Hwf Hstep).
+Qed.
+
+Lemma u_load_pure_two (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (p q : Z) (w1 w2 va : mword 64) :
+  0 < p -> p <= 8 -> in_one_page va p ->
+  0 < q -> q <= 8 -> in_one_page (add_vec_int va p) q ->
+  ud_um P !! svpn_of va = Some w1 ->
+  ud_um P !! svpn_of (add_vec_int va p) = Some w2 ->
+  uleaf_ok (Load Data) w1 -> uleaf_ok (Load Data) w2 ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (v1 : mword (8 * p)) (v2 : mword (8 * q))
+         (rs1 : regstate) (mm1 : pamap) (t1 : ptree)
+         (rs2 : regstate) (mm2 : pamap) (t2 : ptree),
+    exec (translate_and_read_value (Virtaddr va) p (Load Data) false false false)
+      (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w1 va), v1), u_state rs1 mm1) /\
+    goodmb Du_r Du_w
+      (translate_and_read_value (Virtaddr va) p (Load Data) false false false)
+      (u_state rs mm) mm = true /\
+    exec (translate_and_read_value (Virtaddr (add_vec_int va p)) q (Load Data)
+            false false false) (u_state rs1 mm1)
+      = Some (Ok (Physaddr (u_walk_pa w2 (add_vec_int va p)), v2), u_state rs2 mm2) /\
+    goodmb Du_r Du_w
+      (translate_and_read_value (Virtaddr (add_vec_int va p)) q (Load Data)
+         false false false) (u_state rs1 mm1) mm = true /\
+    u_tlb_only rs rs2 /\
+    tlb_ok_pt (mword_of_int 0) t2 (register_lookup tlb rs2) /\
+    u_mem_step P t t2 mm mm2 /\
+    u_data_cfg rs2 /\ u_exec_pins P t2 rs2 /\ u_mem_wf P t2 mm2.
+Proof.
+  intros Hp Hp8 Hpp Hq Hq8 Hqp Hl1 Hl2 Hleaf1 Hleaf2 Hc1 Hc2 Hcfg Hpins Hwf.
+  destruct (u_tarv_page P t mm rs p w1 va Hp Hp8 Hpp Hl1 Hleaf1 Hc1 Hcfg Hpins Hwf)
+    as (v1 & rs1 & mm1 & t1 & H1 & H1g & Ho1 & Htlb1 & Hst1 & Hcfg1 & Hpins1 & Hwf1).
+  destruct (u_tarv_page P t1 mm1 rs1 q w2 (add_vec_int va p) Hq Hq8 Hqp Hl2 Hleaf2 Hc2
+              Hcfg1 Hpins1 Hwf1)
+    as (v2 & rs2 & mm2 & t2 & H2 & H2g & Ho2 & Htlb2 & Hst2 & Hcfg2 & Hpins2 & Hwf2).
+  exists v1, v2, rs1, mm1, t1, rs2, mm2, t2. split_and!;
+    [ exact H1 | exact H1g | exact H2 | | exact (u_tlb_only_trans rs rs1 rs2 Ho1 Ho2)
+    | exact Htlb2 | exact (u_mem_step_trans P t t1 t2 mm mm1 mm2 Hst1 Hst2)
+    | exact Hcfg2 | exact Hpins2 | exact Hwf2 ].
+  rewrite (goodmb_dom Du_r Du_w _ (u_state rs1 mm1) mm mm1).
+  - exact H2g.
+  - symmetry. exact (u_mem_step_dom P t t1 mm mm1 Hwf Hst1).
+Qed.
+
+(* --- the in-one-page [translate_and_write_value], pure --- *)
+Lemma u_tawv_page (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w va : mword 64) (v : mword (8 * k)) :
+  0 < k -> k <= 8 -> in_one_page va k ->
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (Store Data) w ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (rs' : regstate) (mm2 : pamap) (t' : ptree),
+    exec (translate_and_write_value (Virtaddr va) k v (Store Data) false false false)
+      (u_state rs mm) = Some (Ok true, u_state rs' mm2) /\
+    goodmb Du_r Du_w
+      (translate_and_write_value (Virtaddr va) k v (Store Data) false false false)
+      (u_state rs mm) mm = true /\
+    u_tlb_only rs rs' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
+    u_mem_step P t t' mm mm2 /\
+    u_data_cfg rs' /\ u_exec_pins P t' rs' /\ u_mem_wf P t' mm2.
+Proof.
+  intros Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf.
+  destruct (u_store_pure_page P t mm rs k w va v Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf)
+    as (rs' & mm' & mm2 & t' & Htr & Htrg & Hea & Heag & Hwv & Hwvg & Hfile & Htlbok'
+        & Hstep & Hstep2 & Hcfg' & Hpins').
+  assert (Hdom : (dom mm : gset Arch.pa) = dom mm')
+    by (symmetry; exact (u_mem_step_dom P t t' mm mm' Hwf Hstep)).
+  exists rs', mm2, t'. split_and!;
+    [ exact (exec_translate_and_write_value_gen k va (u_walk_pa w va) v (Store Data)
+               false false false PBMT_PMA true (u_state rs mm) (u_state rs' mm')
+               (u_state rs' mm2) Htr Hea Hwv)
+    | | exact (u_tlb_only_land rs rs' Hfile) | exact Htlbok' | exact Hstep2
+    | exact Hcfg' | exact Hpins'
+    | exact (u_mem_step_wf P t t' mm mm2 Hwf Hstep2) ].
+  apply (goodmb_translate_and_write_value_gen Du_r Du_w k va (u_walk_pa w va) v
+           (Store Data) false false false PBMT_PMA true
+           (u_state rs mm) (u_state rs' mm') (u_state rs' mm2) mm Htrg Htr);
+    [ rewrite (goodmb_dom Du_r Du_w _ (u_state rs' mm') mm mm' Hdom); exact Heag
+    | exact Hea
+    | rewrite (goodmb_dom Du_r Du_w _ (u_state rs' mm') mm mm' Hdom); exact Hwvg
+    | exact Hwv ].
+Qed.
+
+Lemma u_store_pure_two (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (p q : Z) (w1 w2 va : mword 64)
+    (dat1 : mword (8 * p)) (dat2 : mword (8 * q)) :
+  0 < p -> p <= 8 -> in_one_page va p ->
+  0 < q -> q <= 8 -> in_one_page (add_vec_int va p) q ->
+  ud_um P !! svpn_of va = Some w1 ->
+  ud_um P !! svpn_of (add_vec_int va p) = Some w2 ->
+  uleaf_ok (Store Data) w1 -> uleaf_ok (Store Data) w2 ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (rs1 : regstate) (mm1 mm1w : pamap) (t1 : ptree)
+         (rs2 : regstate) (mm2 : pamap) (t2 : ptree),
+    exec (translateAddr (Virtaddr va) (Store Data)) (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w1 va), PBMT_PMA, init_ext_ptw),
+              u_state rs1 mm1) /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Store Data))
+      (u_state rs mm) mm = true /\
+    exec (mem_write_ea (Physaddr (u_walk_pa w1 va)) p (Store Data) PBMT_PMA
+            false false false) (u_state rs1 mm1) = Some (Ok tt, u_state rs1 mm1) /\
+    goodmb Du_r Du_w (mem_write_ea (Physaddr (u_walk_pa w1 va)) p (Store Data)
+            PBMT_PMA false false false) (u_state rs1 mm1) mm = true /\
+    exec (mem_write_value (Physaddr (u_walk_pa w1 va)) p dat1 (Store Data) PBMT_PMA
+            false false false) (u_state rs1 mm1) = Some (Ok true, u_state rs1 mm1w) /\
+    goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w1 va)) p dat1 (Store Data)
+            PBMT_PMA false false false) (u_state rs1 mm1) mm = true /\
+    exec (translate_and_write_value (Virtaddr (add_vec_int va p)) q dat2 (Store Data)
+            false false false) (u_state rs1 mm1w) = Some (Ok true, u_state rs2 mm2) /\
+    goodmb Du_r Du_w (translate_and_write_value (Virtaddr (add_vec_int va p)) q dat2
+            (Store Data) false false false) (u_state rs1 mm1w) mm = true /\
+    u_tlb_only rs rs2 /\
+    tlb_ok_pt (mword_of_int 0) t2 (register_lookup tlb rs2) /\
+    u_mem_step P t t2 mm mm2 /\
+    u_data_cfg rs2 /\ u_exec_pins P t2 rs2 /\ u_mem_wf P t2 mm2.
+Proof.
+  intros Hp Hp8 Hpp Hq Hq8 Hqp Hl1 Hl2 Hleaf1 Hleaf2 Hc1 Hc2 Hcfg Hpins Hwf.
+  destruct (u_store_pure_page P t mm rs p w1 va dat1 Hp Hp8 Hpp Hl1 Hleaf1 Hc1
+              Hcfg Hpins Hwf)
+    as (rs1 & mm1 & mm1w & t1 & Htr & Htrg & Hea & Heag & Hwv & Hwvg & Hfile
+        & Htlb1 & Hst1 & Hst1w & Hcfg1 & Hpins1).
+  assert (Hdom1 : (dom mm : gset Arch.pa) = dom mm1)
+    by (symmetry; exact (u_mem_step_dom P t t1 mm mm1 Hwf Hst1)).
+  assert (Hdom1w : (dom mm : gset Arch.pa) = dom mm1w)
+    by (symmetry; exact (u_mem_step_dom P t t1 mm mm1w Hwf Hst1w)).
+  assert (Hwf1w : u_mem_wf P t1 mm1w)
+    by exact (u_mem_step_wf P t t1 mm mm1w Hwf Hst1w).
+  destruct (u_tawv_page P t1 mm1w rs1 q w2 (add_vec_int va p) dat2 Hq Hq8 Hqp Hl2
+              Hleaf2 Hc2 Hcfg1 Hpins1 Hwf1w)
+    as (rs2 & mm2 & t2 & H2 & H2g & Ho2 & Htlb2 & Hst2 & Hcfg2 & Hpins2 & Hwf2).
+  exists rs1, mm1, mm1w, t1, rs2, mm2, t2. split_and!;
+    [ exact Htr | exact Htrg
+    | exact Hea | rewrite (goodmb_dom Du_r Du_w _ (u_state rs1 mm1) mm mm1 Hdom1); exact Heag
+    | exact Hwv | rewrite (goodmb_dom Du_r Du_w _ (u_state rs1 mm1) mm mm1 Hdom1); exact Hwvg
+    | exact H2 | rewrite (goodmb_dom Du_r Du_w _ (u_state rs1 mm1w) mm mm1w Hdom1w); exact H2g
+    | exact (u_tlb_only_trans rs rs1 rs2 (u_tlb_only_land rs rs1 Hfile) Ho2)
+    | exact Htlb2 | exact (u_mem_step_trans P t t1 t2 mm mm1w mm2 Hst1w Hst2)
+    | exact Hcfg2 | exact Hpins2 | exact Hwf2 ].
+Qed.
+
+(* --- the straddle itself: the two-part composers at the geometry the      *)
+(*     model computes.  [p] is the distance to the page boundary and [q]    *)
+(*     the remainder; both parts are [in_one_page] by construction          *)
+(*     ([UserMemMis.straddle_part1_in_page] / [_part2_in_page]) and both    *)
+(*     are non-empty and at most 8 bytes ([straddle_bounds]).               *)
+Lemma u_load_pure_straddle (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w1 w2 va : mword 64) :
+  0 < k -> k <= 8 -> ~ in_one_page va k ->
+  let p := 4096 - bv_unsigned va mod 4096 in
+  ud_um P !! svpn_of va = Some w1 ->
+  ud_um P !! svpn_of (add_vec_int va p) = Some w2 ->
+  uleaf_ok (Load Data) w1 -> uleaf_ok (Load Data) w2 ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (v1 : mword (8 * p)) (v2 : mword (8 * (k - p)))
+         (rs1 : regstate) (mm1 : pamap) (t1 : ptree)
+         (rs2 : regstate) (mm2 : pamap) (t2 : ptree),
+    exec (split_on_page_boundary va k) (u_state rs mm)
+      = Some ((p, k - p), u_state rs mm) /\
+    goodmb Du_r Du_w (split_on_page_boundary va k) (u_state rs mm) mm = true /\
+    0 < p /\ 0 < k - p /\
+    exec (translate_and_read_value (Virtaddr va) p (Load Data) false false false)
+      (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w1 va), v1), u_state rs1 mm1) /\
+    goodmb Du_r Du_w
+      (translate_and_read_value (Virtaddr va) p (Load Data) false false false)
+      (u_state rs mm) mm = true /\
+    exec (translate_and_read_value (Virtaddr (add_vec_int va p)) (k - p) (Load Data)
+            false false false) (u_state rs1 mm1)
+      = Some (Ok (Physaddr (u_walk_pa w2 (add_vec_int va p)), v2), u_state rs2 mm2) /\
+    goodmb Du_r Du_w
+      (translate_and_read_value (Virtaddr (add_vec_int va p)) (k - p) (Load Data)
+         false false false) (u_state rs1 mm1) mm = true /\
+    u_tlb_only rs rs2 /\
+    tlb_ok_pt (mword_of_int 0) t2 (register_lookup tlb rs2) /\
+    u_mem_step P t t2 mm mm2 /\
+    u_data_cfg rs2 /\ u_exec_pins P t2 rs2 /\ u_mem_wf P t2 mm2.
+Proof.
+  intros Hk Hk8 Hout p Hl1 Hl2 Hleaf1 Hleaf2 Hc1 Hc2 Hcfg Hpins Hwf.
+  destruct (straddle_bounds va k Hk Hk8 Hout) as (Hp & Hq & Hp8 & Hq8).
+  destruct (u_load_pure_two P t mm rs p (k - p) w1 w2 va
+              Hp Hp8 (straddle_part1_in_page va k)
+              Hq Hq8 (straddle_part2_in_page va k Hk Hk8 Hout)
+              Hl1 Hl2 Hleaf1 Hleaf2 Hc1 Hc2 Hcfg Hpins Hwf)
+    as (v1 & v2 & rs1 & mm1 & t1 & rs2 & mm2 & t2 & H1 & H1g & H2 & H2g & Ho
+        & Htlb2 & Hst & Hcfg2 & Hpins2 & Hwf2).
+  exists v1, v2, rs1, mm1, t1, rs2, mm2, t2. split_and!;
+    [ exact (exec_split_on_page_boundary_straddle va k (u_state rs mm) Hk Hk8 Hout)
+    | exact (goodmb_split_on_page_boundary_straddle Du_r Du_w va k (u_state rs mm) mm
+               Hk Hk8 Hout)
+    | exact Hp | exact Hq | exact H1 | exact H1g | exact H2 | exact H2g
+    | exact Ho | exact Htlb2 | exact Hst | exact Hcfg2 | exact Hpins2 | exact Hwf2 ].
+Qed.
+
+Lemma u_store_pure_straddle (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w1 w2 va : mword 64) :
+  0 < k -> k <= 8 -> ~ in_one_page va k ->
+  let p := 4096 - bv_unsigned va mod 4096 in
+  forall (dat1 : mword (8 * p)) (dat2 : mword (8 * (k - p))),
+  ud_um P !! svpn_of va = Some w1 ->
+  ud_um P !! svpn_of (add_vec_int va p) = Some w2 ->
+  uleaf_ok (Store Data) w1 -> uleaf_ok (Store Data) w2 ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va p)))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (rs1 : regstate) (mm1 mm1w : pamap) (t1 : ptree)
+         (rs2 : regstate) (mm2 : pamap) (t2 : ptree),
+    exec (split_on_page_boundary va k) (u_state rs mm)
+      = Some ((p, k - p), u_state rs mm) /\
+    goodmb Du_r Du_w (split_on_page_boundary va k) (u_state rs mm) mm = true /\
+    0 < p /\ 0 < k - p /\
+    exec (translateAddr (Virtaddr va) (Store Data)) (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w1 va), PBMT_PMA, init_ext_ptw),
+              u_state rs1 mm1) /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Store Data))
+      (u_state rs mm) mm = true /\
+    exec (mem_write_ea (Physaddr (u_walk_pa w1 va)) p (Store Data) PBMT_PMA
+            false false false) (u_state rs1 mm1) = Some (Ok tt, u_state rs1 mm1) /\
+    goodmb Du_r Du_w (mem_write_ea (Physaddr (u_walk_pa w1 va)) p (Store Data)
+            PBMT_PMA false false false) (u_state rs1 mm1) mm = true /\
+    exec (mem_write_value (Physaddr (u_walk_pa w1 va)) p dat1 (Store Data) PBMT_PMA
+            false false false) (u_state rs1 mm1) = Some (Ok true, u_state rs1 mm1w) /\
+    goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w1 va)) p dat1 (Store Data)
+            PBMT_PMA false false false) (u_state rs1 mm1) mm = true /\
+    exec (translate_and_write_value (Virtaddr (add_vec_int va p)) (k - p) dat2
+            (Store Data) false false false) (u_state rs1 mm1w)
+      = Some (Ok true, u_state rs2 mm2) /\
+    goodmb Du_r Du_w (translate_and_write_value (Virtaddr (add_vec_int va p)) (k - p)
+            dat2 (Store Data) false false false) (u_state rs1 mm1w) mm = true /\
+    u_tlb_only rs rs2 /\
+    tlb_ok_pt (mword_of_int 0) t2 (register_lookup tlb rs2) /\
+    u_mem_step P t t2 mm mm2 /\
+    u_data_cfg rs2 /\ u_exec_pins P t2 rs2 /\ u_mem_wf P t2 mm2.
+Proof.
+  intros Hk Hk8 Hout p dat1 dat2 Hl1 Hl2 Hleaf1 Hleaf2 Hc1 Hc2 Hcfg Hpins Hwf.
+  destruct (straddle_bounds va k Hk Hk8 Hout) as (Hp & Hq & Hp8 & Hq8).
+  destruct (u_store_pure_two P t mm rs p (k - p) w1 w2 va dat1 dat2
+              Hp Hp8 (straddle_part1_in_page va k)
+              Hq Hq8 (straddle_part2_in_page va k Hk Hk8 Hout)
+              Hl1 Hl2 Hleaf1 Hleaf2 Hc1 Hc2 Hcfg Hpins Hwf)
+    as (rs1 & mm1 & mm1w & t1 & rs2 & mm2 & t2 & Htr & Htrg & Hea & Heag & Hwv & Hwvg
+        & H2 & H2g & Ho & Htlb2 & Hst & Hcfg2 & Hpins2 & Hwf2).
+  exists rs1, mm1, mm1w, t1, rs2, mm2, t2. split_and!;
+    [ exact (exec_split_on_page_boundary_straddle va k (u_state rs mm) Hk Hk8 Hout)
+    | exact (goodmb_split_on_page_boundary_straddle Du_r Du_w va k (u_state rs mm) mm
+               Hk Hk8 Hout)
+    | exact Hp | exact Hq | exact Htr | exact Htrg | exact Hea | exact Heag
+    | exact Hwv | exact Hwvg | exact H2 | exact H2g
+    | exact Ho | exact Htlb2 | exact Hst | exact Hcfg2 | exact Hpins2 | exact Hwf2 ].
 Qed.
