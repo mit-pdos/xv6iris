@@ -1246,6 +1246,223 @@ Section ptewrite.
     iApply swp_ret. by iFrame.
   Qed.
 
+
+  (* ------------------------------------------------------------------ *)
+  (* THE A/D WRITE-BACK ([update_and_write_pte], design §3a item (e)):    *)
+  (* the Svadu/ADUE gate (silent), the EXCLUSIVE re-read (an ordinary     *)
+  (* node that leaves the reservation), [check_leaf_pte] on the RE-READ   *)
+  (* word (CommonWalk's footprinted leaf check), the pure A/D recompute,   *)
+  (* and the CONDITIONAL write on the reservation -- whose rule tells the *)
+  (* caller the word memory holds IS the re-read word.                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [read_pte_exclusive] on top of the exclusive node: [swp_read_pte_S]'s
+     twin at [res = true] *)
+  Lemma swp_read_pte_exclusive_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pa : SailStdpp.Values.mword 64) (w : bv 64) :
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
+              (Physaddr pa) 8 false false true false)
+         (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                   resv_frag cpu_id (Some (snap_of pa 8 w)))) -∗
+    swp (read_pte_exclusive (Physaddr pa) 8)
+      (fun r => ⌜r = Values.Ok w⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                resv_frag cpu_id (Some (snap_of pa 8 w))).
+  Proof.
+    iIntros "#Hcert Hrw Hro Hcmr".
+    unfold read_pte_exclusive, mem_read_priv, mem_read_priv_meta.
+    cbn [orb andb].
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                         resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+              with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_bind_use _ _
+                (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                           resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+                with "[Hrw Hro Hcmr] [-]").
+      - iApply ("Hcmr" with "Hrw Hro").
+      - iIntros (v) "(-> & Hrw & Hro & Hfrag)". iApply swp_ret. by iFrame. }
+    iIntros (v) "(-> & Hrw & Hro & Hfrag)". iApply swp_ret.
+    cbn [MemoryOpResult_drop_meta]. by iFrame.
+  Qed.
+
+  (* the extension probe, as a monad term: [returnM true] *)
+  Local Lemma cE_Svadu_ret : currentlyEnabled Ext_Svadu = returnM true.
+  Proof.
+    unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+    vm_compute. reflexivity.
+  Qed.
+
+  (* the Svadu/ADUE gate of [update_and_write_pte]: [true], reading menvcfg *)
+  Local Lemma hfrun_adue_gate (D Drw : gset register) (rs : regstate)
+      (menvcfg0 : mword 64) :
+    (menvcfg : register) ∈ D ->
+    register_lookup menvcfg rs = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
+    hfrun 3 D Drw rs
+      (or_boolM
+         (and_boolM (currentlyEnabled Ext_Svadu)
+            (Defs.bind (Defs.read_reg menvcfg)
+               (fun w => returnM (eq_vec (_get_MEnvcfg_ADUE w) ('b"1")))))
+         (and_boolM
+            (Defs.bind (currentlyEnabled Ext_Svadu) (fun w => returnM (negb w)))
+            (Defs.bind (currentlyEnabled Ext_Svade) (fun w => returnM (negb w)))))
+    = Some (true, rs).
+  Proof.
+    intros HD Hmenv HADUE.
+    unfold or_boolM, and_boolM. rewrite cE_Svadu_ret.
+    cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+      Defs.returnm returnM].
+    rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+    rewrite Hmenv HADUE.
+    cbn beta iota zeta delta [Defs.returnm returnM].
+    apply hfrun_ret.
+  Qed.
+
+  Lemma swp_update_and_write_pte_upd (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (dst : mstate)
+      (vpn : mword 27) (pa : SailStdpp.Values.mword 64)
+      (q0 q0' m0 m0' menvcfg0 : mword 64)
+      (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (R : iProp Σ) (rr : option resv) :
+    (* CommonWalk's leaf-check hypotheses, AT THE RE-READ WORD *)
+    (forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                       (ext_bits_of_PTE m0)) s = Some (false, s)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec m0 7 0)) = false ->
+    (forall s, exec (check_PTE_permission acc p mxr do_sum
+                       (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                       (ext_bits_of_PTE m0) tt) s
+               = Some (PTE_Check_Success tt, s)) ->
+    eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE m0)) ('b"1") = false ->
+    (forall (Db : register -> bool) s,
+       goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                   (ext_bits_of_PTE m0)) s = true) ->
+    (forall (Db : register -> bool) s,
+       goodb Db (check_PTE_permission acc p mxr do_sum
+                   (Mk_PTE_Flags (subrange_vec_dec m0 7 0))
+                   (ext_bits_of_PTE m0) tt) s = true) ->
+    Drw ## Dro ->
+    (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, D_leafchk r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    register_lookup misa dst.(sregs) = MISA_C ->
+    register_lookup menvcfg dst.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
+    (* the CACHED word needs the update (the outer test) and so does the
+       RE-READ word (the inner one) *)
+    update_PTE_Bits (autocast (T := mword) q0 : mword 64) acc = Some q0' ->
+    update_PTE_Bits (autocast (T := mword) m0 : mword 64) acc = Some m0' ->
+    (* the two nodes' PMP/PMA facts *)
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec paddr 0)) 4)
+      (uint pa) (uint (to_bits 64 8)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
+    pma_allows_ram pmar0 ->
+    pma_ram_access pa 8 ->
+    addr_is_ram pa ->
+    is_aligned_paddr (Physaddr pa) 8 = true ->
+    gen_cert -∗
+    resv_frag cpu_id rr -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (* the re-read's witness: memory holds [m0] at the slot *)
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) pa 8 = Some m0⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (* the write, told that memory STILL holds [m0] *)
+    (∀ σ, ⌜read_bytes σ.(mem) pa 8 = Some m0⌝ -∗ mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 8
+                   (Interface.WriteReq.value
+                      (mwrite_req8_con pa (autocast (T := mword) m0'))))
+                σ.(mdev)) ∗ R)) -∗
+    swp (update_and_write_pte 39 vpn (Physaddr pa) q0 0 acc p mxr do_sum tt)
+      (fun r => ⌜r = Values.Ok (Some (autocast (T := mword) m0'), tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                resv_frag cpu_id None).
+  Proof.
+    intros H0i H0nl Hchk0 H0N H0ig Hchk0g Hdisj HDlc Hag Hmisa Hmenv HPBMTE
+      HADUE Hupd0 Hupd HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
+      HA Hord Hrange HR HW Hpallow Hacc Hram Hpa.
+    iIntros "#Hcert Hfrag Hrw Hro Hrd Hwr".
+    unfold update_and_write_pte.
+    match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+      change w with 64 end.
+    rewrite Hupd0. cbn match.
+    (* the gate *)
+    assert (HDmenv : (menvcfg : register) ∈ Drw ∪ Dro)
+      by (apply HDlc; unfold D_leafchk; rewrite register_beq_refl; apply orb_true_r).
+    assert (Hmenv_rs : register_lookup menvcfg rs = menvcfg0).
+    { rewrite -Hmenv. apply Hag. unfold D_leafchk.
+      rewrite register_beq_refl. apply orb_true_r. }
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 3 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_adue_gate (Drw ∪ Dro) Drw rs menvcfg0 HDmenv Hmenv_rs HADUE)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match zeta.
+    (* the exclusive re-read *)
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok m0⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                         resv_frag cpu_id (Some (snap_of pa 8 m0)))%I) _
+              with "[Hrw Hro Hfrag Hrd] [-]").
+    { iApply (swp_read_pte_exclusive_S Drw Dro Df rs pa m0
+                with "Hcert Hrw Hro [Hfrag Hrd]").
+      iIntros "Hrw Hro".
+      iApply (swp_checked_mem_read_pte8_excl Drw Dro Df rs pa pmar0 pcfg paddr
+                m0 rr Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
+                HA Hord Hrange HR Hpallow Hacc Hram Hpa
+                with "Hcert Hfrag Hrw Hro Hrd"). }
+    iIntros (v) "(-> & Hrw & Hro & Hfrag)". cbn match beta.
+    rewrite autocast_id.
+    (* the re-check, on the re-read word *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_check_leaf_pte_leaf0 vpn m0 acc p mxr do_sum
+                   H0i H0nl Hchk0 H0N H0ig Hchk0g (Drw ∪ Dro) Drw rs dst
+                   (Physaddr pa) menvcfg0 HDlc Hag Hmisa Hmenv HPBMTE)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match beta.
+    rewrite Hupd. cbn match. rewrite autocast_id.
+    (* the conditional write *)
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok true⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
+                         resv_frag cpu_id None)%I) _
+              with "[Hrw Hro Hfrag Hwr] [-]").
+    { iApply (swp_write_pte_conditional_S Drw Dro Df rs pa _
+                (R ∗ resv_frag cpu_id None)%I with "Hcert Hrw Hro [Hfrag Hwr]").
+      iIntros "Hrw Hro".
+      iApply (swp_checked_mem_write_pte8_cond Drw Dro Df rs pa _ pmar0 pcfg paddr
+                R m0 Hdisj HDpma HDcfg HDaddr HDhtif Hpma Hpcfg Hpaddr Hhtif
+                HA Hord Hrange HW Hpallow Hacc Hram Hpa
+                with "Hcert Hfrag Hrw Hro Hwr"). }
+    iIntros (v) "(-> & Hrw & Hro & HR & Hfrag)". cbn match.
+    iApply swp_ret. by iFrame.
+  Qed.
+
 End ptewrite.
 
 (* ===================================================================== *)
