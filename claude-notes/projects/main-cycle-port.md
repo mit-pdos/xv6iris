@@ -2013,11 +2013,12 @@ platform ones + `functional_extensionality_dep` where inherited)
 - >5 min per file is a bug; no pkill of coqc; commit by explicit path only.
 
 ### AWAITING USER RULING (tail-1 report, 2026-08-18 late)
-1. `SpecKvminithart.wp_kvminithart_sconf_body` still takes `tlb ↦ᵣ tlbvec0`,
-   but the boot tlb cell moved INTO `SRegime.bare_inv` (52f89133, approved
-   as part of the bare_inv fix) and out of `SpecMain.main_hart_raw`, so the
-   premise is unsatisfiable: DROP it (ProofKvminithart then sources the
-   cell from `strans_inv_acc_bare`).  Caller-visible (Spec file).
+1. **RULED (user, 2026-08-18): the tlb cell lives in `bare_inv`;
+   `SpecKvminithart.wp_kvminithart_sconf_body` drops its `tlb ↦ᵣ tlbvec0`
+   premise and requires the `bare_inv` (via the Bare arm) instead** --
+   ProofKvminithart sources the cell from `strans_inv_acc_bare`.  (The
+   companion `SpecMain.main_hart_raw` change, 52f89133, is thereby approved
+   too.)  TO DO.
 2. `ProofVirtioDiskIntr.v` used-ELEMENT `lw` (~l.1300): the word lives only
    inside `VirtioProto.virtio_proto_reclaim_acc` (one-shot closer), so no
    points-to is reachable before the AU: needs a READ-ONLY used-element
