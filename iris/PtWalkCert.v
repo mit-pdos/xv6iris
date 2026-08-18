@@ -141,6 +141,72 @@ Ltac gmm_peelT tacg tace :=
         first [ erewrite gm_bind_nest; [ | tacg | tace ]
               | erewrite gm_bind;      [ | tacg | tace ] ] ) ].
 
+(* THE LEFT-NESTED PEEL IN THE EARLY-RETURN MONAD, WITHOUT the wrapper.
+   [HartMemAsm] has the nest with the [catch_early_return] on ([gm_cer_*])
+   and the plain-monad nest ([gm_bind_nest]); Sail's [or_boolM]/[and_boolM]
+   inside an already-opened [catch_early_return] body needs neither -- it is
+   [bind (bind m g) f] at [monadR].  (FOLD BACK beside [gm_bind_nest].) *)
+Lemma goodmb_bindR_nest (Dr Dw : register -> bool) {R X Y Z : Type}
+    (m : Defs.monadR R exception X) (g : X -> Defs.monadR R exception Y)
+    (f : Y -> Defs.monadR R exception Z)
+    (s s' : mstate) (mm : pamap) (x : X) :
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr x, s') ->
+  goodmb Dr Dw (Defs.bind (Defs.bind m g) f) s mm
+  = goodmb Dr Dw (Defs.bind (g x) f) s' (mm_after m s mm).
+Proof.
+  revert s mm. induction m as [y0 | T oc k IH]; intros s mm Hg He.
+  - cbn [execR] in He.
+    assert (Hx : x = y0) by congruence. assert (Hs : s' = s) by congruence.
+    subst x s'. reflexivity.
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb execR mm_after Defs.bind Interface.iMon_bind] in Hg, He |- *;
+      try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He. rewrite Hdev.
+      rewrite Hfp. cbn [negb andb] in Hg2 |- *.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma gm_bindR_nest (Dr Dw : register -> bool) {R X Y Z : Type}
+    (m : Defs.monadR R exception X) (g : X -> Defs.monadR R exception Y)
+    (f : Y -> Defs.monadR R exception Z)
+    (s s' : mstate) (mm : pamap) (x : X) :
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr x, s') ->
+  goodmb Dr Dw (Defs.bind (Defs.bind m g) f) s mm
+  = goodmb Dr Dw (Defs.bind (g x) f) s' mm.
+Proof.
+  intros Hg He. rewrite (goodmb_bindR_nest Dr Dw m g f s s' mm x Hg He).
+  exact (goodmb_after_dom Dr Dw m (Defs.bind (g x) f) s s' mm Hg).
+Qed.
+
+Lemma gm_liftR_nest (Dr Dw : register -> bool) {R X Y Z : Type}
+    (m : M X) (g : X -> Defs.monadR R exception Y)
+    (f : Y -> Defs.monadR R exception Z)
+    (s s' : mstate) (mm : pamap) (x : X) :
+  goodmb Dr Dw m s mm = true ->
+  exec m s = Some (x, s') ->
+  goodmb Dr Dw (Defs.bind (Defs.bind (Defs.liftR m) g) f) s mm
+  = goodmb Dr Dw (Defs.bind (g x) f) s' mm.
+Proof.
+  intros Hg He.
+  exact (gm_bindR_nest Dr Dw (Defs.liftR m) g f s s' mm x
+           (goodmb_liftR Dr Dw m s mm Hg) (goodmb_liftR_execR m s s' x He)).
+Qed.
+
 (* [HartMemAsm.gmm_lift] taking TACTICS for the head's two facts, which is
    what a head whose arguments are not determined until the goal is matched
    needs (a term with a hole elaborated in argument position cannot infer it) *)
@@ -155,6 +221,7 @@ Ltac gmm_liftT tacg tace :=
 (* [HartMemAsm.gmm_lift] extended with the depth-2 shapes *)
 Ltac gmm_lift2 Hg He :=
   first [ gmm_lift Hg He
+        | erewrite gm_liftR_nest;     [ | exact Hg | exact He ]
         | erewrite gm_cer_liftR_nest2; [ | exact Hg | exact He ]
         | ( unfold Defs.bind0;
             first [ gmm_lift Hg He

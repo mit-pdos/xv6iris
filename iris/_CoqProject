@@ -174,6 +174,7 @@ UserFrame.v
 PtBytes.v
 UserBytes.v
 PtWalkCert.v
+UserFetchCert.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
