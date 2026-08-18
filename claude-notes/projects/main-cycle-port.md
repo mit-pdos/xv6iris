@@ -224,12 +224,17 @@ guessed — rerun before trusting):
 
 | root | dependents | fails on |
 |---|---|---|
-| `SmodeCorePt` | 464 | `wp_exec_step_decode_execute_inv_priv` (deleted) |
-| `WpIntrInv` | 442 | `wp_exec_step_minstret` (deleted in `c1b82ebc`) |
-| `UserExec` | 39 | `clock_inv` (renamed when the invariants became resources) |
+| `SmodeCorePt` | 468 | `wp_exec_step_decode_execute_inv_priv` (deleted) |
+| `WpIntrInv` | 446 | `wp_exec_step_minstret` (deleted in `c1b82ebc`) |
+| `UserExec` | 54 | `clock_inv` (renamed when the invariants became resources) |
 | `WpMmodeLoad` / `_Store` / `WpGprCsrwStimecmp` / `WpMmodeMret` / `BootBridge` / `RiscvAdequacy` | 2–8 | leaf-level |
 
-**`WpIntrInv`'s cone is a strict SUBSET of `SmodeCorePt`'s** (442 shared, 0
+(Re-measured after merging `origin/main` at `1d13dc20` — 1211 files, 665 green,
+523 in the union of the red cones.  The merge was CLEAN and moved no root: the
+same 9 files fail, for the same reasons.  The counts above are the post-merge
+ones; the pre-merge numbers were 464 / 442 / 39 over 1186 files.)
+
+**`WpIntrInv`'s cone is a strict SUBSET of `SmodeCorePt`'s** (446 shared, 0
 unique) and NEITHER depends on the other.  So the two are independent roots
 over the same downstream files: **fixing either alone unblocks nothing**, and
 both must fall before any of the 501 uncompiled files move.
@@ -246,25 +251,70 @@ tlb_res_pt root_ppn` BY `reflexivity` — so at the kernel-table instance the
 regime hands over exactly the satp/tlb/pmp cells `WpSFrames.s_frames_intro`
 consumes.  Nothing has to be invented to connect them.
 
-**2. THE REGIME ABSTRACTION DOES NOT SURVIVE THE PORT AT THE FETCH.**  It was
-built for the exec world, where `sr_absorb` hides the difference between
-regimes behind ONE fupd over the whole state.  At the swp layer that
-difference is structural: the Sv39 fetch WALKS (three PTE reads, a TLB fill,
-a different landing file) and the Bare fetch is the IDENTITY (a physical read,
-same file).  Those are different node sequences, so one regime-generic swp
-engine cannot cover both.
+**2. THE REGIME ABSTRACTION SURVIVES THE PORT — `wp_instr_s_regime` CONVERTS
+RATHER THAN SPLITS.**  (This REVERSES what this section said between
+`5ce4a3c1` and the merge of `origin/main`; the earlier claim was wrong and the
+evidence against it was already on the page.)
 
-So `wp_instr_s_regime` splits rather than converts:
+The earlier reasoning was: at the swp layer the Sv39 fetch WALKS (three PTE
+reads, a TLB fill, a different landing file) while the Bare fetch is the
+IDENTITY (same file), those are different node sequences, so no one
+regime-generic swp engine can cover both — hence a split, with Bare routed
+through the M-mode fetch at `pv := Supervisor`.
 
-- **Sv39** → `WpSFrames.wp_instr_s*` (all four shapes, proved).  What is
-  still needed is a fraction-generic `s_frames_intro`: `smode_config γ dq`
-  holds its cells at `dq`, while the current intro is written at
-  `DfracOwn 1` (`s_Df` is already parameterized, so this is the statement,
-  not the proof).
-- **Bare** → the M-mode fetch machinery AT SUPERVISOR, which is already
-  reachable: `swp_mem_read_M` takes the privilege as a parameter and
-  `swp_fetch` takes its landing file, so a Bare S-mode fetch is those two at
-  `pv := Supervisor`, `rsf := rs`.
+**The node sequence is not visible in the statement, so the difference does
+not have to be.**  `WpSFrames.wp_instr_s*` does not PERFORM the translation;
+it takes it as an OBLIGATION
+
+```
+hreg_frame (s_rs … tlbv) s_Drw -∗ hreg_frame_ro Df (s_rs … tlbv) s_Dro -∗
+  swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
+      (fun r => ⌜r = Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                hreg_frame (s_rs … tlbv') s_Drw ∗ hreg_frame_ro Df (s_rs … tlbv') s_Dro)
+```
+
+whose landing TLB value `tlbv'` is a LEMMA BINDER, independent of `tlbv`.  A
+walking regime discharges it with `tlbv' ≠ tlbv`; Bare discharges it with
+`tlbv' := tlbv`.  Both are the same obligation.  Node COUNT differs; the
+obligation does not mention it.
+
+And this is not a new invention — `sr_absorb`'s exec-side post already carries
+exactly this shape, as `⌜σ'.(sregs) = σ.(sregs) ∨ ∃ tv, σ'.(sregs) =
+register_set tlb tv σ.(sregs)⌝`: "the file is unchanged, or the TLB was
+written".  The record was ALREADY generic over the difference the split was
+invented to handle.  Reading `sr_absorb` for its mask premise and not for its
+post is how the wrong conclusion got recorded.
+
+So the work is a NEW REGIME FIELD, not a case split:
+
+```
+sr_swp_translate : ∀ acc va pa ppn (kp : kperm) Drw Dro Df rs, <pure premises> →
+  kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗
+  hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+  swp (translateAddr (Virtaddr va) acc)
+      (fun r => ⌜r = Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                ∃ rsf, ⌜rsf = rs ∨ ∃ tv, rsf = register_set tlb tv rs⌝ ∗
+                       hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)
+```
+
+— `sr_absorb` with σ replaced by a file and `∃ σ'` by `∃ rsf`.  Two instances:
+`bare_regime` by the identity path (`rsf := rs`), `kpt_share_regime` by
+`HartSTrans.swp_translate_hit` / `swp_translate_miss` — the caller picks the
+arm by destructing the slot in `tlbv`, which it holds in its own frame.
+
+`wp_instr_s_regime`, `strans_regime`, and both callers (`WpSmodePtCtl:200`,
+`WpSmodePtLeaves:1009`) then stay REGIME-BLIND and their statements do not
+move.  That is the whole point of the record, and the split would have
+destroyed it: `strans_regime` exists precisely so a caller need not know which
+arm it is on.
+
+**One thing the swp field genuinely changes:** `sr_absorb` is a fupd at a mask
+⊇ `↑kptN`, i.e. it opens the shared-table invariant ONCE around the whole
+translation.  A swp spans many nodes and no fupd can be held across them, so
+the `kpt_share` instance must open `kptN` PER READ NODE instead.  That is
+sound for the same reason the table is shareable at all (it is read-only after
+boot), but it is a real difference in the proof, and it is where that
+instance's work is.
 
 **AND `smode_config` PINS `SIE = false`** — interrupts are off in this
 bundle.  So the Sv39 engine here is the ONE-ARMED case, and `WpSFrames.
