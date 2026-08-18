@@ -38,7 +38,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import KptPt KMap.
 Require Import WpLock SleepLock.
 Require Import RiscvExtras.
 Require Import InstrBytes.
@@ -109,90 +108,10 @@ Definition iul_sp (m M : regfile) : Prop :=
   = add_vec (m !!! Regidx csp_rs1 : mword 64)
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
-(* ===================================================================== *)
-(* THE ADDRESS CLAIM for the lock-free [lw a5,8(s1)].                     *)
-(*                                                                        *)
-(* The per-node memory forms take [WpSconfMem.wordw_claim] BESIDE their   *)
-(* atomic update: an access TRANSLATES several nodes before the memory    *)
-(* node where the (linear, one-shot) update is opened, so the window's    *)
-(* mapping cannot be read out of the update itself -- and here it could   *)
-(* not be read out of the escrow either, whose accessors are ghost        *)
-(* UPDATES that cannot be peeked and put back.  For a kernel-DATA address *)
-(* the claim needs no resource but the ambient static bundle: it is       *)
-(* [kmap_static_claims_at] plus [pa_of_id].  The itable is a .bss object, *)
-(* so its entry fields are kdata by ARITHMETIC -- [ientry_unsigned] is    *)
-(* the whole geometry.                                                    *)
-(* ===================================================================== *)
-
-(* [i_ref (ientry k)] in plain Z: entry k's base plus the 8-byte field
-   displacement, with no wrap. *)
-Lemma iul_iref_unsigned (k : nat) :
-  (k < NINODE)%nat ->
-  bv_unsigned (i_ref (ientry k))
-  = (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + 8)%Z.
-Proof.
-  intros Hk. rewrite /i_ref.
-  replace (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
-    with (mword_of_int 8 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
-  rewrite add_vec64_unsigned.
-  rewrite (ientry_unsigned k ltac:(unfold NINODE in *; lia)).
-  rewrite (moi64_small 8 ltac:(lia)).
-  apply bv_wrap_small.
-  assert (Hkz : (Z.of_nat k <= 49)%Z) by (unfold NINODE in Hk; lia).
-  unfold ISLOTSZ, KernelSyms.itable.
-  assert (Hbm : bv_modulus 64 = 18446744073709551616%Z)
-    by (vm_compute; reflexivity).
-  rewrite Hbm. lia.
-Qed.
-
-Lemma iul_iref_kdata_range (k : nat) :
-  (k < NINODE)%nat ->
-  (2147512320 <= KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + 8 < 2281701376)%Z.
-Proof.
-  intros Hk. unfold NINODE in Hk. unfold ISLOTSZ, KernelSyms.itable. lia.
-Qed.
-
-Lemma iul_iref_rem4 (k : nat) :
-  Z.rem (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + 8) 4 = 0%Z.
-Proof.
-  assert (Hnn : (0 <= KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + 8)%Z)
-    by (unfold ISLOTSZ, KernelSyms.itable; lia).
-  rewrite Z.rem_mod_nonneg; [| exact Hnn | lia].
-  replace (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + 8)%Z
-    with (4 * (536904256 + 34 * Z.of_nat k))%Z
-    by (unfold ISLOTSZ, KernelSyms.itable; lia).
-  rewrite Z.mul_comm. apply Z_mod_mult.
-Qed.
-
 Section ProofIunlockMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
             !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-
-  (* the claim, off the ambient static bundle and one arithmetic fact *)
-  Lemma iul_wordw_claim_u (width : Z) (a : Arch.pa) (n : Z) :
-    bv_unsigned a = n ->
-    (2147512320 <= n < 2281701376)%Z ->
-    Z.rem n width = 0%Z ->
-    kmap_static_claims -∗ wordw_claim (KTR := KT0) width a.
-  Proof.
-    intros Hn Hrange Hrem. iIntros "#Hb".
-    assert (Hkd : addr_is_kdata a).
-    { unfold addr_is_kdata, text_end, ram_base, ram_size.
-      rewrite RiscvExtras.uint_unsigned Hn. lia. }
-    assert (Hcan : (uint (a : mword 64) < 274877906944)%Z)
-      by (rewrite RiscvExtras.uint_unsigned Hn; lia).
-    assert (Hal : is_aligned_paddr (Physaddr a) width = true).
-    { unfold is_aligned_paddr. apply Z.eqb_eq.
-      rewrite RiscvExtras.uint_unsigned Hn. exact Hrem. }
-    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw
-                 (kdata_svpn_class a Hkd) with "Hb") as "#Hk0".
-    rewrite /wordw_claim. iSplitR; [iPureIntro; exact Hal |].
-    iExists (kpt_leaf_ppn (svpn_of a)). rewrite (pa_of_id a Hcan).
-    iFrame "Hk0". iPureIntro. split_and!;
-      [ exact Hcan | exact (addr_is_kdata_ram a Hkd)
-      | exact (ktier_pin_of_id KT0 (kpt_leaf_ppn (svpn_of a)) a (pa_of_id a Hcan)) ].
-  Qed.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iul_frame (m : regfile) : iProp Σ :=
@@ -509,7 +428,26 @@ Section ProofIunlockMain.
     assert (Hrefadr : add_vec (rget mH Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
-    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first.  Both accessors this read uses RESTORE, so one peek
+       -- the escrow's checked-out arm, then the itable's liveness read --
+       hands out the ref word's own points-to; [wordw_claim_of] reads the
+       claim off it and the peek closes with everything put back.  The claim
+       is persistent, so it survives the close. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbodyp Hvalid")
+      as "[Hvalid Hborp]".
+    iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
+    iMod (iref_live_load_au (⊤ ∖ ↑icEscN) k sbp
+            ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
+                 ltac:(lia) with "Hcellp") as "#Hclaim0".
+    iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
+    iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".
+    { iNext. iApply ("Hbbackp" with "Hlvp"). }
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
@@ -517,10 +455,7 @@ Section ProofIunlockMain.
               (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc Hi1c [] [Hvalid]").
-    { rewrite Hrefadr Hipe.
-      iApply (iul_wordw_claim_u 4 (i_ref (ientry k)) _
-                (iul_iref_unsigned k Hk) (iul_iref_kdata_range k Hk)
-                (iul_iref_rem4 k) with "Hkm"). }
+    { rewrite Hrefadr Hipe. iExact "Hclaim0". }
     { rewrite Hrefadr Hipe.
       iInv "Hesc" as ">Hbody" "Hclose".
       iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbody Hvalid")
