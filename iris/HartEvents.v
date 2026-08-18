@@ -35,7 +35,41 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift.
+Require VirtioQueue.   (* [write_bytes_lookup]: the snapshot's per-byte hits *)
 Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* THE SNAPSHOT BRIDGE (design §3a): a reservation whose snapshot still     *)
+(* agrees with memory ([resv_ok], handed over by [wp_hart_step_resv]) pins  *)
+(* the word the conditional write finds -- it is the word the exclusive     *)
+(* read returned.  The width bound is what rules out aliasing inside the    *)
+(* footprint ([pa_add] wraps at 2^64); every real access is ≤ 16 bytes.     *)
+(* ---------------------------------------------------------------------- *)
+Lemma snap_of_read_bytes (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N)
+    (w : bv (8 * n)) :
+  Z.of_N n < 18446744073709551616 ->
+  snap_of pa n w ⊆ mm ->
+  read_bytes mm pa n = Some w.
+Proof.
+  intros Hn Hsub.
+  assert (Hbytes : forall j : nat, (N.of_nat j < n)%N ->
+            mm !! pa_add pa j = Some (nth_byte w j)).
+  { intros j Hj.
+    pose proof (VirtioQueue.write_bytes_lookup ∅ pa n w j Hn Hj) as Hhit.
+    exact (map_subseteq_spec _ _ Hsub _ _ Hhit). }
+  destruct (read_bytes mm pa n) as [w'|] eqn:Hrb.
+  - f_equal. apply bv_eq_of_bytes. intros j Hj.
+    pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
+    pose proof (Hbytes j Hj) as H1.
+    rewrite H0 in H1. apply Some_inj in H1. exact H1.
+  - exfalso. revert Hrb. unfold read_bytes.
+    case_match eqn:Hm; [congruence|]. intros _.
+    apply stdpp.list_monad.mapM_None_1, List.Exists_exists in Hm.
+    destruct Hm as (j & Hj & Hnone).
+    apply List.in_seq in Hj.
+    assert (Hjn : (N.of_nat j < n)%N) by lia.
+    rewrite (Hbytes j Hjn) in Hnone. congruence.
+Qed.
 
 Section events.
   Context `{!riscvGS Σ}.
@@ -248,6 +282,78 @@ Section events.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (* THE CONDITIONAL WRITE: the RAM write of an RMW whose exclusive read   *)
+  (* this hart made, at the frag that read handed out.  Same language arm  *)
+  (* as a plain store; what is NEW is knowledge: [wp_hart_step_resv] hands *)
+  (* over [resv_ok] for the hart's own snapshot, so the caller learns the  *)
+  (* word memory holds IS the word it read -- the one invariant access an  *)
+  (* acquire needs.  A blocked arm is absorbed by Löb with the frag         *)
+  (* unchanged (a blocked write keeps its reservation, design §3a).        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_hart_ram_write_cond {X : Type} (C : M X -> M unit)
+      (n : N) (req : Interface.WriteReq.t n) (m : M X) (w : bv (8 * n)) :
+    mctx C ->
+    hwrite_req_at n m = Some req ->
+    dev_addr (Interface.WriteReq.pa req) = false ->
+    Z.of_N n < 18446744073709551616 ->
+    gen_cert -∗
+    resv_frag cpu_id (Some (snap_of (Interface.WriteReq.pa req) n w)) -∗
+    (∀ σ, ⌜read_bytes σ.(mem) (Interface.WriteReq.pa req) n = Some w⌝ -∗
+       mstate_interp σ ={⊤,∅}=∗
+       ▷ (|={∅,⊤}=> mstate_interp
+              (MState σ.(sregs)
+                 (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+                    (Interface.WriteReq.value req)) σ.(mdev)) ∗
+            (resv_frag cpu_id None -∗
+             WP (HartE gen_id cpu_id (C (hwrite_resume m)) : expr riscv_lang)))) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj Hdev Hn) "#Hcert Hfrag H".
+    destruct (hwrite_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
+    assert (Hg : C m = Interface.Next (Interface.MemWrite n req)
+                         (fun v => C (K v)))
+      by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
+    rewrite Hg.
+    iLöb as "IH".
+    iApply (wp_hart_step_resv _ (Some (snap_of (Interface.WriteReq.pa req) n w))
+              with "Hcert Hfrag").
+    iIntros (σ oth) "%Hok Hσ".
+    pose proof (snap_of_read_bytes _ _ _ _ Hn (Hok _ eq_refl)) as Hrb.
+    destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
+      as [Hfree|Hblocked].
+    - (* the write, at the pinned old value *)
+      iMod ("H" $! σ with "[//] Hσ") as "Hk".
+      iModIntro.
+      iExists (C (K (inl None))),
+        (MState σ.(sregs)
+           (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+              (Interface.WriteReq.value req)) σ.(mdev)), None.
+      iSplitR.
+      { iPureIntro. rewrite /mnode_step. cbn beta iota.
+        rewrite Hdev. cbn beta iota. right. done. }
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+      rewrite Hdev in Hstep. cbn beta iota in Hstep.
+      destruct Hstep as [(Hov & _) | (_ & -> & -> & ->)]; [done|].
+      iMod "Hk" as "[Hσ HWP]". iModIntro. iFrame "Hσ".
+      iIntros "Hfrag". rewrite -Hres. iApply ("HWP" with "Hfrag").
+    - (* blocked (never, once reservations are pairwise disjoint -- but the
+         rule need not know): self-loop, frag and premise intact *)
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+      iExists (Interface.Next (Interface.MemWrite n req) (fun v => C (K v))),
+        σ, (Some (snap_of (Interface.WriteReq.pa req) n w)).
+      iSplitR.
+      { iPureIntro. rewrite /mnode_step. cbn beta iota.
+        rewrite Hdev. cbn beta iota. left. done. }
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+      rewrite Hdev in Hstep. cbn beta iota in Hstep.
+      destruct Hstep as [(_ & -> & -> & ->) | (Hfree & _)]; [|done].
+      iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
+      iIntros "Hfrag". iApply ("IH" with "Hfrag H").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* MMIO READ.  The device answers and its state may move (an RHR read   *)
   (* pops the receive FIFO); the accessor is the PARTIAL [dev_read], so   *)
   (* the caller's witness is also the not-stuck evidence.                 *)
@@ -413,6 +519,32 @@ Section events.
     iApply (wp_hart_ram_write C n req m rr HC Hproj Hdev
               with "Hcert Hfrag [H Hcont]").
     iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as "Hk". iModIntro. iNext.
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
+    iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
+  Qed.
+
+  Lemma swp_hart_ram_write_cond {X : Type} (n : N) (req : Interface.WriteReq.t n)
+      (m : M X) (Φ : X -> iProp Σ) (w : bv (8 * n)) :
+    hwrite_req_at n m = Some req ->
+    dev_addr (Interface.WriteReq.pa req) = false ->
+    Z.of_N n < 18446744073709551616 ->
+    gen_cert -∗
+    resv_frag cpu_id (Some (snap_of (Interface.WriteReq.pa req) n w)) -∗
+    (∀ σ, ⌜read_bytes σ.(mem) (Interface.WriteReq.pa req) n = Some w⌝ -∗
+       mstate_interp σ ={⊤,∅}=∗
+       ▷ (|={∅,⊤}=> mstate_interp
+              (MState σ.(sregs)
+                 (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+                    (Interface.WriteReq.value req)) σ.(mdev)) ∗
+            (resv_frag cpu_id None -∗ swp (hwrite_resume m) Φ))) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj Hdev Hn) "#Hcert Hfrag H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_ram_write_cond C n req m w HC Hproj Hdev Hn
+              with "Hcert Hfrag [H Hcont]").
+    iIntros (σ) "%Hrb Hσ". iMod ("H" $! σ with "[//] Hσ") as "Hk".
+    iModIntro. iNext.
     iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ". iIntros "Hfrag".
     iApply (swp_use _ Φ C HC with "[Hswp Hfrag] Hcont"). by iApply "Hswp".
   Qed.

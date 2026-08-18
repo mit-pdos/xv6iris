@@ -1242,7 +1242,7 @@ Section sframes.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
         %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
         %Hmisaval & %Hsecval & _)".
-    iFrame "Hhw Hminv".
+    iFrame "Hhw Hminv Hresv".
     iExists ms, bmi, cy, ti, ip, mst0, mc, micfg, misa0, mseccfg0,
             (mword_of_int 0 : mword 64), pmar0, elp0, satp0, mie_v, mdv0,
             menv0, pcfg, paddr, tlbv.
