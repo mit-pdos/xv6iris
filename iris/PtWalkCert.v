@@ -22,9 +22,12 @@
 (* single-file [coqc] loop (durable-notes: an additive change to a shared  *)
 (* file belongs in a NEW LEAF FILE, folded back at a milestone).  This is  *)
 (* the same call [HartStepFull.v] made against [HartStepAny.v].  FOLD THE  *)
-(* SECTIONS BACK beside their exec twins at the milestone -- section 1     *)
+(* SECTIONS BACK beside their exec twins at the milestone -- section 0b    *)
+(* into [PtTree.v] beside [pte_valid] / [pte_piv_split], section 1         *)
 (* into [SmodePte.v], section 2 into [CommonWalk.v], section 3 into        *)
-(* [PtTreeAdue.v].                                                         *)
+(* [PtTreeAdue.v].  (Section 0b is the ONLY reason this file Requires      *)
+(* [DecodeTotalU]; the fold-back should move those four generic [goodb]    *)
+(* structural rules into [WpDecodeBridge] and drop the import.)            *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -34,6 +37,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpDecodeBridge HartGoodb HartMemRun HartMemAsm PtBytes.
+(* section 0b's peels: [goodb_bind_forall] / [goodb_and_boolM] /
+   [goodb_or_boolM] / [goodb_bind_read_reg], the generic [goodb] structural
+   rules.  They belong in [WpDecodeBridge] beside [goodb_bind]; they live in
+   [DecodeTotalU] because that is where the decode's totality needed them
+   first, and this is the second client. *)
+Require Import DecodeTotalU.
 Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
 Local Open Scope Z_scope.
 Import Defs.
@@ -226,6 +235,170 @@ Ltac gmm_lift2 Hg He :=
         | ( unfold Defs.bind0;
             first [ gmm_lift Hg He
                   | erewrite gm_cer_liftR_nest2; [ | exact Hg | exact He ] ] ) ].
+
+(* ===================================================================== *)
+(* 0b. THE PTE VALIDITY TEST'S FOOTPRINT, AT AN ABSTRACT WORD.            *)
+(*     (FOLD BACK into [PtTree.v] beside [pte_valid] / [pte_piv_split],   *)
+(*     whose [Local] evaluation at [pte_s0] the second lemma reads.)       *)
+(*                                                                        *)
+(* [KptGoodb] certifies [pte_is_invalid] at a KERNEL word, where the flag *)
+(* byte and the extension field are CONCRETE and one [vm_compute] per     *)
+(* A/D variant settles it.  The user tier cannot do that: its walk's two  *)
+(* pointer words and its leaf are abstract ([ptree_maps] pins only        *)
+(* [pte_valid] / [pte_ptr]).  Two facts cover every use, and NEITHER      *)
+(* falls to [vm_compute] at an abstract state -- the Svrsw60t59b /        *)
+(* Svnapot / Svpbmt gates recurse through [Ext_S], which READS [misa], so *)
+(* the evaluator gets stuck on the [if] over an abstract bool (measured:  *)
+(* no answer in 2 min).  Both are ordinary [and_boolM] / [or_boolM]       *)
+(* peels with the extension probes supplied by name.                      *)
+(*                                                                        *)
+(*   - [goodb_pte_is_invalid]: at ANY word, the test's read set is        *)
+(*     {misa, menvcfg} -- [misa] via the three Sv39-gated extension       *)
+(*     probes, [menvcfg] via the SSE and PBMTE arms.                       *)
+(*   - [goodb_pte_is_invalid_valid]: at a word the walk has already       *)
+(*     classified VALID the test reads NOTHING AT ALL, so the certificate *)
+(*     holds at every [D] -- which is the shape the walk's own premises    *)
+(*     ([goodmb_ptree_translateAddr]'s [forall Db s0, goodb Db ...]) ask   *)
+(*     for.  Validity is what does it: read at [pte_s0] (misa = 0,        *)
+(*     menvcfg = 0) it forces N / PBMT / RSW / reserved to zero and rules  *)
+(*     out the R=0,W=1,X=0 encoding, and every register-reading arm of the *)
+(*     test is guarded by exactly one of those.                            *)
+(* ===================================================================== *)
+
+Lemma gb_and_boolM_false (D : register -> bool) (g : bool) (r : M bool) (s : mstate) :
+  g = false -> goodb D (and_boolM (returnM g) r) s = true.
+Proof. intros ->. reflexivity. Qed.
+
+Lemma gb_and3_false (D : register -> bool) (g1 g2 g3 : bool) (r : M bool)
+    (s : mstate) :
+  andb g1 (andb g2 (andb g3 true)) = false ->
+  goodb D (and_boolM (returnM g1)
+             (and_boolM (returnM g2) (and_boolM (returnM g3) r))) s = true.
+Proof. destruct g1, g2, g3; simpl; intro H; try discriminate H; reflexivity. Qed.
+
+(* [hartSupports X] at an extension whose arm is a bare [returnM]: the Acc
+   guard has to be opened by [destruct] before the fixpoint reduces. *)
+Ltac gb_hs :=
+  unfold hartSupports; cbn [hartSupports_measure];
+  destruct (Defs.Zwf_guarded _); cbn [_rec_hartSupports];
+  apply goodb_bind_forall; [reflexivity | intros ?]; reflexivity.
+
+Ltac gb_ce_open :=
+  unfold currentlyEnabled; cbn [currentlyEnabled_measure];
+  destruct (Defs.Zwf_guarded _); cbn [_rec_currentlyEnabled];
+  apply goodb_bind_forall; [reflexivity | intros ?].
+
+(* ...and the same one level in, where the recursive call's Acc is
+   [_limit_reduces_bool _ _] rather than [Zwf_guarded _]. *)
+Ltac gb_ce_next :=
+  match goal with |- context[_rec_currentlyEnabled _ _ ?acc] => destruct acc end;
+  cbn [_rec_currentlyEnabled];
+  apply goodb_bind_forall; [reflexivity | intros ?].
+
+(* Svpbmt / Svnapot / Svrsw60t59b all read down the SAME chain:
+   [hartSupports X && currentlyEnabled Sv39], [Sv39 = hartSupports Sv39 &&
+   currentlyEnabled S], [S = hartSupports S && (misa.S = 1 && Zicsr)]. *)
+Ltac gb_sv_gate :=
+  gb_ce_open; apply goodb_and_boolM; [ gb_hs | ];
+  gb_ce_next; apply goodb_and_boolM; [ gb_hs | ];
+  gb_ce_next; apply goodb_and_boolM; [ gb_hs | ];
+  apply goodb_and_boolM;
+  [ apply goodb_bind_read_reg; [ assumption | reflexivity ]
+  | gb_ce_next; gb_hs ].
+
+Lemma goodb_currentlyEnabled_Svpbmt (Db : register -> bool) (s : mstate) :
+  Db misa = true -> goodb Db (currentlyEnabled Ext_Svpbmt) s = true.
+Proof. intros Hm. gb_sv_gate. Qed.
+
+Lemma goodb_currentlyEnabled_Svnapot_any (Db : register -> bool) (s : mstate) :
+  Db misa = true -> goodb Db (currentlyEnabled Ext_Svnapot) s = true.
+Proof. intros Hm. gb_sv_gate. Qed.
+
+Lemma goodb_currentlyEnabled_Svrsw60t59b (Db : register -> bool) (s : mstate) :
+  Db misa = true -> goodb Db (currentlyEnabled Ext_Svrsw60t59b) s = true.
+Proof. intros Hm. gb_sv_gate. Qed.
+
+(* THE GENERAL FACT: the validity test reads {misa, menvcfg} and nothing
+   else, at an ARBITRARY word and an ARBITRARY state. *)
+Lemma goodb_pte_is_invalid (Db : register -> bool) (q : mword 64) (s : mstate) :
+  Db misa = true -> Db menvcfg = true ->
+  goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec q 7 0))
+              (ext_bits_of_PTE q)) s = true.
+Proof.
+  intros Hmisa Hmenv.
+  unfold pte_is_invalid.
+  repeat first
+    [ reflexivity
+    | apply goodb_or_boolM
+    | apply goodb_and_boolM
+    | (apply goodb_bind_read_reg; [ assumption | reflexivity ])
+    | (apply goodb_bind_forall;
+       [ apply goodb_currentlyEnabled_Svnapot_any; assumption
+       | intros ?; reflexivity ])
+    | (apply goodb_bind_forall;
+       [ apply goodb_currentlyEnabled_Svrsw60t59b; assumption
+       | intros ?; reflexivity ])
+    | (apply goodb_currentlyEnabled_Svpbmt; assumption) ].
+Qed.
+
+(* the five field facts [pte_valid] pins ALL BY ITSELF, read off
+   [PtTree.pte_piv_split]'s evaluation at [pte_s0] *)
+Lemma pte_valid_fields (w : mword 64) :
+  pte_valid w ->
+  andb (eq_vec (_get_PTE_Flags_R (Mk_PTE_Flags (subrange_vec_dec w 7 0))) ('b"0"))
+       (andb (eq_vec (_get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec w 7 0))) ('b"1"))
+             (andb (eq_vec (_get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec w 7 0))) ('b"0"))
+                   true)) = false
+  /\ _get_PTE_Ext_N (ext_bits_of_PTE w) = zeros' 1
+  /\ _get_PTE_Ext_PBMT (ext_bits_of_PTE w) = zeros' 2
+  /\ _get_PTE_Ext_RSW_60t59b (ext_bits_of_PTE w) = zeros' 2
+  /\ _get_PTE_Ext_reserved (ext_bits_of_PTE w) = zeros' 5.
+Proof.
+  intros Hv.
+  pose proof (PtTree.pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                (ext_bits_of_PTE w)) as Hex.
+  specialize (Hv PtTree.pte_s0). rewrite Hex in Hv. injection Hv as Hb.
+  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
+  apply orb_false_iff in Hb; destruct Hb as [Hd2 Hb].
+  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
+  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
+  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
+  apply orb_false_iff in Hb; destruct Hb as [Hd6 Hb].
+  apply orb_false_iff in Hb; destruct Hb as [Hd7 Hb].
+  apply orb_false_iff in Hb; destruct Hb as [Hd8 Hd9].
+  rewrite andb_true_r in Hd6. rewrite andb_true_r in Hd7.
+  rewrite andb_true_r in Hd8.
+  split_and!; [ exact Hd2 | .. ];
+    [ revert Hd6 | revert Hd7 | revert Hd8 | revert Hd9 ];
+    unfold neq_vec; intro H; apply negb_false_iff in H;
+    apply eq_vec_true_iff in H; exact H.
+Qed.
+
+(* ...and so a VALID word's test is register-free: the certificate holds
+   at every footprint, which is the shape the walk lemmas demand. *)
+Lemma goodb_pte_is_invalid_valid (w : mword 64) (Db : register -> bool)
+    (s : mstate) :
+  pte_valid w ->
+  goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+              (ext_bits_of_PTE w)) s = true.
+Proof.
+  intro Hv.
+  destruct (pte_valid_fields w Hv) as (Hd2 & HN & HPBMT & HRSW & HRES).
+  unfold pte_is_invalid.
+  apply goodb_or_boolM; [ reflexivity | ].
+  apply goodb_or_boolM; [ exact (gb_and3_false Db _ _ _ _ s Hd2) | ].
+  apply goodb_or_boolM; [ reflexivity | ].
+  apply goodb_or_boolM.
+  { apply gb_and_boolM_false. rewrite HPBMT. vm_compute; reflexivity. }
+  apply goodb_and_boolM; [ reflexivity | ].
+  apply goodb_or_boolM; [ reflexivity | ].
+  apply goodb_or_boolM.
+  { apply gb_and_boolM_false. rewrite HN. vm_compute; reflexivity. }
+  apply goodb_or_boolM.
+  { apply gb_and_boolM_false. rewrite HPBMT. vm_compute; reflexivity. }
+  apply goodb_or_boolM; [ | reflexivity ].
+  apply gb_and_boolM_false. rewrite HRSW. vm_compute; reflexivity.
+Qed.
 
 (* ===================================================================== *)
 (* 1. THE ACCESS-CHECK BRICKS, and the 8-byte PTE read.                   *)
