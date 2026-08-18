@@ -217,6 +217,62 @@ Some (r, σf)` plus σf's frame properties), and its `swp` twin is the work.  It
 WRITES (the TLB fill), so it is not a `goodb` transport; it is a walk with
 memory events, the shape `HartMFetch.swp_fetch_ram` has in M-mode.
 
+### The next frontier, measured
+
+Transitive dependents of each red root (computed off `.CoqMakefile.d`, not
+guessed — rerun before trusting):
+
+| root | dependents | fails on |
+|---|---|---|
+| `SmodeCorePt` | 464 | `wp_exec_step_decode_execute_inv_priv` (deleted) |
+| `WpIntrInv` | 442 | `wp_exec_step_minstret` (deleted in `c1b82ebc`) |
+| `UserExec` | 39 | `clock_inv` (renamed when the invariants became resources) |
+| `WpMmodeLoad` / `_Store` / `WpGprCsrwStimecmp` / `WpMmodeMret` / `BootBridge` / `RiscvAdequacy` | 2–8 | leaf-level |
+
+**`WpIntrInv`'s cone is a strict SUBSET of `SmodeCorePt`'s** (442 shared, 0
+unique) and NEITHER depends on the other.  So the two are independent roots
+over the same downstream files: **fixing either alone unblocks nothing**, and
+both must fall before any of the 501 uncompiled files move.
+
+### What converting `SmodeCorePt` actually requires
+
+Its failure is inside `wp_instr_s_regime`, the engine that is GENERIC IN THE
+REGIME `R : s_regime`.  Two facts found while scoping it, and the second is
+the design one:
+
+**1. The Sv39 regime's invariant IS the wrapper's bundle.**
+`SRegime.kpt_share_regime_inv` proves `sr_inv (kpt_share_regime root_ppn) ⊣⊢
+tlb_res_pt root_ppn` BY `reflexivity` — so at the kernel-table instance the
+regime hands over exactly the satp/tlb/pmp cells `WpSFrames.s_frames_intro`
+consumes.  Nothing has to be invented to connect them.
+
+**2. THE REGIME ABSTRACTION DOES NOT SURVIVE THE PORT AT THE FETCH.**  It was
+built for the exec world, where `sr_absorb` hides the difference between
+regimes behind ONE fupd over the whole state.  At the swp layer that
+difference is structural: the Sv39 fetch WALKS (three PTE reads, a TLB fill,
+a different landing file) and the Bare fetch is the IDENTITY (a physical read,
+same file).  Those are different node sequences, so one regime-generic swp
+engine cannot cover both.
+
+So `wp_instr_s_regime` splits rather than converts:
+
+- **Sv39** → `WpSFrames.wp_instr_s*` (all four shapes, proved).  What is
+  still needed is a fraction-generic `s_frames_intro`: `smode_config γ dq`
+  holds its cells at `dq`, while the current intro is written at
+  `DfracOwn 1` (`s_Df` is already parameterized, so this is the statement,
+  not the proof).
+- **Bare** → the M-mode fetch machinery AT SUPERVISOR, which is already
+  reachable: `swp_mem_read_M` takes the privilege as a parameter and
+  `swp_fetch` takes its landing file, so a Bare S-mode fetch is those two at
+  `pv := Supervisor`, `rsf := rs`.
+
+**AND `smode_config` PINS `SIE = false`** — interrupts are off in this
+bundle.  So the Sv39 engine here is the ONE-ARMED case, and `WpSFrames.
+s_cycle` (built, then found not to be the general base) is exactly right for
+it.  The general two-armed `s_cycle_any` is for `WpIntrInv`'s engine, where
+SIE is symbolic.  Neither rule is redundant; they serve the two different
+callers.
+
 ### What `WpIntrInv` actually needs
 
 Its two rules are the last whole-cycle-shaped ones in the interrupt path:
