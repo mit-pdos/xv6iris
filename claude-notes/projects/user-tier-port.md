@@ -1017,11 +1017,16 @@ reusable:
   goal** — `Unshelve` it and collapse the `decide`'s proof with
   `proof_irrel`, exactly as `hregread_resume_red` does.
 
-STILL TO DO (mechanical, ~100 lines, same pattern): the three entry-point
-wrappers `swp_handle_interrupt_u`, `swp_handle_exception_u` and
-`swp_exec_trap_u` (`bind (exception_handler …) set_next_pc`), each a
-`swp_bind_use` chain of read-only prefixes around `swp_trap_handler_u` plus
-one `nextPC` write.
+**THE FOUR ENTRY POINTS ARE LANDED TOO**: `swp_exception_handler_u`,
+`swp_handle_exception_u`, `swp_handle_interrupt_u` and `swp_exec_trap_u` —
+one per arm `HartStepFull.swp_try_step_full` offers (the execute-trap arm
+takes `bind (exception_handler …) set_next_pc` directly, without
+`handle_exception`'s two reads, because the step has already made them).
+Each is a `swp_bind_use` chain of read-only prefixes around
+`swp_trap_handler_u` plus the one `nextPC` write of `set_next_pc`
+(`goodmb_set_next_pc`); nothing in them touches `elp`, so the split is paid
+once.  All four close at the five platform axioms.  **`UserStepFull`'s four
+trap arms are therefore unblocked**; what it still waits on is P3's fetch.
 
 ### The finding, as recorded when it was made
 
