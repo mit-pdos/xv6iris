@@ -514,7 +514,7 @@ Qed.
 (* pure content of [UserMemPt.udata_read_word_g]'s coverage half, which    *)
 (* until now was only available inside an Iris proof.                      *)
 (* ---------------------------------------------------------------------- *)
-Lemma u_walk_pa_window (k : Z) (pte0 va : mword 64) (j : nat) :
+Lemma u_walk_pa_window_wf (k : Z) (pte0 va : mword 64) (j : nat) :
   0 < k -> (k | 4096) ->
   is_aligned_vaddr (Virtaddr va) k = true ->
   (j < Z.to_nat k)%nat ->
@@ -536,7 +536,7 @@ Proof.
   intros Hk Hdvd Hal (md & _ & _ & Hmm & Hdm & _ & Hcov & _) Hl.
   apply bytes_owned_of_dom. intros j Hj.
   assert (Hjk : (j < Z.to_nat k)%nat) by lia.
-  rewrite (u_walk_pa_window k w va j Hk Hdvd Hal Hjk).
+  rewrite (u_walk_pa_window_wf k w va j Hk Hdvd Hal Hjk).
   apply elem_of_dom. rewrite Hmm.
   apply lookup_union_is_Some. right.
   apply (proj1 (Hdm _)).
