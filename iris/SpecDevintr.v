@@ -186,14 +186,14 @@ Definition wp_devintr_sconf_body
      Trivial at every real call site: devintr always runs at trap entry,
      where [lks = ∅]. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   cpu_own lvl eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
-      sie_cap_gpr mf av false p -∗
+      sie_cap_gpr KT1 mf av false p -∗
       cpu_own lvl eb p false lks -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is ret_tgt -∗

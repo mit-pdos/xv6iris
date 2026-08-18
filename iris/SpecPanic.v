@@ -161,7 +161,7 @@ End PanicEnv.
 
 Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (m : regfile) (K : nat)
+    (kt : ktier) (m : regfile) (K : nat)
     (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -174,7 +174,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* panic is printk + printk + self-jump; printk's bound is "pr" (14),
      and it reaches "uart" (15) under it via consputc. *)
   locks_below lks "pr" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr kt m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗
   pc_is (mword_of_int KernelSyms.panic) -∗
@@ -186,8 +186,8 @@ Module Type PANIC.
   Parameter wp_panic_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (m : regfile) (K : nat)
+      (kt : ktier) (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),
-      wp_panic_sconf_body m K n eb b p dm lks.
+      wp_panic_sconf_body kt m K n eb b p dm lks.
 End PANIC.

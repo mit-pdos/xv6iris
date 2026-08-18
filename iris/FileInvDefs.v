@@ -463,9 +463,13 @@ Qed.
 (* Timelessness of the word points-to the off invariant puts in its body --
    typeclass search does not unfold a [Definition] on its own, exactly as
    [RiscvPtsto.word4_pointsto_timeless]'s comment says. *)
-Global Instance word_pointsto_timeless' `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac)
-    (w : bv 64) : Timeless (word_pointsto a dq w).
+Global Instance word_pointsto_timeless' `{!riscvGS Σ} (ktr : CurKtier) (a : Arch.pa) (dq : dfrac)
+    (w : bv 64) : Timeless (word_pointsto (KTR := ktr) a dq w).
 Proof. rewrite /word_pointsto. apply _. Qed.
+
+Global Instance word_pointsto_timeless'' `{!riscvGS Σ} (ktr : ktier) (a : Arch.pa) (dq : dfrac)
+    (w : bv 64) : Timeless (word_pointsto (KTR := ktr) a dq w).
+Proof. exact (word_pointsto_timeless' ktr a dq w). Qed.
 
 Section FileInv.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.

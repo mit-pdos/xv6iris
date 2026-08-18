@@ -182,16 +182,16 @@ Section BallocDefs.
      s6@16 s7@8 s8@0.  [pa_stk sp j] counts DOWN from the entry sp, so slot
      j holds the register saved at (newsp + 80 - 8j). *)
   Definition ba_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ (m !!! Regidx Rs8 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] (m !!! Regidx Rs8 : mword 64))%I.
 
   (* THE TWO ARMS, as ONE resource: what each of balloc's two exits carries
      into the shared epilogue.  [rv] is the value in s1 at +0x7e. *)
@@ -223,9 +223,9 @@ Section BallocDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -342,9 +342,9 @@ Section BallocEpilogue.
     ba_sp m M ->
     ba_thr3 m M ->
     M !!! Regidx Rs1 = (sign_extend' 64 rv : mword 64) ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x7e) : mword 64) -∗
@@ -487,9 +487,9 @@ Section BallocEpilogue.
                    = pa_stk (add_vec (P3 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
     { rewrite Hwv HP3sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 10)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 10)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1"|].
       iSplitL "Hf2"; [iExists _; iExact "Hf2"|].
       iSplitL "Hf3"; [iExists _; iExact "Hf3"|].
@@ -608,12 +608,12 @@ Section BallocOut.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
-    printk_gen_contract γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     ba_sp m M ->
     ba_thr9 m M ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0xe8) : mword 64) -∗
@@ -989,7 +989,7 @@ Section BallocExhaust.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
-    printk_gen_contract γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     0 < size <= BPB ->
     ba_sp m M ->
     ba_thr9 m M ->
@@ -1000,9 +1000,9 @@ Section BallocExhaust.
     (kk < NBUF)%nat ->
     (* ba_exhaust's own cone touches only "bcache" (brelse) *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x8a) : mword 64) -∗
@@ -1144,7 +1144,7 @@ Section BallocExhaust.
                      = sb_size).
     { rgne. rewrite HE2s6. unfold sb_size, pa_add, add_vec_int. apply f_equal. pcw. }
     iEval (rewrite -Hszadr) in "Hsbsz".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0x94)) Ra5 Rs6
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0x94)) Ra5 Rs6
               (mword_of_int 4 : mword 12) E2 (K - 10)%nat
               (mword_of_int size : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi94 Hsbsz").
@@ -1222,9 +1222,9 @@ Section BallocRestore.
     bv_unsigned rv <> 0 ->
     bv_unsigned rv ∈ cov ->
     ~ (bv_unsigned rv ∈ log_region_set logstart) ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x70) : mword 64) -∗
@@ -1500,9 +1500,9 @@ Section BallocBzero.
     (* ba_bzero's own cone touches "log" (log_write) and "bcache"
        (bread/brelse) -- "log" is the floor *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x4c) : mword 64) -∗
@@ -1818,7 +1818,7 @@ Section BallocBzero.
       rewrite /Z7 upd_ne; [| regne].
       exact (HZ6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iEval (rewrite -HZ7a0) in "Hby".
-    iApply (MS.wp_memset_sconf Z7 (K - 10)%nat 1024%nat
+    iApply (MS.wp_memset_sconf KT1 KT0 Z7 (K - 10)%nat 1024%nat
               (mword_of_int 0 : mword 64) (fun jj => bsD !!! jj) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HZ7a1 HZ7a2
               with "Hcg Htext Hpc Hby").
@@ -2082,9 +2082,9 @@ Section BallocAlloc.
        ba_bzero) and "bcache" (brelse, directly and via ba_bzero) -- "log"
        is the floor *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x38) : mword 64) -∗
@@ -2508,7 +2508,7 @@ Section BallocScan.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (fuel : nat) :
     (K_balloc <= K)%nat ->
-    printk_gen_contract γpr γu γd ->
+    printk_gen_contract (kt := KT1) γpr γu γd ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
     uint bnoB = bmapstart ->
@@ -2539,9 +2539,9 @@ Section BallocScan.
        "bcache" (via bread's inlining in ba_alloc/ba_exhaust) -- "log" is
        the floor *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64) -∗
@@ -3008,7 +3008,7 @@ Section BallocScan.
                          = pa_add (b_data (bpa kk)) d).
         { rgne. rewrite HS6a2. apply ba_data_off. }
         iEval (rewrite -Hbyadr) in "Hbyte".
-        iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.balloc + 0xd4)) Ra2 Ra2
+        iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xd4)) Ra2 Ra2
                   (mword_of_int 88 : mword 12) S6 (K - 10)%nat
                   (bm_byte used q) b ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hid4 Hbyte").
@@ -3384,7 +3384,7 @@ Section BallocMain.
       let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
       (K_balloc <= K)%nat ->
       log_geom_ok cov logstart ->
-      printk_gen_contract γpr γu γd ->
+      printk_gen_contract (kt := KT1) γpr γu γd ->
       0 < size <= BPB ->
       0 <= bmapstart ->
       bmapstart ∈ cov ->
@@ -3397,9 +3397,9 @@ Section BallocMain.
          ba_alloc) and "bcache" (bread, directly and via ba_scan) -- "log"
          is the floor *)
       locks_below lks "log" ->
-      sie_cap_gpr m K b pj -∗
+      sie_cap_gpr KT1 m K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       kernel_text -∗ pc_is pcE -∗
       kernel_data -∗
@@ -3419,9 +3419,9 @@ Section BallocMain.
       wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
           ⌜callee_saved m mf⌝ -∗
-          sie_cap_gpr mf K b pj -∗
+          sie_cap_gpr KT1 mf K b pj -∗
           cpu_own 0 eb pj b lks -∗
-          trap_csrs_ext eb -∗
+          trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb pj -∗
           pc_is ret_tgt -∗
           p_pid pj ↦₄{dq} pidv -∗
@@ -3513,7 +3513,7 @@ Section BallocMain.
     assert (HR1thr : ba_thr9 m R1).
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe"
       as "(T1 & T2 & T3 & T4 & T5 & T6 & T7 & T8 & T9 & T10 & _)".
     iDestruct "T1" as (v1) "Hf1".   iDestruct "T2" as (v2) "Hf2".
@@ -3618,7 +3618,7 @@ Section BallocMain.
                       = sb_size).
     { rgne. rewrite HR3a5. rewrite /sb_size /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hszadr1) in "Hsbsz".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0xe)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xe)) Ra5 Ra5
               (mword_of_int 2936 : mword 12) R3 (K - 10)%nat
               (mword_of_int size : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi00e Hsbsz").
@@ -3999,7 +3999,7 @@ Section BallocMain.
     { rgne. rewrite HR12s6. unfold sb_bmapstart, pa_add, add_vec_int.
       apply f_equal. pcw. }
     iEval (rewrite -Hbmadr) in "Hsbbm".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0xa0)) Ra5 Rs6
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xa0)) Ra5 Rs6
               (mword_of_int 28 : mword 12) R12 (K - 10)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0a0 Hsbbm").
@@ -4234,7 +4234,7 @@ Section BallocMain.
     { rgne. rewrite HW1s6. unfold sb_size, pa_add, add_vec_int.
       apply f_equal. pcw. }
     iEval (rewrite -Hszadr2) in "Hsbsz".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0xae)) Ra0 Rs6
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xae)) Ra0 Rs6
               (mword_of_int 4 : mword 12) W1 (K - 10)%nat
               (mword_of_int size : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0ae Hsbsz").

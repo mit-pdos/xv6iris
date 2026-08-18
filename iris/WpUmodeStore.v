@@ -1,5 +1,7 @@
 (* WpUmodeStore.v -- THE MEMORY-WRITING LEAF of the verified user-execution
-   tier (claude-notes/projects/user-verified.md): [c.sdsp rs2, uimm(sp)].
+   tier (claude-notes/projects/user-verified.md, user-sh.md): the generic
+   [wp_uv_store], instantiated at [sd] / [sw] / [sb] / [c.sd] / [c.sw] /
+   [c.sdsp].  The exact mirror of WpUmodeLoad.v, section for section.
 
    Every other leaf (WpUmodeLeaf.v) rides the retire funnel [wp_uv_retire],
    whose post-execute state is a PURE register tower ([uv_post] = an
@@ -9,32 +11,57 @@
    post state is not even a function of the pre state.  So this file adds,
    ALONGSIDE the funnel (nothing in WpUmodeStep.v is restructured):
 
-   §1 [uM_store8] -- the image-level effect: the 8 little-endian bytes of
-      the stored word land at the target va and the following seven.  Kept
-      here rather than in UmodeMem.v purely to avoid rebuilding the six
-      files above it; RELOCATION DEBT: it reads naturally beside
-      [uM_bytes].
+   §0 [ustore_width] -- the per-width side conditions bundled as ONE
+      premise ([ustore_width_1] / [_2] / [_4] / [_8] discharge it): the ISA
+      width itself, plus the ONE width-TYPED byte-level brick the model's
+      [write_ram] reduction bottoms out in.  WpUmodeLoad's [uload_width] is
+      the load twin.  RELOCATION DEBT: the three [vmem_width] readings
+      [uvw_le8] / [uvw_dvd] / [uvw_uint] beside it are copies of
+      WpUmodeLoad's [vmem_width_*] (that file sits ABOVE this one); both
+      belong in RiscvExtras.v.
 
-   §2 [umem_store_8] -- the Iris composer: translate the target at User
-      through [utlb_inv_pt_translateAddr_u (Store Data)], write the eight
-      physical bytes against [gen_heap_interp], and re-establish
-      [umem pt (uM_store8 M ...)].  The concrete-byte twin of
+   §1 [uM_store M a k v] -- the image-level effect: the low [k]
+      little-endian bytes of the register word [v] land at [a .. a+k-1].
+      Spelled as the same [foldr]-of-inserts the model's [write_bytes] is,
+      so the ghost update below is a byte-for-byte mirror of [upd_window].
+      [uM_store8 M a v := uM_store M a 8 v] and the whole [uM_store8_*]
+      family are its k = 8 readings, kept verbatim for UProofSync.v /
+      UProofEchoA.v / UProofEcho.v.  [write_bytes_ext] is the bridge that
+      lets the image record the WHOLE register word while the model writes
+      its width-[k] truncation.  Kept here rather than in UmodeMem.v purely
+      to avoid rebuilding the six files above it; RELOCATION DEBT: it reads
+      naturally beside [uM_bytes].
+
+   §2 [umem_store_k] -- the Iris composer, width-generic in a section [k]:
+      translate the target at User through
+      [utlb_inv_pt_translateAddr_u (Store Data)], write [k] physical bytes
+      against [gen_heap_interp], and re-establish
+      [umem pt (uM_store M ... k ...)].  The concrete-byte twin of
       UserMemPt's [user_pt_store_data_g] (which owns its pages with
       EXISTENTIAL contents and therefore says nothing about what was
-      stored).
+      stored).  [umem_store_8] is its k = 8 instance.
 
-   §3 [exec_execute_STORE_8_u_walk] -- the value-precise execute at User
+   §3 [exec_execute_STORE_k_u_walk] -- the value-precise execute at User
       privilege with MPRV = 0 (so effectivePrivilege = User): the U-mode
       analog of WpSmodePtLeaves' [exec_execute_STORE_8_gpr_S_walk_pt],
-      assembled from the safety tier's U-mode memory arms.
+      assembled from the safety tier's U-mode memory arms.  THE AUTOCAST
+      TRAP lives here: the model hands [vmem_write] the width-typed
+      [ustore_data k v] (an [autocast] of a [subrange] of rs2) and the
+      split loop projects a chunk at the index expressions [8*(0+1)*k-1] /
+      [8*0*k]; the leading factors are closed, so a [change] to the reduced
+      indices makes [subrange_full_gen_cast] fire at symbolic [k].
+      [nth_byte_ustore_data] is the bridge back to the image.
 
    §4 [uv_retire_post_state] -- the store-flavoured POST: a strict
       generalization of WpUmodeStep's [uv_retire_post_fetch] tail in which
       the post-execute state is an arbitrary [s_x] the caller has already
-      established, instead of the [uv_post] tower.
+      established, instead of the [uv_post] tower.  WpUmodeLoad rides it
+      too.
 
-   §5 [wp_uv_csdsp] -- the leaf.  Same shape as every other leaf: image in,
-      image out, hart re-bound by the continuation. *)
+   §5 [wp_uv_store] -- ONE width-generic leaf over all four fetch
+      geometries, plus the six instances.  Same shape as every other leaf:
+      image in, image out, hart re-bound by the continuation; the register
+      file is UNCHANGED. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -59,15 +86,71 @@ Import Defs.
 Set Printing Depth 40.
 
 (* ===================================================================== *)
-(* §1 The image-level effect of an 8-byte store.                          *)
+(* §0 The per-width side conditions.                                      *)
 (* ===================================================================== *)
 
-(* [M] with the little-endian bytes of [v] written at [a .. a+7].  Spelled
-   as the same [foldr]-of-inserts the model's [write_bytes] is, so the
-   ghost update below is a byte-for-byte mirror of [upd_window]. *)
-Definition uM_store8 (M : gmap Z (bv 8)) (a : Z) (v : mword 64) : gmap Z (bv 8) :=
+(* RELOCATION DEBT: these three read naturally beside [vmem_width] itself
+   (RiscvExtras.v).  WpUmodeLoad.v carries its own copies under the names
+   [vmem_width_le8] / [_dvd] / [_uint]; that file sits ABOVE this one and
+   cannot be imported here, so the readings are spelled again with local
+   names.  Retire both copies into RiscvExtras at the next sweep. *)
+Lemma uvw_le8 (k : Z) : vmem_width k -> k <= 8.
+Proof. intros [-> | [-> | [-> | ->]]]; lia. Qed.
+
+Lemma uvw_dvd (k : Z) : vmem_width k -> (k | 4096).
+Proof.
+  intros [-> | [-> | [-> | ->]]];
+    [ exists 4096 | exists 2048 | exists 1024 | exists 512 ]; reflexivity.
+Qed.
+
+Lemma uvw_uint (k : Z) : vmem_width k -> uint (to_bits 64 k) = k.
+Proof. intros [-> | [-> | [-> | ->]]]; vm_compute; reflexivity. Qed.
+
+(* Everything a store leaf needs to know about its access width: the ISA
+   width itself, plus the ONE width-TYPED byte-level brick the model's
+   [write_ram] reduction bottoms out in (the exact mirror of WpUmodeLoad's
+   [uload_width], and the [Hwrite_plain] half of UserMemPt's width-generic
+   section). *)
+Definition ustore_width (k : Z) : Prop :=
+  vmem_width k /\
+  (forall (addr : mword 64) (data : mword (8 * k)) (s : mstate),
+     dev_addr addr = false ->
+     exec (write_ram rv64d_types.Write_plain (Physaddr addr) k data tt) s
+     = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev))).
+
+Lemma ustore_width_1 : ustore_width 1.
+Proof. split; [ left; reflexivity | exact exec_write_ram_plain_1 ]. Qed.
+
+Lemma ustore_width_2 : ustore_width 2.
+Proof. split; [ right; left; reflexivity | exact exec_write_ram_plain_2 ]. Qed.
+
+Lemma ustore_width_4 : ustore_width 4.
+Proof. split; [ right; right; left; reflexivity | exact exec_write_ram_plain_4 ]. Qed.
+
+Lemma ustore_width_8 : ustore_width 8.
+Proof.
+  split; [ right; right; right; reflexivity | exact exec_write_ram_plain_8 ].
+Qed.
+
+(* ===================================================================== *)
+(* §1 The image-level effect of a k-byte store.                           *)
+(* ===================================================================== *)
+
+(* [M] with the low [k] little-endian bytes of the register value [v]
+   written at [a .. a+k-1].  Spelled as the same [foldr]-of-inserts the
+   model's [write_bytes] is, so the ghost update below is a byte-for-byte
+   mirror of [upd_window].
+
+   The value stays a WHOLE 64-bit register word at every width: that is
+   what a call site holds ([m !!! Regidx rs2]), and the model's own
+   truncation to [mword (8*k)] agrees with it byte for byte on the [k]
+   bytes that are written ([nth_byte_ustore_data], §3). *)
+Definition uM_store (M : gmap Z (bv 8)) (a k : Z) (v : mword 64) : gmap Z (bv 8) :=
   foldr (fun (j : nat) (acc : gmap Z (bv 8)) => <[a + Z.of_nat j := nth_byte v j]> acc)
-        M (seq 0 8).
+        M (seq 0 (Z.to_nat k)).
+
+Definition uM_store8 (M : gmap Z (bv 8)) (a : Z) (v : mword 64) : gmap Z (bv 8) :=
+  uM_store M a 8 v.
 
 (* an insert run never removes a key *)
 Lemma uM_fold_is_Some (a : Z) (v : mword 64) (l : list nat)
@@ -82,11 +165,42 @@ Proof.
   - rewrite lookup_insert_ne; [ apply IH; exact H | congruence ].
 Qed.
 
+Lemma uM_store_is_Some (M : gmap Z (bv 8)) (a k : Z) (v : mword 64) (key : Z) :
+  is_Some (M !! key) -> is_Some (uM_store M a k v !! key).
+Proof. apply uM_fold_is_Some. Qed.
+
 Lemma uM_store8_is_Some (M : gmap Z (bv 8)) (a : Z) (v : mword 64) (k : Z) :
   is_Some (M !! k) -> is_Some (uM_store8 M a v !! k).
 Proof. apply uM_fold_is_Some. Qed.
 
-(* the run's own eight keys *)
+(* the run's own keys *)
+Lemma uM_fold_lookup (a : Z) (v : mword 64) (l : list nat)
+    (M : gmap Z (bv 8)) (j : nat) :
+  In j l ->
+  foldr (fun (jj : nat) (acc : gmap Z (bv 8)) =>
+           <[a + Z.of_nat jj := nth_byte v jj]> acc) M l !! (a + Z.of_nat j)
+  = Some (nth_byte v j).
+Proof.
+  induction l as [ | x xs IH ]; cbn [foldr]; [ intros [] | ].
+  intro Hin. destruct (decide (j = x)) as [-> | Hne].
+  - apply lookup_insert.
+  - rewrite lookup_insert_ne; [ | intro He; apply Hne; lia ].
+    apply IH. destruct Hin as [-> | Hin]; [ exfalso; exact (Hne eq_refl) | exact Hin ].
+Qed.
+
+Lemma uM_store_lookup (M : gmap Z (bv 8)) (a k : Z) (v : mword 64) (j : nat) :
+  (j < Z.to_nat k)%nat ->
+  uM_store M a k v !! (a + Z.of_nat j) = Some (nth_byte v j).
+Proof.
+  intro Hj. unfold uM_store. apply uM_fold_lookup. apply in_seq. lia.
+Qed.
+
+(* ... in the [uM_bytes] shape the fetch/ABI layer speaks *)
+Lemma uM_store_bytes (M : gmap Z (bv 8)) (a k : Z) (v : mword 64) :
+  uM_bytes (uM_store M a k v) a (Z.to_nat k) v.
+Proof. intros j Hj. exact (uM_store_lookup M a k v j Hj). Qed.
+
+(* the eight width-8 keys, spelled out (the shape three proof files use) *)
 Lemma uM_store8_lookup (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
   uM_store8 M a v !! (a + 0) = Some (nth_byte v 0) /\
   uM_store8 M a v !! (a + 1) = Some (nth_byte v 1) /\
@@ -97,45 +211,71 @@ Lemma uM_store8_lookup (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
   uM_store8 M a v !! (a + 6) = Some (nth_byte v 6) /\
   uM_store8 M a v !! (a + 7) = Some (nth_byte v 7).
 Proof.
-  unfold uM_store8. cbn [seq foldr].
+  unfold uM_store8, uM_store. change (Z.to_nat 8) with 8%nat. cbn [seq foldr].
   split_and!;
     repeat (rewrite lookup_insert_ne; [ | lia ]);
     apply lookup_insert.
 Qed.
 
-(* ... in the [uM_bytes] shape the fetch/ABI layer speaks *)
 Lemma uM_store8_bytes (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
   uM_bytes (uM_store8 M a v) a 8 v.
-Proof.
-  intros j Hj.
-  destruct (uM_store8_lookup M a v) as (H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7).
-  destruct j as [ | [ | [ | [ | [ | [ | [ | [ | j ] ] ] ] ] ] ] ];
-    try (exfalso; lia);
-    [ exact H0 | exact H1 | exact H2 | exact H3
-    | exact H4 | exact H5 | exact H6 | exact H7 ].
-Qed.
+Proof. exact (uM_store_bytes M a 8 v). Qed.
 
 (* keys off the run are untouched *)
+Lemma uM_fold_lookup_ne (a : Z) (v : mword 64) (l : list nat)
+    (M : gmap Z (bv 8)) (key : Z) :
+  (forall j : nat, In j l -> key <> a + Z.of_nat j) ->
+  foldr (fun (jj : nat) (acc : gmap Z (bv 8)) =>
+           <[a + Z.of_nat jj := nth_byte v jj]> acc) M l !! key = M !! key.
+Proof.
+  induction l as [ | x xs IH ]; cbn [foldr]; [ reflexivity | ].
+  intro Hne. rewrite lookup_insert_ne.
+  - apply IH. intros j Hj. apply Hne. right. exact Hj.
+  - intro He. exact (Hne x (or_introl eq_refl) (eq_sym He)).
+Qed.
+
+Lemma uM_store_lookup_ne (M : gmap Z (bv 8)) (a k : Z) (v : mword 64) (key : Z) :
+  (forall j : nat, (j < Z.to_nat k)%nat -> key <> a + Z.of_nat j) ->
+  uM_store M a k v !! key = M !! key.
+Proof.
+  intro Hne. unfold uM_store. apply uM_fold_lookup_ne.
+  intros j Hj. apply Hne. apply in_seq in Hj. lia.
+Qed.
+
 Lemma uM_store8_lookup_ne (M : gmap Z (bv 8)) (a : Z) (v : mword 64) (k : Z) :
   (forall j : nat, (j < 8)%nat -> k <> a + Z.of_nat j) ->
   uM_store8 M a v !! k = M !! k.
+Proof. exact (uM_store_lookup_ne M a 8 v k). Qed.
+
+(* ---- the image / model byte-window bridges -------------------------- *)
+
+Lemma nat_of_N_of_Z (k : Z) : N.to_nat (Z.to_N k) = Z.to_nat k.
+Proof. destruct k; reflexivity. Qed.
+
+(* [write_bytes] reads only the [n] low bytes of its value, so two values
+   that agree there write the same window.  This is what lets the ghost
+   image be stated over the WHOLE register word while the model writes its
+   width-[k] truncation. *)
+Lemma write_bytes_ext {w1 w2 : N} (v1 : bv w1) (v2 : bv w2)
+    (mm : _) (pa : Arch.pa) (n : N) :
+  (forall j : nat, (N.of_nat j < n)%N -> nth_byte v1 j = nth_byte v2 j) ->
+  write_bytes mm pa n v1 = write_bytes mm pa n v2.
 Proof.
-  intro Hne.
-  assert (H : forall j : nat, (j < 8)%nat -> a + Z.of_nat j <> k)
-    by (intros j Hj He; exact (Hne j Hj (eq_sym He))).
-  unfold uM_store8. cbn [seq foldr].
-  repeat (rewrite lookup_insert_ne;
-          [ | first [ exact (H 0%nat ltac:(lia)) | exact (H 1%nat ltac:(lia))
-                    | exact (H 2%nat ltac:(lia)) | exact (H 3%nat ltac:(lia))
-                    | exact (H 4%nat ltac:(lia)) | exact (H 5%nat ltac:(lia))
-                    | exact (H 6%nat ltac:(lia)) | exact (H 7%nat ltac:(lia)) ] ]).
-  reflexivity.
+  intro H. unfold write_bytes.
+  assert (Hl : forall l : list nat,
+            (forall j : nat, In j l -> nth_byte v1 j = nth_byte v2 j) ->
+            foldr (fun j acc => <[pa_add pa j := nth_byte v1 j]> acc) mm l
+            = foldr (fun j acc => <[pa_add pa j := nth_byte v2 j]> acc) mm l).
+  { induction l as [ | x xs IH ]; cbn [foldr]; [ reflexivity | ].
+    intro Hj. rewrite (Hj x (or_introl eq_refl)).
+    rewrite (IH ltac:(intros j Hjj; apply Hj; right; exact Hjj)). reflexivity. }
+  apply Hl. intros j Hj. apply in_seq in Hj. apply H. lia.
 Qed.
 
 (* the in-page bound at the STORE width (UmodeFetch's [uinpage_nc] is the
    4-byte fetch-window version) *)
-Lemma uinpage_nc8 (va : mword 64) (d : Z) :
-  Z.rem (uint va) 4096 <= 4088 -> 0 <= d <= 7 ->
+Lemma uinpage_nc_k (va : mword 64) (k d : Z) :
+  Z.rem (uint va) 4096 <= 4096 - k -> 0 <= d < k ->
   bv_unsigned va mod 4096 + d < 4096.
 Proof.
   intros Hpg Hd.
@@ -143,6 +283,16 @@ Proof.
   rewrite Z.rem_mod_nonneg in Hpg;
     [ | exact (proj1 (bv_unsigned_in_range _ va)) | lia ].
   lia.
+Qed.
+
+(* a 1-byte access never crosses a page: its in-page premise is discharged
+   from the address alone (WpUmodeLoad's [uinpage_1] is the load twin). *)
+Lemma uinpage_byte (va : mword 64) : Z.rem (uint va) 4096 <= 4096 - 1.
+Proof.
+  rewrite uint_unsigned.
+  rewrite Z.rem_mod_nonneg;
+    [ | exact (proj1 (bv_unsigned_in_range _ va)) | lia ].
+  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)). lia.
 Qed.
 
 (* ===================================================================== *)
@@ -186,25 +336,202 @@ Section UmodeStoreMem.
       iModIntro. iFrame "Hmm HM".
   Qed.
 
-  Lemma umem_store8_ghost (pt : uptd) (a : Z) (v : mword 64) (pa : Arch.pa)
+  (* the width-[k] ghost update: the image gains the low [k] bytes of the
+     register word [v], the physical heap the same [k] bytes at the
+     translated address. *)
+  Lemma umem_store_ghost (k : Z) (pt : uptd) (a : Z) (v : mword 64) (pa : Arch.pa)
       (M : gmap Z (bv 8)) (mm : _) :
-    (forall j : nat, (j < 8)%nat -> (uva_pa pt (a + Z.of_nat j) : Arch.pa) = pa_add pa j) ->
-    (forall j : nat, (j < 8)%nat -> exists b : bv 8, M !! (a + Z.of_nat j) = Some b) ->
+    (forall j : nat, (j < Z.to_nat k)%nat ->
+       (uva_pa pt (a + Z.of_nat j) : Arch.pa) = pa_add pa j) ->
+    (forall j : nat, (j < Z.to_nat k)%nat -> exists b : bv 8, M !! (a + Z.of_nat j) = Some b) ->
     gen_heap_interp (hG := riscv_memGS) mm -∗ umem pt M ==∗
-    gen_heap_interp (hG := riscv_memGS) (write_bytes mm pa 8 v) ∗
-    umem pt (uM_store8 M a v).
+    gen_heap_interp (hG := riscv_memGS) (write_bytes mm pa (Z.to_N k) v) ∗
+    umem pt (uM_store M a k v).
   Proof.
     intros Hpa HM.
-    assert (Hin : forall j : nat, In j (seq 0 8) -> (j < 8)%nat).
+    assert (Hin : forall j : nat, In j (seq 0 (Z.to_nat k)) -> (j < Z.to_nat k)%nat).
     { intros j Hj. apply in_seq in Hj. lia. }
-    unfold write_bytes, uM_store8. change (N.to_nat 8) with 8%nat.
-    apply (umem_upd_window pt a v pa (seq 0 8) M mm
+    unfold write_bytes, uM_store. rewrite nat_of_N_of_Z.
+    apply (umem_upd_window pt a v pa (seq 0 (Z.to_nat k)) M mm
              (fun j Hj => Hpa j (Hin j Hj)) (fun j Hj => HM j (Hin j Hj))).
   Qed.
 
-  (* the 8-byte store at a user-mapped, store-permitted, 8-aligned,
+End UmodeStoreMem.
+
+Section UmodeStoreMemK.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (k : Z).
+  Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
+  Context (Huintk : uint (to_bits 64 k) = k).
+  Context (Hwrite_plain : forall (addr : mword 64) (data : mword (8 * k)) (s : mstate),
+      dev_addr addr = false ->
+      exec (write_ram rv64d_types.Write_plain (Physaddr addr) k data tt) s
+      = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev))).
+
+  (* the k-byte store at a user-mapped, store-permitted, k-aligned,
      in-one-page virtual address.  Everything after the translate is the
-     k = 8 instance of UserMemPt's width-generic bricks. *)
+     width-k instance of UserMemPt's bricks; the store DATA the model uses
+     is the width-typed [dat], while the ghost image records the whole
+     register word [v] -- the two agree byte for byte on the window
+     ([Hdat]), which is all [write_bytes] ever reads. *)
+  Lemma umem_store_k (pt : uptd) (M : gmap Z (bv 8)) (w_st va v : mword 64)
+      (dat : mword (8 * k)) (sigma : mstate) :
+    (forall j : nat, (j < Z.to_nat k)%nat -> nth_byte dat j = nth_byte v j) ->
+    ud_um pt !! svpn_of va = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4096 - k ->
+    is_aligned_vaddr (Virtaddr va) k = true ->
+    (forall j : nat, (j < Z.to_nat k)%nat ->
+       exists b : bv 8, M !! (uint va + Z.of_nat j) = Some b) ->
+    register_lookup misa sigma.(sregs) = MISA_C ->
+    register_lookup menvcfg sigma.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base sigma.(sregs) = None ->
+    register_lookup cur_privilege sigma.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus sigma.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus sigma.(sregs))) ('b"1") = false ->
+    pma_allows_all (register_lookup pma_regions sigma.(sregs)) ->
+    reg_interp sigma.(sregs) -∗ gen_heap_interp sigma.(mem) -∗
+    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
+    ∃ sig2 : mstate,
+      ⌜exec (translateAddr (Virtaddr va) (Store Data)) sigma
+        = Some (Ok (Physaddr (u_walk_pa w_st va), PBMT_PMA, init_ext_ptw), sig2)⌝ ∗
+      (* the bump made [vmem_write_addr] announce the store before performing
+         it, and the announcement runs its own PMA/PMP check -- so the composer
+         has to hand the announcement back too *)
+      ⌜exec (mem_write_ea (Physaddr (u_walk_pa w_st va)) k (Store Data)
+               PBMT_PMA false false false) sig2 = Some (Ok tt, sig2)⌝ ∗
+      ⌜exec (mem_write_value (Physaddr (u_walk_pa w_st va)) k dat (Store Data)
+               PBMT_PMA false false false) sig2
+        = Some (Ok true,
+                MState sig2.(sregs)
+                  (write_bytes sig2.(mem) (u_walk_pa w_st va) (Z.to_N k) v)
+                  sig2.(mdev))⌝ ∗
+      ⌜sig2.(mdev) = sigma.(mdev)⌝ ∗
+      ⌜forall r : register, register_beq r tlb = false ->
+         register_lookup r sig2.(sregs) = register_lookup r sigma.(sregs)⌝ ∗
+      reg_interp sig2.(sregs) ∗
+      gen_heap_interp (write_bytes sig2.(mem) (u_walk_pa w_st va) (Z.to_N k) v) ∗
+      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
+      umem pt (uM_store M (uint va) k v).
+  Proof.
+    intros Hdat Hl Hchk Hcanon Hpg Hal HMb Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    iIntros "Hri Hgh Hinv HM".
+    iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) sigma
+                 with "Hri Hinv") as %(HA & Hord & HX & HR & HW & Hcovp).
+    iMod (utlb_inv_pt_translateAddr_u (Store Data)
+            (ud_root pt) (ud_tfp pt) (ud_um pt) w_st va (u_walk_pa w_st va) sigma
+            Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
+            (exec_effectivePrivilege_mprv0 (Store Data)
+               (register_lookup mstatus sigma.(sregs)) User sigma Hmprv)
+            (exec_is_shadow_stack_u_acc (Store Data) sigma
+               (or_intror (or_intror (or_introl eq_refl)))) Hall
+            with "Hri Hgh Hinv")
+      as (sig2) "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+    assert (Tr : forall r : register, register_beq r tlb = false ->
+              register_lookup r sig2.(sregs) = register_lookup r sigma.(sregs)).
+    { intros r Hne.
+      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
+        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+    assert (Hnc : forall j : nat, (j < Z.to_nat k)%nat ->
+              bv_unsigned va mod 4096 + Z.of_nat j < 4096).
+    { intros j Hj. apply (uinpage_nc_k va k (Z.of_nat j) Hpg). lia. }
+    (* the byte-level RAM facts, out of the image (the store window's
+       first and last byte are what the PMP range check needs) *)
+    destruct (HMb 0%nat ltac:(clear -Hk; lia)) as (b0 & Hb0).
+    destruct (HMb (Z.to_nat k - 1)%nat ltac:(clear -Hk; lia)) as (bk & Hbk).
+    iDestruct (umem_fetch_byte pt M w_st va 0 b0 sig2 Hl
+                 (Hnc 0%nat ltac:(clear -Hk; lia)) Hb0 with "Hgh HM") as %[_ Hram0].
+    iDestruct (umem_fetch_byte pt M w_st va (Z.to_nat k - 1)%nat bk sig2 Hl
+                 (Hnc (Z.to_nat k - 1)%nat ltac:(clear -Hk; lia)) Hbk
+                 with "Hgh HM") as %[_ Hramk].
+    set (pa := u_walk_pa w_st va) in *.
+    assert (Hram0' : addr_is_ram pa)
+      by (rewrite <- (pa_add_0 pa); exact Hram0).
+    (* the region and the PMP range, shared by the announcement and the store *)
+    destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+               : pma_allows_all (register_lookup pma_regions sig2.(sregs))) pa k
+              (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
+                 Hram0' Hramk (pma_width_le k 8 Hk Hk8 eq_refl)))
+      as (region & Hpmam & _ & _ & Hwrb).
+    pose proof (addr_is_ram_not_in_clint _ Hram0') as Hnc_c.
+    pose proof (addr_is_ram_not_in_sig _ Hram0') as Hnc_s.
+    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sig2.(sregs)) 0)) 4)
+              (uint pa) (uint (to_bits 64 k)) = PMP_Match).
+    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+               ltac:(clear -Hk; lia) Hram0' Hramk Hcovp). }
+    (* the byte-window bridge: the model writes [dat], the image records [v] *)
+    assert (Hwb : forall mm : gmap Arch.pa (bv 8),
+              write_bytes mm pa (Z.to_N k) dat = write_bytes mm pa (Z.to_N k) v).
+    { intro mm. apply write_bytes_ext. intros j Hj. apply Hdat. lia. }
+    (* the physical write fact at [sig2] *)
+    assert (Hwr : exec (mem_write_value (Physaddr pa) k dat (Store Data)
+                          PBMT_PMA false false false) sig2
+                  = Some (Ok true,
+                          MState sig2.(sregs) (write_bytes sig2.(mem) pa (Z.to_N k) v)
+                            sig2.(mdev))).
+    { rewrite <- (Hwb sig2.(mem)).
+      exact (exec_mem_write_value_U k Hk Hwrite_plain PBMT_PMA pa region dat sig2
+               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+               (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+               Hrange
+               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))
+               Hpmam
+               (pa_aligned_div _ va k Hk Hkdvd Hal)
+               (proj1 Hwrb)
+               (within_clint_false pa k sig2 Hnc_c Hk)
+               (within_sig_false pa k sig2 Hnc_s Hk)
+               (within_htif_writable_false pa k sig2
+                  (ltac:(rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity));
+                         exact Hhtif)))
+               (addr_is_ram_not_dev _ Hram0')
+               (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
+               (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+    (* ...and the effective-address announcement, at the same facts *)
+    assert (Hea : exec (mem_write_ea (Physaddr pa) k (Store Data) PBMT_PMA false false false) sig2
+                  = Some (Ok tt, sig2)).
+    { assert (Heff' : exec (effectivePrivilege (Store Data)
+                              (register_lookup mstatus sig2.(sregs))
+                              (register_lookup cur_privilege sig2.(sregs))) sig2
+                      = Some (User, sig2)).
+      { rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). rewrite Hcp.
+        apply exec_effectivePrivilege_mprv0.
+        rewrite (Tr mstatus ltac:(vm_compute; reflexivity)). exact Hmprv. }
+      refine (exec_mem_write_ea_g k pa (Store Data) PBMT_PMA User sig2 Heff' _ _).
+      - unfold check_pma_with_pmp_priority.
+        rewrite (exec_bind_Some _ _ _ _ _
+                   (exec_pmaCheck_ram_store_g k pa PBMT_PMA region sig2 Hpmam
+                      (pa_aligned_div _ va k Hk Hkdvd Hal)
+                      (proj1 Hwrb))).
+        cbn match. apply exec_returnm.
+      - exact (exec_pmpCheck_user_grant_store pa k sig2
+                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+                 Hrange
+                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))). }
+    (* the ghost half *)
+    iMod (umem_store_ghost k pt (uint va) v pa M sig2.(mem)
+            (fun j Hj => uva_pa_window pt w_st va j Hl (Hnc j Hj)) HMb
+            with "Hgh HM") as "[Hgh HM]".
+    iModIntro. iExists sig2.
+    iSplit; [ iPureIntro; exact Htr | ].
+    iSplit; [ iPureIntro; exact Hea | ].
+    iSplit; [ iPureIntro; exact Hwr | ].
+    iSplit; [ iPureIntro; exact Hmdev | ].
+    iSplit; [ iPureIntro; exact Tr | ].
+    iFrame "Hri Hgh Hinv HM".
+  Qed.
+
+End UmodeStoreMemK.
+
+Section UmodeStoreMem8.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the k = 8 instance, in the spelling the [c.sdsp]-era callers use *)
   Lemma umem_store_8 (pt : uptd) (M : gmap Z (bv 8)) (w_st va v : mword 64)
       (sigma : mstate) :
     ud_um pt !! svpn_of va = Some w_st ->
@@ -225,9 +552,6 @@ Section UmodeStoreMem.
     ∃ sig2 : mstate,
       ⌜exec (translateAddr (Virtaddr va) (Store Data)) sigma
         = Some (Ok (Physaddr (u_walk_pa w_st va), PBMT_PMA, init_ext_ptw), sig2)⌝ ∗
-      (* the bump made [vmem_write_addr] announce the store before performing
-         it, and the announcement runs its own PMA/PMP check -- so the composer
-         has to hand the announcement back too *)
       ⌜exec (mem_write_ea (Physaddr (u_walk_pa w_st va)) 8 (Store Data)
                PBMT_PMA false false false) sig2 = Some (Ok tt, sig2)⌝ ∗
       ⌜exec (mem_write_value (Physaddr (u_walk_pa w_st va)) 8 v (Store Data)
@@ -243,187 +567,133 @@ Section UmodeStoreMem.
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
       umem pt (uM_store8 M (uint va) v).
   Proof.
-    intros Hl Hchk Hcanon Hpg Hal HMb Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
-    iIntros "Hri Hgh Hinv HM".
-    iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) sigma
-                 with "Hri Hinv") as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (Store Data)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_st va (u_walk_pa w_st va) sigma
-            Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_mprv0 (Store Data)
-               (register_lookup mstatus sigma.(sregs)) User sigma Hmprv)
-            (exec_is_shadow_stack_u_acc (Store Data) sigma
-               (or_intror (or_intror (or_introl eq_refl)))) Hall
-            with "Hri Hgh Hinv")
-      as (sig2) "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r sig2.(sregs) = register_lookup r sigma.(sregs)).
-    { intros r Hne.
-      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    assert (Hnc : forall j : nat, (j < 8)%nat ->
-              bv_unsigned va mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. apply (uinpage_nc8 va (Z.of_nat j) Hpg). lia. }
-    (* the byte-level RAM facts, out of the image (the store window's
-       first and last byte are what the PMP range check needs) *)
-    destruct (HMb 0%nat ltac:(lia)) as (b0 & Hb0).
-    destruct (HMb 7%nat ltac:(lia)) as (b7 & Hb7).
-    iDestruct (umem_fetch_byte pt M w_st va 0 b0 sig2 Hl
-                 (Hnc 0%nat ltac:(lia)) Hb0 with "Hgh HM") as %[_ Hram0].
-    iDestruct (umem_fetch_byte pt M w_st va 7 b7 sig2 Hl
-                 (Hnc 7%nat ltac:(lia)) Hb7 with "Hgh HM") as %[_ Hram7].
-    set (pa := u_walk_pa w_st va) in *.
-    assert (Hram0' : addr_is_ram pa)
-      by (rewrite <- (pa_add_0 pa); exact Hram0).
-    (* the region and the PMP range, shared by the announcement and the store *)
-    destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions sig2.(sregs))) pa 8
-              (pma_access_ram _ _ _ Hram0' Hram7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl))
-      as (region & Hpmam & _ & _ & Hwrb).
-    pose proof (addr_is_ram_not_in_clint _ Hram0') as Hnc_c.
-    pose proof (addr_is_ram_not_in_sig _ Hram0') as Hnc_s.
-    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sig2.(sregs)) 0)) 4)
-              (uint pa) (uint (to_bits 64 8)) = PMP_Match).
-    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-      exact (ram_fetch_pmp pa _ 8 7 ltac:(lia) ltac:(lia)
-               ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-               Hram0' Hram7 Hcovp). }
-    (* the physical write fact at [sig2] *)
-    assert (Hwr : exec (mem_write_value (Physaddr pa) 8 v (Store Data)
-                          PBMT_PMA false false false) sig2
-                  = Some (Ok true,
-                          MState sig2.(sregs) (write_bytes sig2.(mem) pa 8 v) sig2.(mdev))).
-    { exact (exec_mem_write_value_U 8 ltac:(lia) exec_write_ram_plain_8 PBMT_PMA pa region v sig2
-               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
-               (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
-               Hrange
-               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))
-               Hpmam
-               (pa_aligned_div _ va 8 ltac:(lia) ltac:(exists 512; reflexivity) Hal)
-               (proj1 Hwrb)
-               (within_clint_false pa 8 sig2 Hnc_c ltac:(lia))
-               (within_sig_false pa 8 sig2 Hnc_s ltac:(lia))
-               (within_htif_writable_false pa 8 sig2
-                  (ltac:(rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity));
-                         exact Hhtif)))
-               (addr_is_ram_not_dev _ Hram0')
-               (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
-               (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
-    (* ...and the effective-address announcement, at the same facts *)
-    assert (Hea : exec (mem_write_ea (Physaddr pa) 8 (Store Data) PBMT_PMA false false false) sig2
-                  = Some (Ok tt, sig2)).
-    { assert (Heff' : exec (effectivePrivilege (Store Data)
-                              (register_lookup mstatus sig2.(sregs))
-                              (register_lookup cur_privilege sig2.(sregs))) sig2
-                      = Some (User, sig2)).
-      { rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). rewrite Hcp.
-        apply exec_effectivePrivilege_mprv0.
-        rewrite (Tr mstatus ltac:(vm_compute; reflexivity)). exact Hmprv. }
-      refine (exec_mem_write_ea_g 8 pa (Store Data) PBMT_PMA User sig2 Heff' _ _).
-      - unfold check_pma_with_pmp_priority.
-        rewrite (exec_bind_Some _ _ _ _ _
-                   (exec_pmaCheck_ram_store_g 8 pa PBMT_PMA region sig2 Hpmam
-                      (pa_aligned_div _ va 8 ltac:(lia) ltac:(exists 512; reflexivity) Hal)
-                      (proj1 Hwrb))).
-        cbn match. apply exec_returnm.
-      - exact (exec_pmpCheck_user_grant_store pa 8 sig2
-                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
-                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
-                 Hrange
-                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))). }
-    (* the ghost half *)
-    iMod (umem_store8_ghost pt (uint va) v pa M sig2.(mem)
-            (fun j Hj => uva_pa_window pt w_st va j Hl (Hnc j Hj)) HMb
-            with "Hgh HM") as "[Hgh HM]".
-    iModIntro. iExists sig2.
-    iSplit; [ iPureIntro; exact Htr | ].
-    iSplit; [ iPureIntro; exact Hea | ].
-    iSplit; [ iPureIntro; exact Hwr | ].
-    iSplit; [ iPureIntro; exact Hmdev | ].
-    iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
+    intros Hl Hchk Hcanon Hpg Hal HMb.
+    exact (umem_store_k 8 ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+             ltac:(vm_compute; reflexivity) exec_write_ram_plain_8
+             pt M w_st va v v sigma (fun j _ => eq_refl)
+             Hl Hchk Hcanon Hpg Hal HMb).
   Qed.
 
-End UmodeStoreMem.
+End UmodeStoreMem8.
 
 (* ===================================================================== *)
-(* §3 The value-precise 8-byte STORE execute at User.                      *)
+(* §3 The value-precise k-byte STORE execute at User.                      *)
 (* ===================================================================== *)
 
-(* the two width-8 autocast identities the model's [subrange]-of-rs2 and
-   the misaligned-split loop's chunk projection leave behind *)
-Local Lemma ucast_store8_a (d : mword 64) :
-  autocast (T := mword) (subrange_vec_dec d (Z.sub (Z.mul 8 8) 1) 0) = d.
-Proof. apply autocast_subrange_id. Qed.
+(* THE store data the model actually hands to [vmem_write]: the low [8*k]
+   bits of the rs2 register word, under the [autocast] that transports the
+   [subrange]'s [k*8-1-0+1] index to the [8*k] one [vmem_write] wants.
+   [ucast_store8_a] was the k = 8 instance, where the transport is the
+   identity on the WHOLE word; at k < 8 it is a genuine truncation, and the
+   bridge back to the image is [nth_byte_ustore_data] below. *)
+Definition ustore_data (k : Z) (v : mword 64) : mword (8 * k) :=
+  autocast (T := mword) (subrange_vec_dec v (Z.sub (Z.mul k 8) 1) 0).
 
-Local Lemma ucast_store8_b (d : mword 64) :
-  (autocast (T := mword) (subrange_vec_dec d (8 * (0 + 1) * 8 - 1) (8 * 0 * 8))
-   : mword (8 * 8)) = d.
+(* a low-window truncation does not move a byte inside the window *)
+Local Lemma byte_of_mod (x n s : Z) :
+  0 <= s -> s + 8 <= n ->
+  ((x mod 2 ^ n) ≫ s) mod 2 ^ 8 = (x ≫ s) mod 2 ^ 8.
 Proof.
-  change (8 * (0 + 1) * 8 - 1) with (Z.sub (Z.mul 8 8) 1).
-  change (8 * 0 * 8) with 0.
-  apply autocast_subrange_id.
+  intros Hs Hn.
+  apply Z.bits_inj_iff'. intros i Hi.
+  destruct (Z_lt_le_dec i 8) as [Hlt | Hge].
+  - rewrite (Z.mod_pow2_bits_low (Z.shiftr (x mod 2 ^ n) s) 8 i ltac:(lia)).
+    rewrite (Z.mod_pow2_bits_low (Z.shiftr x s) 8 i ltac:(lia)).
+    rewrite (Z.shiftr_spec (x mod 2 ^ n) s i ltac:(lia)).
+    rewrite (Z.shiftr_spec x s i ltac:(lia)).
+    rewrite (Z.mod_pow2_bits_low x n (i + s) ltac:(lia)). reflexivity.
+  - rewrite (Z.mod_pow2_bits_high (Z.shiftr (x mod 2 ^ n) s) 8 i ltac:(lia)).
+    rewrite (Z.mod_pow2_bits_high (Z.shiftr x s) 8 i ltac:(lia)). reflexivity.
 Qed.
 
-(* the aligned width-8 [vmem_write_addr] with the chunk cast collapsed *)
-Lemma uvmem_write_addr_8 (va pa : mword 64) (dat : mword 64)
-    (ep : Privilege) (md : SATPMode) (s s2 : mstate) :
-  is_aligned_vaddr (Virtaddr va) 8 = true ->
-  exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs))
-          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
-  exec (translationMode ep) s = Some (md, s) ->
-  exec (translateAddr (Virtaddr va) (Store Data)) s
-    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2) ->
-  exec (mem_write_ea (Physaddr pa) 8 (Store Data) PBMT_PMA false false false) s2
-    = Some (Ok tt, s2) ->
-  exec (mem_write_value (Physaddr pa) 8 dat (Store Data) PBMT_PMA false false false) s2
-    = Some (Ok true, MState s2.(sregs) (write_bytes s2.(mem) pa 8 dat) s2.(mdev)) ->
-  exec (vmem_write_addr (Virtaddr va) 8 dat (Store Data) false false false) s
-    = Some (Ok true, MState s2.(sregs) (write_bytes s2.(mem) pa 8 dat) s2.(mdev)).
+Lemma nth_byte_ustore_data (k : Z) (v : mword 64) (j : nat) :
+  0 < k -> k <= 8 -> (j < Z.to_nat k)%nat ->
+  nth_byte (ustore_data k v) j = nth_byte v j.
 Proof.
-  intros Hal Heff Htm Htr Hea Hwv.
-  pose proof (exec_vmem_write_addr_aligned_store 8 va pa dat ep md s s2
-                (MState s2.(sregs) (write_bytes s2.(mem) pa 8 dat) s2.(mdev))
-                ltac:(unfold vmem_width; lia) Hal Heff Htm Htr Hea) as H.
-  cbv zeta in H.
-  rewrite (ucast_store8_b dat) in H.
-  exact (H Hwv).
+  intros Hk Hk8 Hj.
+  assert (Hjk : Z.of_nat j < k) by lia.
+  apply bv_eq. rewrite !nth_byte_unsigned. unfold ustore_data.
+  rewrite (autocast_unsigned (Z.sub (Z.mul k 8) 1 - 0 + 1) (8 * k) _ ltac:(lia)).
+  rewrite (subrange_dec_unsigned_lo0 v (Z.sub (Z.mul k 8) 1) (2 ^ (8 * k))
+             ltac:(lia) ltac:(f_equal; lia)).
+  apply byte_of_mod; lia.
 Qed.
 
-(* THE execute fact: [sd rs2, imm(rs1)] at User with MPRV = 0.  The U-mode
-   analog of WpSmodePtLeaves' [exec_execute_STORE_8_gpr_S_walk_pt]. *)
-Lemma exec_execute_STORE_8_u_walk (rs2 rs1 : mword 5) (imm : mword 12)
-    (base v pa : mword 64) (md : SATPMode) (s s2 : mstate) :
-  register_lookup cur_privilege s.(sregs) = User ->
-  exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs)) User) s
-    = Some (User, s) ->
-  exec (get_pmlen (Store Data) User) s = Some (0, s) ->
-  exec (translationMode User) s = Some (md, s) ->
-  (if Z.eqb (uint rs1) 0 then zero_reg
-   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) = base ->
-  (if Z.eqb (uint rs2) 0 then zero_reg
-   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)) = v ->
-  is_aligned_vaddr (Virtaddr (add_vec base (sign_extend' 64 imm))) 8 = true ->
-  exec (translateAddr (Virtaddr (add_vec base (sign_extend' 64 imm))) (Store Data)) s
-    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2) ->
-  exec (mem_write_ea (Physaddr pa) 8 (Store Data) PBMT_PMA false false false) s2
-    = Some (Ok tt, s2) ->
-  exec (mem_write_value (Physaddr pa) 8 v (Store Data) PBMT_PMA false false false) s2
-    = Some (Ok true, MState s2.(sregs) (write_bytes s2.(mem) pa 8 v) s2.(mdev)) ->
-  exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s
-    = Some (RETIRE_SUCCESS,
-            MState s2.(sregs) (write_bytes s2.(mem) pa 8 v) s2.(mdev)).
-Proof.
-  intros Hcp Heff Hpml Htm Hbase Hv Hal Htr Hea Hwv.
-  apply (exec_execute_STORE_u_ok imm rs2 rs1 8 true s _ eq_refl).
-  rewrite Hv. rewrite (ucast_store8_a v).
-  apply (exec_vmem_write_u rs1 (sign_extend' 64 imm) 8 v (Store Data)
-           false false false md (Ok true) s _ Hcp Heff Hpml Htm).
-  rewrite Hbase.
-  exact (uvmem_write_addr_8 (add_vec base (sign_extend' 64 imm)) pa v User md s s2 Hal
-           (ltac:(rewrite Hcp; exact Heff)) Htm Htr Hea Hwv).
-Qed.
+Section UmodeStoreExec.
+  Context (k : Z).
+  Context (Hkw : vmem_width k).
+
+  (* the aligned width-k [vmem_write_addr] with the chunk cast collapsed.
+     The autocast the split loop leaves is at the index expressions
+     [8*(0+1)*k-1] / [8*0*k]; both reduce (the leading factors are closed)
+     to [8*k-1] / [0], so [subrange_full_gen_cast] applies after a [change]
+     that spells them at the reduced indices. *)
+  Lemma uvmem_write_addr_k (va pa : mword 64) (dat : mword (8 * k))
+      (ep : Privilege) (md : SATPMode) (s s2 sfin : mstate) :
+    is_aligned_vaddr (Virtaddr va) k = true ->
+    exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs))
+            (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+    exec (translationMode ep) s = Some (md, s) ->
+    exec (translateAddr (Virtaddr va) (Store Data)) s
+      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2) ->
+    exec (mem_write_ea (Physaddr pa) k (Store Data) PBMT_PMA false false false) s2
+      = Some (Ok tt, s2) ->
+    exec (mem_write_value (Physaddr pa) k dat (Store Data) PBMT_PMA false false false) s2
+      = Some (Ok true, sfin) ->
+    exec (vmem_write_addr (Virtaddr va) k dat (Store Data) false false false) s
+      = Some (Ok true, sfin).
+  Proof.
+    intros Hal Heff Htm Htr Hea Hwv.
+    pose proof (vmem_width_pos k Hkw) as Hk.
+    pose proof (exec_vmem_write_addr_aligned_store k va pa dat ep md s s2 sfin
+                  Hkw Hal Heff Htm Htr Hea) as H.
+    cbv zeta in H.
+    change (@autocast mword (Z.sub (Z.mul 8 k) 1 - 0 + 1) (8 * k) _
+              (@subrange_vec_dec (8 * k) dat (Z.sub (Z.mul 8 k) 1) 0)
+            : mword (8 * k))
+      with (@autocast mword (8 * k - 1 - 0 + 1) (8 * k) _
+              (@subrange_vec_dec (8 * k) dat (8 * k - 1) 0) : mword (8 * k)) in H.
+    rewrite (subrange_full_gen_cast (8 * k) dat ltac:(lia)) in H.
+    exact (H Hwv).
+  Qed.
+
+  (* THE execute fact: [s{b,h,w,d} rs2, imm(rs1)] at User with MPRV = 0.
+     The U-mode analog of WpSmodePtLeaves' [exec_execute_STORE_8_gpr_S_walk_pt],
+     and the store twin of WpUmodeLoad's [exec_execute_LOAD_k_u_walk]. *)
+  Lemma exec_execute_STORE_k_u_walk (rs2 rs1 : mword 5) (imm : mword 12)
+      (base v pa : mword 64) (md : SATPMode) (s s2 sfin : mstate) :
+    register_lookup cur_privilege s.(sregs) = User ->
+    exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs)) User) s
+      = Some (User, s) ->
+    exec (get_pmlen (Store Data) User) s = Some (0, s) ->
+    exec (translationMode User) s = Some (md, s) ->
+    (if Z.eqb (uint rs1) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) = base ->
+    (if Z.eqb (uint rs2) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)) = v ->
+    is_aligned_vaddr (Virtaddr (add_vec base (sign_extend' 64 imm))) k = true ->
+    exec (translateAddr (Virtaddr (add_vec base (sign_extend' 64 imm))) (Store Data)) s
+      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2) ->
+    exec (mem_write_ea (Physaddr pa) k (Store Data) PBMT_PMA false false false) s2
+      = Some (Ok tt, s2) ->
+    exec (mem_write_value (Physaddr pa) k (ustore_data k v) (Store Data)
+            PBMT_PMA false false false) s2 = Some (Ok true, sfin) ->
+    exec (execute (STORE (imm, Regidx rs2, Regidx rs1, k))) s
+      = Some (RETIRE_SUCCESS, sfin).
+  Proof.
+    intros Hcp Heff Hpml Htm Hbase Hv Hal Htr Hea Hwv.
+    apply (exec_execute_STORE_u_ok imm rs2 rs1 k true s sfin
+             ltac:(change xlen_bytes with 8; apply Z.leb_le;
+                   exact (uvw_le8 k Hkw))).
+    rewrite Hv.
+    apply (exec_vmem_write_u rs1 (sign_extend' 64 imm) k (ustore_data k v) (Store Data)
+             false false false md (Ok true) s sfin Hcp Heff Hpml Htm).
+    rewrite Hbase.
+    exact (uvmem_write_addr_k (add_vec base (sign_extend' 64 imm)) pa (ustore_data k v)
+             User md s s2 sfin Hal (ltac:(rewrite Hcp; exact Heff)) Htm Htr Hea Hwv).
+  Qed.
+
+End UmodeStoreExec.
 
 (* ===================================================================== *)
 (* §4 The store-flavoured POST.                                            *)
@@ -494,7 +764,7 @@ Section UvRetirePostState.
 End UvRetirePostState.
 
 (* ===================================================================== *)
-(* §5 The leaf.                                                            *)
+(* §5 The leaf, and its five instances.                                    *)
 (* ===================================================================== *)
 
 Section WpUmodeStore.
@@ -502,16 +772,21 @@ Section WpUmodeStore.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
-  (* the geometry-agnostic middle: from the FETCHED state, drive the
-     nextPC write, the store's execute, the memory update and the step
-     assembly.  [Hprog] is the [uv_prog_rvc] / [uv_prog_base] witness the
-     caller's geometry produced -- exactly the seam
-     [uv_retire_post_fetch] uses. *)
+  (* ------------------------------------------------------------------- *)
+  (* The geometry-agnostic middle: from the FETCHED state, drive the       *)
+  (* nextPC write, the store's execute, the memory update and the step     *)
+  (* assembly.  [Hprog] is the [uv_prog_rvc] / [uv_prog_base] witness the   *)
+  (* caller's geometry produced -- the same seam [uv_retire_post_fetch] and *)
+  (* [uv_load_post_fetch] use.  The register file comes back UNCHANGED and  *)
+  (* the image gains exactly [uM_store M (uint va) k wval].                 *)
+  (* ------------------------------------------------------------------- *)
   Lemma uv_store_post_fetch (CIDp : CpuId) (P : iProp Σ)
-      (sg sf : mstate) (b : bool) (mst pc : mword 64) (k : Z) (ib : mword 32)
+      (sg sf : mstate) (b : bool) (mst pc : mword 64) (d : Z) (ib : mword 32)
       (m : regfile) (M : gmap Z (bv 8))
       (i : instruction) (o : option instruction)
-      (rs2 : mword 5) (imm : mword 12) (w_st tgt wval : mword 64) :
+      (imm : mword 12) (rs1 rs2 : mword 5) (k : Z)
+      (w_st va wval : mword 64) :
+    ustore_width k ->
     exec (should_inc_minstret (register_lookup cur_privilege sg.(sregs))) sg
       = Some (b, sg) ->
     register_lookup hart_state
@@ -523,17 +798,18 @@ Section WpUmodeStore.
     eq_vec (_get_Mstatus_MPRV (register_lookup mstatus sf.(sregs))) ('b"1") = false ->
     eq_vec (_get_Mstatus_MXR (register_lookup mstatus sf.(sregs))) ('b"0") = true ->
     pma_allows_all (register_lookup pma_regions sf.(sregs)) ->
-    uv_exp i o = STORE (imm, Regidx rs2, Regidx csp_rs1, 8) ->
-    tgt = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) ->
+    uv_exp i o = STORE (imm, Regidx rs2, Regidx rs1, k) ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     wval = m !!! Regidx rs2 ->
-    ud_um pt !! svpn_of tgt = Some w_st ->
+    ud_um pt !! svpn_of va = Some w_st ->
     uleaf_ok (Store Data) w_st ->
-    uva_canon tgt ->
-    Z.rem (uint tgt) 4096 <= 4088 ->
-    is_aligned_vaddr (Virtaddr tgt) 8 = true ->
-    (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4096 - k ->
+    is_aligned_vaddr (Virtaddr va) k = true ->
+    (forall j : nat, (j < Z.to_nat k)%nat ->
+       exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     (forall s_x : mstate,
-       exec (execute (uv_exp i o)) (set_reg sf nextPC (add_vec_int pc k))
+       exec (execute (uv_exp i o)) (set_reg sf nextPC (add_vec_int pc d))
          = Some (RETIRE_SUCCESS, s_x) ->
        exec (run_hart_active 0) (set_reg sg (R_bool minstret_increment) b)
          = Some (Step_Execute (RETIRE_SUCCESS, ib), s_x)) ->
@@ -545,9 +821,9 @@ Section WpUmodeStore.
     minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ b -∗
     ▷ (P -∗
        utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
-       umem pt (uM_store8 M (uint tgt) wval) -∗
+       umem pt (uM_store M (uint va) k wval) -∗
        hart_state ↦ᵣ HART_ACTIVE tt -∗
-       PC ↦ᵣ add_vec_int pc k -∗ nextPC ↦ᵣ add_vec_int pc k -∗
+       PC ↦ᵣ add_vec_int pc d -∗ nextPC ↦ᵣ add_vec_int pc d -∗
        gpr_file m -∗
        WP (Loop : expr riscv_lang)) -∗
     |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
@@ -555,13 +831,18 @@ Section WpUmodeStore.
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
          WP (Loop : expr riscv_lang)).
   Proof.
-    intros Hsi Hhart_a Lpcf Hagreef Hhtiff HSXLf Hmprvf Hmxrf Hpmaf
-           Hexp Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb Hprog.
+    intros Hkw Hsi Hhart_a Lpcf Hagreef Hhtiff HSXLf Hmprvf Hmxrf Hpmaf
+           Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb Hprog.
+    destruct Hkw as (Hvw & Hwrite_plain).
+    pose proof (vmem_width_pos k Hvw) as Hk.
+    pose proof (uvw_le8 k Hvw) as Hk8.
+    pose proof (uvw_dvd k Hvw) as Hkdvd.
+    pose proof (uvw_uint k Hvw) as Huintk.
     iIntros "Hint HP Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hcont".
     iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iMod (reg_update _ nextPC _ (add_vec_int pc k) with "Hreg Hnpc")
+    iMod (reg_update _ nextPC _ (add_vec_int pc d) with "Hreg Hnpc")
       as "[Hreg Hnpc]".
-    set (s_pc := set_reg sf nextPC (add_vec_int pc k)).
+    set (s_pc := set_reg sf nextPC (add_vec_int pc d)).
     iAssert (reg_interp s_pc.(sregs)) with "[Hreg]" as "Hreg".
     { unfold s_pc; rewrite ?sregs_set_reg. iExact "Hreg". }
     iAssert (gen_heap_interp s_pc.(mem)) with "[Hmem]" as "Hmem".
@@ -574,7 +855,7 @@ Section WpUmodeStore.
               register_lookup r s_pc.(sregs) = v).
     { intros r v Hv Hne. unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hv | exact Hne ]. }
-    pose proof (agree_u_set_nextPC sf (add_vec_int pc k) Hagreef) as Hagree.
+    pose proof (agree_u_set_nextPC sf (add_vec_int pc d) Hagreef) as Hagree.
     pose proof (agree_u_priv s_pc Hagree) as Lprivp.
     pose proof (agree_u_misa s_pc Hagree) as Lmisap.
     pose proof (agree_u_menvcfg s_pc Hagree) as Lmenvp.
@@ -598,54 +879,52 @@ Section WpUmodeStore.
       by (rewrite Lmsp; exact Hmxrf).
     assert (Lpcp : register_lookup PC s_pc.(sregs) = pc)
       by (apply (Tn PC _ Lpcf); vm_compute; reflexivity).
-    assert (Lnpcp : register_lookup nextPC s_pc.(sregs) = add_vec_int pc k)
+    assert (Lnpcp : register_lookup nextPC s_pc.(sregs) = add_vec_int pc d)
       by (unfold s_pc; rewrite ?sregs_set_reg; apply register_lookup_set).
     (* the translation mode, read off the invariant *)
     iDestruct (utlb_inv_pt_translationMode_U (ud_root pt) (ud_tfp pt) (ud_um pt)
                  s_pc HSXLp with "Hreg Hutlb") as "(%Htm & Hreg & Hutlb)".
     (* the store *)
-    iMod (umem_store_8 pt M w_st tgt wval s_pc
+    iMod (umem_store_k k Hk Hk8 Hkdvd Huintk Hwrite_plain pt M w_st va wval
+            (ustore_data k wval) s_pc
+            (fun j Hj => nth_byte_ustore_data k wval j Hk Hk8 Hj)
             Hl Hchk Hcanon Hpg Hal HMb Lmisap Lmenvp Lhtifp Lprivp HSXLp Hmprvp Lpmap
             with "Hreg Hmem Hutlb Humem")
       as (sig2) "(%Htr & %Hea & %Hwv & %Hmdev2 & %Tr2 & Hreg & Hmem & Hutlb & Humem)".
     (* the execute, value-precise *)
-    assert (Hbase : (if Z.eqb (uint csp_rs1) 0 then zero_reg
-                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint csp_rs1)))
-                            s_pc.(sregs)) = m !!! Regidx csp_rs1)
-      by (exact (Hvals csp_rs1)).
+    assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
+                            s_pc.(sregs)) = m !!! Regidx rs1)
+      by (exact (Hvals rs1)).
     assert (Hvv : (if Z.eqb (uint rs2) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2)))
                           s_pc.(sregs)) = wval)
       by (rewrite Hwval; exact (Hvals rs2)).
-    assert (Hex : exec (execute (uv_exp i o)) s_pc
-                  = Some (RETIRE_SUCCESS,
-                          MState sig2.(sregs)
-                            (write_bytes sig2.(mem) (u_walk_pa w_st tgt) 8 wval)
-                            sig2.(mdev))).
+    set (s_x := MState sig2.(sregs)
+                  (write_bytes sig2.(mem) (u_walk_pa w_st va) (Z.to_N k) wval)
+                  sig2.(mdev)).
+    assert (Hex : exec (execute (uv_exp i o)) s_pc = Some (RETIRE_SUCCESS, s_x)).
     { rewrite Hexp.
-      apply (exec_execute_STORE_8_u_walk rs2 csp_rs1 imm (m !!! Regidx csp_rs1)
-               wval (u_walk_pa w_st tgt) Sv39 s_pc sig2 Lprivp
+      apply (exec_execute_STORE_k_u_walk k Hvw rs2 rs1 imm (m !!! Regidx rs1)
+               wval (u_walk_pa w_st va) Sv39 s_pc sig2 s_x Lprivp
                (exec_effectivePrivilege_mprv0 (Store Data)
                   (register_lookup mstatus s_pc.(sregs)) User s_pc Hmprvp)
                (exec_get_pmlen_u (Store Data) s_pc
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity) Hmxrp Lmisap Lmenvp Lsenvp)
                Htm Hbase Hvv);
-        [ rewrite <- Htgt; exact Hal
-        | rewrite <- Htgt; exact Htr
+        [ rewrite <- Hva; exact Hal
+        | rewrite <- Hva; exact Htr
         | exact Hea
         | exact Hwv ]. }
     pose proof (Hprog _ Hex) as Hha.
-    (* re-assemble the post state and hand it to the tick/bump tail *)
-    set (s_x := MState sig2.(sregs)
-                  (write_bytes sig2.(mem) (u_walk_pa w_st tgt) 8 wval) sig2.(mdev)).
-    assert (Lnpcx : register_lookup nextPC s_x.(sregs) = add_vec_int pc k).
+    assert (Lnpcx : register_lookup nextPC s_x.(sregs) = add_vec_int pc d).
     { unfold s_x; cbn [sregs].
       rewrite (Tr2 nextPC ltac:(vm_compute; reflexivity)). exact Lnpcp. }
     iApply (uv_retire_post_state CIDp
               (P ∗ utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-               umem pt (uM_store8 M (uint tgt) wval) ∗ gpr_file m)%I
-              sg s_x b mst pc (add_vec_int pc k) ib
+               umem pt (uM_store M (uint va) k wval) ∗ gpr_file m)%I
+              sg s_x b mst pc (add_vec_int pc d) ib
               Hsi Hhart_a Lnpcx Hha
               with "[Hreg Hmem Hdev] [$HP $Hutlb $Humem $Hgpr] Hhs Hpc Hnpc Hmst Hmi [Hcont]").
     - unfold s_x, mstate_interp; cbn [sregs mem mdev].
@@ -656,46 +935,48 @@ Section WpUmodeStore.
   Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* c.sdsp rs2, uimm -- the one MEMORY-WRITING leaf: store the 8-byte     *)
-  (* word [m !!! rs2] at [sp + uimm*8].  Compressed, so the funnel's two   *)
-  (* RVC geometries are the only ones that occur.                          *)
+  (* THE STORE LEAF.                                                       *)
   (*                                                                       *)
-  (* The premises are exactly what a caller holding a [uv_frame16] window   *)
-  (* (UmodeAbi.v) can hand over: the target's page is mapped store-        *)
-  (* permitting, the target is 8-aligned, canonical, and its 8 bytes sit    *)
-  (* on ONE page and are present in the image.  No register is written     *)
-  (* ([wr] would be [None]); the image comes back as [uM_store8].          *)
+  (* Width-generic: [k] is any [ustore_width] (1/2/4/8), so [sb/sh/sw/sd]  *)
+  (* and every compressed store are ONE lemma.  It takes the same [uinstr] /*)
+  (* [uv_redirect] pair the funnel does, so a compressed store names its   *)
+  (* [ExecuteAs] expansion.  No register is written; the image gains        *)
+  (* exactly the low [k] bytes of [wval = m !!! rs2].                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uv_csdsp (Psi : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (w_st tgt wval : mword 64) :
-    uinstr pt M pc true (C_SDSP (uimm, Regidx rs2)) ->
-    tgt = add_vec (m !!! Regidx csp_rs1)
-            (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
+  Lemma wp_uv_store (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (imm : mword 12) (rs1 rs2 : mword 5) (k : Z)
+      (w_st va wval : mword 64) :
+    ustore_width k ->
+    uinstr pt M pc is_rvc i ->
+    uv_redirect i o ->
+    is_lpad_instruction i = false ->
+    uv_exp i o = STORE (imm, Regidx rs2, Regidx rs1, k) ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     wval = m !!! Regidx rs2 ->
-    ud_um pt !! svpn_of tgt = Some w_st ->
+    ud_um pt !! svpn_of va = Some w_st ->
     uleaf_ok (Store Data) w_st ->
-    uva_canon tgt ->
-    Z.rem (uint tgt) 4096 <= 4088 ->
-    is_aligned_vaddr (Virtaddr tgt) 8 = true ->
-    (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
-    uv_cap_gpr C pt Psi M m -∗
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4096 - k ->
+    is_aligned_vaddr (Virtaddr va) k = true ->
+    (forall j : nat, (j < Z.to_nat k)%nat ->
+       exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
+    uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
     (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Psi (uM_store8 M (uint tgt) wval) m -∗
-       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) k wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb.
+    intros Hkw Hui Hred Hlpad Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb.
     destruct Hui as [Hal2 Hcanonpc Hleaf Hinpage Hcode].
     destruct Hleaf as (w_leaf & Hum & Hlok).
-    destruct Hcode as (h & HisRVC & Hbytes & Hdecrvc & Hnext2).
     iIntros "Hcg Hpc Hcont".
     iDestruct "Hcg" as "(#Hcap & Hlin & Hgprc)".
-    iAssert (uv_cap_gpr C pt Psi M m) with "[Hlin Hgprc]" as "Hcg".
+    iAssert (uv_cap_gpr C pt Ψ M m) with "[Hlin Hgprc]" as "Hcg".
     { rewrite /uv_cap_gpr. iFrame "Hcap Hlin Hgprc". }
-    iApply (wp_uv_step C pt Psi M m pc with "Hcg Hpc [Hcont]").
+    iApply (wp_uv_step C pt Ψ M m pc with "Hcg Hpc [Hcont]").
     rewrite /uv_step_obl.
     iIntros (CID0 sg ms_v sc_v stval_v sepc_v)
       "%Hmsok %Lpriv %Lms %Lpc %Hdisp #Hamb Hhs Hpriv Hms Hsc Hstval Hsepc
@@ -780,12 +1061,13 @@ Section WpUmodeStore.
       - rewrite (Tr mstatus ltac:(vm_compute; reflexivity)).
         exact (T mstatus _ Lms eq_refl).
       - rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)). exact HpmaA. }
-    (* the closure the geometry hands to [uv_store_post_fetch] *)
+    (* the closure every geometry hands to [uv_store_post_fetch] *)
     iAssert (▷ (True -∗
                 utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
-                umem pt (uM_store8 M (uint tgt) wval) -∗
+                umem pt (uM_store M (uint va) k wval) -∗
                 hart_state ↦ᵣ HART_ACTIVE tt -∗
-                PC ↦ᵣ add_vec_int pc 2 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗
+                PC ↦ᵣ add_vec_int pc (if is_rvc then 2 else 4) -∗
+                nextPC ↦ᵣ add_vec_int pc (if is_rvc then 2 else 4) -∗
                 gpr_file m -∗
                 WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hpriv Hms Hsc Hstval Hsepc Hcfg]" as "Hk".
@@ -797,83 +1079,360 @@ Section WpUmodeStore.
       iExists ms_v, sc_v, stval_v, sepc_v.
       iSplitR; [ iPureIntro; exact Hmsok | ].
       iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc". }
-    destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-    - (* 4-aligned: one 4-byte read *)
-      destruct (Hnext2 ltac:(first [exact Hal4 | reflexivity]))
-        as (b2 & b3 & Hb2 & Hb3).
-      iMod (umode_fetch_rvc_4 pt M w_leaf pc h b2 b3
-              (set_reg sg (R_bool minstret_increment) b)
-              Hum Hlok Hcanonpc Hinpage Hal4 Hbytes Hb2 Hb3 HisRVC
-              LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-              HSXL HpmaA
-              with "[Hreg] [Hmem] Hutlb Humem")
-        as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { rewrite ?sregs_set_reg. iExact "Hreg". }
-      { rewrite ?mem_set_reg. iExact "Hmem". }
-      destruct (Hsf sf Tr)
-        as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
-      iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 2
-                (zero_extend' 32 h) m M
-                (C_SDSP (uimm, Regidx rs2))
-                (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
-                              Regidx rs2, Regidx csp_rs1, 8)))
-                rs2 (zero_extend' 12 (concat_vec uimm ('b"000")))
-                w_st tgt wval
-                Hsi Hhart_a Lpcf Hagree Lhtiff
-                ltac:(rewrite Lmsf; exact (proj1 Hmsok))
-                ltac:(rewrite Lmsf; exact (proj1 (proj2 Hmsok)))
-                ltac:(rewrite Lmsf; exact (proj1 (proj2 (proj2 Hmsok))))
-                Hpmaf eq_refl Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb
-                (uv_prog_rvc _ _ h (C_SDSP (uimm, Regidx rs2))
-                   (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
-                                 Regidx rs2, Regidx csp_rs1, 8))) pc
-                   LprivA HdispA Hfetch
-                   (Hdecrvc sf ltac:(rewrite Lmisaf; vm_compute; reflexivity))
-                   Helpf Lpcf
-                   (exec_currentlyEnabled_Zca sf
-                      ltac:(rewrite Lmisaf; vm_compute; reflexivity))
-                   ltac:(intro s; apply exec_execute_C_SDSP))
-                with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-      + unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-        iFrame "Hreg Hmem Hdev".
-      + done.
-    - (* 2 mod 4: one 2-byte read *)
-      iMod (umode_fetch_rvc_2 pt M w_leaf pc h
-              (set_reg sg (R_bool minstret_increment) b)
-              Hum Hlok Hcanonpc Hinpage Hal2 Hal4 Hbytes HisRVC
-              LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-              HSXL HpmaA
-              with "[Hreg] [Hmem] Hutlb Humem")
-        as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { rewrite ?sregs_set_reg. iExact "Hreg". }
-      { rewrite ?mem_set_reg. iExact "Hmem". }
-      destruct (Hsf sf Tr)
-        as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
-      iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 2
-                (zero_extend' 32 h) m M
-                (C_SDSP (uimm, Regidx rs2))
-                (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
-                              Regidx rs2, Regidx csp_rs1, 8)))
-                rs2 (zero_extend' 12 (concat_vec uimm ('b"000")))
-                w_st tgt wval
-                Hsi Hhart_a Lpcf Hagree Lhtiff
-                ltac:(rewrite Lmsf; exact (proj1 Hmsok))
-                ltac:(rewrite Lmsf; exact (proj1 (proj2 Hmsok)))
-                ltac:(rewrite Lmsf; exact (proj1 (proj2 (proj2 Hmsok))))
-                Hpmaf eq_refl Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb
-                (uv_prog_rvc _ _ h (C_SDSP (uimm, Regidx rs2))
-                   (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
-                                 Regidx rs2, Regidx csp_rs1, 8))) pc
-                   LprivA HdispA Hfetch
-                   (Hdecrvc sf ltac:(rewrite Lmisaf; vm_compute; reflexivity))
-                   Helpf Lpcf
-                   (exec_currentlyEnabled_Zca sf
-                      ltac:(rewrite Lmisaf; vm_compute; reflexivity))
-                   ltac:(intro s; apply exec_execute_C_SDSP))
-                with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-      + unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-        iFrame "Hreg Hmem Hdev".
-      + done.
+    destruct is_rvc.
+    - (* ================= COMPRESSED ================= *)
+      destruct Hcode as (h & HisRVC & Hbytes & Hdecrvc & Hnext2).
+      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
+      + (* 4-aligned: one 4-byte read *)
+        destruct (Hnext2 ltac:(first [exact Hal4 | reflexivity]))
+          as (b2 & b3 & Hb2 & Hb3).
+        iMod (umode_fetch_rvc_4 pt M w_leaf pc h b2 b3
+                (set_reg sg (R_bool minstret_increment) b)
+                Hum Hlok Hcanonpc Hinpage Hal4 Hbytes Hb2 Hb3 HisRVC
+                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
+                HSXL HpmaA
+                with "[Hreg] [Hmem] Hutlb Humem")
+          as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
+        destruct (Hsf sf Tr)
+          as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
+        iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 2
+                  (zero_extend' 32 h) m M i o imm rs1 rs2 k
+                  w_st va wval Hkw
+                  Hsi Hhart_a Lpcf Hagree Lhtiff
+                  ltac:(rewrite Lmsf; exact (proj1 Hmsok))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 Hmsok)))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 (proj2 Hmsok))))
+                  Hpmaf Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+                  (uv_prog_rvc _ _ h i o pc LprivA HdispA Hfetch
+                     (Hdecrvc sf ltac:(rewrite Lmisaf; vm_compute; reflexivity))
+                     Helpf Lpcf
+                     (exec_currentlyEnabled_Zca sf
+                        ltac:(rewrite Lmisaf; vm_compute; reflexivity)) Hred)
+                  with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
+        * unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
+          iFrame "Hreg Hmem Hdev".
+        * done.
+      + (* 2 mod 4: one 2-byte read *)
+        iMod (umode_fetch_rvc_2 pt M w_leaf pc h
+                (set_reg sg (R_bool minstret_increment) b)
+                Hum Hlok Hcanonpc Hinpage Hal2 Hal4 Hbytes HisRVC
+                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
+                HSXL HpmaA
+                with "[Hreg] [Hmem] Hutlb Humem")
+          as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
+        destruct (Hsf sf Tr)
+          as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
+        iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 2
+                  (zero_extend' 32 h) m M i o imm rs1 rs2 k
+                  w_st va wval Hkw
+                  Hsi Hhart_a Lpcf Hagree Lhtiff
+                  ltac:(rewrite Lmsf; exact (proj1 Hmsok))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 Hmsok)))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 (proj2 Hmsok))))
+                  Hpmaf Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+                  (uv_prog_rvc _ _ h i o pc LprivA HdispA Hfetch
+                     (Hdecrvc sf ltac:(rewrite Lmisaf; vm_compute; reflexivity))
+                     Helpf Lpcf
+                     (exec_currentlyEnabled_Zca sf
+                        ltac:(rewrite Lmisaf; vm_compute; reflexivity)) Hred)
+                  with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
+        * unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
+          iFrame "Hreg Hmem Hdev".
+        * done.
+    - (* ================= BASE (4-byte) ================= *)
+      destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
+      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
+      + iMod (umode_fetch_base_4 pt M w_leaf pc w
+                (set_reg sg (R_bool minstret_increment) b)
+                Hum Hlok Hcanonpc Hinpage Hal4 Hbytes HnRVC
+                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
+                HSXL HpmaA
+                with "[Hreg] [Hmem] Hutlb Humem")
+          as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
+        destruct (Hsf sf Tr)
+          as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
+        iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 4
+                  (zero_extend' 32 w) m M i o imm rs1 rs2 k
+                  w_st va wval Hkw
+                  Hsi Hhart_a Lpcf Hagree Lhtiff
+                  ltac:(rewrite Lmsf; exact (proj1 Hmsok))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 Hmsok)))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 (proj2 Hmsok))))
+                  Hpmaf Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+                  (uv_prog_base _ _ w i o pc LprivA HdispA Hfetch
+                     (Hdecbase sf Hagree) Helpf Hlpad Lpcf Hred)
+                  with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
+        * unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
+          iFrame "Hreg Hmem Hdev".
+        * done.
+      + iMod (umode_fetch_base_2 pt M w_leaf pc w
+                (set_reg sg (R_bool minstret_increment) b)
+                Hum Hlok Hcanonpc Hinpage Hal2 Hal4 Hbytes HnRVC
+                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
+                HSXL HpmaA
+                with "[Hreg] [Hmem] Hutlb Humem")
+          as (sf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hmem & Hutlb & Humem)".
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
+        destruct (Hsf sf Tr)
+          as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
+        iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 4
+                  (zero_extend' 32 w) m M i o imm rs1 rs2 k
+                  w_st va wval Hkw
+                  Hsi Hhart_a Lpcf Hagree Lhtiff
+                  ltac:(rewrite Lmsf; exact (proj1 Hmsok))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 Hmsok)))
+                  ltac:(rewrite Lmsf; exact (proj1 (proj2 (proj2 Hmsok))))
+                  Hpmaf Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+                  (uv_prog_base _ _ w i o pc LprivA HdispA Hfetch
+                     (Hdecbase sf Hagree) Helpf Hlpad Lpcf Hred)
+                  with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
+        * unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
+          iFrame "Hreg Hmem Hdev".
+        * done.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* sd rs2, imm(rs1) -- the base 8-byte store.  Base geometry, no         *)
+  (* [ExecuteAs] redirect, so [o := None].                                 *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_sd (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rs2 : mword 5)
+      (w_st va wval : mword 64) :
+    uinstr pt M pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
+    wval = m !!! Regidx rs2 ->
+    ud_um pt !! svpn_of va = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4088 ->
+    is_aligned_vaddr (Virtaddr va) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store8 M (uint va) wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hva Hwval Hl Hchk Hcanon Hpg Hal HMb.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_store Ψ M m pc false
+              (STORE (imm, Regidx rs2, Regidx rs1, 8)) None
+              imm rs1 rs2 8 w_st va wval
+              ustore_width_8 Hui ltac:(intro s; exact I) eq_refl eq_refl
+              Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* sw rs2, imm(rs1) -- the base 4-byte store: the image gains the LOW    *)
+  (* four bytes of [m !!! rs2].                                            *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_sw (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rs2 : mword 5)
+      (w_st va wval : mword 64) :
+    uinstr pt M pc false (STORE (imm, Regidx rs2, Regidx rs1, 4)) ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
+    wval = m !!! Regidx rs2 ->
+    ud_um pt !! svpn_of va = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4092 ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) 4 wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hva Hwval Hl Hchk Hcanon Hpg Hal HMb.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_store Ψ M m pc false
+              (STORE (imm, Regidx rs2, Regidx rs1, 4)) None
+              imm rs1 rs2 4 w_st va wval
+              ustore_width_4 Hui ltac:(intro s; exact I) eq_refl eq_refl
+              Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* sb rs2, imm(rs1) -- the base 1-byte store.  A 1-byte access is        *)
+  (* trivially aligned and can never cross a page, so BOTH the alignment   *)
+  (* and the in-page premises are discharged HERE (as [wp_uv_lbu] does on  *)
+  (* the load side) -- the call site supplies only the byte that is being  *)
+  (* overwritten.                                                          *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_sb (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rs2 : mword 5)
+      (w_st va wval : mword 64) (bb : mword 8) :
+    uinstr pt M pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
+    wval = m !!! Regidx rs2 ->
+    ud_um pt !! svpn_of va = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon va ->
+    M !! (uint va) = Some bb ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) 1 wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hva Hwval Hl Hchk Hcanon Hbb.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_store Ψ M m pc false
+              (STORE (imm, Regidx rs2, Regidx rs1, 1)) None
+              imm rs1 rs2 1 w_st va wval
+              ustore_width_1 Hui ltac:(intro s; exact I) eq_refl eq_refl
+              Hva Hwval Hl Hchk Hcanon (uinpage_byte va) (is_aligned_vaddr_1 va)
+              ltac:(intros j Hj;
+                    assert (Hj0 : j = 0%nat) by (clear -Hj; lia);
+                    subst j; exists bb;
+                    rewrite Z.add_0_r; exact Hbb)
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* c.sdsp rs2, uimm -- the compressed 8-byte store off sp.  The          *)
+  (* [ExecuteAs] expansion is [STORE (zext(uimm ++ 000), rs2, sp, 8)]      *)
+  (* ([exec_execute_C_SDSP]).                                              *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_csdsp (Psi : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
+      (w_st tgt wval : mword 64) :
+    uinstr pt M pc true (C_SDSP (uimm, Regidx rs2)) ->
+    tgt = add_vec (m !!! Regidx csp_rs1)
+            (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
+    wval = m !!! Regidx rs2 ->
+    ud_um pt !! svpn_of tgt = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon tgt ->
+    Z.rem (uint tgt) 4096 <= 4088 ->
+    is_aligned_vaddr (Virtaddr tgt) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
+    uv_cap_gpr C pt Psi M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Psi (uM_store8 M (uint tgt) wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_store Psi M m pc true (C_SDSP (uimm, Regidx rs2))
+              (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
+                            Regidx rs2, Regidx csp_rs1, 8)))
+              (zero_extend' 12 (concat_vec uimm ('b"000")))
+              csp_rs1 rs2 8 w_st tgt wval
+              ustore_width_8 Hui
+              ltac:(intro s; apply exec_execute_C_SDSP)
+              eq_refl eq_refl
+              Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* c.sd rs2', uimm(rs1') -- the compressed 8-byte register-relative      *)
+  (* store.  Both register fields are COMPRESSED indices, so the leaf      *)
+  (* takes the expanded ones with the decoder's expansion as pure          *)
+  (* premises (one [vm_compute] apiece at the call), exactly as            *)
+  (* [wp_uv_caddi4spn] does.                                               *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_csd (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5)
+      (w_st va wval : mword 64) :
+    uinstr pt M pc true (C_SD (uimm, Cregidx cr1, Cregidx cr2)) ->
+    creg2reg_idx (Cregidx cr1) = Regidx rs1 ->
+    creg2reg_idx (Cregidx cr2) = Regidx rs2 ->
+    va = add_vec (m !!! Regidx rs1)
+           (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
+    wval = m !!! Regidx rs2 ->
+    ud_um pt !! svpn_of va = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4088 ->
+    is_aligned_vaddr (Virtaddr va) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store8 M (uint va) wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hcr1 Hcr2 Hva Hwval Hl Hchk Hcanon Hpg Hal HMb.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_store Ψ M m pc true (C_SD (uimm, Cregidx cr1, Cregidx cr2))
+              (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
+                            Regidx rs2, Regidx rs1, 8)))
+              (zero_extend' 12 (concat_vec uimm ('b"000")))
+              rs1 rs2 8 w_st va wval
+              ustore_width_8 Hui
+              ltac:(intro s;
+                    exact (exec_execute_C_SD_leaf uimm (Cregidx cr1) (Cregidx cr2)
+                             (zero_extend' 12 (concat_vec uimm ('b"000")))
+                             rs1 rs2 s eq_refl Hcr1 Hcr2))
+              eq_refl eq_refl
+              Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* c.sw rs2', uimm(rs1') -- the compressed 4-byte store.                 *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_csw (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5)
+      (w_st va wval : mword 64) :
+    uinstr pt M pc true (C_SW (uimm, Cregidx cr1, Cregidx cr2)) ->
+    creg2reg_idx (Cregidx cr1) = Regidx rs1 ->
+    creg2reg_idx (Cregidx cr2) = Regidx rs2 ->
+    va = add_vec (m !!! Regidx rs1)
+           (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"00")))) ->
+    wval = m !!! Regidx rs2 ->
+    ud_um pt !! svpn_of va = Some w_st ->
+    uleaf_ok (Store Data) w_st ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4092 ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) 4 wval) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hcr1 Hcr2 Hva Hwval Hl Hchk Hcanon Hpg Hal HMb.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_store Ψ M m pc true (C_SW (uimm, Cregidx cr1, Cregidx cr2))
+              (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
+                            Regidx rs2, Regidx rs1, 4)))
+              (zero_extend' 12 (concat_vec uimm ('b"00")))
+              rs1 rs2 4 w_st va wval
+              ustore_width_4 Hui
+              ltac:(intro s;
+                    exact (exec_execute_C_SW_leaf uimm (Cregidx cr1) (Cregidx cr2)
+                             (zero_extend' 12 (concat_vec uimm ('b"00")))
+                             rs1 rs2 s eq_refl Hcr1 Hcr2))
+              eq_refl eq_refl
+              Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
+              with "Hcg Hpc Hcont").
   Qed.
 
 End WpUmodeStore.

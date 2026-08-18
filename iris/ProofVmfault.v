@@ -217,7 +217,7 @@ Section ProofVmfault.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> mm) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u40) "Hk1". iDestruct "S2" as (u32) "Hk2".
     iDestruct "S3" as (u24) "Hk3". iDestruct "S4" as (u16) "Hk4".
@@ -367,11 +367,11 @@ Section ProofVmfault.
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs4 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
-        sie_cap_gpr mj (K - 6)%nat b p -∗
+        sie_cap_gpr KT1 mj (K - 6)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.vmfault + 0x10) : mword 64) -∗
         (∃ w3 w4 w5 : mword 64,
-           pa_stk sp0 3 ↦₈ w3 ∗ pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
+           pa_stk sp0 3 ↦₈[KT1] w3 ∗ pa_stk sp0 4 ↦₈[KT1] w4 ∗ pa_stk sp0 5 ↦₈[KT1] w5) -∗
         PAY res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hk1 Hk2 Hk6]" as "Hepi".
@@ -443,8 +443,8 @@ Section ProofVmfault.
                      = pa_stk (add_vec (E3 !!! Regidx csp_rs1)
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
       { rewrite Hwv HE3sp. symmetry. exact Hsprstk. }
-      iAssert (stack_own sp0 6) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6]" as "Hframe6".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 6) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6]" as "Hframe6".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
         iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
         iSplitL "Hk3"; [iExists _; iExact "Hk3" |].
@@ -840,7 +840,7 @@ Section ProofVmfault.
         apply HN1thr; assumption. }
       iDestruct (cpu_own_transport CID Cka lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
+      iApply (Kalloc.wp_kalloc_sconf KT1 γa γk (mword_of_int (KernelSyms.kmem + 24))
                 A1 None lvl eb p (K - 6)%nat b _
                 ltac:(lia) ltac:(reflexivity) Hlvl Hbelow
                 with "Hcg Hcnt Htext Hpc Hlock Havail").
@@ -1102,7 +1102,7 @@ Section ProofVmfault.
           [| intros Hx; injection Hx as Hx2; subst c; apply H20; reflexivity].
         apply HA2thr; assumption. }
       (* ---- memset(mem, 0, PGSIZE) ---- *)
-      iApply (MemsetPage.wp_memset_page_sconf A6 (K - 6)%nat (mword_of_int 0 : mword 64) b p
+      iApply (MemsetPage.wp_memset_page_sconf KT1 A6 (K - 6)%nat (mword_of_int 0 : mword 64) b p
                 ltac:(lia) ltac:(rewrite HA6a0; exact Hpv) HA6a1 HA6a2
                 with "Hcg Htext Hpc [Hpage]").
       { iEval (rewrite HA6a0). iExact "Hpage". }
@@ -1287,7 +1287,7 @@ Section ProofVmfault.
          exactly the int-range fact their kalloc needs. *)
       iDestruct (cpu_own_transport Ckr Cmg lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Mappages.wp_mappages_sconf γa G6 t m_ad 1%nat 22 lvl (K - 6)%nat
+      iApply (Mappages.wp_mappages_sconf KT1 γa G6 t m_ad 1%nat 22 lvl (K - 6)%nat
                 eb p None b _
                 Hlvl ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh
@@ -1488,7 +1488,7 @@ Section ProofVmfault.
         apply Hmgthr; assumption. }
       iDestruct (cpu_own_transport Cgr Ckf lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
+      iApply (Kfree.wp_kfree_sconf KT1 γa γk (mword_of_int KernelSyms.kmem)
                 (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p (K - 6)%nat b lks
                 ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 Hlvl Hbelow

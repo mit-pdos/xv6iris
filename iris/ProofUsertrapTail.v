@@ -66,7 +66,6 @@ Require Import SchedCtx.
 Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts.
 From Kernel Require KernelInstrs.
@@ -128,12 +127,18 @@ Section ProofUsertrapTail.
     locks_below lks "log" ->
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
+    (* THE DYING THREAD'S STACK CLOSER, straight through.  This dead end adds
+       no frame of its own -- it is a [jal] and nothing else -- so kexit's
+       premise is this one verbatim.  Its three call sites build it from
+       [ut_caps]' [is_kstack] and usertrap's own frame; see
+       [ProcDefs.kstack_closer_top]. *)
+    kstack_closer (un_pj N) (m !!! Regidx csp_rs1) (trap_res b + nx)%nat -∗
     ut_hold Rsys N V b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    iIntros "#Htext Hpc Hcg Hcl (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct "Hcaps" as "(#Hpi & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
                            & #Hgeom & #Hav & #Hic)".
@@ -147,7 +152,7 @@ Section ProofUsertrapTail.
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
               None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
-              with "Hcg Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
+              with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
     all: try lkbelow.
   Qed.
@@ -198,7 +203,7 @@ Section UtRet2.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xb2)) -∗
     (* ---- exactly what prepare_return handed back ---- *)
-    sie_cap_gpr mf (trap_res b + nx)%nat false (un_pj N) -∗
+    sie_cap_gpr KT1 mf (trap_res b + nx)%nat false (un_pj N) -∗
     cpu_own 0%nat false (un_pj N) false lks -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ mepc_val uepc -∗
@@ -236,7 +241,7 @@ Section UtRet2.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_priv_open with "Hsc") as (msf) "(Hcl & Hpriv & Hmsown)".
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsf)".
-    iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Hwit)".
     iDestruct (sie_arm_half_agree false (un_pj N) msf with "Hhalf Harm") as %Hsie0.
     iDestruct (ghost_var_agree with "Hhalf Hq4") as %Hvb.
     rewrite Hsie0 in Hvb. rewrite -Hvb.
@@ -255,13 +260,13 @@ Section UtRet2.
       rewrite /sconf_msown /sret_tie Hsie0 Hspp Hspie.
       iSplitL "Hms"; [iExact "Hms"|]. iSplitL "Hhalf"; [iExact "Hhalf"|].
       iSplitL "Htie"; [iExact "Htie"|]. iPureIntro. exact Hmsf. }
-    iAssert (sie_cap_gpr mf (trap_res b + nx)%nat false (un_pj N))
+    iAssert (sie_cap_gpr KT1 mf (trap_res b + nx)%nat false (un_pj N))
       with "[Hhs Hsc Hstk Hstr Harm Hfile]" as "Hcg".
     { rewrite /sie_cap_gpr /sie_cap.
       iSplitL "Hhs"; [iExact "Hhs"|]. iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitR "Hfile"; [| iExact "Hfile"].
       iSplitL "Hstk"; [iExact "Hstk"|]. iSplitL "Hstr"; [iExact "Hstr"|].
-      iExact "Harm". }
+      iSplitL "Harm"; [iExact "Harm"|]. iExact "Hwit". }
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     (* [ut_caps] is NOT destructured here: +0xb2..+0xc6 calls nothing, so no
        member of it is needed, and destructuring an intuitionistic hypothesis
@@ -289,7 +294,7 @@ Section UtRet2.
                       = p_pagetable (un_pj N))
       by (rgne; rewrite Hmfs1; reflexivity).
     iEval (rewrite -Haddrpg) in "Hpgt".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xb2)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xb2)) Ra0 Rs1
               (mword_of_int 80 : mword 12) mf (trap_res b + nx)%nat
               (page_base (ud_root (pv_upt V))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -488,8 +493,8 @@ Section UtRet2.
     iEval (rewrite Hp2) in "Hbs0".
     iEval (rewrite Hp3) in "Hbs1".
     iEval (rewrite Hp4) in "Hbs2".
-    iAssert (stack_own ksp 4) with "[Hbra Hbs0 Hbs1 Hbs2]" as "Hfr".
-    { iApply (stack_own_4_intro ksp with "Hbra Hbs0 Hbs1 Hbs2"). }
+    iAssert (stack_own (KTR := KT1) ksp 4) with "[Hbra Hbs0 Hbs1 Hbs2]" as "Hfr".
+    { iApply (stack_own_4_intro (KTR := KT1) ksp with "Hbra Hbs0 Hbs1 Hbs2"). }
     iEval (rewrite -Hwv) in "Hfr".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (UT + 0xc4))
               (mword_of_int 2 : mword 6) S8 (trap_res b + nx)%nat 4 false Hpop
@@ -610,7 +615,7 @@ Section UtRet2.
          too, are NOT in [ut_trap]: they go to the boundary raw (above). *)
       iSplitL "Hcap Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
       + rewrite /ut_trap /ut_stack /ut_ghosts.
-        iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+        iDestruct "Hcap" as "(Hstk & Hstr & Harm & _)".
         iSplitL "Hstk". { rewrite /S9 upd_eq. iExact "Hstk". }
         iSplitL "Hstr". { iExact "Hstr". }
         iSplitL "Harm". { iExact "Harm". }
@@ -653,7 +658,7 @@ Section UtRet.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
     ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -777,7 +782,7 @@ Section UtA6.
     locks_below lks "log" ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
     ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -942,11 +947,32 @@ Section UtA6.
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
       iDestruct (cpu_claim_ext_transport CID3 CID7 b (un_pj N)
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
+      (* ---- THE DYING THREAD'S STACK CLOSER, BUILT HERE.  usertrap was
+         entered with sp AT THE PAGE TOP ([Hksp]), which is the one point in
+         a trap round where the closer is free ([ProcDefs.kstack_closer_top]:
+         nothing is owed above the top).  Wrapping usertrap's own frame
+         around it re-anchors it at the sp the walk is running on -- and that
+         frame is dead, because kexit does not return. ---- *)
+      assert (HKsp : (<[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
+                       !!! Regidx csp_rs1 = pa_stk ksp 4).
+      { rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite /K2 upd_ne; [| vm_compute; discriminate].
+        rewrite /K1 upd_ne; [exact Hmfsp | vm_compute; discriminate]. }
+      iAssert (is_kstack (un_pj N) (un_ks N)) as "#Hkstk".
+      { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+      iDestruct (ut_frame_stack with "Hframe") as "Hfr".
+      iDestruct (kstack_closer_top (un_pj N) (un_ks N) av
+                   ltac:(unfold KSTACK_AV; lia) with "Hkstk") as "Hkcl".
+      iEval (rewrite Hksp) in "Hkcl".
+      iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
+                   with "Hkcl Hfr") as "Hkcl4".
+      iEval (rewrite -Hnx -HKsp) in "Hkcl4".
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
                 nx b lks Hwf' ltac:(lia) ltac:(lkbelow)
-                with "Htext Hpc Hcg [-]").
+                with "Htext Hpc Hcg Hkcl4 [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -1013,7 +1039,7 @@ Section UtFa.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
-    sie_cap_gpr m nx b (un_pj N) -∗
+    sie_cap_gpr KT1 m nx b (un_pj N) -∗
     ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗

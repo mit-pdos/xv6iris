@@ -130,7 +130,7 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
      real instantiation [lks] is ∅ and this is [locks_below_empty]; the body
      is stated ∀-generically in [lks], so it has to be said. *)
   locks_below lks "ftable" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the ftable lock, for filedup's ghost step *)
@@ -139,7 +139,7 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       sys_dup_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗

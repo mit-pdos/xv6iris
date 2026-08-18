@@ -118,11 +118,13 @@ Section StatBuf.
      alignment hole) are NOT part of this bundle. *)
   Definition stat_at (st : mword 64)
       (dev ino : mword 32) (ty nl : mword 16) (sz : mword 64) : iProp Σ :=
-    (st_dev   st ↦₄ dev ∗
-     st_ino   st ↦₄ ino ∗
-     st_type  st ↦₂ ty  ∗
-     st_nlink st ↦₂ nl  ∗
-     st_size  st ↦₈ sz)%I.
+    (* the [struct stat] is the CALLER's frame local (filestat's [st], which
+       sys_fstat then copies out), so it is at the post-boot tier. *)
+    (st_dev   st ↦₄[KT1] dev ∗
+     st_ino   st ↦₄[KT1] ino ∗
+     st_type  st ↦₂[KT1] ty  ∗
+     st_nlink st ↦₂[KT1] nl  ∗
+     st_size  st ↦₈[KT1] sz)%I.
 
   Global Instance stat_at_timeless st dev ino ty nl sz :
     Timeless (stat_at st dev ino ty nl sz).
@@ -145,7 +147,7 @@ Definition wp_stati_sconf_body
   (* a0 = ip, a1 = st *)
   mm !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   mm !!! Regidx (mword_of_int 11 : mword 5) = st ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   (* the two identity cells -- READ ONLY, so any dfrac *)
@@ -158,7 +160,7 @@ Definition wp_stati_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
     ⌜callee_saved mm mr⌝ -∗
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     i_dev  ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗

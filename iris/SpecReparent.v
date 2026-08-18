@@ -85,7 +85,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
      no lock of its own and wakeup's own contract is balanced -- so [lks] is
      unchanged end to end and this premise is not re-established anywhere. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
  procs_inv γs -∗
@@ -94,7 +94,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
   wp_next b pme (fun (CID : CpuId) =>
     ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b pme -∗
+      sie_cap_gpr KT1 Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗

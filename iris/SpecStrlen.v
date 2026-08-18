@@ -46,7 +46,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 
-Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kts : ktier) (mm : regfile)
     (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.strlen in
   let s := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -56,15 +56,15 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
   (k < n)%nat ->
   bb_cstr f k ->
   (Z.of_nat k < 2 ^ 31)%Z ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
-  ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
+  ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kts]{dq} f j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kts]{dq} f j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5)
        = (mword_of_int (Z.of_nat k) : mword 64)⌝ -∗
@@ -73,7 +73,7 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
 
 Module Type STRLEN.
   Parameter wp_strlen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kts : ktier) (mm : regfile)
       (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
-      wp_strlen_sconf_body mm n k f K dq b p.
+      wp_strlen_sconf_body kts mm n k f K dq b p.
 End STRLEN.

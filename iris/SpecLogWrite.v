@@ -129,7 +129,7 @@ Definition wp_log_write_gen_body
      which every landed caller is at (a caller of log_write holds sleeplocks,
      not spinlocks). *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -152,7 +152,7 @@ Definition wp_log_write_gen_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -220,7 +220,7 @@ Definition wp_log_write_au_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -279,7 +279,7 @@ Definition wp_log_write_au_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -381,7 +381,7 @@ Definition wp_log_write_gene_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -401,7 +401,7 @@ Definition wp_log_write_gene_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -448,7 +448,7 @@ Definition wp_log_write_sconf_body
   ~ (uint bno ∈ log_region_set logstart) ->
   (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -465,7 +465,7 @@ Definition wp_log_write_sconf_body
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

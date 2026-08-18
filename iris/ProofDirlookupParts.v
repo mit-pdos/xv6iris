@@ -364,6 +364,9 @@ Proof. unfold dir_name. f_equal; lia. Qed.
 Section DlkBuf.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  (* the [de] scratch record is a run of FRAME slots, so the whole section
+     rides the caller's regime (StackOwn.v's KTR discipline). *)
+  Context `{KTR : !CurKtier}.
 
   Lemma dlk_de_split (a : Arch.pa) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ f j)

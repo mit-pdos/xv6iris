@@ -127,7 +127,7 @@ Definition wp_iunlock_sconf_body
      releases the sleeplock's inner "sleep lock" spinlock internally, so
      the caller must already hold only locks BELOW its rank. *)
   locks_below lks "sleep lock" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the [ref] words, and the entry's content escrow *)
@@ -160,7 +160,7 @@ Definition wp_iunlock_sconf_body
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗

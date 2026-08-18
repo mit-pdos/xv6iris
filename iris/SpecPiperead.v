@@ -93,7 +93,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (* piperead acquires the pipe lock (7); killed/sleep_prepare/sleep/wakeup all
      sit at "proc" (11), strictly higher, so this ONE premise covers the cone. *)
   locks_below lks "pipe" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -110,7 +110,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗

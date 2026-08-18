@@ -289,7 +289,7 @@ Definition wp_sys_read_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol): every fileread arm
      sleeps, so this syscall parks. *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* a syscall runs at push_off level 0 *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -314,7 +314,7 @@ Definition wp_sys_read_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_read_ret V v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗

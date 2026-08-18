@@ -167,7 +167,7 @@ Definition wp_balloc_sconf_body
   log_geom_ok cov logstart ->
   (* THE OUT-OF-BLOCKS ARM'S CALLEE, as a hypothesis and not a functor -- see
      the header for why that is what keeps this proof at the standing six *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ONE BITMAP BLOCK (see the header), and the [0 < size] that kills the
      +0x12 arm *)
   0 < size <= BPB ->
@@ -183,7 +183,7 @@ Definition wp_balloc_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  balloc holds no lock of its
      own -- every push_off/pop_off pair that can mint or spend an
@@ -196,7 +196,7 @@ Definition wp_balloc_sconf_body
      handed it over, and passed to bread exactly as bread's own contract
      wants it.  See claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials, for the
@@ -235,9 +235,9 @@ Definition wp_balloc_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -323,7 +323,7 @@ Definition wp_balloc_gen_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_balloc <= K)%nat ->
   log_geom_ok cov logstart ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ cov ->
@@ -337,7 +337,7 @@ Definition wp_balloc_gen_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_balloc_sconf_body] above.  balloc holds no lock of its own, so it
@@ -347,7 +347,7 @@ Definition wp_balloc_gen_body
      path routes here, and a core pinned at [eb = true] would have forced
      a second, independent proof of the same 70 instructions.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
@@ -371,9 +371,9 @@ Definition wp_balloc_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

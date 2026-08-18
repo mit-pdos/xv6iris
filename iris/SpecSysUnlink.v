@@ -320,7 +320,7 @@ Definition wp_sys_unlink_sconf_body
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- balloc's out-of-blocks arm (under the zeroing writei) calls
      printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := KT1) γpr gu gd ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* nameiparent's own premise, inherited: the walker runs with the base
@@ -330,7 +330,7 @@ Definition wp_sys_unlink_sconf_body
      page [proc_priv] carries.  Nothing is assumed about it: argstr checks
      the string itself. *)
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
      DERIVES [lks = ∅] and every order goal the ten callees raise is
@@ -338,7 +338,7 @@ Definition wp_sys_unlink_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr gu gd -∗
@@ -380,9 +380,9 @@ Definition wp_sys_unlink_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

@@ -60,6 +60,7 @@ Section WpSconfAlu.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
@@ -74,10 +75,10 @@ Section WpSconfAlu.
     creg2reg_idx rdc = Regidx rd ->
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -106,10 +107,10 @@ Section WpSconfAlu.
     let wval := add_vec (rget m rd) (sign_extend' 64 (sign_extend' 12 imm)) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -133,10 +134,10 @@ Section WpSconfAlu.
     let wval := and_vec (rget m rd) (sign_extend' 64 (sign_extend' 12 imm)) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -162,10 +163,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs1 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (rget m rs1) (sign_extend' 64 imm))) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -189,10 +190,10 @@ Section WpSconfAlu.
     let wval := add_vec (rget m rd) (rget m rs2) in
     uint rd <> 0 ->
     ops_ok b rd rd rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -218,10 +219,10 @@ Section WpSconfAlu.
     let wval := add_vec zero_reg (rget m rs2) in
     uint rd <> 0 ->
     ops_ok b rd rs2 rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -250,10 +251,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (rget m rs1) (rget m rs2))) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -274,10 +275,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
     or_vec (rget m rs1) (rget m rs2) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -301,10 +302,10 @@ Section WpSconfAlu.
     let wval := and_vec (rget m rd) (rget m rs2) in
     uint rd <> 0 ->
     ops_ok b rd rd rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, AND)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -331,10 +332,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
     and_vec (rget m rs1) (rget m rs2) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -360,10 +361,10 @@ Section WpSconfAlu.
       sign_extend' 64 (subrange_vec_dec (add_vec (rget m rs1) (sign_extend' 64 imm)) 31 0) in
     uint rd <> 0 ->
     ops_ok b rd rs1 rs1 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ADDIW (imm, Regidx rs1, Regidx rd)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -387,10 +388,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
     sub_vec (rget m rs1) (rget m rs2) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -421,10 +422,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
     sub_vec (rget m rs1) (rget m rs2) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -450,10 +451,10 @@ Section WpSconfAlu.
     let wval := sub_vec (rget m rd) (rget m rs2) in
     uint rd <> 0 ->
     ops_ok b rd rd rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, SUB)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -473,10 +474,10 @@ Section WpSconfAlu.
     sign_extend' 64
       (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
                (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -501,10 +502,10 @@ Section WpSconfAlu.
     let wval := sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -521,10 +522,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs2 ->
     add_vec (rget m rs1) (rget m rs2) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -551,10 +552,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs1 ->
     shift_bits_left (rget m rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -576,10 +577,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     rd_ok rd ->
     luival imm = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (UTYPE (imm, Regidx rd, LUI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -602,10 +603,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     rd_ok rd ->
     luival imm = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -628,10 +629,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     ops_ok b rd rs1 rs1 ->
     sign_extend' 64 (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -654,10 +655,10 @@ Section WpSconfAlu.
       sign_extend' 64 (subrange_vec_dec (add_vec (rget m rd) (sign_extend' 64 (sign_extend' 12 imm))) 31 0) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -683,10 +684,10 @@ Section WpSconfAlu.
     rsd = Regidx rd ->
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -712,10 +713,10 @@ Section WpSconfAlu.
     creg2reg_idx crsd = Regidx rd ->
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -740,10 +741,10 @@ Section WpSconfAlu.
       shift_bits_right (rget m rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) in
     uint rd <> 0 ->
     ops_ok b rd rs1 rs1 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -770,10 +771,10 @@ Section WpSconfAlu.
     let wval := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     ops_ok b rd rs1 rs1 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -803,10 +804,10 @@ Section WpSconfAlu.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec zero_reg (sign_extend' 64 imm) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, zreg, Regidx rd, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -852,11 +853,11 @@ Section WpSconfAlu.
        exec (execute i) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false i -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -928,10 +929,10 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (UTYPE (imm, Regidx rd, AUIPC)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec pc (auipc_off imm))]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (add_vec pc (auipc_off imm))]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -987,7 +988,7 @@ Section WpSconfAlu.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc c base -∗
     (* THE TRANSFORMER IS HART-GENERIC, and it has to be: the capability it
@@ -997,10 +998,10 @@ Section WpSconfAlu.
        proof of a transformer is uniform in the hart, so quantifying costs the
        builders one [iIntros (CIDx)]. *)
     ( ∀ CIDx : CpuId,
-      sie_cap (CID := CIDx) m n b p -∗
-      sie_cap (CID := CIDx) (<[Regidx rd := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+      sie_cap kt (CID := CIDx) m n b p -∗
+      sie_cap kt (CID := CIDx) (<[Regidx rd := regval_into_reg wval]> m) n' b p ∗ P ) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n' b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n' b p -∗
       P -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1081,14 +1082,14 @@ Section WpSconfAlu.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true base -∗
     ( ∀ CIDx : CpuId,
-      sie_cap (CID := CIDx) m n b p -∗
-      sie_cap (CID := CIDx) (<[Regidx rd := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+      sie_cap kt (CID := CIDx) m n b p -∗
+      sie_cap kt (CID := CIDx) (<[Regidx rd := regval_into_reg wval]> m) n' b p ∗ P ) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n' b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n' b p -∗
       P -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1106,14 +1107,14 @@ Section WpSconfAlu.
       (pc : mword 64) (imm : mword 6)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm)) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     ( ∀ CIDx : CpuId,
-      sie_cap (CID := CIDx) m n b p -∗
-      sie_cap (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+      sie_cap kt (CID := CIDx) m n b p -∗
+      sie_cap kt (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
       P -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1136,14 +1137,14 @@ Section WpSconfAlu.
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
     ( ∀ CIDx : CpuId,
-      sie_cap (CID := CIDx) m n b p -∗
-      sie_cap (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+      sie_cap kt (CID := CIDx) m n b p -∗
+      sie_cap kt (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
       P -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1180,12 +1181,12 @@ Section WpSconfAlu.
     let wval := add_vec sp0 (sign_extend' 64 (sign_extend' 12 imm)) in
     (k <= n)%nat ->
     wval = pa_stk sp0 k ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
-      stack_own sp0 k -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
+      stack_own (KTR := kt) sp0 k -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1195,7 +1196,7 @@ Section WpSconfAlu.
     assert (Hsp' : <[Regidx csp_rs1 := regval_into_reg wval]> m !!! Regidx csp_rs1
                    = pa_stk (m !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_caddi_sp_s_sconf pc imm m n (n - k) (stack_own sp0 k) b
+    iApply (wp_caddi_sp_s_sconf pc imm m n (n - k) (stack_own (KTR := kt) sp0 k) b
               with "Hcg Hpc Hinstr [] [Hcont]").
     { iIntros (CIDx) "Hcap".
       iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
@@ -1212,12 +1213,12 @@ Section WpSconfAlu.
     let sp0 := m !!! Regidx csp_rs1 in
     let wval := add_vec sp0 (sign_extend' 64 (sign_extend' 12 imm)) in
     sp0 = pa_stk wval k ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
-    stack_own wval k -∗
+    stack_own (KTR := kt) wval k -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1246,12 +1247,12 @@ Section WpSconfAlu.
     let wval := add_vec sp0 (sign_extend' 64 (caddi16sp_imm imm6)) in
     (k <= n)%nat ->
     wval = pa_stk sp0 k ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
-      stack_own sp0 k -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
+      stack_own (KTR := kt) sp0 k -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1261,7 +1262,7 @@ Section WpSconfAlu.
     assert (Hsp' : <[Regidx csp_rs1 := regval_into_reg wval]> m !!! Regidx csp_rs1
                    = pa_stk (m !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_caddi16sp_s_sconf pc imm6 m n (n - k) (stack_own sp0 k) b
+    iApply (wp_caddi16sp_s_sconf pc imm6 m n (n - k) (stack_own (KTR := kt) sp0 k) b
               with "Hcg Hpc Hinstr [] [Hcont]").
     { iIntros (CIDx) "Hcap".
       iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
@@ -1278,12 +1279,12 @@ Section WpSconfAlu.
     let sp0 := m !!! Regidx csp_rs1 in
     let wval := add_vec sp0 (sign_extend' 64 (caddi16sp_imm imm6)) in
     sp0 = pa_stk wval k ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
-    stack_own wval k -∗
+    stack_own (KTR := kt) wval k -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1316,14 +1317,14 @@ Section WpSconfAlu.
       (pc : mword 64) (imm : mword 12)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     ( ∀ CIDx : CpuId,
-      sie_cap (CID := CIDx) m n b p -∗
-      sie_cap (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
+      sie_cap kt (CID := CIDx) m n b p -∗
+      sie_cap kt (CID := CIDx) (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p ∗ P ) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) n' b p -∗
       P -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1349,12 +1350,12 @@ Section WpSconfAlu.
     let wval := add_vec sp0 (sign_extend' 64 imm) in
     (k <= n)%nat ->
     wval = pa_stk sp0 k ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
-      stack_own sp0 k -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n - k) b p -∗
+      stack_own (KTR := kt) sp0 k -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1364,7 +1365,7 @@ Section WpSconfAlu.
     assert (Hsp' : <[Regidx csp_rs1 := regval_into_reg wval]> m !!! Regidx csp_rs1
                    = pa_stk (m !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_addi_sp4_s_sconf pc imm m n (n - k) (stack_own sp0 k) b
+    iApply (wp_addi_sp4_s_sconf pc imm m n (n - k) (stack_own (KTR := kt) sp0 k) b
               with "Hcg Hpc Hinstr [] [Hcont]").
     { iIntros (CIDx) "Hcap".
       iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
@@ -1381,12 +1382,12 @@ Section WpSconfAlu.
     let sp0 := m !!! Regidx csp_rs1 in
     let wval := add_vec sp0 (sign_extend' 64 imm) in
     sp0 = pa_stk wval k ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (ITYPE (imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
-    stack_own wval k -∗
+    stack_own (KTR := kt) wval k -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
+      sie_cap_gpr kt (<[Regidx csp_rs1 := regval_into_reg wval]> m) (n + k) b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1416,10 +1417,10 @@ Section WpSconfAlu.
     uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     shift_bits_right (rget m rs1)
       (subrange_vec_dec (rget m rs2) (Z.sub log2_xlen 1) 0) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SRL)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1439,10 +1440,10 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> ops_ok b rd rs1 rs1 ->
     or_vec (rget m rs1) (sign_extend' 64 imm) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1465,10 +1466,10 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> ops_ok b rd rs1 rs1 ->
     xor_vec (rget m rs1) (sign_extend' 64 imm) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1489,10 +1490,10 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> ops_ok b rd rs1 rs1 ->
     and_vec (rget m rs1) (sign_extend' 64 imm) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1515,10 +1516,10 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     or_vec (rget m rs1) (rget m rs2) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1545,10 +1546,10 @@ Section WpSconfAlu.
     let wval :=
       shift_bits_right_arith (rget m rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRAI)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1571,10 +1572,10 @@ Section WpSconfAlu.
     uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
       (rget m rs1) (rget m rs2) (mulop_mul.(mul_op_result_part)) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1599,10 +1600,10 @@ Section WpSconfAlu.
     to_bits_truncate 64
       (if Z.eqb (uint (rget m rs2)) 0 then (-1)%Z
        else Z.quot (uint (rget m rs1)) (uint (rget m rs2))) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1622,10 +1623,10 @@ Section WpSconfAlu.
     to_bits_truncate 64
       (if Z.eqb (uint (rget m rs2)) 0 then uint (rget m rs1)
        else Z.rem (uint (rget m rs1)) (uint (rget m rs2))) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1644,10 +1645,10 @@ Section WpSconfAlu.
     let wval :=
       sign_extend' 64 (add_vec (subrange_vec_dec (rget m rd) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
     uint rd <> 0 -> ops_ok b rd rd rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1673,10 +1674,10 @@ Section WpSconfAlu.
     let wval :=
       sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
     uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1704,10 +1705,10 @@ Section WpSconfAlu.
       sign_extend' 64 (add_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
                                (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
     uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

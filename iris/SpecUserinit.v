@@ -86,7 +86,7 @@ Definition wp_userinit_sconf_body
   (* enough pages for allocproc's trapframe + page table and uvmfirst's first
      user page; stated exactly as virtio_disk_init states its three *)
   (exists nb, on = Some nb /\ (userinit_pages <= nb)%nat) ->
-  sie_cap_gpr m0 K b pj -∗
+  sie_cap_gpr KT1 m0 K b pj -∗
   (* [kernel_data] supplies the "initcode" / "/" string literals *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   cpu_own 0%nat eb pj b lks -∗
@@ -98,7 +98,7 @@ Definition wp_userinit_sconf_body
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
-    sie_cap_gpr mf K b pj -∗
+    sie_cap_gpr KT1 mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     cpu_own 0%nat eb pj b lks -∗

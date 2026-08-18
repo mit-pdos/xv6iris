@@ -130,18 +130,18 @@ Section ProofDevintr.
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     M !!! Regidx a0_idx = retv ->
     di_thr m0 M ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr KT1 M k false p -∗
     cpu_own lvl eb p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x22) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ v3 -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[KT1] ra0 -∗
+    pa_stk sp0 2 ↦₈[KT1] s00 -∗
+    pa_stk sp0 3 ↦₈[KT1] v3 -∗
+    pa_stk sp0 4 ↦₈[KT1] v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = retv ⌝ -∗
-        sie_cap_gpr mf (k + 4) false p -∗
+        sie_cap_gpr KT1 mf (k + 4) false p -∗
         cpu_own lvl eb p false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
@@ -267,19 +267,19 @@ Section ProofDevintr.
         r <> csp_rs1 -> r <> (mword_of_int 8 : mword 5) ->
         r <> (mword_of_int 9 : mword 5) -> M !!! Regidx r = m0 !!! Regidx r ) ->
     devintr_ret sc = (mword_of_int 1 : mword 64) ->
-    sie_cap_gpr M k false p -∗
+    sie_cap_gpr KT1 M k false p -∗
     cpu_own lvl eb p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
     dev_inv γu γv -∗
-    pa_stk sp0 1 ↦₈ ra0 -∗
-    pa_stk sp0 2 ↦₈ s00 -∗
-    pa_stk sp0 3 ↦₈ s10 -∗
-    pa_stk sp0 4 ↦₈ v4 -∗
+    pa_stk sp0 1 ↦₈[KT1] ra0 -∗
+    pa_stk sp0 2 ↦₈[KT1] s00 -∗
+    pa_stk sp0 3 ↦₈[KT1] s10 -∗
+    pa_stk sp0 4 ↦₈[KT1] v4 -∗
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = devintr_ret sc ⌝ -∗
-        sie_cap_gpr mf (k + 4) false p -∗
+        sie_cap_gpr KT1 mf (k + 4) false p -∗
         cpu_own lvl eb p false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗

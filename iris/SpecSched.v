@@ -105,7 +105,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      that called it -- which is false twice over ([SpecSwtch]'s continuation
      is over an arbitrary hart, and the post-resume release exits at
      [outb = eb = true]).  There is consequently no [b] binder left. *)
-  sie_cap_gpr m av false pj -∗
+  sie_cap_gpr KT1 m av false pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   proc_held cpu_id j γl st ch -∗
@@ -125,9 +125,9 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      sched needs its frame after the swtch -- but so is the closer:
      [park_pay] is [emp] there, so the caller passes [fun _ => emp] and
      nothing is promised. *)
-  (stack_own (m !!! Regidx csp_rs1) av -∗ park_pay pj st) -∗
+  (stack_own (KTR := KT1) (m !!! Regidx csp_rs1) av -∗ park_pay pj st) -∗
   (* handed over at the crossing, taken back from the dispatch payload. *)
-  trap_csrs -∗
+  trap_csrs KT1 -∗
   (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:
      the parked-scheduler slot content is the ▷ sched_vc premise below.
      sched PRESERVES [eb] across the park -- its intena save/restore is
@@ -155,12 +155,12 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      wp_next true pj (fun (CID : CpuId) =>
        ∀ (mf : regfile) (ch' : mword 64),
          ⌜callee_saved m mf⌝ -∗
-         sie_cap_gpr mf av false pj -∗
+         sie_cap_gpr KT1 mf av false pj -∗
          pc_is ret_tgt -∗
          proc_held cpu_id j γl RUNNING ch' -∗
          (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
             rides inside it, which is what the caller's own retune needs. *)
-         trap_csrs -∗
+         trap_csrs KT1 -∗
          cpu_own 1 eb pj false {["proc"]} -∗
          own_ctx (p_context pj) -∗
          hart_full j cpu_id -∗

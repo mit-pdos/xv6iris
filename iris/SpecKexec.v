@@ -491,7 +491,7 @@ Definition wp_kexec_sconf_body
      [b = true]; it is kept because it is what the callee contracts quote. *)
   b = true ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -516,8 +516,8 @@ Definition wp_kexec_sconf_body
      source to a fraction is the "right" shape and has no consumer; recorded in
      projects/kexec.md, not done.
        The pointer vector stays at [dqa] because kexec only loads from it. *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
   bslots bn 3 -∗
@@ -528,7 +528,7 @@ Definition wp_kexec_sconf_body
       ⌜callee_saved m mf⌝ -∗
       ⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
                 entry spv szv' na alen⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -537,8 +537,8 @@ Definition wp_kexec_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
          [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
       bslots bn 3 -∗

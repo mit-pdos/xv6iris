@@ -218,7 +218,7 @@ Definition wp_iget_sconf_body
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
@@ -238,7 +238,7 @@ Definition wp_iget_sconf_body
   iname γi γfs inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr

@@ -64,6 +64,8 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
+Require Import WpMmodeLeafBase.
+Require Import StackOwn.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
@@ -127,7 +129,18 @@ Definition wp_sys_exit_sconf_body
      is "ftable" (1), via the fileclose loop -- so this is exactly kexit's
      own premise, unconsumed. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
+  (* THE DYING THREAD'S STACK CLOSER, in transit.  sys_exit is one layer of
+     the diverging chain [usertrap -> syscall -> sys_exit -> kexit]: it takes
+     the closer anchored at ITS entry sp, wraps its own (dead) 4-slot frame
+     around it, and hands the result to kexit, whose ZOMBIE park is where the
+     page finally reaches the slot ([ProcDefs.kstack_closer],
+     [ProcDefs.kstack_closer_frame]).  UNPAID HERE and honestly so: nothing
+     applies this contract yet -- syscall's dispatch does not reach sys_exit
+     (ProofSyscall.v's header lists what blocks it) -- and the payer, when it
+     comes, is usertrap's entry, where sp IS the page top
+     ([ProcDefs.kstack_closer_top]). *)
+  kstack_closer pj (m !!! Regidx csp_rs1) (trap_res b + av)%nat -∗
   (* entered with no lock held *)
   cpu_own 0%nat eb pj b lks -∗
   (* [kernel_data] is argint/argraw's own premise (the jump table it reads

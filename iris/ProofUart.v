@@ -41,11 +41,12 @@ Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
     (off : Z)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
-    : wp_sb_uart_uinv_s_sconf_body γd off pc is_rvc rs2 rs1 imm m n R S b p.
+    : wp_sb_uart_uinv_s_sconf_body kt γd off pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
@@ -80,7 +81,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
     by exact (src_ok_rget_indep m rs1 CID CID0).
   assert (Lpin_rs2 : tp_pin (CID := CID) m (Regidx rs2) = rget m rs2)
     by exact (src_ok_rget_indep m rs2 CID CID0).
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -203,8 +204,8 @@ Context `{GEN : GenId} `{CID : CpuId}.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+  iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
      obligation is discharged by instantiating it here. *)
@@ -218,7 +219,7 @@ Qed.
     (off : Z)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
-    : wp_sb_uart_s_sconf_body γd γv off pc is_rvc rs2 rs1 imm m n R S b p.
+    : wp_sb_uart_s_sconf_body kt γd γv off pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_sb_uart_s_sconf_body].
     intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
@@ -233,7 +234,7 @@ Qed.
     (off : Z)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
     (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64)
-    : wp_lb_uart_s_sconf_body γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
+    : wp_lb_uart_s_sconf_body kt γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_lb_uart_s_sconf_body].
   intros ea a8 ldval lppn Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
@@ -268,7 +269,7 @@ Qed.
      say the words are the same. *)
   assert (Lpin_rs1 : tp_pin (CID := CID) m (Regidx rs1) = rget m rs1)
     by exact (src_ok_rget_indep m rs1 CID CID0).
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -398,8 +399,8 @@ Qed.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+  iAssert (sie_cap kt (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".
   iDestruct (sie_cap_retarget (CID := CID) m

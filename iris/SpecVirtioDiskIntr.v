@@ -60,7 +60,7 @@ Definition wp_virtio_disk_intr_sconf_body
      "virtio_disk"'s -- virtio_disk_intr acquires and releases [disk.vdisk_lock]
      once, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "virtio_disk" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
  procs_inv γs -∗
@@ -70,7 +70,7 @@ Definition wp_virtio_disk_intr_sconf_body
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr mf K b pme -∗
+      sie_cap_gpr KT1 mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

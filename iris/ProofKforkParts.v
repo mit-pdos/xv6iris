@@ -293,21 +293,21 @@ Section ProofKforkParts.
        have lost. *)
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 8)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xfc) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -409,8 +409,8 @@ Section ProofKforkParts.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8)
       by (rewrite Hwv; exact HT4sp).
-    iAssert (stack_own sp0 8) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 8) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -649,12 +649,15 @@ Section KforkFreeproc.
     fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
     own_ctx (p_context pa) -∗
+    (* the child's kernel stack, back: allocproc handed it out with the slot
+       and freeproc's block is where it goes when the slot is given up *)
+    kstack_free pa -∗
     SpecFreeproc.fp_rest pa V pid ∗
     SpecFreeproc.fp_pt pa (pv_sz V) (Some (pv_upt V)) ∗
     SpecFreeproc.fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     intros Hof Hcwd.
-    iIntros "Hpv Hsp Hir Hctx".
+    iIntros "Hpv Hsp Hir Hctx Hkst".
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
     iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho")
@@ -664,7 +667,7 @@ Section KforkFreeproc.
     cbn [fst snd].
     iSplitR "Hpg Hptt Htfc Htfp".
     { iSplitR; [iPureIntro; split_and!; [exact Hof | exact Hcwd | exact Hszb]|].
-      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hctx". }
+      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hkst Hctx". }
     iSplitL "Hpg Hptt".
     { iFrame "Hpg Hptt". iPureIntro. split; [exact Hbel | exact Hszb]. }
     iFrame "Htfc Htfp". iPureIntro. exact Hpv.

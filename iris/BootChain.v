@@ -448,7 +448,7 @@ Section BootRun.
        it at [K_main] would be a silent 78-slot leak that leaves main unable
        to fund a trap. *)
     (∀ mf : regfile,
-       sie_cap_gpr mf (kv_frame_slots + K_main)%nat false zero_reg -∗
+       sie_cap_gpr KT0 mf (kv_frame_slots + K_main)%nat false zero_reg -∗
        cpu_ctx_free -∗
        cpu_own 0 false zero_reg false ∅ -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗

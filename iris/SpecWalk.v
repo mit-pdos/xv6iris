@@ -29,7 +29,7 @@ Import Defs.
 
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (kt : ktier) (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -51,14 +51,14 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
      nothing else in walk's cone touches a lock.  One premise covers the
      whole cone. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗ cpu_own lvl eb p b lks -∗
+  sie_cap_gpr kt mm K b p -∗ cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-    sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗
+    sie_cap_gpr kt mr K b p -∗ cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -78,9 +78,9 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
 
 Module Type WALK.
   Parameter wp_walk_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_walk_sconf_body γa mm t m K lvl eb p on b lks.
+      wp_walk_sconf_body kt γa mm t m K lvl eb p on b lks.
 End WALK.
 
 (* --------------------------------------------------------------------- *)
@@ -94,7 +94,7 @@ End WALK.
 (* either the map's leaf (mapped) or the literal zero (unmapped).         *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree)
+Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (mm : regfile) (t : ptree)
     (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.walk in
   let va := mm !!! Regidx (mword_of_int 11) in
@@ -106,13 +106,13 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
   mm !!! Regidx (mword_of_int 12) = mword_of_int 0 ->
   (uint va < 2 ^ 38)%Z ->
   pt_rep0 t m ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own 2 dq t -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     pc_is ret_tgt -∗
     ptree_own 2 dq t -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -127,7 +127,7 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
 
 Module Type WALK_NOALLOC.
   Parameter wp_walk_noalloc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
-      wp_walk_noalloc_sconf_body mm t m K dq b p.
+      wp_walk_noalloc_sconf_body kt mm t m K dq b p.
 End WALK_NOALLOC.

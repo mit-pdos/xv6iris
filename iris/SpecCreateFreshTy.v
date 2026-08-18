@@ -423,7 +423,7 @@ Definition create_fresh_ty_body
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
   bv_unsigned ty <> 0 ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   dev = ROOTDEV ->
@@ -474,7 +474,7 @@ Definition create_fresh_ty_body
                          nib' k' s' g' dev' inum' pidv' dq' dqs'
                          m' K' eb' b' lks') ->
   (* ================= THE SPAN ================= *)
-  sie_cap_gpr Ma K b pj -∗
+  sie_cap_gpr KT1 Ma K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   kernel_data -∗
@@ -505,7 +505,7 @@ Definition create_fresh_ty_body
     (kslot : nat) (q : Qp) (g : gname) (inum : mword 32)
     (gil gisl : gname) (dn : dinode) (bm : blkmap),
       ⌜cr_cs_but_s3 Ma Mo⌝ -∗
-      sie_cap_gpr Mo K b pj -∗
+      sie_cap_gpr KT1 Mo K b pj -∗
       cpu_own 0 eb pj b lks -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

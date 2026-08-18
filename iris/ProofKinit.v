@@ -84,7 +84,7 @@ Section ProofKinit.
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (vra0) "Hras". iDestruct "S2" as (vs00) "Hs0s".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.kinit + 0x02)) by (unfold pcE; apply bv_eq; vm_compute; reflexivity).
@@ -204,7 +204,7 @@ Section ProofKinit.
     (* initlock(&kmem.lock, "kmem") : owns lk's 3 struct fields, returns them init'd.
        [Hcnt] is not one of its arguments (initlock takes no [cpu_own]), so no
        transport is needed here -- unlike the freerange call below. *)
-    iApply (Initlock.wp_initlock_sconf R7 vlock vname vcpu "kmem"%string (K - 2) b pcur
+    iApply (Initlock.wp_initlock_sconf KT0 R7 vlock vname vcpu "kmem"%string (K - 2) b pcur
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HR7a1). iExact "Hstr". }
@@ -372,8 +372,8 @@ Section ProofKinit.
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HE2sp. exact Hspr2. }
-    iAssert (stack_own sp0 2) with "[Hras Hs0s]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT0) sp0 2) with "[Hras Hs0s]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT0)). cbn [seq].
       iSplitL "Hras"; [iExists _; iExact "Hras"|].
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|]. done. }
     iEval (rewrite -Hwv) in "Hframe".

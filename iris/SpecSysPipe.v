@@ -183,7 +183,7 @@ Definition wp_sys_pipe_sconf_body
      three fileclose calls (inside [sp_close2]), whose own lowest rank is
      "ftable" (1).  One premise covers the whole cone. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
@@ -196,7 +196,7 @@ Definition wp_sys_pipe_sconf_body
      to be threaded rather than framed -- a hart-indexed resource held across
      a [true] crossing could not be transported back.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -226,9 +226,9 @@ Definition wp_sys_pipe_sconf_body
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')

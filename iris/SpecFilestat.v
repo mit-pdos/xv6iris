@@ -475,7 +475,7 @@ Definition wp_filestat_sconf_body
      "bcache" is the lower, so one premise there covers both via
      [locks_below_mono]. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -499,7 +499,7 @@ Definition wp_filestat_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜filestat_ret r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗

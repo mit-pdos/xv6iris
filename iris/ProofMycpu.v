@@ -54,9 +54,10 @@ Section ProofMycpu.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Lemma wp_mycpu_sconf
       (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_mycpu_sconf_body m0 n p.
+    : wp_mycpu_sconf_body kt m0 n p.
   Proof.
     cbv beta delta [wp_mycpu_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hn.
@@ -322,7 +323,7 @@ Section ProofMycpu.
   Lemma wp_call_mycpu_sconf_cs
       (P : mword 64) (jimm : mword 21)
       (m : regfile) (n : nat) (p : mword 64)
-    : wp_call_mycpu_sconf_cs_body P jimm m n p.
+    : wp_call_mycpu_sconf_cs_body kt P jimm m n p.
   Proof.
     cbv beta delta [wp_call_mycpu_sconf_cs_body].
     intros ra_idx m0 pcE ra0 ret_tgt Htarget Halpce Hn.

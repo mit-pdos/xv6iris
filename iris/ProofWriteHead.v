@@ -473,9 +473,9 @@ Section WriteHeadDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -491,10 +491,10 @@ Section WriteHeadDefs.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
   Definition wh_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   (* what every block knows about its arrival map *)
   Definition wh_regs (m M : regfile) : Prop :=
@@ -551,9 +551,9 @@ Section WriteHeadBlocks.
     (* wh_tail's own acquire (via brelse's unlink/splice) is at "bcache"
        (rank 4); nothing below it is touched here. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x46) : mword 64) -∗
@@ -906,9 +906,9 @@ Section WriteHeadBlocks.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].
@@ -1062,9 +1062,9 @@ Section WriteHeadBlocks.
     M !!! Regidx Ra4 = lh_block i ->
     M !!! Regidx Ra5 = pa_add (bnode kk) (4 * i)%nat ->
     M !!! Regidx Ra2 = pa_add (bnode kk) (4 * n)%nat ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x3a) : mword 64) -∗
@@ -1115,7 +1115,7 @@ Section WriteHeadBlocks.
                    = lh_block i).
     { rgne. rewrite HMa4 wh_s0. apply wh_blk_at. }
     iEval (rewrite -Hsrc) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
               (mword_of_int 0 : mword 12) M (K - 4)%nat w b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a Hcell").
@@ -1396,7 +1396,7 @@ Section ProofWriteHead.
                     = add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -1515,7 +1515,7 @@ Section ProofWriteHead.
                      = l_start).
     { rgne. rewrite HR4s2 wh_s24. apply wh_l_start. }
     iEval (rewrite -Hstart) in "Hstc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
               (mword_of_int 24 : mword 12) R4 (K - 4)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1537,7 +1537,7 @@ Section ProofWriteHead.
                     = l_dev).
     { rgne. rewrite HR5s2 wh_s36. apply wh_l_dev. }
     iEval (rewrite -Hdvad) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
               (mword_of_int 36 : mword 12) R5 (K - 4)%nat dev b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hdevc").
@@ -1675,7 +1675,7 @@ Section ProofWriteHead.
                    = lh_n_pa).
     { rgne. rewrite HB1s2 wh_s44. apply wh_l_lhn. }
     iEval (rewrite -Hlhn) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
               (mword_of_int 44 : mword 12) B1 (K - 4)%nat
               (mword_of_int (Z.of_nat n) : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)

@@ -85,7 +85,7 @@ Section ProofPrintkinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia) Hpr
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.printkinit
+    iApply (ILW.wp_initlock_wrapper_sconf KT0 m K KernelSyms.printkinit
               (mword_of_int 6) (mword_of_int 18) (mword_of_int 2002) (mword_of_int 2842)
               (mword_of_int 724) lk name "pr"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)

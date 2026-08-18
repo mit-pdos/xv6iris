@@ -138,10 +138,10 @@ Section UiCont.
 
   (* the frame the prologue spilled *)
   Definition ui_frame (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1) ∗
-     pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2))%I.
+    (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
+     pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
   Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
@@ -149,7 +149,7 @@ Section UiCont.
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-         sie_cap_gpr mf av b pme -∗
+         sie_cap_gpr KT1 mf av b pme -∗
          cpu_own lvl eb pme b lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -194,7 +194,7 @@ Section ProofUartintr.
     m0 !!! Regidx csp_rs1 = sp0 ->
     (uartintr_stack <= av)%nat ->
     kernel_text -∗
-    sie_cap_gpr M (av - 4) b pme -∗
+    sie_cap_gpr KT1 M (av - 4) b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x4c)) -∗
     ui_frame sp0 m0 -∗
@@ -264,8 +264,8 @@ Section ProofUartintr.
     assert (HE4sp : E4 !!! Regidx csp_rs1 = spd) by (rewrite /E4 upd_ne; [exact HE3sp | reg_neq]).
     iEval (rewrite P54) in "Hpc".
     (* +0x54 c.addi16sp sp,32 -- the frame pop *)
-    iAssert (stack_own sp0 4) with "[H1 H2 H3 H4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[H1 H2 H3 H4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "H1"; [by iExists _|]. iSplitL "H2"; [iExists _; iEval (rewrite -Hb2 -HE1sp); iExact "H2"|].
       iSplitL "H3"; [iExists _; iEval (rewrite -Hb3 -HE2sp); iExact "H3"|].
       iSplitL "H4"; [iExists _; iEval (rewrite -Hb4 -HE3sp); iExact "H4"|]. done. }
@@ -361,7 +361,7 @@ Section ProofUartintr.
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
       kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗
       console_caps γu -∗
-      sie_cap_gpr (CID := CIDe) M (av - 4) b pme -∗
+      sie_cap_gpr KT1 (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
@@ -388,7 +388,7 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M1 (pa_stk sp0 4) ⌝ -∗
       ⌜ M1 !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M1 !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      sie_cap_gpr (CID := CIDk) M1 (av - 4) b pme -∗
+      sie_cap_gpr KT1 (CID := CIDk) M1 (av - 4) b pme -∗
       cpu_own (CID := CIDk) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
       ui_frame sp0 m0 -∗
@@ -493,7 +493,7 @@ Section ProofUartintr.
     locks_below lks "cons" ->
     kernel_text -∗ dev_inv γu γv -∗
     procs_inv γs -∗ console_caps γu -∗
-    sie_cap_gpr M (av - 4)%nat b pme -∗
+    sie_cap_gpr KT1 M (av - 4)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
     ui_frame sp0 m0 -∗
@@ -603,7 +603,7 @@ Section ProofUartintr.
     assert (HcspA0 : A0 !!! Regidx csp_rs1 = spd)
       by (rewrite /A0 upd_eq Hpush Hspm; reflexivity).
     iEval (rewrite P02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
     iDestruct "F3" as (v3) "H3". iDestruct "F4" as (v4) "H4".

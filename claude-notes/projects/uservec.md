@@ -853,19 +853,32 @@ kfork/sys_fork side:
 
 - `stack_own ksp av` -- the child's KERNEL STACK, free.  A running thread
   carries its stack in `sie_cap_gpr` and a parked one in its record; a
-  never-run one has it nowhere.  procinit maps the NPROC KSTACK pages and
-  allocproc's post hands out `is_kstack` (the persistent `p->kstack`
-  agreement) but never the words.  A real hole in the chain.
+  never-run one has it nowhere.  **AVAILABLE** since sp-migration K3a:
+  allocproc's post hands out a sealed `ProcDefs.kstack_free` beside the
+  persistent `is_kstack`, and the carve is one `kstack_free_at` at
+  `av = KSTACK_AV = K_usertrap = 342`.
 - the residue closer, `∀ h V', ⌜pv_upt V' = pt⌝ -∗ forkret_yield … -∗
   fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗ URes h pt ksp`.  It takes the
   park's own two allowances because they live INSIDE the loop's bundle
   (`UsertrapRes.ut_own_nopt`), and the record is where they are captured.
-  Producing `URes` for the child needs only `bslots bn 3`, `fileclose_bm` and
-  the `initproc` share: `ut_caps` AND `ProofSyscall.syscall_env` are both
-  entirely persistent, so a second process's copy of either is free.  See
-  [`proc-struct-resources.md`](proc-struct-resources.md) for the full
-  four-obstacle measurement, including the layering wall that decides how the
-  package reaches kfork at all.
+  Producing `URes` for the child needs `bslots bn 3`, `fileclose_bm` and the
+  `initproc` share: `ut_caps` AND `ProofSyscall.syscall_env` are both
+  entirely persistent, so a second process's copy of either is free.  **Of
+  those three, `bslots bn 3` is boot-mintable per slot (`NPROC*3 = 192 ≤
+  BSLOTS = 1024`, the `fd_slots FDSPARE` route) and the `initproc` share is
+  free once boot discards the cell -- but `fileclose_bm` HAS NO SOURCE.**
+  Its `bitmap_res` conjunct is the FS block bitmap: one half-fraction
+  `fsblock` at `bmapstart` plus a full-fraction `blk_own` per free block, so
+  two copies are refutable (`FsBlocks.blk_own_excl`), boot cannot mint 64,
+  and the parent cannot spare its own (`wp_syscall_sconf_body` demands it
+  back).  **THE CONSEQUENCE FOR THIS FILE'S SUBJECT: the closed trap loop's
+  residue is satisfiable for exactly ONE process** -- `ut_res_bare` is what
+  a process holds while parked in USER mode too, not only in a record.  The
+  fix is to move `bitmap_res` behind the log lock, out of the per-process
+  residue.  Accounting and cascade:
+  [`sp-migration.md`](sp-migration.md) §"K4 findings"; the layering wall
+  that decides how the package reaches kfork is in
+  [`proc-struct-resources.md`](proc-struct-resources.md).
 - the persistent world (`kernel_text`, `wire_inv`, the trampoline `kmap_at`,
   `procs_inv`, `pslot_used_at`) -- free for any caller, but NAMED, because a
   closure captures what it uses.

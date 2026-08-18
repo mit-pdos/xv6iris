@@ -578,9 +578,9 @@ Section InstallTransDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -615,16 +615,16 @@ Section InstallTransDefs.
 
   (* the ten saved slots (ra, s0..s8): every one is written *)
   Definition it_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ (m !!! Regidx Rs8 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] (m !!! Regidx Rs8 : mword 64))%I.
 
   (* what the caller still owns when the loop is done / at the epilogue *)
   Definition it_out (bn : bio_names) (γfs : fs_names) (logstart : Z)
@@ -782,12 +782,12 @@ Section InstallTransBlocks.
     M !!! Regidx Rs9 = (m !!! Regidx Rs9 : mword 64) ->
     M !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64) ->
     M !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64) ->
-    sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.install_trans + 0xb2) : mword 64) -∗
     it_frame m -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     it_out bn γfs logstart n W Lw L D -∗
@@ -1015,9 +1015,9 @@ Section InstallTransBlocks.
                    = pa_stk (add_vec (P10 !!! Regidx csp_rs1 : mword 64)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
     { rewrite Hwv HP10sp Hsp. exact (it_push m). }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 10)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 10)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iEval (rewrite -Hb1); iExists _; iExact "Hf1"|].
       iSplitL "Hf2"; [iEval (rewrite -Hb2 -HP1sp); iExists _; iExact "Hf2"|].
       iSplitL "Hf3"; [iEval (rewrite -Hb3 -HP2sp); iExists _; iExact "Hf3"|].
@@ -1220,9 +1220,9 @@ Section InstallTransBlocks.
        against "bcache"(4) only.  Threaded on this recursive helper's own
        binder list -- every recursive call re-proves it unchanged. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 10)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64) -∗
@@ -1339,7 +1339,7 @@ Section InstallTransBlocks.
                       = l_start).
     { rgne. rewrite HMs4. exact it_addr_start. }
     iEval (rewrite -Hastart) in "Hstc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
               M (K - 10)%nat (mword_of_int logstart : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi70 Hstc").
@@ -1405,7 +1405,7 @@ Section InstallTransBlocks.
                     = l_dev).
     { rgne. rewrite HA3s4. exact it_addr_dev. }
     iEval (rewrite -Hadev) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A3 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a Hdevc").
@@ -1490,7 +1490,7 @@ Section InstallTransBlocks.
                     = lh_block t).
     { rgne. rewrite HA6s5. exact (it_cursor_at t). }
     iEval (rewrite -Hacur) in "Hblk".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
               A6 (K - 10)%nat w eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi84 Hblk").
@@ -1513,7 +1513,7 @@ Section InstallTransBlocks.
                      = l_dev).
     { rgne. rewrite HA7s4. exact it_addr_dev. }
     iEval (rewrite -Hadev2) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A7 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi88 Hdevc").
@@ -1708,7 +1708,7 @@ Section InstallTransBlocks.
     iDestruct (it_data_fwd (b_data (bpa k2)) (Lw t) 1024%nat Hlen2 with "Hdata2") as "Hdata2".
     iEval (rewrite -HB5a1) in "Hdata1".
     iEval (rewrite -HB5a0) in "Hdata2".
-    iApply (Mm.wp_memmove_sconf B5 (K - 10)%nat 1024%nat
+    iApply (Mm.wp_memmove_sconf KT1 KT0 KT0 B5 (K - 10)%nat 1024%nat
               (fun i => (Lw t) !!! i) (fun i => (Lw t) !!! i) eb (proc_addr j)
               (it_Kmm K HK)
               ltac:(vm_compute; reflexivity) HB5a2
@@ -2090,7 +2090,7 @@ Section InstallTransBlocks.
                     = lh_n_pa).
     { rgne. rewrite HB15s4. exact it_addr_lhn. }
     iEval (rewrite -Halhn) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
               B15 (K - 10)%nat (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64 Hncell").
@@ -2223,7 +2223,7 @@ Section ProofInstallTrans.
                   = lh_n_pa).
     { rgne. rewrite /R1 upd_eq. exact it_reloc_lhn. }
     iEval (rewrite -Hna) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
               (mword_of_int 2226 : mword 12) R1 K
               (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2349,7 +2349,7 @@ Section ProofInstallTrans.
       assert (HQ1sp : Q1 !!! Regidx csp_rs1 = it_spr m).
       { rewrite /Q1 upd_eq /it_spr HR2sp. reflexivity. }
       iEval (rewrite HR2sp) in "Hframe".
-      iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+      iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
       iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
       iDestruct "S1" as (v1) "Hf1".   iDestruct "S2" as (v2) "Hf2".
       iDestruct "S3" as (v3) "Hf3".   iDestruct "S4" as (v4) "Hf4".

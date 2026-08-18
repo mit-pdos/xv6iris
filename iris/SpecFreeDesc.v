@@ -54,7 +54,7 @@ Definition wp_free_desc_sconf_body
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* free_desc's only callee is wakeup, whose bound is "proc" (11). *)
   locks_below lks "proc" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
  procs_inv γs -∗
@@ -72,7 +72,7 @@ Definition wp_free_desc_sconf_body
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr mf K b pme -∗
+      sie_cap_gpr KT1 mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       d_free_cell i ↦ₘ Z_to_bv 8 1 -∗

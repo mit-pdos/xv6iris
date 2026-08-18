@@ -121,7 +121,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      "uart" for the acquire call.  uartwrite is BALANCED overall (each byte's
      acquire/release pair cancels), so [lks] is unchanged end to end. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -141,16 +141,16 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      motivated -- delete it when the cone is next touched. *)
   p_pid pj ↦₄{dqp} pidv -∗
   (* the buffer, read-only *)
-  ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
+  ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
+      ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ[KT1]{dq} f k) -∗
       p_pid pj ↦₄{dqp} pidv -∗
       uart_sent_sub γu (f <$> seq 0 n) -∗
       WP (Loop : expr riscv_lang)) -∗

@@ -96,7 +96,7 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   \/ r = (mword_of_int (-1) : mword 64).
 
 Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
+    (ktb : ktier) (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
@@ -118,20 +118,20 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* copyinstr -> walkaddr -> walk *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_olds j) -∗
+  ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     proc_pt P' -∗
-    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_new j) -∗
+    ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜copyinstr_ret maxn dst_new (mr !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
@@ -141,8 +141,8 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 Module Type COPYINSTR.
   Parameter wp_copyinstr_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
+      (ktb : ktier) (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p b lks.
+      wp_copyinstr_sconf_body ktb γa mm P szv maxn dst_olds K lvl eb p b lks.
 End COPYINSTR.

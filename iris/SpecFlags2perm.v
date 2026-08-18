@@ -87,12 +87,12 @@ Definition wp_flags2perm_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
   let fl := mm !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_flags2perm <= K)%nat ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5)

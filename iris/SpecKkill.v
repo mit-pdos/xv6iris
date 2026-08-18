@@ -88,7 +88,7 @@ Definition wp_kkill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      [lks = ∅]; [locks_below_not_elem] gives the non-membership the ghost
      step needs. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
@@ -97,7 +97,7 @@ Definition wp_kkill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = rv /\
         (rv = (zero_reg : mword 64) \/ rv = mword_of_int (-1)) ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

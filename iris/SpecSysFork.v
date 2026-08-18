@@ -101,7 +101,7 @@ Definition wp_sys_fork_sconf_body
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (* straight through to kfork, whose cone floors at wait_lock (8) *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
@@ -118,7 +118,7 @@ Definition wp_sys_fork_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       (* the caller's block comes back verbatim: kfork only reads it *)

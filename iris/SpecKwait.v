@@ -155,7 +155,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
      11); freeproc/either_copyout reach "kmem" (13).  10 is the floor, and the
      nested acquires follow by [locks_below_union_singleton]/[locks_below_mono]. *)
   locks_below lks "wait_lock" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -173,7 +173,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗

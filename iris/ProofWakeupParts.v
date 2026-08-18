@@ -186,8 +186,8 @@ Section ProofWakeupPartsEpi.
     { unfold wk_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb0 : wk_fcell spF 0 = pa_stk sp0 8).
     { unfold wk_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iAssert (stack_own sp0 8) with "[Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 8) with "[Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf7"; [iEval (rewrite -Hb7); iExists _; iExact "Hf7"|].
       iSplitL "Hf6"; [iEval (rewrite -Hb6); iExists _; iExact "Hf6"|].
       iSplitL "Hf5"; [iEval (rewrite -Hb5); iExists _; iExact "Hf5"|].
@@ -281,7 +281,7 @@ Section ProofWakeupPartsPro.
               with "Hcg Hpc Hi00").
     iIntros (CID1 Hst1) "Hcg Hframe Hpc".
     assert (Hsp0f : m !!! Regidx csp_rs1 = sp0) by reflexivity.
-    iEval (rewrite Hsp0f stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite Hsp0f (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & C7 & C8 & _)".
     iDestruct "C1" as (v1) "Hc1". iDestruct "C2" as (v2) "Hc2".
     iDestruct "C3" as (v3) "Hc3". iDestruct "C4" as (v4) "Hc4".

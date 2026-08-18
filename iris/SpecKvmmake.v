@@ -46,13 +46,13 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
   (* kvmmake kallocs the root table and every kvmmap page: "kmem" (13). *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmake) -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT0 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t -∗

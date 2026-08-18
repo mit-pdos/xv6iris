@@ -91,6 +91,8 @@ Definition pipe_name_str : Z := 0x800075b8%Z.
 
 Section SpecPipealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ}.
+  (* [pf0]/[pf1] are the CALLER's two [struct file *] locals -- cells on its
+     own frame -- so they ride the caller's regime. *)
 
   (* the four content fields pipealloc writes into each [struct file]: it makes
      the [w = false] file the READ end and the [w = true] file the WRITE end,
@@ -120,7 +122,7 @@ Section SpecPipealloc.
         could break that. *)
      ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
      kalloc_avail γk on ∗ fd_slot ∗ fd_slot ∗
-     (∃ w0 w1 : mword 64, pf0 ↦₈ w0 ∗ pf1 ↦₈ w1)
+     (∃ w0 w1 : mword 64, pf0 ↦₈[KT1] w0 ∗ pf1 ↦₈[KT1] w1)
      ∨
      (* SUCCESS (a0 = 0): the two files, each owning one end of a live pipe.
         Each [file_ref] is EXCLUSIVE (fraction 1) -- pipealloc's own unlocked
@@ -134,7 +136,7 @@ Section SpecPipealloc.
      (∃ (pi : mword 64) (k0 k1 : nat) (C0 C1 : fcontent),
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
         ⌜pipe_file pi false C0⌝ ∗ ⌜pipe_file pi true C1⌝ ∗
-        pf0 ↦₈ fnode k0 ∗ pf1 ↦₈ fnode k1 ∗
+        pf0 ↦₈[KT1] fnode k0 ∗ pf1 ↦₈[KT1] fnode k1 ∗
         file_ref γf k0 1 C0 ∗ file_ref γf k1 1 C1))%I.
 
 End SpecPipealloc.
@@ -166,7 +168,7 @@ Definition wp_pipealloc_sconf_body
      filealloc/fileclose; kalloc's "kmem" (13) is reached from this one
      by [LockRank.locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
@@ -177,7 +179,7 @@ Definition wp_pipealloc_sconf_body
      hart-indexed resource cannot be framed across such a call -- it has to be
      handed over and given back.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
@@ -193,17 +195,17 @@ Definition wp_pipealloc_sconf_body
   fd_slot -∗
   (* the caller's two [struct file *] cells; both are overwritten on entry, so
      their incoming contents are arbitrary *)
-  pf0 ↦₈ v0 -∗
-  pf1 ↦₈ v1 -∗
+  pf0 ↦₈[KT1] v0 -∗
+  pf1 ↦₈[KT1] v1 -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  pipealloc's error paths
      call fileclose, whose crossing is [true] on every arm, so pipealloc can
      return on another hart; the cost is the CALLER's, which must supply its
      continuation hart-generically. *)
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

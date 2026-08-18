@@ -259,7 +259,7 @@ Definition wp_sys_link_sconf_body
      ZERO-extended halfword argument. *)
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- dirlink's out-of-blocks arm calls printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := KT1) γpr gu gd ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* namei's own premise, inherited: the walker runs with the base enabled *)
@@ -268,7 +268,7 @@ Definition wp_sys_link_sconf_body
      trapframe page [proc_priv] carries *)
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here: the depth is pinned at ZERO, so [CpuOwn.cpu_own_zero_empty]
      DERIVES [lks = ∅] and every order goal the eleven callees raise is
@@ -276,7 +276,7 @@ Definition wp_sys_link_sconf_body
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr gu gd -∗
@@ -318,9 +318,9 @@ Definition wp_sys_link_sconf_body
          in.  [uptd_ext] is argstr's own report, composed across the pair by
          [ProcPtOwn.uptd_ext_trans]. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

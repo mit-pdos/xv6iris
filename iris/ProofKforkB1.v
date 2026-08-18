@@ -150,19 +150,19 @@ Section KforkB1Proof.
        reserve of the exit arm [b].  EXIT below is at [K] and arm [b]: the
        physical carve [trap_res b + (K - 8)] -> [trap_res b + K] is exactly the
        8-slot epilogue pop, i.e. the reserve is CONSERVED across this block. *)
-    sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 Mt (trap_res b + (K - 8))%nat false pme -∗
     cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-    arm_pay lvl eb pme -∗
+    arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    (∃ w4, word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4) -∗
-    (∃ w5, word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5) -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    (∃ w8, word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    (∃ w4, word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4) -∗
+    (∃ w5, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8) -∗
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
@@ -173,7 +173,7 @@ Section KforkB1Proof.
     wp_next (match lvl with O => eb | S _ => false end) pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr mf K (match lvl with O => eb | S _ => false end) pme -∗
+        sie_cap_gpr KT1 mf K (match lvl with O => eb | S _ => false end) pme -∗
         pc_is (ret_pc ra0) -∗
         cpu_own lvl eb pme (match lvl with O => eb | S _ => false end) lks -∗
         kalloc_env γa None -∗
@@ -299,7 +299,7 @@ Section KforkB1Proof.
        with no reserve summand at all (the arm is [b] there), so nothing needs
        undoing afterwards. *)
     iEval (rewrite -Hb) in "Hcg".
-    iApply (RL.wp_release_sconf γl (proc_addr j) "proc"%string
+    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)

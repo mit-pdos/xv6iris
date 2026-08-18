@@ -105,14 +105,14 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (uint tf + 4096 < 2 ^ 56)%Z ->
   (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
@@ -143,14 +143,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   (uint tf + 4096 < 2 ^ 56)%Z ->
   (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗

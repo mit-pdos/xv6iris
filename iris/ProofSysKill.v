@@ -101,14 +101,14 @@ Section ProofSysKill.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
     (* the local [pid] is the upper half of slot 3 *)
     iDestruct (word_pointsto_aligned_p with "Hb3") as %Hal3.
     iDestruct (word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
-    iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄ nv -∗ ∃ w, pa_stk sp0 3 ↦₈ w)%I
+    iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄[KT1] nv -∗ ∃ w, pa_stk sp0 3 ↦₈[KT1] w)%I
       with "[Hb3lo]" as "Hjoin3".
     { iIntros (nv) "Hhi". iExists _.
       iApply (word_pointsto_join4 _ _ _ _ Hal3 with "Hb3lo Hhi"). }
@@ -328,8 +328,8 @@ Section ProofSysKill.
                    = pa_stk (add_vec (E1 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HE1sp).
-    iAssert (stack_own sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1". { iExists _. iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iExact "Hb3". }

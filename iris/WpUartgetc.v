@@ -54,6 +54,7 @@ Section WpUartgetc.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
+  Context {kt : ktier}.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
@@ -114,7 +115,7 @@ Section WpUartgetc.
     add_vec_int pcR 4 = pcK ->
     add_vec pcB (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) = pcNo ->
     eq_vec (access_vec_dec pcNo 0) ('b"0") = true ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pcL -∗
     instr pcL false (LOAD (mword_of_int 0 : mword 12, Regidx rs_lsr, Regidx Ra5, true, 1)) -∗
     instr pcA true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx Ra5, Regidx Ra5, ANDI)) -∗
@@ -128,13 +129,13 @@ Section WpUartgetc.
       ( (* "return -1": the rx FIFO was empty *)
         ( ∀ bt : bv 8,
             ⌜ rx_empty bt = true ⌝ -∗
-            sie_cap_gpr (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b p -∗
+            sie_cap_gpr kt (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b p -∗
             pc_is pcNo -∗
             WP (Loop : expr riscv_lang))
         ∧ (* "return the byte": it is in a0, zero-extended *)
         ( ∀ bt c : bv 8,
             ⌜ rx_empty bt = false ⌝ -∗
-            sie_cap_gpr (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
+            sie_cap_gpr kt (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                            (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m)) n b p -∗
             pc_is pcK -∗
             WP (Loop : expr riscv_lang)) )) -∗

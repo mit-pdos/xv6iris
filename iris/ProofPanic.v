@@ -137,13 +137,14 @@ Section PanicSpin.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId}.
 
+  Context {kt : ktier}.
   (* [h] is bound as a [CpuId], not as a [CPU]: [Loop] itself is
      [LoopE gen_id cpu_id], so the PROGRAM names the hart it steps and the
      statement has to put one in scope for the body to elaborate at all. *)
   Lemma pn_spin :
     kernel_text -∗
     ∀ (h : CpuId) (m : regfile) (K : nat) (b : bool) (p : mword 64),
-      sie_cap_gpr m K b p -∗
+      sie_cap_gpr kt m K b p -∗
       pc_is (mword_of_int (PA + 0x26)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -177,6 +178,7 @@ Section ProofPanic.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Context {kt : ktier}.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
   Local Ltac reg_neq :=
@@ -194,7 +196,7 @@ Section ProofPanic.
       (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string)
-    : wp_panic_sconf_body m K n eb b p dm lks.
+    : wp_panic_sconf_body kt m K n eb b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31 Hbelow.
@@ -253,7 +255,7 @@ Section ProofPanic.
                   = pa_stk (m !!! Regidx csp_rs1) 3).
     { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
     iDestruct "F3" as (v3) "H3".
@@ -373,7 +375,7 @@ Section ProofPanic.
       by (rewrite /P5 upd_ne; [exact HP4s1 | reg_neq]).
     iDestruct (cpu_own_transport CID CID9 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Printk.wp_printk_sconf (CID := CID9) (dqf := DfracDiscarded)
+    iApply (Printk.wp_printk_sconf kt (CID := CID9) (dqf := DfracDiscarded)
               γpr γl γd γv P5 (K - 4)%nat [] n eb pn_hdr [] b p lks
               (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
@@ -462,7 +464,7 @@ Section ProofPanic.
     assert (Hva : pk_vararg Q3 0%nat = m !!! Regidx Ra0) by exact HQ2a1.
     iDestruct (cpu_own_transport CID10 CID14 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Printk.wp_printk_sconf (CID := CID14) (dqf := DfracDiscarded)
+    iApply (Printk.wp_printk_sconf kt (CID := CID14) (dqf := DfracDiscarded)
               γpr γl γd γv Q3 (K - 4)%nat cs n eb pn_fmt [dm] b p lks
               (pn_Kpk K HK) pn_fmt_len pn_fmt_nonul
               ltac:(rewrite pn_fmt_kinds; cbn [map pk_desc_kind];

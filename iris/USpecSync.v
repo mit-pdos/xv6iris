@@ -9,7 +9,7 @@
    Only what is SPECIFIC to the sync program lives here: its entry
    addresses, its image, its call structure and stack budget.  The generic
    vocabulary is elsewhere -- the trap capability and threading bundle in
-   UmodeCap.v, the ABI registers / image inclusion / stack-frame window in
+   UmodeCap.v, the ABI registers / image inclusion / stack budget in
    UmodeAbi.v, and the syscall semantics in UmodeSyscall.v (a syscall's
    meaning belongs to the KERNEL: this program's protocol is just the xv6
    table, [xv6_sys_protocol]).
@@ -77,8 +77,10 @@ Section USpecSync.
   (* ------------------------------------------------------------------- *)
   (* §2 main and start.  Both DIVERGE (their final call is exit, and       *)
   (* exit's ecall never comes back), so neither has a continuation and     *)
-  (* neither says anything about ra.  Each needs its own 16-byte frame     *)
-  (* below its entry sp; start additionally needs main's frame below that. *)
+  (* neither says anything about ra.  Each asks for a stack BUDGET below   *)
+  (* its entry sp covering its own 16-byte frame plus everything its       *)
+  (* callees need: main's 16 is its own (sync and exit are leaf stubs),    *)
+  (* and start's 32 is its own 16 plus main's 16.                          *)
   (* ------------------------------------------------------------------- *)
 
   (* main @0x0: prologue (16-byte frame), jal sync, li a0,0, jal exit. *)
@@ -87,7 +89,7 @@ Section USpecSync.
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hsp : m !!! Regidx sp_idx = sp0)
-      (Hfr : uv_frame16 pt M sp0),
+      (Hst : uv_stack pt M sp0 16),
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.main) -∗
     WP (Loop : expr riscv_lang).
@@ -101,8 +103,7 @@ Section USpecSync.
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hsp : m !!! Regidx sp_idx = sp0)
-      (Hfr : uv_frame16 pt M sp0)                          (* start's frame *)
-      (Hfr' : uv_frame16 pt M (add_vec_int sp0 (-16))),    (* main's frame *)
+      (Hst : uv_stack pt M sp0 32),   (* start's own 16 + main's 16 *)
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.start) -∗
     WP (Loop : expr riscv_lang).

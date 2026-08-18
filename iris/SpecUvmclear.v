@@ -85,13 +85,13 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   P.(ud_um) !! vpn = Some w ->
   (* the cleared flag byte is a legal user leaf.  1007 = 1023 - PTE_U *)
   uvm_perm_ok (Z.land (pte_flags10 w) 1007) ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_set P vpn (pte_clear_u w)) -∗

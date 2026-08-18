@@ -87,7 +87,7 @@ Section ConsoleinitBody.
   Hypothesis wp_initlock :
     forall `{CID : CpuId} (m : regfile) (vlock : bv 32)
       (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
-      wp_initlock_sconf_body m vlock vname vcpu s K b p.
+      wp_initlock_sconf_body KT0 m vlock vname vcpu s K b p.
 
   Hypothesis wp_uartinit :
     forall `{CID : CpuId} (γd : uart_names) (m : regfile) (K : nat)
@@ -157,7 +157,7 @@ Section ConsoleinitBody.
     iIntros "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /W1 upd_eq; reflexivity).
@@ -263,7 +263,7 @@ Section ConsoleinitBody.
        everything needed about it is already captured in
        [HW7a0]/[HW7a1]/[HW7sp]/[Hretil] above, which [remember] restates
        at [m7] automatically since [W7] is part of the current goal. *)
-    iAssert (sie_cap_gpr W7 (K - 2)%nat false p) with "Hcg" as "Hcg".
+    iAssert (sie_cap_gpr KT0 W7 (K - 2)%nat false p) with "Hcg" as "Hcg".
     remember W7 as m7 eqn:Heqm7.
     iApply (wp_initlock m7 vclock vcname vccpu "cons"%string (K - 2)%nat false p
               ltac:(lia) with "Hcg Htext Hpc [] [Hclock] [Hcname] [Hccpu]").
@@ -355,7 +355,7 @@ Section ConsoleinitBody.
     (* +0x30 sd a4,16(a5) : devsw[CONSOLE].read = consoleread *)
     assert (Hdra : forall (CID' : CpuId), add_vec (rget (CID := CID') D4 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = devsw_console_read).
     { intros CID'. rewrite HD4a5. unfold devsw_console_read. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 16 : mword 12)
+    iApply (wp_csd_s_sconf (kt := KT0) (ktd := KT0) (mword_of_int (KernelSyms.consoleinit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 16 : mword 12)
               D4 (K - 2)%nat dread0 false with "Hcg Hpc Hi30 [Hdr]").
     { iEval (rewrite Hdra). iExact "Hdr". }
     iApply wp_next_off_intro.
@@ -392,7 +392,7 @@ Section ConsoleinitBody.
     (* +0x3a sd a4,24(a5) : devsw[CONSOLE].write = consolewrite *)
     assert (Hdwa : forall (CID' : CpuId), add_vec (rget (CID := CID') D6 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12)) = devsw_console_write).
     { intros CID'. rewrite HD6a5. unfold devsw_console_write. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x3a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 24 : mword 12)
+    iApply (wp_csd_s_sconf (kt := KT0) (ktd := KT0) (mword_of_int (KernelSyms.consoleinit + 0x3a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 24 : mword 12)
               D6 (K - 2)%nat dwrite0 false with "Hcg Hpc Hi3a [Hdw]").
     { iEval (rewrite Hdwa). iExact "Hdw". }
     iApply wp_next_off_intro.
@@ -433,8 +433,8 @@ Section ConsoleinitBody.
     { rewrite HE2sp. apply frame_cancel_16. }
     assert (Hpop : E2 !!! Regidx csp_rs1 = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HE2sp. exact Hpush. }
-    iAssert (stack_own (m !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
-    { rewrite stack_own_slots; cbn [seq].
+    iAssert (stack_own (KTR := KT0) (m !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT0)); cbn [seq].
       iSplitL "Hc1". { iExists (m !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (m !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }
@@ -519,7 +519,7 @@ Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINI
        uses to keep a dfrac argument's implicit explicit. *)
     wp_consoleinit_sconf_gen
       (fun `(CID' : CpuId) m' vlock' vname' vcpu' s' K' b' p' =>
-         Initlock.wp_initlock_sconf (CID:=CID') m' vlock' vname' vcpu' s' K' b' p')
+         Initlock.wp_initlock_sconf KT0 (CID:=CID') m' vlock' vname' vcpu' s' K' b' p')
       (fun `(CID' : CpuId) γd' m' K' l' b0' p' =>
          Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' p')
       γd m K l b0 vclock vcname vccpu dread0 dwrite0 p.

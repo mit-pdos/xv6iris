@@ -50,7 +50,6 @@ Require Import DinodeEnc.
 Require Import DirView.
 Require Import IcacheRef.
 Require Import DirLinks.
-Require Import InodeInv.
 Require Import InodeRegion.
 
 Local Open Scope Z_scope.

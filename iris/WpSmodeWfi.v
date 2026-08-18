@@ -44,6 +44,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile HartTp WpGpr MinstretInv InstrBytes.
 Require Import SmodeCore SmodeCorePt.
+Require Import SRegime.   (* sr_ktier_wit_KT0: the fetch engine's tier witness *)
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -410,6 +411,7 @@ Section WpSmodeWfi.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
@@ -514,11 +516,11 @@ Section WpSmodeWfi.
   (* ------------------------------------------------------------------- *)
   Lemma wp_wfi_s_sconf (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     intr_count 0 false -∗
     pc_is pc -∗
     instr pc false (WFI tt) -∗
-    ( ▷ ( sie_cap_gpr m n b p -∗
+    ( ▷ ( sie_cap_gpr kt m n b p -∗
           intr_count 0 false -∗
           pc_is (add_vec_int pc 4) -∗
           WP (Loop : expr riscv_lang))) -∗
@@ -526,7 +528,7 @@ Section WpSmodeWfi.
   Proof.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -584,9 +586,10 @@ Section WpSmodeWfi.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σa.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the fetch, through the capability's translation slot (both arms) *)
+    iPoseProof (sr_ktier_wit_KT0 strans_regime) as "#Hwtier".
     unshelve iMod (s_regime_fetch strans_regime σa pc (F_Base w) _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
-            with "[$Hreg $Hmem] Htr Hbytes")
+            with "Hwtier [$Hreg $Hmem] Htr Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htr)"; [solve_ndisj |].
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -633,7 +636,7 @@ Section WpSmodeWfi.
     (* ---- and now the WAIT phase, with everything the client is owed
        riding through as [R] ---- *)
     iApply (wp_wfi_wait pc (zero_extend' 32 w)
-              (sconf ∗ sie_cap m n b p ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
+              (sconf ∗ sie_cap kt m n b p ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
               with "Hminv Hhs Hpcr Hnpc
                     [Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv Hstk Htr Harm Hfile Hcnt]
                     [Hcont]").
@@ -645,7 +648,7 @@ Section WpSmodeWfi.
         { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm". }
+      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Hwit". }
       iFrame "Hfile Hcnt". }
     iIntros "Hhs' Hpc' (Hsc & Hcap & Hfile & Hcnt)".
     iApply ("Hcont" with "[Hhs' Hsc Hcap Hfile] Hcnt Hpc'").

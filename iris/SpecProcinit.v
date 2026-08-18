@@ -54,6 +54,8 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmMap.
+Require Import StackOwn.
+Require Import KstackOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -135,11 +137,34 @@ Section SpecProcinit.
        proc_dormant_nofd pa)%I.
 
   (* ---- one process, after ---- *)
+  (* the block is the PRE-STACK one ([ProcInv.proc_dormant_prestk]): procinit
+     has just written [p->kstack], and the slot's stack cannot be deposited
+     until that cell is persisted into [is_kstack], which is the caller's
+     next ghost step ([procs_inv_alloc] below). *)
   Definition proc_ready (i : nat) : iProp Σ :=
     (lk_fresh (proc_addr i) "proc"%string ∗
      p_state (proc_addr i) ↦₄ UNUSED ∗
      p_kstack (proc_addr i) ↦₈ kstack_va i ∗
-     proc_dormant (proc_addr i) UNUSED)%I.
+     proc_dormant_prestk (proc_addr i))%I.
+
+  (* ---- THE BANK, CARVED TO WHAT A SLOT PARKS ----
+     [KstackOwn.kstack_bank] hands out the WHOLE page, 512 slots;
+     [ProcDefs.kstack_free] states [KSTACK_AV] (400).  The 112-slot
+     difference is deliberate headroom that no consumer names, so the carve
+     happens ONCE, here, at the deposit -- rather than by restating
+     [kstack_free] at 512, which would oblige the exit path to give back
+     words nobody ever tracked.  The tail is dropped (affine). *)
+  Lemma kstack_bank_carve :
+    kstack_bank ⊢
+    [∗ list] i ∈ seq 0 NPROC,
+      stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV.
+  Proof.
+    rewrite /kstack_bank /NPROC.
+    iIntros "H". iApply (big_sepL_mono with "H").
+    iIntros (k i _) "Hs".
+    iDestruct (stack_own_split_1 (KTR := KT1) _ KSTACK_AV 512%nat
+                 ltac:(rewrite /KSTACK_AV; lia) with "Hs") as "[$ _]".
+  Qed.
 
 End SpecProcinit.
 
@@ -165,14 +190,20 @@ Section ProcinitSeals.
     hart_at_any (proc_addr i) -∗
     (* the slot's state mirror, whole, at the UNUSED procinit just stored *)
     pstate_lock (proc_addr i) UNUSED -∗
+    (* [kstack_free] is the caller's to supply, and it is supplied HERE
+       because this is the first point at which it can be: [is_kstack] does
+       not exist until [p->kstack] is persisted, which the caller does in the
+       same ghost step (see [procs_inv_alloc]). *)
+    kstack_free (proc_addr i) -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
     proc_lock_res γs γl (proc_addr i).
   Proof.
-    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst".
     iFrame "Hlk Hks".
     iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
-    iApply (proc_slots_unused_intro with "Hdorm Hpark").
+    iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
+    iApply (proc_dormant_prestk_seal with "Hdorm Hkst").
   Qed.
 
 End ProcinitSeals.
@@ -218,18 +249,23 @@ Section ProcinitProcsInv.
      p_state (proc_addr i) ↦₄ UNUSED ∗
      (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
      proc_pub (proc_addr i) ∗
-     proc_dormant (proc_addr i) UNUSED ∗
+     proc_dormant_prestk (proc_addr i) ∗
      hart_at_any (proc_addr i) ∗
-     pstate_lock (proc_addr i) UNUSED)%I.
+     pstate_lock (proc_addr i) UNUSED ∗
+     (* the slot's kernel stack, still spelled at [kstack_va i] because
+        [is_kstack] has not been minted yet -- pass 3 below mints it and the
+        two become [kstack_free]. *)
+     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV)%I.
 
   Lemma proc_ready_split (i : nat) (ch : mword 64) :
     proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
     hart_at_any (proc_addr i) -∗ pstate_lock (proc_addr i) UNUSED -∗
+    stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof.
     rewrite /proc_ready /proc_res.
-    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
-    iFrame "Hks Hst Hpub Hdorm Hpark Hg". iExists ch. iExact "Hch".
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk".
+    iFrame "Hks Hst Hpub Hdorm Hpark Hg Hstk". iExists ch. iExact "Hch".
   Qed.
 
   (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
@@ -265,25 +301,39 @@ Section ProcinitProcsInv.
   (* THE HELPER.  procinit's postcondition plus the two public cells it never
      touches ([p_chan] and [proc_pub], exactly what [proc_ready_lock_res]
      consumes) becomes the scheduler's [procs_inv]. *)
+  (* THE KERNEL STACKS ARRIVE HERE, one per slot, anchored at the top of the
+     page procinit just recorded in [p->kstack].  They are the caller's --
+     main's -- and they exist: [KstackOwn.kstack_bank] is minted in
+     [ProofMain.mn_grp_kvm] out of kvminit's 64 identity pages and
+     kvminithart's 64 [kmap_at] claims, the one point where both halves are
+     in hand.  This step is the FIRST that can take them: [kstack_free]
+     names its anchor through the persistent [is_kstack], and that is minted
+     in pass 3 below, out of the very cell procinit wrote. *)
   Lemma procs_inv_alloc (E : coPset) :
     ([∗ list] i ∈ seq 0 NPROC,
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
          proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
-       pstate_full i UNUSED)
+       pstate_full i UNUSED) -∗
+    kstack_bank
     ={E}=∗ ∃ γs : list gname, procs_inv γs.
   Proof.
-    iIntros "Hin".
+    iIntros "Hin Hbank".
+    iDestruct (kstack_bank_carve with "Hbank") as "Hstk".
+    (* pair each slot's stack with its resources, so one [big_sepL_impl] can
+       carry both through the two passes below *)
+    iDestruct (big_sepL_sep_2 with "Hin Hstk") as "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
     iDestruct (big_sepL_impl
-                 (fun _ i => (((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-                                proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
-                              pstate_full i UNUSED)%I)
+                 (fun _ i => ((((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+                                 proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
+                               pstate_full i UNUSED) ∗
+                              stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV)%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
-    { iIntros "!>" (k i Hk) "(((Hrdy & Hch & Hpub) & Hpark) & Hg)".
+    { iIntros "!>" (k i Hk) "[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk]".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
-      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg]").
+      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk").
       { iApply (hart_at_any_intro k (0%fin : CPU) Hlt with "Hpark"). }
       (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
       rewrite /pstate_lock unclaimed_UNUSED.
@@ -301,14 +351,20 @@ Section ProcinitProcsInv.
                                         (proc_lock_res γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
-    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg)]".
+    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
       iMod (word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
+      (* THE DEPOSIT: the persisted cell is [is_kstack], and with the words
+         beside it the slot's stack is sealed into the dormant block. *)
+      iAssert (kstack_free (proc_addr i)) with "[Hstk]" as "Hkst".
+      { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
+                  with "[] Hstk"). iExact "Hksp". }
       iMod ("Hmk" $! (proc_lock_res γs g (proc_addr i))
-              with "[Hst Hg Hch Hpub Hdorm Hpark]") as "#Hlk".
+              with "[Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "#Hlk".
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
-                  with "Hst Hg Hch Hpub [Hdorm Hpark]").
-        iApply (proc_slots_unused_intro with "Hdorm Hpark"). }
+                  with "Hst Hg Hch Hpub [Hdorm Hpark Hkst]").
+        iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
+        iApply (proc_dormant_prestk_seal with "Hdorm Hkst"). }
       iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd with "Hmk") as "Hmk".
     rewrite (big_sepL_sep (PROP:=iPropI Σ)).
@@ -326,7 +382,7 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
      wants 2 below that. *)
   (10 <= K)%nat ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two standalone locks ... *)
   lk_raw pid_lock_addr -∗
@@ -344,7 +400,7 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
   iref_slots (NPROC * (1 + IREFSPARE)) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk_fresh pid_lock_addr "nextpid"%string -∗

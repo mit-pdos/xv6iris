@@ -105,7 +105,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
      slots, and [initlock] demands [(2 <= av)] of what is left, so the budget
      is 2 + 2. *)
   (4 <= K)%nat ->
-  sie_cap_gpr m K false p -∗
+  sie_cap_gpr KT0 m K false p -∗
   (* [kernel_data] is load-bearing again: it is where the "uart" string
      literal that the [auipc a1 / addi a1] pair points at comes from -- the
      name uartinit hands [initsleeplock] -- alongside the device-register
@@ -122,7 +122,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
      [struct spinlock tx_lock], contents arbitrary. *)
   lk_raw a_tx_lock -∗
   ( ∀ mr,
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* no THR write, so the accepted trace is untouched *)

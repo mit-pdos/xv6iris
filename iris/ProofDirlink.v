@@ -609,16 +609,16 @@ Section DlBuf.
   (* the two frame slots the [de] occupies (10 and 9), carved into sixteen
      named bytes and put back *)
   Lemma dl_slots_bytes (sp0 : Arch.pa) (w1 w2 : bv 64) :
-    (pa_stk sp0 10) ↦₈ w1 -∗ (pa_stk sp0 9) ↦₈ w2 -∗
+    (pa_stk sp0 10) ↦₈[KT1] w1 -∗ (pa_stk sp0 9) ↦₈[KT1] w2 -∗
     ⌜is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true
      /\ is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true⌝ ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 10) 16.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 10) 16.
   Proof.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "H1 H2".
-    iDestruct (slot_bytes_own with "H1") as "[%Ha1 B1]".
-    iDestruct (slot_bytes_own with "H2") as "[%Ha2 B2]".
+    iDestruct (slot_bytes_own (KTR := KT1) with "H1") as "[%Ha1 B1]".
+    iDestruct (slot_bytes_own (KTR := KT1) with "H2") as "[%Ha2 B2]".
     iSplitR; [done |].
     change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iSplitL "B1"; [iExact "B1" | iExact "B2"].
@@ -627,16 +627,16 @@ Section DlBuf.
   Lemma dl_bytes_slots (sp0 : Arch.pa) :
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
-    bytes_own (DfracOwn 1) (pa_stk sp0 10) 16 ⊢
-    ∃ w1 w2 : bv 64, (pa_stk sp0 10) ↦₈ w1 ∗ (pa_stk sp0 9) ↦₈ w2.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 10) 16 ⊢
+    ∃ w1 w2 : bv 64, (pa_stk sp0 10) ↦₈[KT1] w1 ∗ (pa_stk sp0 9) ↦₈[KT1] w2.
   Proof.
     intros Ha1 Ha2.
     assert (E1 : pa_add (pa_stk sp0 10) 8 = pa_stk sp0 9)
       by (rewrite (pa_stk_next sp0 10 ltac:(lia)); reflexivity).
     iIntros "B". change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iDestruct "B" as "[B1 B2]".
-    iDestruct (bytes_own_slot _ Ha1 with "B1") as (w1) "H1".
-    iDestruct (bytes_own_slot _ Ha2 with "B2") as (w2) "H2".
+    iDestruct (bytes_own_slot (KTR := KT1) _ Ha1 with "B1") as (w1) "H1".
+    iDestruct (bytes_own_slot (KTR := KT1) _ Ha2 with "B2") as (w2) "H2".
     iExists w1, w2. iFrame.
   Qed.
 
@@ -646,12 +646,12 @@ Section DlBuf.
      built out of, so [nth_byte_assemble_len] gives the two readings. *)
   Lemma dl_bytes_half (a : Arch.pa) (g : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ g j) ⊢ ∃ w : bv 16, a ↦₂ w.
+    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] g j) ⊢ ∃ w : bv 16, a ↦₂[KT1] w.
   Proof.
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
-    iApply (word2_pointsto_intro a (DfracOwn 1) _ Hal).
-    rewrite (bb_ext a 2 g
+    iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) _ Hal).
+    rewrite (bb_ext (KTR := KT1) a 2 g
                (fun j => nth_byte (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])) j)).
     - iExact "H".
     - intros j Hj. destruct j as [| [| j]]; [| | exfalso; lia].
@@ -1009,14 +1009,14 @@ Section ProofDirlinkMain.
   (* readi's sixteen delivered bytes as the [lhu]'s halfword plus the name *)
   Lemma dl_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
-    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ file_byte data (16 * i + jj)%nat)
-    ⊣⊢ a ↦₂ dir_inum data i
-       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ dir_name data i jj).
+    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)
+    ⊣⊢ a ↦₂[KT1] dir_inum data i
+       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[KT1] dir_name data i jj).
   Proof.
     intro Hal.
-    rewrite -(dlk_half_acc data i a Hal).
-    rewrite -(dlk_name_acc data i (pa_add a 2)).
-    exact (dlk_de_split a (fun jj => file_byte data (16 * i + jj)%nat)).
+    rewrite -(dlk_half_acc (KTR := KT1) data i a Hal).
+    rewrite -(dlk_name_acc (KTR := KT1) data i (pa_add a 2)).
+    exact (dlk_de_split (KTR := KT1) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
   (* the [V] slot of readi's contract is dead on the kernel arm *)
@@ -1045,22 +1045,22 @@ Section ProofDirlinkMain.
       (CIDt : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (w3 w5 w6 : mword 64) (dnew : nat -> bv 8),
        ⌜dl_tregs m sp0 Mt⌝ -∗
-       sie_cap_gpr Mt (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mt (K - 10)%nat b (proc_addr j) -∗
        pc_is (mword_of_int (DK + 0x9c)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ w3 -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ w5 -∗
-       (pa_stk sp0 6) ↦₈ w6 -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dnew jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] w3 -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dnew jj) -∗
        wp_next (CID0 := CIDt) true (proc_addr j) (fun CIDf : CpuId =>
          ∀ mf : regfile,
            ⌜callee_saved m mf⌝ -∗
            ⌜mf !!! Regidx Ra0 = (Mt !!! Regidx Ra0 : mword 64)⌝ -∗
-           sie_cap_gpr mf K b (proc_addr j) -∗
+           sie_cap_gpr KT1 mf K b (proc_addr j) -∗
            pc_is ret_tgt -∗
            WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
@@ -1081,24 +1081,24 @@ Section ProofDirlinkMain.
        ⌜dl_pregs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64)
           (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Mp⌝ -∗
-       sie_cap_gpr Mp (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Mp (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (DK + 0x70)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ w5 -∗
-       (pa_stk sp0 6) ↦₈ w6 -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dolz jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+       (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dolz jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        i_inum ip ↦₄{dqf} dinum -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
-       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1116,7 +1116,7 @@ Section ProofDirlinkMain.
            (dn' dn0' : dinode) (n' : nat) (used' : gset Z) (Sb' : gset Z)
            (tot : nat),
              ⌜callee_saved m mf⌝ -∗
-             sie_cap_gpr mf K b (proc_addr j) -∗
+             sie_cap_gpr KT1 mf K b (proc_addr j) -∗
              cpu_own 0 eb (proc_addr j) b lks -∗
              pc_is ret_tgt -∗
              i_dev ip ↦₄{dqd} dev -∗
@@ -1124,7 +1124,7 @@ Section ProofDirlinkMain.
              inode_meta ip dn' -∗
              inode_map gfs ip bm' -∗
              inode_blocks gfs bm' data' -∗
-             ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+             ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
              sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1196,24 +1196,24 @@ Section ProofDirlinkMain.
        ⌜dir_free_first data i = None⌝ -∗
        ⌜dl_regs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64) (16 * i)%nat Ml⌝ -∗
-       sie_cap_gpr Ml (K - 10)%nat b (proc_addr j) -∗
+       sie_cap_gpr KT1 Ml (K - 10)%nat b (proc_addr j) -∗
        cpu_own 0 eb (proc_addr j) b lks -∗
        pc_is (mword_of_int (DK + 0x30)) -∗
-       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-       (pa_stk sp0 6) ↦₈ (m !!! Regidx Rs4 : mword 64) -∗
-       (pa_stk sp0 7) ↦₈ (m !!! Regidx Rs5 : mword 64) -∗
-       (pa_stk sp0 8) ↦₈ (m !!! Regidx Rs6 : mword 64) -∗
-       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ dol jj) -∗
+       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) -∗
+       (pa_stk sp0 7) ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) -∗
+       (pa_stk sp0 8) ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] dol jj) -∗
        i_dev ip ↦₄{dqd} dev -∗
        i_inum ip ↦₄{dqf} dinum -∗
        inode_meta ip dn -∗
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
-       ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ{dqn} fn i0) -∗
+       ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ[KT1]{dqn} fn i0) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1232,7 +1232,7 @@ Section ProofDirlinkMain.
            (dn' dn0' : dinode) (n' : nat) (used' : gset Z) (Sb' : gset Z)
            (tot : nat),
              ⌜callee_saved m mf⌝ -∗
-             sie_cap_gpr mf K b (proc_addr j) -∗
+             sie_cap_gpr KT1 mf K b (proc_addr j) -∗
              cpu_own 0 eb (proc_addr j) b lks -∗
              pc_is ret_tgt -∗
              i_dev ip ↦₄{dqd} dev -∗
@@ -1240,7 +1240,7 @@ Section ProofDirlinkMain.
              inode_meta ip dn' -∗
              inode_map gfs ip bm' -∗
              inode_blocks gfs bm' data' -∗
-             ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ{dqn} fn i0) -∗
+             ([∗ list] i0 ∈ seq 0 14, pa_add nb i0 ↦ₘ[KT1]{dqn} fn i0) -∗
              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
              sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1401,7 +1401,7 @@ Section ProofDirlinkMain.
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> m).
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as
       "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -1673,9 +1673,9 @@ Section ProofDirlinkMain.
       (* ---- the [de] buffer goes back to being two frame slots ---- *)
       iDestruct (dlk_name_bytes with "Hde") as "Hdeb2".
       iDestruct (dl_bytes_slots sp0 Hal10 Hal9 with "Hdeb2") as (w10 w9) "[Hc10 Hc9]".
-      iAssert (stack_own sp0 10) with
+      iAssert (stack_own (KTR := KT1) sp0 10) with
         "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".
-      { rewrite stack_own_slots. cbn [seq].
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hb1"; [iExists _; iExact "Hb1" |].
         iSplitL "Hb2"; [iExists _; iExact "Hb2" |].
         iSplitL "Hb3"; [iExists _; iExact "Hb3" |].
@@ -2014,7 +2014,7 @@ Section ProofDirlinkMain.
       (* +0x1e lw s1,76(s2) : s1 := dp->size *)
       iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
       iEval (rewrite /i_size) in "Hisz".
-      iApply (wp_lw_s_sconf (mword_of_int (DK + 0x1e)) Rs1 Rs2
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DK + 0x1e)) Rs1 Rs2
                 (mword_of_int 76 : mword 12) mdl (K - 10)%nat
                 (di_size dn : mword 32) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1e [Hisz]").
@@ -2153,7 +2153,7 @@ Section ProofDirlinkMain.
                         = add_vec_int (mword_of_int (DK + 0x78) : mword 64) 4)
           by (rewrite /W4; apply upd_eq).
         (* the [de] buffer splits into the inum halfword and the name *)
-        iEval (rewrite (dlk_de_split (pa_stk sp0 10) dolz)) in "Hde".
+        iEval (rewrite (dlk_de_split (KTR := KT1) (pa_stk sp0 10) dolz)) in "Hde".
         iDestruct "Hde" as "[Hdehi Hdenm]".
         iEval (rewrite -HW4a0) in "Hdenm".
         iEval (rewrite -HW4a1) in "Hnm".
@@ -2182,7 +2182,7 @@ Section ProofDirlinkMain.
                            (sign_extend' 64 (mword_of_int 4016 : mword 12))
                          = pa_stk sp0 10) by (rewrite Hs8; apply dl_de_addr).
         iEval (rewrite -Hdeadr) in "Hdehi".
-        iApply (wp_sh_s_sconf (mword_of_int (DK + 0x7c)) Rs6 Rs0
+        iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DK + 0x7c)) Rs6 Rs0
                   (mword_of_int 4016 : mword 12) msn (K - 10)%nat vold b
                   with "Hcg Hpc Hi7c [Hdehi]").
         { iEval (rgne). iExact "Hdehi". }
@@ -2192,19 +2192,19 @@ Section ProofDirlinkMain.
                         = mword_of_int (DK + 0x80)) by pcw.
         iEval (rewrite Hqq80) in "Hpc".
         (* ---- the sixteen bytes ARE [dirent_bytes (de_of_name inum s)] ---- *)
-        iDestruct (word2_pointsto_bytes with "Hdehi") as "Hdehi".
+        iDestruct (word2_pointsto_bytes (KTR := KT1) with "Hdehi") as "Hdehi".
         iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
-                   ↦ₘ (dirent_bytes (de_of_name inum s) !!! jj))%I
+                   ↦ₘ[KT1] (dirent_bytes (de_of_name inum s) !!! jj))%I
           with "[Hdehi Hdenm]" as "Hsrc".
-        { rewrite (dlk_de_split (pa_stk sp0 10)
+        { rewrite (dlk_de_split (KTR := KT1) (pa_stk sp0 10)
                      (fun jj => dirent_bytes (de_of_name inum s) !!! jj)).
           iSplitL "Hdehi".
-          - rewrite (bb_ext (pa_stk sp0 10) 2
+          - rewrite (bb_ext (KTR := KT1) (pa_stk sp0 10) 2
                        (fun jj => nth_byte inum jj)
                        (fun jj => dirent_bytes (de_of_name inum s) !!! jj)
                        (fun jj Hjj => eq_sym (dl_rec_hi fn inum jj Hjj))).
             iExact "Hdehi".
-          - rewrite (bb_ext (pa_add (pa_stk sp0 10) 2) 14 hh
+          - rewrite (bb_ext (KTR := KT1) (pa_add (pa_stk sp0 10) 2) 14 hh
                        (fun jj => dirent_bytes (de_of_name inum s) !!! (2 + jj)%nat)
                        (fun jj Hjj => eq_sym (dl_rec_nm fn hh inum jj Hsnc Hjj))).
             iExact "Hdenm". }
@@ -2364,7 +2364,7 @@ Section ProofDirlinkMain.
            call's own window -- same offset, same booleans, same entry set,
            because dirlookup's readi prefix and the scan above log NOTHING
            and so the count and the set here are still the caller's. *)
-        iApply (WI.wp_writei_gen gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
+        iApply (WI.wp_writei_gen KT1 gs j gl gu gd gk pd pav pu bn g gfs gi ga gf
                   cov logstart inodestart nib bmapstart size dev used gpr
                   ip dinum bm data dn dn0
                   false (16 * k0)%nat 16%nat
@@ -2984,13 +2984,13 @@ Section ProofDirlinkMain.
                                (mword_of_int (Z.of_nat 16%nat) : mword 32))
             by (rewrite HL6a4; apply rd_arg32_small; lia).
           iAssert (([∗ list] ii ∈ seq 0 16,
-                      pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ dol ii)
+                      pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[KT1] dol ii)
                    ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
             with "[Hde Hppid]" as "Hdst".
           { iEval (rewrite HL6a2). iFrame. }
           iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (RD.wp_readi_sconf gs j gl gu gd gk pd pav pu bn gfs ga gf
+          iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol dl_dummyV
                     pidv dq dqd L6 (K - 10)%nat eb b lks
@@ -3014,7 +3014,7 @@ Section ProofDirlinkMain.
              Hdst2 Hbs1".
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii
-                        ↦ₘ rd_delivered data dol (16 * i) tot ii)
+                        ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)
                    ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
             with "[Hdst2]" as "[Hde Hppid]".
           { iExact "Hdst2". }
@@ -3107,7 +3107,7 @@ Section ProofDirlinkMain.
                             (add_vec_int (mword_of_int (DK + 0x68) : mword 64) 4)]> PB2).
             assert (Ha0msg3 : PB3 !!! Regidx Ra0 = (mword_of_int dl_msg_a : mword 64))
               by pcw.
-            iApply (PN.wp_panic_sconf (CID := CIDpa4) PB3 (K - 10)%nat
+            iApply (PN.wp_panic_sconf KT1 (CID := CIDpa4) PB3 (K - 10)%nat
                       0%nat eb b (proc_addr j) (PkAStr DfracDiscarded dl_msg) lks
                       (dl_panic_K K HK) eq_refl dl_panic_noff
                       (dl_panic_below lks Hbelow)
@@ -3125,7 +3125,7 @@ Section ProofDirlinkMain.
             by (rewrite Hra0rd Htot; pcw).
           (* the delivered bytes ARE the file's bytes, split into the two views *)
           iEval (rewrite HL6a2 Htot
-                   (bb_ext (pa_stk sp0 10) 16
+                   (bb_ext (KTR := KT1) (pa_stk sp0 10) 16
                       (fun jj => rd_delivered data dol (16 * i) 16 jj)
                       (fun jj => file_byte data (16 * i + jj)%nat)
                       (fun jj Hjj => dlk_rd_delivered data dol i jj Hjj))
@@ -3143,7 +3143,7 @@ Section ProofDirlinkMain.
                           = mword_of_int (DK + 0x42)) by pcw.
           iEval (rewrite Hbb42) in "Hpc".
           (* +0x42 lhu a5,-80(s0) : de.inum *)
-          iApply (wp_lhu_s_sconf (mword_of_int (DK + 0x42)) Ra5 Rs0
+          iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DK + 0x42)) Ra5 Rs0
                     (mword_of_int 4016 : mword 12) mrd (K - 10)%nat
                     (dir_inum data i) b ltac:(nz) ltac:(rdok)
                     with "Hcg Hpc Hj42 [Hdehi]").
@@ -3180,7 +3180,7 @@ Section ProofDirlinkMain.
             iApply bi.later_intro. iIntros (CIDB9 HqB9) "Hcg Hpc".
             iEval (rewrite Htgt6c) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dl_de_view data i (pa_stk sp0 10)
                                 (dlk_align_8_2 _ Hal10))).
@@ -3265,7 +3265,7 @@ Section ProofDirlinkMain.
                             = mword_of_int (DK + 0x48)) by pcw.
             iEval (rewrite Hbb48) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
-                       ↦ₘ file_byte data (16 * i + jj)%nat)%I
+                       ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
               with "[Hdehi Hdenm]" as "Hde".
             { iEval (rewrite (dl_de_view data i (pa_stk sp0 10)
                                 (dlk_align_8_2 _ Hal10))).
@@ -3305,7 +3305,7 @@ Section ProofDirlinkMain.
             (* +0x4a lw a5,76(s2) : the size is re-read every iteration *)
             iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
             iEval (rewrite /i_size) in "Hisz".
-            iApply (wp_lw_s_sconf (mword_of_int (DK + 0x4a)) Ra5 Rs2
+            iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DK + 0x4a)) Ra5 Rs2
                       (mword_of_int 76 : mword 12) N2 (K - 10)%nat
                       (di_size dn : mword 32) b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj4a [Hisz]").

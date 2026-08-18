@@ -116,7 +116,7 @@ Definition wp_sys_close_sconf_body
      LOWEST rank in the table, and nothing else sys_close touches (argfd,
      myproc) carries any order premise at all. *)
   locks_below lks "log" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
@@ -127,7 +127,7 @@ Definition wp_sys_close_sconf_body
      literal [true], so a hart-indexed resource held across the call could
      not be transported to the arbitrary hart it may return on.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γl γf -∗
@@ -149,9 +149,9 @@ Definition wp_sys_close_sconf_body
   wp_next true p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_close_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗

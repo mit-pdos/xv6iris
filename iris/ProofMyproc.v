@@ -192,7 +192,7 @@ Section ProofMyproc.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.myproc + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -268,7 +268,7 @@ Section ProofMyproc.
     iDestruct (cpu_own_transport CID CID6 n eb p b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* the noff/intena cells + counting token ride inside cpu_own *)
-    iApply (PushOff.wp_push_off_sconf A2 (av - 4)%nat n eb p b _
+    iApply (PushOff.wp_push_off_sconf KT1 A2 (av - 4)%nat n eb p b _
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
@@ -383,7 +383,7 @@ Section ProofMyproc.
     iDestruct (cpu_own_set_proc (S n) eb p p lks with "Hown") as "(Hcur & Hown)".
     iEval (rewrite /cur_proc /a_cpu_proc) in "Hcur".
     iPoseProof (mpi_1e with "Htext") as "Hi1e".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.myproc + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.myproc + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))
               B6 (trap_res b + (av - 4))%nat p false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hcur]").
@@ -432,7 +432,7 @@ Section ProofMyproc.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
-    iApply (PushOff.wp_pop_off_sconf B9 (av - 4)%nat n eb p _
+    iApply (PushOff.wp_pop_off_sconf KT1 B9 (av - 4)%nat n eb p _
               ltac:(lia) Hszlks
               with "Hcg Hown Hpay Htext Hpc").
     rewrite -Hbmatch.
@@ -539,8 +539,8 @@ Section ProofMyproc.
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspE3. symmetry. exact Hspd4. }
     iPoseProof (mpi_2e with "Htext") as "Hi2e".
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hgap]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1 -HcspC1). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2 -HcspE1). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3 -HcspE2). iExact "Hr8". }

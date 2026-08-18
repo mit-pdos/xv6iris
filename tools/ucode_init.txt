@@ -1,0 +1,55 @@
+# ucode_init.txt -- the pc set of iris/UCodeInit.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Init --out iris/UCodeInit.v \
+#       --spec tools/ucode_init.txt
+#
+# init is the FIRST verified program that never terminates, and the first
+# whose theorem assumes nothing about what the kernel returns: every arm of
+# every test in main() is reachable, because init handles each failure
+# itself (mknod when console is missing, and a diagnostic printf + exit(1)
+# when fork, exec or wait fails).  So `func main` is the whole function, not
+# a traced subset.
+#
+# Unreachable branches INSIDE a listed function are kept, following
+# ucode_sh.txt: an unused [uinstr] fact costs only compile time, and pruning
+# per branch would have to be re-audited whenever the reachable set moves.
+# That matters most for vprintf, whose state == '%' arms init never enters
+# (none of its four format strings contains a '%') but which are generated
+# anyway.  A whole function that is never entered is another matter: its
+# facts would be a claim about code no proof reads, so it is left out and
+# the reason is recorded below.
+
+note This catalog covers init as it runs: the console-priming prologue, the
+note restart loop around fork/exec/wait, and the printf cone underneath the
+note four diagnostics.  Its coverage claim is the list of omitted functions
+note above, not all of ulib.
+
+# ---- the program ------------------------------------------------------
+func start
+func main
+
+# ---- the printf cone (reached by all four diagnostics) ----------------
+func printf
+func vprintf
+func putc
+
+# ---- the syscall stubs it issues --------------------------------------
+func open
+func mknod
+func dup
+func fork
+func wait
+func exec
+func write
+func exit
+
+# ---- and what is deliberately absent ---------------------------------
+skipfunc printint unreachable: vprintf reaches it only from a state == '%' arm, and none of init's four format strings contains a '%'
+skipfunc fprintf unreachable: init calls printf, never fprintf
+skipfunc malloc unreachable: init allocates nothing
+skipfunc free unreachable: init allocates nothing
+skipfunc sbrk unreachable: init allocates nothing
+skipfunc sbrklazy unreachable: init allocates nothing
+skipfunc sys_sbrk unreachable: init allocates nothing
+
+skipdefault library or syscall stub that init never calls

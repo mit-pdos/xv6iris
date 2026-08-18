@@ -139,7 +139,7 @@ Definition wp_consolewrite_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
      released inside uartwrite's own loop -- be the only lock held. *)
   cpu_own 0%nat eb pj b lks -∗
@@ -163,7 +163,7 @@ Definition wp_consolewrite_sconf_body
          between nothing and all of it. *)
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗

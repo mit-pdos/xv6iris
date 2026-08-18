@@ -32,126 +32,9 @@ Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
 
-(* ===================================================================== *)
-(* §0 Pure arithmetic helpers.                                            *)
-(*                                                                        *)
-(* Everything here is stated over PLAIN [Z] variables (or over a single    *)
-(* [mword] with the bitvector reading taken immediately), because [lia]    *)
-(* is unusable on a goal mentioning [bv_unsigned] under this file's        *)
-(* import set (durable-notes: the [bitvector.tactics] zify hook).          *)
-(* ===================================================================== *)
-
-(* a 16-aligned page offset leaves at least 4080-r room: this is what makes *)
-(* both stack slots' 4-byte/8-byte windows sit on ONE page.                 *)
-Lemma z_mod4096_of_mod16 (V r : Z) :
-  0 <= V -> 0 <= r < 16 -> V mod 16 = r -> V mod 4096 <= 4080 + r.
-Proof.
-  intros HV Hr Hm.
-  assert (Hd : (16 | 4096)) by (exists 256; reflexivity).
-  pose proof (Znumtheory.Zmod_div_mod 16 4096 V ltac:(lia) ltac:(lia) Hd) as Hq.
-  pose proof (Z.mod_pos_bound V 4096 ltac:(lia)) as Hb.
-  pose proof (Z.div_mod (V mod 4096) 16 ltac:(lia)) as Hdm.
-  rewrite <- Hq in Hdm. rewrite Hm in Hdm. lia.
-Qed.
-
-(* Sv39 canonicality of any address below 2^38 (the [uv_frame16] bound). *)
-Lemma z_canon_small (V : Z) :
-  0 <= V < 274877906944 ->
-  V = (((V mod 549755813888 + 274877906944) mod 549755813888) - 274877906944)
-        mod 18446744073709551616.
-Proof.
-  intro HV.
-  rewrite (Z.mod_small V 549755813888 ltac:(lia)).
-  rewrite (Z.mod_small (V + 274877906944) 549755813888 ltac:(lia)).
-  replace (V + 274877906944 - 274877906944) with V by lia.
-  rewrite (Z.mod_small V 18446744073709551616 ltac:(lia)). reflexivity.
-Qed.
-
-Lemma uva_canon_small (a : mword 64) :
-  bv_unsigned a < 274877906944 -> uva_canon a.
-Proof.
-  intro Hlt.
-  pose proof (proj1 (bv_unsigned_in_range _ a)) as Hlo.
-  apply uva_canon_unsigned.
-  unfold bv_swrap, bv_wrap.
-  assert (E39 : bv_modulus 39 = 549755813888) by (vm_compute; reflexivity).
-  assert (E64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  assert (Eh39 : bv_half_modulus 39 = 274877906944) by (vm_compute; reflexivity).
-  rewrite E39 E64 Eh39.
-  exact (z_canon_small (bv_unsigned a) (conj Hlo Hlt)).
-Qed.
-
-(* a NEGATIVE 64-bit displacement, as unsigned arithmetic (the [add_vec_int]
-   twin of UserBits' [uint_add_vec_int_small]) *)
-Lemma uv_avi_neg (a : mword 64) (d : Z) :
-  0 <= d -> d <= bv_unsigned a ->
-  bv_unsigned (add_vec_int a (- d)) = bv_unsigned a - d.
-Proof.
-  intros Hd Hle.
-  unfold add_vec_int.
-  rewrite add_vec64_unsigned moi64_unsigned.
-  unfold bv_wrap.
-  assert (E64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  rewrite E64.
-  rewrite Zplus_mod_idemp_r.
-  apply Z.mod_small.
-  pose proof (bv_unsigned_in_range _ a) as Hr. rewrite E64 in Hr. lia.
-Qed.
-
-Lemma z_mod8_of_mod16 (V r : Z) :
-  0 <= V -> (r = 0 \/ r = 8) -> V mod 16 = r -> V mod 8 = 0.
-Proof.
-  intros HV Hr Hm.
-  assert (Hd : (8 | 16)) by (exists 2; reflexivity).
-  rewrite (Znumtheory.Zmod_div_mod 8 16 V ltac:(lia) ltac:(lia) Hd).
-  rewrite Hm. destruct Hr as [ -> | -> ]; reflexivity.
-Qed.
-
-(* THE pure-Z package behind every stack-slot side condition: with sp0
-   16-aligned, the slot at sp0-16+d (d = 0 or 8) is 8-aligned, sits inside
-   one page, and leaves the whole 8-byte window on that page. *)
-Lemma frame_slot_arith (U d : Z) :
-  0 <= U -> 4096 + 16 <= U -> U mod 16 = 0 -> (d = 0 \/ d = 8) ->
-  (U - 16 + d) mod 4096 <= 4080 + d /\
-  (U - 16 + d) mod 8 = 0 /\
-  (U - 16) mod 4096 + d < 4096.
-Proof.
-  intros HU0 HUlo HU16 Hd.
-  assert (Hdr : (U - 16 + d) mod 16 = d).
-  { replace (U - 16 + d) with (U + (d - 16)) by lia.
-    rewrite Zplus_mod. rewrite HU16. destruct Hd as [ -> | -> ]; reflexivity. }
-  assert (Hz : (U - 16) mod 16 = 0).
-  { replace (U - 16) with (U + (0 - 16)) by lia.
-    rewrite Zplus_mod. rewrite HU16. reflexivity. }
-  split_and!.
-  - apply (z_mod4096_of_mod16 (U - 16 + d) d); [ lia | destruct Hd; lia | exact Hdr ].
-  - apply (z_mod8_of_mod16 (U - 16 + d) d); [ lia | exact Hd | exact Hdr ].
-  - pose proof (z_mod4096_of_mod16 (U - 16) 0 ltac:(lia) ltac:(lia) Hz). lia.
-Qed.
-
-(* a 64-bit fit bound, mword-free (so [lia] never meets a [bv_unsigned]) *)
-Lemma z_fit64 (A d : Z) :
-  0 <= A < 18446744073709551616 -> 16 <= A -> 0 <= d <= 8 ->
-  A - 16 + d < 18446744073709551616.
-Proof. lia. Qed.
-
-Lemma z_canon_slot (A d C : Z) : A < C -> 16 <= A -> 0 <= d <= 8 -> A - 16 + d < C.
-Proof. lia. Qed.
-
-(* the address of the slot at sp0-16+d, as unsigned arithmetic *)
-Lemma uv_slot_unsigned (sp0 : mword 64) (d : Z) :
-  16 <= bv_unsigned sp0 -> 0 <= d <= 8 ->
-  bv_unsigned (add_vec_int (add_vec_int sp0 (-16)) d) = bv_unsigned sp0 - 16 + d.
-Proof.
-  intros Hlo Hd.
-  pose proof (bv_unsigned_in_range _ sp0) as Hrng.
-  assert (Em64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  rewrite Em64 in Hrng.
-  pose proof (uv_avi_neg sp0 16 ltac:(lia) Hlo) as H1.
-  rewrite (uint_add_vec_int_small (add_vec_int sp0 (-16)) d ltac:(lia)
-             ltac:(rewrite H1; exact (z_fit64 _ d Hrng Hlo Hd))).
-  rewrite H1. reflexivity.
-Qed.
+(* The pure stack arithmetic every slot access needs -- [uv_stack_slot] and
+   friends -- lives in UmodeAbi.v, where it is stated once for a budget of
+   any size.  Only what is SPECIFIC to the sync image is proved here. *)
 
 (* ===================================================================== *)
 (* §1 The image is only ever written ABOVE the text.                      *)
@@ -187,70 +70,6 @@ Proof.
   - exact (Hs k b Hk).
   - intros j Hj. pose proof (sync_bytes_key_lt k b Hk) as Hlt.
     pose proof (Nat2Z.is_nonneg j) as Hj0. lia.
-Qed.
-
-(* ===================================================================== *)
-(* §1b The two stack slots of a 16-byte frame, as store-leaf premises.     *)
-(*                                                                        *)
-(* [wp_uv_csdsp] wants, for its target va: the page mapped store-          *)
-(* permitting, canonicality, 8-alignment, the whole 8-byte window on one   *)
-(* page, and the bytes present in the image.  A [uv_frame16] window gives  *)
-(* all five for the slot at [sp0-16+d] with d = 0 (the s0 slot) and d = 8  *)
-(* (the ra slot) -- one lemma, both call sites, both prologues.            *)
-(* ===================================================================== *)
-
-Lemma frame_slot_facts (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64) (d : Z) :
-  uv_frame16 pt M sp0 -> (d = 0 \/ d = 8) ->
-  let tgt := add_vec_int (add_vec_int sp0 (-16)) d in
-  uint tgt = uint sp0 - 16 + d /\
-  (exists w_st : mword 64,
-     ud_um pt !! svpn_of tgt = Some w_st /\ uleaf_ok (Store Data) w_st) /\
-  uva_canon tgt /\
-  Z.rem (uint tgt) 4096 <= 4088 /\
-  is_aligned_vaddr (Virtaddr tgt) 8 = true /\
-  (forall j : nat, (j < 8)%nat ->
-     exists b : bv 8, M !! (uint tgt + Z.of_nat j) = Some b).
-Proof.
-  intros [Hfb Hfl Hfal Hflo Hfcanon] Hd tgt.
-  pose proof (bv_unsigned_in_range _ sp0) as Hrng.
-  assert (Em64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  rewrite Em64 in Hrng.
-  rewrite !uint_unsigned in Hfb Hfal Hflo Hfcanon.
-  rewrite Z.rem_mod_nonneg in Hfal; [ | exact (proj1 Hrng) | lia ].
-  assert (Hd08 : 0 <= d <= 8) by (destruct Hd; lia).
-  assert (Hlo16 : 16 <= bv_unsigned sp0) by lia.
-  (* the address of the slot *)
-  assert (Htu : bv_unsigned tgt = bv_unsigned sp0 - 16 + d)
-    by (unfold tgt; exact (uv_slot_unsigned sp0 d Hlo16 Hd08)).
-  destruct (frame_slot_arith (bv_unsigned sp0) d (proj1 Hrng) Hflo Hfal Hd)
-    as (Apg & Aal & Awin).
-  (* the leaf: the slot is on the same page as sp0-16 *)
-  pose proof (uv_avi_neg sp0 16 ltac:(lia) Hlo16) as Hsp1u.
-  assert (Hleaf : svpn_of tgt = svpn_of (add_vec_int sp0 (-16))).
-  { unfold tgt.
-    apply (usvpn_window (add_vec_int sp0 (-16)) d ltac:(lia)).
-    rewrite Hsp1u. exact Awin. }
-  split_and!.
-  - rewrite !uint_unsigned. exact Htu.
-  - destruct Hfl as (w & Hw & Hok). exists w. rewrite Hleaf. split; assumption.
-  - apply uva_canon_small. rewrite Htu.
-    exact (z_canon_slot _ d 274877906944 Hfcanon Hlo16 Hd08).
-  - rewrite uint_unsigned Htu.
-    rewrite Z.rem_mod_nonneg; [ | lia | lia ]. lia.
-  - unfold is_aligned_vaddr. apply Z.eqb_eq.
-    rewrite uint_unsigned Htu.
-    rewrite Z.rem_mod_nonneg; [ exact Aal | lia | lia ].
-  - intros j Hj. rewrite uint_unsigned Htu.
-    destruct Hd as [ -> | -> ].
-    + destruct (Hfb j ltac:(lia)) as (b & Hb). exists b.
-      replace (bv_unsigned sp0 - 16 + 0 + Z.of_nat j)
-        with (bv_unsigned sp0 - 16 + Z.of_nat j) by lia.
-      exact Hb.
-    + destruct (Hfb (8 + j)%nat ltac:(lia)) as (b & Hb). exists b.
-      replace (bv_unsigned sp0 - 16 + 8 + Z.of_nat j)
-        with (bv_unsigned sp0 - 16 + Z.of_nat (8 + j)%nat)
-        by (rewrite Nat2Z.inj_add; lia).
-      exact Hb.
 Qed.
 
 (* ===================================================================== *)
@@ -385,14 +204,17 @@ Section UProofSync.
       (sp0 : mword 64) :
     wp_sync_main_body (CID := CIDp) C pt M m sp0.
   Proof.
-    intros Hlay Htext Hsp Hfr.
+    intros Hlay Htext Hsp Hst.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
-    (* the two 8-byte stack slots, with every store-leaf side condition *)
-    destruct (frame_slot_facts pt M sp0 8 Hfr (or_intror eq_refl))
-      as (Hu8 & (w8 & Hl8 & Hok8) & Hcanon8 & Hpg8 & Hal8 & Hb8).
-    destruct (frame_slot_facts pt M sp0 0 Hfr (or_introl eq_refl))
-      as (Hu0 & (w0 & Hl0 & Hok0) & Hcanon0 & Hpg0 & Hal0 & Hb0).
-    pose proof Hfr as Hfrc. destruct Hfrc as [ _ _ _ Hflo _ ].
+    (* the prologue's two [c.sdsp] slots: offsets d = 8 (ra) and d = 0 (s0)
+       of main's own 16-byte budget, with every store-leaf side condition *)
+    destruct (uv_stack_slot pt M sp0 16 8 Hst ltac:(lia) ltac:(lia)
+                ltac:(reflexivity))
+      as (Hu8 & (w8 & Hl8 & Hok8 & _) & Hcanon8 & Hpg8 & Hal8 & Hb8).
+    destruct (uv_stack_slot pt M sp0 16 0 Hst ltac:(lia) ltac:(lia)
+                ltac:(reflexivity))
+      as (Hu0 & (w0 & Hl0 & Hok0 & _) & Hcanon0 & Hpg0 & Hal0 & Hb0).
+    pose proof (us_lo _ _ _ _ Hst) as Hflo.
     assert (Hu8' : uint (add_vec_int (add_vec_int sp0 (-16)) 8) = uint sp0 - 8)
       by (rewrite Hu8; lia).
     assert (Hu0' : uint (add_vec_int (add_vec_int sp0 (-16)) 0) = uint sp0 - 16)
@@ -575,13 +397,19 @@ Section UProofSync.
       (sp0 : mword 64) :
     wp_sync_start_body (CID := CIDp) C pt M m sp0.
   Proof.
-    intros Hlay Htext Hsp Hfr Hfr'.
+    intros Hlay Htext Hsp Hst.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
-    destruct (frame_slot_facts pt M sp0 8 Hfr (or_intror eq_refl))
-      as (Hu8 & (w8 & Hl8 & Hok8) & Hcanon8 & Hpg8 & Hal8 & Hb8).
-    destruct (frame_slot_facts pt M sp0 0 Hfr (or_introl eq_refl))
-      as (Hu0 & (w0 & Hl0 & Hok0) & Hcanon0 & Hpg0 & Hal0 & Hb0).
-    pose proof Hfr as Hfrc. destruct Hfrc as [ _ _ _ Hflo _ ].
+    (* the 32-byte budget splits into start's own frame and main's, the
+       latter sitting at the post-prologue sp = sp0-16 *)
+    destruct (uv_stack_split pt M sp0 32 16 16 ltac:(lia) ltac:(lia)
+                ltac:(reflexivity) ltac:(lia) Hst) as [Hstf Hstm].
+    destruct (uv_stack_slot pt M sp0 16 8 Hstf ltac:(lia) ltac:(lia)
+                ltac:(reflexivity))
+      as (Hu8 & (w8 & Hl8 & Hok8 & _) & Hcanon8 & Hpg8 & Hal8 & Hb8).
+    destruct (uv_stack_slot pt M sp0 16 0 Hstf ltac:(lia) ltac:(lia)
+                ltac:(reflexivity))
+      as (Hu0 & (w0 & Hl0 & Hok0 & _) & Hcanon0 & Hpg0 & Hal0 & Hb0).
+    pose proof (us_lo _ _ _ _ Hstf) as Hflo.
     assert (Hu8' : uint (add_vec_int (add_vec_int sp0 (-16)) 8) = uint sp0 - 8)
       by (rewrite Hu8; lia).
     assert (Hu0' : uint (add_vec_int (add_vec_int sp0 (-16)) 0) = uint sp0 - 16)
@@ -726,11 +554,15 @@ Section UProofSync.
                      ltac:(vm_compute; discriminate))
                   (upd_eq m (Regidx sp_idx)
                      (regval_into_reg (add_vec_int sp0 (-16)))))). }
-    assert (Hfr3 : uv_frame16 pt M3 (add_vec_int sp0 (-16)))
-      by exact (uv_frame16_dom pt M2 M3 _ Hdom3
-                  (uv_frame16_dom pt M M2 _ Hdom2 Hfr')).
+    assert (Hstm3 : uv_stack pt M3 (add_vec_int sp0 (-16)) 16)
+      by exact (uv_stack_dom pt M2 M3 _ 16 Hdom3
+                  (uv_stack_dom pt M M2 _ 16 Hdom2 Hstm)).
     iApply (wp_sync_main CID5 M3 m3 (add_vec_int sp0 (-16))
-              Hlay Htext3 Hsp3 Hfr3 with "Hcg Hpc").
+              Hlay Htext3 Hsp3 Hstm3 with "Hcg Hpc").
   Qed.
 
 End UProofSync.
+
+(* sentinel: the whole sync verification rests on nothing but the platform
+   axioms and functional extensionality *)
+Print Assumptions wp_sync_start.

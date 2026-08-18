@@ -44,7 +44,8 @@ Definition strncmp_res (f g : nat -> bv 8) (n : nat) (res : mword 64) : Prop :=
     ((forall j, (j < n)%nat -> f j = g j /\ f j <> (mword_of_int 0 : mword 8)) /\
      res = (mword_of_int 0 : mword 64)))).
 
-Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    (ktf ktg : ktier) (mm : regfile)
     (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.strncmp in
   let s1 := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -54,17 +55,17 @@ Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
   (2 <= K)%nat ->
   mm !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
   (Z.of_nat n < 2 ^ 31)%Z ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
-  ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
-  ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
+  ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ[ktf]{dq1} f j) -∗
+  ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ[ktg]{dq2} g j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ{dq1} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ{dq2} g j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s1 j) ↦ₘ[ktf]{dq1} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s2 j) ↦ₘ[ktg]{dq2} g j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜strncmp_res f g n (mr !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -72,7 +73,8 @@ Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type STRNCMP.
   Parameter wp_strncmp_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+      (ktf ktg : ktier) (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64),
-      wp_strncmp_sconf_body mm n f g K dq1 dq2 b p.
+      wp_strncmp_sconf_body ktf ktg mm n f g K dq1 dq2 b p.
 End STRNCMP.

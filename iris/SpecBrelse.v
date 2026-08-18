@@ -73,7 +73,7 @@ Definition wp_brelse_sconf_body
      gets there from this one, so "bcache" (the lowest rank brelse touches)
      is the only premise stated here. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
@@ -89,7 +89,7 @@ Definition wp_brelse_sconf_body
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b p -∗
+      sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗

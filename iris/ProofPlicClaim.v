@@ -188,7 +188,7 @@ Section ProofPlicClaim.
        [b = false]-only (SpecCpuid.v) with no [wp_next] wrapper, matching
        plic_claim's own now-[b = false] contract exactly -- so the call
        produces its continuation directly, with nothing to collapse. ---- *)
-    iApply (Cpuid.wp_call_cpuid_sconf_cs (mword_of_int (KernelSyms.plic_claim + 0x08))
+    iApply (Cpuid.wp_call_cpuid_sconf_cs KT1 (mword_of_int (KernelSyms.plic_claim + 0x08))
               (mword_of_int 2081410 : mword 21) R2 (n - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

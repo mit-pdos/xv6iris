@@ -106,7 +106,7 @@ Section KforkB7.
       (M : regfile) (n : nat) (p : mword 64) :
     M !!! Regidx Rs4 = npa ->
     M !!! Regidx Rs5 = pme ->
-    sie_cap_gpr M n false p -∗
+    sie_cap_gpr KT1 M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
     proc_priv_nocwd γf npa pid_c V -∗
@@ -117,7 +117,7 @@ Section KforkB7.
           Mx !!! Regidx Rs5 = pme /\
           (forall r : mword 5, is_cs_idx r = true ->
               r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mx !!! Regidx r = M !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mx n false p -∗
+        sie_cap_gpr KT1 Mx n false p -∗
         pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
         proc_priv_nocwd γf npa pid_c (upd_pt V (pv_upt V) (<[(14%nat) := zero_reg]> (pv_tf V))) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -153,7 +153,7 @@ Section KforkB7.
     (* ---- +0x66: ld a5,88(s4) ---- *)
     assert (Htgt66 : add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
                      = p_trapframe npa) by (rewrite HM4; reflexivity).
-    iApply (wp_ld_s_sconf (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
               M n (page_base (ud_tfp (pv_upt V))) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi066 [Htf]").
@@ -174,7 +174,7 @@ Section KforkB7.
     assert (Htgt6a : add_vec (T1 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 112 : mword 12))
                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat 14))
       by (rewrite HT1a5; apply kfkb7_tf14_addr).
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
+    iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
               T1 n w14 false
               with "Hcg Hpc Hi06a [Hcell]").
     { iEval (rgne; rewrite Htgt6a). iExact "Hcell". }

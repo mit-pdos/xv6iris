@@ -780,8 +780,20 @@ Section UvRetireFunnel.
   (* The continuation quantifies the hart: the step may be preceded by an   *)
   (* arbitrary number of absorbed interrupts, each of which may migrate the *)
   (* process, so nothing after the step runs at the entry hart.             *)
+  (*                                                                       *)
+  (* [wp_uv_retire_later] IS THE GENERAL FORM and hands the step's own      *)
+  (* [|>] OUT: at the point the funnel applies the continuation the goal    *)
+  (* already IS [|> WP] (that is what [uv_retire_post_fetch] asks for), so  *)
+  (* exposing the later costs nothing here and is the only thing that lets  *)
+  (* a caller close an UNBOUNDED loop -- an [iLoeb] IH is [|>]-guarded and  *)
+  (* a later-free leaf can never strip it (design/kernel-proofs.md, and the *)
+  (* kernel tier's [wp_cbnez_taken_s]).  [wp_uv_retire] is the later-free   *)
+  (* restatement every existing leaf uses: it absorbs the later with its    *)
+  (* own [iNext], so nothing downstream changed shape.  init's two          *)
+  (* unbounded loops (claude-notes/projects/user-init.md) are what made the *)
+  (* general form necessary; echo's and sh's loops are all bounded.         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uv_retire (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+  Lemma wp_uv_retire_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
       (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
     uinstr pt M pc is_rvc i ->
@@ -802,10 +814,10 @@ Section UvRetireFunnel.
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
-       pc_is (CID := CID0) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
-       WP (Loop : expr riscv_lang)) -∗
+    ▷ (∀ CID0 : CpuId,
+         uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
+         pc_is (CID := CID0) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hexec.
@@ -1006,6 +1018,45 @@ Section UvRetireFunnel.
                   with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
         unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* The later-free restatement: the shape every leaf in WpUmodeLeaf.v /   *)
+  (* WpUmodeBranch.v / WpUmodeStore.v / WpUmodeLoad.v takes.  A caller     *)
+  (* that does not want the step's later absorbs it here, once.            *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_retire (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
+    uinstr pt M pc is_rvc i ->
+    uv_redirect i o ->
+    is_lpad_instruction i = false ->
+    uv_wrok wr ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       exec (execute (uv_exp i o)) s_pc
+         = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
+       pc_is (CID := CID0) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hred Hlpad Hwrok Hexec.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_retire_later Ψ M m pc is_rvc i o jt wr
+              Hui Hred Hlpad Hwrok Hexec with "Hcg Hpc [Hcont]").
+    iNext. iExact "Hcont".
   Qed.
 
 End UvRetireFunnel.

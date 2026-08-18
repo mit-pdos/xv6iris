@@ -65,7 +65,6 @@ Require Import BioDefs.
 Require Import IrefSlots InodeRegion ProcAvail.
 Require Import CodeForkret.
 Require Import SpecMyproc SpecRelease SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit SpecKexit.
 Require Import SpecUserretClosed.
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
@@ -209,7 +208,7 @@ Proof.
   assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (FR + 0x02)) by pcw.
   iEval (rewrite Hp02) in "Hpc".
   (* the frame: three saved words, three scratch slots *)
-  iDestruct (stack_own_split_1 ksp 4 6 ltac:(lia) with "Hframe") as "[Hf14 Hf56]".
+  iDestruct (stack_own_split_1 (KTR := KT1) ksp 4 6 ltac:(lia) with "Hframe") as "[Hf14 Hf56]".
   iDestruct (stack_own_4_elim with "Hf14") as (vra vs0 vs1 vsc) "(Hbra & Hbs0 & Hbs1 & Hbsc)".
   assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                    (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
@@ -342,7 +341,7 @@ Proof.
     by (rewrite HM5a0; apply addv_sext0).
   (* the arm splits: what release wants and what prepare_return will *)
   iDestruct (arm_pay_ext_split eb p with "Htc Hclm") as "[Hpay [Hext Hcx]]".
-  iApply (RL.wp_release_sconf γl p s Rlk M5 0%nat eb p av2 {[s]}
+  iApply (RL.wp_release_sconf KT1 γl p s Rlk M5 0%nat eb p av2 {[s]}
             Hlka ltac:(lia) with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
   iIntros (CIDr Hkr mr) "Hcg Hpc %Hcsr Hcpu".
   assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (FR + 0x14))
@@ -393,7 +392,7 @@ Proof.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = first_addr)
     by (rewrite HT2a5; apply addv_sext0).
   iEval (rewrite -Hfaddr) in "Hfirst".
-  iApply (wp_clw_s_sconf (mword_of_int (FR + 0x1c)) Ra5 Ra5
+  iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x1c)) Ra5 Ra5
             (mword_of_int 0 : mword 12) T2 av2 (mword_of_int 0 : mword 32) eb
             ltac:(vm_compute; discriminate) ltac:(rdok)
             with "Hcg Hpc Hi1c Hfirst").
@@ -527,7 +526,7 @@ Proof.
     by (rgne; rewrite Hmfs1; reflexivity).
   iEval (rewrite -Haddrpg) in "Hpgt".
   (* ---- +0x68: c.ld a0,80(s1) ---- *)
-  iApply (wp_cld_s_sconf (mword_of_int (FR + 0x68)) Ra0 Rs1
+  iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FR + 0x68)) Ra0 Rs1
             (mword_of_int 80 : mword 12) mf (trap_res eb + av2)%nat
             (page_base (ud_root (pv_upt V'))) false
             ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -800,7 +799,7 @@ Proof.
      which the closer would re-park. *)
   iDestruct "Hsc" as "(#Hhw & #Hmin & Hprivc & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (msg) "(Hms & Hhalf & Htie & %Hmsg)".
-  iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Hwit)".
   (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
      it existential because it never reads it; the arm it also hands back is
      at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -841,14 +840,14 @@ Proof.
     rewrite /S2 upd_ne; [| reg_neq]. rewrite /S1 upd_ne; [| reg_neq].
     rewrite /S0 upd_ne; [| reg_neq]. exact Hmfsp. }
   iEval (rewrite HSEsp) in "Hstk".
-  iAssert (stack_own ksp 4) with "[Hbra Hbs0 Hbs1 Hbsc]" as "Hf14".
-  { iApply (stack_own_4_intro ksp with "Hbra Hbs0 Hbs1 Hbsc"). }
-  iAssert (stack_own ksp 6) with "[Hf14 Hf56]" as "Hf16".
-  { iApply (stack_own_split_2 ksp 4 6 ltac:(lia)).
+  iAssert (stack_own (KTR := KT1) ksp 4) with "[Hbra Hbs0 Hbs1 Hbsc]" as "Hf14".
+  { iApply (stack_own_4_intro (KTR := KT1) ksp with "Hbra Hbs0 Hbs1 Hbsc"). }
+  iAssert (stack_own (KTR := KT1) ksp 6) with "[Hf14 Hf56]" as "Hf16".
+  { iApply (stack_own_split_2 (KTR := KT1) ksp 4 6 ltac:(lia)).
     iSplitL "Hf14"; [iExact "Hf14" | iExact "Hf56"]. }
-  iAssert (stack_own ksp av) with "[Hstk Hf16]" as "Hstack".
+  iAssert (stack_own (KTR := KT1) ksp av) with "[Hstk Hf16]" as "Hstack".
   { rewrite Havsum.
-    iApply (bi.equiv_entails_1_2 _ _ (stack_own_app ksp 6 (trap_res eb + av2))).
+    iApply (bi.equiv_entails_1_2 _ _ (stack_own_app (KTR := KT1) ksp 6 (trap_res eb + av2))).
     iSplitL "Hf16"; [iExact "Hf16" | iExact "Hstk"]. }
   (* ---- the trap-side residue, and the table it hands userret ---- *)
   iAssert (ut_trap p ksp av ∅)

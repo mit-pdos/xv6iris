@@ -122,7 +122,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
      see the proof file's report for why that is not this function's
      obligation to supply. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
  procs_inv γs -∗
@@ -131,7 +131,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b pme -∗
+      sie_cap_gpr KT1 Mf K b pme -∗
       cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       WP (Loop : expr riscv_lang)) -∗

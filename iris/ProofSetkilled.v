@@ -92,7 +92,7 @@ Section ProofSetkilled.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with M1.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.setkilled + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (v1) "Hb1". iDestruct "S2c" as (v2) "Hb2".
     iDestruct "S3c" as (v3) "Hb3". iDestruct "S4c" as (v4) "Hb4".
@@ -185,7 +185,7 @@ Section ProofSetkilled.
     (* ===================== acquire(&p->lock) ===================== *)
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γl "proc"%string
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
               (proc_lock_res γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock]").
@@ -223,7 +223,7 @@ Section ProofSetkilled.
     assert (Hsaddr : add_vec (C1 !!! Regidx sk_s1) (sign_extend' 64 (mword_of_int 40 : mword 12))
                      = p_killed (proc_addr j))
       by (rewrite HC1s1; apply sk_killed_off).
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.setkilled + 0x12)) sk_a5 sk_s1
+    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.setkilled + 0x12)) sk_a5 sk_s1
               (mword_of_int 40 : mword 12) C1 (trap_res b + (av - 4))%nat kl false
               with "Hcg Hpc Hi12 [Hkilled]").
     { iEval (rgne; rewrite Hsaddr). iExact "Hkilled". }
@@ -276,7 +276,7 @@ Section ProofSetkilled.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C3 n eb p (av - 4)%nat
               ({["proc"%string]} ∪ lks)
               Hlka ltac:(lia)
@@ -351,8 +351,8 @@ Section ProofSetkilled.
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv HE2csp; symmetry; exact Hspd4).
     iPoseProof (ski_20 with "Htext") as "Hi20".
-    iAssert (stack_own sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hb1 Hb2 Hb3 Hb4]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1". { iExists _. iEval (rewrite Hb1a -Hmrelcsp). iExact "Hb1". }
       iSplitL "Hb2". { iExists _. iEval (rewrite Hb2a -HE0csp). iExact "Hb2". }
       iSplitL "Hb3". { iExists _. iEval (rewrite Hb3a -HE1csp). iExact "Hb3". }

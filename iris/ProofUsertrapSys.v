@@ -62,7 +62,7 @@ Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
-Require Import SpecSyscall SpecSysExit.
+Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
@@ -132,7 +132,7 @@ Section UtSysBlock.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr KT1 m nx false (un_pj N) -∗
     ut_hold (SY.syscall_env) N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -245,11 +245,31 @@ Section UtSysBlock.
                        (sign_extend' 64 (mword_of_int 2095532 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
+      (* ---- THE DYING THREAD'S STACK CLOSER, BUILT HERE.  usertrap was
+         entered with sp AT THE PAGE TOP ([Hksp]), which is the one point in
+         a trap round where the closer is free ([ProcDefs.kstack_closer_top]:
+         nothing is owed above the top).  Wrapping usertrap's own frame
+         around it re-anchors it at the sp the walk is running on -- and that
+         frame is dead, because kexit does not return. ---- *)
+      assert (HKsp : (<[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
+                       !!! Regidx csp_rs1 = pa_stk ksp 4).
+      { rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite /K1 upd_ne; [exact Hmfsp | vm_compute; discriminate]. }
+      iAssert (is_kstack (un_pj N) (un_ks N)) as "#Hkstk".
+      { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+      iDestruct (ut_frame_stack with "Hframe") as "Hfr".
+      iDestruct (kstack_closer_top (un_pj N) (un_ks N) av
+                   ltac:(unfold KSTACK_AV; lia) with "Hkstk") as "Hkcl".
+      iEval (rewrite Hksp) in "Hkcl".
+      iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
+                   with "Hkcl Hfr") as "Hkcl4".
+      iEval (rewrite -Hnx -HKsp) in "Hkcl4".
       iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
                 nx false lks Hwf' ltac:(lia)
-                with "Htext Hpc Hcg [-]").
+                with "Htext Hpc Hcg Hkcl4 [-]").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -302,7 +322,7 @@ Section UtSysBlock.
                         = p_trapframe (un_pj N))
         by (rgne; rewrite Hmfs1; apply prr_p_trapframe).
       iEval (rewrite -Haddrtf) in "Htfc".
-      iApply (wp_cld_s_sconf (mword_of_int (UT + 0x96)) Ra4 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x96)) Ra4 Rs1
                 (mword_of_int 88 : mword 12) mf nx
                 (page_base (ud_tfp (pv_upt V))) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -324,7 +344,7 @@ Section UtSysBlock.
         by (rewrite HS1a4; apply prr_tf_addr_24).
       (* ---- +0x98: c.ld a5,24(a4) -- a5 := epc ---- *)
       iEval (rewrite -Haddrw) in "Hword".
-      iApply (wp_cld_s_sconf (mword_of_int (UT + 0x98)) Ra5 Ra4
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x98)) Ra5 Ra4
                 (mword_of_int 24 : mword 12) S1 nx uepc false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi98 Hword [-]").
@@ -436,13 +456,44 @@ Section UtSysBlock.
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
                 (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
-                Hj Hjl ltac:(rewrite Hn2; lia)
+                Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hbm Hip Hfd Hir Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
          fold in any more. *)
       { rewrite Hlkempty. iApply cpu_own_on_intro. }
+      (* ---- THE EXIT SLOT IS NOW ADDITIVE, AND USERTRAP PAYS BOTH HALVES
+         OUT OF THE SAME FRAME CELLS.  syscall() may dispatch to an entry
+         that never returns ([sys_exit], which parks the thread as a ZOMBIE),
+         and the choice is the syscall number -- so the contract asks for the
+         return continuation AND a stack closer, joined by [∧] rather than
+         [∗] or [∨] (SpecSyscall.v's note says why).  [∧] is what makes this
+         affordable: each branch is proved from the WHOLE context, and
+         [Hframe] is spent only in the branch where the thread dies.
+
+         The closer itself is free at this altitude and that is the reason
+         this change stops at syscall(): usertrap is entered with sp AT THE
+         PAGE TOP ([Hksp]), where [kstack_closer_top] mints one out of the
+         PERSISTENT [is_kstack] alone; wrapping usertrap's own dead frame
+         around it re-anchors it at syscall's entry sp.  Identical
+         construction to the [jal kexit] arm above, at the other place a
+         usertrap round can stop returning. ---- *)
+      iSplit.
+      2:{ iAssert (is_kstack (un_pj N) (un_ks N)) as "#Hkstk".
+          { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+          iDestruct (ut_frame_stack with "Hframe") as "Hfr".
+          iDestruct (kstack_closer_top (un_pj N) (un_ks N) av
+                       ltac:(unfold KSTACK_AV; lia) with "Hkstk") as "Hkcl".
+          iEval (rewrite Hksp) in "Hkcl".
+          iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
+                       with "Hkcl Hfr") as "Hkcl4".
+          (* the depth the contract names is syscall's own, and it is
+             [av - 4] on the nose: [trap_res true = kv_frame_slots] and
+             [n2 = nx - kv_frame_slots] with [nx = av - 4]. *)
+          assert (Hdep : (trap_res true + n2)%nat = (av - 4)%nat)
+            by (rewrite Hn2; unfold trap_res in *; lia).
+          rewrite Hdep HS4sp. iExact "Hkcl4". }
       iIntros (CID2 Hk2 mg V2 us2) "%Hcsg %Htfg Hcg Hcpu Hbs Hbm Hip Hfd Hir Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

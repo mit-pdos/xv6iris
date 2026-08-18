@@ -78,7 +78,7 @@ Section KvminithartBody.
     iIntros "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /W1 upd_eq; reflexivity).
@@ -181,7 +181,7 @@ Section KvminithartBody.
     assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 968 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (kvi_10 with "Htext") as "Hi10".
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 968 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT0) (ktd := KT0) (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 968 : mword 12)
               A0 (K - 2)%nat (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 []").
@@ -297,7 +297,7 @@ Section KvminithartBody.
     rewrite Lva2 in Hex2.
     rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) (kvi_satp_word root) (kvi_satp_mode root)) in Hex2.
     (* open the Bare arm of the translation slot; do the switch *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (strans_inv_acc_bare with "Hbit Htr") as "(Hbit & Hbit2 & Hbare & Hstv)".
     iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
     iMod (reg_update _ satp _ (kvi_satp_word root) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
@@ -312,8 +312,8 @@ Section KvminithartBody.
     { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
     iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
     iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
-    iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    iAssert (sie_cap KT0 S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word root)).
     iSplitR.
     { iPureIntro. rewrite Hpceq2. fold s_pc2.
@@ -361,7 +361,7 @@ Section KvminithartBody.
     destruct (exec_execute_SFENCE_VMA_S s_pc3 Lpriv3p ltac:(rewrite Lms3p; exact HTVM3))
       as (tlbz3 & Hex3 & Hnone3).
     (* open the KPT arm to reach the tlb cell; flush; re-seal *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & _)".
     iDestruct "Htr" as "[(Hbit0 & _ & _) | (Hbit1 & Hk)]".
     { iDestruct (kpt_on_pending_False with "Hbitkpt Hbit0") as %[]. }
     iDestruct "Hk" as (root_ppn) "Htlbinv".
@@ -376,8 +376,8 @@ Section KvminithartBody.
                  (tlb_ok_pt_empty (mword_of_int 0) kt3 tlbz3 (fun vpn' => Hnone3 _ (tlb_hash_range vpn')))
                  with "Hsatp Htlbc Hlb3 Hpmp Hkinv3") as "Htlbinv".
     iDestruct (strans_inv_intro root_ppn with "Hbit1 Htlbinv") as "Htr".
-    iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    iAssert (sie_cap KT0 S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iModIntro. iExists (set_reg s_pc3 tlb tlbz3).
     iSplitR.
     { iPureIntro. rewrite Hpceq3. fold s_pc3. rewrite Hzreg. exact Hex3. }
@@ -435,8 +435,8 @@ Section KvminithartBody.
     { rewrite HL2sp. apply frame_cancel_16. }
     assert (Hpop : L2 !!! Regidx csp_rs1 = pa_stk (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HL2sp. exact Hpush. }
-    iAssert (stack_own (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
-    { rewrite stack_own_slots; cbn [seq].
+    iAssert (stack_own (KTR := KT0) (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := KT0)); cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }

@@ -63,8 +63,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
 Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -154,9 +152,9 @@ Section KexecB2Frame.
   (* slots 55..62 are [ph]'s seven words and the unused one; slot 63 is [off],
      split out and PINNED for the reason the header gives. *)
   Lemma kxc_slot63_split (sp0 : mword 64) :
-    stack_own (pa_stk sp0 54) 9 ⊣⊢
-    stack_own (pa_stk sp0 54) 8 ∗
-    (∃ w : mword 64, word_pointsto (pa_stk sp0 63) (DfracOwn 1) w).
+    stack_own (KTR := KT1) (pa_stk sp0 54) 9 ⊣⊢
+    stack_own (KTR := KT1) (pa_stk sp0 54) 8 ∗
+    (∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 63) (DfracOwn 1) w).
   Proof.
     rewrite (kxc_slots_asc sp0 9 54) (kxc_slots_asc sp0 8 54).
     cbn [seq big_opL Nat.add].
@@ -167,27 +165,27 @@ Section KexecB2Frame.
 
   Definition kxc_frameBpin (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64) : iProp Σ :=
-    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 ∗
-     word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 ∗
-     word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 ∗
-     word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 ∗
-     word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
-     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
-     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
-     stack_own (pa_stk sp0 13) 33 ∗
-     stack_own (pa_stk sp0 54) 8 ∗
-     word_pointsto (pa_stk sp0 63) (DfracOwn 1) w63 ∗
-     word_pointsto (pa_stk sp0 64) (DfracOwn 1) av ∗
-     word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 ∗
-     word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv ∗
-     word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 ∗
-     (∃ w68, word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68))%I.
+    (word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
+     stack_own (KTR := KT1) (pa_stk sp0 13) 33 ∗
+     stack_own (KTR := KT1) (pa_stk sp0 54) 8 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 63) (DfracOwn 1) w63 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 64) (DfracOwn 1) av ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 65) (DfracOwn 1) w65 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 67) (DfracOwn 1) w67 ∗
+     (∃ w68, word_pointsto (KTR := KT1) (pa_stk sp0 68) (DfracOwn 1) w68))%I.
 
   (* the two directions between it and [kxc_frameB] *)
   Lemma kxc_frameBpin_of_B (sp0 ra0 s00 s10 s20 pv av : mword 64)
@@ -248,13 +246,13 @@ Section KexecB2Frame.
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
     kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                  w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 -∗
-    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+    ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av w6.
   Proof.
     intro Hal. rewrite /kxc_frameBpin /kxc_frameA6.
     iIntros "(A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9 & A10 & A11 & A12 &
               A13 & Aust & Aph0 & A63 & A64 & A65 & A66 & A67 & A68) Helf".
-    iAssert (stack_own (pa_stk sp0 54) 9) with "[Aph0 A63]" as "Aph".
+    iAssert (stack_own (KTR := KT1) (pa_stk sp0 54) 9) with "[Aph0 A63]" as "Aph".
     { rewrite kxc_slot63_split.
       iSplitL "Aph0"; [iExact "Aph0" | by iExists w63]. }
     iDestruct (kxc_elf_give sp0 ef Hal with "Helf") as "Aelf".
@@ -308,11 +306,11 @@ Section KexecB2Res.
      bslots bn 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
-     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
-     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
-     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67)%I.
 
@@ -464,11 +462,11 @@ Section KexecB2Res.
   (*  back edge, because [kxc_at_12c] carries the chunk whole.             *)
   (* ------------------------------------------------------------------ *)
   Lemma kxc_ph_slots_of_stack (sp0 : mword 64) :
-    stack_own (pa_stk sp0 54) 9 ⊢
+    stack_own (KTR := KT1) (pa_stk sp0 54) 9 ⊢
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
-    (∃ w : mword 64, word_pointsto (pa_stk sp0 62) (DfracOwn 1) w) ∗
-    (∃ w : mword 64, word_pointsto (pa_stk sp0 63) (DfracOwn 1) w).
+       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
+    (∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 62) (DfracOwn 1) w) ∗
+    (∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 63) (DfracOwn 1) w).
   Proof.
     rewrite (kxc_slots_asc sp0 9 54). cbn [seq big_opL].
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & _)".
@@ -479,10 +477,10 @@ Section KexecB2Res.
 
   Lemma kxc_stack_of_ph_slots (sp0 : mword 64) (w62 w63 : mword 64) :
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
-    word_pointsto (pa_stk sp0 62) (DfracOwn 1) w62 -∗
-    word_pointsto (pa_stk sp0 63) (DfracOwn 1) w63 -∗
-    stack_own (pa_stk sp0 54) 9.
+       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 62) (DfracOwn 1) w62 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 63) (DfracOwn 1) w63 -∗
+    stack_own (KTR := KT1) (pa_stk sp0 54) 9.
   Proof.
     iIntros "H A B".
     rewrite (kxc_slots_asc sp0 9 54). cbn [seq big_opL Nat.add Nat.sub].
@@ -496,25 +494,25 @@ Section KexecB2Res.
      [bytes_own_slotsn] demands it back.  [kxc_elf_take]'s twin. *)
   Lemma kxc_ph_take (sp0 : mword 64) :
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ⊢
+       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ⊢
     ⌜forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true⌝ ∗
     ∃ f : nat -> bv 8,
-      [∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ f j.
+      [∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ[KT1] f j.
   Proof.
     iIntros "H".
     iDestruct (kxc_slots_ph sp0 with "H") as "[%Hal Hb]".
     iSplitR; [iPureIntro; exact Hal |].
-    iApply (bb_any_named (pa_stk sp0 61) 56). rewrite /bytes_own /byte_any.
+    iApply (bb_any_named (KTR := KT1) (pa_stk sp0 61) 56). rewrite /bytes_own /byte_any.
     iExact "Hb".
   Qed.
 
   Lemma kxc_ph_give (sp0 : mword 64) (h : nat -> bv 8) :
     (forall i, (i < 7)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (61 - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ h j) ⊢
+    ([∗ list] j ∈ seq 0 56, pa_add (pa_stk sp0 61) j ↦ₘ[KT1] h j) ⊢
     [∗ list] i ∈ seq 0 7,
-      ∃ w : mword 64, word_pointsto (pa_stk sp0 (61 - i)) (DfracOwn 1) w.
+      ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w.
   Proof.
     intro Hal. iIntros "Hh".
     iApply (kxc_bytes_ph sp0 Hal). rewrite /bytes_own.
@@ -527,16 +525,16 @@ Section KexecB2Res.
   Lemma kxc_win8 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 8 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 8 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
-    ((pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢
+    (pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
+    ((pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
-    rewrite (bb_split3 a o 8 r n f Hn).
+    rewrite (bb_split3 (KTR := KT1) a o 8 r n f Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro _ _ _ Hal).
+    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
@@ -604,7 +602,7 @@ Definition kxc_bad324_body
      is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ->
   um_below szf P.(ud_um) ->
   um_covered szf P.(ud_um) ->
-  sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
+  sie_cap_gpr KT1 Mt (K - 68)%nat true (proc_addr jp) -∗
   cpu_own 0 true (proc_addr jp) true lks -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
@@ -618,11 +616,11 @@ Definition kxc_bad324_body
   kalloc_env ga None -∗
   proc_pt P -∗
   proc_priv gf (proc_addr jp) pidv V -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
-  ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) -∗
+  ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
   bslots bn 3 -∗
   iref_slots 1 -∗
   log_op g n2 -∗
@@ -637,7 +635,7 @@ Definition kxc_bad324_body
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-        sie_cap_gpr mf K true (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
         cpu_own 0 true (proc_addr jp) true lks -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -646,8 +644,8 @@ Definition kxc_bad324_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -725,7 +723,7 @@ Definition kxc_ls_body
   Ml !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) ->
   Ml !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) ->
   Ml !!! Regidx Rs11 = (mword_of_int 56 : mword 64) ->
-  sie_cap_gpr Ml (K - 68)%nat true (proc_addr jp) -∗
+  sie_cap_gpr KT1 Ml (K - 68)%nat true (proc_addr jp) -∗
   cpu_own 0 true (proc_addr jp) true lks -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
@@ -749,7 +747,7 @@ Definition kxc_ls_body
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-        sie_cap_gpr mf K true (proc_addr jp) -∗
+        sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
         cpu_own 0 true (proc_addr jp) true lks -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -758,8 +756,8 @@ Definition kxc_ls_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         bslots bn 3 -∗
@@ -779,7 +777,7 @@ Definition kxc_ls_body
         Mx !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) /\
         Mx !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) /\
         Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64)⌝ -∗
-      sie_cap_gpr Mx (K - 68)%nat true (proc_addr jp) -∗
+      sie_cap_gpr KT1 Mx (K - 68)%nat true (proc_addr jp) -∗
       cpu_own 0 true (proc_addr jp) true lks -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
@@ -794,7 +792,7 @@ Definition kxc_ls_body
           (entry spv szv' : mword 64),
             ⌜callee_saved m mf⌝ -∗
             ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-            sie_cap_gpr mf K true (proc_addr jp) -∗
+            sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
             cpu_own 0 true (proc_addr jp) true lks -∗
             pc_is (ret_pc ra0) -∗
             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -803,8 +801,8 @@ Definition kxc_ls_body
             bitmap_res gfs bmapstart cov logstart size used' -∗
             kalloc_env ga None -∗
             proc_priv gf (proc_addr jp) pidv V' -∗
-            ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-            ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+            ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+            ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
             ([∗ list] i ∈ seq 0 na,
                [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
             bslots bn 3 -∗

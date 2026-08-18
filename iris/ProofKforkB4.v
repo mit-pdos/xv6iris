@@ -237,7 +237,7 @@ Section KforkB4Proof.
        on the pointer -- a process between [p->cwd = 0] and its next chdir
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]
        with no null test, so this is the honest reading of the code. *)
-    sie_cap_gpr m (rsv + (K - 8))%nat false pme -∗
+    sie_cap_gpr KT1 m (rsv + (K - 8))%nat false pme -∗
     cpu_own lvl eb pme false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
@@ -256,7 +256,7 @@ Section KforkB4Proof.
         ⌜(forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
             mf !!! Regidx r = m !!! Regidx r) /\
          mf !!! Regidx Rs1 = sign_extend' 64 pid_c⌝ -∗
-        sie_cap_gpr mf (rsv + (K - 8))%nat false pme -∗
+        sie_cap_gpr KT1 mf (rsv + (K - 8))%nat false pme -∗
         cpu_own lvl eb pme false lks -∗
         pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
         proc_priv γf pme pid_p Vp -∗
@@ -316,7 +316,7 @@ Section KforkB4Proof.
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
     iEval (rewrite -Hpa0a4) in "Hpcwd".
-    iApply (wp_ld_s_sconf (mword_of_int (KF + 0xa4)) Ra0 Rs5 (mword_of_int 336 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xa4)) Ra0 Rs5 (mword_of_int 336 : mword 12)
               m (rsv + (K - 8))%nat (pv_cwd Vp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a4 Hpcwd").
@@ -531,7 +531,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* [ns := n = 16]: kfork owns all sixteen bytes of [p->name], so the
        source-ownership premise is [ssc_src_ok]'s first (budget) disjunct. *)
-    iApply (SS.wp_safestrcpy_sconf M6 16%nat 16%nat
+    iApply (SS.wp_safestrcpy_sconf KT0 KT0 M6 16%nat 16%nat
               (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
               (rsv + (K - 8))%nat (DfracOwn 1) false pme
               ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31
@@ -569,7 +569,7 @@ Section KforkB4Proof.
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
     iDestruct (proc_priv_pid γf npa pid_c Vc3 with "Hchild3") as "[Hcpid Hcpidback]".
-    iApply (wp_lw_s_sconf (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
               mr2 (rsv + (K - 8))%nat pid_c false (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0be [Hcpid]").
