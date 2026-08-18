@@ -24,9 +24,9 @@
    PERMISSION check tolerates it -- [KptShare.tlb_res_pt_translateAddr_at]'s
    premise is [forall (a d : mword 1) …, pte_check_ok … (pte_set_ad … a d)],
    already A/D-quantified because the exec walk could not pin them either.
-   The READ and the write-back condition do NOT tolerate it, and that is
-   what stands between this file and [swp_translate_kpt]: see the note at
-   the end. *)
+   The READ and the write-back condition do NOT tolerate it; both are
+   answered by reading the leaf at a PREDICATE rather than at a value
+   ([HartSTrans]'s [_ex] rules), which is what [swp_translate_kpt] does. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap relations bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -40,6 +40,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
         RiscvFetchExec.
 Require Import SmodePte PtAdBits Pt4kWalk PtTree PtTreeAdue KptPt KMap KptTree.
+Require Import KptGoodb.
 Require Import KptGhost KptShare.
 Require Import HartSwp HartLift HartRegNode HartSpan HartGoodb HartEvents HartMStore.
 Require Import WpDecodeBridge.
@@ -574,13 +575,11 @@ Section kptnode.
   (* write-back's re-read is the same canon-keyed seam and its conditional  *)
   (* write is [kpt_leaf_write_node].                                        *)
   (*                                                                      *)
-  (* THE FOOTPRINT COMPANIONS ARE PREMISES.  The swp layer needs [goodb]    *)
-  (* certificates for the two PTE tests that the exec layer never did, and  *)
-  (* the tree has no general lemma for them (both tests read [menvcfg] on    *)
-  (* branches that a real PTE never takes, so they are true but need the     *)
-  (* word's own flags).  They are taken here in the shapes the walk uses:    *)
-  (* A/D-quantified at the claim's leaf, and [pte_ptr]-conditioned for the   *)
-  (* two internal levels, whose words no caller can name.                    *)
+  (* THE FOOTPRINT COMPANIONS ARE PROVED, NOT TAKEN.  The swp layer needs   *)
+  (* [goodb] certificates for the two PTE tests that the exec layer never   *)
+  (* did.  They live in [KptGoodb]: at the claim's LEAF off the canonical   *)
+  (* class, at the two INTERNAL levels off [ptree_maps]' own [pte_valid] +  *)
+  (* [pte_ptr] pair -- and NOT off [pte_ptr] alone, which is false.          *)
   (* ================================================================== *)
   Lemma swp_translate_kpt
       (acc : MemoryAccessType mem_payload)
@@ -647,21 +646,6 @@ Section kptnode.
     (forall (a d : mword 1) (mxr do_sum : bool),
        pte_check_ok acc Supervisor mxr do_sum
          (pte_set_ad (mk_pte ppn (kperm_flags kp)) a d)) ->
-    (* ...and the swp layer's footprint companions *)
-    (forall w : mword 64, pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)) ->
-       forall (Db' : register -> bool) s,
-         goodb Db' (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-                      (ext_bits_of_PTE w)) s = true) ->
-    (forall w : mword 64, pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)) ->
-       forall (mxr do_sum : bool) (Db' : register -> bool) s,
-         goodb Db' (check_PTE_permission acc Supervisor mxr do_sum
-                      (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-                      (ext_bits_of_PTE w) tt) s = true) ->
-    (forall w : mword 64,
-       pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = true ->
-       forall (Db' : register -> bool) s,
-         goodb Db' (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-                      (ext_bits_of_PTE w)) s = true) ->
     kmap_at (svpn_of va) ppn kp -∗
     kpt_inv root_ppn -∗
     tlb_snap_ok tlbvec -∗
@@ -680,7 +664,7 @@ Section kptnode.
     intros Hdisj HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif
       HDb Hag HDlc Haglc Hcp Hsatp Htlb Hhtif Hpma Hpcfg Hpaddr Hmstag
       Hmisa Hmenv HPBMTE HADUE Heff Heffg Hss Hssg Htm Htmg Hppn Hasid
-      Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk Higleaf Hchkgleaf Higptr.
+      Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk.
     iIntros "#Hat #Hkinv Hsnap #Hcert Hfrag Hrw Hro".
     assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver.
     iDestruct "Hsnap" as (t0) "(%Htlbok0 & #Hlb0)".
@@ -693,6 +677,17 @@ Section kptnode.
     pose proof Hmaps as Hmapsd.
     destruct Hmapsd as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ &
                         Hv2 & Hn2 & Hv1 & Hn1 & _ & _ & _ & _).
+    (* the swp layer's footprint companions, which the exec layer never
+       needed.  At the two INTERNAL levels they come off [ptree_maps]'
+       own [pte_valid] + [pte_ptr] pair ([KptGoodb.pte_ptr_goodb_invalid];
+       [pte_ptr] alone would be FALSE -- see that file's header), and at
+       the claim's LEAF off the canonical class, with the shadow-stack
+       tail taken from the caller's own [Hssg]. *)
+    pose proof (pte_ptr_goodb_invalid p2 Hv2 Hn2) as Higptr2.
+    pose proof (pte_ptr_goodb_invalid p1 Hv1 Hn1) as Higptr1.
+    pose proof (kperm_canon_goodb_invalid ppn kp) as Higleaf.
+    pose proof (fun w Hc => kperm_canon_goodb_check ppn kp w acc Db dst Hssg Hc)
+      as Hchkgleaf.
     (* the leaf predicate, and its three closure facts *)
     assert (HP0i : forall w : mword 64,
               pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)) ->
@@ -905,7 +900,7 @@ Section kptnode.
                       p2 p1 menvcfg0
                       (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)))
                       tlbvec (Some ent) pmar0 pcfg paddr rr
-                      Hv2 Hn2 Hv1 Hn1 (Higptr p1 Hn1) (Higptr p2 Hn2)
+                      Hv2 Hn2 Hv1 Hn1 Higptr1 Higptr2
                       HP0i HP0nl (fun w Hw => HP0chk w Hw mxr do_sum) HP0N
                       Higleaf (fun w Hw => Hchkgleaf w Hw mxr do_sum)
                       HPvar HPupd
@@ -936,7 +931,7 @@ Section kptnode.
                     p2 p1 menvcfg0
                     (fun w => pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)))
                     tlbvec None pmar0 pcfg paddr rr
-                    Hv2 Hn2 Hv1 Hn1 (Higptr p1 Hn1) (Higptr p2 Hn2)
+                    Hv2 Hn2 Hv1 Hn1 Higptr1 Higptr2
                     HP0i HP0nl (fun w Hw => HP0chk w Hw mxr do_sum) HP0N
                     Higleaf (fun w Hw => Hchkgleaf w Hw mxr do_sum)
                     HPvar HPupd
@@ -962,25 +957,28 @@ Section kptnode.
 End kptnode.
 
 (* =====================================================================
-   WHAT [swp_translate_kpt] STILL TAKES AS A PREMISE, AND WHY.
+   WHAT [swp_translate_kpt] USED TO TAKE AS A PREMISE, AND WHERE IT WENT.
 
    Two [goodb] certificates -- one for [pte_is_invalid], one for
-   [check_PTE_permission] -- are premises rather than facts proved here.
-   They are the FOOTPRINT companions of the two PTE tests: the exec layer
-   never needed them (it evaluates against a reference state), the swp layer
-   does (a stretch may only read registers in its frame).  Both tests DO
-   read [menvcfg] -- [pte_is_invalid] on the reserved-encoding branch
-   (V=1, R=0, W=1, X=0) and [check_PTE_permission] on the shadow-stack
-   branch (R=0, W=1, X=0) -- so neither is register-free in general and
-   there is no unconditional lemma to prove.  At a real PTE both branches
-   are dead, but killing them needs the WORD's own flag bits, which is why
-   the premises are stated conditioned exactly as the walk can supply them:
-   A/D-quantified at the claim's leaf (via [pte_canon]), and
-   [pte_is_non_leaf]-conditioned for the two internal levels, whose words
-   no caller can name.  Discharging them for the kernel table is a pure
-   computation at [KptPt.kperm_flags]'s concrete bytes plus a
-   [pte_is_non_leaf] case split; it belongs beside [KptTree]'s
-   [kperm_variant_*] family, not here.
+   [check_PTE_permission] -- used to be premises here, and travelled up
+   through [SRegime.kpt_swp_side] to the caller.  They are the FOOTPRINT
+   companions of the two PTE tests: the exec layer never needed them (it
+   evaluates against a reference state), the swp layer does (a stretch may
+   only read registers in its frame).  Both tests DO read [menvcfg] --
+   [pte_is_invalid] on the reserved-encoding branch (V=1, R=0, W=1, X=0)
+   and [check_PTE_permission] on the shadow-stack branch (R=0, W=1, X=0) --
+   and [pte_is_invalid] reads [misa] on the [not (pbmt matches)] branch, so
+   neither is register-free in general.
+
+   They are now PROVED, in [KptGoodb], and discharged inside the proof
+   below.  The INTERNAL-LEVEL one is the interesting case: the premise
+   used to be conditioned on [pte_is_non_leaf] alone, and in that shape it
+   is FALSE -- a non-leaf word with PBMT = 'b"11" really does reach the
+   Svpbmt probe and read [misa].  What kills that branch is VALIDITY, not
+   pointer-ness: [PtTree.pte_ptr_ext_zero] reads the whole 10-bit
+   extension field off [pte_valid] + [pte_ptr], and [ptree_maps] carries
+   both at every internal level.  So the premise did not need weakening,
+   it needed deleting.
 
    Everything else the note that used to stand here called missing is
    built: the leaf read is PREDICATE-indexed all the way down

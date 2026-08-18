@@ -1107,9 +1107,10 @@ Section SRegimeSwp.
 
   (* the side condition: the satp facts that make this hart's frame an Sv39
      file rooted at [root_ppn], the mode reduction and its footprint
-     certificate, the PMP/PMA grant facts off the frame's own pmp cells, and
-     the two PTE tests' footprint certificates (see HartSKpt's closing note
-     for why the last three cannot be proved unconditionally) *)
+     certificate, and the PMP/PMA grant facts off the frame's own pmp cells.
+     The two PTE tests' [goodb] certificates used to ride here as three more
+     conjuncts; they are PROVED now ([KptGoodb]) and discharged inside
+     [HartSKpt.swp_translate_kpt] itself. *)
   Definition kpt_swp_side (root_ppn : mword 44)
       (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
       (kp : kperm) (Db : register -> bool) (Drw Dro : gset register)
@@ -1131,23 +1132,7 @@ Section SRegimeSwp.
          ('b"1") = true
     /\ (ram_base + ram_size
         <= uint (vec_access_dec (register_lookup pmpaddr_n rs) 0) * 4)%Z
-    /\ pma_allows_ram (register_lookup pma_regions rs)
-    /\ (forall w : mword 64,
-          pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)) ->
-          forall (Db' : register -> bool) s,
-            goodb Db' (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-                         (ext_bits_of_PTE w)) s = true)
-    /\ (forall w : mword 64,
-          pte_canon w = pte_canon (mk_pte ppn (kperm_flags kp)) ->
-          forall (mxr do_sum : bool) (Db' : register -> bool) s,
-            goodb Db' (check_PTE_permission acc Supervisor mxr do_sum
-                         (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-                         (ext_bits_of_PTE w) tt) s = true)
-    /\ (forall w : mword 64,
-          pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = true ->
-          forall (Db' : register -> bool) s,
-            goodb Db' (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-                         (ext_bits_of_PTE w)) s = true).
+    /\ pma_allows_ram (register_lookup pma_regions rs).
 
   Lemma kpt_swp_translate (root_ppn : mword 44) :
     forall (acc : MemoryAccessType mem_payload)
@@ -1205,7 +1190,7 @@ Section SRegimeSwp.
       HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
       Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat _
       (Hmode & Hasid & Hppn & Htm & Htmg & HA & Hord & HR & HW & Hcov &
-       Hpallow & Higleaf & Hchkgleaf & Higptr).
+       Hpallow).
     assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE (register_lookup menvcfg dst.(sregs)))
                        ('b"0") = true)
       by (rewrite Hmenv; vm_compute; reflexivity).
@@ -1226,7 +1211,6 @@ Section SRegimeSwp.
                   HA Hord HR HW Hcov Hpallow
                   (fun a d mxr do_sum =>
                      kperm_variant_check ppn kp acc a d mxr do_sum Hacc Hallow)
-                  Higleaf Hchkgleaf Higptr
                   with "Hat Hkinv Hsnap Hcert Hfrag Hrw Hro"). }
     iIntros (v) "(-> & %rsf & %Hshape & Hrw & Hro & Hsnap & Hany)".
     iSplitR; [done |]. iExists rsf. iFrame "Hrw Hro Hany Hsnap Hkinv".
