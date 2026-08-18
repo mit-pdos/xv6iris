@@ -248,3 +248,142 @@ they enter only through `gdep3_acyclic_main` and `co_serialized_pkg`,
 both of which `robust_main_bundle` now calls before delegating.
 `robust_main_bundle` is proved as a corollary (same statement), and
 `robust_main`/`robust_transport` through it.
+
+### 7.3 L2-M1 — `iris/WeakRobustL2.v` (new, after `WeakRobustDisc.v`)
+
+Generic over `{P D}`, `pstep`, `TS` with `ptraces_wf pstep TS` and
+`ptraces_fwd_own TS`; nothing else.
+
+**The D2 view layer** (`Section astep`, one case per label):
+`astep_ok_regv_ne` (only an `LRegW rd _` moves `regv rd`),
+`astep_ok_regw_eq` (`regv rd := V(srcs)`), `astep_ok_ldv_ge` (`w_ldv`
+only grows except at `LInstr`), `astep_ok_read_ldv` (an UNFORWARDED read
+banks its timestamp in `w_ldv` — `DLdRes`), `astep_ok_ctrl_vcap`,
+`astep_ok_read_nowrites` (`readable`'s floor at the agent's own `coh`),
+`astep_ok_read_fulfil_coh` (an rmw's fulfilled timestamp lands in the
+`coh` of the byte its READ half named).  Supporting `wstate` lemmas:
+`fulfil_vext_vcap`, `fulfil_vext_srcs` (EXT dominates `w_vcap` and the
+label's own `asrc`/`vsrc` views — RVWMO ppo 9/10/11), `srcs_view_ge`,
+plus the `w_regv`/`w_ldv` fold lemmas for `load_post_run_d` /
+`store_post_run_d` / `ctrl_post` / `fence_post` / `instr_post`.
+
+**C3 — the dependent exit** (the headline).  Carriers
+`ldcarry T k ts` (`w_ldv ≥ ts`), `rcarry T k r ts` (`regv r ≥ ts`),
+`vcapat T k ts` (`w_vcap ≥ ts`), and the two NAMED windows the D2
+non-monotonicity forces: `no_instr T k1 k2` and `no_regw T k1 k2 r`.
+
+```coq
+Lemma ldcarry_of_read   : (a,ts) ∈ lb_reads (ae_lb evr) → read_unforwarded Log i _ ts →
+                          ldcarry T (S kr) ts
+Lemma ldcarry_mono      : no_instr T k1 k2 → ldcarry T k1 ts → ldcarry T k2 ts
+Lemma rcarry_of_ldres   : ae_lb ev1 = LRegW rd srcs → DLdRes ∈ srcs →
+                          ldcarry T k1 ts → rcarry T (S k1) rd ts
+Lemma rcarry_of_regw    : ae_lb ev  = LRegW rd srcs → DReg r ∈ srcs →
+                          rcarry T k2 r ts → rcarry T (S k2) rd ts
+Lemma rcarry_mono       : no_regw T k1 k2 r → rcarry T k1 r ts → rcarry T k2 r ts
+Lemma vcapat_of_ctrl    : ae_lb evc = LCtrl srcs → DReg r ∈ srcs →
+                          rcarry T kc r ts → vcapat T (S kc) ts
+Lemma vcapat_mono       : (w_vcap IS in ws_le — no window needed)
+Lemma fcov_of_vcap      : vcapat T kc ts → kc ≤ k' → is_Some (ae_ts ev') → fcov T k' ts
+
+Theorem fcov_of_ctrl_dep : … LCtrl on the chain's register at kc < k' … → fcov T k' ts
+Theorem fcov_of_data_dep : DReg r ∈ lb_asrc (ae_lb ev') ∨ DReg r ∈ lb_vsrc (ae_lb ev') →
+                           rcarry T k' r ts → fcov T k' ts
+Theorem regv_of_dep_chain : rcarry T k r ts → rchain T k r hs →
+                            rcarry (rchain_end k r hs).1 (rchain_end k r hs).2 ts
+Theorem fcov_of_dep_chain : load at kr → LRegW rd0 [… DLdRes …] at k0 (no_instr between)
+                            → register chain hs → LCtrl at kc → fulfil at k' > kc
+                            → fcov T k' ts
+```
+
+`rchain`/`rchain_end` are the `WeakRobustDisc.chain_ok`/`chain_end`
+idiom over `list (nat * wreg)`; the NO-OVERWRITE side condition is
+explicit inside `rchain`, because `regv` is not monotone (the D2
+finding) — the view has to be tracked per register between the writes.
+`no_instr` is the analogous window for `DLdRes`: the load-result bank is
+reset by `LInstr`, so the register write that consumes it must sit in
+the SAME instruction as the load.
+
+**C1/C2 in the segment's coordinates**: `S1_of_disciplined` — a foreign
+entry read at `h` that is `aq`, or followed by a `pr∧sw` fence before
+`kd ≤ kf`, has `ts < ts_f` at the segment's exit fulfil.  (The agent
+record at `kd` is derived, not supplied.)
+
+**The rmw co-chain**: `writes_b_po_lt` (same agent, same byte, later
+trace index ⟹ later timestamp) and
+
+```coq
+Theorem rmw_reads_pred L e tr t e' t' :
+  gev_reads TS e L tr → gev_ts TS e = Some t → writes_b TS L e' t' →
+  ¬ ((tr < t')%nat ∧ (t' < t)%nat).
+```
+
+— every rmw reads the write IMMEDIATELY BELOW its own.  Foreign writes
+in the window die by `excl_ok` (`WeakRobustSer.gev_read_fulfil`); own
+writes below by `readable`'s `coh` floor (`astep_ok_read_nowrites`) and
+own writes above by the rmw's own coherence gain
+(`astep_ok_read_fulfil_coh`).
+
+**The CS windows**:
+
+```coq
+Definition cs_window L i ka kr t_a t_w t_r :=
+  gev_reads TS (i,ka) L t_a ∧ writes_b TS L (i,ka) t_w ∧
+  (ka < kr)%nat ∧ writes_b TS L (i,kr) t_r.
+Definition win_excl L i t_w t_r :=
+  ∀ e t, writes_b TS L e t → e.1 ≠ i → ¬ ((t_w < t)%nat ∧ (t < t_r)%nat).
+
+Theorem cs_windows_ordered … : i ≠ j → cs_window L i … → cs_window L j … →
+  win_excl L i tw_i tr_i → win_excl L j tw_j tr_j →
+  (tr_i ≤ ta_j)%nat ∨ (tr_j ≤ ta_i)%nat.
+```
+
+⚠ **FINDING — §4's "excl_ok totally orders the CS windows" is WRONG.**
+`excl_ok` makes the RMW ITSELF atomic (no foreign write between its read
+and its write); it says nothing about the interval between an agent's
+acquire and its release.  A coherence order that INTERLEAVES two
+windows (`t_w(i) < t_w(j) < t_r(i) < t_r(j)`) violates no rule of the
+machine — mutual exclusion is a statement about the lock word's VALUES,
+which Layer 1 never inspects.  Disjointness is therefore SF-1 itself and
+enters as the named premise `win_excl`.  What IS machine-derivable, and
+is what `cs_windows_ordered` proves from it, is the strengthening
+`t_r(i) ≤ t_a(j)`: given disjointness, `rmw_reads_pred` upgrades "i's
+release precedes j's acquire write" to "j's acquire READS at or above
+i's release", which is the inequality the coverage argument needs.
+(A second small machine fact used here: two writes of a byte at the same
+timestamp have the same author, via `writes_b_author`.)
+
+**The lock-mediated read**:
+
+```coq
+Theorem cs_read_covered        : j's acquire is [aq] and read ta_j ≥ ts_m ⟹ covered Tj h ts_m
+Corollary cs_read_covered_window : the same with the two windows and win_excl in front,
+                                   the inequality supplied by cs_windows_ordered
+Theorem cs_read_before_absurd  : j's window BEFORE i's ⟹ ts_m < tr_j ≤ ta_i < ts_m, absurd
+```
+
+so under SF-1 a plain critical-section read is ALWAYS covered or
+contradictory — the design's §4 claim, in trace terms, with no
+pf-realness anywhere.
+
+**The A/D CAS structural fact**: `gpo_no_return` (premise-free:
+`¬ gpo TS d c` when `c` is po-before `d`) and
+`no_gdep2_back_to_po_pred` (under `gdep2_acyclic`, no `gdep2` path from
+a po-later event of the same agent back to `c`).
+
+### 7.4 What L2-M1 did NOT close
+
+- **C4/C5** are already Layer-1 lemmas (`WeakRobustDisc`'s Track A,
+  `bad_edge_violates`) — nothing was owed.
+- **C6 / SF-1** stays a site fact, now with a machine-checked NAME
+  (`win_excl`) and a machine-checked consequence (`cs_windows_ordered`).
+  §5's ⚑ decision (α vs β for the byte→lock map) is untouched.
+- **SF-2, SF-3** untouched (L2-M3's `w_rdw`/`w_lock` exports).
+- **L2-M2** (the minimal-cycle skeleton: `gev_enum`, minimal length,
+  one-segment-per-agent, the case split, L2-acyc under SF-1/2/3) is the
+  next stage; A0″ and `robust_main_acyc` are exactly the interface it
+  targets, and C1/C2/C3 are now available to it as machine facts.
+- **`ldcarry_of_read` still takes `read_unforwarded`** (as every
+  Track-A lemma does); `WeakRobustDisc.foreign_ts_unforwarded` discharges
+  it for any cross-agent edge, which is the only case a cycle segment
+  has.
