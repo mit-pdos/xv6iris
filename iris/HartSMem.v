@@ -390,6 +390,54 @@ Proof.
   apply hfrun_ret.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE TWO Sv39 ADAPTERS.  The engines below take the address transform and *)
+(* the translation mode as [hval] FACTS rather than as the satp-mode        *)
+(* equation, because the leaves they serve are REGIME-GENERIC: a leaf       *)
+(* holding only [SRegime.sr_inv R] cannot say whether its regime installs   *)
+(* Sv39 or Bare, and the mode decides a branch inside [vmem_read_addr] /    *)
+(* [vmem_write_addr] and inside [transform_effective_address].  A leaf that *)
+(* DOES know it is on the kernel table feeds these two, which are the       *)
+(* [hfrun] walks above at the [hval] layer.                                 *)
+(* ---------------------------------------------------------------------- *)
+Lemma hval_translationMode_S_sv39 (D Drw : gset register) (rs : regstate) :
+  (mstatus : register) ∈ D ->
+  (satp : register) ∈ D ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)) = ('b"1000" : mword 4) ->
+  hval D Drw rs (translationMode Supervisor) Sv39 rs.
+Proof.
+  intros HDmst HDsatp HSXL Hmode.
+  exact (hfrun_hval 6 D Drw rs _ _ _
+           (hfrun_translationMode_S_sv39 D Drw rs HDmst HDsatp HSXL Hmode)).
+Qed.
+
+Lemma hval_transform_effective_address_S (D Drw : gset register)
+    (rs : regstate) (a : SailStdpp.Values.mword 64)
+    (acc : MemoryAccessType mem_payload) :
+  (mstatus : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  (menvcfg : register) ∈ D ->
+  (satp : register) ∈ D ->
+  register_lookup cur_privilege rs = Supervisor ->
+  effectivePrivilege acc (register_lookup mstatus rs) Supervisor
+    = returnM Supervisor ->
+  Instances.generic_neq acc (InstructionFetch tt) = true ->
+  Instances.generic_neq acc (Load PageTableEntry) = true ->
+  Instances.generic_neq acc (Store PageTableEntry) = true ->
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus rs)) ('b"0") = true ->
+  pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
+    = PMM_Disabled ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)) = ('b"1000" : mword 4) ->
+  hval D Drw rs (transform_effective_address (Virtaddr a) acc) (Virtaddr a) rs.
+Proof.
+  intros HDmst HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmode.
+  exact (hfrun_hval 20 D Drw rs _ _ _
+           (hfrun_transform_effective_address_S D Drw rs a acc HDmst HDpriv
+              HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmode)).
+Qed.
+
 (* ====================================================================== *)
 (* 5. THE ENGINES.                                                         *)
 (*                                                                        *)
@@ -746,13 +794,14 @@ Section smem.
   (* [do_split_access], and the page-split test has already answered          *)
   (* [(width, 0)], so the split arm is dead and the chain is one access.     *)
   (* ------------------------------------------------------------------ *)
-  Lemma swp_vmem_read_addr_S (Drw Dro : gset register)
+  Lemma swp_vmem_read_addr_S_gen (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (ea pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
       (bytes : SailStdpp.Values.mword (8 * width))
-      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -767,8 +816,7 @@ Section smem.
     register_lookup pmpcfg_n rs = pcfg ->
     register_lookup pmpaddr_n rs = paddr ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
     effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -826,12 +874,26 @@ Section smem.
     unfold Defs.and_boolM.
     iApply (swp_use_cer3 (translationMode Supervisor) _ _ _ _ C HC
               with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_translationMode_S_sv39 (Drw ∪ Dro) Drw rs
-                   HDmst HDsatp HSXL Hmode) with "Hcert Hrw Hro"). }
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hmode
+                with "Hcert Hrw Hro"). }
     iIntros (v0) "(-> & Hrw & Hro)". sm_glue.
-    change (Instances.generic_neq Sv39 Bare) with true. sm_glue.
-    rewrite mbindR_ret. sm_glue.
+    (* THE ONE BRANCH THE MODE DECIDES, and both arms reach the same value:
+       at [md <> Bare] the second conjunct is evaluated and is [false]; at
+       [Bare] the [and_boolM] short-circuits to [false] outright. *)
+    (* THE ONE BRANCH THE TRANSLATION MODE DECIDES, COLLAPSED BEFORE IT
+       SPLITS THE PROOF.  The page-split conjunct is [next_page_bytes > 0]
+       and the address is aligned, so the second conjunct is [0 >? 0] --
+       [false] -- and [and_boolM] returns [false] whatever the mode is.
+       Collapsing it here (rather than [destruct]ing the mode) is what keeps
+       this walk ONE goal and the engines regime-generic: a leaf holding only
+       [sr_inv R] cannot say which mode its regime installs. *)
+    rewrite mbindR_ret.
+    match goal with
+    | |- context [ if Instances.generic_neq md Bare then ?x else ?y ] =>
+        replace (if Instances.generic_neq md Bare then x else y) with x
+          by (destruct (Instances.generic_neq md Bare); reflexivity)
+    end.
+    sm_glue.
     change (Z.gtb 0 0) with false. sm_glue.
     change (sys_misaligned_order_decreasing && false) with false. sm_glue.
     rewrite mbindR_ret. sm_glue.
@@ -858,7 +920,7 @@ Section smem.
   (* one node no walker takes, so it is peeled at [gpr_file]; the rest is   *)
   (* the pinned-register walk [hfrun_transform_effective_address_S].        *)
   (* ------------------------------------------------------------------ *)
-  Lemma swp_get_transformed_data_addr_S (Drw Dro : gset register)
+  Lemma swp_get_transformed_data_addr_S_gen (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (i : SailStdpp.Values.mword 5) (m : regfile)
       (offset : SailStdpp.Values.mword 64)
@@ -878,8 +940,10 @@ Section smem.
     pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
       = PMM_Disabled ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address
+         (Virtaddr (add_vec (m !!! Regidx i) offset)) acc)
+      (Virtaddr (add_vec (m !!! Regidx i) offset)) rs ->
     gen_cert -∗
     gpr_file m -∗
     hreg_frame rs Drw -∗
@@ -906,10 +970,7 @@ Section smem.
               (transform_effective_address
                  (Virtaddr (add_vec (m !!! Regidx i) offset)) acc)
               _ _ _ with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 20 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_transform_effective_address_S (Drw ∪ Dro) Drw rs _ acc
-                   HDmst HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr
-                   Hpmm HSXL Hmode)
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hmode
                 with "Hcert Hrw Hro"). }
     iIntros (v0) "(-> & Hrw & Hro)". iApply swp_ret. by iFrame.
   Qed.
@@ -917,13 +978,14 @@ Section smem.
   (* ------------------------------------------------------------------ *)
   (* [vmem_read] and [execute_LOAD] at Supervisor.                        *)
   (* ------------------------------------------------------------------ *)
-  Lemma swp_vmem_read_S (Drw Dro : gset register) (Df : register -> dfrac)
+  Lemma swp_vmem_read_S_gen (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (i : SailStdpp.Values.mword 5) (m : regfile)
       (offset pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
       (bytes : SailStdpp.Values.mword (8 * width))
-      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
     let ea := add_vec (m !!! Regidx i) offset in
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
@@ -943,8 +1005,10 @@ Section smem.
     pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
       = PMM_Disabled ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address (Virtaddr ea) (Load Data))
+      (Virtaddr ea) rs ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
     effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -979,7 +1043,7 @@ Section smem.
                   Rt rsf ∗ resv_any cpu_id ∗ R).
   Proof.
     intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
-      Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Hmode Hep HA Hord HR
+      Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR
       Hcov Hpallow Hram Hva Hpa.
     iIntros "#Hcert Hfrag Hres Hf Hrw Hro Htr Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
@@ -987,31 +1051,33 @@ Section smem.
     iApply (swp_use_cer
               (get_transformed_data_addr (Regidx i) offset (Load Data) width)
               _ _ C HC with "[Hf Hrw Hro] [-]").
-    { iApply (swp_get_transformed_data_addr_S Drw Dro Df rs i m offset
+    { iApply (swp_get_transformed_data_addr_S_gen Drw Dro Df rs i m offset
                 (Load Data) Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
-                Hmxr Hpmm HSXL Hmode with "Hcert Hf Hrw Hro"). }
+                Hmxr Hpmm HSXL Htf with "Hcert Hf Hrw Hro"). }
     iIntros (v0) "(-> & Hf & Hrw & Hro)". cbn beta iota. sm_glue.
     rewrite mbindR_ret. sm_glue.
     iApply (swp_use_cer0
               (vmem_read_addr (Virtaddr ea) width (Load Data) false false false)
               _ C HC with "[Hfrag Hres Hrw Hro Htr Hmem] [-]").
-    { iApply (swp_vmem_read_addr_S Drw Dro Df rs ea pa pmar0 pcfg paddr bytes
-                R Rt rr Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif
-                Hpriv Hhtif Hpma Hpcfg Hpaddr HSXL Hmode Hep HA Hord HR Hcov
-                Hpallow Hram Hva Hpa with "Hcert Hfrag Hres Hrw Hro Htr Hmem"). }
+    { iApply (swp_vmem_read_addr_S_gen Drw Dro Df rs ea pa pmar0 pcfg paddr
+                bytes R Rt rr md Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr
+                HDhtif Hpriv Hhtif Hpma Hpcfg Hpaddr HSXL Hmode Hep HA Hord HR
+                Hcov Hpallow Hram Hva Hpa
+                with "Hcert Hfrag Hres Hrw Hro Htr Hmem"). }
     iIntros (v0) "(-> & Hland)".
     iApply ("Hcont" $! (Values.Ok bytes)). iSplitR; [done|]. iFrame.
   Qed.
 
-  Lemma swp_execute_LOAD_S (Drw Dro : gset register) (Df : register -> dfrac)
+  Lemma swp_execute_LOAD_S_gen (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (imm : SailStdpp.Values.mword 12)
       (rs1 rd : SailStdpp.Values.mword 5) (is_unsigned : bool)
       (m : regfile) (pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
       (bytes : SailStdpp.Values.mword (8 * width))
-      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
@@ -1031,8 +1097,10 @@ Section smem.
     pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
       = PMM_Disabled ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address (Virtaddr ea) (Load Data))
+      (Virtaddr ea) rs ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
     effectivePrivilege (Load Data) (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -1070,7 +1138,7 @@ Section smem.
                   Rt rsf ∗ resv_any cpu_id ∗ R).
   Proof.
     intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
-      Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Hmode Hep HA Hord HR
+      Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR
       Hcov Hpallow Hram Hva Hpa Hrd.
     pose proof w_le8 as Hw8.
     iIntros "#Hcert Hfrag Hres Hf Hrw Hro Htr Hmem".
@@ -1087,11 +1155,11 @@ Section smem.
                            hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                            Rt rsf ∗ resv_any cpu_id ∗ R)%I) _
               with "[Hfrag Hres Hf Hrw Hro Htr Hmem] [-]").
-    { iApply (swp_vmem_read_S Drw Dro Df rs rs1 m (sign_extend' 64 imm) pa
-                pmar0 pcfg paddr bytes R Rt rr Hdisj HDmst HDpriv HDmenv
+    { iApply (swp_vmem_read_S_gen Drw Dro Df rs rs1 m (sign_extend' 64 imm) pa
+                pmar0 pcfg paddr bytes R Rt rr md Hdisj HDmst HDpriv HDmenv
                 HDsatp HDpma HDcfg HDaddr HDhtif Hpriv Hhtif Hpma Hpcfg
-                Hpaddr Hmxr Hpmm HSXL Hmode Hep HA Hord HR Hcov Hpallow Hram
-                Hva Hpa with "Hcert Hfrag Hres Hf Hrw Hro Htr Hmem"). }
+                Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR Hcov Hpallow
+                Hram Hva Hpa with "Hcert Hfrag Hres Hf Hrw Hro Htr Hmem"). }
     iIntros (v0) "(-> & Hf & Hland)". cbn beta iota.
     iApply (swp_bind0_use (wX_bits (Regidx rd) (extend_value is_unsigned bytes))
               _ _ _ with "[Hf] [-]").
@@ -1568,13 +1636,14 @@ Section smem_w.
   (* non-straddling path), so this is the one obligation site and both      *)
   (* [mem_write_ea] and [mem_write_value] run at the landing file.          *)
   (* ------------------------------------------------------------------ *)
-  Lemma swp_vmem_write_addr_S (Drw Dro : gset register)
+  Lemma swp_vmem_write_addr_S_gen (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (ea pa : SailStdpp.Values.mword 64)
       (v : SailStdpp.Values.mword (8 * width))
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
-      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -1589,8 +1658,7 @@ Section smem_w.
     register_lookup pmpaddr_n rs = paddr ->
     register_lookup htif_tohost_base rs = None ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
     effectivePrivilege (Store Data) (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -1648,12 +1716,26 @@ Section smem_w.
     unfold Defs.and_boolM.
     iApply (swp_use_cer3 (translationMode Supervisor) _ _ _ _ C HC
               with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_translationMode_S_sv39 (Drw ∪ Dro) Drw rs
-                   HDmst HDsatp HSXL Hmode) with "Hcert Hrw Hro"). }
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hmode
+                with "Hcert Hrw Hro"). }
     iIntros (v0) "(-> & Hrw & Hro)". sm_glue.
-    change (Instances.generic_neq Sv39 Bare) with true. sm_glue.
-    rewrite mbindR_ret. sm_glue.
+    (* THE ONE BRANCH THE MODE DECIDES, and both arms reach the same value:
+       at [md <> Bare] the second conjunct is evaluated and is [false]; at
+       [Bare] the [and_boolM] short-circuits to [false] outright. *)
+    (* THE ONE BRANCH THE TRANSLATION MODE DECIDES, COLLAPSED BEFORE IT
+       SPLITS THE PROOF.  The page-split conjunct is [next_page_bytes > 0]
+       and the address is aligned, so the second conjunct is [0 >? 0] --
+       [false] -- and [and_boolM] returns [false] whatever the mode is.
+       Collapsing it here (rather than [destruct]ing the mode) is what keeps
+       this walk ONE goal and the engines regime-generic: a leaf holding only
+       [sr_inv R] cannot say which mode its regime installs. *)
+    rewrite mbindR_ret.
+    match goal with
+    | |- context [ if Instances.generic_neq md Bare then ?x else ?y ] =>
+        replace (if Instances.generic_neq md Bare then x else y) with x
+          by (destruct (Instances.generic_neq md Bare); reflexivity)
+    end.
+    sm_glue.
     change (Z.gtb 0 0) with false. sm_glue.
     change (sys_misaligned_order_decreasing && false) with false. sm_glue.
     rewrite mbindR_ret. sm_glue.
@@ -1704,13 +1786,14 @@ Section smem_w.
     iExists rsf. iFrame. done.
   Qed.
 
-  Lemma swp_vmem_write_S (Drw Dro : gset register) (Df : register -> dfrac)
+  Lemma swp_vmem_write_S_gen (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (i : SailStdpp.Values.mword 5) (m : regfile)
       (offset pa : SailStdpp.Values.mword 64)
       (v : SailStdpp.Values.mword (8 * width))
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
-      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
     let ea := add_vec (m !!! Regidx i) offset in
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
@@ -1730,8 +1813,10 @@ Section smem_w.
     pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
       = PMM_Disabled ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address (Virtaddr ea) (Store Data))
+      (Virtaddr ea) rs ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
     effectivePrivilege (Store Data) (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -1766,7 +1851,7 @@ Section smem_w.
                   Rt rsf ∗ R ∗ resv_frag cpu_id None).
   Proof.
     intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
-      Hpriv Hpma Hpcfg Hpaddr Hhtif Hmxr Hpmm HSXL Hmode Hep HA Hord HW
+      Hpriv Hpma Hpcfg Hpaddr Hhtif Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HW
       Hcov Hpallow Hram Hva Hpa.
     iIntros "#Hcert Hfrag Hres Hf Hrw Hro Htr Hmem".
     rewrite /swp. iIntros (C) "%HC Hcont".
@@ -1774,32 +1859,33 @@ Section smem_w.
     iApply (swp_use_cer
               (get_transformed_data_addr (Regidx i) offset (Store Data) width)
               _ _ C HC with "[Hf Hrw Hro] [-]").
-    { iApply (swp_get_transformed_data_addr_S width Drw Dro Df rs i m offset
-                (Store Data) Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
+    { iApply (swp_get_transformed_data_addr_S_gen width Drw Dro Df rs i m
+                offset (Store Data) Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
-                Hmxr Hpmm HSXL Hmode with "Hcert Hf Hrw Hro"). }
+                Hmxr Hpmm HSXL Htf with "Hcert Hf Hrw Hro"). }
     iIntros (v0) "(-> & Hf & Hrw & Hro)". cbn beta iota. sm_glue.
     rewrite mbindR_ret. sm_glue.
     iApply (swp_use_cer0
               (vmem_write_addr (Virtaddr ea) width v (Store Data)
                  false false false) _ C HC
               with "[Hfrag Hres Hrw Hro Htr Hmem] [-]").
-    { iApply (swp_vmem_write_addr_S Drw Dro Df rs ea pa v pmar0 pcfg paddr
-                R Rt rr Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif
+    { iApply (swp_vmem_write_addr_S_gen Drw Dro Df rs ea pa v pmar0 pcfg paddr
+                R Rt rr md Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif
                 Hpriv Hpma Hpcfg Hpaddr Hhtif HSXL Hmode Hep HA Hord HW Hcov
                 Hpallow Hram Hva Hpa with "Hcert Hfrag Hres Hrw Hro Htr Hmem"). }
     iIntros (v0) "(-> & Hland)".
     iApply ("Hcont" $! (Values.Ok true)). iSplitR; [done|]. iFrame.
   Qed.
 
-  Lemma swp_execute_STORE_S (Drw Dro : gset register) (Df : register -> dfrac)
+  Lemma swp_execute_STORE_S_gen (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (imm : SailStdpp.Values.mword 12)
       (rs2 rs1 : SailStdpp.Values.mword 5) (m : regfile)
       (pa : SailStdpp.Values.mword 64)
       (v : SailStdpp.Values.mword (8 * width))
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n)
-      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv) :
+      (R : iProp Σ) (Rt : regstate -> iProp Σ) (rr : option resv)
+      (md : SATPMode) :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     (* the stored word: the model truncates the source GPR to the width *)
     autocast (T := mword)
@@ -1822,8 +1908,10 @@ Section smem_w.
     pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
       = PMM_Disabled ->
     _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
-      = ('b"1000" : mword 4) ->
+    hval (Drw ∪ Dro) Drw rs
+      (transform_effective_address (Virtaddr ea) (Store Data))
+      (Virtaddr ea) rs ->
+    hval (Drw ∪ Dro) Drw rs (translationMode Supervisor) md rs ->
     effectivePrivilege (Store Data) (register_lookup mstatus rs) Supervisor
       = returnM Supervisor ->
     pmpAddrMatchType_encdec_backwards
@@ -1858,7 +1946,7 @@ Section smem_w.
                   Rt rsf ∗ R ∗ resv_frag cpu_id None).
   Proof.
     intros ea Hdata Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr
-      HDhtif Hpriv Hpma Hpcfg Hpaddr Hhtif Hmxr Hpmm HSXL Hmode Hep HA Hord
+      HDhtif Hpriv Hpma Hpcfg Hpaddr Hhtif Hmxr Hpmm HSXL Htf Hmode Hep HA Hord
       HW Hcov Hpallow Hram Hva Hpa.
     pose proof ww_le8 as Hw8.
     iIntros "#Hcert Hfrag Hres Hf Hrw Hro Htr Hmem".
@@ -1879,11 +1967,11 @@ Section smem_w.
                            hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                            Rt rsf ∗ R ∗ resv_frag cpu_id None)%I) _
               with "[Hfrag Hres Hf Hrw Hro Htr Hmem] [-]").
-    { iApply (swp_vmem_write_S Drw Dro Df rs rs1 m (sign_extend' 64 imm) pa v
-                pmar0 pcfg paddr R Rt rr Hdisj HDmst HDpriv HDmenv HDsatp
+    { iApply (swp_vmem_write_S_gen Drw Dro Df rs rs1 m (sign_extend' 64 imm) pa
+                v pmar0 pcfg paddr R Rt rr md Hdisj HDmst HDpriv HDmenv HDsatp
                 HDpma HDcfg HDaddr HDhtif Hpriv Hpma Hpcfg Hpaddr Hhtif
-                Hmxr Hpmm HSXL Hmode Hep HA Hord HW Hcov Hpallow Hram Hva Hpa
-                with "Hcert Hfrag Hres Hf Hrw Hro Htr Hmem"). }
+                Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HW Hcov Hpallow Hram Hva
+                Hpa with "Hcert Hfrag Hres Hf Hrw Hro Htr Hmem"). }
     iIntros (v0) "(-> & Hf & Hland)". cbn beta iota.
     iApply swp_ret. by iFrame.
   Qed.
@@ -2548,25 +2636,25 @@ Section instances.
 
   (* ---- the four RAM LOAD engines ---- *)
   Definition swp_execute_LOAD_ram_S1 :=
-    swp_execute_LOAD_S 1 vmw1 addr_is_ram pma_allows_ram
+    swp_execute_LOAD_S_gen 1 vmw1 addr_is_ram pma_allows_ram
       (ram_pma_load 1 vmw1 dvd1) (ram_mmio_r 1 vmw1)
       (ram_pmprange 1 vmw1 dvd1 uintw1) (Mobl_ram 1)
       (fun pa bytes R H => swp_read_ram_node1 pa bytes R
                              (addr_is_ram_not_dev pa H)).
   Definition swp_execute_LOAD_ram_S2 :=
-    swp_execute_LOAD_S 2 vmw2 addr_is_ram pma_allows_ram
+    swp_execute_LOAD_S_gen 2 vmw2 addr_is_ram pma_allows_ram
       (ram_pma_load 2 vmw2 dvd2) (ram_mmio_r 2 vmw2)
       (ram_pmprange 2 vmw2 dvd2 uintw2) (Mobl_ram 2)
       (fun pa bytes R H => swp_read_ram_node2 pa bytes R
                              (addr_is_ram_not_dev pa H)).
   Definition swp_execute_LOAD_ram_S4 :=
-    swp_execute_LOAD_S 4 vmw4 addr_is_ram pma_allows_ram
+    swp_execute_LOAD_S_gen 4 vmw4 addr_is_ram pma_allows_ram
       (ram_pma_load 4 vmw4 dvd4) (ram_mmio_r 4 vmw4)
       (ram_pmprange 4 vmw4 dvd4 uintw4) (Mobl_ram 4)
       (fun pa bytes R H => swp_read_ram_node4 pa bytes R
                              (addr_is_ram_not_dev pa H)).
   Definition swp_execute_LOAD_ram_S8 :=
-    swp_execute_LOAD_S 8 vmw8 addr_is_ram pma_allows_ram
+    swp_execute_LOAD_S_gen 8 vmw8 addr_is_ram pma_allows_ram
       (ram_pma_load 8 vmw8 dvd8) (ram_mmio_r 8 vmw8)
       (ram_pmprange 8 vmw8 dvd8 uintw8) (Mobl_ram 8)
       (fun pa bytes R H => swp_read_ram_node8 pa bytes R
@@ -2574,25 +2662,25 @@ Section instances.
 
   (* ---- the four RAM STORE engines ---- *)
   Definition swp_execute_STORE_ram_S1 :=
-    swp_execute_STORE_S 1 vmw1 addr_is_ram pma_allows_ram
+    swp_execute_STORE_S_gen 1 vmw1 addr_is_ram pma_allows_ram
       (ram_pma_store 1 vmw1 dvd1) (ram_mmio_w 1 vmw1)
       (ram_pmprange 1 vmw1 dvd1 uintw1) (Wobl_ram 1)
       (fun pa v R rr H => swp_write_ram_node1 pa v R rr
                             (addr_is_ram_not_dev pa H)).
   Definition swp_execute_STORE_ram_S2 :=
-    swp_execute_STORE_S 2 vmw2 addr_is_ram pma_allows_ram
+    swp_execute_STORE_S_gen 2 vmw2 addr_is_ram pma_allows_ram
       (ram_pma_store 2 vmw2 dvd2) (ram_mmio_w 2 vmw2)
       (ram_pmprange 2 vmw2 dvd2 uintw2) (Wobl_ram 2)
       (fun pa v R rr H => swp_write_ram_node2 pa v R rr
                             (addr_is_ram_not_dev pa H)).
   Definition swp_execute_STORE_ram_S4 :=
-    swp_execute_STORE_S 4 vmw4 addr_is_ram pma_allows_ram
+    swp_execute_STORE_S_gen 4 vmw4 addr_is_ram pma_allows_ram
       (ram_pma_store 4 vmw4 dvd4) (ram_mmio_w 4 vmw4)
       (ram_pmprange 4 vmw4 dvd4 uintw4) (Wobl_ram 4)
       (fun pa v R rr H => swp_write_ram_node4 pa v R rr
                             (addr_is_ram_not_dev pa H)).
   Definition swp_execute_STORE_ram_S8 :=
-    swp_execute_STORE_S 8 vmw8 addr_is_ram pma_allows_ram
+    swp_execute_STORE_S_gen 8 vmw8 addr_is_ram pma_allows_ram
       (ram_pma_store 8 vmw8 dvd8) (ram_mmio_w 8 vmw8)
       (ram_pmprange 8 vmw8 dvd8 uintw8) (Wobl_ram 8)
       (fun pa v R rr H => swp_write_ram_node8 pa v R rr
@@ -2600,22 +2688,22 @@ Section instances.
 
   (* ---- the MMIO engines (widths 1 and 4) ---- *)
   Definition swp_execute_LOAD_dev_S1 :=
-    swp_execute_LOAD_S 1 vmw1 (dev_cls 1) pma_allows_io
+    swp_execute_LOAD_S_gen 1 vmw1 (dev_cls 1) pma_allows_io
       (dev_pma_load 1) (dev_mmio_r 1 vmw1) (dev_pmprange 1 vmw1 uintw1)
       Mobl_dev1
       (fun pa bytes R H => swp_dev_read_node1 pa bytes R (dev_cls_dev 1 pa H)).
   Definition swp_execute_LOAD_dev_S4 :=
-    swp_execute_LOAD_S 4 vmw4 (dev_cls 4) pma_allows_io
+    swp_execute_LOAD_S_gen 4 vmw4 (dev_cls 4) pma_allows_io
       (dev_pma_load 4) (dev_mmio_r 4 vmw4) (dev_pmprange 4 vmw4 uintw4)
       Mobl_dev4
       (fun pa bytes R H => swp_dev_read_node4 pa bytes R (dev_cls_dev 4 pa H)).
   Definition swp_execute_STORE_dev_S1 :=
-    swp_execute_STORE_S 1 vmw1 (dev_cls 1) pma_allows_io
+    swp_execute_STORE_S_gen 1 vmw1 (dev_cls 1) pma_allows_io
       (dev_pma_store 1) (dev_mmio_w 1 vmw1) (dev_pmprange 1 vmw1 uintw1)
       Wobl_dev1
       (fun pa v R rr H => swp_dev_write_node1 pa v R rr (dev_cls_dev 1 pa H)).
   Definition swp_execute_STORE_dev_S4 :=
-    swp_execute_STORE_S 4 vmw4 (dev_cls 4) pma_allows_io
+    swp_execute_STORE_S_gen 4 vmw4 (dev_cls 4) pma_allows_io
       (dev_pma_store 4) (dev_mmio_w 4 vmw4) (dev_pmprange 4 vmw4 uintw4)
       Wobl_dev4
       (fun pa v R rr H => swp_dev_write_node4 pa v R rr (dev_cls_dev 4 pa H)).
@@ -3557,10 +3645,15 @@ Section samo.
     iApply (swp_use_cer
               (get_transformed_data_addr (Regidx rs1) (zeros' 64) amoacc 4)
               _ _ C HC with "[Hf Hrw Hro] [-]").
-    { iApply (swp_get_transformed_data_addr_S 4 Drw Dro Df rs rs1 m
+    { iApply (swp_get_transformed_data_addr_S_gen 4 Drw Dro Df rs rs1 m
                 (zeros' 64) amoacc Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
-                Hmxr Hpmm HSXL Hmode with "Hcert Hf Hrw Hro"). }
+                Hmxr Hpmm HSXL
+                (hval_transform_effective_address_S (Drw ∪ Dro) Drw rs _ amoacc
+                   HDmst HDpriv HDmenv HDsatp Hpriv Hep
+                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
+                   Hmxr Hpmm HSXL Hmode)
+                with "Hcert Hf Hrw Hro"). }
     iIntros (v0) "(-> & Hf & Hrw & Hro)". cbn beta iota.
     rewrite mbindR_ret. sm_glue.
     rewrite Hva. sm_glue.
@@ -3756,10 +3849,15 @@ Section samo.
     iApply (swp_use_cer
               (get_transformed_data_addr (Regidx rs1) (zeros' 64) amoacc 4)
               _ _ C HC with "[Hf Hrw Hro] [-]").
-    { iApply (swp_get_transformed_data_addr_S 4 Drw Dro Df rs rs1 m
+    { iApply (swp_get_transformed_data_addr_S_gen 4 Drw Dro Df rs rs1 m
                 (zeros' 64) amoacc Hdisj HDmst HDpriv HDmenv HDsatp Hpriv Hep
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
-                Hmxr Hpmm HSXL Hmode with "Hcert Hf Hrw Hro"). }
+                Hmxr Hpmm HSXL
+                (hval_transform_effective_address_S (Drw ∪ Dro) Drw rs _ amoacc
+                   HDmst HDpriv HDmenv HDsatp Hpriv Hep
+                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
+                   Hmxr Hpmm HSXL Hmode)
+                with "Hcert Hf Hrw Hro"). }
     iIntros (v0) "(-> & Hf & Hrw & Hro)". cbn beta iota.
     rewrite mbindR_ret. sm_glue.
     rewrite Hva. sm_glue.
