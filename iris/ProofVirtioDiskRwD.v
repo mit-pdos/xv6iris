@@ -610,6 +610,32 @@ Section VdrwdLeaves.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* ---- THE ADDRESS CLAIM, off the STATIC KERNEL MAP.
+     The per-node memory forms take [WpSconfMem.wordw_claim] BESIDE their
+     atomic update: an access translates several nodes before the memory node
+     where the (linear, one-shot) update is opened, so the window's mapping
+     cannot be read out of the update itself.  For a kernel-DATA address the
+     whole claim is derivable from the ambient static bundle plus three pure
+     facts, and [DiskInv.disk_geom] carries all three for every virtio page --
+     so no invariant has to be peeked at.  Stated locally: it is one
+     application of [KMap.kmap_static_claims_at] and [KptPt.pa_of_id], and
+     hoisting it would recompile [WpSconfMem]'s whole cone. ---- *)
+  Lemma vdrwd_wordw_claim_static (width : Z) (a : Arch.pa) :
+    is_aligned_paddr (Physaddr a) width = true ->
+    kmap_static (svpn_of a) KP_rw ->
+    addr_is_ram a ->
+    (uint (a : SailStdpp.Values.mword 64) < 274877906944)%Z ->
+    kmap_static_claims -∗ wordw_claim (KTR := KT0) width a.
+  Proof.
+    iIntros (Hal Hst Hram Hcan) "#Hb".
+    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw Hst with "Hb") as "#Hk0".
+    rewrite /wordw_claim. iSplitR; [iPureIntro; exact Hal |].
+    iExists (kpt_leaf_ppn (svpn_of a)). rewrite (pa_of_id a Hcan).
+    iFrame "Hk0". iPureIntro. split_and!;
+      [ exact Hcan | exact Hram
+      | exact (ktier_pin_of_id KT0 (kpt_leaf_ppn (svpn_of a)) a (pa_of_id a Hcan)) ].
+  Qed.
+
   (* ---- the avail-ring INDEX read: [lhu rd,2(rs1)] with rs1 = disk.avail.
      Drives [virtio_proto_avail_idx_acc]: the value is the driver's OWN
      published count, so nothing new is learned about it -- what the read is
@@ -648,7 +674,7 @@ Section VdrwdLeaves.
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
-    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _)".
+    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & %Hkda & _)".
     destruct Hal0 as (_ & Hala & _).
     assert (Halign : is_aligned_paddr (Physaddr (pa_add pav 2%nat)) 2 = true).
     { apply (vdrwd_aligned_off pav 2%nat 2 Hala);
@@ -666,7 +692,12 @@ Section VdrwdLeaves.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub] [Hcont]").
+    { rewrite Hea.
+      iApply (vdrwd_wordw_claim_static 2 (pa_add pav 2%nat) Halign
+                (Hsta 2%nat ltac:(lia))
+                (addr_is_kdata_ram _ (Hkda 2%nat ltac:(lia)))
+                (Hcana 2%nat ltac:(lia)) with "Hkm"). }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
@@ -736,7 +767,7 @@ Section VdrwdLeaves.
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hsta & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcana & _).
-    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _)".
+    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & %Hkda & _)".
     destruct Hal0 as (_ & Hala & _).
     assert (Halign : is_aligned_paddr (Physaddr (pa_add pav 2%nat)) 2 = true).
     { apply (vdrwd_aligned_off pav 2%nat 2 Hala);
@@ -755,7 +786,12 @@ Section VdrwdLeaves.
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hpin Hwrb Hpend] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hpin Hwrb Hpend] [Hcont]").
+    { rewrite Hea.
+      iApply (vdrwd_wordw_claim_static 2 (pa_add pav 2%nat) Halign
+                (Hsta 2%nat ltac:(lia))
+                (addr_is_kdata_ram _ (Hkda 2%nat ltac:(lia)))
+                (Hcana 2%nat ltac:(lia)) with "Hkm"). }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
