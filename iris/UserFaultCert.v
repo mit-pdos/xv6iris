@@ -61,7 +61,8 @@ Import Defs.
    [UserFetchCert.v] does not compile against the current [UserBytes.v]
    (P4b's new [UserBytes.u_walk_pa_window] SHADOWS [UserMem.u_walk_pa_window]
    at [u_fetch_bytes]), so this file cannot Require it; these nine lemmas are
-   its section-3 slot projections and its section-6 [translationMode] chain,
+   its section-2 [Ziccif] probe, its section-3 slot projections and its
+   section-6 [translationMode] chain,
    restated under a [ufa_] prefix.  DELETE THEM at the fold-back, when
    section 3 moves to [UserMem.v] and section 6 to [UserPtTree.v]. *)
 
@@ -149,6 +150,14 @@ Qed.
 Lemma ufa_slot_owned (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) (q : mword 64) :
   u_mem_wf P t mm -> word_bytes a q ∈ pt_maps 2 t -> bytes_owned mm a 8 = true.
 Proof. intros Hwf Hin. exact (u_mem_wf_owned P t mm a q Hwf Hin). Qed.
+
+Lemma ufa_goodmb_currentlyEnabled_Ziccif (Dr Dw : register -> bool) (s : mstate)
+    (mm : PtBytes.pamap) :
+  goodmb Dr Dw (currentlyEnabled Ext_Ziccif) s mm = true.
+Proof.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  vm_compute. reflexivity.
+Qed.
 
 Lemma ufa_goodb_read_reg_D (Db : register -> bool) {E} (r : register) (s : mstate) :
   Db r = true -> goodb Db (Defs.read_reg r : Defs.monad E _) s = true.
@@ -924,4 +933,160 @@ Proof.
                (svpn_of va) (ud_root P) (PTW_No_Permission tt) e usatp va s mm
                Heff Heffg Hss Hssg Lcp Htm Htmg Hsatp Hppn Hasid Hcanon eq_refl
                Htr Htrg Hte3 (u_texc_goodb acc (PTW_No_Permission tt) e s Hte3 Du_r s)).
+Qed.
+
+(* ===================================================================== *)
+(* 8. [u_fetch_fault_pure] -- THE [F_Error] ARM OF [fetch].                *)
+(*                                                                        *)
+(* [UserFetchCert] has only the SUCCESS arm ([u_fetch_pure]), so           *)
+(* [HartRunFull.run_fetch_post]'s [F_Error] arm had no producer.  The      *)
+(* premise is the fetch's own flavour predicate                            *)
+(* ([UserFetchPt.u_fetch_fault_flavor], which                              *)
+(* [UserActiveClass.fetch_classify] produces); everything below the        *)
+(* translation is [UserFetch]'s own plumbing, so the two shells here are   *)
+(* [exec_fetch_bytes_fault] / [exec_fetch_fault_4]'s twins.                *)
+(*                                                                        *)
+(* [fetch_bytes] IS the [catch_early_return] region that THROWS -- the     *)
+(* [Err] arm is an [early_return] -- so its certificate keeps the wrapper  *)
+(* ON and is peeled with [gm_cer_bind], ending at [mcer_early_return]'s    *)
+(* conversion.  The whole [fetch] does NOT throw (the [F_Error] value is   *)
+(* returned normally), so its own wrapper comes off with [goodmb_cer].     *)
+(*                                                                        *)
+(* THE STATE DOES NOT MOVE, so where [u_fetch_pure] exhibits [rsf'],       *)
+(* [mm'] and [t'] this one has nothing to exhibit: the landing-file        *)
+(* disjunct would read [rsf = rsf] and is left out, and the last two       *)
+(* conjuncts are stated at the INCOMING tree and map, which is exactly     *)
+(* what [UserClassifyAsm.u_landing_map] needs of them.                     *)
+(* ===================================================================== *)
+
+
+
+Lemma goodmb_fetch_bytes_fault (Dr Dw : register -> bool) (width : Z)
+    (fs gs : mword 64) (ex : ExceptionType) (s s' : mstate) (mm : PtBytes.pamap) :
+  exec (translateAddr (Virtaddr gs) (InstructionFetch tt)) s
+    = Some (Err (ex, tt), s') ->
+  goodmb Dr Dw (translateAddr (Virtaddr gs) (InstructionFetch tt)) s mm = true ->
+  goodmb Dr Dw (fetch_bytes fs gs width) s mm = true.
+Proof.
+  intros Htr Htrg.
+  unfold fetch_bytes.
+  change (ext_fetch_check_pc fs gs) with (@None unit). cbv iota beta.
+  match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+    assert (Htrs : execR (Defs.bind0 a b) s
+                   = Some (inr (Err (ex, tt)), s'));
+    [ | assert (Htrsg : goodmb Dr Dw (Defs.bind0 a b) s mm = true) ] end.
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+    rewrite execR_liftR. rewrite Htr. cbn match. reflexivity. }
+  { erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    apply goodmb_liftR. exact Htrg. }
+  erewrite (gm_cer_bind Dr Dw _ _ s s' mm _ Htrsg Htrs). cbv iota beta.
+  reflexivity.
+Qed.
+
+Section FetchFault4Cert.
+  Context (Dr Dw : register -> bool).
+  Context (s : mstate) (mm : PtBytes.pamap) (pc : mword 64) (ex : ExceptionType).
+  Hypothesis HDpc : Dr PC = true.
+  Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
+  Hypothesis Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true.
+  Hypothesis Htr : exec (translateAddr (Virtaddr pc) (InstructionFetch tt)) s
+                   = Some (Err (ex, tt), s).
+  Hypothesis Htrg : goodmb Dr Dw (translateAddr (Virtaddr pc) (InstructionFetch tt))
+                      s mm = true.
+
+  Let HrdPC : exec (Defs.read_reg PC) s = Some (pc, s).
+  Proof. rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. Qed.
+
+  Let HrdPCg : goodmb Dr Dw (Defs.read_reg PC : M _) s mm = true.
+  Proof. rewrite goodmb_read_reg. exact HDpc. Qed.
+
+  Lemma goodmb_fetch_fault_4 : goodmb Dr Dw (fetch tt) s mm = true.
+  Proof using Dr Dw s mm pc ex HDpc HpcPC Hvalign Htr Htrg.
+    destruct (align4_low_bits pc Hvalign) as [Hbit0 Hbit1].
+    unfold fetch. apply goodmb_cer.
+    change (get_config_rvfi tt) with false. cbv iota beta.
+    gmm_lift HrdPCg HrdPC.
+    gmm_lift HrdPCg HrdPC.
+    change (ext_fetch_check_pc pc pc) with (@None unit). cbv iota beta.
+    match goal with |- context[Defs.bind ?A ?K] =>
+      assert (Halg : goodmb Dr Dw A s mm = true);
+      [ | assert (Hale : execR A s = Some (inr false, s)) ] end.
+    { erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+      unfold Defs.or_boolM.
+      erewrite gm_liftR_nest; [ | exact HrdPCg | exact HrdPC ].
+      rewrite Hbit0. rewrite bindR_ret. cbv iota beta.
+      unfold Defs.and_boolM.
+      erewrite gm_liftR_nest; [ | exact HrdPCg | exact HrdPC ].
+      rewrite Hbit1. rewrite bindR_ret. cbv iota beta. reflexivity. }
+    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      unfold Defs.or_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit0.
+          apply execR_returnR_fwd. }
+      cbv iota beta.
+      unfold Defs.and_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit1.
+          apply execR_returnR_fwd. }
+      cbv iota beta. reflexivity. }
+    erewrite (gm_bindR Dr Dw _ _ s s mm false Halg Hale). cbv iota beta.
+    match goal with |- context[Defs.bind ?A ?K] =>
+      assert (Hzg : goodmb Dr Dw A s mm = true);
+      [ | assert (Hze : execR A s = Some (inr true, s)) ] end.
+    { unfold Defs.and_boolM.
+      erewrite gm_liftR_nest; [ | exact HrdPCg | exact HrdPC ].
+      rewrite Hvalign. rewrite bindR_ret. cbv iota beta.
+      apply goodmb_liftR. apply ufa_goodmb_currentlyEnabled_Ziccif. }
+    { unfold Defs.and_boolM.
+      rewrite (execR_bind_Some _ _ _ true s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hvalign.
+          apply execR_returnR_fwd. }
+      cbv iota beta.
+      rewrite execR_liftR. rewrite exec_currentlyEnabled_Ziccif.
+      cbn match. reflexivity. }
+    erewrite (gm_bindR Dr Dw _ _ s s mm true Hzg Hze). cbv iota beta.
+    gmm_lift HrdPCg HrdPC.
+    gmm_lift HrdPCg HrdPC.
+    erewrite gm_liftR_seq;
+      [ | exact (goodmb_fetch_bytes_fault Dr Dw 4 pc pc ex s s mm Htr Htrg)
+        | exact (exec_fetch_bytes_fault 4 pc pc ex s s Htr) ].
+    cbv iota beta.
+    gmm_lift HrdPCg HrdPC.
+    apply goodmb_returnm.
+  Qed.
+
+End FetchFault4Cert.
+
+Lemma u_fetch_fault_pure (P : uptd) (t : ptree) (mm : PtBytes.pamap)
+    (rsf : regstate) (va : mword 64) (mi : bool) :
+  UserFetchPt.u_fetch_fault_flavor (ud_tfp P) (ud_um P) va ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  post_fetch_cfg (u_state rsf mm) va mi ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  exec (fetch tt) (u_state rsf mm)
+    = Some (F_Error (E_Fetch_Page_Fault tt, va), u_state rsf mm)
+  /\ goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true
+  /\ tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rsf)
+  /\ u_mem_step P t t mm mm.
+Proof.
+  intros Hflavor Hal Hcfg Hpins Hwf.
+  pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
+  destruct Lms as (Lsxl & _).
+  pose proof Hpins as (_ & _ & _ & Htlbok).
+  set (s := u_state rsf mm) in *.
+  destruct (u_translate_fault_pure P t mm rsf (InstructionFetch tt)
+              (E_Fetch_Page_Fault tt) va Hflavor
+              ltac:(unfold translationException; cbn match; apply exec_returnm)
+              ltac:(unfold translationException; cbn match; apply exec_returnm)
+              ltac:(unfold translationException; cbn match; apply exec_returnm)
+              (exec_effectivePrivilege_fetch (register_lookup mstatus rsf) User s)
+              (exec_is_shadow_stack_fetch s) Lcp Lsxl Hpins Hwf)
+    as (Htr & Htrg).
+  split_and!.
+  - exact (exec_fetch_fault_4 s va Lpc (E_Fetch_Page_Fault tt) Hal Htr).
+  - exact (goodmb_fetch_fault_4 Du_r Du_w s mm va (E_Fetch_Page_Fault tt)
+             ltac:(vm_compute; reflexivity) Lpc Hal Htr Htrg).
+  - exact Htlbok.
+  - exact (u_mem_step_refl P t mm Hwf).
 Qed.
