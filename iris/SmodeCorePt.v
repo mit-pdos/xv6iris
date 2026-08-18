@@ -2646,6 +2646,101 @@ Section SmodeCorePt.
   Qed.
 
 
+
+  (* ------------------------------------------------------------------ *)
+  (* THE FRAME OPEN/CLOSE, PROVEN IN A CLEAN GOAL.                        *)
+  (*                                                                     *)
+  (* MEASURED: doing this INLINE inside the wrapper's proof -- [rewrite   *)
+  (* s_rw_split s_ro_split_mix] and then the 25 [s_rs_*] lookups against  *)
+  (* the wrapper's [envs_entails] -- is the file's whole cost (>600 s for *)
+  (* ONE tactic, against 23 s for the other ~2000 steps).  The same       *)
+  (* rewrites in a two-hypothesis goal are milliseconds, which is the     *)
+  (* tree's standing rule about tower lookups under a big context.        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma spt_frames_open
+      (dq : dfrac) (pc npc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+      (tlbv : type_of_register tlb) :
+    hreg_frame (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip ∗ tlb ↦ᵣ tlbv ∗
+     cur_privilege ↦ᵣ{ dq } Supervisor ∗ mstatus ↦ᵣ{ dq } mst0 ∗
+     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+     pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 ∗
+     satp ↦ᵣ satp0 ∗ mie ↦ᵣ{ dq } mie0 ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
+     menvcfg ↦ᵣ{ dq } menv0).
+  Proof.
+    iIntros "Hrw Hro".
+    rewrite s_rw_split s_ro_split_mix.
+    rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
+      s_rs_tlb s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+      s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+      s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+    iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc)".
+    iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & Hmc & Hmicfg &
+                         Hmisa & Hsec & Hpma & Hhtif & Help & Hsenv &
+                         Hsatp & Hmie & Hmdl & Hmenv)".
+    iFrame.
+  Qed.
+
+  Lemma spt_frames_close
+      (dq : dfrac) (pc npc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+      (tlbv : type_of_register tlb) :
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip ∗ tlb ↦ᵣ tlbv ∗
+     cur_privilege ↦ᵣ{ dq } Supervisor ∗ mstatus ↦ᵣ{ dq } mst0 ∗
+     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+     pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 ∗
+     satp ↦ᵣ satp0 ∗ mie ↦ᵣ{ dq } mie0 ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
+     menvcfg ↦ᵣ{ dq } menv0) -∗
+    hreg_frame (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw ∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro.
+  Proof.
+    iIntros "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc & Hpriv & Hmst
+              & Hhs & Hpcfg & Hpaddr & Hmc & Hmicfg & Hmisa & Hsec & Hpma
+              & Hhtif & Help & Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
+    rewrite s_rw_split s_ro_split_mix.
+    rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
+      s_rs_tlb s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+      s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+      s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+    iFrame.
+  Qed.
+
   (* the tower transport the execute obligation needs: the fetch committed
      nextPC by a [register_set], and the cells are read off a tower.
      [HartMFrame.mm_npc_agree]'s S twin. *)
@@ -2920,15 +3015,14 @@ Section SmodeCorePt.
                     mie_v mdv0 menvcfg0 tv') as Hnp.
       iDestruct (s_rw_ext _ _ Hnp with "Hrw") as "Hrw".
       iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hnp with "Hro") as "Hro".
-      rewrite s_rw_split s_ro_split_mix.
-      rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
-        s_rs_tlb s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
-        s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
-        s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
-      iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc)".
-      iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg
-                           & #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv
-                           & Hsatp & Hmie & Hmdl & Hmenv)".
+      iDestruct (spt_frames_open dq pc
+                   (add_vec_int pc (if is_rvc then 2 else 4)) ms
+                   (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
+                   pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
+                   mie_v mdv0 menvcfg0 tv' with "Hrw Hro")
+        as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc & Hpriv & Hmst
+             & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg & #Hmisa & #Hsec & #Hpma
+             & #Hhtif & #Help & #Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
       iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hhs] [-]");
         [| iApply ("Hex" $! tv' with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
                      Hpaddr Htlbc HRes' HPC HnPC Hany") ].
@@ -2938,15 +3032,17 @@ Section SmodeCorePt.
       iSplitR; [done|].
       iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv').
       iSplitR; [iPureIntro; by exists npc, tv' |].
-      rewrite s_rw_split s_ro_split_mix.
-      rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
-        s_rs_tlb s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
-        s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
-        s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
-      iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg Hpaddr
-              Hsatp Hmie Hmdl Hmenv".
-      iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv".
-      iFrame "HRes' Hany HRl".
+      iDestruct (spt_frames_close dq pc npc ms
+                   (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus1
+                   pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1
+                   mie1 mdv1 menvcfg1 tv'
+                   with "[HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs
+                          Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenv]")
+        as "[Hrw Hro]".
+      { iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg
+                Hpaddr Hsatp Hmie Hmdl Hmenv".
+        by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv". }
+      rewrite s_rs_tlb. iFrame "Hrw Hro HRes' Hany HRl".
   Qed.
 
   (* ==================================================================== *)
@@ -3017,7 +3113,35 @@ Section SmodeCorePt.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-  Admitted.
+    intros HA Hord HX Hcov.
+    iIntros "Hsm Hsatp Hpcfg Hpaddr Htlbc HRes Hpc Hinstr Htr Hex Hcont".
+    iDestruct (smode_config_unbundle with "Hsm")
+      as "(#Hhw & #Hminv & Hhs & Hpriv & Hmst & Hmiebundle & Hmenvbundle)".
+    iDestruct "Hmst" as (mstatus0)
+      "(Hmstatus & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmiebundle" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
+    iDestruct "Hmenvbundle" as (menvcfg0)
+      "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
+    iApply (wp_instr_s_config_regime Res pc is_rvc i mstatus0 mie_v mdv0
+              menvcfg0 satp0 pcfg paddr tlbv mstatus0 mie_v mdv0 menvcfg0
+              satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [Htr] [Hex]
+                    [Hcont Hsie]").
+    - iApply ("Htr" $! mstatus0 mie_v mdv0 menvcfg0 with "[%] [%] [%] [%]");
+        [ exact HSIE | exact HSXL | exact Hmm | exact Hmenvval ].
+    - iApply ("Hex" $! mstatus0 mie_v mdv0 menvcfg0).
+    - iNext. iIntros (npc tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc tv1 with
+                "[Hhs Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] Hsatp Hpcfg
+                 Hpaddr Htlbc HRes Hpc HRl").
+      iApply (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval
+                with "Hhw Hminv Hhs Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc").
+  Qed.
 
   (* =================================================================== *)
   (* Sv39-kernel instances under the ORIGINAL names/signatures: nothing   *)
@@ -3133,6 +3257,35 @@ Section SmodeCorePt.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-  Admitted.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval.
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbres
+             Hpc Hinstr Htr Hex Hcont".
+    iDestruct "Htlbres" as (satp0 tlbv)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & Hsnap & Hpmp & #Hkpt)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iApply (wp_instr_s_config_regime (spt_res_pt root_ppn) pc is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc [Hsnap] Hpc Hinstr [Htr] [Hex]
+                    [Hcont]").
+    - rewrite /spt_res_pt. iFrame "Hsnap Hkpt".
+    - iApply ("Htr" $! satp0 pcfg paddr).
+    - iApply ("Hex" $! satp0 pcfg paddr).
+    - iNext. iIntros (npc tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iDestruct "HRes" as "[Hsnap _]".
+      iDestruct "Hsnap" as (t0) "[%Hok #Hlb]".
+      iApply ("Hcont" $! npc with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr] Hpc HRl").
+      iApply (tlb_res_pt_intro root_ppn satp0 tv1 t0 Hmode Hasid Hppn Hok
+                with "Hsatp Htlbc Hlb [Hpcfg Hpaddr] Hkpt").
+      iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+                with "Hpcfg Hpaddr").
+  Qed.
 
 End SmodeCorePt.
