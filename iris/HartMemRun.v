@@ -1099,19 +1099,25 @@ Proof. unfold Defs.write_reg. cbn [goodmb]. by destruct (Dw r). Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* THE FOUR ASSEMBLY COMBINATORS.  Each is [goodmb_bind*] with the map      *)
-(* argument already collapsed by [mm_after_empty], stated in the direction  *)
-(* a twin's proof uses it: certificate for the head, [exec] fact for the    *)
-(* head, certificate for the tail AT THE POST STATE -> certificate for the  *)
-(* chain.  A twin is one application per bind and nothing else.             *)
+(* argument already collapsed by [mm_after_empty], so each is [exec]'s own  *)
+(* [exec_bind_Some] / [exec_bind0_Some] with the same argument order: a     *)
+(* TWIN'S PROOF IS THE EXEC PROOF WITH [exec_bind_Some] REPLACED BY         *)
+(* [goodmb_bind_empty] AND THE HEAD'S [exec] FACT PAIRED WITH ITS OWN       *)
+(* CERTIFICATE.  Nothing about the byte map ever appears in a twin.         *)
+(*                                                                         *)
+(* [goodmb]'s bind equations must be GIVEN their left operand (the same     *)
+(* habit [WpDecodeBridge.goodb_bind] needs: a hand-retyped copy of an       *)
+(* [and_boolM] does not match), so peel with                                *)
+(*   [match goal with |- goodmb _ _ (Defs.bind ?L _) _ _ = _ => ... end]    *)
+(* or [erewrite], never by restating the operand.                           *)
 (* ---------------------------------------------------------------------- *)
 Lemma goodmb_bind_empty (Dr Dw : register -> bool) {X Y} (m : M X) (f : X -> M Y)
     (s s' : mstate) (x : X) :
   goodmb Dr Dw m s ∅ = true ->
   exec m s = Some (x, s') ->
-  goodmb Dr Dw (f x) s' ∅ = true ->
-  goodmb Dr Dw (Defs.bind m f) s ∅ = true.
+  goodmb Dr Dw (Defs.bind m f) s ∅ = goodmb Dr Dw (f x) s' ∅.
 Proof.
-  intros Hg He Hf. rewrite (goodmb_bind Dr Dw m f s s' ∅ x Hg He).
+  intros Hg He. rewrite (goodmb_bind Dr Dw m f s s' ∅ x Hg He).
   by rewrite (mm_after_empty Dr Dw m s Hg).
 Qed.
 
@@ -1119,19 +1125,17 @@ Lemma goodmb_bind0_empty (Dr Dw : register -> bool) {Y} (m : M unit) (n : M Y)
     (s s' : mstate) :
   goodmb Dr Dw m s ∅ = true ->
   exec m s = Some (tt, s') ->
-  goodmb Dr Dw n s' ∅ = true ->
-  goodmb Dr Dw (Defs.bind0 m n) s ∅ = true.
-Proof. intros Hg He Hn. exact (goodmb_bind_empty Dr Dw m (fun _ => n) s s' tt Hg He Hn). Qed.
+  goodmb Dr Dw (Defs.bind0 m n) s ∅ = goodmb Dr Dw n s' ∅.
+Proof. intros Hg He. exact (goodmb_bind_empty Dr Dw m (fun _ => n) s s' tt Hg He). Qed.
 
 Lemma goodmb_bindR_empty (Dr Dw : register -> bool) {R X Y : Type}
     (m : Defs.monadR R exception X) (f : X -> Defs.monadR R exception Y)
     (s s' : mstate) (x : X) :
   goodmb Dr Dw m s ∅ = true ->
   execR m s = Some (inr x, s') ->
-  goodmb Dr Dw (f x) s' ∅ = true ->
-  goodmb Dr Dw (Defs.bind m f) s ∅ = true.
+  goodmb Dr Dw (Defs.bind m f) s ∅ = goodmb Dr Dw (f x) s' ∅.
 Proof.
-  intros Hg He Hf. rewrite (goodmb_bindR Dr Dw m f s s' ∅ x Hg He).
+  intros Hg He. rewrite (goodmb_bindR Dr Dw m f s s' ∅ x Hg He).
   by rewrite (mm_after_empty Dr Dw m s Hg).
 Qed.
 
@@ -1140,9 +1144,8 @@ Lemma goodmb_bind0R_empty (Dr Dw : register -> bool) {R Y : Type}
     (s s' : mstate) :
   goodmb Dr Dw m s ∅ = true ->
   execR m s = Some (inr tt, s') ->
-  goodmb Dr Dw n s' ∅ = true ->
-  goodmb Dr Dw (Defs.bind0 m n) s ∅ = true.
-Proof. intros Hg He Hn. exact (goodmb_bindR_empty Dr Dw m (fun _ => n) s s' tt Hg He Hn). Qed.
+  goodmb Dr Dw (Defs.bind0 m n) s ∅ = goodmb Dr Dw n s' ∅.
+Proof. intros Hg He. exact (goodmb_bindR_empty Dr Dw m (fun _ => n) s s' tt Hg He). Qed.
 
 (* ====================================================================== *)
 (* 5. THE COMPOSITE RULE: an [exec] fact plus its certificate, in [swp].    *)
