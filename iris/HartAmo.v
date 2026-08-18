@@ -339,6 +339,63 @@ Section amo.
           rewrite HL HM. iIntros "Hi Hf". iModIntro. by iFrame.
   Qed.
 
+
+  (* ---- transporting the fused rule's premises through a context ---- *)
+
+  Lemma hread_req_at_mctx {X : Type} (C : M X -> M unit) (n : N)
+      (m : M X) (req : Interface.ReadReq.t n) :
+    mctx C ->
+    hread_req_at n m = Some req ->
+    hread_req_at n (C m) = Some req.
+  Proof.
+    intros HC Hn.
+    destruct (hread_req_at_inv n m req Hn) as (K & Hm & _).
+    rewrite Hm (HC _ (Interface.MemRead n req) K eq_refl).
+    cbn [hread_req_at].
+    destruct (decide (n = n)) as [Heq|Hne]; [|congruence].
+    assert (Heq = eq_refl) as -> by apply proof_irrel.
+    reflexivity.
+  Qed.
+
+  Lemma hread_resume_mctx {X : Type} (C : M X -> M unit) (n : N)
+      (m : M X) (req : Interface.ReadReq.t n) (v : Z) :
+    mctx C ->
+    hread_req_at n m = Some req ->
+    hread_resume v (C m) = C (hread_resume v m).
+  Proof.
+    intros HC Hn.
+    destruct (hread_req_at_inv n m req Hn) as (K & Hm & _).
+    rewrite Hm (HC _ (Interface.MemRead n req) K eq_refl).
+    cbn [hread_resume]. reflexivity.
+  Qed.
+
+  Lemma hwrite_req_at_mctx {X : Type} (C : M X -> M unit) (n : N)
+      (m : M X) (req : Interface.WriteReq.t n) :
+    mctx C ->
+    hwrite_req_at n m = Some req ->
+    hwrite_req_at n (C m) = Some req.
+  Proof.
+    intros HC Hn.
+    destruct (hwrite_req_at_inv n m req Hn) as (K & Hm & _).
+    rewrite Hm (HC _ (Interface.MemWrite n req) K eq_refl).
+    cbn [hwrite_req_at].
+    destruct (decide (n = n)) as [Heq|Hne]; [|congruence].
+    assert (Heq = eq_refl) as -> by apply proof_irrel.
+    reflexivity.
+  Qed.
+
+  Lemma hwrite_resume_mctx {X : Type} (C : M X -> M unit) (n : N)
+      (m : M X) (req : Interface.WriteReq.t n) :
+    mctx C ->
+    hwrite_req_at n m = Some req ->
+    hwrite_resume (C m) = C (hwrite_resume m).
+  Proof.
+    intros HC Hn.
+    destruct (hwrite_req_at_inv n m req Hn) as (K & Hm & _).
+    rewrite Hm (HC _ (Interface.MemWrite n req) K eq_refl).
+    cbn [hwrite_resume]. reflexivity.
+  Qed.
+
   (* ==================================================================== *)
   (* 3. THE RULE.                                                          *)
   (* ==================================================================== *)
@@ -450,6 +507,75 @@ Section amo.
     { rewrite /mstate_interp /=. iFrame "Hri Hmem' Hdv". }
     rewrite Hmeq.
     by iApply "HWP".
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* 4. THE [swp] FACE, which is the whole point of §0.                    *)
+  (*                                                                      *)
+  (* [HartEvents] turns each [wp_hart_*] event rule into an [swp] one the  *)
+  (* same way; what is special here is only that the fused rule names its  *)
+  (* window with [hsil], so the context has to be pushed through the walk  *)
+  (* ([hsil_mctx]) and not merely through a single node.                   *)
+  (* ==================================================================== *)
+  Lemma swp_hart_amo {X : Type} (D : gset register) (k : nat) (n : N)
+      (req : Interface.ReadReq.t n) (m : M X) (rs : regstate)
+      (nw : N) (wreq : bv (8 * n) -> Interface.WriteReq.t nw)
+      (Φ : X -> iProp Σ) :
+    hread_req_at n m = Some req ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_excl (Interface.ReadReq.access_kind req) = true ->
+    (forall w : bv (8 * n),
+       hwrite_req_at nw
+         (hsil k D (rs, hread_resume (bv_unsigned w) m)).2 = Some (wreq w)) ->
+    (forall w, dev_addr (Interface.WriteReq.pa (wreq w)) = false) ->
+    (forall w, ak_excl (Interface.WriteReq.access_kind (wreq w)) = true) ->
+    (* the window passes through no [Ret] and no early return -- the
+       condition [hsil_mctx] needs, and the one the A/D write-back meets *)
+    (forall (w : bv (8 * n)) (j : nat), (j < k)%nat ->
+       hsil_opaque ((hsil j D (rs, hread_resume (bv_unsigned w) m)).2) = false) ->
+    gen_cert -∗
+    hreg_frame rs D -∗
+    (∀ mm : gmap Arch.pa (bv 8), gen_heap_interp mm ={⊤,∅}=∗
+       ∃ w : bv (8 * n),
+         ⌜read_bytes mm (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ▷ (|={∅,⊤}=> gen_heap_interp
+                (write_bytes mm (Interface.WriteReq.pa (wreq w)) nw
+                   (Interface.WriteReq.value (wreq w))) ∗
+              (hreg_frame
+                 (hsil k D (rs, hread_resume (bv_unsigned w) m)).1 D -∗
+               swp (hwrite_resume
+                      (hsil k D (rs, hread_resume (bv_unsigned w) m)).2) Φ))) -∗
+    swp m Φ.
+  Proof.
+    intros Hproj Hdev Hexcl Hwin Hwdev Hwexcl Hop.
+    iIntros "#Hcert Hrf H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    (* the window, transported through the context once and for all *)
+    assert (Hstep : forall w : bv (8 * n),
+              hsil k D (rs, hread_resume (bv_unsigned w) (C m))
+              = ((hsil k D (rs, hread_resume (bv_unsigned w) m)).1,
+                 C (hsil k D (rs, hread_resume (bv_unsigned w) m)).2)).
+    { intros w.
+      rewrite (hread_resume_mctx C n m req (bv_unsigned w) HC Hproj).
+      exact (hsil_mctx C D k rs (hread_resume (bv_unsigned w) m) HC (Hop w)). }
+    assert (Hwin' : forall w : bv (8 * n),
+              hwrite_req_at nw
+                (hsil k D (rs, hread_resume (bv_unsigned w) (C m))).2
+              = Some (wreq w)).
+    { intros w. rewrite (Hstep w). cbn [snd].
+      exact (hwrite_req_at_mctx C nw _ (wreq w) HC (Hwin w)). }
+    iApply (wp_hart_amo D k n req (C m) rs nw wreq
+              (hread_req_at_mctx C n m req HC Hproj) Hdev Hexcl
+              Hwin' Hwdev Hwexcl with "Hcert Hrf [H Hcont]").
+    iIntros (mm) "Hmm". iMod ("H" $! mm with "Hmm") as (w) "[%Hrb Hk]".
+    iModIntro. iExists w. iSplitR; [done|]. iNext.
+    iMod "Hk" as "[Hmm Hcl]". iModIntro. iFrame "Hmm".
+    rewrite (Hstep w). cbn [fst snd].
+    iIntros "Hrf'".
+    rewrite (hwrite_resume_mctx C nw _ (wreq w) HC (Hwin w)).
+    iApply (swp_use _ Φ C HC with "[Hcl Hrf'] Hcont").
+    by iApply "Hcl".
   Qed.
 
 End amo.
