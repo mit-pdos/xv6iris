@@ -303,6 +303,41 @@ Qed.
 (* [vmem_read_addr] / [vmem_write_addr] and                                *)
 (* [transform_effective_address] all consult it OUTSIDE [translateAddr].   *)
 (* ====================================================================== *)
+(* THE MODE-GENERIC WALK.  The mode's VALUE is never used downstream (see
+   the branch note in [swp_vmem_read_addr_S_gen]); what a caller needs is
+   that the walk LANDS, and it does as soon as the satp mode bits decode --
+   which is the one thing a regime says about its satp value.  The Sv39
+   instance below keeps its statement, and a Bare caller (or any regime,
+   through [s_regime]'s own mode field) uses the generic one. *)
+Lemma hfrun_translationMode_S_mode (D Drw : gset register) (rs : regstate)
+    (md : SATPMode) :
+  (mstatus : register) ∈ D ->
+  (satp : register) ∈ D ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)))
+    = Some md ->
+  hfrun 6 D Drw rs (translationMode Supervisor) = Some (md, rs).
+Proof.
+  intros HDmst HDsatp HSXL Hmd.
+  unfold translationMode.
+  replace (Instances.generic_eq Supervisor Machine) with false
+    by (vm_compute; reflexivity).
+  sm_cbn.
+  unfold architecture. cbn match. sm_cbn.
+  sm_read. sm_cbn.
+  unfold architecture_bits_backwards. rewrite HSXL.
+  replace (eq_vec ('b"10") ('b"01")) with false by (vm_compute; reflexivity).
+  cbn match.
+  replace (eq_vec ('b"10") ('b"10")) with true by (vm_compute; reflexivity).
+  cbn match. sm_cbn.
+  change (xlen >=? 64) with true.
+  unfold Defs.assert_exp'. cbn match. sm_cbn.
+  sm_read. sm_cbn.
+  rewrite Hmd.
+  cbn match. sm_cbn.
+  apply hfrun_ret.
+Qed.
+
 Lemma hfrun_translationMode_S_sv39 (D Drw : gset register) (rs : regstate) :
   (mstatus : register) ∈ D ->
   (satp : register) ∈ D ->
@@ -341,6 +376,61 @@ Qed.
 (* and the mode is Sv39, so the transform is [pm_transform_VA] rather than  *)
 (* [pm_transform_PA] -- at pmlen 0 both are the identity.                  *)
 (* ====================================================================== *)
+Lemma hfrun_transform_effective_address_S_mode (D Drw : gset register)
+    (rs : regstate) (a : SailStdpp.Values.mword 64)
+    (acc : MemoryAccessType mem_payload) (md : SATPMode) :
+  (mstatus : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  (menvcfg : register) ∈ D ->
+  (satp : register) ∈ D ->
+  register_lookup cur_privilege rs = Supervisor ->
+  effectivePrivilege acc (register_lookup mstatus rs) Supervisor
+    = returnM Supervisor ->
+  Instances.generic_neq acc (InstructionFetch tt) = true ->
+  Instances.generic_neq acc (Load PageTableEntry) = true ->
+  Instances.generic_neq acc (Store PageTableEntry) = true ->
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus rs)) ('b"0") = true ->
+  pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
+    = PMM_Disabled ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)))
+    = Some md ->
+  hfrun 20 D Drw rs (transform_effective_address (Virtaddr a) acc)
+  = Some (Virtaddr a, rs).
+Proof.
+  intros HDmst HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmode.
+  unfold transform_effective_address.
+  sm_cbn.
+  sm_read. sm_cbn.
+  sm_read. rewrite Hpriv. sm_cbn.
+  rewrite Hep. sm_cbn.
+  unfold get_pmlen, is_pmm_applicable.
+  sm_cbn.
+  rewrite Hnf Hnlp Hnsp. sm_cbn.
+  replace (Instances.generic_eq Supervisor Machine) with false
+    by (vm_compute; reflexivity).
+  sm_cbn.
+  sm_read. rewrite Hmxr. sm_cbn.
+  unfold get_pmm. cbn match. sm_cbn.
+  sm_read. rewrite Hpmm. sm_cbn.
+  apply (hfrun_bindm _ 6 10 D Drw rs rs rs _ _ md (Virtaddr a));
+    [ lia
+    | exact (hfrun_translationMode_S_mode D Drw rs md HDmst HDsatp HSXL Hmode)
+    | ].
+  sm_cbn.
+  (* THE MODE'S ONE EFFECT ON THE ADDRESS, and it is none: at pmlen 0 the
+     physical transform and the virtual one are both the identity (this is
+     what the section header claims; here it is, discharged). *)
+  destruct (Instances.generic_eq md Bare);
+    cbn match;
+    [ unfold pm_transform_PA; change (xlen - 0 - 1) with 63;
+      rewrite subrange_full_64 zero_extend'_id
+    | unfold pm_transform_VA; change (xlen - 0 - 1) with 63;
+      rewrite subrange_full_64 sign_extend'_id ];
+    apply hfrun_ret.
+Qed.
+
+(* the Sv39 instance, statement unchanged *)
 Lemma hfrun_transform_effective_address_S (D Drw : gset register)
     (rs : regstate) (a : SailStdpp.Values.mword 64)
     (acc : MemoryAccessType mem_payload) :
@@ -363,31 +453,9 @@ Lemma hfrun_transform_effective_address_S (D Drw : gset register)
   = Some (Virtaddr a, rs).
 Proof.
   intros HDmst HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmode.
-  unfold transform_effective_address.
-  sm_cbn.
-  sm_read. sm_cbn.
-  sm_read. rewrite Hpriv. sm_cbn.
-  rewrite Hep. sm_cbn.
-  unfold get_pmlen, is_pmm_applicable.
-  sm_cbn.
-  rewrite Hnf Hnlp Hnsp. sm_cbn.
-  replace (Instances.generic_eq Supervisor Machine) with false
-    by (vm_compute; reflexivity).
-  sm_cbn.
-  sm_read. rewrite Hmxr. sm_cbn.
-  unfold get_pmm. cbn match. sm_cbn.
-  sm_read. rewrite Hpmm. sm_cbn.
-  apply (hfrun_bindm _ 6 10 D Drw rs rs rs _ _ Sv39 (Virtaddr a));
-    [ lia
-    | exact (hfrun_translationMode_S_sv39 D Drw rs HDmst HDsatp HSXL Hmode)
-    | ].
-  sm_cbn.
-  change (Instances.generic_eq Sv39 Bare) with false.
-  cbn match.
-  unfold pm_transform_VA.
-  change (xlen - 0 - 1) with 63.
-  rewrite subrange_full_64 sign_extend'_id.
-  apply hfrun_ret.
+  apply (hfrun_transform_effective_address_S_mode D Drw rs a acc Sv39
+           HDmst HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL).
+  rewrite Hmode. vm_compute. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -436,6 +504,49 @@ Proof.
   exact (hfrun_hval 20 D Drw rs _ _ _
            (hfrun_transform_effective_address_S D Drw rs a acc HDmst HDpriv
               HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmode)).
+Qed.
+
+(* ...and the MODE-GENERIC twins, which is what a regime-generic leaf uses:
+   it names no mode, only that its regime's satp value decodes. *)
+Lemma hval_translationMode_S_mode (D Drw : gset register) (rs : regstate)
+    (md : SATPMode) :
+  (mstatus : register) ∈ D ->
+  (satp : register) ∈ D ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)))
+    = Some md ->
+  hval D Drw rs (translationMode Supervisor) md rs.
+Proof.
+  intros HDmst HDsatp HSXL Hmd.
+  exact (hfrun_hval 6 D Drw rs _ _ _
+           (hfrun_translationMode_S_mode D Drw rs md HDmst HDsatp HSXL Hmd)).
+Qed.
+
+Lemma hval_transform_effective_address_S_mode (D Drw : gset register)
+    (rs : regstate) (a : SailStdpp.Values.mword 64)
+    (acc : MemoryAccessType mem_payload) (md : SATPMode) :
+  (mstatus : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  (menvcfg : register) ∈ D ->
+  (satp : register) ∈ D ->
+  register_lookup cur_privilege rs = Supervisor ->
+  effectivePrivilege acc (register_lookup mstatus rs) Supervisor
+    = returnM Supervisor ->
+  Instances.generic_neq acc (InstructionFetch tt) = true ->
+  Instances.generic_neq acc (Load PageTableEntry) = true ->
+  Instances.generic_neq acc (Store PageTableEntry) = true ->
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus rs)) ('b"0") = true ->
+  pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg rs))
+    = PMM_Disabled ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)))
+    = Some md ->
+  hval D Drw rs (transform_effective_address (Virtaddr a) acc) (Virtaddr a) rs.
+Proof.
+  intros HDmst HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmd.
+  exact (hfrun_hval 20 D Drw rs _ _ _
+           (hfrun_transform_effective_address_S_mode D Drw rs a acc md HDmst
+              HDpriv HDmenv HDsatp Hpriv Hep Hnf Hnlp Hnsp Hmxr Hpmm HSXL Hmd)).
 Qed.
 
 (* ====================================================================== *)
