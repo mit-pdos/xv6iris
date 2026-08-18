@@ -142,8 +142,15 @@ Section SPtData.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma sda_translate (R : s_regime) (dq : dfrac)
-      (acc : MemoryAccessType mem_payload) (kp : kperm)
+  (* THE TIER SPLIT, [SRegime.sr_absorb_ktier]'s at the swp layer.  At KT0 the
+     datum's own pin IS the identity claim, [sr_adm_of_pin] takes it and the
+     plain [sr_swp_translate] runs; at KT1 there is no pin at all,
+     [KtierLe KT1 kt] forces kt = KT1 so the hart's witness IS [sr_kwit], and
+     the WITNESSED field runs instead.  Both arms have the same premise list
+     apart from that one conjunct, and both land on the same post, so no leaf
+     above ever sees the split. *)
+  Lemma sda_translate (R : s_regime) (kt kt' : ktier) `{Hle : !KtierLe kt' kt}
+      (dq : dfrac) (acc : MemoryAccessType mem_payload) (kp : kperm)
       (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
@@ -158,7 +165,8 @@ Section SPtData.
     pmp_ent0_ok pcfg paddr ->
     pma_allows_ram pmar0 ->
     (uint va < 274877906944)%Z ->
-    ktier_pin cur_ktier ppn va ->
+    ktier_pin kt' ppn va ->
+    sr_ktier_wit R kt -∗
     kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
     sr_swp_res R (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) -∗
     hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drw -∗
@@ -177,44 +185,76 @@ Section SPtData.
                   sr_swp_res R rsf ∗ resv_any cpu_id).
   Proof.
     intros Hacc Hallow Hmenv HSXL HMPRV Hsok Hpmp Hpma Hlt Hpin.
-    exact (sr_swp_translate R acc sda_Drw sda_Dro (sda_Df dq)
-             (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
-             (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
-                dev0_state)
-             spf_Db va (pa_of ppn va) ppn kp rr
-             sda_disj Hacc Hallow
-             sda_in_mst sda_in_priv sda_in_satp sda_w_tlb sda_in_pma
-             sda_in_pcfg sda_in_paddr sda_in_htif
-             spf_Db_in_sda (fun r _ => eq_refl)
-             spf_leafchk_in_sda (fun r _ => eq_refl)
-             (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _) eq_refl
-             ltac:(cbn [sregs]; apply sda_rs_misa)
-             ltac:(cbn [sregs]; rewrite sda_rs_menv; exact Hmenv)
-             ltac:(rewrite sda_rs_mst; exact HSXL)
-             (s_eff_exec acc
-                (register_lookup mstatus
-                   (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv))
-                Supervisor _
-                ltac:(rewrite sda_rs_mst; exact HMPRV))
-             (s_eff_goodb acc
-                (register_lookup mstatus
-                   (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv))
-                Supervisor spf_Db _
-                ltac:(rewrite sda_rs_mst; exact HMPRV))
-             (s_acc_ssa_exec acc _ Hacc) (s_acc_ssa_goodb acc spf_Db _ Hacc)
-             (lo_canonical va Hlt) eq_refl
-             (sr_adm_of_pin R va ppn Hpin)
-             (sr_swp_side_ok R acc va ppn kp spf_Db sda_Drw sda_Dro
+    (* the premise block both arms share, named once *)
+    assert (Hside : sr_swp_side R acc va ppn kp spf_Db sda_Drw sda_Dro
+              (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+              (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
+                 dev0_state)).
+    { apply (sr_swp_side_ok R acc va ppn kp spf_Db sda_Drw sda_Dro _ _ Hacc);
+        [ rewrite sda_rs_satp; exact Hsok
+        | rewrite sda_rs_pcfg sda_rs_paddr; exact Hpmp
+        | rewrite sda_rs_pma; exact Hpma
+        | rewrite sda_rs_mst; exact HMPRV
+        | exact spf_Db_mst | exact spf_Db_satp
+        | cbn [sregs]; rewrite sda_rs_mst; exact HSXL
+        | cbn [sregs]; reflexivity ]. }
+    assert (Heff : exec (effectivePrivilege acc
+                     (register_lookup mstatus
+                        (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+                           ∅ dev0_state).(sregs)) Supervisor)
+                     (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
+                        dev0_state)
+                   = Some (Supervisor, _))
+      by (apply s_eff_exec; cbn [sregs]; rewrite sda_rs_mst; exact HMPRV).
+    assert (Heffg : goodb spf_Db (effectivePrivilege acc
+                      (register_lookup mstatus
+                         (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+                            ∅ dev0_state).(sregs)) Supervisor)
+                      (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
+                         dev0_state) = true)
+      by (apply s_eff_goodb; cbn [sregs]; rewrite sda_rs_mst; exact HMPRV).
+    destruct kt' as [|].
+    - (* KT0: the datum's pin IS the identity claim *)
+      iIntros "_".
+      iApply (sr_swp_translate R acc sda_Drw sda_Dro (sda_Df dq)
                 (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
                 (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
-                   dev0_state) Hacc
-                ltac:(rewrite sda_rs_satp; exact Hsok)
-                ltac:(rewrite sda_rs_pcfg sda_rs_paddr; exact Hpmp)
-                ltac:(rewrite sda_rs_pma; exact Hpma)
-                ltac:(rewrite sda_rs_mst; exact HMPRV)
-                spf_Db_mst spf_Db_satp
-                ltac:(cbn [sregs]; rewrite sda_rs_mst; exact HSXL)
-                ltac:(cbn [sregs]; reflexivity))).
+                   dev0_state)
+                spf_Db va (pa_of ppn va) ppn kp rr
+                sda_disj Hacc Hallow
+                sda_in_mst sda_in_priv sda_in_satp sda_w_tlb sda_in_pma
+                sda_in_pcfg sda_in_paddr sda_in_htif
+                spf_Db_in_sda (fun r _ => eq_refl)
+                spf_leafchk_in_sda (fun r _ => eq_refl)
+                (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _) eq_refl
+                ltac:(cbn [sregs]; apply sda_rs_misa)
+                ltac:(cbn [sregs]; rewrite sda_rs_menv; exact Hmenv)
+                ltac:(rewrite sda_rs_mst; exact HSXL)
+                Heff Heffg
+                (s_acc_ssa_exec acc _ Hacc) (s_acc_ssa_goodb acc spf_Db _ Hacc)
+                (lo_canonical va Hlt) eq_refl
+                (sr_adm_of_pin R va ppn Hpin) Hside).
+    - (* KT1: no pin; the hart's witness carries admissibility *)
+      destruct (ktier_le_cases _ _ Hle) as [Heq | [Hbad _]]; [| discriminate Hbad].
+      rewrite -Heq. iIntros "Hw".
+      iApply (sr_swp_translate_wit R acc sda_Drw sda_Dro (sda_Df dq)
+                (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+                (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∅
+                   dev0_state)
+                spf_Db va (pa_of ppn va) ppn kp rr
+                sda_disj Hacc Hallow
+                sda_in_mst sda_in_priv sda_in_satp sda_w_tlb sda_in_pma
+                sda_in_pcfg sda_in_paddr sda_in_htif
+                spf_Db_in_sda (fun r _ => eq_refl)
+                spf_leafchk_in_sda (fun r _ => eq_refl)
+                (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _) eq_refl
+                ltac:(cbn [sregs]; apply sda_rs_misa)
+                ltac:(cbn [sregs]; rewrite sda_rs_menv; exact Hmenv)
+                ltac:(rewrite sda_rs_mst; exact HSXL)
+                Heff Heffg
+                (s_acc_ssa_exec acc _ Hacc) (s_acc_ssa_goodb acc spf_Db _ Hacc)
+                (lo_canonical va Hlt) eq_refl Hside
+                with "Hw").
   Qed.
 
 End SPtData.

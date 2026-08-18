@@ -842,4 +842,46 @@ Section SdaFrames.
     by rewrite !bi.sep_assoc.
   Qed.
 
+  (* the two DIRECTED forms (a [⊣⊢] rewrite inside a proofmode goal is both
+     awkward and, per optimization.md, occasionally very slow) *)
+  Lemma sda_frames_in (dq : dfrac)
+      (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    reg_pointsto tlb (DfracOwn 1) tlbv -∗
+    reg_pointsto mstatus dq mst0 -∗
+    reg_pointsto cur_privilege dq Supervisor -∗
+    reg_pointsto menvcfg dq menv0 -∗
+    reg_pointsto satp (DfracOwn 1) satp0 -∗
+    reg_pointsto pma_regions DfracDiscarded pmar0 -∗
+    reg_pointsto pmpcfg_n (DfracOwn 1) pcfg -∗
+    reg_pointsto pmpaddr_n (DfracOwn 1) paddr -∗
+    reg_pointsto htif_tohost_base DfracDiscarded None -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drw ∗
+     hreg_frame_ro (sda_Df dq)
+       (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro : iProp Σ).
+  Proof.
+    iIntros "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10". rewrite sda_frames. iFrame.
+  Qed.
+
+  Lemma sda_frames_out (dq : dfrac)
+      (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    (hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drw ∗
+     hreg_frame_ro (sda_Df dq)
+       (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro : iProp Σ) -∗
+    (reg_pointsto tlb (DfracOwn 1) tlbv ∗
+     reg_pointsto mstatus dq mst0 ∗
+     reg_pointsto cur_privilege dq Supervisor ∗
+     reg_pointsto menvcfg dq menv0 ∗
+     reg_pointsto satp (DfracOwn 1) satp0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto pmpcfg_n (DfracOwn 1) pcfg ∗
+     reg_pointsto pmpaddr_n (DfracOwn 1) paddr ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof. rewrite sda_frames. iIntros "H". iExact "H". Qed.
+
 End SdaFrames.
