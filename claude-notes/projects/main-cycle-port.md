@@ -2576,14 +2576,19 @@ Each line is a ROOT: every file that merely depends on one is skipped by
   *the register-writing analogue of `hval_of_goodb`*), with
   `HartStepFull`'s reference-state idiom: `MState rs ∅ dev0_state`,
   `reg_agree_refl`, `∅ ⊆ mem`, `bytes_own ∅` persistent.
-* `wp_sfence_vma_bare_s_sconf` / `wp_sfence_vma_kpt_s_sconf` — **ruling 1 as
-  a leaf statement.**  The `tlb` cell lives in `sie_cap`'s translation slot
-  and the slot may NOT be dissolved around the call (the stretch between
-  kvminithart's first sfence and its `csrw satp` keeps calling other leaves,
-  each taking `sie_cap_gpr` whole), so the borrow-and-reseal happens INSIDE
-  the step, one variant per arm of `strans_inv`, each pinned by the caller's
-  own receipt.  The KPT one needs no tree argument and opens no invariant:
-  a flushed cell is coherent with ANY tree (`tlb_ok_pt_empty`).
+* `wp_sfence_vma_s_sconf` — the leaf, and its interface is **CELLS**: it
+  receives the `tlb` cell and returns it rewritten, with the flushed
+  vector and its all-`None` property in the post.  That is the
+  wrapper-shape convention above ("the leaf receives the cells it may
+  touch, returns `swp (execute i)` with those cells … in the post"), and
+  here it is also forced: kvminithart's `csrw satp` consumes the FIRST
+  sfence's flush six instructions later
+  (`tlb_res_pt_intro … (tlb_ok_pt_empty … Hnone1)`), so the cell has to
+  stay in the caller's hand across that window.  **Do not re-seal it into
+  the translation slot**: `strans_inv`'s Bare arm is `bare_inv`, which is
+  existential in the tlb value, so re-sealing discards exactly the fact
+  the switch needs.  (Two arm-specific variants that did that were
+  written and then removed; the comment in the file says why.)
 
 **WHAT IS LEFT IN THE LANE**, in order:
 
@@ -2592,17 +2597,16 @@ Each line is a ROOT: every file that merely depends on one is skipped by
    should be a NODE WALK, not an `swp_hmrun_of_exec`: `HartSCsr.
    swp_execute_CSRReg_w_p` is already CSR-generic and `wp_csrw_stvec_s_sconf`
    (WpSconfCsr.v) is the template — what it needs at `csr_satp` is
-   `hval_check_CSR_result_S` fed by `UserretDefs.exec_check_CSR_result_csrw_satp_S`
-   (exists) and an `swp_write_CSR_satp_S` (does not).  On top of that the
-   leaf must MOVE THE SLOT from the Bare arm to the KPT arm, which is the
-   semantically interesting part and has no analogue among the converted
-   leaves.
-2. **`SpecKvminithart.wp_kvminithart_sconf_body`**: drop `tlb ↦ᵣ tlbvec0`
-   (it is unsatisfiable beside the capability, which already owns the cell
-   inside `bare_inv` — that is the bug ruling 1 names) and require the Bare
-   arm instead.
+   `hval_check_CSR_result_S` fed by
+   `UserretDefs.exec_check_CSR_result_csrw_satp_S` (exists) and an
+   `swp_write_CSR_satp_S` (does not).  Its interface is cells too: the
+   `satp` cell in, rewritten out.  The slot move (Bare arm → KPT arm) is
+   the CALLER's, exactly as in the raw block — `strans_inv_acc_bare`,
+   `tlb_res_pt_intro`, `strans_flip`, `strans_inv_intro`.
+2. Ruling 1 (already recorded above, "RULINGS ON THE TAIL-1 ITEMS" item 1,
+   with the unsatisfiability diagnosis at "BLOCKED (1)").
 3. **ProofKvminithart**: the three raw blocks become three leaf
-   applications.
+   applications; `tlbz1` / `Hnone1` from +0x08 must survive to +0x1c.
 4. **ProofMain / ProofMainSecondary**: `SpecMain.main_hart_raw` is already
    `strans_pending ∗ trap_csrs_raw`, so `iDestruct "Hhart" as "(Hsbit &
    Htlb & Htcsr)"` over-destructs into `trap_csrs_raw`; and `mn_grp_kvm`
