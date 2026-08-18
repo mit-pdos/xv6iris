@@ -496,10 +496,36 @@ a conditional write is a plain store, as before.
    re-proved with statements UNCHANGED (the write and the new
    `wp_hart_ram_read_excl`/`swp_hart_ram_read_excl` absorb the self-loop by
    `iLöb`); `HartRegNode`/`HartSpan`/`HartLift`/`HartLift2` re-indexed.
-   `HartAmo.v` DELETED.  What is left of this item: (b) the `resv_frag`
-   ghost + `resv_ok` conjunct in `state_interp` and a lifting rule that
-   exposes them; the conditional-write rule on top of it; (d) the acquire;
-   (e) the write-back twin.
+   `HartAmo.v` DELETED.  Then (`f03c2a8e`) a BLOCKED exclusive read
+   RELEASES the hart's own reservation (a blocked write keeps it -- design
+   §3a says why); GCP build green modulo the same nine red roots.
+
+   What is left of this item, with the shape DECIDED (2026-08-18):
+   - **(b) the ghost.**  Per-ERA, like the register cells: a
+     `ghost_mapG Σ CPU (option resv)` instance in `riscvFixedGS`, an
+     `era_resv_name : gname` in `riscvEraGS`; `era_interp` gains
+     `ghost_map_auth (era_resv_name E) 1 (gresv-as-map) ∗ ⌜resv_ok g⌝`
+     (the pure conjunct rides on `prim_step_resv_ok`); `resv_frag c r :=
+     c ↪[era_resv_name riscv_eraGS] r`.  Every era allocation
+     (`PowerBoot`/`RiscvAdequacy`/`BootShared`'s `boot_shared_alloc`)
+     allocates the auth at all-`None` and hands out the frags.
+     **OWNERSHIP OF `resv_frag c None` GOES INTO `pc_is`** (the user's
+     call): `pc_is` is the per-hart bundle of everything Sail-monad-level
+     execution reasoning needs, so the frag joins it at `None` on every
+     instruction boundary and the cycle wrapper threads it exactly as it
+     threads the rest of the bundle.  A leaf that steps an exclusive read
+     takes it out to `Some snap` and its conditional write puts it back at
+     `None`.
+   - a second lifting rule beside `wp_hart_step` (or a strengthening of
+     it) that hands the callback the frag agreement (`r = gresv c` via the
+     auth) plus `⌜resv_ok g⌝`; the plain rules keep using the ∀-form.
+   - the conditional-write rule: caller holds `resv_frag c (Some rv)`, `dom
+     rv = footprint`, `ak_excl = true`; learns `read_bytes mem pa n = snap`
+     from `resv_ok`; frag `→ None`; its blocked arm is absorbed by Löb with
+     the frag unchanged (a blocked write keeps `r`), so no disjointness is
+     ever needed.  The exclusive-read rule with frag: `iLöb … forall r0`
+     (its blocked arm releases).
+   - (d) the acquire; (e) the write-back twin.
 
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
