@@ -1961,7 +1961,7 @@ be derived from something other than the points-to (the static trampoline
 mapping), because the trampoline va is not identity-mapped and its bytes
 are described physically.**
 
-## CHECKPOINT 2026-08-18 (late) -- HANDOFF STATE (read this first when resuming)
+## CHECKPOINT 2026-08-18 (late) -- SUPERSEDED; see "CHECKPOINT 2026-08-18 (session 2)" at the END of this file for the CURRENT state.  The landed/ruling content below is still accurate; the red-root list and the HOW TO RESUME list are not.
 
 **Everything below is on branch `hart-node-port`, LOCAL ONLY (not pushed);
 HEAD ≈ 893801d3.**  Working tree at handoff: `iris/TrampStepPt.v` modified
@@ -2532,3 +2532,87 @@ it here.  What is left is the rest:
   script runs green, and only `Qed` fails -- with no location and nothing to
   bisect.  `Unshelve` before `Qed` prints the leftovers and names the
   culprit in one run.  Write `ltac:(by srs)`.
+
+## CHECKPOINT 2026-08-18 (session 2) -- THE CURRENT HANDOFF STATE
+
+Branch `hart-node-port`, LOCAL ONLY (still nothing pushed).  Working tree
+CLEAN at handoff.  Last whole-tree run: `./gcp-rocq/run-on-gcp make -k -j36
+proofs`, **9 red roots**, down from 14 at the start of the session.
+
+### THE NINE RED ROOTS, CLASSIFIED
+
+Each line is a ROOT: every file that merely depends on one is skipped by
+`-k`, not broken.
+
+| root | error | lane |
+|---|---|---|
+| `ProofKvminithart` | `iIntro: cannot turn … sconf_step_obl …` | **S-mode leaf, NOT ported** — see below |
+| `ProofMain` | `iSpecialize: cannot instantiate (tlb ↦ᵣ tlbvec0 -∗ …)` | ruling 1 (tlb → `bare_inv`) |
+| `ProofMainSecondary` | same | ruling 1 |
+| `ProofVirtioDiskIntr` | `iInv: cannot open invariant (disk_inv γd)` | ruling 2 (a read-only used-element accessor) |
+| `ProofUser` | `arm_LOAD_u C pt` — pre-port arity | P7 §5 assembly + the last 2 arms |
+| `UserretPt` | `wp_instr_u_pt` not found | trampoline lane (b) |
+| `UservecExitPt` | `wp_instr_u_pt` not found | trampoline lane (a)+(b) |
+| `UserretEntryPt` | `wp_instr_ktramp_pt_share` not found | trampoline lane (a) |
+| `WpUmodeStep` | `minstret_inv_body` not found | "Not started" (verified U-mode tier) |
+
+### WHAT `ProofKvminithart` REALLY NEEDS, AND IT IS NOT RULING 1
+
+The file's first error is one missing `b'` argument to
+`wp_instr_s_sconf` (fixed, three sites).  Behind it is the real one: the
+three `sfence.vma` blocks (+0x08, +0x1c, +0x20) are written as RAW steps —
+`iApply wp_next_off_intro; iIntros (σ1 Hpceq1) "Hsc Hcap Hfile Hnpc Hsi"`,
+then `reg_update`/`reg_valid` against the state interp by hand.  Under
+per-node stepping there is no such callback, and **the tree has no converted
+S-mode `sfence.vma` leaf at all** (`grep 'SFENCE_VMA'`: only
+`CodeKvminithart`'s two `instr` facts, `UserretDefs.exec_execute_SFENCE_VMA_S`
+and the U-mode pair).  So the ruling-1 change (drop `tlb ↦ᵣ tlbvec0` from
+`SpecKvminithart.wp_kvminithart_sconf_body`, require the `bare_inv` and take
+the cell out of `IntrDefs.strans_inv_acc_bare`) is the SPEC half of a job
+whose PROOF half is a new leaf — and `ProofMain` / `ProofMainSecondary`'s
+`iSpecialize` failures are the same lane's caller side
+(`SpecMain.main_hart_raw` is already `strans_pending ∗ trap_csrs_raw`, with
+the tlb cell removed, so ProofMain's `iDestruct "Hhart" as "(Hsbit & Htlb &
+Htcsr)"` now over-destructs into `trap_csrs_raw`).
+
+Doing this lane turns THREE roots green and is the largest single win left.
+
+### WHAT LANDED THIS SESSION
+
+- **The counter cells** (ruling 3 + a user RULING REVERSAL): `hw_config`
+  carries `scounteren` / `mhpmcounter` (frozen at boot, in `boot_D_named`);
+  `mcounteren` cannot join them because timerinit writes it after
+  `hw_config` exists, so it comes out of the residue's `TimerCap.sstc_enabled`
+  via the new `UsertrapRes.ut_res_bare_sstc`.  No spec statement grew a
+  premise.  `ProofUserretClosed` and the whole userret/forkret cone are
+  green.
+- **`ProofIdup` / `ProofIlock` / `ProofIput`**: the last three
+  `wordw_claim` call sites, every claim off the accessed word's own
+  points-to.
+- **P4b 16 → 17 of 19 arms**: `UserMemArmsC.v` (the thirteen compressed) and
+  `UserMemArmsA.v` (`arm_LOADRES_u`).  Design notes in
+  `user-tier-port.md` §16.
+- Assorted port-shape corrections: `hw_config`'s trailing conjunct in three
+  ipatterns, `user_trap_frame_open`'s `pc_is`, `minstret_inv`'s lost hart
+  index.
+
+### HOW TO RESUME (for a fresh session/agent)
+
+1. `git log` on `hart-node-port`; read this section, then
+   `user-tier-port.md` §8-§16, then "LEAF-STATEMENT CHANGES: THE RULE",
+   "THE S-MODE WRAPPER SHAPES" and the traps list in this file.
+2. `./gcp-rocq/run-on-gcp make -k -j36 proofs` from the repo root to
+   re-establish the baseline (~7 min; the table above is the expected
+   answer).  Beware: `make -C iris -f CoqMakefile <one>.vo` through
+   `run-on-gcp` runs WITHOUT the opam switch (`rocq: not found`) — prefix it
+   with `opam exec --switch=/shared/xv6rocq --` if you want a single file.
+3. Pick a lane.  In descending order of roots-per-effort: the kvminithart
+   sfence leaf (3 roots), the VirtioProto read-only accessor (1), the
+   trampoline leaves (3, but they need `wp_instr_u_pt` first), the last two
+   memory arms + P7 §5 (1, and it is the biggest).
+4. Standing rules, unchanged: no caller-visible leaf/spec statement change
+   without the user; every address claim from
+   `mem_pointsto_claim`/`wordw_claim_of`; per-file <5 min; commit by
+   explicit path; never `pkill coqc` / `git stash` / `git reset` /
+   `git commit --amend`, and never leave anything staged.
+5. Then PUSH -- nothing is pushed yet.

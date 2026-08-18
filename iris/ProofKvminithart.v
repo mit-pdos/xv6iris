@@ -121,7 +121,7 @@ Section KvminithartBody.
     iEval (rewrite Hp08) in "Hpc".
     iPoseProof (kvi_08 with "Htext") as "Hi08".
     (* ============ +0x08 sfence.vma zero,zero (under Bare) ============= *)
-    iApply (wp_instr_s_sconf W2 (K - 2)%nat false (mword_of_int (KernelSyms.kvminithart + 0x08)) false
+    iApply (wp_instr_s_sconf W2 (K - 2)%nat false false (mword_of_int (KernelSyms.kvminithart + 0x08)) false
               (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
               with "Hcg Hpc Hi08").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
@@ -254,7 +254,7 @@ Section KvminithartBody.
     iEval (rewrite Hp1c) in "Hpc".
     iPoseProof (kvi_1c with "Htext") as "Hi1c".
     (* ============ +0x1c csrw satp,a5 : THE SWITCH ============ *)
-    iApply (wp_instr_s_sconf S4 (K - 2)%nat false (mword_of_int (KernelSyms.kvminithart + 0x1c)) false
+    iApply (wp_instr_s_sconf S4 (K - 2)%nat false false (mword_of_int (KernelSyms.kvminithart + 0x1c)) false
               (CSRReg (mword_of_int 384 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 0), CSRRW))
               with "Hcg Hpc Hi1c").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
@@ -335,7 +335,7 @@ Section KvminithartBody.
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
     iPoseProof (kvi_20 with "Htext") as "Hi20".
     (* ============ +0x20 sfence.vma zero,zero (under the kernel PT) ===== *)
-    iApply (wp_instr_s_sconf S4 (K - 2)%nat false (mword_of_int (KernelSyms.kvminithart + 0x20)) false
+    iApply (wp_instr_s_sconf S4 (K - 2)%nat false false (mword_of_int (KernelSyms.kvminithart + 0x20)) false
               (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
               with "Hcg Hpc Hi20").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
