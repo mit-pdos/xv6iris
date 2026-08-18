@@ -151,6 +151,15 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`weak-memory-layer2.md`](design/weak-memory-layer2.md)** — LAYER 2 as a
+  DIRECT acyclicity theorem (2026-08-18): why per-edge premises are the
+  wrong interface (walker A/D traffic violates any per-edge form
+  harmlessly), the `robust_main_acyc` interface, the minimal-cycle case
+  tree C1–C6 (fence / aq / DEPENDENT exit — what D2/D3 bought / covered /
+  bad / residue), the pf-realness argument that reduces the residue to
+  three site facts (lock protection per edge, sync-byte discipline, byte
+  classification), what Ψ can export (`w_rdw`, `w_lock`) and the ⚑ choice
+  for the byte→lock map (explicit side condition vs ghost export).
 - **[`weak-memory-deps.md`](design/weak-memory-deps.md)** — PROPOSAL
   (2026-08-17): restore PARM's dependency tracking (per-register views +
   `vcap`) in the full machine and the pf fragment, so the model IS
