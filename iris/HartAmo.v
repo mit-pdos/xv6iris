@@ -185,6 +185,31 @@ Proof.
       * by split.
 Qed.
 
+
+(* the same at the two-footprint walker, from [HartLift2.hsil_node2_agree] *)
+Lemma hrun_silent2_agree {X : Type} (k : nat) (Drw Dro : gset register)
+    (rs rs0 : regstate) (m : M X) :
+  reg_agree_on (Drw ∪ Dro) rs rs0 ->
+  (hrun_silent2 k Drw Dro rs0 m).2 = (hrun_silent2 k Drw Dro rs m).2 /\
+  reg_agree_on (Drw ∪ Dro)
+    (hrun_silent2 k Drw Dro rs m).1 (hrun_silent2 k Drw Dro rs0 m).1.
+Proof.
+  revert rs rs0 m. induction k as [|k IH]; intros rs rs0 m Hag.
+  - simpl. by split.
+  - simpl. destruct (hsil_node2 Drw Dro rs m) as [[rs1 m1]|] eqn:Hnode1.
+    + destruct (hsil_node2_agree Drw Dro rs rs0 m m1 rs1 Hag Hnode1)
+        as (rs2 & Hnode2 & Hag').
+      rewrite Hnode2. exact (IH rs1 rs2 m1 Hag').
+    + destruct (hsil_node2 Drw Dro rs0 m) as [[rs2 m2]|] eqn:Hnode2.
+      * exfalso.
+        assert (Hag' : reg_agree_on (Drw ∪ Dro) rs0 rs).
+        { intros r Hr. symmetry. by apply Hag. }
+        destruct (hsil_node2_agree Drw Dro rs0 rs m m2 rs2 Hag' Hnode2)
+          as (rs3 & Hnode3 & _).
+        rewrite Hnode1 in Hnode3. discriminate Hnode3.
+      * by split.
+Qed.
+
 (* ====================================================================== *)
 (* 2. The ghost transport: update the register bridge and the caller's      *)
 (*    frame along the walk, in one bupd.                                    *)

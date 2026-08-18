@@ -169,8 +169,8 @@ Proof.
     injection Hnode as <- <-; destruct Hstep as (-> & ->); by split.
 Qed.
 
-Lemma hsil_node2_agree (Drw Dro : gset register) (rs1 rs2 : regstate)
-    (m m1 : M unit) (rs1' : regstate) :
+Lemma hsil_node2_agree {X : Type} (Drw Dro : gset register) (rs1 rs2 : regstate)
+    (m m1 : M X) (rs1' : regstate) :
   reg_agree_on (Drw ∪ Dro) rs1 rs2 ->
   hsil_node2 Drw Dro rs1 m = Some (rs1', m1) ->
   exists rs2', hsil_node2 Drw Dro rs2 m = Some (rs2', m1) /\
