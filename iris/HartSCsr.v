@@ -85,7 +85,7 @@ Section HartSCsr.
   (* looks at the privilege, it only forwards what the two [cur_privilege]   *)
   (* reads answered.                                                        *)
   (* ================================================================== *)
-  Lemma swp_doCSR_r_p (Drw Dro : gset register) (Df : register -> dfrac)
+  Lemma swp_doCSR_r_obl_p (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (m : regfile) (csr : SailStdpp.Values.mword 12)
       (pr : Privilege) (rd : SailStdpp.Values.mword 5) (op : csrop)
       (rs1_val : SailStdpp.Values.mword 64)
@@ -95,8 +95,6 @@ Section HartSCsr.
     register_lookup cur_privilege rs = pr ->
     uint rd <> 0 ->
     ext_check_CSR csr pr CSRRead = true ->
-    hval (Drw ∪ Dro) Drw rs (check_CSR_result csr pr CSRRead)
-      (CSR_Check_OK tt) rs ->
     eq_vec csr csr344 = false ->
     eq_vec csr csr144 = false ->
     (forall x, csr_id_read_callback csr x = Defs.returnm tt) ->
@@ -104,6 +102,19 @@ Section HartSCsr.
     gpr_file m -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
+    (* THE LEGALITY CHECK, AS AN OBLIGATION rather than as an [hval].  A
+       check whose result depends on ONE owned cell and whose walk also
+       reads an UNOWNED one -- Supervisor's [csrr time], gated on
+       mcounteren.TM while scounteren is read and ignored -- has no single
+       [hval] certificate: [hval_of_goodb] wants every read register owned,
+       and the ∀-peel cannot pin the one that matters.  At the [swp] layer
+       the two mix freely ([swp_read_reg_pinned] beside [swp_read_reg_any]),
+       so the obligation is the general form and [swp_doCSR_r_p] below is
+       the [hval] instance every other CSR uses. *)
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (check_CSR_result csr pr CSRRead)
+         (fun w => ⌜w = CSR_Check_OK tt⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
        swp (read_CSR csr)
          (fun x => Q x ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
@@ -113,8 +124,8 @@ Section HartSCsr.
                 gpr_file (<[Regidx rd := regval_into_reg x]> m) ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
-    intros Hdisj HDpriv Hpriv Hrd Hext Hchk H344 H144 Hcb.
-    iIntros "#Hcert Hf Hrw Hro Hrdcsr".
+    intros Hdisj HDpriv Hpriv Hrd Hext H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hchk Hrdcsr".
     unfold doCSR.
     iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
               with "[Hrw Hro] [-]").
@@ -122,9 +133,8 @@ Section HartSCsr.
                 with "Hcert Hrw Hro"). }
     iIntros (p0) "(-> & Hrw & Hro)". rewrite Hpriv.
     iApply (swp_bind_use (check_CSR_result csr pr CSRRead) _ _ _
-              with "[Hrw Hro] [-]").
-    { iApply (swp_span Drw Dro Df rs rs _ (CSR_Check_OK tt) Hdisj Hchk
-                with "Hcert Hrw Hro"). }
+              with "[Hchk Hrw Hro] [-]").
+    { iApply ("Hchk" with "Hrw Hro"). }
     iIntros (w1) "(-> & Hrw & Hro)". cbn match.
     iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
               with "[Hrw Hro] [-]").
@@ -162,6 +172,46 @@ Section HartSCsr.
       iIntros (u2) "Hf". by iFrame. }
     iIntros (u3) "(Hf & Hrw & Hro)". iApply swp_ret.
     iSplitR; [done|]. iExists rv. iFrame.
+  Qed.
+
+  (* the [hval] instance -- what every CSR whose check reads only OWNED
+     cells uses, and what the leaves were written against. *)
+  Lemma swp_doCSR_r_p (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (m : regfile) (csr : SailStdpp.Values.mword 12)
+      (pr : Privilege) (rd : SailStdpp.Values.mword 5) (op : csrop)
+      (rs1_val : SailStdpp.Values.mword 64)
+      (Q : SailStdpp.Values.mword 64 -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = pr ->
+    uint rd <> 0 ->
+    ext_check_CSR csr pr CSRRead = true ->
+    hval (Drw ∪ Dro) Drw rs (check_CSR_result csr pr CSRRead)
+      (CSR_Check_OK tt) rs ->
+    eq_vec csr csr344 = false ->
+    eq_vec csr csr144 = false ->
+    (forall x, csr_id_read_callback csr x = Defs.returnm tt) ->
+    gen_cert -∗
+    gpr_file m -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (read_CSR csr)
+         (fun x => Q x ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (doCSR csr rs1_val (Regidx rd) op CSRRead)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                ∃ x : SailStdpp.Values.mword 64, Q x ∗
+                gpr_file (<[Regidx rd := regval_into_reg x]> m) ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpriv Hpriv Hrd Hext Hchk H344 H144 Hcb.
+    iIntros "#Hcert Hf Hrw Hro Hrdcsr".
+    iApply (swp_doCSR_r_obl_p Drw Dro Df rs m csr pr rd op rs1_val Q
+              Hdisj HDpriv Hpriv Hrd Hext H344 H144 Hcb
+              with "Hcert Hf Hrw Hro [] Hrdcsr").
+    iIntros "Hrw Hro".
+    iApply (swp_span Drw Dro Df rs rs _ (CSR_Check_OK tt) Hdisj Hchk
+              with "Hcert Hrw Hro").
   Qed.
 
   (* the PINNED corollary: the read value is named, so no existential
