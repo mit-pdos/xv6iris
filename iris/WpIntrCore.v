@@ -42,7 +42,7 @@ Require Import MinstretInv.
 Require Import WpDecode ExecCommon.
 (* the swp layer, for the footprinted twins of the dispatch chain below *)
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
-        HartMFrame WpDecodeBridge WpMmodeCsrSwp.
+        HartMFrame WpDecodeBridge WpMmodeCsrSwp HartRunGen.
 Require Import WpGprMret.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
@@ -424,6 +424,92 @@ Section SwpDispatch.
       destruct (findPendingInterrupt (s_pending mip_v meip seip mie_v mdv_v));
         by iFrame.
     - cbn match. by iFrame.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* [run_hart_active] AT SUPERVISOR, both arms.  This is                  *)
+  (* [HartRunGen.swp_run_hart_active_gen] with its DISPATCH obligation      *)
+  (* discharged by the rule above; the FETCH stays an obligation, since     *)
+  (* what the fetch needs (a translation and the text bytes) is the         *)
+  (* caller's to supply -- [HartSTrans.swp_fetch_S] is what discharges it.  *)
+  (*                                                                      *)
+  (* [Qi] carries the wires INSIDE it.  The gen rule fixes [Qi] before the  *)
+  (* dispatch runs, and the wire values are not known until it does, so the *)
+  (* existential lives in the payload rather than around the rule -- which  *)
+  (* is the honest statement: the trap this cycle takes is whichever one    *)
+  (* the wires made pending while it was running.                          *)
+  (* ==================================================================== *)
+  Lemma swp_run_hart_active_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf rs2 : regstate) (dst : mstate) (Db : register -> bool)
+      (pc : mword 64) (w : mword 32) (i : instruction) (nl : nat)
+      (R : iProp Σ) (mip_v mie_v mdv_v ms_v : mword 64) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mip : register) ∈ Drw ∪ Dro ->
+    (mie : register) ∈ Drw ∪ Dro ->
+    (mideleg : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    Db mstatus = true ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mip rs = mip_v ->
+    register_lookup mie rs = mie_v ->
+    register_lookup mideleg rs = mdv_v ->
+    register_lookup mstatus dst.(sregs) = ms_v ->
+    and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    register_lookup (R_bitvector_64 PC) rsf = pc ->
+    hval (Drw ∪ Dro) Drw rsf (ext_decode w) i rsf ->
+    hfrun nl (Drw ∪ Dro) Drw rsf (is_landing_pad_expected tt)
+      = Some (false, rsf) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch tt)
+         (fun r => ⌜r = F_Base w⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 4) rsf) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 4) rsf) Dro -∗
+     swp (execute i)
+       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗
+                    ∃ meip seip : mword 1,
+                      ⌜s_dispatch mip_v meip seip mie_v mdv_v ms_v
+                       = Some (ii, pr)⌝ ∗
+                      hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)
+                 ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w)⌝ ∗
+                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)).
+  Proof.
+    intros Hdisj HDpriv HDmip HDmie HDmdl HDpc HDnpc HDbmst Hpriv Hmip Hmie
+      Hmdl Hms Hmm HDb Hag HES HESg Hpcf Hdec Hlpad.
+    iIntros "#Hcert Hrw Hro Hfet Hex".
+    iApply (swp_run_hart_active_gen Drw Dro Df rs rsf rs2 Supervisor pc w i nl R
+              (fun ii pr => (∃ meip seip : mword 1,
+                   ⌜s_dispatch mip_v meip seip mie_v mdv_v ms_v = Some (ii, pr)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+              Hdisj HDpriv HDpc HDnpc Hpriv Hpcf Hdec Hlpad
+              with "Hcert Hrw Hro [] Hfet Hex").
+    (* the dispatch, from the rule above, re-shaped into the match the gen
+       rule expects *)
+    iIntros "Hrw Hro".
+    iApply (swp_mono with "[] [Hrw Hro]");
+      [| iApply (swp_dispatchInterrupt_S Drw Dro Df rs dst Db mip_v mie_v mdv_v
+                   ms_v Hdisj HDmip HDmie HDmdl HDbmst Hmip Hmie Hmdl Hms Hmm
+                   HDb Hag HES HESg with "Hcert Hrw Hro") ].
+    iIntros (o). iDestruct 1 as (meip seip) "(%Hd & Hrw & Hro)".
+    destruct o as [[ii pr] |].
+    - iExists meip, seip. iFrame. iPureIntro. by rewrite Hd.
+    - iFrame.
   Qed.
 
 End SwpDispatch.
