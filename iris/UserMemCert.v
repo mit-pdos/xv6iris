@@ -15,7 +15,7 @@ Require Import ExecCommon UserTranslate UptTree UserPtTree UserBits UserMem User
 Require Import UserBytes PtWalkCert.
 Require Import SmodeCore.
 Require Import UserFrame UserExec UserClassify UserClassifyAsm.
-Require Import UserMemPt UserMemAccess UserFetchCert.
+Require Import UserMemPt UserMemAccess UserMemMis UserFetchCert.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -403,123 +403,6 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* 4. [u_load_pure] -- THE PURE U-MODE DATA LOAD.                         *)
-(*                                                                       *)
-(* [UserMemPt.user_pt_load_data_g] with its [reg_interp] /                *)
-(* [gen_heap_interp] / [utlb_inv_pt] / [udata_own] premises replaced by   *)
-(* [u_data_cfg] + [UserClassifyAsm.u_exec_pins] + [UserBytes.u_mem_wf],   *)
-(* the two [goodmb] conjuncts added, and the post-state said out loud.    *)
-(* The certificate of the READ is stated at the map the walk LANDED on    *)
-(* ([mm']); [u_mem_step] says its domain is [mm]'s, so a caller that      *)
-(* wants it at [mm] transports by [goodmb_dom].                          *)
-(*                                                                       *)
-(* The width [k] is abstract, and the ONE premise that is not width-      *)
-(* generic is the byte-level RAM read [Hread_plain] -- the model's        *)
-(* [read_ram] result is typed [mword (8*k)] and resists abstraction       *)
-(* inside [sail_mem_read]'s cast, so section 5 of [UserMemPt] closes over *)
-(* exactly this brick and so does every arm in [UserMemClassify].  The    *)
-(* certificate side needs no such brick at all.                           *)
-(* ===================================================================== *)
-
-Lemma u_load_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
-    (k : Z) (w va : mword 64) :
-  0 < k -> k <= 8 -> (k | 4096) -> uint (to_bits 64 k) = k ->
-  (forall (addr : mword 64) (dv : mword (8 * k)) (s : mstate),
-     dev_addr addr = false ->
-     (forall j : nat, (N.of_nat j < Z.to_N k)%N ->
-        s.(mem) !! (pa_add addr j) = Some (nth_byte dv j)) ->
-     exec (read_ram rv64d_types.Read_plain (Physaddr addr) k false) s
-       = Some ((dv, default_meta), s)) ->
-  ud_um P !! svpn_of va = Some w ->
-  uleaf_ok (Load Data) w ->
-  is_aligned_vaddr (Virtaddr va) k = true ->
-  neq_vec (bits_of_virtaddr (Virtaddr va))
-    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
-                        (Z.sub 39 1) 0)) = false ->
-  u_data_cfg rs ->
-  u_exec_pins P t rs ->
-  u_mem_wf P t mm ->
-  exists (dv : mword (8 * k)) (rs' : regstate) (mm' : pamap) (t' : ptree),
-    exec (translateAddr (Virtaddr va) (Load Data)) (u_state rs mm)
-      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
-              u_state rs' mm') /\
-    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Load Data))
-      (u_state rs mm) mm = true /\
-    exec (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w va)) k
-            false false false) (u_state rs' mm') = Some (Ok dv, u_state rs' mm') /\
-    goodmb Du_r Du_w (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w va)) k
-            false false false) (u_state rs' mm') mm' = true /\
-    (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
-    u_mem_step P t t' mm mm'.
-Proof.
-  intros Hk Hk8 Hkdvd Huintk Hread_plain Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
-  destruct (u_walk_pure (Load Data) P t mm rs w va
-              (or_intror (or_introl eq_refl)) Hl Hleaf Hcanon Hcfg Hpins Hwf)
-    as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
-  set (pa := u_walk_pa w va).
-  set (s' := u_state rs' mm').
-  (* what the READ needs of the landed state *)
-  destruct (u_data_bytes P t' mm' k w va Hk Hkdvd Hal Hwf' Hl) as (dv & Hbytes).
-  destruct (u_data_ram P t' mm' k w va Hk Hkdvd Hal Hwf' Hl) as (Hram0 & Hramk).
-  assert (Hdev : dev_addr pa = false)
-    by exact (u_mem_wf_not_dev_data P t' mm' w va Hwf' Hl).
-  assert (Hown : bytes_owned mm' pa (Z.to_N k) = true)
-    by exact (u_mem_wf_owned_data P t' mm' k w va Hk Hkdvd Hal Hwf' Hl).
-  destruct Hcfg' as (Lcp & Lms & Lmenv).
-  destruct Lms as (Lsxl & Lmprv & _).
-  destruct Hpins' as (Hhw & _ & Hpt & _).
-  destruct Hhw as (Hmisa & _ & _ & Hhtif & Hall & _).
-  destruct Hpt as (_ & HA & Hord & _ & _ & HR & Hcovp).
-  (* the PMA region and the PMP range *)
-  destruct (pma_all_ram Hall pa k
-              (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
-                 Hram0 Hramk (pma_width_le k 8 Hk Hk8 eq_refl)))
-    as (region & Hpmam & _ & Hrd & _).
-  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-            (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
-            (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
-                ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
-  assert (Halign : is_aligned_paddr (Physaddr pa) k = true)
-    by exact (pa_aligned_div _ va k Hk Hkdvd Hal).
-  assert (Hclint : exec (within_clint (Physaddr pa) k) s' = Some (false, s'))
-    by exact (within_clint_false pa k s' (addr_is_ram_not_in_clint _ Hram0) Hk).
-  assert (Hsig : exec (within_sig (Physaddr pa) k) s' = Some (false, s'))
-    by exact (within_sig_false pa k s' (addr_is_ram_not_in_sig _ Hram0) Hk).
-  assert (Hrp : exec (read_ram rv64d_types.Read_plain (Physaddr pa) k false) s'
-                = Some ((dv, default_meta), s'))
-    by exact (Hread_plain pa dv s' Hdev Hbytes).
-  (* the read, exec side and certificate side *)
-  assert (Hmr : exec (mem_read (Load Data) PBMT_PMA (Physaddr pa) k
-                        false false false) s' = Some (Ok dv, s'))
-    by exact (exec_mem_read_data_U k Hk Hread_plain PBMT_PMA pa region dv s'
-                HA Hord Hrange HR Hpmam Halign Hrd Hclint Hsig
-                (within_htif_false pa k s' Hhtif) Hdev Hbytes Lmprv Lcp).
-  assert (Hchke : exec (checked_mem_read (Load Data) PBMT_PMA User (Physaddr pa) k
-                          false false false false) s'
-                  = Some (Ok (dv, default_meta), s'))
-    by exact (exec_checked_mem_read_ram_U k Hk Hread_plain PBMT_PMA pa region dv s'
-                HA Hord Hrange HR Hpmam Halign Hrd Hclint Hsig
-                (within_htif_false pa k s' Hhtif) Hdev Hbytes).
-  assert (Hchkg : goodmb Du_r Du_w
-                    (checked_mem_read (Load Data) PBMT_PMA User (Physaddr pa) k
-                       false false false false) s' mm' = true)
-    by exact (goodmb_checked_mem_read_ram_U Du_r Du_w k Hk PBMT_PMA pa region dv s' mm'
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-                HA Hord Hrange HR Hpmam Halign Hrd Hclint Hsig Hhtif Hdev Hown Hrp).
-  assert (Hmrg : goodmb Du_r Du_w (mem_read (Load Data) PBMT_PMA (Physaddr pa) k
-                          false false false) s' mm' = true)
-    by exact (goodmb_mem_read_data_U Du_r Du_w k PBMT_PMA pa dv s' mm'
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-                Lmprv Lcp Hchkg Hchke).
-  exists dv, rs', mm', t'. split_and!;
-    [ exact Htr | exact Htrg | exact Hmr | exact Hmrg
-    | exact Hfile | exact Htlbok' | exact Hstep ].
-Qed.
-
-(* ===================================================================== *)
 (* 5. WHAT A DATA STORE DOES TO THE OWNED MAP.                            *)
 (*                                                                       *)
 (* [UserFetchCert] section 4 is the PTE-side absorption (writing the leaf *)
@@ -603,7 +486,7 @@ Proof.
   assert (Hin : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
             is_Some (md' !! pa_add (u_walk_pa w va) j)).
   { intros j Hj.
-    rewrite (u_walk_pa_window k w va j Hk Hdvd Hal ltac:(lia)).
+    rewrite (u_walk_pa_window_wf k w va j Hk Hdvd Hal ltac:(lia)).
     apply (proj1 (Hdm' _)).
     exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
   assert (Hnt : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
@@ -779,4 +662,291 @@ Proof.
     [ exact Htr | exact Htrg | exact Hea | exact Heag | exact Hwr | exact Hwrg
     | exact Hfile | exact Htlbok' | exact Hstep
     | exact (u_mem_step_store P t t' mm mm' k w va v Hk Hkdvd Hal Hl Hwf Hstep) ].
+Qed.
+
+(* ===================================================================== *)
+(* 7. THE PAGE WINDOW, PURE -- and the composers at an access of ANY       *)
+(*    ALIGNMENT that stays inside ONE page.                                *)
+(*                                                                       *)
+(* A LOAD/STORE's effective address is [rs1 + imm], an arbitrary word, so  *)
+(* the arms cannot assume alignment.  [UserMemMis.in_one_page] is what the *)
+(* ownership side actually used alignment FOR, and P4a's                   *)
+(* [exec_mem_read_mis_U] / [exec_mem_write_ea_mis_U] /                     *)
+(* [exec_mem_write_value_mis_U] (and their [goodmb] twins) already run     *)
+(* [checked_mem_*]'s split loop N times instead of once.  So the           *)
+(* in-one-page composers are the PRIMARY ones and the aligned pair is a    *)
+(* corollary through [UserMemMis.in_one_page_aligned].                     *)
+(*                                                                       *)
+(* [UserMemMis.udata_window_facts]' pure content.  Note the read composer  *)
+(* needs NO width-typed [read_ram] brick: it sources the value from the    *)
+(* per-chunk [exec_read_ram_plain_gen], so [u_load_pure_page] has neither  *)
+(* an [Hread_plain] nor a [uint (to_bits 64 k) = k] premise.               *)
+(* ===================================================================== *)
+
+Lemma u_page_window (P : uptd) (t : ptree) (mm : pamap) (k : Z) (w va : mword 64) :
+  0 < k -> in_one_page va k ->
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  forall j : nat, (j < Z.to_nat k)%nat ->
+    is_Some (mm !! pa_add (u_walk_pa w va) j) /\
+    addr_is_ram (pa_add (u_walk_pa w va) j) /\
+    pa_add (u_walk_pa w va) j ∈ ud_data P.
+Proof.
+  intros Hk Hp Hwf Hl j Hj.
+  pose proof Hwf as (md & _ & _ & Hmm & Hdm & Hram & Hcov & _).
+  assert (Hd : pa_add (u_walk_pa w va) j ∈ ud_data P).
+  { rewrite (u_walk_pa_window_page w va k j Hk Hp Hj).
+    exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+  assert (Hs : is_Some (mm !! pa_add (u_walk_pa w va) j)).
+  { rewrite Hmm. apply lookup_union_is_Some. right.
+    exact (proj1 (Hdm _) Hd). }
+  split_and!; [ exact Hs | apply Hram, elem_of_dom, Hs | exact Hd ].
+Qed.
+
+Lemma u_page_owned (P : uptd) (t : ptree) (mm : pamap) (k : Z) (w va : mword 64) :
+  0 < k -> in_one_page va k ->
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true.
+Proof.
+  intros Hk Hp Hwf Hl. apply bytes_owned_of_dom. intros j Hj.
+  apply elem_of_dom.
+  exact (proj1 (u_page_window P t mm k w va Hk Hp Hwf Hl j ltac:(lia))).
+Qed.
+
+Lemma u_load_pure_page (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w va : mword 64) :
+  0 < k -> k <= 8 -> in_one_page va k ->
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (Load Data) w ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (dv : mword (8 * k)) (rs' : regstate) (mm' : pamap) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (Load Data)) (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rs' mm') /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Load Data))
+      (u_state rs mm) mm = true /\
+    exec (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w va)) k
+            false false false) (u_state rs' mm') = Some (Ok dv, u_state rs' mm') /\
+    goodmb Du_r Du_w (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w va)) k
+            false false false) (u_state rs' mm') mm' = true /\
+    (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
+    u_mem_step P t t' mm mm'.
+Proof.
+  intros Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf.
+  destruct (u_walk_pure (Load Data) P t mm rs w va
+              (or_intror (or_introl eq_refl)) Hl Hleaf Hcanon Hcfg Hpins Hwf)
+    as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
+  pose proof (u_page_window P t' mm' k w va Hk Hp Hwf' Hl) as Hwin.
+  assert (Hown : bytes_owned mm' (u_walk_pa w va) (Z.to_N k) = true)
+    by exact (u_page_owned P t' mm' k w va Hk Hp Hwf' Hl).
+  destruct Hcfg' as (Lcp & Lms & Lmenv).
+  destruct Lms as (Lsxl & Lmprv & _).
+  destruct Hpins' as (Hhw & _ & Hpt & _).
+  destruct Hhw as (Hmisa & _ & _ & Hhtif & Hall & _).
+  destruct Hpt as (_ & HA & Hord & _ & _ & HR & Hcovp).
+  destruct (exec_mem_read_mis_U (u_walk_pa w va) k (u_state rs' mm') Hk Hk8
+              HA Hord Hcovp Hhtif Hall
+              (fun j Hj => proj1 (proj2 (Hwin j Hj)))
+              Lmprv Lcp HR (fun j Hj => proj1 (Hwin j Hj)))
+    as (dv & Hmr).
+  exists dv, rs', mm', t'. split_and!;
+    [ exact Htr | exact Htrg | exact Hmr | | exact Hfile | exact Htlbok' | exact Hstep ].
+  exact (goodmb_mem_read_mis_U (u_walk_pa w va) k (u_state rs' mm') Hk Hk8
+           HA Hord Hcovp Hhtif Hall (fun j Hj => proj1 (proj2 (Hwin j Hj)))
+           Du_r Du_w mm'
+           ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+           ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+           ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+           Lmprv Lcp HR (fun j Hj => proj1 (Hwin j Hj)) Hown).
+Qed.
+
+(* [u_load_pure] -- the ALIGNED corollary.  Alignment enters only through
+   [in_one_page]; the model's split loop is what makes the general case no
+   harder, so this is one application and NOT a second development. *)
+Lemma u_load_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w va : mword 64) :
+  0 < k -> k <= 8 -> (k | 4096) ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (Load Data) w ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (dv : mword (8 * k)) (rs' : regstate) (mm' : pamap) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (Load Data)) (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rs' mm') /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Load Data))
+      (u_state rs mm) mm = true /\
+    exec (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w va)) k
+            false false false) (u_state rs' mm') = Some (Ok dv, u_state rs' mm') /\
+    goodmb Du_r Du_w (mem_read (Load Data) PBMT_PMA (Physaddr (u_walk_pa w va)) k
+            false false false) (u_state rs' mm') mm' = true /\
+    (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
+    u_mem_step P t t' mm mm'.
+Proof.
+  intros Hk Hk8 Hkdvd Hal Hl Hleaf Hcanon Hcfg Hpins Hwf.
+  exact (u_load_pure_page P t mm rs k w va Hk Hk8
+           (in_one_page_aligned va k Hk Hkdvd Hal) Hl Hleaf Hcanon Hcfg Hpins Hwf).
+Qed.
+
+(* --------------------------------------------------------------------- *)
+(* 7b. THE SPLIT WRITE'S POST MAP IS STILL A [u_mem_step].                 *)
+(*                                                                       *)
+(* A misaligned in-page store writes N chunk windows, so the post state is *)
+(* [UserMemMis.wchain] rather than one [write_bytes].  Section 5's         *)
+(* absorption generalises to ANY window that lies in [ud_data P], and the  *)
+(* chain is then N applications of it.                                     *)
+(* --------------------------------------------------------------------- *)
+
+Lemma u_mem_step_write_in (P : uptd) (t t' : ptree) (mm mm2 : pamap)
+    (a : Arch.pa) (n : N) {wd : N} (v : bv wd) :
+  (forall j : nat, (N.of_nat j < n)%N -> pa_add a j ∈ ud_data P) ->
+  u_mem_step P t t' mm mm2 ->
+  u_mem_step P t t' mm (write_bytes mm2 a n v).
+Proof.
+  intros Hd (Hshape & Hspec' & md' & Hdj' & Hmm' & Hdm').
+  assert (Hin : forall j : nat, (N.of_nat j < n)%N -> is_Some (md' !! pa_add a j))
+    by (intros j Hj; exact (proj1 (Hdm' _) (Hd j Hj))).
+  assert (Hnt : forall j : nat, (N.of_nat j < n)%N ->
+            ptree_bytes 2 t' !! pa_add a j = None).
+  { intros j Hj.
+    destruct (ptree_bytes 2 t' !! pa_add a j) as [c |] eqn:Hc;
+      [ exfalso | reflexivity ].
+    destruct (Hin j Hj) as (b & Hb).
+    exact (proj1 (map_disjoint_spec (ptree_bytes 2 t') md') Hdj' _ c b Hc Hb). }
+  pose proof (fun x => write_bytes_is_Some_iff md' a n v x Hin) as Hiff.
+  split_and!; [ exact Hshape | exact Hspec' |].
+  exists (write_bytes md' a n v). split_and!.
+  - apply map_disjoint_spec. intros i x y Hx Hy.
+    destruct (proj1 (Hiff i) (mk_is_Some _ _ Hy)) as (b & Hb).
+    exact (proj1 (map_disjoint_spec (ptree_bytes 2 t') md') Hdj' i x b Hx Hb).
+  - rewrite Hmm'. apply write_bytes_union_r. exact Hnt.
+  - intros x. rewrite (Hdm' x). symmetry. exact (Hiff x).
+Qed.
+
+Lemma u_mem_step_wchain (P : uptd) (t t' : ptree) (mm : pamap)
+    (pa : mword 64) (W bytes : Z) (N : nat) (sg : mstate) (dat : mword (8 * W)) :
+  0 < bytes -> Z.of_nat N * bytes = W ->
+  (forall j : nat, (j < Z.to_nat W)%nat -> pa_add pa j ∈ ud_data P) ->
+  (forall j : nat, (j < Z.to_nat W)%nat -> addr_is_ram (pa_add pa j)) ->
+  u_mem_step P t t' mm sg.(mem) ->
+  forall k : nat, (k <= N)%nat ->
+    u_mem_step P t t' mm (wchain pa W sg bytes dat k).(mem).
+Proof.
+  intros Hb Hw Hdata Hram Hstep.
+  pose proof (chunk_dev_false pa W bytes N Hb Hw Hram) as Hdev.
+  assert (HbN : Z.to_nat W = (N * Z.to_nat bytes)%nat).
+  { rewrite <- Hw. rewrite Z2Nat.inj_mul; [| lia | lia]. rewrite Nat2Z.id. reflexivity. }
+  induction k as [| k IH]; intro Hk; [ exact Hstep |].
+  destruct (exec_write_ram_plain_gen bytes (add_vec_int pa (Z.of_nat k * bytes))
+              (wvc W bytes dat k) (wchain pa W sg bytes dat k) (Hdev k ltac:(lia)))
+    as (nn & v & Hwr).
+  assert (Hstepk : wchain pa W sg bytes dat (S k)
+            = MState (wchain pa W sg bytes dat k).(sregs)
+                (write_bytes (wchain pa W sg bytes dat k).(mem)
+                   (add_vec_int pa (Z.of_nat k * bytes)) (Z.to_N bytes) v)
+                (wchain pa W sg bytes dat k).(mdev))
+    by (cbn [wchain]; rewrite Hwr; reflexivity).
+  rewrite Hstepk. cbn [mem].
+  apply u_mem_step_write_in; [ | exact (IH ltac:(lia)) ].
+  intros j Hj.
+  rewrite (pa_add_chunk pa k bytes ltac:(lia)). rewrite pa_add_bump2.
+  apply Hdata. rewrite HbN. nia.
+Qed.
+
+Lemma u_store_pure_page (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
+    (k : Z) (w va : mword 64) (v : mword (8 * k)) :
+  0 < k -> k <= 8 -> in_one_page va k ->
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (Store Data) w ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  u_data_cfg rs ->
+  u_exec_pins P t rs ->
+  u_mem_wf P t mm ->
+  exists (rs' : regstate) (mm' mm2 : pamap) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (Store Data)) (u_state rs mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rs' mm') /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (Store Data))
+      (u_state rs mm) mm = true /\
+    exec (mem_write_ea (Physaddr (u_walk_pa w va)) k (Store Data) PBMT_PMA
+            false false false) (u_state rs' mm') = Some (Ok tt, u_state rs' mm') /\
+    goodmb Du_r Du_w (mem_write_ea (Physaddr (u_walk_pa w va)) k (Store Data)
+            PBMT_PMA false false false) (u_state rs' mm') mm' = true /\
+    exec (mem_write_value (Physaddr (u_walk_pa w va)) k v (Store Data) PBMT_PMA
+            false false false) (u_state rs' mm') = Some (Ok true, u_state rs' mm2) /\
+    goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w va)) k v (Store Data)
+            PBMT_PMA false false false) (u_state rs' mm') mm' = true /\
+    (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
+    u_mem_step P t t' mm mm' /\
+    u_mem_step P t t' mm mm2.
+Proof.
+  intros Hk Hk8 Hp Hl Hleaf Hcanon Hcfg Hpins Hwf.
+  destruct (u_walk_pure (Store Data) P t mm rs w va
+              (or_intror (or_intror (or_introl eq_refl))) Hl Hleaf Hcanon Hcfg Hpins Hwf)
+    as (rs' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep & Hcfg' & Hpins' & Hwf').
+  set (pa := u_walk_pa w va).
+  set (s' := u_state rs' mm').
+  pose proof (u_page_window P t' mm' k w va Hk Hp Hwf' Hl) as Hwin.
+  assert (Hown : bytes_owned mm' pa (Z.to_N k) = true)
+    by exact (u_page_owned P t' mm' k w va Hk Hp Hwf' Hl).
+  destruct Hcfg' as (Lcp & Lms & Lmenv).
+  destruct Lms as (Lsxl & Lmprv & _).
+  destruct Hpins' as (Hhw & _ & Hpt & _).
+  destruct Hhw as (Hmisa & _ & _ & Hhtif & Hall & _).
+  destruct Hpt as (_ & HA & Hord & _ & HW & _ & Hcovp).
+  assert (Hea : exec (mem_write_ea (Physaddr pa) k (Store Data) PBMT_PMA
+                        false false false) s' = Some (Ok tt, s'))
+    by exact (exec_mem_write_ea_mis_U pa k s' Hk Hk8 HA Hord Hcovp Hall
+                (fun j Hj => proj1 (proj2 (Hwin j Hj))) Lmprv Lcp HW).
+  assert (Heag : goodmb Du_r Du_w (mem_write_ea (Physaddr pa) k (Store Data)
+                          PBMT_PMA false false false) s' mm' = true)
+    by exact (goodmb_mem_write_ea_mis_U pa k s' Hk Hk8 HA Hord Hcovp Hall
+                (fun j Hj => proj1 (proj2 (Hwin j Hj))) Du_r Du_w mm'
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) Lmprv Lcp HW).
+  destruct (exec_mem_write_value_mis_U pa k s' Hk Hk8 HA Hord Hcovp Hhtif Hall
+              (fun j Hj => proj1 (proj2 (Hwin j Hj))) v Lmprv Lcp HW)
+    as (bytes & N & Hbpos & Hwidth & HN & Hwv).
+  assert (Hwrg : goodmb Du_r Du_w (mem_write_value (Physaddr pa) k v (Store Data)
+                          PBMT_PMA false false false) s' mm' = true)
+    by exact (goodmb_mem_write_value_mis_U pa k s' Hk Hk8 HA Hord Hcovp Hhtif Hall
+                (fun j Hj => proj1 (proj2 (Hwin j Hj))) Du_r Du_w v mm'
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                Lmprv Lcp HW Hown).
+  (* the split write's post state: same file, same devices, N chunk windows *)
+  destruct (wchain_regs_gen pa k s' bytes N v
+              (chunk_dev_false pa k bytes N Hbpos Hwidth
+                 (fun j Hj => proj1 (proj2 (Hwin j Hj)))) N ltac:(lia)) as (Hcs & Hcd).
+  assert (Heta : forall x : mstate, x = MState x.(sregs) x.(mem) x.(mdev))
+    by (intros [a b c]; reflexivity).
+  assert (Hpost : wchain pa k s' bytes v N
+                  = u_state rs' (wchain pa k s' bytes v N).(mem)).
+  { rewrite (Heta (wchain pa k s' bytes v N)) at 1.
+    rewrite Hcs. rewrite Hcd. reflexivity. }
+  exists rs', mm', (wchain pa k s' bytes v N).(mem), t'. split_and!;
+    [ exact Htr | exact Htrg | exact Hea | exact Heag
+    | rewrite <- Hpost; exact Hwv | exact Hwrg
+    | exact Hfile | exact Htlbok' | exact Hstep |].
+  exact (u_mem_step_wchain P t t' mm pa k bytes N s' v Hbpos Hwidth
+           (fun j Hj => proj2 (proj2 (Hwin j Hj)))
+           (fun j Hj => proj1 (proj2 (Hwin j Hj))) Hstep N ltac:(lia)).
 Qed.
