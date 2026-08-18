@@ -816,6 +816,10 @@ Section ProofSysUnlinkTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -862,7 +866,7 @@ Section ProofSysUnlinkTails.
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -933,7 +937,7 @@ Section ProofSysUnlinkTails.
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
+                    Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
@@ -1144,6 +1148,10 @@ Section ProofSysUnlinkTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1189,7 +1197,7 @@ Section ProofSysUnlinkTails.
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
     iPoseProof (suli_158 with "Htext") as "Hi0".
@@ -1238,7 +1246,7 @@ Section ProofSysUnlinkTails.
               HM1s1 HM1s2 HM1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
-                    Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid
+                    Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 Hcont").
   Qed.
@@ -1330,6 +1338,10 @@ Section ProofSysUnlinkTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     (* ---- ip, released HERE ---- *)
     is_sleeplock_gen gili gisli (i_lock (ientry ki)) "inode"%string (ic_tok cn ki) (slh_tok (icfg_isl ki)) -∗
@@ -1341,6 +1353,10 @@ Section ProofSysUnlinkTails.
     i_valid (ientry ki) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart ki inumi dni bmi -∗
     ity_shot gyi (di_type dni) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inumi) -∗
     inode_ref_short ki (qip + si)%Qp qip dev inumi -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1387,9 +1403,9 @@ Section ProofSysUnlinkTails.
            Hsp0 HMsp HMthr HMs1 HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hescki #Hireg
-              #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshot Hkeep
+              #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep
               #Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hloadi
-              #Hshoti Hkeepi
+              #Hshoti Hfrzi Hkeepi
               Hsbb Hsbi Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop
               Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP H27 HbE H30 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1456,7 +1472,7 @@ Section ProofSysUnlinkTails.
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hescki Hireg Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi
-                    Hivalidi Hloadi Hshoti Hkeepi Hsbb Hsbi Hbmres Hpid Hprocs
+                    Hivalidi Hloadi Hshoti Hfrzi Hkeepi Hsbb Hsbi Hbmres Hpid Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
@@ -1554,7 +1570,7 @@ Section ProofSysUnlinkTails.
               Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
-                    Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid
+                    Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 [Hislot Hcont]").
     iEval (rewrite /wp_next).

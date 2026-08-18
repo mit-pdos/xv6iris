@@ -1309,13 +1309,13 @@ Section IreclaimOrphan.
     iAssert (iname γi γfs inum (BufL (uint bno) ds)) with "[HpL Hboot]" as "Hlic".
     { rewrite /iname /fsblock -Hbseq. iFrame "HpL Hboot". iPureIntro.
       split; [exact Hdswf | exact Htnz]. }
-    iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
+    iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
               (BufL (uint bno) ds)
               O6 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanenv Hiref Hlic").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref Hlic").
     all: try lkbelow.
     iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href Hlic".
     (* ...and the half goes straight back into the handle, unspent.  The
@@ -1662,7 +1662,7 @@ Section IreclaimOrphan.
     { rewrite /cpu_claim_ext. done. }
     iIntros (CID18 Hq18 mL dnl bml fl_)
       "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
-       Hvalid Hloaded #Hshot %Hfr_".
+       Hvalid Hloaded #Hshot Hfrz %Hfr_".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
       by (rewrite HOCra; pcw).
@@ -1764,7 +1764,7 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd Hslpid
-                    Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot").
+                    Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot Hfrz").
     all: try lkbelow.
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".

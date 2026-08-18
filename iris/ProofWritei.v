@@ -1208,6 +1208,10 @@ Section WriteiJoin.
                  and [Hstab] is writei's own premise about [dn] vs [dn0]. *)
               ltac:(rewrite Hdneq; exact Hstab)
               ltac:(rewrite Hdneq; exact Hnlk)
+              (* §3.1's TYPE NARROWING: writei flushes a LIVE record --
+                 [wi_dinode] keeps [dn]'s type ([Hdneq]) and writei's own
+                 [Hdtnz] says that type is nonzero. *)
+              ltac:(rewrite Hdneq; exact Hdtnz)
               Hadr Hdirlen Hj Hgl HT1a0
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom

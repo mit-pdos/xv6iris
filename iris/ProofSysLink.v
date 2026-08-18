@@ -1365,7 +1365,7 @@ Section ProofSysLinkBody.
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CID28 Hq28 mil dn bm fl)
             "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hslpid Hdep
-             Hidev Hiinum Hivalid Hload #Hshot %Hfl".
+             Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl".
           assert (Hpc46 : ret_pc (R0 !!! Regidx Rra : mword 64)
                           = mword_of_int (SL + 0x46)) by (rewrite HR0ra; pcw).
           iEval (rewrite Hpc46) in "Hpc".
@@ -1470,7 +1470,8 @@ Section ProofSysLinkBody.
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
                        with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                              Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep
-                             Hidev Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi
+                             Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb
+                             Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
                              Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                              [Hsbs Hir1 Hir1b Hcwd Hcwdref Hpback Hcont]").
@@ -1622,7 +1623,8 @@ Section ProofSysLinkBody.
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                 Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
-                                Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hsbb
+                                Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep
+                                Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
                                 [HopS] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                 [Hsbs Hir1 Hir1b Hcwd Hcwdref Hpback Hcont]").
@@ -1789,7 +1791,9 @@ Section ProofSysLinkBody.
                 sl_own_transport CID28 CID40 eb pj b.
                 iApply (Iupdate.wp_iupdate_link (CID := CID40) gs j gl gu gd gk
                           pd pav pu bn g gfs gi cov logstart inodestart nib dev
-                          (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None pid
+                          (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None
+                          (* pin = true: this site pays the TOKEN arm (§3.9) *)
+                          true pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
                           ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
@@ -1802,14 +1806,39 @@ Section ProofSysLinkBody.
                           ltac:(intros pv Hc; discriminate Hc)
                           ltac:(rewrite /sl_incnl; apply sl_setnl_nlink)
                           Hnl
+                          (* ===== THE IIIc WALL, SITE 2 OF 2 -- PAID
+                             (RULING A-prime, iclaim-ledger.md §3.9) ==========
+                             [SpecIupdate.wp_iupdate_link]'s freeze-pin premise
+                             is the two-armed
+                               |_di_nlink dn <> 0_| \/ ifreeze_off (…inum),
+                             and this walk pays the RIGHT arm with [Hfrz].
+                             The LEFT arm is genuinely unavailable here, as
+                             IIIc checked on the lane: xv6's sys_link has no
+                             [ip->nlink == 0] guard (ARM D is the NLINK_MAX
+                             test alone, and ARM E2's zero test is about [dp],
+                             after this mint), [InodeLock.inode_ok] carries no
+                             [nlink] conjunct, and this walk holds no [ilink]
+                             for [ip] -- [namei]'s licence is borrowed and
+                             returned at the iget (IgetLic §7.1.6), so
+                             [IregLinkNz.ireg_link_nz] has no fragment to read.
+                             [Hfrz] is [ip]'s own freeze token, handed over by
+                             the [ilock(ip)] at +0x4a: A-custody puts it on the
+                             payload's path and [SpecIlock]'s post now surfaces
+                             it.  Borrowed -- it comes back below and goes home
+                             at the [iunlockput(ip)]. *)
                           ltac:(rewrite /sl_incnl sl_setnl_addrs; exact Haddreq)
                           Hdirlen Hj Hgl HS2a0 Heb (Hlb "log"%string)
                           with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum
-                                Hmeta Hmap Hsbi Hireg Hdiat Hpidq Hprocs Hdev
-                                Hgeo Hdlk Hbs2 HopS").
+                                Hmeta Hmap Hsbi Hireg Hdiat [Hfrz] Hpidq Hprocs
+                                Hdev Hgeo Hdlk Hbs2 HopS").
+                { rewrite /InodeRegion.ireg_link_pin. iExact "Hfrz". }
                 iIntros (CID41 Hq41 miu)
                   "%Hcsiu Hcg Hown Hpc Hpidq Hidev Hiinum Hmeta Hmap Hsbi Hdiat
-                   Hilink Hbs2 HopS".
+                   Hilink Hpin Hbs2 HopS".
+                (* at [pin = true] the premise that comes back IS the token,
+                   by [InodeRegion.ireg_link_pin]'s own definition. *)
+                iEval (rewrite /InodeRegion.ireg_link_pin) in "Hpin".
+                iRename "Hpin" into "Hfrz".
                 assert (Hpc6a : ret_pc (S2 !!! Regidx Rra : mword 64)
                                 = mword_of_int (SL + 0x6a)) by (rewrite HS2ra; pcw).
                 iEval (rewrite Hpc6a) in "Hpc".
@@ -1904,7 +1933,7 @@ Section ProofSysLinkBody.
                           ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hslpid Hpidq Hprocs Hdep Hidev Hiinum
-                                Hivalid Hload Hshot2").
+                                Hivalid Hload Hshot2 Hfrz").
                 iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr".
                 (* THE GENERATION SURVIVES THE WINDOW, and sys_link is the
                    caller that needs it: the share it still holds denies the
@@ -2153,7 +2182,8 @@ Section ProofSysLinkBody.
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CID52 Hq52 mild dnd bmd fld)
                      "%Hcsild Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd Hslpidd
-                      Hdepd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 %Hfld".
+                      Hdepd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
+                      %Hfld".
                    (* ilock's RETURN ADDRESS IS +0x84, NOT +0x8a.  The
                       relayout maps offsets by where the OLD instruction
                       went, and old +0x84 (the [c.mv a0,s2]) went to +0x8a --
@@ -2297,7 +2327,7 @@ Section ProofSysLinkBody.
                                      Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
                                      Hslpidd
                                      Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
-                                     Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                                     Hfrzd Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                      HbN HbW HbO
                                      [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
@@ -2667,7 +2697,7 @@ Section ProofSysLinkBody.
                                        Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
                                        Hslpidd
                                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
-                                       Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                                       Hfrzd Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                        HbN HbW HbO
                                        [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
@@ -2917,7 +2947,8 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hslkd0 Hslkdd
                                             Hslpidd Hdepd Hidevd Hiinumd Hivalidd
-                                            Hloadd Hshotd3 Hkeepd Hsbb Hsbi Hbmres
+                                            Hloadd Hshotd3 Hfrzd Hkeepd Hsbb Hsbi
+                                            Hbmres
                                             Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [] HopE").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
@@ -3289,7 +3320,8 @@ Section ProofSysLinkBody.
                                             Hireg Hslkk Hslkd0 Hkeep Hshr Hshot2
                                             Hilink
                                             Hslkdd Hslpidd Hdepd Hidevd Hiinumd
-                                            Hivalidd Hloadd Hshotd3 Hkeepd Hsbb
+                                            Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd
+                                            Hsbb
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                             HbN HbW HbO

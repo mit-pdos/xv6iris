@@ -486,6 +486,12 @@ Definition create_fresh_ty_body
   ic_escrows cn γfs γi cov logstart -∗
   SpecDirlink.ic_sleeplocks cn -∗
   ireg_inv γi γfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  The span
+     covers [jal ialloc] at +0xa8, and [wp_ialloc_gen_body] -- the
+     HYPOTHESIS this axiom takes for that callee -- now asks for it (via
+     [InodeRegion.ireg_claim_au], the one [c]-column mover).  Persistent, so
+     the span borrows it and hands nothing back. *)
+  ireg_open -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -536,6 +542,20 @@ Definition create_fresh_ty_body
          i_valid (ientry kslot) ↦₄ valid_word true ∗
          ic_loaded γfs γi cov logstart kslot inum dn bm ∗
          ity_shot g (di_type dn) ∗
+         (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.9, RULING
+            A-prime).  The span ends at [ilock]'s return, and [SpecIlock]'s
+            post now hands the holder [ifreeze_off] beside the payload
+            ([IcacheEscrow.ic_payload]'s A-custody conjunct) -- so this is
+            not new content, it is the callee's own postcondition relayed,
+            exactly as [ic_loaded] and [ity_shot] above are.
+
+            WHO WANTS IT: create's [ip->nlink = 1; iupdate(ip)] at +0xc4.
+            The freeze pin's premise on [wp_iupdate_link] is FALSE at the
+            fresh child (its pre-count is zero by [fresh_shape]), so the
+            walk pays the TOKEN arm; the token is borrowed by the mover and
+            comes straight back, and create returns it at the child's
+            iunlock. *)
+         ifreeze_off (bv_unsigned inum) ∗
          inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev inum g ∗
          (* ialloc's [ia_spend = 1], and the membership create's own
             [iupdate(ip)] and every [dirlink] on [ip] credit against *)

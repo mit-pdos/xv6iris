@@ -285,6 +285,9 @@ Section ProofSysOpenBody.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* the payload's freeze token (§3.9, RULING A-prime), relayed to
+       [so_tail_s]'s iunlock *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
     (* the six raw pieces the walk carries across the tail *)
     fref_tok gf kf 1 -∗
@@ -328,7 +331,7 @@ Section ProofSysOpenBody.
     subst dev.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-              Hload #Hshot Hkeep Hfref Hflive Hflds Hfpn Hfip Hfoff
+              Hload #Hshot Hfrz Hkeep Hfref Hflive Hflds Hfpn Hfip Hfoff
               Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi Hbmres Hbsl
               Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (proc_priv_core_pid with "Hcore") as "[Hpidq Hcback]".
@@ -340,7 +343,8 @@ Section ProofSysOpenBody.
               HMs1 HMs3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4
+                    Hload Hshot Hfrz Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
+                    Hf4
                     Hf5 Hf6 HbP H23 H24
                     [Hkeep Hfref Hflive Hflds Hfpn Hfip Hfoff Hcback Howe Hsbb
                      Hsbi Hbmres Hbsl Hisl Hfds Hcont]").
@@ -497,6 +501,9 @@ Section ProofSysOpenBody.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* the payload's freeze token (§3.9, RULING A-prime), relayed to
+       [so_tail_s]'s iunlock *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
     (* the fresh slot, six cells PLAIN and [f->ip] WHOLE *)
     fref_tok gf kf 1 -∗
@@ -549,7 +556,7 @@ Section ProofSysOpenBody.
     destruct u as [| [| u2]]; [ exfalso; lia | exfalso; lia | ].
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-              Hivalid Hload #Hshot Hkeep Hfref Hflive Hfpn Hfty Hfrd Hfwr
+              Hivalid Hload #Hshot Hfrz Hkeep Hfref Hflive Hfpn Hfty Hfrd Hfwr
               Hfpip Hfmaj Hfip Hfoff Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
               Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP
               H23lo H23hi H24 Hcont".
@@ -773,7 +780,7 @@ Section ProofSysOpenBody.
                 ltac:(reflexivity) Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                      Hload Hshot Hfrz Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                       Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Hcont"). }
@@ -867,7 +874,7 @@ Section ProofSysOpenBody.
                 ltac:(reflexivity) Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                      Hload Hshot Hfrz Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                       Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Hcont"). }
@@ -1018,7 +1025,7 @@ Section ProofSysOpenBody.
               Husedsub Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                    Hload Hshot Hfrz Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                     Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                     Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     Hcont").
@@ -1107,6 +1114,9 @@ Section ProofSysOpenBody.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* the payload's freeze token (§3.9, RULING A-prime), relayed to
+       [so_tail_s]'s iunlock *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
     proc_priv gf (proc_addr jx) pidv V -∗
     procs_inv gs -∗
@@ -1145,7 +1155,7 @@ Section ProofSysOpenBody.
     subst dev. subst nib.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
               Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep
-              Hidev Hiinum Hivalid Hload #Hshot Hkeep Hpriv #Hprocs #Hdev #Hgeo
+              Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1297,7 +1307,7 @@ Section ProofSysOpenBody.
                 HM2s1 HM2s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
-                      Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpidq
+                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpidq
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hcont]").
       iEval (rewrite /wp_next).
@@ -1466,7 +1476,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Href
                       [] Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
-                      Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpidq
+                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpidq
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hcback Howe Hisl Hcont]").
       { iApply (fileclose_env_none _ _ _ _ _ _ Cf Hty0). }
@@ -1680,7 +1690,7 @@ Section ProofSysOpenBody.
                 Hal23 Hsp0 HM7sp HM7thr HM7s0 HM7s1 HM7s2 HM7s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-                      Hivalid Hload Hshot Hkeep Hfref Hflive Hfpn Hfty Hfrd
+                      Hivalid Hload Hshot Hfrz Hkeep Hfref Hflive Hfpn Hfty Hfrd
                       Hfwr Hfpip Hfmaj Hfip Hfoff Hcore Howe Hprocs Hdev Hgeo
                       Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4
                       Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
@@ -1773,7 +1783,7 @@ Section ProofSysOpenBody.
               Hal23 Hsp0 HM8sp HM8thr HM8s0 HM8s1 HM8s2 HM8s3 Hal
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-                    Hivalid Hload Hshot Hkeep Hfref Hflive Hfpn Hfty Hfrd
+                    Hivalid Hload Hshot Hfrz Hkeep Hfref Hflive Hfpn Hfty Hfrd
                     Hfwr Hfpip Hfmaj Hfip Hfoff Hcore Howe Hprocs Hdev Hgeo
                     Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4
                     Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
@@ -1861,6 +1871,9 @@ Section ProofSysOpenBody.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* the payload's freeze token (§3.9, RULING A-prime), relayed to
+       [so_tail_s]'s iunlock *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
     proc_priv gf (proc_addr jx) pidv V -∗
     procs_inv gs -∗
@@ -1899,7 +1912,7 @@ Section ProofSysOpenBody.
     subst dev. subst nib.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
               Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep
-              Hidev Hiinum Hivalid Hload #Hshot Hkeep Hpriv #Hprocs #Hdev #Hgeo
+              Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1994,7 +2007,7 @@ Section ProofSysOpenBody.
                 HM2sp HM2thr HM2s0 HM2s1 HM2s2 HM2s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
-                      Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hpriv Hprocs
+                      Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
     (* ---- T_DEVICE: the [major] bounds test ---- *)
@@ -2095,7 +2108,7 @@ Section ProofSysOpenBody.
                 HM4s1 HM4s2 HM4s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
-                      Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpidq
+                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpidq
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hcont]").
       iEval (rewrite /wp_next).
@@ -2141,7 +2154,7 @@ Section ProofSysOpenBody.
               HM4sp HM4thr HM4s0 HM4s1 HM4s2 HM4s3 Hal
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                     Hseam Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
-                    Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hpriv Hprocs
+                    Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hpriv Hprocs
                     Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                     Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
   Qed.
@@ -2297,6 +2310,10 @@ Section ProofSysOpenBody.
     ic_escrows cn gfs gi cov logstart -∗
     ic_sleeplocks cn -∗
     ireg_inv gi gfs inodestart nib -∗
+    (* RULING B (iclaim-ledger.md §3.2): the sealed regime, threaded on to
+       [SpecCreate] -> [SpecIalloc] -> [InodeRegion.ireg_claim_au].  It is
+       on THIS arm only: [so_entry_n] is the arm that does not create. *)
+    ireg_open -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -2336,6 +2353,7 @@ Section ProofSysOpenBody.
                               HK10 & HK24 & Kpop).
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpre #Hftab #Hbio
               #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hireg
+              #Hiopen
               Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS
               Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
               Hcont".
@@ -2490,7 +2508,8 @@ Section ProofSysOpenBody.
               ltac:(unfold create_units; lia) Hnsb Hj Hgl
               HN5a1 HN5a2 HN5a3 Heb
               with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv Hitab
-                    Hitinv Hescrows Hslks Hireg Hsbn Hsbi Hsbs Hsbb Hbmres
+                    Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs Hsbb
+                    Hbmres
                     Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hisl HopS").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
     iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1 used1)
@@ -2608,7 +2627,7 @@ Section ProofSysOpenBody.
                  with "Hescrows") as "#Hesc".
     iDestruct "Hlocked" as (gil gisl)
       "(Hslk & Hslkd & Hslpid & Hdep & Hidev & Hiinum & Hivalid & Hload &
-        Hshot & Href)".
+        Hshot & Hfrz & Href)".
     iApply (wp_cbeqz_fall_s_sconf (CID := CID7) (mword_of_int (SO + 0x48))
               (mword_of_int 69 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               P1 (K - 24)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
@@ -2652,7 +2671,8 @@ Section ProofSysOpenBody.
               Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                     Hseam Hgen Hitab Hitinv Hesc Hireg Hslk Hslkd Hslpid Hdep
-                    Hidev Hiinum Hivalid Hload Hshot Href Hpriv Hprocs Hdev
+                    Hidev Hiinum Hivalid Hload Hshot Hfrz Href Hpriv Hprocs
+                    Hdev
                     Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3
                     Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -3072,7 +3092,7 @@ Section ProofSysOpenBody.
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID7 Hq7 mil dn bm fl)
       "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hslpid Hdep
-       Hidev Hiinum Hivalid Hload #Hshot %Hfl".
+       Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl".
     assert (Hpcil : ret_pc (P2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0xec)) by (rewrite HP2ra; pcw).
     iEval (rewrite Hpcil) in "Hpc".
@@ -3202,7 +3222,7 @@ Section ProofSysOpenBody.
                 Hal23 Hsp0 HQ2sp HQ2thr HQ2s0 HQ2s1 HQ2s2 HQ2s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
-                      Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hpriv Hprocs
+                      Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
@@ -3287,7 +3307,7 @@ Section ProofSysOpenBody.
                 Hal23 Hsp0 HQ3sp HQ3thr HQ3s0 HQ3s1 HQ3s2 HQ3s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
-                      Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hpriv Hprocs
+                      Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
@@ -3321,7 +3341,7 @@ Section ProofSysOpenBody.
               HQ3s1 HQ3s2 HQ3s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab
                     Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-                    Hivalid Hload Hshot Hkeepe Hsbb Hsbi Hbmres Hpidq Hprocs
+                    Hivalid Hload Hshot Hfrz Hkeepe Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23
                     H24 [Hpback2 Hfds Hisl Hsbn Hsbs Hcont]").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -3413,8 +3433,8 @@ Section ProofSysOpenBody.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpre #Hftab #Hbio #Hlog
              Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hisl Hfds Hpriv
-             Hcont".
+             #Hireg #Hiopen Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hisl
+             Hfds Hpriv Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -4093,6 +4113,7 @@ Section ProofSysOpenBody.
               ltac:(reflexivity) HS2sp HS2thr HS2s0 HS2s2 HS2s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpre Hftab Hbio
                     Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg
+                    Hiopen
                     Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
                     HopS Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
                     H23hi H24 Hcont0").

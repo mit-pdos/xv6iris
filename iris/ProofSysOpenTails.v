@@ -636,6 +636,10 @@ Section ProofSysOpenTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -680,7 +684,7 @@ Section ProofSysOpenTails.
            HMs2 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -752,7 +756,7 @@ Section ProofSysOpenTails.
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
+                    Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
@@ -978,6 +982,10 @@ Section ProofSysOpenTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1022,7 +1030,7 @@ Section ProofSysOpenTails.
            HMs2 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1094,7 +1102,7 @@ Section ProofSysOpenTails.
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
+                    Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
@@ -1319,6 +1327,10 @@ Section ProofSysOpenTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1363,7 +1375,7 @@ Section ProofSysOpenTails.
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1432,7 +1444,7 @@ Section ProofSysOpenTails.
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
+                    Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
@@ -1707,6 +1719,10 @@ Section ProofSysOpenTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1754,7 +1770,7 @@ Section ProofSysOpenTails.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hftab Hfref Hfenv
               #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1871,7 +1887,7 @@ Section ProofSysOpenTails.
               HP1s1 HP1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
-                    Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid
+                    Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbP H23 H24 [Hfd Hfout Hcont]").
     iEval (rewrite /wp_next).
@@ -1961,6 +1977,10 @@ Section ProofSysOpenTails.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart kk inum dn bm -∗
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1994,7 +2014,7 @@ Section ProofSysOpenTails.
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-              Hload #Hshot Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4
+              Hload #Hshot Hfrz Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4
               Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (soi_0b8 with "Htext") as "Hi0".
@@ -2055,7 +2075,7 @@ Section ProofSysOpenTails.
               HKiu Hkk HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd Hslpid
-                    Hpid Hprocs Hdep Hidev Hiinum Hivalid Hload Hshot").
+                    Hpid Hprocs Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz").
     iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)

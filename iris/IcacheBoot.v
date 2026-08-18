@@ -653,7 +653,7 @@ Section IcacheBootRegion.
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
-                  ireg_par_ok_none (ireg_claim_ok_none _) I
+                  ireg_par_ok_none (ireg_claim_ok_none _ _) I
                   with "Hla Hep [] Hcnt []").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
@@ -667,7 +667,7 @@ Section IcacheBootRegion.
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
-                  ireg_par_ok_none (ireg_claim_ok_none _) I
+                  ireg_par_ok_none (ireg_claim_ok_none _ _) I
                   with "Hla Hep [] Hcnt []").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)

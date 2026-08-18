@@ -746,9 +746,18 @@ Section IlockLoad.
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
     inode_raw ip -∗
-    ipool_shape gfs gi cov logstart inum -∗
+    (* THE [_np] FORM, not the full [ipool_shape] (iclaim-ledger.md §3.5
+       item 7).  What a checked-out UNLOADED payload actually contains is
+       [IcacheEscrow.ic_unloaded], i.e. [inode_raw ∗ ipool_shape_np]: the
+       ledger's [icnt] half and the freeze token left the bundle at the
+       RECYCLE's peel ([ipool_shape_to_np], ProofIget +0x72) and now live on
+       the slot's live [islot2] arm and the parked payload respectively.  So
+       the fill has no pool shape left to convert and does no peel of its own
+       -- the conversion happened once, at the recycle, for the whole
+       lifetime of the cached entry. *)
+    ipool_shape_np gfs gi cov logstart inum -∗
     (* THE GENERATION'S PENDING ONE-SHOT (design §17.6): the caller splits it
-       out of the UNLOADED payload alongside the [inode_raw]/[ipool_shape]
+       out of the UNLOADED payload alongside the [inode_raw]/[ipool_shape_np]
        pair it already splits, and this arm SPENDS it against the record the
        [bread] returns.  [g] was already one of this lemma's parameters. *)
     ity_pending g -∗
@@ -1079,10 +1088,13 @@ Section IlockLoad.
                     ind_res gfs bm ∗ inode_blocks gfs bm data))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL]" as ">[HL Hrest]".
-    { (* OPTION A (b)(ii): redeem any pending entry to [imark] pool-locally,
-         then the fill sees the Timeless 2-arm shape. *)
-      iMod (ipool_shape_to_np ⊤ gfs gi cov logstart inum ltac:(solve_ndisj)
-              with "Hpool") as "Hpool".
+    { (* NO PEEL HERE ANY MORE (iclaim-ledger.md §3.5 item 7).  OPTION A
+         (b)(ii)'s redeem -- [ipool_shape_to_np] -- happened once, at the
+         RECYCLE that cached this entry, and what the unloaded payload holds
+         from then on IS the Timeless 2-arm [ipool_shape_np].  Keeping the
+         peel here would ask the fill for the licence and the region open the
+         recycle already paid, and would ask it to produce a second
+         [icnt_half z 0] for an inum whose count is 1. *)
       rewrite /ipool_shape_np. iDestruct "Hpool" as "[Hal | Hmk]".
       - iDestruct "Hal" as (dn0 bm0 data0)
           "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & %Hduq0 & Hdlk0 & Hdn & Hind & Hblk)".
@@ -2439,11 +2451,21 @@ Section ProofIlockMain.
       iIntros (CID13 Hq13) "Hcg Hpc".
       iEval (rewrite Htk) in "Hpc".
       iEval (change (valid_word false) with (mword_of_int 0 : mword 32)) in "Hvalid".
+      (* FOUR pieces since RULING A-prime (iclaim-ledger.md §3.10): the
+         payload is [ic_payload_np ∗ ifreeze_off], and at [v = false] the
+         [_np] half is [(inode_raw ∗ ipool_shape_np) ∗ ity_pending].  The
+         token is the holder's from here on -- that is what [SpecIlock]'s
+         post hands out and what create's fresh child and sys_link's
+         [ip->nlink++] pay [wp_iupdate_link]'s pin with.  Routing it through
+         [il_cont] to that post is the SAME un-landed item as the [iclaim]
+         goal this file still carries (see [ireg_withdraw] in [il_load]). *)
       iAssert (inode_raw (ientry k) ∗
-               ipool_shape gfs gi cov logstart inum ∗
-               ity_pending g)%I
-        with "[Hpay]" as "(Hraw & Hpool & Hpend)";
-        [rewrite /ic_payload /ic_unloaded; iDestruct "Hpay" as "[[$ $] $]" |].
+               ipool_shape_np gfs gi cov logstart inum ∗
+               ity_pending g ∗
+               ifreeze_off (bv_unsigned inum))%I
+        with "[Hpay]" as "(Hraw & Hpool & Hpend & Hfoff)";
+        [rewrite /ic_payload /ic_payload_np /ic_unloaded;
+         iDestruct "Hpay" as "[[[$ $] $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
       iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

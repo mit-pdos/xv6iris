@@ -156,7 +156,7 @@ Section ProofIunlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hpid Hppid
-              #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
+              #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
@@ -516,9 +516,16 @@ Section ProofIunlockMain.
        checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
        the sleeplock protects now -- and the caller's reference out. *)
     iApply fupd_wp.
+    (* THE PARKED PAYLOAD, AND ITS TOKEN (iclaim-ledger.md §3.9).
+       [IcacheEscrow.ic_payload] is the [_np] bundle plus the inum's
+       [ifreeze_off]; the token is the one [SpecIlock]'s post handed this
+       holder, threaded through its critical section untouched, and putting
+       it back is what re-establishes the parked arm's A-custody conjunct. *)
     iAssert (ic_payload gfs gi cov logstart k inum g true)%I
-      with "[Hlk]" as "Hpay";
-      [iExists dn', bm'; iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"] |].
+      with "[Hlk Hfrz]" as "Hpay".
+    { iApply (ic_payload_join with "[Hlk] Hfrz").
+      rewrite /ic_payload_np. iExists dn', bm'.
+      iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"]. }
     iInv "Hesc" as ">Hbody" "Hclose".
     iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g) g
                  true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")

@@ -126,17 +126,17 @@ Section ProofNamexRoot.
 
   Lemma wp_namex_root
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
+    : wp_namex_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namex_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.
     destruct (nxr_kb K HK) as (Kig & K12 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg Hisl Hp0 Hp1 Hcont".
     iPoseProof (nxi_000 with "Htext") as "Hi000".
     iPoseProof (nxi_002 with "Htext") as "Hi002".
     iPoseProof (nxi_004 with "Htext") as "Hi004".
@@ -551,11 +551,11 @@ Section ProofNamexRoot.
        this walk nothing.  This is the root clause's first consumer. *)
     iAssert (iname gi gfs ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hisl Hlic").
+              with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl Hlic").
     iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
     destruct Higp as (Hcsig & Hkig & Higa0).
     assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).

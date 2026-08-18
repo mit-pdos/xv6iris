@@ -780,7 +780,8 @@ Section ProofSysMkdirBody.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpre #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+             #Hireg #Hiopen Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hir
+             Hpriv Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -1207,7 +1208,8 @@ Section ProofSysMkdirBody.
                 ltac:(unfold create_units; lia) Hnsb Hj Hgl
                 HN4a1 HN4a2 HN4a3 Heb
                 with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
-                      Hitab Hitinv Hescrows Hslks Hireg Hsbn Hsbi Hsbs Hsbb
+                      Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
+                      Hsbb
                       Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
       iIntros (CID18 Hq18 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1 used1)
@@ -1266,7 +1268,7 @@ Section ProofSysMkdirBody.
         (* the ten conjuncts create hands back ARE iunlockput's precondition *)
         iDestruct "Hlocked" as (gil gisl)
           "(Hslk & Hslkd & Hslpid & Hdep & Hidev & Hiinum & Hivalid & Hload &
-            Hshot & Href)".
+            Hshot & Hfrz & Href)".
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
@@ -1288,7 +1290,7 @@ Section ProofSysMkdirBody.
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                         Hesc Hireg Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                        Hload Hshot Href Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                        Hload Hshot Hfrz Href Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }

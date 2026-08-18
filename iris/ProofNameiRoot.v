@@ -117,17 +117,17 @@ Section ProofNameiRoot.
 
   Lemma wp_namei_root
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_namei_root_body gtl cn gfs gi cov logstart nib dev dqp
+    : wp_namei_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namei_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Hbelow.
     destruct (nmr_kb K HK) as (Knx & K4 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg Hisl Hp0 Hp1 Hcont".
     iPoseProof (nmi_00 with "Htext") as "Hi00".
     iPoseProof (nmi_02 with "Htext") as "Hi02".
     iPoseProof (nmi_04 with "Htext") as "Hi04".
@@ -286,10 +286,10 @@ Section ProofNameiRoot.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID7)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_root gtl cn gfs gi cov logstart nib dev dqp
+    iApply (NX.wp_namex_root gtl cn gfs gi cov logstart inodestart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hisl Hp0 Hp1").
     iIntros (CID8 Hq8 mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
     destruct Hcsp as (Hcs & Hfa0).
     iEval (rewrite HR5a0) in "Hp0".

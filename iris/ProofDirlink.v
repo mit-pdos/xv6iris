@@ -1792,17 +1792,23 @@ Section ProofDirlinkMain.
    iDestruct (cpu_own_transport CID CID12 0%nat eb (proc_addr j) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
-              ga gf cov logstart nib dev ip dinum bm data dn dn0 fn
+              ga gf cov logstart inodestart nib dev ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
               pidv dq dqd dqn R7 (K - 10)%nat eb b _
               ltac:(exact HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hinums
-              Hdisj Horph Hdn0nz Hj Hgs
+              Hdisj Horph Hdn0nz
+              (* premise (6'), iclaim-ledger.md §3.3.  This is the ONE caller
+                 whose region index is genuinely stale, and the equation is
+                 [di_nlink_stable]'s first conjunct -- already in the
+                 contract for [SpecIupdate]'s sake. *)
+              (eq_sym (proj1 Hnlk))
+              Hj Hgs
               HR7a0
               ltac:(cbn [negb]; rewrite HR7a2 dlk_zero_moi; exact (eq_vec_refl _))
               Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
-                    Hitb2 Hitbl Hesc Hislot Hlinks Hdat").
+                    Hitb2 Hitbl Hesc Hiregi Hislot Hlinks Hdat").
     all: try lkbelow.
     { done. }
     iIntros (CIDdl Hsdl mdl found kk kslot qq)

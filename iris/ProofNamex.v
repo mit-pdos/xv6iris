@@ -3112,7 +3112,7 @@ Section ProofNamexMain.
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CIDil Hqil mil dnl bml fl_)
                      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload #Hshot %Hfr_".
+                      Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
                             = mword_of_int (NX + 0xc6)).
                    { rewrite HV2ra. pcw. }
@@ -3330,7 +3330,7 @@ Section ProofNamexMain.
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
-                                     Hshot Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
+                                     Hshot Hfrz Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
@@ -3610,7 +3610,7 @@ Section ProofNamexMain.
                                  ltac:(lkbelow)
                                  with "Hcg Hcnt Htext Hpc Hitbl Hesck
                                        Hslkk Hslkd Hslpid Hppid Hprocs Hdep
-                                       Hidev Hiinum Hivalid Hload Hshot").
+                                       Hidev Hiinum Hivalid Hload Hshot Hfrz").
                        all: try lkbelow.
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr".
@@ -3770,7 +3770,7 @@ Section ProofNamexMain.
                          with "[IHl Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                 Hb10 Hb11 Hb12 Hisl Hbmap Hinos Hbits Hppid
                                 Hcwdc Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hslkd
-                                Hslpid Hdep Hidev Hiinum Hivalid Hdiat Hity
+                                Hslpid Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
                                Hdlnk]"
                          as "Hdlblk".
@@ -3896,7 +3896,7 @@ Section ProofNamexMain.
                                       with "Hcnt") as "Hcnt".
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
                                    pd pav pu bn gfs gi cn gtl ga gf cov
-                                   logstart nib dev (ientry ik) iinum
+                                   logstart inodestart nib dev (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
                                    pidv dq (DfracOwn (1/2)) (DfracOwn 1)
@@ -3926,6 +3926,9 @@ Section ProofNamexMain.
                                       on the payload. ---- *)
                                    (or_introl (nx_nlink_nz _ Hnl0))
                                    Hdoc Htydnz
+                                   (* premise (6'), iclaim-ledger.md §3.3:
+                                      region record = in-core record here *)
+                                   eq_refl
                                    Hj Hgs
                                    HGA4a0
                                    ltac:(rewrite HGA4a2; vm_compute;
@@ -3933,7 +3936,7 @@ Section ProofNamexMain.
                                    with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv
                                          Hidev Hmeta Hmap Hblocks [Hname] []
                                          Hppid Hprocs Hdev Hgeom Hdlk Hbs1
-                                         Hitb2 Hitbl Hesc Hisl Hdlnk Hdiat").
+                                         Hitb2 Hitbl Hesc Hireg Hisl Hdlnk Hdiat").
                          all: try lkbelow.
                          { iEval (rewrite HGA4a1). iExact "Hname". }
                          { done. }
@@ -4116,7 +4119,7 @@ Section ProofNamexMain.
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
-                                           Hiinum Hivalid Hload Hshot Hkeep2 Hbmap
+                                           Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
@@ -4334,7 +4337,7 @@ Section ProofNamexMain.
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
-                                           Hiinum Hivalid Hload Hshot Hkeep2 Hbmap
+                                           Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
@@ -4623,7 +4626,7 @@ Section ProofNamexMain.
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
-                                     Hshot Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
+                                     Hshot Hfrz Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
@@ -5393,12 +5396,12 @@ Section ProofNamexMain.
          is why it costs the walk nothing. *)
       iAssert (iname gi gfs ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-      iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
+      iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
                 Hrino HA3a0 HA3a1 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hisl1
+                with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.
       iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".

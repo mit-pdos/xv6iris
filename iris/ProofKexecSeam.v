@@ -562,6 +562,8 @@ Section KexecBSeam.
      i_valid (ientry kf) ↦₄ valid_word true ∗
      ic_loaded gfs gi cov logstart kf inumf dnf bmf ∗
      ity_shot gyf (di_type dnf) ∗
+     (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
+     ifreeze_off (bv_unsigned inumf) ∗
      inode_ref_short kf (qf + sf)%Qp qf dev inumf)%I.
 
   (* --------------------------------------------------------------- *)

@@ -1307,6 +1307,10 @@ Section KexecABad.
     (* the parked record's type witness -- SpecIunlockput's new premise
        (SpecIlock v5's postcondition supplies it at the same [gy]) *)
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short k (qi + sq)%Qp qi dev inum -∗
     (* ---- and the rest of kexec's state ---- *)
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1349,7 +1353,7 @@ Section KexecABad.
            Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
     iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
-             Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
+             Hiinum Hivalid Hload Hity Hfrz Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
        order premise needs no hypothesis of this lemma's own. *)
@@ -1410,7 +1414,7 @@ Section KexecABad.
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                    Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
+                    Hity Hfrz Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

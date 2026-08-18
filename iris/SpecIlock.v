@@ -334,6 +334,25 @@ Definition wp_ilock_sconf_body
          vacuous.  A generation sees at most one fill (17.6), which is what
          makes that agreement sound. *)
       ity_shot g (di_type dn) -∗
+      (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.1 A-custody /
+         §3.9 RULING A-prime).  A-custody puts the token on the PAYLOAD's
+         custody path -- pool bundle <-> parked arm <-> holder -- and this is
+         the holder's end of it: [IcacheEscrow.ic_payload], the predicate
+         [ic_swap_checkout] takes out of the parked arm, carries
+         [ifreeze_off], so a checkout hands it over exactly as it hands over
+         [ic_loaded].  [SpecIunlock]'s precondition takes it back.
+
+         WHY THE CONTRACT GREW (§3.9's ruling, and its price): the freeze
+         pin's premise on [InodeRegion.ireg_write_link_fl] is FALSE at
+         create's fresh child ([fresh_shape] pins the pre-count at zero) and
+         unavailable at sys_link's [ip->nlink++] (no guard, no ilink in
+         hand); IIIc refuted every cheaper route.  The honest supply is this
+         token, and a checked-out holder is exactly who has it.
+
+         WHAT A CALLER THAT DOES NOT WRITE DOES WITH IT: nothing -- it
+         threads it to its own iunlock.  iProp is affine, so a caller that
+         parks through some other route may drop it. *)
+      ifreeze_off (bv_unsigned inum) -∗
       (* THE CLAIM-BOX INDICATOR -- see the header.  Proven content, not a
          new obligation: [InodeRegion.ireg_withdraw] pays [fresh_shape] to
          §16.4's fill sub-arm and this clause is where it now leaves. *)

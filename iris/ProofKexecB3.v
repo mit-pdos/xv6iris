@@ -1084,7 +1084,7 @@ Section KexecB3Body.
       apply (w32_moi_arg 56); lia. }
     (* ---- what readi borrows ---- *)
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                           Hivalid & Hload & #Hity & Hkeep)".
+                           Hivalid & Hload & #Hity & Hfrz & Hkeep)".
     iDestruct (kxc_load_peel with "Hload") as
       (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Hmap
                & Hblocks)".
@@ -1127,7 +1127,7 @@ Section KexecB3Body.
     iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                  inumf dnf bmf gilf gislf
                  with "Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                       Hity Hkeep") as "Hopen".
+                       Hity Hfrz Hkeep") as "Hopen".
     set (pf := rd_delivered datl phb offn tot).
     assert (HM2get : forall r : mword 5, is_cs_idx r = true ->
               M2 !!! Regidx r = M !!! Regidx r).
@@ -3186,7 +3186,7 @@ Section KexecB3Close.
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                           Hivalid & Hload & #Hity & Hkeep)".
+                           Hivalid & Hload & #Hity & Hfrz & Hkeep)".
     iDestruct (proc_priv_pid gf (proc_addr jp) pidv V with "Hpriv")
       as "[Hppid Hpvbk]".
     iDestruct (A.kxa_esc_acc cn gfs gi cov logstart kf Hk with "Hesc")
@@ -3251,7 +3251,7 @@ Section KexecB3Close.
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                    Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
+                    Hity Hfrz Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

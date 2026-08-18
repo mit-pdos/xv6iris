@@ -257,6 +257,14 @@ Definition wp_sys_mkdir_sconf_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
+     borrowed and never spent; it rides the SAME channel [ireg_inv] does,
+     down to [SpecCreate] -> [SpecIalloc] -> [InodeRegion.ireg_claim_au],
+     the one mover that mints a [c] column.  Its producer is the boot
+     chain's ([IcacheRef.ity_shoot] on fsinit's returned [ireg_boot]), which
+     terminates at the EXISTING [LinkForkretNF.wp_forkret_nf_ax] IOU -- no
+     new axiom, and a premise pulls nothing into [Print Assumptions]. *)
+  ireg_open -∗
   (* ---- the FOUR superblock cells (create reads all of them) ---- *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

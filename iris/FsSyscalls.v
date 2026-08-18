@@ -233,6 +233,11 @@ Section FsBundles.
      ic_escrows cn γfs γi cov logstart ∗
      ic_sleeplocks cn ∗
      ireg_inv γi γfs inodestart nib ∗
+     (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).
+        Persistent, and it rides beside [ireg_inv] because that is the
+        channel [SpecCreate] -> [SpecIalloc] -> [ireg_claim_au] uses.  Like
+        every other conjunct here, F2 pays for it once at boot. *)
+     ireg_open ∗
      kalloc_env γa None ∗
      procs_inv γs)%I.
 
@@ -374,7 +379,7 @@ Module FsSysMkdir (M : SYSMKDIR).
     iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
     iDestruct "Hw" as "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
                         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-                        Hesc & Hisl & Hireg & Hkenv & Hprocs)".
+                        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
@@ -385,7 +390,8 @@ Module FsSysMkdir (M : SYSMKDIR).
               eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpr Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
-                    Hireg Hsbn Hsbi Hsbs Hsbb Hbm Hkenv Hprocs Hir Hpriv").
+                    Hireg Hiopen Hsbn Hsbi Hsbs Hsbb Hbm Hkenv Hprocs Hir
+                    Hpriv").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
@@ -530,7 +536,7 @@ Module FsSysChdir (M : SYSCHDIR).
     iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
     iDestruct "Hw" as "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
                         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-                        Hesc & Hisl & Hireg & Hkenv & Hprocs)".
+                        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn

@@ -707,7 +707,7 @@ Section ProofFilestat.
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
         "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-         Hidev Hinum Hvalid Hlk #Hshot %Hfr_".
+         Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).
       { rewrite HQ3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -984,7 +984,7 @@ Section ProofFilestat.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                       Hheld Hslpid Hppid Hprocs
-                      Hdep Hidev Hinum Hvalid Hlk Hshot").
+                      Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
       iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".

@@ -349,3 +349,448 @@ add the fire in main's fsinit-return path).
 * `ipool_shape_to_np`'s await case takes a licence premise — its two
   call sites must have one in scope (they do: fill and recycle both run
   under an iget/ilock contract that carries it), but the plumbing is new.
+
+---
+
+## 3. THE IIIb WALLS: RULINGS + AS-BUILT AMENDMENTS (2026-08-18)
+
+Increment IIIb stopped-and-reported four walls (`990f32474a`'s commit
+message is the finding record).  This section rules on each, verified
+against the lane at `990f32474a`, and ends with the executable IIIc brief.
+Where §1/§2 below conflict with this section, THIS SECTION WINS — §3.4
+marks the superseded sites.
+
+### 3.1 RULING A — the freeze pin, the token's custody, and the refuter
+(one coupled ruling)
+
+**A-pin.  `ireg_frz_ok` gains the record, and BOTH record conjuncts are
+phase-dependent:**
+
+    FrzPre  ⟹  di_nlink d = 0  ∧  di_type d ≠ 0  ∧  n = 1
+    FrzPost ⟹  di_nlink d = 0  ∧  di_type d ≠ 0  ∧  n = 0
+    (signature: ireg_frz_ok (f : frzUR) (n : nat) (d : dinode))
+
+The nlink conjunct is what makes §2.6's licence table implementable (it
+is the contradiction surface for LinkedL/HeldL/RootL); the type conjunct
+is what refutes a freeze at a claim/free box (claim_au's `di_type = 0`
+premise + the pin gives `f = FrzOff` at every claim — which the ClaimL
+row needs, see the table below).  Verified mover-by-mover cost (all
+checked against the lane's actual premises):
+
+| mover | pin re-establishment | cost |
+|---|---|---|
+| `ireg_write_au` | FREE — already carries `di_type dn' ≠ 0`, `di_type_stable`, `di_nlink_stable` | none |
+| `ireg_write_link_fl` | new pure premise `bv_unsigned (di_nlink dn) ≠ 0` (current record; with the pin's contrapositive this refutes frozen outright) | 1 premise; its one ++ site (mkdir's dp) has nlink ≥ 1 in hand |
+| `ireg_write_unlink_fl` | FREE — its premise `nlink dn = nlink dn' + 1` already forces `nlink dn ≠ 0` | none |
+| `ireg_free_au` | fires only from the DEPOSIT after this campaign (see below); takes `ifreeze_post` in and retires it in the same move — pin's FrzPost arm dissolves as it fires | folded into increment IV's deposit extension |
+| `ireg_claim_au` | FREE — its `di_type (ds!!!islot inum) = 0` premise + the pin's type conjunct give `f = FrzOff` at the claim; it then ESTABLISHES the new `ireg_claim_ok` clause below | none |
+| `ireg_withdraw` | FREE — record and count untouched | none |
+| `ireg_freeze_au` | gains borrowed `dinode_at γi inum dn` + `⌜bv_unsigned (di_nlink dn) = 0⌝` + `⌜bv_unsigned (di_type dn) ≠ 0⌝` (establishes the pin at the mint via auth agreement; the freezer holds all three at ip_free_entry) | 3 premises, all in the walk's hand |
+
+**`ireg_claim_ok` gains `c = Some ⟹ f = Some (Excl FrzOff)`** —
+established at the claim (previous row), preserved by the freeze mint
+for free (the mint holds `dinode_at`, so the arm is MARKED, and
+`ireg_marked_ok` already says MARKED ⟹ c = None).  This is the ClaimL
+row's contradiction surface.
+
+**SpecIupdate narrows: `bv_unsigned (di_type dn') ≠ 0` becomes a
+contract premise.**  Post-reorder no verified caller writes a type-0
+record through generic iupdate (itrunc, create's fill, size updates all
+have type ≠ 0 in hand; the OLD iput free path is retired by this very
+campaign); the only type-0 write in the reordered kernel is the off-lock
+ifree, which goes through the DEPOSIT.  This deletes ProofIupdate's
+`ireg_free_au` branch (:197) and makes `ireg_free_au` the deposit's
+private mover, where the freeze token is in hand.  TRIPWIRE t4: grep
+SpecIupdate's callers first; if a landed caller genuinely writes type 0,
+stop and report.
+
+**A-custody.  The freeze token RIDES THE PAYLOAD; `islot2` is untouched.**
+IIIb's "live arm is the coherent home" is OVERRULED — the live arm can
+never soundly promise a token the freezer holds, and every attempted
+disjunct leaked.  The coherent custody is the payload bundle's, exactly
+like `dinode_at`:
+
+  - pool bundle (uncached): `ifreeze_off z` — ALREADY LANDED (IIIa);
+  - recycle peel: token moves pool → the entry escrow's PARKED arm with
+    the payload;
+  - PARKED arm: carries `(ifreeze_off z ∨ ifreeze_pre z)` — ordinary
+    parks deposit FrzOff; the freezer's +0x70 mid-free park deposits its
+    FrzPre and takes it back at the +0x8a re-extraction;
+  - HELD arm (payload out): NO token — it is in the payload holder's
+    hand, which is what `ireg_freeze_au`'s caller-token model already
+    assumes and what the walk needs at ip_free_entry;
+  - eviction (`ic_close_to_empty` / `_await`): payload + token move
+    escrow → pool together — IIIa's premises already demand exactly this.
+
+**A-AUs.  The count-move family reworks as:**
+
+  - `iref_incr_store_au` / `iref_dup_store_au` / `iref_upgrade_store_au`
+    (up-counts): DROP the `ifreeze_off` in/out (the mover cannot have it
+    — the token is with the payload holder, possibly the freezer).  GAIN
+    a borrowed `iname γi γfs inum l` and refute `FrzPre` INSIDE the
+    region open via the new licence-table lemma (below).
+  - `iref_close_store_au` (not-last): unchanged (ge-2 count refutes both
+    phases arithmetically, already landed).
+  - `iref_close_last_store_au`: II's generic `ifreeze ph → ifreeze
+    (frz_close ph)` shape SURVIVES — the custody ruling makes it
+    presentable by both callers: the ordinary last closer sources
+    `ifreeze_off` from the parked payload it is about to evict; the
+    freezer sources `ifreeze_pre` from its hand.
+  - NEW `iref_alloc_store_au` (the 0→1 recycle wrapper, region-aware
+    sibling; takes the peel's `icnt_half z 0 ∗ ifreeze_off z`).
+
+**A-refuter.  `ipool_await_refuter` is DELETED.**  IIIb proved its shape
+unbuildable (a bare wand into False cannot come out of a fupd).  The
+peel (`ipool_shape_to_np`) instead takes the borrowed `iname γi γfs inum
+l` + `ireg_inv` (+ mask), opens the region inside, and refutes the await
+arm's `ifreeze_post` via the table.  Fupd-shaped, licence-taking —
+exactly the reshape IIIb's finding demanded.
+
+**The licence-table lemma (`iname_not_frozen`, home: IgetLic.v — it
+needs both `iname` and the region internals):** for each runtime licence
+at inum z with the slot's arm open (link_auth, `ireg_link_ok`,
+`ireg_claim_ok`, `ireg_frz_ok f n d`, the boot disjunct):
+
+| licence | contradiction with `f ∈ {FrzPre, FrzPost}` |
+|---|---|
+| `LinkedL` | ipaid → w-sum ≥ 1 → `ireg_link_ok` nlink ≥ 1 vs pin nlink = 0 |
+| `HeldL d` | dinode_at agreement (auth) pins d = arm record; its `nlink d ≠ 0` vs pin |
+| `ClaimL` | iclaim → c = Some (ledger agreement) → new `ireg_claim_ok` clause f = FrzOff |
+| `RootL` | `ireg_root_ok` strict (w < nlink) → nlink ≥ 1 vs pin |
+| `BufL` | carries `ireg_boot`: kills the f-clause's ireg_boot disjunct by pending-exclusivity and its ireg_open disjunct by `ireg_boot_open_excl` |
+
+Conclusion `⌜f = Some (Excl FrzOff)⌝`, borrowed licence returned.
+
+### 3.2 RULING B — the `ireg_open` producer: seal in forkret-first, ride
+`sysc_fs_env`, terminate at the EXISTING forkret IOU
+
+Verified: the seal is a one-liner that already exists (`ity_shoot`,
+IcacheRef.v:847; the header at :894 says verbatim "[ireg_boot ==∗
+ireg_open] fires once after fsinit returns").  SpecFsinit RETURNS
+`ireg_boot` in its post (SpecFsinit:339's comment assigns the seal to
+the boot caller, "after fsinit returns and before kexec(/init)" = the
+forkret first branch).  forkret's first branch is axiomatized
+(`wp_forkret_nf_ax`, LinkForkretNF.v:62) and that axiom is ALREADY in
+the accepted adequacy baseline.  Upstream's `sysc_fs_env`
+(ProofSyscall.v:511, Persistent) is the ambient fs fabric every syscall
+proof receives, and `syscall_env` is a Definition nobody constructs yet
+("SATISFIABILITY IS UNCHECKED" — upstream's own header).
+
+**Route (chosen):** `sysc_fs_env` gains one persistent field,
+`ireg_open`.  Zero proof cost today (nothing constructs the env); when
+the boot wiring lands, the constructor's obligation is discharged by
+fsinit's returned `ireg_boot` + `ity_shoot` at exactly the owed site.
+Threading: `ireg_open` rides the SAME channel `ireg_inv` already rides —
+sysc dispatch → SpecCreate premise (+ the three create-calling syscalls'
+proofs pass it) → SpecIalloc premise → ProofIalloc:1476 →
+`ireg_claim_au`.  Persistent, so every step is a mechanical
+frame-through.
+
+**Termination + honesty clause:** the chain terminates at
+`wp_forkret_nf_ax` — an EXISTING, accepted IOU (shared with upstream's
+own boot-shelter interest; durable-notes' adequacy baseline records it).
+NO new axiom.  Premises do not pull axioms into `Print Assumptions`, so
+the create/unlink/iput gate targets are unaffected; the axiom appears
+only where forkret is USED (adequacy chain), as it already does.  If the
+user wants that IOU retired too, the two honest options are: prove
+forkret's first branch (upstream's shared-interest item), or wire the
+boot chain to adequacy (the bigger, separately-scoped project).  Neither
+blocks this campaign's gates.
+
+### 3.3 RULING D — dirlookup's premise + the contract set
+
+`SpecDirlookup` gains the pure twin of premise (6):
+`bv_unsigned (di_nlink dr) ≠ 0` (about the REGION record `dr`, beside
+:298's `di_type dr ≠ 0`).  Discharged at the four callers IIIb located:
+ProofNamex:3897 (the walk's fs.c:693 nlink guard / inode_held_ty),
+ProofCreate:3307 (dp locked and live), ProofDirlink:1794 (caller's live
+parent), ProofSysUnlink:2347 (its own nlink guard).  TRIPWIRE t3b: if a
+caller's discharge is not in hand, stop and report — do not weaken to a
+disjunction.
+
+**Contract-set widening (approved):** `SpecIget`, `SpecIdup`, `SpecIput`
+gain `ireg_inv γi γfs inodestart nib` (+ the index params) — forced by
+II's count coupling; the `Iput*Dev` walk files already carry `ireg_inv`
+(verified: 3/1/3 occurrences), so the walk side is ready.  SpecIget's
+"no ireg_inv" header prose is amended: iget still never reads a dinode —
+the region open is ghost-only (icnt/freeze columns).
+
+### 3.4 As-built amendments (the doc's earlier §-sites are superseded by)
+
+- §2.3's pin → §3.1's phase-dependent THREE-conjunct form (supersedes
+  both the original and increment I's count-only deviation, recorded at
+  `de366eb301`).
+- §2.6's table → §3.1's `iname_not_frozen` (the table is a LEMMA, its
+  rows as above).
+- §1.2/§1.3's pool_await/refuter → IIIa's shapes (`65e7403340`) with
+  §3.1's refuter deletion; pool_await carries `ifreeze_post` (IIIa
+  deviation 3, stands).
+- §2.2's half placement → II's islot2 live arm + IIIa's pool bundle
+  (`9148a15200`, `65e7403340`); islot_empty carries nothing (II's
+  fraction-25 refutation, stands).
+- Increment I's five deviations (`de366eb301`): FrzOff three-state,
+  arm-coupled claim pin, withdraw spends iclaim, claim_au's ireg_open —
+  all stand; only the count-only pin is superseded (above).
+
+### 3.5 THE IIIc BRIEF (dependency-ordered; red trajectory 7 → 3)
+
+Target red set after IIIc: `EscrowDeposit` (increment IV's),
+`ProofIput` (the integration's), `ProofIlock` (item 7's — its :1113
+iclaim goal is create's contract clause by design; its :749/:1084
+mechanical fixes DO land here so item 7 inherits exactly one goal).
+
+1. **InodeRegion.v**: `ireg_frz_ok` → 3-conjunct phase form (+ record
+   param; :1354's arm site updates); `ireg_claim_ok` + the `c = Some ⟹
+   f = FrzOff` clause (claim_au establishes); `ireg_write_link_fl` +
+   nlink≠0 premise; `ireg_freeze_au` + the three premises (§3.1 table);
+   re-prove the arm movers' pin re-establishment (the table says which
+   are free).
+2. **IgetLic.v**: `iname_not_frozen` (five rows; BufL row via the boot
+   exclusivities).
+3. **IcacheEscrow.v**: PARKED arm gains `(ifreeze_off z ∨ ifreeze_pre
+   z)`; peel routes the token pool→parked at the recycle; extraction
+   (ilock's payload-out) hands token to holder; `ic_close_to_empty`
+   sources its IIIa token premise from the parked payload.  TRIPWIRE t2:
+   the ordinary extraction/fill at a FrzPre-parked box must be refuted
+   from the extractor's own resources (it holds a reference; pin says
+   n = 1 = the freezer's — expected route: count agreement/iref_lookup
+   under the itable lock, or valid=0 structural exclusion since the
+   mid-free park wrote valid=0 and ordinary extraction requires
+   valid=1).  Three failed shapes → stop and report.
+4. **IcacheInv.v**: the up-count AU rework (licence premise +
+   iname_not_frozen inside the open); NEW `iref_alloc_store_au`;
+   close_last generic form retained.
+5. **SpecIupdate.v** (+ProofIupdate): the type≠0 narrowing (t4 grep
+   first); delete the free_au branch.
+6. **Contracts**: SpecIget/SpecIdup/SpecIput widen (ireg_inv + params);
+   SpecDirlookup + nlink premise; SpecIalloc + SpecCreate + the three
+   create-calling sys_* proofs + `ireg_open` premise; `sysc_fs_env` +
+   `ireg_open` field.
+7. **Caller cone re-green**: ProofIget (peel-with-licence, alloc AU at
+   +0x78, licence-borrowing hit), ProofIdup, ProofDirlookup (+ its four
+   callers' new pure discharge), ProofIalloc (ireg_open + ClaimL +
+   iclaim into SpecIalloc's post; frame-and-ignore at ProofCreate),
+   ProofIlock :749 (`ipool_shape_np` form) + :1084 (peel) + ordinary
+   fill — leaving :1113's `iclaim` as item 7's single inherited goal
+   (ProofIlock stays red).
+8. Whole-tree `make -k`: failures = exactly {EscrowDeposit, ProofIput,
+   ProofIlock} + their Link* cones.  Zero admits.  TRIPWIRE t5: any
+   growth beyond that set stops the increment.
+
+
+### 3.9 RULING A′ (IIIc's wall, 2026-08-18): the nlink++ mover pays with the holder's freeze token
+
+IIIc executed steps 1/2/3a/4/5 green (`ccb447c5e4`) and stopped at ruling
+A's mispriced `ireg_write_link_fl` row: the `di_nlink dn ≠ 0` premise is
+FALSE at 2 of the mover's 3 sites (ProofCreate:4910 fresh child, pre-count
+pinned 0 by `fresh_shape`; ProofSysLink:1790 `ip->nlink++`, no guard, no
+fact).  Every cheaper route was refuted in the IIIc record commit.
+
+RULING: adopt IIIc's option (A).  The A-custody ruling already places the
+freeze token in the payload HOLDER's hand; the missing piece is only the
+surfacing route:
+- `SpecIlock`'s post hands the holder `ifreeze_off z` alongside the payload
+  it already returns (the token travels pool-bundle ↔ PARKED arm ↔ holder,
+  so ilock's withdraw has it by construction);
+- `wp_iupdate_link`'s premise becomes `⌜di_nlink dn0 ≠ 0⌝ ∨ ifreeze_off z`
+  (borrowed-and-returned on the token arm);
+- mkdir's dp site (ProofCreate:8715) pays the pure arm unchanged; create's
+  fresh child and sys_link pay the token arm from their own ilock;
+- `iunlockput`/`ip_free_locked`'s re-park returns the token with the payload
+  (the freezer's own path swaps it FrzOff→FrzPre at `ireg_freeze_au`, so the
+  free path's park carries the phase the §1.2/§2.3 shapes already state).
+Contract set grows by SpecIlock (post clause) — sanctioned.  The pin, the
+table, and every other §3 ruling stand unchanged.
+
+INCREMENT IIId (the convergence pass) = A′ + IIIc's unexecuted steps 3-rest/
+6/7 + walls B (sysc_fs_env ireg_open threading) and D (SpecDirlookup pure
+premise): target red set = {EscrowDeposit, ProofIput, ProofIlock(:1113 only)}.
+
+### 3.10 IIId AS-BUILT (2026-08-18): what landed, the three deviations, and what is left
+
+IIId executed A′ and walls B and D in full and stopped short of IIIc's steps
+6/7 (the `SpecIget`/`SpecIdup`/`SpecIput` contract widening and its caller
+cone).  Red set 9 → 5.  Every deviation below is a WEAKENING of a ruling's
+LETTER that preserves its argument; each is recorded at its site in the
+source as well.
+
+**A′ AS BUILT — the token rides `ic_payload`, not the post's text.**
+§3.9 says "`SpecIlock`'s post hands the holder `ifreeze_off z`", and IIIc's
+record offered the alternative "or the payload bundle carries it".  BOTH
+landed, and the second is what made the first cheap:
+
+  - `IcacheEscrow.ic_payload` splits into `ic_payload_np` (the old body) and
+    `ic_payload := ic_payload_np ∗ ifreeze_off (bv_unsigned inum)`.  That one
+    line puts the token on A-custody's path by construction — `ic_parked`'s
+    payload conjunct IS `ic_payload`, so PARKED carries it; `ic_swap_checkout`
+    hands it to the holder and `ic_swap_park` takes it back, both with their
+    statements otherwise untouched.
+  - Why not `ic_loaded`: 45 files name `ic_loaded` and a dozen destructure
+    it; EIGHT name `ic_payload`.  And `ic_loaded` would have poisoned
+    `ic_close_to_empty_await`, whose payload is the FREEZER's (token at
+    `FrzPost`); with the split that lemma keeps its exact signature by
+    speaking at `_np`, as do `ic_close_to_empty` and `_core`.
+  - DEVIATION 1 (recorded): the PARKED arm carries `ifreeze_off`, not
+    A-custody's `(ifreeze_off ∨ ifreeze_pre)`.  The disjunct exists for the
+    freezer's +0x70 mid-free park, which is `ProofIput`'s and
+    `EscrowDeposit`'s — both red by design here — and every LANDED path
+    through the arms is FrzOff-only (pool peel → `ic_unloaded` → fill →
+    checkout → park → eviction).  Stating the disjunction now would have
+    cost each of those a refutation it cannot yet perform (TRIPWIRE t2's
+    obligation) and bought nothing green.  The widening is one line, at the
+    same place, when the iput integration lands.
+  - Contracts that grew: `SpecIlock`'s post, `SpecIunlock`'s and
+    `SpecIunlockput`'s preconditions, `SpecCreate.create_locked`,
+    `SpecCreateFreshTy`'s alloc arm (an axiom's body: zero proof cost).
+    §3.9 sanctioned only `SpecIlock`; the other four are the SAME clause on
+    the return leg, and without them the parked arm cannot be rebuilt.  This
+    is the "every ilock caller's continuation pattern" that IIIc's OPTION A
+    priced.
+  - DEVIATION 2 (recorded): `wp_iupdate_link`'s premise is NOT §3.9's
+    disjunction but `InodeRegion.ireg_link_pin pin z d`, a bool-indexed
+    predicate (`true` ↦ the token, `false` ↦ `di_nlink d ≠ 0`).  A
+    disjunction is the wrong SHAPE for a borrowed-and-returned premise: the
+    mover hands back what it was given, but a caller that presented the
+    TOKEN could not tell the returned `⌜…⌝ ∨ ifreeze_off` apart from the
+    pure arm and would have to drop it — which is exactly the resource
+    sys_link needs at its re-park.  With the index, in and out are the same
+    proposition at the same `pin`.
+  - The three sites, as ruled: ProofCreate's fresh child (`pin = true`,
+    paid from `create_fresh_ty`'s relayed token), ProofSysLink's
+    `ip->nlink++` (`pin = true`, from its own `ilock(ip)`), ProofCreate's
+    mkdir `dp->nlink++` (`pin = false`, `Hp3nlnz`).
+    `InodeRegion.ireg_write_link_p` is no longer VACUOUS: IIIc's
+    contradictory pair (`di_nlink dn = 0` from `fresh_shape` AND RULING A's
+    `≠ 0`) is replaced by the token, so the tagged mint now says something.
+
+**WALL B AS BUILT — exactly §3.2's route.**  `ProofSyscall.sysc_fs_env`
+gains `ireg_open` as a final conjunct (zero proof cost: nobody constructs
+it), and `FsSyscalls.fs_world` gains it beside `ireg_inv` for the same
+reason.  Channel, in order: `sysc_fs_env` / `fs_world` → `SpecSysMkdir`,
+`SpecSysMknod`, `SpecSysOpen` → their proofs → `SpecCreate` → `ProofCreate`
+→ `SpecCreateFreshTy` (the span) → `SpecIalloc` → `ProofIalloc:1476` →
+`InodeRegion.ireg_claim_au`.  ProofIalloc is GREEN.
+
+Two riders came with it, both from the IIIb brief's step 4:
+  - `SpecIalloc`'s post now exposes `iclaim (bv_unsigned inum)` — the AU has
+    delivered it since increment I and ialloc was dropping it at an
+    `iIntros` underscore.  It travels `ia_arms` → `ia_cont` → the contract.
+  - **`SpanL` IS DELETED.**  `ProofIalloc`'s tail iget presented it because
+    "(d) is foreclosed until F1.5c mints an `iclaim`"; F1.5c has landed, so
+    the site is now `ClaimL` and the receipt is borrowed and returned, as
+    `IgetLic.v`'s own R14 tombstone promised.  `grep -n "SpanL" iris/*.v`
+    now matches only IgetLic.v's tombstone text.
+
+**WALL D AS BUILT — DEVIATION 3 (recorded), and it is forced.**
+§3.3 says `SpecDirlookup` gains `bv_unsigned (di_nlink dr) ≠ 0`.  dirlookup
+has FIVE callers, not the four §3.3 enumerates, and the fifth —
+`FsLookup.wp_dirlookup_tree` — provably cannot pay it: FsLookup's own header
+says `node_rep` "says NOTHING about `di_nlink`.  There is no tree-level fact
+that implies it", which is why ITS premise (4) is the §7.5.6 disjunction.
+Under the ruling's shape the tree layer goes red with no discharge in sight
+(t3b territory).
+
+What landed instead is the EQUATION `di_nlink dr = di_nlink dn`.  The proof
+site already holds `Hnl0 : di_nlink dn ≠ 0` (that is `dl_lic_live`'s output
+on the hit arm, before the self/non-self split), so the only count it is
+missing is the region record's, and the equation transports the one it has.
+FOUR of the five callers hand the same record in twice and pay `eq_refl`
+(FsLookup, ProofCreate, ProofNamex, ProofSysUnlink); the fifth
+(ProofDirlink, the one caller with a genuinely stale region index) pays it
+out of `di_nlink_stable`'s first conjunct, which its contract already
+carries for `SpecIupdate`'s sake.  It is the same "parked-means-flushed"
+fact `ic_loaded` states resource-side, at one field.
+
+**THE RED SET AFTER IIId** (whole-tree `make -k`): `EscrowDeposit` (:73,
+increment IV's), `ProofIput` (:972, the integration's), `ProofIlock`
+(:1084 — the peel; item 7's `iclaim` at :1113 is still behind it),
+`ProofIget` (:1306, the recycle's `ipool_shape_to_np` licence) and
+`ProofIdup` (:432, `iref_upgrade_store_au`'s licence).  The last two are
+IIIc step 7's and were NOT attempted: steps 6/7 (widening
+`SpecIget`/`SpecIdup`/`SpecIput` with `ireg_inv` + index params, and the
+whole iget/idup/iput caller cone) remain for IIIe.  Zero admits added.
+
+### 3.11 IIIe AS-BUILT (2026-08-18): the iget cone converged; idup hit OPEN(2.6b)
+
+IIIe executed IIIc's deferred steps 6/7 for `SpecIget` and `SpecIput`, greened
+`ProofIget` and the whole five-caller iget cone, and reduced `ProofIlock` to the
+single `iclaim` goal item 7 owns.  It STOPPED at `SpecIdup`, on tripwire 1.
+Red set 5 → 4: `{EscrowDeposit:73, ProofIdup:432, ProofIlock:1123, ProofIput:972}`
+(+ a 39-file `Link*` cone).  Zero admits added.
+
+**`SpecIget` WIDENED, and the header's purity clause is spent.**  It gains
+`inodestart` and `ireg_inv γi γfs inodestart nib`, placed after `ic_escrows`.
+The "NO `ireg_inv`: iget never reads a dinode" paragraph is amended IN PLACE
+rather than deleted: iget still reads no dinode, and both new opens are
+GHOST-ONLY on the ledger's two columns —
+
+  - the recycle's pool peel (`ipool_shape_to_np`, +0x72), which since §3.1's
+    A-refuter refutes the await arm's standing freeze from the borrowed licence
+    INSIDE its own fupd, and hands back `icnt_half z 0` and `ifreeze_off z`;
+  - the recycle's 0 → 1 (`iref_alloc_store_au`, +0x78), replacing the inline
+    region-blind `iref_alloc_step`.  Its token travels on into the parked arm at
+    +0x7c (`ic_close_mid_to_parked` already took it) and its half into
+    `islot2`'s live arm.
+
+**`SpecIput` NEEDED NOTHING** — §3.3's prediction verified on the lane: it
+already carried `ireg_inv`, `inodestart` and the inum bound, and iput's movers
+are the two CLOSES, which are licence-free.  So the iput caller cone (fileclose,
+kexit, sys_chdir, sys_link, iunlockput, dirlink, ireclaim, namex) did not move at
+all.  The whole IIIe ripple is the IGET cone.
+
+**THE LICENCE NOW RIDES THE SCAN, NOT THE TAIL CLOSURE (ProofIget).**  Before
+IIIe both of iget's exits reached a shared tail that had captured `Hlic` at
++0x44 and produced it at +0x9c.  Both exits now SPEND it inside their own count
+move — the hit's `iref_incr_store_au` borrows it, the recycle's peel borrows it
+— so `TAILC` takes it as an argument and the fuel induction carries it.  Also:
+`islot2`'s live arm is FOUR conjuncts and the hit arm had been destructing it
+into three (the `icnt` half riding along inside the `ic_id` pattern); it is
+split explicitly now, and the three MISS exits put it back unmoved.
+
+**ProofIlock: the fill does NO peel.**  `il_load`'s premise at :749 becomes
+`ipool_shape_np` (which is what a checked-out UNLOADED payload actually holds —
+`ic_unloaded` = `inode_raw ∗ ipool_shape_np`), and the :1084 peel is DELETED.
+The conversion happens ONCE, at the recycle that cached the entry, for the whole
+lifetime of the cached box; asking the fill to peel again would demand a second
+`icnt_half z 0` at an inum whose count is 1.  With that, ProofIlock's first error
+is `ireg_withdraw`'s un-supplied `iclaim (bv_unsigned inum)` at :1123, exactly as
+§3.5 item 7 predicted — and nothing else stands between :1084 and it.  Also
+recorded at the checkout site: `ic_payload` is FOUR pieces since A′, and routing
+its `ifreeze_off` through `il_cont` to `SpecIlock`'s post is the SAME un-landed
+item as that `iclaim`.
+
+**WALL (tripwire 1): `SpecIdup` CANNOT WIDEN — this is OPEN(2.6b), reached.**
+`ip->ref++`'s mover is `iref_upgrade_store_au`, and RULING A gives every UP-count
+a borrowed `iname γi γfs inum l`.  The widened contract and a green `ProofIdup`
+were BUILT (ireg_inv + inodestart + inum bound + licence, licence returned in the
+post) and then REVERTED, because idup's two call sites are both `idup(p->cwd)`
+— `ProofKforkB4:365`, `ProofNamex:5660` — and neither can present a licence at
+any of the five constructors: `LinkedL` wants a directory payload's `ipaid`,
+`HeldL` (and every region-side `iname_*_alloc`) wants a `dinode_at`, `ClaimL`
+wants an `iclaim`, `RootL` wants the inum to BE the root, `BufL` is boot-only.
+A cwd is not even `nlink ≠ 0` — xv6 permits unlinking a process's cwd.  Both
+files went red at exactly that argument on the lane; threading the premise up
+would put a licence clause on `SpecKfork` and `SpecNamex` (and `SpecKfork` has no
+`ireg_inv` or `logG` at all) with no discharge anywhere above them.
+
+The arithmetic route does not save it either: the licence-free accessor
+`ireg_icnt_acc` refutes both phases from the pins (`FrzPost ⇒ n = 0`,
+`FrzPre ⇒ n = 1`), so it needs `2 ≤ n`, and a cwd held by one process sits at
+`n = 1` — the one value `FrzPre` admits.
+
+RULING NEEDED, and §2.6b already names it: at `FrzPre` the freezer holds the
+WHOLE of the slot's outstanding share (`iref_lookup`'s REF-1 exclusivity), so a
+foreign share's fraction genuinely collides with it — but the freezer's holdings
+are in its hand, not in the region, so the FREEZE ARM must park a witness for the
+mover to collide against ("the freeze-arm parks the dying reference's `iref_slot`
+unit, so a foreign idup's supply-side collides").  That is a ruling plus an
+`InodeRegion` edit on the freeze arm, `ireg_freeze_au` and the deposit — it
+belongs with the increment that owns the freeze arm, not with a convergence pass.
+The finding is also recorded in `SpecIdup.v`'s own header.
+
+**Premise-plumbing done (all mechanical, ireg_inv + `inodestart` only):**
+`SpecDirlookup` (+ its five callers FsLookup / ProofCreate / ProofDirlink /
+ProofNamex / ProofSysUnlink), `SpecNamex.wp_namex_root_body` → `ProofNamexRoot`,
+`SpecNamei.wp_namei_root_body` → `ProofNameiRoot` (both chains terminate — the
+root contracts have no further consumers), and the direct sites in `ProofIalloc`
+and `ProofIreclaim`, which already held `ireg_inv`.

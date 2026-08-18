@@ -118,7 +118,7 @@ Section ProofIunlockputMain.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
+              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
@@ -278,7 +278,7 @@ Section ProofIunlockputMain.
               ltac:(lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hpid Hppid
-                    Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot").
+                    Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
@@ -597,7 +597,7 @@ Section ProofIunlockputMain.
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
+              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     iDestruct "Hlogop" as (Sb0) "Hlogop".
@@ -610,7 +610,8 @@ Section ProofIunlockputMain.
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hpar
+                    Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
+                    Hpar
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").
     all: try lkbelow.

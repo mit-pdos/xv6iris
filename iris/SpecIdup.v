@@ -98,7 +98,54 @@
    The SIE/[cpu_own] bookkeeping is [SpecFiledup.v]'s, and for the same
    reason: a fully-nested acquire/release leaves [n], [eb] and the SIE
    index [b] as they came in.  Unlike filedup's, this is now DERIVED from
-   the two lock contracts rather than asserted.                            *)
+   the two lock contracts rather than asserted.
+
+   ---- WHY THIS CONTRACT DID *NOT* WIDEN IN INCREMENT IIIe ---------------
+
+   iclaim-ledger.md §3.3 approved widening [SpecIget], [SpecIdup] and
+   [SpecIput] with [ireg_inv] + the index params, and IIIe executed that for
+   the other two.  idup's is BLOCKED, and the block is the doc's own
+   OPEN(2.6b), reached rather than avoided.  The exact shape:
+
+     [ip->ref++] is a ledger move, so its mover is
+     [IcacheInv.iref_upgrade_store_au], and RULING A (§3.1, A-AUs) gives
+     every UP-count the same premise: a borrowed [IgetLic.iname γi γfs inum
+     l].  The mover cannot take an [ifreeze_off] instead -- A-custody puts
+     the token on the PAYLOAD, which at a cached inum is in some holder's
+     hand, possibly the freezer's -- so it presents a licence and refutes
+     both frozen phases inside its own [↑iregN] open.  With [ireg_inv] and
+     the licence the proof closes; it was PROVEN GREEN in that form and then
+     reverted, because:
+
+     idup's TWO call sites are both [idup(p->cwd)] -- ProofKforkB4:365 and
+     ProofNamex:5660 -- and NEITHER can produce a licence at ANY of the five
+     constructors.  [LinkedL] wants an [ipaid] ticket (a directory payload's,
+     and no parent payload is in hand); [HeldL] and the region-side
+     [*_alloc] lemmas all want a [dinode_at] (idup reads no dinode and neither
+     does its caller); [ClaimL] wants an [iclaim]; [RootL] wants the inum to
+     BE the root; [BufL] is boot-only.  A cwd is moreover not even
+     [nlink <> 0]: xv6 permits unlinking a process's cwd.  Threading the
+     premise up would put a licence clause on [SpecKfork] and [SpecNamex]
+     with no discharge anywhere above them.
+
+     WHY THE COUNT DOES NOT DO IT EITHER.  The licence-free accessor
+     ([IcacheInv.ireg_icnt_acc], which [iref_close_store_au] uses) refutes
+     both phases ARITHMETICALLY from [ireg_frz_ok]'s pins -- [FrzPost => n =
+     0], [FrzPre => n = 1] -- so it needs [2 <= n].  A cwd held by one
+     process sits at [n = 1] exactly, which is the one value [FrzPre] admits.
+
+     WHAT WOULD FIX IT is §2.6b's own RECOMMENDATION, and it is a CORE change
+     rather than a caller-side one: at [FrzPre] the freezer holds the whole
+     of the slot's outstanding share ([IcacheInv.iref_lookup]'s REF-1
+     exclusivity), so a foreign share's fraction collides with it -- but the
+     freezer's holdings live in ITS hand, not in the region, so the freeze arm
+     has to PARK a witness (§2.6b: "the freeze-arm parks the dying reference's
+     [iref_slot] unit, so a foreign idup's supply-side collides") for the
+     mover to collide against.  That is a ruling plus an [InodeRegion] edit,
+     and it belongs with the increment that owns the freeze arm.
+
+   Until then this contract stands EXACTLY as increment IIId left it, and
+   [ProofIdup.v] is red at its one un-supplied argument.                    *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.

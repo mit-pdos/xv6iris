@@ -185,6 +185,13 @@ Definition wp_iunlockput_sconf_body
   (* the parked record's type witness -- SpecIunlock's new premise, threaded
      verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
   ity_shot gy (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, relayed straight to [SpecIunlock]'s
+     park (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- what the parked arm holds -- now carries
+     [ifreeze_off], so the parker owes it exactly as it owes the type
+     witness above.  Every caller has it: it is the token its own
+     [ilock] handed over, unspent. *)
+  ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
   (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
      iunlock hands the share back and [inode_ref_gather] re-forms the
@@ -315,6 +322,13 @@ Definition wp_iunlockput_gen_body
   (* the parked record's type witness -- SpecIunlock's new premise, threaded
      verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
   ity_shot gy (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, relayed straight to [SpecIunlock]'s
+     park (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- what the parked arm holds -- now carries
+     [ifreeze_off], so the parker owes it exactly as it owes the type
+     witness above.  Every caller has it: it is the token its own
+     [ilock] handed over, unspent. *)
+  ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
   (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
      iunlock hands the share back and [inode_ref_gather] re-forms the

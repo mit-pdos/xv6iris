@@ -169,6 +169,9 @@ Require Import InodeRegion.
 Require Import EscrowDefs.
 Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
 Require Import IrefSlots.
+(* §3.1's A-refuter: the pool peel refutes its AWAIT arm with the caller's
+   LICENCE ([IgetLic.iname_freeze_off]) rather than with a wand into False *)
+Require Import IgetLic.
 Require Import IcacheInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -597,35 +600,68 @@ Section IcacheEscrow.
      the pool takes its uncached ledger resources with it, which is exactly
      the pair [IcacheInv.iref_upgrade_store_au] then consumes (count 0 -> 1
      under the standing [FrzOff] pin). *)
-  Definition ipool_await_refuter (z : Z) : iProp Σ :=
-    (ifreeze_post z -∗ False)%I.
+  (* ---- THE REFUTER IS DELETED (iclaim-ledger.md §3.1, A-refuter) -------
 
-  (* the cached-side spelling: increment II's premise still discharges it *)
-  Lemma ipool_await_refuter_off (z : Z) :
-    ifreeze_off z -∗ ipool_await_refuter z.
-  Proof.
-    iIntros "Hoff Hpost". rewrite /ifreeze_off /ifreeze_post.
-    iDestruct (ifreeze_excl with "Hoff Hpost") as "[]".
-  Qed.
+     IIIa's [ipool_await_refuter z := ifreeze_post z -* False] is gone, and
+     its deletion was FORCED rather than chosen.  IIIb proved the shape
+     unbuildable at BOTH call sites: at the recycle (ProofIget +0x6a) the
+     inum is uncached and its one token is inside the very bundle being
+     peeled, so [ipool_await_refuter_off] cannot fire; and the licence route
+     -- the one §1.3 always intended -- cannot fire either, because a bare
+     wand into [False] is not producible from an [ireg_inv] opening ( that
+     opening is a fupd, and [(|={E}=> False)] does not entail [False] ).
 
-  Lemma ipool_shape_to_np E γfs γi cov logstart (inum : mword 32) :
+     The RULING was to change the shape of the premise, not its discharge.
+     So the peel now takes the borrowed licence and the region invariant,
+     and does the refutation INSIDE its own fupd, through
+     [IgetLic.iname_freeze_off] -- §2.6's table, at whichever of the five
+     licences the caller presented.  The licence comes back out.  Both call
+     sites (ProofIget's recycle, ProofIlock's fill) run under an iget/ilock
+     contract that carries one, which is what §2.9's third honest risk
+     priced. *)
+  (* A NESTED SECTION, and it costs the file nothing: [ireg_inv] carries
+     [InodeRegion.ireg_ep]'s log-epoch lower bound, so naming it needs
+     [LogInv.logG] -- a class this file's outer context deliberately does
+     not have (the escrow itself never mentions the log).  Adding it to the
+     outer [Section IcacheEscrow] would put an instance argument on all
+     ~120 of its lemmas; a nested section puts it on this one. *)
+  Section PoolPeelLic.
+    (* QUALIFIED, and that is load-bearing: this file does not [Require
+       Import LogInv], so a bare [!logG Σ] would silently generalise a NEW
+       variable of that name instead of the class (the trap IcacheInv's
+       preamble records), and every use of [ireg_inv] below would then fail
+       to find the real instance. *)
+    Context `{!LogInv.logG Σ}.
+
+  Lemma ipool_shape_to_np E γfs γi (inodestart : Z) (nib : nat)
+      cov logstart (inum : mword 32) (l : ilic) :
     ↑escAN (bv_unsigned inum) ⊆ E ->
-    ipool_await_refuter (bv_unsigned inum) -∗
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    iname γi γfs inum l -∗
     ipool_shape γfs γi cov logstart inum ={E}=∗
+    iname γi γfs inum l ∗
     ipool_shape_np γfs γi cov logstart inum ∗
     icnt_half (bv_unsigned inum) 0%nat ∗ ifreeze_off (bv_unsigned inum).
   Proof.
-    iIntros (HE) "Href H". rewrite /ipool_shape.
+    iIntros (HE HER Hin) "#Hrinv Hl H". rewrite /ipool_shape.
     iDestruct "H" as "[Hcnt [[Hnp Hoff] | [[Hpp Hoff] | Haw]]]".
-    - iModIntro. iFrame "Hnp Hcnt Hoff".
+    - iModIntro. iFrame "Hl Hnp Hcnt Hoff".
     - iDestruct "Hpp" as (ge gr) "(#Hesc & #Hcom & Htk)".
       iMod (escA_redeem E ge gr γi (bv_unsigned inum) HE with "Hesc Htk Hcom")
         as "Hmk".
-      iModIntro. iFrame "Hcnt Hoff". rewrite /ipool_shape_np. iRight. iExact "Hmk".
-    - iDestruct "Haw" as (ge gr) "(_ & _ & Hpost)".
-      rewrite /ipool_await_refuter.
-      iDestruct ("Href" with "Hpost") as "[]".
+      iModIntro. iFrame "Hl Hcnt Hoff". rewrite /ipool_shape_np. iRight.
+      iExact "Hmk".
+    - (* THE AWAIT ARM, refuted by the table rather than by a wand *)
+      iDestruct "Haw" as (ge gr) "(_ & _ & Hpost)".
+      rewrite /ifreeze_post.
+      iMod (iname_freeze_off E γi γfs inodestart nib inum l FrzPost HER Hin
+              with "Hrinv Hl Hpost") as "(%Hc & _ & _)".
+      discriminate Hc.
   Qed.
+
+  End PoolPeelLic.
 
   Global Instance ipool_alloc_timeless γfs γi cov logstart inum :
     Timeless (ipool_alloc γfs γi cov logstart inum).
@@ -744,7 +780,7 @@ Section IcacheEscrow.
      re-parks UNLOADED with a fresh pending.  [ipool_shape], [imark],
      [InodeRegion] and [ProofIalloc] are untouched, which is §16's standing
      constraint respected by construction. *)
-  Definition ic_payload (γfs : fs_names) (γi : gname) (cov : gset Z)
+  Definition ic_payload_np (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) (g : gname)
       (v : bool) : iProp Σ :=
     (if v
@@ -753,9 +789,75 @@ Section IcacheEscrow.
             ity_shot g (di_type dn)
      else ic_unloaded γfs γi cov logstart k inum ∗ ity_pending g)%I.
 
+  Global Instance ic_payload_np_timeless γfs γi cov logstart k inum g v :
+    Timeless (ic_payload_np γfs γi cov logstart k inum g v).
+  Proof. rewrite /ic_payload_np. destruct v; apply _. Qed.
+
+  (* ==================================================================== *)
+  (*  THE FREEZE TOKEN RIDES THE PAYLOAD (iclaim-ledger.md §3.1 A-custody, *)
+  (*  §3.9 RULING A-prime)                                                 *)
+  (* ==================================================================== *)
+
+  (*  A-custody's words are "the freeze token RIDES THE PAYLOAD ... exactly
+      like [dinode_at]", and this is where that lands.  [ic_payload] is the
+      payload as an ARM holds it; [ic_payload_np] is the same bundle MINUS
+      the token, which is what the eviction lemmas below and iput's free
+      path speak at.  The split costs no arity anywhere and no other file
+      names [ic_payload_np].
+
+      WHY HERE AND NOT IN [ic_loaded].  [ic_loaded] is named in forty-five
+      files and destructured in a dozen; [ic_payload] is named in eight.
+      Both would put the token on the same custody path -- pool bundle ->
+      parked arm -> holder -> parked arm -> pool -- because [ic_parked]'s
+      payload conjunct is exactly this predicate.  The cheaper one wins, and
+      the expensive one would also have poisoned [ic_close_to_empty_await],
+      whose payload is the FREEZER's (its token is standing at [FrzPost],
+      not [FrzOff]); with the split, that lemma keeps its exact signature by
+      speaking at [_np].
+
+      WHY [FrzOff] AND NOT [(ifreeze_off ∨ ifreeze_pre)].  A-custody's
+      PARKED row offers the disjunction so that the freezer's +0x70 mid-free
+      park has somewhere to put its [FrzPre].  That park is [ProofIput]'s and
+      [EscrowDeposit]'s -- both red by design in this increment -- and every
+      LANDED path through the arms is [FrzOff]-only: the recycle peels
+      [FrzOff] out of the pool ([ipool_shape_to_np]), the fill carries it
+      [ic_unloaded] -> [ic_loaded], the checkout hands it to the holder, the
+      park takes it back and the eviction returns it to the pool's
+      [ifreeze_off] arm.  Stating the disjunction now would cost every one of
+      those a refutation it cannot yet perform (TRIPWIRE t2's obligation) and
+      would buy nothing green.  The widening is the iput integration's, at
+      the same one line.
+
+      WHAT IT BUYS, which is the whole point of RULING A-prime: [SpecIlock]'s
+      post now hands the holder [ifreeze_off z] beside the payload, so
+      create's fresh child (ProofCreate) and sys_link's [ip->nlink++]
+      (ProofSysLink) can pay [wp_iupdate_link]'s freeze-pin premise with the
+      token arm, where the pure arm [di_nlink dn0 <> 0] is FALSE at the one
+      and unavailable at the other. *)
+  Definition ic_payload (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32) (g : gname)
+      (v : bool) : iProp Σ :=
+    (ic_payload_np γfs γi cov logstart k inum g v ∗
+     ifreeze_off (bv_unsigned inum))%I.
+
   Global Instance ic_payload_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload γfs γi cov logstart k inum g v).
-  Proof. rewrite /ic_payload. destruct v; apply _. Qed.
+  Proof. rewrite /ic_payload. apply _. Qed.
+
+  Lemma ic_payload_split γfs γi cov logstart k inum g v :
+    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_payload_np γfs γi cov logstart k inum g v ∗
+    ifreeze_off (bv_unsigned inum).
+  Proof. rewrite /ic_payload. iIntros "H". iExact "H". Qed.
+
+  Lemma ic_payload_join γfs γi cov logstart k inum g v :
+    ic_payload_np γfs γi cov logstart k inum g v -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    ic_payload γfs γi cov logstart k inum g v.
+  Proof.
+    rewrite /ic_payload. iIntros "H Ht".
+    iSplitL "H"; [iExact "H" | iExact "Ht"].
+  Qed.
 
   (* THE LOADED POLARITY AT A NAMED RECORD (design §20.13/§20.14's (R1)).
 
@@ -788,11 +890,24 @@ Section IcacheEscrow.
     Timeless (ic_payload_at γfs γi cov logstart k inum g dn bm).
   Proof. rewrite /ic_payload_at. apply _. Qed.
 
+  Lemma ic_payload_at_pack_np γfs γi cov logstart k inum g dn bm :
+    ic_payload_at γfs γi cov logstart k inum g dn bm -∗
+    ic_payload_np γfs γi cov logstart k inum g true.
+  Proof.
+    rewrite /ic_payload_np /ic_payload_at. iIntros "H". iExists dn, bm.
+    iExact "H".
+  Qed.
+
+  (* ...and the arm-level pack, which is the [_np] one plus the token the
+     arm owes (§3.9).  The holder that re-parks a named record presents
+     both. *)
   Lemma ic_payload_at_pack γfs γi cov logstart k inum g dn bm :
     ic_payload_at γfs γi cov logstart k inum g dn bm -∗
+    ifreeze_off (bv_unsigned inum) -∗
     ic_payload γfs γi cov logstart k inum g true.
   Proof.
-    rewrite /ic_payload /ic_payload_at. iIntros "H". iExists dn, bm. iExact "H".
+    iIntros "H Ht". iApply (ic_payload_join with "[H] Ht").
+    iApply (ic_payload_at_pack_np with "H").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1629,7 +1744,7 @@ Section IcacheEscrow.
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_payload_np γfs γi cov logstart k inum g v -∗
     ic_mid cn k -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
@@ -1691,7 +1806,7 @@ Section IcacheEscrow.
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_payload_np γfs γi cov logstart k inum g v -∗
     ic_mid cn k -∗
     icnt_half (bv_unsigned inum) 0%nat -∗
     ifreeze_off (bv_unsigned inum) -∗
@@ -1724,7 +1839,7 @@ Section IcacheEscrow.
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_payload_np γfs γi cov logstart k inum g v -∗
     ic_mid cn k -∗
     icnt_half (bv_unsigned inum) 0%nat -∗
     ifreeze_post (bv_unsigned inum) -∗
@@ -1797,18 +1912,26 @@ Section IcacheEscrow.
     ic_unloaded γfs γi cov logstart k inum -∗
     live_gen k (1/2) g -∗
     ity_pending g -∗
+    (* THE PEELED TOKEN (iclaim-ledger.md §3.9).  The recycler took the
+       inum's [ifreeze_off] out of the pool at [ipool_shape_to_np] and
+       [IcacheInv.iref_alloc_store_au] handed it straight back ("the token
+       travels on into the entry's parked arm" -- that lemma's own header);
+       this is where it lands. *)
+    ifreeze_off (bv_unsigned inum) -∗
     ic_escrow_body cn γfs γi cov logstart k ∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum.
   Proof.
-    iIntros "Hmt Hgid Hid Hin Hvld Hpay Hlv Hpend".
+    iIntros "Hmt Hgid Hid Hin Hvld Hpay Hlv Hpend Hoff".
     iDestruct (word4_pointsto_half_split with "Hin") as "[Hin1 Hin2]".
     iSplitR "Hin2"; [| iExact "Hin2"].
     iLeft. rewrite /ic_parked.
     iExists dev, inum, false, g.
     iSplitL "Hid"; [iExact "Hid" |]. iSplitL "Hin1"; [iExact "Hin1" |].
     iSplitL "Hvld"; [iExact "Hvld" |].
-    iSplitL "Hpay Hpend";
-      [rewrite /ic_payload; iSplitL "Hpay"; [iExact "Hpay" | iExact "Hpend"] |].
+    iSplitL "Hpay Hpend Hoff";
+      [rewrite /ic_payload /ic_payload_np;
+       iSplitR "Hoff"; [| iExact "Hoff"];
+       iSplitL "Hpay"; [iExact "Hpay" | iExact "Hpend"] |].
     iSplitL "Hlv"; [iExact "Hlv" |].
     iSplitL "Hmt"; [iExact "Hmt" | iExact "Hgid"].
   Qed.
@@ -1926,10 +2049,10 @@ Section IcacheEscrow.
   Qed.
 
   Local Lemma ic_payload_size γfs γi cov logstart k inum g (v : bool) :
-    ic_payload γfs γi cov logstart k inum g v -∗
+    ic_payload_np γfs γi cov logstart k inum g v -∗
     ∃ w : bv 32, i_size (ientry k) ↦₄ w.
   Proof.
-    rewrite /ic_payload. destruct v.
+    rewrite /ic_payload_np. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & _ & Hmeta & _)".
@@ -1943,8 +2066,10 @@ Section IcacheEscrow.
     ic_payload γfs γi cov logstart k inum2 g2 v2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    iDestruct (ic_payload_size with "H1") as (w1) "H1".
-    iDestruct (ic_payload_size with "H2") as (w2) "H2".
+    iDestruct (ic_payload_split with "H1") as "[Hp1 _]".
+    iDestruct (ic_payload_split with "H2") as "[Hp2 _]".
+    iDestruct (ic_payload_size with "Hp1") as (w1) "H1".
+    iDestruct (ic_payload_size with "Hp2") as (w2) "H2".
     iApply (iesc_word4_excl with "H1 H2").
   Qed.
 
@@ -1955,7 +2080,8 @@ Section IcacheEscrow.
     ic_unloaded γfs γi cov logstart k inum2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    iDestruct (ic_payload_size with "H1") as (w1) "H1".
+    iDestruct (ic_payload_split with "H1") as "[Hp1 _]".
+    iDestruct (ic_payload_size with "Hp1") as (w1) "H1".
     iDestruct (ic_unloaded_size with "H2") as (w2) "H2".
     iApply (iesc_word4_excl with "H1 H2").
   Qed.
@@ -1970,7 +2096,7 @@ Section IcacheEscrow.
   Proof.
     iIntros "Hpay".
     iApply (ic_payload_size γfs γi cov logstart k inum g true).
-    iApply (ic_payload_at_pack with "Hpay").
+    iApply (ic_payload_at_pack_np with "Hpay").
   Qed.
 
 
@@ -2060,7 +2186,8 @@ Section IcacheEscrow.
       iDestruct "Hpk" as (dev' inum' v' ga) "(_ & _ & _ & Hpay' & _ & _ & Hgt)".
       iExFalso.
       iDestruct (ic_payload_at_size with "Hpay") as (w1) "Hsz1".
-      iDestruct (ic_payload_size with "Hpay'") as (w2) "Hsz2".
+      iDestruct (ic_payload_split with "Hpay'") as "[Hpn' _]".
+      iDestruct (ic_payload_size with "Hpn'") as (w2) "Hsz2".
       iApply (iesc_word4_excl with "Hsz1 Hsz2").
     - (* OUT: REF-1, on both deposit kinds, exactly as in
          [ic_open_auth_ref] -- the count for a reference, the LIVE mass for a

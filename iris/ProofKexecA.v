@@ -911,6 +911,8 @@ Section KexecABody.
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
+        (* the payload's freeze token (§3.9, RULING A-prime) *)
+        ifreeze_off (bv_unsigned inumf) -∗
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         log_op g n2 -∗
         iref_slots 1 -∗
@@ -1084,7 +1086,7 @@ Section KexecABody.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
-             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity %Hfr_".
+             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x3a))
       by (rewrite HQ2ra; pcw).
     iEval (rewrite Hpc3a) in "Hpc".
@@ -1458,7 +1460,7 @@ Section KexecABody.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
                   n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hslpid Hdep
-                  Hidev Hiinum Hivalid Hload Hity Hkeep Hlog Hirs Hbm Hins Hbits
+                  Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
@@ -1529,7 +1531,7 @@ Section KexecABody.
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
                   with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
-                        Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
+                        Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
                                        Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
@@ -1602,7 +1604,7 @@ Section KexecABody.
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
                 with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
+                      Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
                                      Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
@@ -1785,6 +1787,8 @@ Section KexecAMain.
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
+        (* the payload's freeze token (§3.9, RULING A-prime) *)
+        ifreeze_off (bv_unsigned inumf) -∗
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
         log_op g n2 -∗
         iref_slots 1 -∗

@@ -635,7 +635,7 @@ Section KexecB2Body.
     iDestruct (cpu_own_transport CID4 CID13 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                           Hivalid & Hload & #Hity & Hkeep)".
+                           Hivalid & Hload & #Hity & Hfrz & Hkeep)".
     (* [kxc_bad64] pins its own [CID0] from "Hcg", so kexec's exit -- still
        anchored at the section's [CID0] -- is re-anchored there, and the
        crossing fact goes by NAME (durable-notes.md). *)
@@ -651,7 +651,7 @@ Section KexecB2Body.
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
               with "Hcg Hcnt Htext Hpc Hfab Hslkk Hslkd Hslpid Hdep
-                    Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits
+                    Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                     Hcont").
     iApply (kxc_frameBpin_to_A6 sp0 ra0 s00 s10 s20 pv av
@@ -1322,7 +1322,7 @@ Section KexecB2Loops.
         exact (HD3get r Hr Hne). }
       (* ---- the resources readi asks for ---- *)
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                             Hivalid & Hload & #Hity & Hkeep)".
+                             Hivalid & Hload & #Hity & Hfrz & Hkeep)".
       iDestruct (kxc_load_peel with "Hload") as
         (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Hmap
                & Hblocks)".
@@ -1376,7 +1376,7 @@ Section KexecB2Loops.
       iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                    inumf dnf bmf gilf gislf
                    with "Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                         Hity Hkeep") as "Hopen".
+                         Hity Hfrz Hkeep") as "Hopen".
       (* ---- the register facts on the far side of readi ---- *)
       assert (HM2s2 : M2 !!! Regidx Rs2
                       = (mword_of_int (Z.of_nat nn) : mword 64)).

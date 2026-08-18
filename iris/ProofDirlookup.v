@@ -441,7 +441,7 @@ Section ProofDirlookupMain.
       (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -451,12 +451,12 @@ Section ProofDirlookupMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
-                              ga gf cov logstart nib dev ip dinum bm data dn dr
+                              ga gf cov logstart inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
-           Hinums Hdisj Horph Hdrnz Hj Hgs Ha0 Hposs Heb Hbelow.
+           Hinums Hdisj Horph Hdrnz Hdrnl Hj Hgs Ha0 Hposs Heb Hbelow.
     (* the reading of the type premise the LICENCE work needs, taken
        once here (increment C'-lite, fs-fragments.md §7.1) *)
     assert (Htyz : bv_unsigned (di_type dn) = T_DIR_z)
@@ -469,7 +469,7 @@ Section ProofDirlookupMain.
     assert (Hpjd : proc_addr j = pj) by reflexivity.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
               Hnm Hpoff Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbslot #Hitb2 #Hitbl
-              #Hesc Hislot Hlinks Hdi Hcont".
+              #Hesc #Hireg Hislot Hlinks Hdi Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
        [true] here.  Making that explicit is what keeps every hart-chain in
@@ -2073,9 +2073,15 @@ Section ProofDirlookupMain.
                   by (apply bv_eq; rewrite Hzu; exact Hself).
                 iExists (HeldL dr). rewrite Hii.
                 iSplitL "Hdi".
-                { iApply (iname_held_intro gi gfs dinum dr Hdrnz with "Hdi"). }
+                (* §3.3 (RULING D): licence (c) now costs BOTH pure halves of
+                   the borrowed region record.  [Hdrnz] is premise (6); the
+                   count comes from the IN-CORE one ([Hnl0], already in hand
+                   on this arm out of [dl_lic_live]) transported across
+                   premise (6')'s equation [Hdrnl]. *)
+                { iApply (iname_held_intro gi gfs dinum dr Hdrnz
+                            ltac:(rewrite Hdrnl; exact Hnl0) with "Hdi"). }
                 iIntros "Hl".
-                iDestruct (iname_held_alloc with "Hl") as "[_ Hdi]".
+                iDestruct (iname_held_alloc with "Hl") as "(_ & _ & Hdi)".
                 iFrame "Hlinks Hdi".
               - (* any other record: licence (a), the payload's own ticket *)
                 iDestruct (dir_links_borrow (bv_unsigned dinum) dn data i
@@ -2084,7 +2090,7 @@ Section ProofDirlookupMain.
                 iExists (LinkedL fl). rewrite /iname Hzu.
                 iSplitL "Hp"; [iExact "Hp" |].
                 iIntros "Hp". iFrame "Hdi". iApply ("Hback" with "Hp"). }
-            iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
+            iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks
@@ -2092,7 +2098,7 @@ Section ProofDirlookupMain.
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
-                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hislot
+                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hislot
                             Hlic").
             all: try lkbelow.
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href Hlic".
