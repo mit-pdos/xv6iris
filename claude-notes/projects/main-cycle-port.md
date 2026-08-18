@@ -1967,6 +1967,73 @@ P7's UserTotalU, P7 on UserTotalU/UserStepFull/UserActiveClass §3-5.
 Not started: downstream compile tail (`pc_is` destructuring sites),
 WpUmodeStep tier, GCP full build, push (dozens of local commits).
 
+### THE TRAMPOLINE TOWER IS CONVERTED DOWN TO ONE MISSING WALK
+
+`TrampStepPt.wp_instr_tramp_pt` is `SmodeCorePt.wp_instr_s_config_regime`'s
+shape with the fetch's VA and its BYTES pulled apart -- the va is a
+trampoline `pc`, the bytes are at the physical `pa` -- and the deleted
+whole-cycle `Habs` is now the per-node `tramp_tr_obl` / `tramp_fetch_tr`,
+`SRegime.sr_swp_translate`'s shape at `InstructionFetch tt`.  Three things
+generalize beyond the trampoline:
+
+- **THE BYTE WINDOW AND THE FETCH VA NEED NOT BE THE SAME ADDRESS, and
+  almost nothing in the fetch tower assumed they were.**  `spt_fetch_S_P` /
+  `_S_rvc2_P` / `_S_base2_P`, `swp_checked_mem_read_ifetch{2,4}_S`,
+  `s_chunk_ram` and `s_text_obl` all already take the va and the pa (or the
+  byte-list base and the chunk base) separately; only
+  `spt_run_hart_active_instr_S` tied them, through `instr pc`.  So the
+  trampoline's four-arm dispatch is that lemma with `pa` substituted in the
+  byte-window lemmas and `pc` left in the fetch-shape ones -- no new fetch
+  machinery at all.
+- **A NON-IDENTITY VA MUST GO THROUGH `sr_swp_translate_wit`, NOT
+  `sr_swp_translate`.**  The trampoline claim is `kmap_at tramp_vpn
+  tramp_ppn KP_rx`, whose ppn is not `svpn_of va`, so there is no
+  `ktier_pin` to feed `sr_adm` and `spt_tr_obl_of_regime` does not apply.
+  The witnessed route drops admissibility for the regime's all-claims
+  witness (`emp` at `kpt_share_regime`, `False` at Bare).  Everything else
+  in the producer -- the reference state being the hart's own file, the
+  residue converting by `sr_swp_res_agree`, the landing file moving onto
+  the tower by `s_rs_agree` -- is `spt_tr_obl_of_regime` verbatim.
+- **THE BYTE WINDOW'S OWN CLAIM IS RECOVERED FROM THE STATIC BUNDLE, not
+  from the datum's tier pin** (`TrampStepPt.tramp_phys_id`): the trampoline
+  page IS kernel text, so `KptPt.tramp_window_static` gives `kmap_static
+  (svpn_of pa) KP_rx`, `kmap_static_claims_at` turns it into a claim at
+  `kpt_leaf_ppn`, `kmap_at_agree` pins the datum's ppn to it and
+  `pa_of_id` collapses `pa_of ppn pa` to `pa`.  This works at ANY ambient
+  `CurKtier`, which the tier pin does not.
+
+**WHAT THE TOWER IS BLOCKED ON is ONE missing per-node walk, in two
+instances.**  The engine is regime-generic and the SHARED KERNEL TABLE
+instance is proved (`ktramp_fetch_tr_share`, off `SRegime.kpt_share_regime`
+/ `HartSKpt.swp_translate_kpt`).  The other two tables have no swp
+`translateAddr` at all -- only exec-level ones
+(`UptTree.utlb_inv_pt_translateAddr_tramp_fetch`,
+`TransPt.tlb_inv_pt2_translateAddr`):
+
+- the USER table `UptTree.utlb_inv_pt` (`wp_instr_u_pt`'s 7 sites in
+  `UservecPt` / `UserretPt` / `UservecExitPt`);
+- the switch-window two-table invariants `TransPt.tlb_inv_pt2_kcur` /
+  `_kprev` (2 sites).
+
+Each needs the assembly `HartSKpt.swp_translate_kpt` is for the kernel
+table: `PtTreeAdue.swp_translateAddr_pt_front`, the hit/miss split
+(`HartSTrans.swp_translate_hit` / `CommonWalk.swp_translate_TLB_miss_user`)
+and the three `read_pte` nodes over the table's own bytes.  **The user
+table is OWNED, so the cheaper route to try first is
+`HartMemRun.swp_hmrun_of_exec`** -- carry the existing exec fact at the
+reference state `MState (srs tv) mm dev0_state` under a `goodmb`
+certificate over the owned PT bytes -- but check the A/D write-back first:
+`pt2_tramp_spec` leaves the trampoline PTE's A/D quantified, and
+`CommonWalk.swp_translate_TLB_miss_user` is stated only for
+`update_PTE_Bits _ acc = None`.
+
+Downstream of that walk, `UservecPt` / `UserretPt` / `UserretEntryPt` /
+`UservecExitPt` also need their own leaves converted: their obligations are
+the old `∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) … ⌝ ∗ …`
+shape, and the per-node engine hands them `swp (execute i)` instead, so
+each data access becomes a `HartSMem` instantiation over the user table's
+data translation.
+
 ## Left, in order
 
 1. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
