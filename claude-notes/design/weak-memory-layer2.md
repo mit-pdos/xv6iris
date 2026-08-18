@@ -866,3 +866,27 @@ IS available, in increasing cost:
 - a MODEL fork adding walker markers to `vmem.sail` (the `-D SYMBOLIC`
   announce nodes are the precedent, but those existed upstream and these do
   not) — plus the machine parameter and a full tower re-land.
+
+
+## 13. DECISION (the user, 2026-08-18) — the walker A/D RMW is NON-PROMISABLE, as SAIL FIDELITY
+
+**The model of record for A/D updates is the generated Sail model, and the Sail
+model does not issue speculative A-bit writebacks**: the PTE A/D update happens
+inside the translating access's own execution (the atomic recheck,
+[`weak-memory-walk-bridge.md`](weak-memory-walk-bridge.md) shape 4), never
+detached from it.  So the full machine makes the walker's A/D RMW
+append-at-fulfil (§8's option (a) mechanics), and the justification is fidelity
+to the Sail model — NOT a new assumption class.  For the D bit it is an ISA
+theorem regardless (§12).  What binds future work:
+
+- The model boundary reads: hardware that makes a speculative A-bit update
+  VISIBLE TO OTHER HARTS before the access it serves is outside the model of
+  record, exactly as hardware outside the other recorded Sail-model boundaries
+  (dropped FENCE I/O bits, no-icache) is.  Record it with those, not as a
+  kernel side condition.
+- `gdep2_acyclic` stays Layer 2's target theorem; no exhibit generalization
+  for walker events is owed.  D8/E1/L2′ proceed.
+- The machine change still needs to NAME walker traffic (§12's last item); the
+  non-promisability gate is scoped by whatever discriminator that
+  investigation lands.  Worklist:
+  [`../projects/weak-memory-certification.md`](../projects/weak-memory-certification.md).

@@ -229,6 +229,13 @@ are working on that effort — the relevant `projects/` file.
   predicate and the record-own-registers residual invariant (C9), and for
   the Hcls retag elimination, the Hres→Horc derivation and the Hirqb→Hseip
   coverage fix.
+- **[`weak-memory-certification.md`](projects/weak-memory-certification.md)** —
+  the CERTIFICATION ROUTE's worklist (Layer 2 with NO side conditions,
+  `design/weak-memory-layer2.md` §8/§11/§13): W1/W2 (naming the walker's A/D
+  RMW and making it non-promisable, as Sail fidelity), D8-1..3 (the PARM
+  certification-completeness port, spec in
+  `design/parm-certification-notes.md`), E1 (the extended exhibit), L2′ (the
+  case analysis that turns `win_excl`/SF-1 into a theorem).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).

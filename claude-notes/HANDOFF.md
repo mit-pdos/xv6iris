@@ -1,5 +1,16 @@
 # SESSION HANDOFF — 2026-08-18 (branch `weak-memory`)
 
+**LATEST (2026-08-18, orchestrator session): THE WALKER DECISION IS TAKEN —
+the user chose "follow the Sail model: it does not issue speculative A-bit
+writebacks", i.e. §8's option (a) mechanics justified as SAIL FIDELITY, not a
+new assumption class (`design/weak-memory-layer2.md` §13).  `gdep2_acyclic`
+stays the Layer-2 target; D8 is GO.  Worklist:
+`projects/weak-memory-certification.md` (W1/W2 walker naming + machine change,
+D8-1..3 the PARM port, E1, L2′).  In flight: W1 (walker-discriminator spike,
+investigation only) and D8-1 (`iris/WeakCertify.v`: `wp_cert_step`,
+`wp_certify`, the vcap-lemma ports) on subagents.**
+
+
 **LATEST (2026-08-18, later session): §10.2 IS NOW HALF-ANSWERED — from the
 privileged spec's own words (`design/weak-memory-layer2.md` §12).  The ISA
 PERMITS speculative A-bit updates ("even if the associated memory access
