@@ -14,8 +14,9 @@ L2-M1/M2 (`WeakRobustL2.v`, `WeakRobustL2b.v`: SCC skeleton, `U_Qinv`,
 `head_prestate_pf_real`, `sf_edges ≡ edges_split_cyc`); M4-1 first slice
 (`WeakEvFunnel/Wire/ExecEff/Disk`).  Open technical questions before D8:
 (1) whether PARM's `interference_certify` transfers to our machine without
-the `RES = ts` view (a read-only investigation report may be in the
-scratchpad `interference-certify-report.md`); (2) speculative A-bit
+the `RES = ts` view (ANSWERED: `design/weak-memory-layer2.md` §11 + `design/parm-certification-notes.md`
+— completeness uses the ARCH-GENERIC restriction lemma, `RES` unused, our
+D2 machine suffices; real risks = fabric, lat reads, fused RMW); (2) speculative A-bit
 updates vs the acyclicity route (§10).**
 
 

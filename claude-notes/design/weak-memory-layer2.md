@@ -735,3 +735,43 @@ re-derived from the promise run exactly as `robust_main_bundle` does.
    it lets the walker's CAS be append-at-fulfil in the full machine) and the
    generalized exhibit (walker-idempotent replay).  Either way, no manual
    condition on the kernel.
+
+
+## 11. ANSWER to §10.1 (2026-08-18, read-only investigation of the PARM sources — full report in [`parm-certification-notes.md`](parm-certification-notes.md))
+
+- There are TWO `interference_certify` lemmas in PARM.  The one
+  `certified_exec_complete` uses is `lcertify/CertifyComplete.v:101` —
+  the RESTRICTION direction (`certify (mem ++ interference) ⇒ certify mem`),
+  ARCH-GENERIC (`CertifySim.v`, no `arch == riscv` anywhere); the RISC-V
+  one (`CertifyProgressRiscV.v:1233`, EXTENSION) serves only
+  `certified_deadlock_free`.  §8/§10.1's worry about `RES = ts` was
+  mis-targeted: **completeness needs neither `RES` nor the RISC-V
+  forwarding rule; our D2 machine suffices as it is.**
+- The "new store above a fixed promise with a fence between" shape is
+  NOT certifiable in either memory (EXT already fails in the given run):
+  nothing to repair.  `sim_eu`'s essential ingredients: register views
+  (value agreement), `vcap` (irreplaceable: `certify_step_vcap_promise` —
+  once `vcap ≥ ts_p` the promise `ts_p` can never be fulfilled — is the
+  termination guard), `fwdbank`, `exbank`, `Memory.exclusive`; `RES` is
+  provably unused (both `condtac` branches close arch-blind).
+- `certify_step` = `state_step ∪ write_step` (promise+fulfil at the top =
+  our pf store); NO new promises inside a certifying run; promised fulfils
+  at fixed ts/loc/VALUE.  Our port needs `wp_cert_step i := (wpstep at i,
+  minus WPPromise) ∪ (PFStore/PFRmw)` — `wp_pf_step` alone has no arm
+  fulfilling an EXISTING promise.
+- `axiomatic_to_promising` produces the unconstrained `Machine.exec` by
+  promising everything up front — our `WPPromise` shape.
+- THE THREE REAL D8 RISKS (none of them view arithmetic): (i) the DEVICE
+  FABRIC `pc_dev` (PARM has no shared component beyond memory; interference
+  moves the fabric — reuse G4/G5's `qfab`/`gdev` machinery for a `sim_dev`);
+  (ii) `lat = true` reads (`latest_ts`-indexed, unstable under removing
+  messages — never emitted by the language, so restrict certification to
+  lat-free programs, as Layer 1 already does); (iii) the fused RMW
+  (`excl_ok`'s per-byte window becomes an in-case obligation of the
+  restriction simulation).  D-5b (forward-bank gate on the load's `aq`
+  rather than the banked store's `ex`) matters only for PROGRESS, which we
+  do not need.
+- RECOMMENDATION for D8: port the arch-generic `CertifySim.v` line only;
+  start with the two `vcap` lemmas (`Certify.v:144/166`), then the
+  restriction simulation `sim_wpcfg` with its four invariants, then
+  `certified_exec_complete`'s backward induction.

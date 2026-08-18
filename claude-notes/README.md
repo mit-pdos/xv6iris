@@ -151,6 +151,13 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`parm-certification-notes.md`](design/parm-certification-notes.md)** —
+  reference notes (2026-08-18) on Promising-ARM/RISC-V's certification
+  proofs (`lcertify/`): the two `interference_certify` lemmas and their
+  directions, what `certified_exec_complete` needs, which machine
+  components carry the simulation (`vcap` irreplaceable, `RES = ts` unused),
+  and the three real risks for porting it (device fabric, `lat` reads,
+  the fused RMW).
 - **[`weak-memory-layer2.md`](design/weak-memory-layer2.md)** — LAYER 2 as a
   DIRECT acyclicity theorem (2026-08-18): why per-edge premises are the
   wrong interface (walker A/D traffic violates any per-edge form
