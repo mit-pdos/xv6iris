@@ -961,7 +961,52 @@ joined into the frame), flips the SIE ghost, assembles `ihs_entry_of` and
 runs the handler contract exactly as today, then re-enters the Löb; the
 RETIRE arm hands the leaf's swp obligation the cells.
 
-### THE S-MODE WRAPPER IS TOO RIGID FOR THREE FAMILIES OF LEAF (found 2026-08-18, during the CSR/SRET/timer sweep)
+### WHAT IS LEFT OF THE S-MODE CSR/SRET/TIMER SWEEP (2026-08-18, after the b'/ms' generalization landed)
+
+The `b'`/`ms'` generalization below was made and unblocked most of the sweep:
+**14 of WpSconfCsr's 16 leaves and `WpSconfTimer.wp_csrr_time_s_sconf` are
+converted and verified**, all statements byte-identical except
+`wp_csrr_ro_s_sconf`'s forced exec→swp premise change.  Three things are
+left, and each is a DIFFERENT kind of gap -- none is proof volume:
+
+1. **THE RIDER IS AT THE ENTRY HART.**  `R : mword 64 -> mword 64 -> regfile
+   -> nat -> iProp` is a parameter of `wp_instr_s_sconf`, so it is elaborated
+   BEFORE the callback binds its hart, while `sconf_step_obl … CID` applies it
+   at the REBOUND one.  A pure rider does not care; a rider carrying
+   hart-indexed resources cannot be written at all.  That blocks exactly the
+   two csrci DISABLE flips (`wp_csrci_sstatus_s_sconf`,
+   `wp_csrci_sstatus_x0_s_sconf`), which hand their continuation the enabled
+   arm's payload -- the trap CSRs, the count token, the running claim, the
+   per-cpu cells.  **The edit is `R : CpuId -> …`, applied at
+   `sconf_step_obl`'s own `CID` in both the post and the continuation.**  The
+   ENABLE flips and `wp_sret_s_sconf` are unaffected: their already-enabled
+   arm is refuted ABOVE the funnel (a register cell is per hart, so the
+   payload's sepc and the arm's cannot coexist at the entry hart), which
+   leaves `b = false` and `wp_next_off_intro` retires the hart question.
+
+2. **AN INVARIANT CANNOT SPAN A CSR WRITE.**  `WpSconfTimer.
+   wp_csrw_stimecmp_s_sconf` is blocked on the RESOURCE, not the wrapper:
+   `TimerCap.timer_cap` seals the deadline cell in an invariant, and
+   `write_CSR 0x14D` touches that cell THREE times across a long stretch
+   (read old / write legalized / `clint_dispatch` / read back).  The one-node
+   seam (`HartSCsr.swp_write_reg_acc`, the atomic-accessor form over
+   `swp_hart_regwrite`) covers a SINGLE register-write node and nothing
+   covers a stretch -- an Iris invariant does not stay open across a machine
+   step.  The fix is at the resource: thread `stimecmp_free` as an exclusive
+   cell the way `wp_csrw_stvec_s_sconf` threads stvec.  That changes
+   `timer_cap` and both timer statements, so it is the timer owner's call.
+
+3. **`WpSconfSret.wp_sret_s_sconf` needs the MRET walk one privilege over.**
+   No interface gap: `execute (SRET tt)` writes mstatus five times,
+   cur_privilege, elp and nextPC, so it is `WpMmodeMret`'s per-node walk with
+   the `sret_ms1..5` tower in place of MRET's, CHOPPED at the elp write
+   (`HartRegNode.swp_write_reg_same` -- elp is pinned persistently by
+   `hw_config` and the write is value-preserving, which is exactly the M-mode
+   twin's shape).  `HartMemRun.swp_hmrun_of_exec` is NOT the shortcut here:
+   it demands every written register in `Drw` at full ownership, and elp is
+   only persistently owned.
+
+### THE S-MODE WRAPPER IS TOO RIGID FOR THREE FAMILIES OF LEAF (found 2026-08-18, during the CSR/SRET/timer sweep; the b'/ms' half is FIXED)
 
 `WpSmodeIntr.sconf_step_obl` fixes THREE things across the instruction that
 some S-mode leaves have to move, and each is a one-parameter generalization
