@@ -835,3 +835,194 @@ Section URegs.
   Qed.
 
 End URegs.
+
+(* ===================================================================== *)
+(* 9. THE ENTRY FILE: a [regstate] BUILT from the cells, not read off a    *)
+(*    machine state.                                                      *)
+(*                                                                       *)
+(* THE PROBLEM (section 8 of the port plan, left open there and answered  *)
+(* here).  Every frame is [hreg_frame rs D], and [u_frames_intro] takes   *)
+(* [rs] forall-quantified with the values as [u_pins_*] side conditions.  *)
+(* That is right for every cycle AFTER the first, because the step rules  *)
+(* hand back [exists rs2, ... * frames rs2].  At the ENTRY -- userret's    *)
+(* join, and the WAITING-hart arm -- somebody must PRODUCE one, and under *)
+(* per-node semantics there is no [mstate_interp] in scope to take        *)
+(* [sigma.(sregs)] from: the frames are ghost resources whose file the    *)
+(* caller NAMES.                                                          *)
+(*                                                                       *)
+(* THE ANSWER, and why it is NOT [HartSFrame.s_rs]'s [register_set]       *)
+(* tower.  A tower answers [register_lookup] by peeling                   *)
+(* [irrelevant_register_set] once per level, and each peel needs          *)
+(* [register_beq r r' = false] to COMPUTE.  For the twenty-odd named CSRs *)
+(* that is fine.  For a GPR it is not: an operand index arrives as        *)
+(* [gpr_of_Z (uint i)] at a SYMBOLIC [i], so every level of the tower     *)
+(* would owe its own 31-way case split -- 21 towers deep, that is ~650    *)
+(* [vm_compute]s per lookup.  A [Build_regstate] whose [bitvector_64_s]   *)
+(* is a FUNCTION pays ONE iota step instead: every named lookup below is  *)
+(* [reflexivity], and the GPR agreement is a SINGLE 31-way split          *)
+(* ([u_rs_gpr_agree]), the same one [WpGpr.exec_rX_bits_gpr] already      *)
+(* pays.                                                                  *)
+(*                                                                       *)
+(* Registers nobody in the U-mode footprint names get [inhabitant] --     *)
+(* exactly as [init_regstate] does; the file is a WITNESS for the frame,  *)
+(* not a claim about the machine, and only the pinned cells are ever      *)
+(* looked up.                                                             *)
+(* ===================================================================== *)
+
+Definition u_bv64 (g : regfile)
+    (va va' ms sc stv sep mst cy ti ip micfg
+     misav mseccfgv senvv stvecv miev mdlv medv menvv mstenv satpv : mword 64)
+    (r : register_bitvector_64) : mword 64 :=
+  match r with
+  | PC => va | nextPC => va'
+  | mstatus => ms | scause => sc | stval => stv | sepc => sep
+  | minstret => mst | mcycle => cy | mtime => ti | mip => ip
+  | minstretcfg => micfg
+  | misa => misav | mseccfg => mseccfgv | senvcfg => senvv
+  | stvec => stvecv | mie => miev | mideleg => mdlv | medeleg => medv
+  | menvcfg => menvv | mstateen0 => mstenv | satp => satpv
+  | x1 => g (Regidx (mword_of_int 1))
+  | x2 => g (Regidx (mword_of_int 2))
+  | x3 => g (Regidx (mword_of_int 3))
+  | x4 => g (Regidx (mword_of_int 4))
+  | x5 => g (Regidx (mword_of_int 5))
+  | x6 => g (Regidx (mword_of_int 6))
+  | x7 => g (Regidx (mword_of_int 7))
+  | x8 => g (Regidx (mword_of_int 8))
+  | x9 => g (Regidx (mword_of_int 9))
+  | x10 => g (Regidx (mword_of_int 10))
+  | x11 => g (Regidx (mword_of_int 11))
+  | x12 => g (Regidx (mword_of_int 12))
+  | x13 => g (Regidx (mword_of_int 13))
+  | x14 => g (Regidx (mword_of_int 14))
+  | x15 => g (Regidx (mword_of_int 15))
+  | x16 => g (Regidx (mword_of_int 16))
+  | x17 => g (Regidx (mword_of_int 17))
+  | x18 => g (Regidx (mword_of_int 18))
+  | x19 => g (Regidx (mword_of_int 19))
+  | x20 => g (Regidx (mword_of_int 20))
+  | x21 => g (Regidx (mword_of_int 21))
+  | x22 => g (Regidx (mword_of_int 22))
+  | x23 => g (Regidx (mword_of_int 23))
+  | x24 => g (Regidx (mword_of_int 24))
+  | x25 => g (Regidx (mword_of_int 25))
+  | x26 => g (Regidx (mword_of_int 26))
+  | x27 => g (Regidx (mword_of_int 27))
+  | x28 => g (Regidx (mword_of_int 28))
+  | x29 => g (Regidx (mword_of_int 29))
+  | x30 => g (Regidx (mword_of_int 30))
+  | x31 => g (Regidx (mword_of_int 31))
+  | _ => mword_of_int 0
+  end.
+
+Definition u_rs (g : regfile) (hs : HartState) (mi : bool)
+    (mc sstenv : mword 32) (elpv : mword 1)
+    (pmar : list PMA_Region) (htifv : type_of_register htif_tohost_base)
+    (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+    (tlbv : type_of_register tlb)
+    (va va' ms sc stv sep mst cy ti ip micfg
+     misav mseccfgv senvv stvecv miev mdlv medv menvv mstenv satpv : mword 64)
+    : regstate :=
+  Build_regstate
+    (fun _ => hs)
+    (fun _ => User)
+    (fun r => match r with elp => elpv | _ => mword_of_int 0 end)
+    inhabitant inhabitant inhabitant
+    (fun r => match r with
+              | sstateen0 => sstenv | mcountinhibit => mc
+              | _ => mword_of_int 0 end)
+    inhabitant inhabitant inhabitant
+    (u_bv64 g va va' ms sc stv sep mst cy ti ip micfg
+       misav mseccfgv senvv stvecv miev mdlv medv menvv mstenv satpv)
+    inhabitant inhabitant
+    (fun r => match r with minstret_increment => mi | _ => false end)
+    (fun _ => pmar)
+    (fun _ => htifv)
+    inhabitant
+    (fun _ => paddr)
+    (fun _ => pcfg)
+    (fun _ => tlbv).
+
+Section URs.
+  Context (g : regfile) (hs : HartState) (mi : bool)
+          (mc sstenv : mword 32) (elpv : mword 1)
+          (pmar : list PMA_Region) (htifv : type_of_register htif_tohost_base)
+          (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+          (tlbv : type_of_register tlb)
+          (va va' ms sc stv sep mst cy ti ip micfg
+           misav mseccfgv senvv stvecv miev mdlv medv menvv mstenv satpv
+             : mword 64).
+
+  Local Notation RS :=
+    (u_rs g hs mi mc sstenv elpv pmar htifv pcfg paddr tlbv
+       va va' ms sc stv sep mst cy ti ip micfg
+       misav mseccfgv senvv stvecv miev mdlv medv menvv mstenv satpv).
+
+
+(* THE ONE SPLIT.  [gpr_of_Z] is a 31-deep [Z.eqb] chain, so it does not
+   reduce at a symbolic index; the split makes the index concrete, and then
+   BOTH sides are one iota step.  [u_mword5_eq] is what turns the value fact
+   [uint i = k] back into the index equality [i = mword_of_int k] the file's
+   own spelling needs. *)
+Lemma u_rs_gpr_agree : u_gpr_agree g RS.
+Proof.
+  intros i Hi. pose proof (uint5_lt i) as Hb.
+  assert (Hc : uint i = 1 \/ uint i = 2 \/ uint i = 3 \/ uint i = 4 \/ uint i = 5 \/ uint i = 6 \/ uint i = 7 \/ uint i = 8 \/ uint i = 9 \/ uint i = 10 \/ uint i = 11 \/ uint i = 12 \/ uint i = 13 \/ uint i = 14 \/ uint i = 15 \/ uint i = 16 \/ uint i = 17 \/ uint i = 18 \/ uint i = 19 \/ uint i = 20 \/ uint i = 21 \/ uint i = 22 \/ uint i = 23 \/ uint i = 24 \/ uint i = 25 \/ uint i = 26 \/ uint i = 27 \/ uint i = 28 \/ uint i = 29 \/ uint i = 30 \/ uint i = 31) by lia.
+  destruct Hc as [H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|H]]]]]]]]]]]]]]]]]]]]]]]]]]]]]];
+  (* the index literal must be GIVEN: left open, [u_mword5_eq]'s [0 <= k <
+     32] side goal has no witness for [lia] to find. *)
+  [ rewrite H (u_mword5_eq i 1 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 2 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 3 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 4 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 5 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 6 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 7 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 8 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 9 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 10 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 11 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 12 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 13 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 14 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 15 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 16 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 17 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 18 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 19 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 20 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 21 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 22 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 23 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 24 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 25 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 26 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 27 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 28 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 29 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 30 ltac:(lia) H); reflexivity
+  | rewrite H (u_mword5_eq i 31 ltac:(lia) H); reflexivity ].
+Qed.
+
+  (* EVERY ONE OF THESE IS ONE IOTA STEP.  That is the whole point of the
+     [Build_regstate] spelling. *)
+  Lemma u_rs_pins_regs : u_pins_regs RS hs ms sc stv sep va va' g.
+  Proof.
+    rewrite /u_pins_regs. split_and!; try reflexivity.
+    exact u_rs_gpr_agree.
+  Qed.
+
+  Lemma u_rs_pins_tick : u_pins_tick RS mst mi mc micfg cy ti ip.
+  Proof. rewrite /u_pins_tick. split_and!; reflexivity. Qed.
+
+  Lemma u_rs_pins_cfg :
+    u_pins_cfg RS stvecv miev mdlv medv menvv mstenv sstenv.
+  Proof. rewrite /u_pins_cfg. split_and!; reflexivity. Qed.
+
+  Lemma u_rs_pins_hw : u_pins_hw RS misav mseccfgv senvv pmar htifv elpv.
+  Proof. rewrite /u_pins_hw. split_and!; reflexivity. Qed.
+
+  Lemma u_rs_pins_pt : u_pins_pt RS satpv pcfg paddr tlbv.
+  Proof. rewrite /u_pins_pt. split_and!; reflexivity. Qed.
+
+End URs.
