@@ -949,3 +949,74 @@ Proof.
   rewrite write_bytes_word.
   unfold pt_addr0. by rewrite Hb0.
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4d. ...AND SO THE WRITE-BACK IS A [u_mem_step].                          *)
+(* ---------------------------------------------------------------------- *)
+Lemma pt_same_shape_upd_ent (lvl : nat) (t : ptree) (i : mword 9) (q : mword 64) :
+  pt_same_shape lvl t (pt_upd_ent t i q).
+Proof.
+  destruct lvl as [| lvl]; split; [ reflexivity | done | reflexivity |].
+  intros k. cbn [pt_kids pt_upd_ent].
+  destruct (pt_kids t k) as [c|]; [ apply pt_same_shape_refl | done ].
+Qed.
+
+Lemma pt_same_shape_upd_kid (lvl : nat) (t c c' : ptree) (i : mword 9) :
+  pt_kids t i = Some c -> pt_same_shape lvl c c' ->
+  pt_same_shape (S lvl) t (pt_upd_kid t i (Some c')).
+Proof.
+  intros Hk Hs. split; [ reflexivity |].
+  intros k. destruct (decide (k = i)) as [-> | Hne].
+  - rewrite pt_kids_upd_kid_same. rewrite Hk. exact Hs.
+  - rewrite (pt_kids_upd_kid_ne t i k (Some c') Hne).
+    destruct (pt_kids t k) as [c0|]; [ apply pt_same_shape_refl | done ].
+Qed.
+
+Lemma pt_same_shape_set_leaf (t : ptree) (vpn : mword 27) (p2 p1 p0 q : mword 64) :
+  ptree_maps t vpn p2 p1 p0 -> pt_same_shape 2 t (ptree_set_leaf t vpn q).
+Proof.
+  intros (c1 & c0 & Hk1 & Hk0 & _).
+  assert (Hsl : ptree_set_leaf t vpn q
+                = pt_upd_kid t (vpn_idx 2 vpn)
+                    (Some (pt_upd_kid c1 (vpn_idx 1 vpn)
+                             (Some (pt_upd_ent c0 (vpn_idx 0 vpn) q))))).
+  { unfold ptree_set_leaf. rewrite Hk1. by rewrite Hk0. }
+  rewrite Hsl.
+  apply (pt_same_shape_upd_kid 1 t c1 _ (vpn_idx 2 vpn) Hk1).
+  apply (pt_same_shape_upd_kid 0 c1 c0 _ (vpn_idx 1 vpn) Hk0).
+  apply pt_same_shape_upd_ent.
+Qed.
+
+Lemma u_mem_step_writeback (P : uptd) (t : ptree) (mm : pamap)
+    (vpn : mword 27) (p2 p1 p0 q : mword 64) :
+  u_mem_wf P t mm ->
+  ptree_maps t vpn p2 p1 p0 ->
+  upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P) (ptree_set_leaf t vpn q) ->
+  u_mem_step P t (ptree_set_leaf t vpn q) mm
+    (write_bytes mm (pt_addr0 p1 vpn) 8 q).
+Proof.
+  intros Hwf Hmaps Hspec'.
+  pose proof (pt_same_shape_set_leaf t vpn p2 p1 p0 q Hmaps) as Hshape.
+  destruct Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hrest).
+  (* the slot's OLD bytes live in the tree half, hence are disjoint from the
+     data half; the NEW ones have the same keys, so they are too *)
+  assert (Hwdj : word_bytes (pt_addr0 p1 vpn) q ##ₘ md).
+  { apply map_disjoint_spec. intros x b1 b2 H1 H2.
+    destruct (word_bytes_is_Some (pt_addr0 p1 vpn) q p0 x (mk_is_Some _ _ H1))
+      as [b0 Hb0].
+    pose proof (maps_disj_subseteq (pt_maps 2 t)
+                  (word_bytes (pt_addr0 p1 vpn) p0) Hdisj
+                  (ptree_maps_slot0 t vpn p2 p1 p0 Hmaps)) as Hsubt.
+    pose proof (lookup_weaken _ _ x b0 Hb0 Hsubt) as Hbt.
+    exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 b2 Hbt H2). }
+  assert (Heq : ptree_bytes 2 (ptree_set_leaf t vpn q)
+                = word_bytes (pt_addr0 p1 vpn) q ∪ ptree_bytes 2 t).
+  { rewrite (ptree_bytes_set_leaf t vpn p2 p1 p0 q Hdisj Hmaps).
+    apply write_bytes_word. }
+  split_and!; [ exact Hshape | exact Hspec' |].
+  exists md. split_and!.
+  - rewrite Heq. apply map_disjoint_union_l. by split.
+  - rewrite Hmm. rewrite write_bytes_union_l. rewrite write_bytes_word.
+    rewrite Heq. reflexivity.
+  - exact Hdm.
+Qed.
