@@ -44,12 +44,13 @@ From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map.
-Require Import SailStdpp.Operators_mwords SailStdpp.Values.
+Require Import SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes VirtioQueue.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import HartMemRun PtBytes.
 Require Import PtreeType CommonWalk Pt4kWalk PtTree.
+Require Import RiscvFetchExec PtTreeAdue SmodePte UptTree UserPtTree.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -330,3 +331,356 @@ Section UserBytesShape.
   Qed.
 
 End UserBytesShape.
+
+(* ===================================================================== *)
+(* 3. [u_mem_wf] / [u_mem_step] -- THE HART'S OWNED MAP.                  *)
+(*                                                                       *)
+(* [u_mem_wf P t mm] says: [mm] is the tree [t]'s bytes together with the *)
+(* mapped data pages' bytes, the two halves are DISJOINT, every address   *)
+(* in it is RAM, and the pure page-table facts [user_pt_inv] carries hold *)
+(* of [t].  It is the premise every memory [goodmb] twin in the port      *)
+(* takes; [goodmb]'s two obligations at a RAM access -- the footprint is  *)
+(* inside the owned map, and the address is not a device -- are           *)
+(* projections of it ([PtBytes] section 2, and the [addr_is_ram]          *)
+(* conjunct with [RiscvPtsto.addr_is_ram_not_dev]).                        *)
+(*                                                                       *)
+(* [u_mem_step P t t' mm mm'] is what a user cycle may do to it: the      *)
+(* data half is ARBITRARY at the same domain (a user store writes what it *)
+(* likes inside its own pages), and the tree half moves only to a         *)
+(* SAME-SHAPED tree that still satisfies [upt_tree_spec] -- which is      *)
+(* exactly the A/D write-back, since [upt_tree_spec] already quantifies   *)
+(* its leaves as [pte_set_ad w a d].  Re-establishing the invariant is    *)
+(* therefore the pure content of the existing ADUE absorption and not new *)
+(* reasoning.                                                             *)
+(* ===================================================================== *)
+
+Definition u_mem_wf (P : uptd) (t : ptree) (mm : pamap) : Prop :=
+  exists md : pamap,
+    maps_disj (pt_maps 2 t) /\
+    ptree_bytes 2 t ##ₘ md /\
+    mm = ptree_bytes 2 t ∪ md /\
+    (forall a : Arch.pa, a ∈ ud_data P <-> is_Some (md !! a)) /\
+    (forall a : Arch.pa, a ∈ (dom mm : gset Arch.pa) -> addr_is_ram a) /\
+    udata_cov (ud_um P) (ud_data P) /\
+    upt_acc_wf (ud_um P) /\
+    upt_map_wf (ud_um P) /\
+    upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P) t.
+
+Definition u_mem_step (P : uptd) (t t' : ptree) (mm mm' : pamap) : Prop :=
+  pt_same_shape 2 t t' /\
+  upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P) t' /\
+  exists md' : pamap,
+    ptree_bytes 2 t' ##ₘ md' /\
+    mm' = ptree_bytes 2 t' ∪ md' /\
+    (forall a : Arch.pa, a ∈ ud_data P <-> is_Some (md' !! a)).
+
+(* the domains agree along a step -- which is what [HartMemRun]'s
+   [dom mm' = dom mm] obligation wants, and what makes a stretch's
+   certificate re-usable at the next node *)
+Lemma union_list_dom_shape (l l' : list pamap) :
+  Forall2 (fun m m' => (dom m : gset Arch.pa) = dom m') l l' ->
+  (dom (⋃ l) : gset Arch.pa) = dom (⋃ l').
+Proof.
+  induction 1 as [| m m' l l' Hm Hl IH]; [reflexivity |].
+  rewrite !union_list_cons !dom_union_L. by f_equal.
+Qed.
+
+Lemma ptree_bytes_dom_shape (lvl : nat) (t t' : ptree) :
+  pt_same_shape lvl t t' ->
+  (dom (ptree_bytes lvl t) : gset Arch.pa) = dom (ptree_bytes lvl t').
+Proof.
+  intros Hs. rewrite /ptree_bytes.
+  apply union_list_dom_shape, pt_maps_dom_shape, Hs.
+Qed.
+
+Lemma u_mem_step_dom (P : uptd) (t t' : ptree) (mm mm' : pamap) :
+  u_mem_wf P t mm -> u_mem_step P t t' mm mm' ->
+  (dom mm' : gset Arch.pa) = dom mm.
+Proof.
+  intros (md & _ & _ & -> & Hdm & _) (Hshape & _ & md' & _ & -> & Hdm').
+  assert (Hd : (dom md' : gset Arch.pa) = dom md).
+  { apply set_eq. intros a. rewrite !elem_of_dom. split; intros H.
+    - apply (proj1 (Hdm a)), (proj2 (Hdm' a)), H.
+    - apply (proj1 (Hdm' a)), (proj2 (Hdm a)), H. }
+  rewrite (dom_union_L (ptree_bytes 2 t') md') (dom_union_L (ptree_bytes 2 t) md).
+  rewrite Hd -(ptree_bytes_dom_shape 2 t t' Hshape). reflexivity.
+Qed.
+
+(* ...and so a step lands back in [u_mem_wf], at the new tree *)
+Lemma u_mem_step_wf (P : uptd) (t t' : ptree) (mm mm' : pamap) :
+  u_mem_wf P t mm -> u_mem_step P t t' mm mm' -> u_mem_wf P t' mm'.
+Proof.
+  intros Hwf Hstep.
+  pose proof (u_mem_step_dom P t t' mm mm' Hwf Hstep) as Hdom.
+  destruct Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc & Hwfm & Hspec).
+  destruct Hstep as (Hshape & Hspec' & md' & Hdj' & Hmm' & Hdm').
+  (* explicit, never [try done]: [done] on a [maps_disj (pt_maps 2 t')] goal
+     tries to evaluate the 512-way [seqZ] and does not come back *)
+  exists md'. split_and!.
+  - apply (pt_maps_disj_shape 2 t t' Hshape Hdisj).
+  - exact Hdj'.
+  - exact Hmm'.
+  - exact Hdm'.
+  - intros a Ha. apply Hram. rewrite <- Hdom. exact Ha.
+  - exact Hcov.
+  - exact Hacc.
+  - exact Hwfm.
+  - exact Hspec'.
+Qed.
+
+(* a stretch that changes nothing is a step *)
+Lemma u_mem_step_refl (P : uptd) (t : ptree) (mm : pamap) :
+  u_mem_wf P t mm -> u_mem_step P t t mm mm.
+Proof.
+  intros (md & _ & Hdj & Hmm & Hdm & _ & _ & _ & _ & Hspec).
+  split_and!; [ apply pt_same_shape_refl | exact Hspec |].
+  exists md. split_and!; [ exact Hdj | exact Hmm | exact Hdm ].
+Qed.
+
+(* THE SLOT VIEW.  A page-table slot of ANY node of the tree is readable
+   out of the owned map -- which is what turns the walk's [ptree_own_path_mem]
+   (an Iris accessor over the authority) into a PURE premise. *)
+Lemma pt_page_map_mem (t : ptree) (i : Z) :
+  0 <= i < 512 ->
+  word_bytes (u_pte_addr (pt_base t) (mword_of_int i))
+             (pt_ents t (mword_of_int i)) ∈ pt_page_maps t.
+Proof.
+  intros Hi. rewrite /pt_page_maps. apply elem_of_list_fmap.
+  exists i. split; [reflexivity |]. apply elem_of_seqZ. lia.
+Qed.
+
+Lemma pt_maps_page (lvl : nat) (t : ptree) (m : pamap) :
+  m ∈ pt_page_maps t -> m ∈ pt_maps lvl t.
+Proof.
+  intros Hm. destruct lvl as [| lvl]; [ by rewrite pt_maps_O |].
+  rewrite pt_maps_S elem_of_app. by left.
+Qed.
+
+Lemma pt_maps_kid (lvl : nat) (t c : ptree) (i : Z) (m : pamap) :
+  0 <= i < 512 -> pt_kids t (mword_of_int i) = Some c ->
+  m ∈ pt_maps lvl c -> m ∈ pt_maps (S lvl) t.
+Proof.
+  intros Hi Hk Hm. rewrite pt_maps_S elem_of_app. right.
+  apply elem_of_list_In, in_concat.
+  exists (pt_maps lvl c). split.
+  - apply elem_of_list_In, elem_of_list_fmap.
+    exists i. rewrite Hk. split; [reflexivity |]. apply elem_of_seqZ. lia.
+  - by apply elem_of_list_In.
+Qed.
+
+Lemma u_mem_wf_sub (P : uptd) (t : ptree) (mm : pamap)
+    (a : Arch.pa) (w : bv 64) :
+  u_mem_wf P t mm -> word_bytes a w ∈ pt_maps 2 t -> word_bytes a w ⊆ mm.
+Proof.
+  intros (md & Hdisj & Hdj & -> & _) Hm.
+  etrans; [ exact (maps_disj_subseteq _ _ Hdisj Hm) |].
+  apply map_union_subseteq_l.
+Qed.
+
+Lemma u_mem_wf_read (P : uptd) (t : ptree) (mm : pamap)
+    (a : Arch.pa) (w : bv 64) :
+  u_mem_wf P t mm -> word_bytes a w ∈ pt_maps 2 t ->
+  read_bytes mm a 8 = Some w.
+Proof. intros Hwf Hm. by apply read_bytes_word, (u_mem_wf_sub P t mm a w). Qed.
+
+Lemma u_mem_wf_owned (P : uptd) (t : ptree) (mm : pamap)
+    (a : Arch.pa) (w : bv 64) :
+  u_mem_wf P t mm -> word_bytes a w ∈ pt_maps 2 t ->
+  bytes_owned mm a 8 = true.
+Proof.
+  intros Hwf Hm.
+  apply (bytes_owned_word mm a w), (u_mem_wf_sub P t mm a w Hwf Hm).
+Qed.
+
+(* every access inside the owned map is RAM, hence NOT a device -- the
+   conjunct that lets the tier have no MMIO arm at all *)
+Lemma u_mem_wf_not_dev (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) :
+  u_mem_wf P t mm -> a ∈ (dom mm : gset Arch.pa) -> dev_addr a = false.
+Proof.
+  intros (_ & _ & _ & _ & _ & Hram & _) Ha. by apply addr_is_ram_not_dev, Hram.
+Qed.
+
+(* ===================================================================== *)
+(* 3b. THE DATA PAGES -- AND A TYPE DIVIDE THAT HAS TO BE CROSSED.        *)
+(*                                                                       *)
+(* The port plan says [UserPtTree.udata_own] IS [HartMemRun.bytes_own] up *)
+(* to the [dom] conjunct, and therefore zero work.  THAT IS NOT TRUE AS   *)
+(* THE TREE STANDS, and the reason is invisible at the printed syntax:    *)
+(* the two byte maps are at DIFFERENT [Countable Arch.pa] instances.      *)
+(* [RiscvModelBytes] / [HartMemRun] (and hence [read_bytes], [bytes_own], *)
+(* [gen_heap_interp]) elaborate [gmap Arch.pa (bv 8)] with stdpp's        *)
+(* [bv_countable]; [UserPtTree] imports [SailStdpp.Base]/[Values], where  *)
+(* [Instances.Countable_mword] wins.  The two records differ in their     *)
+(* [decode_encode] PROOF field, so the resulting [gmap] types are NOT     *)
+(* convertible -- [exact] refuses them -- while both print as             *)
+(* [gmap Arch.pa (bv 8)].                                                 *)
+(*                                                                       *)
+(* THE REAL FIX is to pin [udata_own]'s map (and [uptd.ud_data]) to the   *)
+(* canonical instance, i.e. to state them at [PtBytes.pamap]; that is a   *)
+(* change to [UserPtTree.v] and its consumers and belongs with the tier   *)
+(* package.  Until then the two lemmas below cross the divide by          *)
+(* [list_to_map (map_to_list _)], which is the identity on lookups, and   *)
+(* the transport is one [Permutation] of [map_to_list]s.                  *)
+(* ===================================================================== *)
+
+Section UserBytesData.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* stated at [ud_data P] rather than at an abstract [data : gset Arch.pa]
+     ON PURPOSE: writing that annotation here elaborates the set at THIS
+     file's instances, which are not [UserPtTree]'s -- see the note above. *)
+  Lemma udata_own_bytes (P : uptd) :
+    udata_own (ud_data P) -∗
+    ∃ md : pamap, ⌜forall a : Arch.pa, a ∈ ud_data P <-> is_Some (md !! a)⌝ ∗
+                  bytes_own md.
+  Proof.
+    iIntros "H". iDestruct "H" as (dm) "[%Hdom Hm]".
+    iExists (list_to_map (map_to_list dm)).
+    assert (Hlk : forall a : Arch.pa,
+              (list_to_map (map_to_list dm) : pamap) !! a = dm !! a).
+    { intros a. destruct (dm !! a) as [b |] eqn:Hb.
+      - apply elem_of_list_to_map_1; [ apply NoDup_fst_map_to_list |].
+        by apply elem_of_map_to_list.
+      - apply not_elem_of_list_to_map_1. intros Hin.
+        apply elem_of_list_fmap in Hin as ([a' b'] & Ha' & Hin').
+        apply elem_of_map_to_list in Hin'. cbn in Ha'. subst a'.
+        rewrite Hb in Hin'. discriminate. }
+    iSplitR.
+    { iPureIntro. intros a. rewrite Hlk -Hdom elem_of_dom. reflexivity. }
+    assert (Hperm : map_to_list (list_to_map (map_to_list dm) : pamap)
+                    ≡ₚ map_to_list dm)
+      by (apply map_to_list_to_map, NoDup_fst_map_to_list).
+    (* [rewrite] in the proofmode sees the CONTEXT too and would rewrite
+       "Hm" instead of the goal; [iEval] without [in] targets the goal. *)
+    iEval (rewrite big_opM_map_to_list) in "Hm".
+    iEval (rewrite /bytes_own big_opM_map_to_list Hperm).
+    iExact "Hm".
+  Qed.
+
+  Lemma udata_own_of_bytes (P : uptd) (md : pamap) :
+    (forall a : Arch.pa, a ∈ ud_data P <-> is_Some (md !! a)) ->
+    bytes_own md -∗ udata_own (ud_data P).
+  Proof.
+    intros Hdom. iIntros "Hm". rewrite /udata_own.
+    iExists (list_to_map (map_to_list md)).
+    iSplitR.
+    { iPureIntro. apply set_eq. intros a. rewrite elem_of_dom (Hdom a).
+      split.
+      - intros [b Hb]. apply elem_of_list_to_map_2, elem_of_map_to_list in Hb.
+        by exists b.
+      - intros [b Hb]. exists b. apply elem_of_list_to_map_1;
+          [ apply NoDup_fst_map_to_list | by apply elem_of_map_to_list ]. }
+    iEval (rewrite /bytes_own big_opM_map_to_list) in "Hm".
+    (* the permutation cannot be stated as a hypothesis here: its left-hand
+       side is [map_to_list] of a map at UserPtTree's [Countable] instance,
+       which this file cannot NAME.  Applied inline, [rewrite] takes the
+       instance from the goal. *)
+    iEval (rewrite big_opM_map_to_list
+             (map_to_list_to_map _ (NoDup_fst_map_to_list md))).
+    iExact "Hm".
+  Qed.
+
+End UserBytesData.
+
+(* ===================================================================== *)
+(* 4. THE ACCESSOR.                                                       *)
+(*                                                                       *)
+(* [user_pt_inv] in, ONE byte map out -- plus the register cells, the     *)
+(* persistent node claims, and a closing wand that takes a map back.      *)
+(* This is the shape every memory-facing rule of the ported tier sits on: *)
+(* the hart holds [bytes_own mm] across its whole cycle, each model call  *)
+(* is one [swp_hmrun_of_exec] at [MState rs mm dev0_state], and the       *)
+(* invariant is re-sealed once at the end.                                *)
+(*                                                                       *)
+(* WHAT THE CLOSING WAND ASKS FOR, and why each piece is unavoidable:     *)
+(*   [u_mem_step]  -- the new map is a same-shaped tree's bytes plus      *)
+(*                    arbitrary data bytes at the same domain, and the    *)
+(*                    new tree still satisfies [upt_tree_spec].  That is  *)
+(*                    the A/D absorption, and it is the caller's to       *)
+(*                    discharge because only the walk knows which leaf    *)
+(*                    it touched.                                         *)
+(*   [tlb_ok_pt]   -- a fill installs an entry, so the TLB/tree agreement *)
+(*                    is re-established by whoever filled it; the cell    *)
+(*                    comes back at a FRESH value for the same reason     *)
+(*                    [HartRunGen]'s fetch obligation lets the fetch land *)
+(*                    on a different file.                                *)
+(* Everything else -- the node claims, the satp facts, the pma clause --  *)
+(* is carried across untouched.                                           *)
+(* ===================================================================== *)
+
+Section UserPtInvBytes.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the register cells [utlb_inv_pt] owns, as one bundle *)
+  Definition upt_regs (P : uptd) (usatp : mword 64)
+      (tlbvec : type_of_register tlb) : iProp Σ :=
+    (satp ↦ᵣ usatp ∗ tlb ↦ᵣ tlbvec ∗ pmp_config (ud_root P))%I.
+
+  (* ...and the pure facts about satp and the PMAs that ride with them *)
+  Definition upt_satp_ok (P : uptd) (usatp : mword 64) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) /\
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64))
+      = (mword_of_int 0 : mword 16) /\
+    autocast (T := mword)
+      (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = ud_root P /\
+    (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0).
+
+  Lemma user_pt_inv_bytes (P : uptd) :
+    user_pt_inv P -∗
+    ∃ (t : ptree) (mm : pamap) (usatp : mword 64)
+      (tlbvec : type_of_register tlb),
+      ⌜u_mem_wf P t mm⌝ ∗ ⌜upt_satp_ok P usatp⌝ ∗
+      ⌜tlb_ok_pt (mword_of_int 0) t tlbvec⌝ ∗
+      upt_regs P usatp tlbvec ∗ pt_claims 2 t ∗ bytes_own mm ∗
+      (∀ (t' : ptree) (mm' : pamap) (tlbvec' : type_of_register tlb),
+         ⌜u_mem_step P t t' mm mm'⌝ -∗
+         ⌜tlb_ok_pt (mword_of_int 0) t' tlbvec'⌝ -∗
+         upt_regs P usatp tlbvec' -∗ bytes_own mm' -∗ user_pt_inv P).
+  Proof.
+    iIntros "(Htlb & Hdata & %Hcov & %Hacc)".
+    iDestruct "Htlb" as (usatp tlbvec t)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlbc & %Hok & %Hspec & %Hwfm &
+        %Hpmaw & Htree & Hpmp)".
+    iDestruct (udata_own_bytes with "Hdata") as (md) "[%Hdm Hmd]".
+    iDestruct (ptree_own_bytes with "Htree") as "(#Hc & %Hdisj & Hmt)".
+    iDestruct (bytes_own_disj with "Hmt Hmd") as %Hdj.
+    iAssert (bytes_own (ptree_bytes 2 t ∪ md)) with "[Hmt Hmd]" as "Hmm".
+    { rewrite (bytes_own_union _ _ Hdj). iFrame. }
+    iDestruct (bytes_own_ram with "Hmm") as %Hram.
+    iExists t, (ptree_bytes 2 t ∪ md), usatp, tlbvec.
+    iSplitR.
+    { iPureIntro. exists md. split_and!.
+      - exact Hdisj.
+      - exact Hdj.
+      - reflexivity.
+      - exact Hdm.
+      - exact Hram.
+      - exact Hcov.
+      - exact Hacc.
+      - exact Hwfm.
+      - exact Hspec. }
+    iSplitR.
+    { iPureIntro. rewrite /upt_satp_ok. split_and!;
+        [ exact Hmode | exact Hasid | exact Hppn | exact Hpmaw ]. }
+    iSplitR; [ iPureIntro; exact Hok |].
+    rewrite /upt_regs. iFrame "Hsatp Htlbc Hpmp Hc Hmm".
+    (* the closing wand *)
+    iIntros (t' mm' tlbvec') "%Hstep %Hok' (Hsatp & Htlbc & Hpmp) Hmm'".
+    destruct Hstep as (Hshape & Hspec' & md' & Hdj' & -> & Hdm').
+    rewrite (bytes_own_union _ _ Hdj'). iDestruct "Hmm'" as "[Hmt' Hmd']".
+    rewrite /user_pt_inv.
+    iSplitR "Hmd'".
+    - iApply (utlb_inv_pt_intro (ud_root P) (ud_tfp P) (ud_um P)
+                usatp tlbvec' t' Hmode Hasid Hppn Hok' Hspec' Hwfm Hpmaw
+                with "Hsatp Htlbc [Hmt'] Hpmp").
+      iApply (ptree_own_of_bytes 2 t'
+                (pt_maps_disj_shape 2 t t' Hshape Hdisj) with "[] Hmt'").
+      by iApply (pt_claims_shape 2 t t' Hshape).
+    - iSplitL "Hmd'".
+      + iApply (udata_own_of_bytes P md' Hdm' with "Hmd'").
+      + iSplitR; [ iPureIntro; exact Hcov | iPureIntro; exact Hacc ].
+  Qed.
+
+End UserPtInvBytes.

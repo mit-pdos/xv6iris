@@ -283,6 +283,28 @@ Proof.
     apply map_disjoint_dom, Hhd, elem_of_list_lookup. by exists k.
 Qed.
 
+(* the head of a disjoint list is disjoint from the union of the tail *)
+Lemma maps_disj_head (m : pamap) (l : list pamap) :
+  (forall m' : pamap, m' ∈ l -> m ##ₘ m') -> m ##ₘ ⋃ l.
+Proof.
+  intros H. apply map_disjoint_union_list_r, Forall_forall.
+  intros m' Hm'. by apply symmetry, H.
+Qed.
+
+(* ...so a member of a disjoint list is a SUBMAP of the union: what turns
+   "the walk owns this slot" into "the slot is readable out of the hart's
+   one byte map" *)
+Lemma maps_disj_subseteq (l : list pamap) (m : pamap) :
+  maps_disj l -> m ∈ l -> m ⊆ ⋃ l.
+Proof.
+  induction l as [| m0 l IH]; intros Hd Hm; [by apply elem_of_nil in Hm |].
+  destruct Hd as [Hhd Htl]. rewrite union_list_cons.
+  apply elem_of_cons in Hm as [-> | Hm].
+  - apply map_union_subseteq_l.
+  - etrans; [ apply (IH Htl Hm) |].
+    apply map_union_subseteq_r, (maps_disj_head m0 l Hhd).
+Qed.
+
 Section MapsUnion.
   Context `{!riscvGS Σ}.
 
@@ -306,9 +328,7 @@ Section MapsUnion.
     induction l as [| m l IH]; intros Hd.
     - rewrite /bytes_own /=. by rewrite big_sepM_empty.
     - destruct Hd as [Hhd Htl].
-      assert (Hdisj : m ##ₘ ⋃ l).
-      { apply map_disjoint_union_list_r, Forall_forall.
-        intros m' Hm'. by apply symmetry, Hhd. }
+      pose proof (maps_disj_head m l Hhd) as Hdisj.
       rewrite big_sepL_cons (IH Htl) /=.
       by rewrite (bytes_own_union _ _ Hdisj).
   Qed.
