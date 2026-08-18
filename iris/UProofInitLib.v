@@ -21,12 +21,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import InstrBytes RegFile.
-Require Import AlignBits UserBits.
+Require Import AlignBits.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo
                UmodeInitIo UmodeFetch.
-Require Import WpUmodeStep WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
+Require Import WpUmodeLeaf WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame UmodeStub.
 Require Import UCodeInit USpecInit.
 Require User.InitSyms User.InitInstrs User.InitData.

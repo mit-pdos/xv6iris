@@ -114,7 +114,6 @@ Require Import SmodeCore.
 Require Import KernelText.
 Require Import IntrDefs.
 Require Import WpMmodeLeafBase.
-Require Import StackOwn.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.

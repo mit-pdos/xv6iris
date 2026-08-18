@@ -51,11 +51,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes RegFile.
-Require Import AlignBits UserBits.
+Require Import AlignBits.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeFetch.
-Require Import WpUmodeStep WpUmodeLeaf WpUmodeStore WpUmodeLoad.
+Require Import UmodeMem UmodeCap UmodeAbi UmodeArith.
+Require Import WpUmodeLeaf WpUmodeStore WpUmodeLoad.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.

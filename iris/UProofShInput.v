@@ -21,10 +21,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes RegFile.
-Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo.
+Require Import UmodeAbi.
 Require Import UCodeSh USpecSh USpecShParse.
 Local Open Scope Z_scope.
 Import Defs.

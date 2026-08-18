@@ -309,7 +309,6 @@ Require Import FsCrash.
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
 Require Import InodeRegion.
-Require Import IcacheEscrow IcacheInv.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
 Require Import ProcInv.

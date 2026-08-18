@@ -59,14 +59,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes WpGpr RegFile.
-Require Import AlignBits UserBits.
+Require Import InstrBytes RegFile.
+Require Import AlignBits.
 Require Import RiscvModelBytes.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo UmodeFetch.
-Require Import WpUmodeStep WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
-Require Import UmodeFrame.
+Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo.
+Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UCodeSh USpecSh UProofShLib UProofShMem.
 (* re-imported LAST on purpose: WpUmodeStep.v's funnel names its optional
    gpr write [uv_wr], which otherwise shadows UmodeAbi's writable-window
