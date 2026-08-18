@@ -168,6 +168,7 @@ SpecSpin.v
 ProofSpin.v
 LinkSpin.v
 SmodePte.v
+UserFrame.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
