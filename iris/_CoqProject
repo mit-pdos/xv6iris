@@ -22,7 +22,6 @@ HartBlock.v
 HartSwp.v
 HartLift.v
 HartEvents.v
-HartAmo.v
 HartRegNode.v
 HartSpan.v
 HartSpanChar.v

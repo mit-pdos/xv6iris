@@ -14,9 +14,11 @@ hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
 **2026-08-18 DECISION: the FUSED AMO/write-back arm is RETIRED in favour of a
-per-hart RESERVATION in σ (design §3a).**  The next piece of work is
-implementing it (item 1 under "What is left, in order" in the S-mode fetch
-section); the two-footprint-walker item it replaces is closed.
+per-hart RESERVATION in σ (design §3a), AND THE LANGUAGE SIDE IS LANDED**
+(`RiscvLang`, `HartBlock`, `RiscvExec.wp_hart_step`, the `HartEvents` /
+`HartRegNode` / `HartSpan` / `HartLift*` rules; `HartAmo.v` deleted; red
+roots unchanged).  What is left is the `state_interp` side -- see item 1
+under "What is left, in order" in the S-mode fetch section.
 
 **BOTH WRAPPERS ARE DONE AND THE CSR FAMILIES ARE GREEN.**  No admits anywhere;
 `wp_instr` closes at exactly the 5 rv64d platform axioms.  The sweep has needed
@@ -476,6 +478,29 @@ a conditional write is a plain store, as before.
    e. Then the write-back twin below is just the conditional-write rule at
       `(Store PageTableEntry)`/`Supervisor`/8 through the `kptN` seam.
 
+   **Progress (2026-08-18): (a) DONE and (c) HALF DONE; the tree's red
+   roots are unchanged (the same nine files as before, none new).**
+   `RiscvLang.v` has `resv`/`footprint`/`snap_of`, `gstate.gresv`,
+   `others_resv`/`all_resv`, `resv_ok`, the new `mnode_step oth s r m m' s'
+   r'` (self-loop arms on the exclusive read and on EVERY RAM write, own
+   reservation cleared by every `MemWrite` incl. MMIO and by the boundary,
+   plain-read guard / `silent1` / `silent_run` / `wr_node` deleted), the
+   disk arm's reserved-bytes-untouched conjunct, `boot_facts`' "no
+   reservation" clause, and the invariant proof `prim_step_resv_ok`
+   (via `mnode_step_resv`, `hart_node_step_resv_ok`, `snap_of_sub`,
+   `write_bytes_lookup_notin`, `dom_snap_of`).  `HartBlock` threads the
+   hart's reservation existentially at `oth = ∅` (the bracket is otherwise
+   unchanged).  `RiscvExec.wp_hart_step` ∀-quantifies `oth`/`r` and the
+   caller owes a witness + continuation for every value -- the stopgap
+   until (b); its comment says so.  `HartEvents`: read/write/MMIO rules
+   re-proved with statements UNCHANGED (the write and the new
+   `wp_hart_ram_read_excl`/`swp_hart_ram_read_excl` absorb the self-loop by
+   `iLöb`); `HartRegNode`/`HartSpan`/`HartLift`/`HartLift2` re-indexed.
+   `HartAmo.v` DELETED.  What is left of this item: (b) the `resv_frag`
+   ghost + `resv_ok` conjunct in `state_interp` and a lifting rule that
+   exposes them; the conditional-write rule on top of it; (d) the acquire;
+   (e) the write-back twin.
+
 2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
    uncovered and it was NOT on this list before.  `swp_translate_hit` and
    `swp_translate_miss` both carry `update_PTE_Bits … = None` -- i.e. they
@@ -775,10 +800,11 @@ footprints).
 The language and the bracket:
 
 - `iris/RiscvLang.v` — `HartE gen cpu m`; `LoopE` a Definition;
-  `mnode_step` (hart-local, on `mstate`) + `hart_node_step`
-  (focus / step / write-back); `ak_excl`; **still carries the RETIRED
-  fused-AMO window** (`silent1`/`silent_run`/`wr_node`) until §3a's
-  reservation lands ("Left, in order" / the write-back item); per-arm `prim_step`
+  `mnode_step oth s r m m' s' r'` (hart-local, on `mstate` plus the
+  reservation context) + `hart_node_step` (focus / step / write-back);
+  `ak_excl`; the reservation (`resv`, `footprint`, `snap_of`,
+  `gstate.gresv`, `others_resv`/`all_resv`, `resv_ok` and its preservation
+  `prim_step_resv_ok`); per-arm `prim_step`
   inversion; `prim_step_hart_regs_frame` — the batching licence: plic's
   `sig_seip` wire is the only cross-thread register write.
 - `iris/HartBlock.v` — the solo-block bracket, sound direction
@@ -810,15 +836,12 @@ The proof interface (design §5 items 1, 1c, 6, 7):
 - `iris/HartSpanChar.v` — the six peel inversions, **`hfrun_hval`** (the
   computed route, no side conditions), `swp_hfrun`, and the two rules that
   fire constantly: `swp_read_reg_pinned`, `swp_write_reg_owned`.
-- `iris/HartEvents.v` — RAM read/write and MMIO read/write, each in a
-  context form and a `swp` form.
+- `iris/HartEvents.v` — RAM read (plain and exclusive)/write and MMIO
+  read/write, each in a context form and a `swp` form; the write and the
+  exclusive read absorb the reservation self-loop by Löb.
 - `iris/HartRegNode.v` — single-node RegRead/RegWrite (the escape hatch
   for invariant-held cells and the `sig_seip` wire), likewise both forms,
   plus the `hregread_resume_red`/`hregwrite_resume_red` equations.
-- `iris/HartAmo.v` — the fused-AMO rule and its pure window layer.
-  **RETIRED by design §3a**; to be deleted when the reservation lands
-  (the exclusive read and conditional write become ordinary `swp`
-  memory-event rules).
 - `iris/HartLift.v` / `iris/HartLift2.v` — the older cursor batch and the
   two-footprint functional batch.  **Superseded by `hfrun`**; `HartLift`'s
   projections (`hread_req_at`, `hread_resume`, `hreg_frame`, …) are still

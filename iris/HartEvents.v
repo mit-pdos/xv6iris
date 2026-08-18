@@ -1,8 +1,19 @@
 (* HartEvents.v -- the per-memory-event WP rules, item 2 of the proof
    interface (claude-notes/design/main-cycle-port.md §5): one rule per event
-   class -- RAM read, RAM write, MMIO read, MMIO write.  (The fused AMO has
-   its own file, HartAmo.v; the pinned-text fetch rule is a later derived
-   specialization of [wp_hart_ram_read].)
+   class -- RAM read (plain and EXCLUSIVE), RAM write, MMIO read, MMIO
+   write.  (The pinned-text fetch rule is a later derived specialization of
+   [wp_hart_ram_read].)
+
+   THE RESERVATION (design §3a) shows up in exactly two ways here, and both
+   are INSIDE the proofs, not in the statements: a RAM write or an exclusive
+   read whose footprint meets another hart's reservation SELF-LOOPS, and the
+   rule absorbs that arm by Löb (the caller's premise is untouched on that
+   arm, so the IH applies verbatim); and the caller learns nothing about the
+   hart's own reservation from these rules -- [wp_hart_step] ∀-quantifies
+   it -- which is right until the conditional-write rule that will need the
+   [resv_frag].  The exclusive-read rule below therefore has the SAME
+   statement as the plain one; what differs is only which language arm it
+   takes.
 
    THE CURRENCY IS TODAY'S: each rule hands the caller a fupd σ-callback
    with [mstate_interp], exactly as [wp_exec_step] did, so the points-to /
@@ -31,9 +42,8 @@ Section events.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)
-  (* RAM READ (the plain, non-exclusive one -- [ak_excl = false], which   *)
-  (* is the guard of the language's plain-read arm; an exclusive read     *)
-  (* goes through HartAmo.v's fused rule).                                *)
+  (* RAM READ, the plain one ([ak_excl = false]): never blocked, never    *)
+  (* reserving.  The exclusive twin follows it.                           *)
   (*                                                                      *)
   (* The caller's witness is a [read_bytes] fact -- the same shape        *)
   (* [exec] pins reads with -- which both certifies the arm's ∃ and,      *)
@@ -67,18 +77,18 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ".
+    iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
-    iModIntro. iExists (C (K (inl (w, None)))), σ.
+    iModIntro. iExists (C (K (inl (w, None)))), σ, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       left. split; [exact Hexcl|]. exists w.
       split; [exact (read_bytes_spec _ _ _ _ Hrb)|]. done. }
-    iNext. iIntros (m' σ') "%Hstep".
+    iNext. iIntros (m' σ' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as [(_ & w' & Hbytes' & -> & ->) | (Hex & _)];
+    destruct Hstep as [(_ & w' & Hbytes' & -> & -> & ->) | (Hex & _)];
       last congruence.
     assert (w' = w) as ->.
     { apply bv_eq_of_bytes. intros j Hj.
@@ -90,10 +100,12 @@ Section events.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* RAM WRITE.  Deterministic and total (the language's store arm is     *)
-  (* unguarded -- see the fused-arm note in RiscvLang.v), so there is no  *)
-  (* witness at all: the caller re-establishes [mstate_interp] at the     *)
-  (* written map, with the gen_heap update happening inside its fupd.     *)
+  (* RAM WRITE.  Total, so there is no witness at all: the caller           *)
+  (* re-establishes [mstate_interp] at the written map, with the gen_heap  *)
+  (* update happening inside its fupd.  Which of the two arms fires is     *)
+  (* decided by σ (another hart's reservation on the footprint ⇒ self-      *)
+  (* loop), and the rule sees σ BEFORE running the caller's premise, so on  *)
+  (* the self-loop arm the premise survives and Löb closes it.              *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_hart_ram_write {X : Type} (C : M X -> M unit)
       (n : N) (req : Interface.WriteReq.t n) (m : M X) :
@@ -117,23 +129,110 @@ Section events.
                          (fun v => C (K v)))
       by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
     rewrite Hg.
+    iLöb as "IH".
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ".
-    iMod ("H" $! σ with "Hσ") as "Hk".
-    iModIntro.
-    iExists (C (K (inl None))),
-      (MState σ.(sregs)
-         (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
-            (Interface.WriteReq.value req)) σ.(mdev)).
-    iSplitR.
-    { iPureIntro. rewrite /mnode_step. cbn beta iota.
-      rewrite Hdev. cbn beta iota. done. }
-    iNext. iIntros (m' σ') "%Hstep".
-    rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
-    rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as [-> ->].
-    iMod "Hk" as "[Hσ HWP]". iModIntro.
-    rewrite -Hres. by iFrame.
+    iIntros (σ oth rv) "Hσ".
+    destruct (decide (footprint (Interface.WriteReq.pa req) n ## oth))
+      as [Hfree|Hblocked].
+    - (* the write *)
+      iMod ("H" $! σ with "Hσ") as "Hk".
+      iModIntro.
+      iExists (C (K (inl None))),
+        (MState σ.(sregs)
+           (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+              (Interface.WriteReq.value req)) σ.(mdev)), None.
+      iSplitR.
+      { iPureIntro. rewrite /mnode_step. cbn beta iota.
+        rewrite Hdev. cbn beta iota. right. done. }
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+      rewrite Hdev in Hstep. cbn beta iota in Hstep.
+      destruct Hstep as [(Hov & _) | (_ & -> & -> & ->)]; [done|].
+      iMod "Hk" as "[Hσ HWP]". iModIntro.
+      rewrite -Hres. by iFrame.
+    - (* blocked by another hart's reservation: self-loop, premise intact *)
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+      iExists (Interface.Next (Interface.MemWrite n req) (fun v => C (K v))),
+        σ, rv.
+      iSplitR.
+      { iPureIntro. rewrite /mnode_step. cbn beta iota.
+        rewrite Hdev. cbn beta iota. left. done. }
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+      rewrite Hdev in Hstep. cbn beta iota in Hstep.
+      destruct Hstep as [(_ & -> & -> & ->) | (Hfree & _)]; [|done].
+      iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
+      iApply ("IH" with "H").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* RAM READ, EXCLUSIVE ([ak_excl = true]): the same read, the same       *)
+  (* statement; the language also records the snapshot as this hart's     *)
+  (* reservation (invisible here -- see the header) and self-loops while   *)
+  (* another hart reserves any of the bytes, which Löb absorbs.            *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_hart_ram_read_excl {X : Type} (C : M X -> M unit)
+      (n : N) (req : Interface.ReadReq.t n) (m : M X) :
+    mctx C ->
+    hread_req_at n m = Some req ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_excl (Interface.ReadReq.access_kind req) = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+       ∃ w : bv (8 * n),
+         ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ▷ (|={∅,⊤}=> mstate_interp σ ∗
+              WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
+                  : expr riscv_lang))) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj Hdev Hexcl) "#Hcert H".
+    destruct (hread_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
+    assert (Hg : C m = Interface.Next (Interface.MemRead n req)
+                         (fun v => C (K v)))
+      by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
+    rewrite Hg.
+    iLöb as "IH".
+    iApply (wp_hart_step with "Hcert").
+    iIntros (σ oth rv) "Hσ".
+    destruct (decide (footprint (Interface.ReadReq.pa req) n ## oth))
+      as [Hfree|Hblocked].
+    - (* the read, now reserving *)
+      iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
+      iModIntro. iExists (C (K (inl (w, None)))), σ,
+        (Some (snap_of (Interface.ReadReq.pa req) n w)).
+      iSplitR.
+      { iPureIntro. rewrite /mnode_step. cbn beta iota.
+        rewrite Hdev. cbn beta iota.
+        right. split; [exact Hexcl|]. right. split; [exact Hfree|].
+        exists w. split; [exact (read_bytes_spec _ _ _ _ Hrb)|]. done. }
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+      rewrite Hdev in Hstep. cbn beta iota in Hstep.
+      destruct Hstep as [(Hex & _) | (_ & [(Hov & _) | (_ & w' & Hbytes' & -> & -> & ->)])];
+        [congruence|done|].
+      assert (w' = w) as ->.
+      { apply bv_eq_of_bytes. intros j Hj.
+        pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
+        pose proof (Hbytes' j Hj) as H1.
+        rewrite H1 in H0. apply Some_inj in H0. exact H0. }
+      iMod "Hk" as "[Hσ HWP]". iModIntro.
+      rewrite -(Hres w). by iFrame.
+    - (* blocked: self-loop, premise intact *)
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+      iExists (Interface.Next (Interface.MemRead n req) (fun v => C (K v))),
+        σ, rv.
+      iSplitR.
+      { iPureIntro. rewrite /mnode_step. cbn beta iota.
+        rewrite Hdev. cbn beta iota.
+        right. split; [exact Hexcl|]. left. done. }
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+      rewrite Hdev in Hstep. cbn beta iota in Hstep.
+      destruct Hstep as [(Hex & _) | (_ & [(_ & -> & -> & ->) | (Hfree & _)])];
+        [congruence| |done].
+      iMod "Hmask" as "_". iModIntro. iFrame "Hσ".
+      iApply ("IH" with "H").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -164,24 +263,25 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ".
+    iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as (w d') "[%Hdr Hk]".
-    iModIntro. iExists (C (K (inl (w, None)))), (MState σ.(sregs) σ.(mem) d').
+    iModIntro. iExists (C (K (inl (w, None)))), (MState σ.(sregs) σ.(mem) d'), rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       exists w, d'. done. }
-    iNext. iIntros (m' σ') "%Hstep".
+    iNext. iIntros (m' σ' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (w' & d'' & Hdr' & -> & ->).
+    destruct Hstep as (w' & d'' & Hdr' & -> & -> & ->).
     rewrite Hdr in Hdr'. injection Hdr' as <- <-.
     iMod "Hk" as "[Hσ HWP]". iModIntro.
     rewrite -(Hres w). by iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* MMIO WRITE.                                                          *)
+  (* MMIO WRITE.  A [MemWrite] event, so it clears the hart's own         *)
+  (* reservation -- invisible to the caller here.                         *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_hart_dev_write {X : Type} (C : M X -> M unit)
       (n : N) (req : Interface.WriteReq.t n) (m : M X) :
@@ -205,17 +305,17 @@ Section events.
       by (rewrite Hm; exact (HC _ (Interface.MemWrite n req) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ".
+    iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as (d') "[%Hdw Hk]".
-    iModIntro. iExists (C (K (inl None))), (MState σ.(sregs) σ.(mem) d').
+    iModIntro. iExists (C (K (inl None))), (MState σ.(sregs) σ.(mem) d'), None.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       exists d'. done. }
-    iNext. iIntros (m' σ') "%Hstep".
+    iNext. iIntros (m' σ' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (d'' & Hdw' & -> & ->).
+    destruct Hstep as (d'' & Hdw' & -> & -> & ->).
     rewrite Hdw in Hdw'. injection Hdw' as <-.
     iMod "Hk" as "[Hσ HWP]". iModIntro.
     rewrite -Hres. by iFrame.
@@ -243,6 +343,29 @@ Section events.
     iIntros (Hproj Hdev Hexcl) "#Hcert H".
     rewrite /swp. iIntros (C) "%HC Hcont".
     iApply (wp_hart_ram_read C n req m HC Hproj Hdev Hexcl
+              with "Hcert [H Hcont]").
+    iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
+    iModIntro. iExists w. iSplitR; [done|]. iNext.
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
+    iApply (swp_use _ Φ C HC with "Hswp Hcont").
+  Qed.
+
+  Lemma swp_hart_ram_read_excl {X : Type} (n : N) (req : Interface.ReadReq.t n)
+      (m : M X) (Φ : X -> iProp Σ) :
+    hread_req_at n m = Some req ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_excl (Interface.ReadReq.access_kind req) = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+       ∃ w : bv (8 * n),
+         ⌜read_bytes σ.(mem) (Interface.ReadReq.pa req) n = Some w⌝ ∗
+         ▷ (|={∅,⊤}=> mstate_interp σ ∗
+              swp (hread_resume (bv_unsigned w) m) Φ)) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj Hdev Hexcl) "#Hcert H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_ram_read_excl C n req m HC Hproj Hdev Hexcl
               with "Hcert [H Hcont]").
     iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as (w) "[%Hrb Hk]".
     iModIntro. iExists w. iSplitR; [done|]. iNext.

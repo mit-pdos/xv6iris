@@ -127,25 +127,26 @@ Qed.
 Lemma hsil_node_mnode (D : gset register) (rs rs' : regstate)
     (m m' : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state) :
   hsil_node D rs m = Some (rs', m') ->
-  mnode_step (MState rs mem dev) m m' (MState rs' mem dev).
+  forall (oth : gset Arch.pa) (r : option resv),
+    mnode_step oth (MState rs mem dev) r m m' (MState rs' mem dev) r.
 Proof.
-  intros Hnode. destruct m as [y|T oc k]; [by simpl in Hnode|].
+  intros Hnode oth r. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; by split.
+    injection Hnode as <- <-; by split_and!.
 Qed.
 
 Lemma hsil_node_mnode_inv (D : gset register) (rs rs' : regstate)
     (m m' m2 : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state)
-    (σ2 : mstate) :
+    (σ2 : mstate) (oth : gset Arch.pa) (r r2 : option resv) :
   hsil_node D rs m = Some (rs', m') ->
-  mnode_step (MState rs mem dev) m m2 σ2 ->
-  m2 = m' /\ σ2 = MState rs' mem dev.
+  mnode_step oth (MState rs mem dev) r m m2 σ2 r2 ->
+  m2 = m' /\ σ2 = MState rs' mem dev /\ r2 = r.
 Proof.
   intros Hnode Hstep. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (-> & ->); by split.
+    injection Hnode as <- <-; destruct Hstep as (-> & -> & ->); by split_and!.
 Qed.
 
 (* ====================================================================== *)
@@ -432,18 +433,18 @@ Section batch.
   Proof.
     iIntros (Hnode) "#Hcert Hrf H".
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ". destruct σ as [rs0 mem0 dev0].
+    iIntros (σ oth r) "Hσ". destruct σ as [rs0 mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs D rs0 with "Hri Hrf") as %Hag.
     destruct (hsil_node_agree D rs rs0 m m1 rs1 Hag Hnode)
       as (rs2 & Hnode2 & Hag2).
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iExists m1, (MState rs2 mem0 dev0).
+    iExists m1, (MState rs2 mem0 dev0), r.
     iSplitR.
-    { iPureIntro. exact (hsil_node_mnode D rs0 rs2 m m1 mem0 dev0 Hnode2). }
-    iNext. iIntros (m' σ') "%Hstep".
-    destruct (hsil_node_mnode_inv D rs0 rs2 m m1 m' mem0 dev0 σ'
-                Hnode2 Hstep) as (-> & ->).
+    { iPureIntro. exact (hsil_node_mnode D rs0 rs2 m m1 mem0 dev0 Hnode2 oth r). }
+    iNext. iIntros (m' σ' r') "%Hstep".
+    destruct (hsil_node_mnode_inv D rs0 rs2 m m1 m' mem0 dev0 σ' oth r r'
+                Hnode2 Hstep) as (-> & -> & ->).
     (* re-establish: for a RegWrite one footprint register moves, for
        everything else the file is untouched *)
     iAssert (|==> reg_interp rs2 ∗ hreg_frame rs1 D)%I

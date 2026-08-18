@@ -174,15 +174,15 @@ Section regnode.
     destruct (hregread_at_inv r m Hat) as (ak & K & -> & Hres).
     rewrite (HC _ (Interface.RegRead r ak) K eq_refl).
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ".
+    iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
-    iExists (C (K (register_lookup r σ.(sregs)))), σ.
+    iExists (C (K (register_lookup r σ.(sregs)))), σ, rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. auto. }
-    iNext. iIntros (m' σ') "%Hstep".
+    iNext. iIntros (m' σ' rv') "%Hstep".
     cbv beta iota delta [mnode_step] in Hstep.
-    destruct Hstep as [-> ->].
+    destruct Hstep as (-> & -> & ->).
     rewrite -(Hres (register_lookup r σ.(sregs))).
     iExact "H".
   Qed.
@@ -209,15 +209,15 @@ Section regnode.
     destruct (hregwrite_val_at_inv r m v Hat) as (ak & K & -> & Hres).
     rewrite (HC _ (Interface.RegWrite r ak v) K eq_refl).
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ".
+    iIntros (σ oth rv) "Hσ".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
-    iExists (C (K tt)), (set_reg σ r v).
+    iExists (C (K tt)), (set_reg σ r v), rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. auto. }
-    iNext. iIntros (m' σ') "%Hstep".
+    iNext. iIntros (m' σ' rv') "%Hstep".
     cbv beta iota delta [mnode_step] in Hstep.
-    destruct Hstep as [-> ->].
+    destruct Hstep as (-> & -> & ->).
     rewrite -Hres.
     iExact "H".
   Qed.

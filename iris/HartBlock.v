@@ -15,19 +15,19 @@
 
    DIRECTION.  Only the SOUND direction (block => run) is proven here, and it
    is the unconditional one: whatever the new machine does in a solo block,
-   the old machine also did.  The converse (run => block) is NOT
-   unconditionally true and is deliberately not stated here -- the language
-   FUSES an exclusive read with its paired conditional write and guards the
-   plain read arm with [ak_excl = false], so a [run] containing a BARE
-   exclusive read has no block.  Its honest witness is the language's own
-   functional interpreter (the reflective stepper), where "the fused window
-   was found" is a computation rather than a hypothesis; it belongs with that
-   stepper, not here.
+   the old machine also did.  The converse (run => block) is deliberately not
+   stated here; its honest witness is the language's own functional
+   interpreter (the reflective stepper), and it belongs with that stepper.
 
    INTERFERENCE.  "No interference" is not a hypothesis of any lemma below --
    it is built into the shape: [mblock] chains [mnode_step] on ONE hart's
-   [mstate], so there is nowhere for another thread's effect to enter.  A
-   caller in the logic earns that shape by owning what the block reads. *)
+   [mstate] with NO OTHER HART'S RESERVATION in force ([oth = ∅], design
+   §3a), so there is nowhere for another thread's effect to enter and no
+   self-loop arm is ever enabled.  The hart's OWN reservation is threaded
+   existentially: with nobody else reserving, it changes what the memory arms
+   RECORD but never what they DO, so [run] -- which has no reservation --
+   is reached regardless.  A caller in the logic earns that shape by owning
+   what the block reads. *)
 From stdpp Require Import gmap relations bitvector.definitions.
 (* imported for the same reason RiscvLang.v does, and BEFORE the model: it is
    what makes ssreflect's [rewrite /def] available (the model's own imports
@@ -51,102 +51,51 @@ Local Open Scope Z_scope.
 Definition mstep1 (c c' : M unit * mstate) : Prop :=
   match c.1 with
   | Interface.Ret _ => False
-  | _ => mnode_step c.2 c.1 c'.1 c'.2
+  | _ => exists r r' : option resv, mnode_step ∅ c.2 r c.1 c'.1 c'.2 r'
   end.
 
 Definition mblock : relation (M unit * mstate) := rtc mstep1.
 
 (* ====================================================================== *)
-(* 2. The window ingredients: silent nodes and the conditional write both   *)
-(*    fold back into [run].                                                 *)
-(*                                                                         *)
-(* These are what the FUSED AMO arm costs: its single language step stands  *)
-(* for a whole stretch of [run], so the bracket has to re-expand it.        *)
-(* ====================================================================== *)
-
-Lemma silent1_run (c c' : M unit * regstate)
-    (mem : gmap Arch.pa (bv 8)) (d : dev_state) :
-  silent1 c c' ->
-  forall x s2, run c'.1 (MState c'.2 mem d) x s2
-            -> run c.1 (MState c.2 mem d) x s2.
-Proof.
-  destruct c as [m rs]. rewrite /silent1 /=.
-  destruct m as [y|T oc k]; [by intros []|].
-  destruct oc; simpl; try (by intros []);
-    try (intros ->; simpl; intros x s2 H; exact H).
-  (* Choose: the language picked one branch, [run] quantifies over some *)
-  intros (ch & ->) x s2 H. simpl. by exists ch.
-Qed.
-
-Lemma silent_run_run (c c' : M unit * regstate)
-    (mem : gmap Arch.pa (bv 8)) (d : dev_state) :
-  silent_run c c' ->
-  forall x s2, run c'.1 (MState c'.2 mem d) x s2
-            -> run c.1 (MState c.2 mem d) x s2.
-Proof.
-  rewrite /silent_run. induction 1 as [c|c c1 c2 Hstep _ IH]; [done|].
-  intros x s2 H. eapply silent1_run; [exact Hstep|]. by apply IH.
-Qed.
-
-Lemma wr_node_run (m1 m' : M unit) (mem mem1 : gmap Arch.pa (bv 8))
-    (rs : regstate) (d : dev_state) :
-  wr_node m1 mem mem1 m' ->
-  forall x s2, run m' (MState rs mem1 d) x s2
-            -> run m1 (MState rs mem d) x s2.
-Proof.
-  rewrite /wr_node. destruct m1 as [y|T oc k]; [by intros []|].
-  destruct oc; try (by intros []).
-  intros (Hdev & _ & -> & ->) x s2 H. cbn [run]. by rewrite Hdev.
-Qed.
-
-(* ====================================================================== *)
-(* 3. One node folds back into [run] -- the whole bracket in one step.      *)
+(* 2. One node folds back into [run] -- the whole bracket in one step.      *)
 (* ====================================================================== *)
 
 Lemma mnode_step_run (s : mstate) (m m' : M unit) (s' : mstate) :
   mstep1 (m, s) (m', s') ->
   forall x s2, run m' s' x s2 -> run m s x s2.
 Proof.
-  (* [s] is destructed up front: [mstate] is not a primitive record, so [s]
-     and [MState (sregs s) (mem s) (mdev s)] are NOT convertible, and the
-     fused arm's appeal to [silent_run_run] needs the latter shape. *)
-  destruct s as [rs0 mem0 dv0].
-  rewrite /mstep1 /= /mnode_step.
+  rewrite /mstep1 /=.
   destruct m as [y|T oc k]; [by intros []|].
+  intros (r & r' & Hn). revert Hn. rewrite /mnode_step.
   (* [cbn beta iota] and NOT [simpl]: it reduces the dependent match that
      selects this outcome's arm WITHOUT also unfolding the [run] in the
      conclusion -- which would pre-destruct [dev_addr] and leave the memory
      arms with nothing to rewrite. *)
   destruct oc; cbn beta iota; try (by intros []);
-    try (intros (-> & ->); intros x s2 H; exact H).
+    try (intros (-> & -> & _); intros x s2 H; exact H).
   - (* MemRead *)
     destruct (dev_addr _) eqn:Hd.
-    + intros (w & d' & Hdr & Hm & Hs) x s2 H. subst m' s'.
+    + intros (w & d' & Hdr & Hm & Hs & _) x s2 H. subst m' s'.
       cbn [run]. rewrite Hd Hdr. exact H.
-    + intros [(_ & w & Hbytes & Hm & Hs)
-             |(_ & w & m1 & rs1 & mem1 & Hbytes & Hsil & Hwr & Hs)] x s2 H.
-      * (* the plain read *)
-        subst m' s'. cbn [run]. rewrite Hd.
-        exists w. split; [exact Hbytes|exact H].
-      * (* THE FUSED WINDOW, re-expanded: read, silent stretch, write *)
-        subst s'. cbn [run]. rewrite Hd.
-        exists w. split; [exact Hbytes|].
-        (* both pair arguments given LITERALLY: [silent_run_run]'s conclusion
-           projects out of its cursor, and a projection of an evar pair does
-           not unify. *)
-        eapply (silent_run_run (k (inl (w, None)), rs0) (m1, rs1) mem0 dv0);
-          [exact Hsil|]. cbn.
-        eapply wr_node_run; [exact Hwr|]. exact H.
+    + (* plain or exclusive, the read is the same; the self-loop arm needs an
+         overlap with the EMPTY set *)
+      intros [(_ & w & Hbytes & Hm & Hs & _)
+             |(_ & [(Hov & _) | (_ & w & Hbytes & Hm & Hs & _)])] x s2 H;
+        [ | by exfalso; apply Hov; set_solver | ];
+        subst m' s'; cbn [run]; rewrite Hd; exists w; split; [exact Hbytes|exact H
+        | exact Hbytes | exact H].
   - (* MemWrite *)
     destruct (dev_addr _) eqn:Hd.
-    + intros (d' & Hdw & Hm & Hs) x s2 H. subst m' s'.
+    + intros (d' & Hdw & Hm & Hs & _) x s2 H. subst m' s'.
       cbn [run]. rewrite Hd Hdw. exact H.
-    + intros (Hm & Hs) x s2 H. subst m' s'. cbn [run]. rewrite Hd. exact H.
-  - (* Choose *) intros (ch & -> & ->) x s2 H. cbn [run]. by exists ch.
+    + intros [(Hov & _) | (_ & Hm & Hs & _)] x s2 H;
+        [by exfalso; apply Hov; set_solver|].
+      subst m' s'. cbn [run]. rewrite Hd. exact H.
+  - (* Choose *) intros (ch & -> & -> & _) x s2 H. cbn [run]. by exists ch.
 Qed.
 
 (* ====================================================================== *)
-(* 4. THE BRACKET.                                                          *)
+(* 3. THE BRACKET.                                                          *)
 (* ====================================================================== *)
 
 Lemma mblock_run (c c' : M unit * mstate) :

@@ -678,19 +678,14 @@ Section pteread.
   (* [read_pte] on top of the node: [mem_read_priv] at [Load PageTableEntry]
      is [checked_mem_read] plus the callback and the meta drop, both pure.
      [SmodePte.exec_read_pte_S] reduces the same two steps on the exec side. *)
-  (* NO STANDALONE EXCLUSIVE PTE RE-READ, and that is the model's design
-     rather than a gap.  [RiscvLang]'s MemRead arm GUARDS the plain RAM read
-     with [ak_excl = false] and hands every exclusive read to the FUSED
-     arm -- the read, the silent steps between, and the paired conditional
-     write are ONE step, because on this machine an LR/SC pair is one step.
-     ([RiscvLang.wr_node]'s comment states the other half: a STANDALONE
-     conditional write is unguarded on purpose and takes the ordinary store
-     arm, which is why [swp_checked_mem_write_pte8_con] above is sound.)
-
-     So the A/D write-back cannot be assembled from a read node and a write
-     node.  It goes through [HartAmo.wp_hart_amo], which is already proved
-     and already has exactly this shape: an exclusive read, [k] footprinted
-     silent steps, and the conditional write it lands on. *)
+  (* THE EXCLUSIVE PTE RE-READ of the A/D write-back is an ordinary node
+     (design §3a): [HartEvents.swp_hart_ram_read_excl], the plain read's
+     twin, which also leaves the hart's reservation behind; the window is an
+     ordinary silent stretch and [write_pte_conditional] an ordinary write
+     ([swp_checked_mem_write_pte8_con] above).  Assembling the write-back
+     from those three is item (e) of the worklist's reservation plan; the
+     conditional-write rule that also learns the word is still the snapshot
+     needs the [resv_frag]/[resv_ok] pair in [state_interp] first. *)
 
   Lemma swp_read_pte_S (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pa : SailStdpp.Values.mword 64) (w : bv 64) :

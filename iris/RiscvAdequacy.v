@@ -923,7 +923,7 @@ Section power.
       iSplitR.
       { iPureIntro.
         exists [], PowerLoopE,
-          (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false), [].
+          (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)), [].
         do 4 right. split_and!; auto. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct Hstep as

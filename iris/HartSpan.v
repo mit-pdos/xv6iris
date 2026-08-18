@@ -453,7 +453,7 @@ Section span.
       by (destruct oc; try reflexivity; discriminate Hns).
     rewrite (HC _ oc k Hoc).
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hσ". destruct σ as [rsM mem0 dev0].
+    iIntros (σ oth rv) "Hσ". destruct σ as [rsM mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs Drw rsM with "Hri Hrf") as %HagW.
     iDestruct (hreg_frame_ro_agree Df rs Dro rsM with "Hri Hro") as %HagO.
@@ -479,10 +479,10 @@ Section span.
                    (register_beq_false r' reg Hne)).
         by apply HagO. }
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-      iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0).
-      iSplitR; [iPureIntro; split; reflexivity|].
-      iNext. iIntros (m' σ') "%Hstep".
-      destruct Hstep as [-> Hσ'].
+      iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0), rv.
+      iSplitR; [iPureIntro; split_and!; reflexivity|].
+      iNext. iIntros (m' σ' rv') "%Hstep".
+      destruct Hstep as (-> & Hσ' & ->).
       assert (σ' = MState (register_set reg regval rsM) mem0 dev0) as ->
         by exact Hσ'.
       iMod (hreg_frame_update rs Drw reg regval rsM Hns with "Hri Hrf")
@@ -499,10 +499,10 @@ Section span.
                      Dro HagO'). }
     (* RegRead and the silent classes: the file does not move *)
     all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
-         iExists _, (MState rsM mem0 dev0);
-         (iSplitR; [iPureIntro; split; reflexivity|]);
-         iNext; iIntros (m' σ') "%Hstep";
-         destruct Hstep as [-> ->];
+         iExists _, (MState rsM mem0 dev0), rv;
+         (iSplitR; [iPureIntro; split_and!; reflexivity|]);
+         iNext; iIntros (m' σ' rv') "%Hstep";
+         destruct Hstep as (-> & -> & ->);
          iMod "Hmask" as "_"; iModIntro;
          (iSplitR "H Hrf Hro"; [iFrame "Hri Hmem Hdev"|]);
          iApply ("H" $! _ rsM rsM with "[%] [%] [Hrf] [Hro]");

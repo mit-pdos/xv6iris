@@ -262,12 +262,22 @@ Section WPExec.
      pinned only by what the caller owns) hands the continuation whatever the
      machine chose.  Callers that step a DETERMINISTIC node discharge the ∀
      from a determinism fact, exactly as the old rule discharged
-     [wp_lift_step]'s "forall next-state" obligation from [exec_run_det]. *)
+     [wp_lift_step]'s "forall next-state" obligation from [exec_run_det].
+
+     THE RESERVATION CONTEXT (design §3a) is ∀-quantified: [oth] is what the
+     other harts have reserved, [r] this hart's own reservation.  Neither is
+     tracked by [state_interp] yet, so the caller learns nothing about them
+     and owes a witness and a continuation for EVERY value -- which is
+     exactly enough: a register node ignores them; a RAM write or an
+     exclusive read whose footprint meets [oth] SELF-LOOPS, and the memory
+     rules absorb that arm by Löb.  Only the conditional-write rule needs to
+     KNOW [r] (to learn the RMW's old value), and that is the rule that will
+     hand [state_interp] the [resv_frag]/[resv_ok] pair. *)
   Lemma wp_hart_step (m : M unit) :
     gen_cert -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-       ∃ m0 σ0, ⌜mnode_step σ m m0 σ0⌝ ∗
-          ▷ (∀ m' σ', ⌜mnode_step σ m m' σ'⌝ ={∅,⊤}=∗
+    (∀ σ oth r, mstate_interp σ ={⊤,∅}=∗
+       ∃ m0 σ0 r0, ⌜mnode_step oth σ r m m0 σ0 r0⌝ ∗
+          ▷ (∀ m' σ' r', ⌜mnode_step oth σ r m m' σ' r'⌝ ={∅,⊤}=∗
                mstate_interp σ' ∗
                WP (HartE gen_id cpu_id m' : expr riscv_lang))) -∗
     WP (HartE gen_id cpu_id m : expr riscv_lang).
@@ -313,27 +323,28 @@ Section WPExec.
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
-            with "[Hri Hmem Hdev]") as (m0 σ0) "(%Hwit & Hk)".
+            (others_resv g.(gresv) cpu_id) (g.(gresv) cpu_id)
+            with "[Hri Hmem Hdev]") as (m0 σ0 r0) "(%Hwit & Hk)".
     { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (HartE gen_id cpu_id m0),
              (GState (<[cpu_id := σ0.(sregs)]> g.(gregs)) σ0.(mem) σ0.(mdev)
-                g.(ggen) g.(gpow)), [].
+                g.(ggen) g.(gpow) (<[cpu_id := r0]> g.(gresv))), [].
       left. exists gen_id, cpu_id, m. split_and!; try reflexivity.
-      left. split; [exact Hlive|]. by exists m0, σ0. }
+      left. split; [exact Hlive|]. by exists m0, σ0, r0. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
-      as (-> & -> & [(_ & (m2 & σ2 & Hnode & -> & ->)) | (Hnl & _)]);
+      as (-> & -> & [(_ & (m2 & σ2 & r2 & Hnode & -> & ->)) | (Hnl & _)]);
       last by exfalso.
     (* the hart moved no disk byte: the durable conjunct is FRAMED, at the
        post-state's own image ([RiscvLang.mnode_step_v_disk]) *)
-    pose proof (mnode_step_v_disk _ _ _ _ Hnode) as Hvd.
+    pose proof (mnode_step_v_disk _ _ _ _ _ _ _ Hnode) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio (mdev σ2))))
       by (rewrite Hvd; exact Hdview).
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (mdev σ2)))
       by (symmetry; exact Hvd).
-    iMod ("Hk" $! m2 σ2 with "[//]") as "[(Hri' & Hmem' & Hdev') HWP]".
+    iMod ("Hk" $! m2 σ2 r2 with "[//]") as "[(Hri' & Hmem' & Hdev') HWP]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iIntros "_ !>".
     iEval (rewrite /fs_tie_interp Hvd2) in "Htie".
@@ -362,12 +373,12 @@ Section WPExec.
   Proof.
     iIntros "#Hcert H". rewrite /LoopE.
     iApply (wp_hart_step with "Hcert").
-    iIntros (σ) "Hsi".
+    iIntros (σ oth r) "Hsi".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
-    iExists (riscv_step false), σ.
+    iExists (riscv_step false), σ, None.
     iSplitR; [iPureIntro; by exists false|].
-    iNext. iIntros (m' σ') "%Hn".
-    destruct Hn as (tick & -> & ->).
+    iNext. iIntros (m' σ' r') "%Hn".
+    destruct Hn as (tick & -> & -> & ->).
     iMod "Hback" as "_". iModIntro. iFrame "Hsi". iApply "H".
   Qed.
 
@@ -432,7 +443,7 @@ Section WPDev.
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. exists [], (UartLoopE gen_id),
-        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow)), [].
+        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)), [].
       right; left. exists gen_id. split_and!; auto.
       left. split; [split; congruence|].
       eexists. split; [apply UartStepIdle|]. rewrite Hpw. done. }
@@ -528,13 +539,14 @@ Section WPDev.
       exact Hdview. }
     iModIntro. iSplitR.
     { iPureIntro. exists [], (DiskLoopE gen_id),
-        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow)), [].
+        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)), [].
       right; right; left. exists gen_id. split_and!; auto.
       left. split; [split; congruence|].
-      do 2 eexists. split; [apply DiskStepIdle|]. rewrite Hpw. done. }
+      do 2 eexists. split; [apply DiskStepIdle|]. split; [done|].
+      rewrite Hpw. done. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct (prim_step_disk_inv _ _ _ _ _ _ Hstep)
-      as (-> & -> & -> & [ (Hlive & d' & m' & Hdstep & ->) | (Hnl & ->) ]);
+      as (-> & -> & -> & [ (Hlive & d' & m' & Hdstep & _ & ->) | (Hnl & ->) ]);
       last by (exfalso; apply Hnl; split; congruence).
     iMod ("Hk" $! d' m' with "[//]")
       as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & HWP)".
@@ -597,7 +609,7 @@ Section WPDev.
         (GState (<[0%fin := register_set sig_seip
                     (bool_to_bit (dev_seip g.(gdev) (fin_to_nat (0%fin : CPU))))
                     (g.(gregs) 0%fin)]> g.(gregs)) g.(gmem) g.(gdev)
-           g.(ggen) g.(gpow)), [].
+           g.(ggen) g.(gpow) g.(gresv)), [].
       right; right; right; left. exists gen_id. split_and!; auto.
       left. split; [split; congruence|].
       eexists. split; [apply (PlicStepWire _ _ 0%fin)|]. rewrite Hpw. done. }
