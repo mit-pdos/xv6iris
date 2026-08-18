@@ -1192,3 +1192,69 @@ it back into something the next `erewrite` matches SYNTACTICALLY; and
 with plain `reflexivity` is INSTANT (~0.5 s): the throw absorbs the tail, so
 there is nothing for the conversion checker to unfold.  The trap is only
 about a SHAPE obligation under an open `Phi`, where the tail is still there.
+
+## 10. P3 STATUS — the walk + fetch certificates, and the ONE thing left
+
+**P3 is landed and admit-free in two NEW leaf files**, `iris/PtWalkCert.v`
+(~2 970 lines) and `iris/UserFetchCert.v` (~590).  Both close under the
+global context except `rv64d.plat_term_write`, one of the five sanctioned
+platform axioms.
+
+**WHY NEW FILES.**  `CommonWalk.v` and `PtTreeAdue.v` carry 769 and 763
+dependents; an additive change to either costs that cone on every iteration
+and breaks every sibling lane's single-file `coqc` loop.  This is the
+durable-notes rule and the call `HartStepFull.v` made against
+`HartStepAny.v`.  **FOLD BACK at the milestone**: section 0 into
+`HartMemAsm.v`, section 1 into `SmodePte.v`, sections 2–3 into
+`CommonWalk.v`, sections 4–7 into `PtTreeAdue.v` / `PtTree.v`, and
+`UserFetchCert` sections 1–2 into `UserMem.v` / `UserFetch.v`.
+
+**WHAT `HartMemAsm` DID NOT HAVE, and every memory family will want it.**
+`bindR_ret` / `bindm_ret` (a `returnm`/`returnR` head is a CONVERSION, so a
+`boolM`'s residue is rewritten away — `cbv iota beta` does NOT see through
+`Defs.bind`), the DEPTH-2 nest peels `gm_cer_bind_nest2` /
+`gm_cer_liftR_nest2` (`pmpCheck`'s body is a LEFT nest three deep),
+`mcer_early_return_nest`, and `gm_bindR_nest` / `gm_liftR_nest` (the
+left-nested peel in the early-return monad WITHOUT the wrapper — what an
+`or_boolM` inside an already-opened `catch_early_return` body is).
+
+**THE CONVERSION TRAP THAT COSTS AN HOUR IF YOU HAVE NOT SEEN IT.**  A
+`goodmb` goal carries terms that are CONVERTIBLE with the exec proof's
+hypotheses but not syntactically equal, so the exec proof's `rewrite H`
+fails on a goal that PRINTS `H`'s own left-hand side.  Every such site
+becomes `match goal with |- context[F ?X] => replace (F X) with <rhs> by
+(symmetry; exact H) end`.  Seen at `pte_is_non_leaf`,
+`check_PTE_permission` and both occurrences of `update_PTE_Bits` inside
+`update_and_write_pte` (whose two occurrences do not even carry the same
+width argument).
+
+### THE ONE MISSING LEMMA, and it is an I3 (UserBytes) item
+
+`u_fetch_pure` — the pure fetch composer of §4.2, in P7's
+`UserClassifyAsm` style (reference state `u_state rs mm`, premises
+`post_fetch_cfg` / `u_exec_pins` / `u_mem_wf`, conclusion the `exec` fact +
+`goodmb Du_r Du_w (fetch tt) … mm = true` + the landing file + `tlb_ok_pt`
+at the new tree + `u_mem_step`) — is assembled from
+`PtWalkCert.goodmb_ptree_translateAddr`, `UserFetchCert.goodmb_fetch_ok_4`
+and `UserFetchCert`'s `u_mem_wf` projections, EXCEPT for its `u_mem_step`
+conjunct on the Svadu A/D write-back arm, which needs
+
+```coq
+Lemma ptree_bytes_set_leaf (t : ptree) (vpn : mword 27) (p2 p1 p0 q : mword 64) :
+  maps_disj (pt_maps 2 t) ->
+  ptree_maps t vpn p2 p1 p0 ->
+  ptree_bytes 2 (ptree_set_leaf t vpn q)
+  = write_bytes (ptree_bytes 2 t) (pt_addr0 p1 vpn) 8 q.
+```
+
+i.e. **the byte-level statement of the ADUE absorption**: writing the leaf
+slot IS setting the leaf in the tree.  Nothing in `UserBytes.v` says it
+(P0's `u_mem_step` is stated over `pt_same_shape` and the tree spec, and
+those two halves are already available — `pt_maps_disj_shape` and
+`UptTree.upt_tree_spec_set_leaf`); it is the third conjunct,
+`mm' = ptree_bytes 2 t' ∪ md'`, that has no supplier.  Its proof is map
+algebra, not page-table reasoning: `write_bytes m a 8 q = word_bytes a q ∪ m`
+(both insert the same eight pairs), `insert_union_l` to push the write past
+the data half, and then "⋃ of a disjoint list with ONE element replaced by a
+same-domain map" — with the standing warning that `pt_maps`' body mentions
+`seqZ 0 512`, so no `cbn` and no `done` may touch it.
