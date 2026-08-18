@@ -53,7 +53,7 @@ Require Import SmodeCore.
 Require Import HartSwp HartMFrame WpMmodeSwpBase.
 Require Import HartLift HartSpan HartSpanChar HartRegNode HartMCycle WpMmodeJump ColdBoot.
 Require Import HartGoodb WpDecodeBridge WpDecode RiscvExtras ExecCommon.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -735,10 +735,11 @@ Section WpSconfEngine.
   Proof.
     iIntros (Hrd Hops Hwval) "Hex Hcg Hpc Hinstr Hrecap Hcont".
     pose proof (ops_ok_sp_rd _ _ _ _ Hops) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b pc c base
-              (fun npc m2 n2 => ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
-                                ⌜m2 = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
-                                ⌜n2 = n'⌝ ∗ P)%I
+    iApply (wp_instr_s_sconf m n b b pc c base
+              (fun _ npc ms' m2 n2 =>
+                 ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
+                 ⌜m2 = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
+                 ⌜n2 = n'⌝ ∗ P)%I
               with "Hcg Hpc Hinstr [Hex Hrecap Hcont]").
     iNext.
     (* FREE THE NAME [CID] FOR THE REBOUND HART -- the statement never sees
@@ -766,10 +767,15 @@ Section WpSconfEngine.
         [| iExact "Hexx" ].
       iIntros (e) "(-> & Hfile & HPC)".
       iSplitR; [done|].
-      iExists (add_vec_int pc (if c then 2 else 4)),
+      (* the funnel's post names the mstatus the instruction LEFT; this leaf
+         family does not move it, so the witness comes straight back out of
+         the bundle ([WpIntrInv.sconf_at_priv_open]). *)
+      iAssert (sconf (CID := CID)) with "[Hsc]" as "Hsc2".
+      { rewrite /sconf. iFrame "Hhw Hminv Hsc". }
+      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc2") as (ms') "Hscp".
+      iExists (add_vec_int pc (if c then 2 else 4)), ms',
               (<[Regidx rd := regval_into_reg wval]> m), n'.
-      iFrame "HPC HnPC Hresv".
-      iSplitL "Hsc". { iFrame "Hhw Hminv Hsc". }
+      iFrame "HPC HnPC Hresv Hscp".
       iSplitL "Hcap"; [ iExact "Hcap" |].
       iSplitL "Hfile".
       { iEval (rewrite Hval) in "Hfile".
@@ -777,7 +783,8 @@ Section WpSconfEngine.
           in "Hfile". iExact "Hfile". }
       iFrame "HP". done.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
-      iIntros (npc m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
+      iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' HP Hpc'"). exact Hs.
   Qed.
 
@@ -1017,9 +1024,10 @@ Section WpSconfEngine.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hred) "Hcmp Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc c i
-              (fun npc m2 n2 => ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
-                                ⌜m2 = m⌝ ∗ ⌜n2 = n⌝)%I
+    iApply (wp_instr_s_sconf m n b b pc c i
+              (fun _ npc ms' m2 n2 =>
+                 ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
+                 ⌜m2 = m⌝ ∗ ⌜n2 = n⌝)%I
               with "Hcg Hpc Hinstr [Hcmp Hcont]").
     iNext. rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
@@ -1032,11 +1040,13 @@ Section WpSconfEngine.
                      (tp_pin (CID := CID) m) (execute i) cmp Hred
                      Hc0 with "Hcert Hfile") ].
       iIntros (e) "[-> Hfile]". iSplitR; [done|].
-      iExists (add_vec_int pc (if c then 2 else 4)), m, n.
-      iFrame "HPC HnPC Hresv".
-      iSplitL "Hsc". { iFrame "Hhw Hminv Hsc". }
-      iFrame "Hcap Hfile". done.
-    - iIntros (npc m2 n2) "Hcg' Hpc' (-> & -> & ->)".
+      iAssert (sconf (CID := CID)) with "[Hsc]" as "Hsc2".
+      { rewrite /sconf. iFrame "Hhw Hminv Hsc". }
+      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc2") as (ms') "Hscp".
+      iExists (add_vec_int pc (if c then 2 else 4)), ms', m, n.
+      iFrame "HPC HnPC Hresv Hscp Hcap Hfile". done.
+    - iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
@@ -1061,9 +1071,9 @@ Section WpSconfEngine.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hred Hal0) "Hcmp Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc c i
-              (fun npc m2 n2 => ⌜npc = add_vec pc (sign_extend' 64 imm)⌝ ∗
-                                ⌜m2 = m⌝ ∗ ⌜n2 = n⌝)%I
+    iApply (wp_instr_s_sconf m n b b pc c i
+              (fun _ npc ms' m2 n2 => ⌜npc = add_vec pc (sign_extend' 64 imm)⌝ ∗
+                                      ⌜m2 = m⌝ ∗ ⌜n2 = n⌝)%I
               with "Hcg Hpc Hinstr [Hcmp Hcont]").
     iNext. rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
@@ -1078,11 +1088,13 @@ Section WpSconfEngine.
                      (add_vec_int pc (if c then 2 else 4)) cmp Hred
                      Hc0 Hal0 with "Hcert Hfile HPC HnPC Hmisa") ].
       iIntros (e) "(-> & Hfile & HPC & HnPC & _)". iSplitR; [done|].
-      iExists (add_vec pc (sign_extend' 64 imm)), m, n.
-      iFrame "HPC HnPC Hresv".
-      iSplitL "Hsc". { iFrame "Hhw Hminv Hsc". }
-      iFrame "Hcap Hfile". done.
-    - iIntros (npc m2 n2) "Hcg' Hpc' (-> & -> & ->)".
+      iAssert (sconf (CID := CID)) with "[Hsc]" as "Hsc2".
+      { rewrite /sconf. iFrame "Hhw Hminv Hsc". }
+      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc2") as (ms') "Hscp".
+      iExists (add_vec pc (sign_extend' 64 imm)), ms', m, n.
+      iFrame "HPC HnPC Hresv Hscp Hcap Hfile". done.
+    - iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
@@ -1116,8 +1128,9 @@ Section WpSconfEngine.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hex Hrecap Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc c i
-              (fun npc2 m2 n2 => ⌜npc2 = npc⌝ ∗ ⌜m2 = m'⌝ ∗ ⌜n2 = n'⌝ ∗ P)%I
+    iApply (wp_instr_s_sconf m n b b pc c i
+              (fun _ npc2 ms' m2 n2 =>
+                 ⌜npc2 = npc⌝ ∗ ⌜m2 = m'⌝ ∗ ⌜n2 = n'⌝ ∗ P)%I
               with "Hcg Hpc Hinstr [Hex Hrecap Hcont]").
     iNext. rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "Hex Hrecap".
@@ -1128,8 +1141,11 @@ Section WpSconfEngine.
         [| iExact "Hexx" ].
       iIntros (e) "(-> & Hsc & Hfile & HPC & HnPC)".
       iSplitR; [done|].
-      iExists npc, m', n'. iFrame "HPC HnPC Hresv Hsc Hcap Hfile HP". done.
-    - iIntros (npc2 m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
+      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc") as (ms') "Hscp".
+      iExists npc, ms', m', n'.
+      iFrame "HPC HnPC Hresv Hscp Hcap Hfile HP". done.
+    - iIntros (npc2 ms' m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' HP Hpc'"). exact Hs.
   Qed.
 
