@@ -1608,3 +1608,117 @@ Note for whoever ports the trampoline tower: `wp_instr_tramp_pt`
 `PC ↦ᵣ pc` — so today the two-cell breakage is LATENT.  When that tower is
 ported it will need exactly the riders, and the trap frame is their only
 carrier across the U→S boundary.
+
+## 14. `active_class` IS FROZEN — the interface, and exactly what §5 still needs (2026-08-18, P7)
+
+`UserStepFull.wp_user_step_active` is proved (statement byte-identical to the
+pre-port one, verified mechanically), so `active_class` is now a FIXED
+obligation and anything that discharges it can be written against this.
+
+### 14.1 The shape, and the one choice that made the wrapper 120 lines
+
+`swp_exec_step_full` is instantiated at `Q := u_land rs1`,
+`Psi := u_step_psi rs1`, and `active_class` is LITERALLY its body slot.
+
+* **`Q` is minimal.** `u_land` says only what the rule demands: the hart is
+  still ACTIVE and `minstret_increment` holds the flag the prelude computed
+  — plus one tag (see 14.2).
+* **`Psi` is a CLOSER, not a description.** `u_step_psi rs1 rs2` carries the
+  reservation (the cycle rule's continuation returns none — the boundary
+  drops it — and `user_inv`'s `pc_is` needs one) plus a wand taking the
+  file the cycle landed on, the frame at it and the two continuations, and
+  producing the `WP`.  So the wrapper never case-splits on the arm: only
+  the classification knows the arm, the new tree and the new byte map, so
+  only it can rebuild `user_inv` / `user_trap_frame`.
+* **Pins are stated at `rs1`** (before the minstret prelude), with the frame
+  arriving at `rsA` and `reg_agree_on (u_Drw ∪ u_Dro) (wrap_pre rs1) rsA` as
+  a premise.  The prelude writes only `minstret_increment`, so every pin
+  transports — and stating them at `rs1` is what lets the wrapper discharge
+  all fourteen by `reflexivity` at its concrete `u_rs` entry file.
+* **`u_open`** bundles everything the machine owns beside the register
+  frame: the pmp re-intro wand, the six persistent config cells, the
+  `pt_claims`, the `bytes_own` and the `user_pt_inv` closer.  It is exactly
+  `UserStep.u_close_inv`'s non-frame premise list.
+* **`Ei` and `wire_inv` are DEAD** and deliberately kept: the swp layer is
+  not mask-indexed and the wire reads are answered from the hart's own
+  read-only frame, so nothing is opened across the step.
+
+### 14.2 `u_land`'s third conjunct is load-bearing
+
+```coq
+match st with
+| Step_Execute (Enter_Wait wr, _) =>
+    (wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO) /\
+    register_lookup cur_privilege rs2 = User
+| _ => True
+end
+```
+
+`tsf_post` quantifies the step EXISTENTIALLY, so without a tag a closer
+cannot tell which arm ran, and BOTH landing shapes — `wrap_post rs2 mi` and
+`register_set hart_state (HART_WAITING …) rs2` — are available at every arm.
+The trap closers (whose pc must be `stvec_base`) then cannot rule the wait
+shape out.  The privilege pin refutes it at every arm that TRAPPED (those
+land at Supervisor); the `WaitReason` pin is what `user_hart_ok` needs so
+that ONE ACTIVE-at-User builder covers the retiring and the wait shape.
+
+### 14.3 What §3–§4 landed, and what §5 still needs
+
+LANDED in `UserActiveClass.v` (fetch-INDEPENDENT half):
+`u_close_trap` (the trapped twin of `u_close_inv`, on the new
+`UserFrame.u_frames_elim_at`), `u_tail` / `u_tail_of` / `u_tail_reg` /
+`u_tail_hart` (the cycle tail with `tsf_post`'s existential discharged), and
+the two payload builders `u_psi_active` / `u_psi_trap`.  Sections 1–2 are
+untouched.
+
+STILL OPEN, §5 (the fetch-DEPENDENT half), in dependency order:
+
+1. **The success-side fetch composer.**  `swp (fetch tt)
+   (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C)) Pe Pf Px)` from
+   `UserFetchCert.u_fetch_pure` through `HartMemRun.swp_hmrun_of_exec`,
+   with `UserClassifyAsm.u_landing_map` pinning the post map and
+   `HartRunGen.hfrun_lpad` / `hfrun_cE_Zca` discharging
+   `run_fetch_base` / `run_fetch_rvc`'s two gate riders.  The landing file
+   is `swp_hmrun_of_exec`'s `rs'`, which only AGREES with the fetch's own
+   `rsf` on the footprint — `run_fetch_base`'s `rsf` is existential, so use
+   `rs'` itself and re-derive the decode fact there with
+   `UserTotalU.u_hval_base` rather than transporting `hval` (there is no
+   `hval` congruence lemma in the tree).
+2. **The fault-side fetch composer DOES NOT EXIST.**  `UserFetchCert` has
+   only `u_fetch_pure`; `fetch_classify`'s second disjunct
+   (`u_fetch_fault_flavor`) has no `swp`-level producer, so
+   `run_fetch_post`'s `F_Error` arm (`Pf`) cannot be discharged.  This is a
+   P3 deliverable.
+3. **The execute obligation** `swp (execute i) (run_exec_post Pe w)` from
+   `base_exec_total_u` / `rvc_exec_total_u`, again via
+   `swp_hmrun_of_exec`, with `run_exec_post_direct` / `_redirect` for the
+   `ExecuteAs` fork.  Take the two totalities as Coq-level hypotheses:
+   `base_exec_total_u_holds` needs P4's 19 `arm_*_u` memory arms, which do
+   not exist yet.
+4. **The four trap arms**, each an instantiation of `UserTrap`'s
+   `UTrapReduce` section at a concrete `s := u_state rsf mm` with its eight
+   hypotheses, feeding `u_psi_trap`.
+5. **The assembly** through `HartRunFull.swp_run_hart_active_U` +
+   `swp_mono` into `u_step_post`, with `UserStep.u_dispatch_of_pending`
+   for the pending-interrupt arm.
+
+### 14.4 What `u_fetch_pure_2` would take (the 2-aligned / straddle geometry)
+
+`u_fetch_pure` requires `is_aligned_vaddr (Virtaddr va) 4 = true`.  A
+2-aligned-but-not-4-aligned `va` is a different lemma, not an instance:
+
+* **width-2 fetch `goodmb` twins.**  Every certificate on the fetch path is
+  built for the 4-byte read; the 2-aligned fetch reads a HALFWORD first, so
+  the `mem_read`/`translateAddr` certificates need width-2 siblings.
+* **TWO walks, and a straddle predicate.**  If the first halfword is not
+  compressed the model reads the second at `va+2`, which may be in another
+  page: the lemma needs `uleaf_ok` for `svpn_of va` AND for
+  `svpn_of (va+2)`, plus a predicate saying whether they coincide.
+* **A THIRD outcome.**  First half fetched, second half's page unmapped or
+  denied — the model faults at `va+2`.  The post is no longer
+  `F_RVC | F_Base` but `F_RVC | F_Base | F_Error at va+2`.
+* **`u_mem_step` TRANSITIVITY, which does not exist.**  Two walks can each
+  do an A/D write-back, so the two steps must compose; `UserBytes` has only
+  `u_mem_step_refl` and `u_mem_step_wf`.  The missing ingredient is
+  transitivity of `pt_same_shape 2` (the other three conjuncts come from
+  the second step).
