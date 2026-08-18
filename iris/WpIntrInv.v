@@ -27,8 +27,10 @@
    dispatch discharged by [WpIntrCore.swp_dispatchInterrupt_S] and the fetch
    by [HartSTrans.swp_fetch_S*] over the converted page walk.  The two arms:
 
-     - PENDING: the trap itself is [swp_handle_interrupt_S] (WpIntrCore.v),
-       a hand-walk of [handle_interrupt i Supervisor] over the trap CSRs
+     - PENDING: the trap itself is [swp_handle_interrupt_S] (§2 below; it is
+       HERE rather than in [WpIntrCore] only so that iterating on it does not
+       rebuild that file's ~600-file cone), a hand-walk of
+       [handle_interrupt i Supervisor] over the trap CSRs
        ([sie_cap]'s enabled arm supplies sepc/scause/stval/stvec).  After the
        cycle's own tail the engine flips the SIE ghost, updates [sret_bits],
        assembles [ihs_entry_of], runs [intr_handler_spec_apply] and re-enters
@@ -64,7 +66,8 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var invariants.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap
+        ghost_map.
 From iris.bi.lib Require Import fractional.
 From iris.program_logic Require Import language lifting weakestpre.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -74,7 +77,9 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr RegFile HartTp WpMmodeLeafBase.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
-        HartMCycle HartStepAny HartRunGen HartSFrame HartSTrans.
+        HartMCycle HartStepAny HartRunGen HartSFrame HartSTrans HartMFrame
+        HartGoodb WpDecodeBridge WpDecode DecodeTotalU CommonWalk ExecCommon
+        WpGprMret.
 Require Import SmodeCore WpSFrames KptShare KptPt KMap SRegime StackOwn.
 Require Import MstatusBits WpIntrCore.
 Require Export IntrDefs.
@@ -216,17 +221,6 @@ Section IFrames.
 
 End IFrames.
 
-(* ===================================================================== *)
-(* §2 THE TRAP, AS A WALK.                                                *)
-(*                                                                       *)
-(* [WpIntrCore.exec_handle_interrupt_S] is the same fact on the exec      *)
-(* side; this is its per-node twin, at a frame that must additionally     *)
-(* hold the four trap CSRs ([sie_cap]'s enabled arm owns sepc / scause /  *)
-(* stval, and [intr_res] owns stvec).  [goodb] cannot carry it -- the     *)
-(* stretch WRITES -- so it is a hand walk, and it SPLITS at the zicfilp   *)
-(* elp reset, the one write to a cell no frame may own                    *)
-(* ([HartRegNode.swp_write_reg_same]; the other client is MRET's).        *)
-(* ===================================================================== *)
 Lemma i_sub_s : i_Drw ∪ i_Dro ⊆ s_Drw ∪ s_Dro.
 Proof. rewrite /i_Drw /i_Dro /s_Drw /s_Dro. set_solver. Qed.
 
@@ -293,14 +287,688 @@ Proof.
     | lkp s_rs_mie | lkp s_rs_mdl | lkp s_rs_menv ].
 Qed.
 
-Section IntrEngine.
+(* ===================================================================== *)
+(* §2 THE TRAP, AS A WALK.
+
+   [WpIntrCore.exec_handle_interrupt_S] is the same fact on the exec side;
+   this is its per-node twin, stated over the caller's INDIVIDUAL register
+   cells rather than a reference state.  [goodb] cannot carry the whole of
+   it -- the stretch WRITES -- so the walk is by hand over its own small
+   footprint ([ti_Drw] / [ti_Dro], six written cells and four read ones),
+   with the read-only sub-monads ([hartSupports Ext_Zicfilp],
+   [currentlyEnabled Ext_S], [track_trap]) carried by the certificate; and
+   it SPLITS at the zicfilp elp reset, the one write to a cell no frame may
+   own ([HartRegNode.swp_write_reg_same]; the other client is MRET's).       *)
+(* ===================================================================== *)
+(* ==================================================================== *)
+(* THE FOOTPRINT.                                                        *)
+(* ==================================================================== *)
+Definition ti_Drw : gset register :=
+  {[ (mstatus : register); (scause : register); (stval : register);
+     (sepc : register); (cur_privilege : register);
+     (R_bitvector_64 nextPC : register) ]}.
+Definition ti_Dro : gset register :=
+  {[ (R_bitvector_64 PC : register); (misa : register); (stvec : register);
+     (elp : register) ]}.
+
+Definition ti_Df (dqp dqm dqv : dfrac) : register -> dfrac := fun r =>
+  if decide (r = (R_bitvector_64 PC : register)) then dqp
+  else if decide (r = (misa : register)) then dqm
+  else if decide (r = (stvec : register)) then dqv
+  else DfracDiscarded.
+
+Definition ti_rs (ms sc sv se : mword 64) (p : Privilege)
+    (npc pc0 mis stv : mword 64) (e : mword 1) : regstate :=
+  register_set mstatus ms
+  (register_set scause sc
+  (register_set stval sv
+  (register_set sepc se
+  (register_set cur_privilege p
+  (register_set (R_bitvector_64 nextPC) npc
+  (register_set (R_bitvector_64 PC) pc0
+  (register_set misa mis
+  (register_set stvec stv
+  (register_set elp e init_regstate))))))))).
+
+Local Ltac tt1 := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
+
+Lemma ti_rs_ms ms sc sv se p npc pc0 mis stv e :
+  register_lookup mstatus (ti_rs ms sc sv se p npc pc0 mis stv e) = ms.
+Proof. rewrite /ti_rs. apply register_lookup_set. Qed.
+Lemma ti_rs_sc ms sc sv se p npc pc0 mis stv e :
+  register_lookup scause (ti_rs ms sc sv se p npc pc0 mis stv e) = sc.
+Proof. rewrite /ti_rs. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_sv ms sc sv se p npc pc0 mis stv e :
+  register_lookup stval (ti_rs ms sc sv se p npc pc0 mis stv e) = sv.
+Proof. rewrite /ti_rs. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_se ms sc sv se p npc pc0 mis stv e :
+  register_lookup sepc (ti_rs ms sc sv se p npc pc0 mis stv e) = se.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_priv ms sc sv se p npc pc0 mis stv e :
+  register_lookup cur_privilege (ti_rs ms sc sv se p npc pc0 mis stv e) = p.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_npc ms sc sv se p npc pc0 mis stv e :
+  register_lookup (R_bitvector_64 nextPC) (ti_rs ms sc sv se p npc pc0 mis stv e) = npc.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_pc ms sc sv se p npc pc0 mis stv e :
+  register_lookup (R_bitvector_64 PC) (ti_rs ms sc sv se p npc pc0 mis stv e) = pc0.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. tt1. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_misa ms sc sv se p npc pc0 mis stv e :
+  register_lookup misa (ti_rs ms sc sv se p npc pc0 mis stv e) = mis.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. tt1. tt1. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_stvec ms sc sv se p npc pc0 mis stv e :
+  register_lookup stvec (ti_rs ms sc sv se p npc pc0 mis stv e) = stv.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. tt1. tt1. tt1. tt1. tt1. apply register_lookup_set. Qed.
+Lemma ti_rs_elp ms sc sv se p npc pc0 mis stv e :
+  register_lookup elp (ti_rs ms sc sv se p npc pc0 mis stv e) = e.
+Proof. rewrite /ti_rs. tt1. tt1. tt1. tt1. tt1. tt1. tt1. tt1. tt1.
+       apply register_lookup_set. Qed.
+
+Lemma ti_disj : ti_Drw ## ti_Dro.
+Proof. rewrite /ti_Drw /ti_Dro. set_solver. Qed.
+
+Lemma ti_w_ms : (mstatus : register) ∈ ti_Drw.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_w_sc : (scause : register) ∈ ti_Drw.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_w_sv : (stval : register) ∈ ti_Drw.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_w_se : (sepc : register) ∈ ti_Drw.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_w_priv : (cur_privilege : register) ∈ ti_Drw.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_w_npc : (R_bitvector_64 nextPC : register) ∈ ti_Drw.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+
+Lemma ti_in_ms : (mstatus : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_sc : (scause : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_sv : (stval : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_se : (sepc : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_priv : (cur_privilege : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_npc : (R_bitvector_64 nextPC : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_pc : (R_bitvector_64 PC : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Dro. set_solver. Qed.
+Lemma ti_in_misa : (misa : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Dro. set_solver. Qed.
+Lemma ti_in_stvec : (stvec : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Dro. set_solver. Qed.
+Lemma ti_in_elp : (elp : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Dro. set_solver. Qed.
+
+Local Ltac tidf :=
+  unfold ti_Df;
+  repeat first [ rewrite decide_True; [reflexivity|reflexivity]
+               | rewrite decide_False; [|discriminate] ];
+  reflexivity.
+Lemma ti_Df_pc dqp dqm dqv : ti_Df dqp dqm dqv (R_bitvector_64 PC) = dqp.
+Proof. tidf. Qed.
+Lemma ti_Df_misa dqp dqm dqv : ti_Df dqp dqm dqv misa = dqm.
+Proof. tidf. Qed.
+Lemma ti_Df_stvec dqp dqm dqv : ti_Df dqp dqm dqv stvec = dqv.
+Proof. tidf. Qed.
+Lemma ti_Df_elp dqp dqm dqv : ti_Df dqp dqm dqv elp = DfracDiscarded.
+Proof. tidf. Qed.
+
+(* the six write-normalizations *)
+Local Ltac tiag :=
+  intros r Hr; rewrite /ti_Drw /ti_Dro in Hr;
+  repeat (apply elem_of_union in Hr as [Hr|Hr]);
+  apply elem_of_singleton in Hr; subst r;
+  first [ rewrite register_lookup_set | tt1 ];
+  rewrite ?ti_rs_ms ?ti_rs_sc ?ti_rs_sv ?ti_rs_se ?ti_rs_priv ?ti_rs_npc
+          ?ti_rs_pc ?ti_rs_misa ?ti_rs_stvec ?ti_rs_elp;
+  reflexivity.
+
+Lemma ti_set_ms ms ms' sc sv se p npc pc0 mis stv e :
+  reg_agree_on (ti_Drw ∪ ti_Dro)
+    (register_set mstatus ms' (ti_rs ms sc sv se p npc pc0 mis stv e))
+    (ti_rs ms' sc sv se p npc pc0 mis stv e).
+Proof. tiag. Qed.
+Lemma ti_set_sc ms sc sc' sv se p npc pc0 mis stv e :
+  reg_agree_on (ti_Drw ∪ ti_Dro)
+    (register_set scause sc' (ti_rs ms sc sv se p npc pc0 mis stv e))
+    (ti_rs ms sc' sv se p npc pc0 mis stv e).
+Proof. tiag. Qed.
+Lemma ti_set_sv ms sc sv sv' se p npc pc0 mis stv e :
+  reg_agree_on (ti_Drw ∪ ti_Dro)
+    (register_set stval sv' (ti_rs ms sc sv se p npc pc0 mis stv e))
+    (ti_rs ms sc sv' se p npc pc0 mis stv e).
+Proof. tiag. Qed.
+Lemma ti_set_se ms sc sv se se' p npc pc0 mis stv e :
+  reg_agree_on (ti_Drw ∪ ti_Dro)
+    (register_set sepc se' (ti_rs ms sc sv se p npc pc0 mis stv e))
+    (ti_rs ms sc sv se' p npc pc0 mis stv e).
+Proof. tiag. Qed.
+Lemma ti_set_priv ms sc sv se p p' npc pc0 mis stv e :
+  reg_agree_on (ti_Drw ∪ ti_Dro)
+    (register_set cur_privilege p' (ti_rs ms sc sv se p npc pc0 mis stv e))
+    (ti_rs ms sc sv se p' npc pc0 mis stv e).
+Proof. tiag. Qed.
+Lemma ti_set_npc ms sc sv se p npc npc' pc0 mis stv e :
+  reg_agree_on (ti_Drw ∪ ti_Dro)
+    (register_set (R_bitvector_64 nextPC) npc' (ti_rs ms sc sv se p npc pc0 mis stv e))
+    (ti_rs ms sc sv se p npc' pc0 mis stv e).
+Proof. tiag. Qed.
+
+(* ==================================================================== *)
+(* PURE MONAD EQUATIONS for the constant extension probes, and the       *)
+(* [goodb] certificates for the three read-only sub-monads the trap runs. *)
+(* ==================================================================== *)
+Lemma hS_Zicfilp_ret : hartSupports Ext_Zicfilp = returnM true.
+Proof. unfold hartSupports. destruct (Defs.Zwf_guarded _). reflexivity. Qed.
+
+Lemma hS_S_ret : hartSupports Ext_S = returnM true.
+Proof. unfold hartSupports. destruct (Defs.Zwf_guarded _). reflexivity. Qed.
+
+Lemma hS_Zicsr_ret : hartSupports Ext_Zicsr = returnM true.
+Proof. unfold hartSupports. destruct (Defs.Zwf_guarded _). reflexivity. Qed.
+
+Lemma rec_cE_Zicsr_ret (acc : Acc (Zwf 0) 0) :
+  _rec_currentlyEnabled Ext_Zicsr 0 acc = returnM true.
+Proof.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  replace (Z.geb 0 0) with true by reflexivity. cbn match.
+  apply hS_Zicsr_ret.
+Qed.
+
+Lemma goodb_of_ret (Db : register -> bool) {X : Type} (m : M X) (x : X)
+    (s : mstate) : m = returnM x -> goodb Db m s = true.
+Proof. intros ->. reflexivity. Qed.
+
+Lemma goodb_cE_S (Db : register -> bool) (s : mstate) :
+  Db misa = true -> goodb Db (currentlyEnabled Ext_S) s = true.
+Proof.
+  intro HD. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  replace (Z.geb (currentlyEnabled_measure Ext_S) 0) with true by reflexivity.
+  cbn match.
+  apply goodb_bind_forall; [reflexivity|]. intros ?.
+  apply goodb_and_boolM.
+  - apply (goodb_of_ret _ _ true), hS_S_ret.
+  - apply goodb_and_boolM.
+    + apply goodb_bind_read_reg; [exact HD|]. reflexivity.
+    + apply (goodb_of_ret _ _ true), rec_cE_Zicsr_ret.
+Qed.
+
+Lemma goodb_hS_Zicfilp (Db : register -> bool) (s : mstate) :
+  goodb Db (hartSupports Ext_Zicfilp) s = true.
+Proof. apply (goodb_of_ret _ _ true), hS_Zicfilp_ret. Qed.
+
+Lemma cb_mstatus (V : mword 64) :
+  long_csr_write_callback "mstatus" "mstatush" V = returnM tt.
+Proof. vm_compute. reflexivity. Qed.
+Lemma cb_scause (V : mword 64) : csr_name_write_callback "scause" V = returnM tt.
+Proof. vm_compute. reflexivity. Qed.
+Lemma cb_stval (V : mword 64) : csr_name_write_callback "stval" V = returnM tt.
+Proof. vm_compute. reflexivity. Qed.
+Lemma cb_sepc (V : mword 64) : csr_name_write_callback "sepc" V = returnM tt.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma bind0_retM {Y : Type} (n : M Y) : Defs.bind0 (returnM tt) n = n.
+Proof. reflexivity. Qed.
+
+Lemma bind_returnM {X Y : Type} (x : X) (f : X -> M Y) :
+  Defs.bind (returnM x) f = f x.
+Proof. reflexivity. Qed.
+
+(* Sail parses [W >> R >>= K] LEFT-nested; a WRITE node re-associates by
+   CONVERSION (it is one [Next] carrying a [Ret] continuation), so one
+   rewrite puts the write back at the head where the node rules want it. *)
+Lemma bind_bind0_wr {X Y : Type} (r : register) (v : type_of_register r)
+    (n : M X) (K : X -> M Y) :
+  Defs.bind (Defs.bind0 (Defs.write_reg r v) n) K
+  = Defs.bind0 (Defs.write_reg r v) (Defs.bind n K).
+Proof. reflexivity. Qed.
+
+Lemma bind0_bind0_wr {X : Type} (r : register) (v : type_of_register r)
+    (n : M unit) (K : M X) :
+  Defs.bind0 (Defs.bind0 (Defs.write_reg r v) n) K
+  = Defs.bind0 (Defs.write_reg r v) (Defs.bind0 n K).
+Proof. reflexivity. Qed.
+
+Lemma goodb_track_trap_S (Db : register -> bool) (is_i : bool) (cause : mword 6)
+    (s : mstate) :
+  Db mstatus = true -> Db scause = true -> Db stval = true -> Db sepc = true ->
+  goodb Db (track_trap Supervisor is_i cause) s = true.
+Proof.
+  intros H1 H2 H3 H4. unfold track_trap.
+  apply goodb_bind_read_reg; [exact H1|].
+  rewrite cb_mstatus. rewrite bind0_retM. cbn match.
+  apply goodb_bind_read_reg; [exact H2|].
+  rewrite cb_scause. rewrite bind0_retM.
+  apply goodb_bind_read_reg; [exact H3|].
+  rewrite cb_stval. rewrite bind0_retM.
+  apply goodb_bind_read_reg; [exact H4|].
+  rewrite cb_sepc. reflexivity.
+Qed.
+
+(* ==================================================================== *)
+(* The three read-only sub-monads as FOOTPRINTED facts, at the leaf's     *)
+(* OWN file (no reference state: misa is generic here, only its S bit is  *)
+(* pinned, so [dstateM] transport is unavailable).                        *)
+(* ==================================================================== *)
+Definition ti_Db (r : register) : bool :=
+  register_beq r (misa : register) || register_beq r (mstatus : register)
+  || register_beq r (scause : register) || register_beq r (stval : register)
+  || register_beq r (sepc : register).
+
+Lemma ti_Db_misa : ti_Db misa = true. Proof. reflexivity. Qed.
+Lemma ti_Db_ms : ti_Db mstatus = true. Proof. reflexivity. Qed.
+Lemma ti_Db_sc : ti_Db scause = true. Proof. reflexivity. Qed.
+Lemma ti_Db_sv : ti_Db stval = true. Proof. reflexivity. Qed.
+Lemma ti_Db_se : ti_Db sepc = true. Proof. reflexivity. Qed.
+
+Lemma ti_Db_in (r : register) : ti_Db r = true -> r ∈ ti_Drw ∪ ti_Dro.
+Proof.
+  unfold ti_Db. intros Hr.
+  repeat (apply orb_true_elim in Hr as [Hr|Hr]);
+    apply register_beq_eq in Hr; subst r;
+    first [ exact ti_in_misa | exact ti_in_ms | exact ti_in_sc
+          | exact ti_in_sv | exact ti_in_se ].
+Qed.
+
+Lemma hval_at_ti {X : Type} (D Drw : gset register) (rs : regstate)
+    (m : M X) (x : X) :
+  (forall r : register, ti_Db r = true -> r ∈ D) ->
+  goodb ti_Db m (MState rs ∅ dev0_state) = true ->
+  exec m (MState rs ∅ dev0_state) = Some (x, MState rs ∅ dev0_state) ->
+  hval D Drw rs m x rs.
+Proof.
+  intros HD Hg He.
+  exact (hval_of_goodb ti_Db D Drw m (MState rs ∅ dev0_state) rs x
+           HD (fun r _ => eq_refl) Hg He).
+Qed.
+
+Lemma hval_hS_Zicfilp_ti (D Drw : gset register) (rs : regstate) :
+  (forall r : register, ti_Db r = true -> r ∈ D) ->
+  hval D Drw rs (hartSupports Ext_Zicfilp) true rs.
+Proof.
+  intros HD. apply (hval_at_ti D Drw rs _ true HD).
+  - apply goodb_hS_Zicfilp.
+  - apply exec_hartSupports_Zicfilp.
+Qed.
+
+Lemma hval_cE_S_ti (D Drw : gset register) (rs : regstate) :
+  (forall r : register, ti_Db r = true -> r ∈ D) ->
+  eq_vec (_get_Misa_S (register_lookup misa rs)) ('b"1") = true ->
+  hval D Drw rs (currentlyEnabled Ext_S) true rs.
+Proof.
+  intros HD Hm. apply (hval_at_ti D Drw rs _ true HD).
+  - apply goodb_cE_S, ti_Db_misa.
+  - rewrite (exec_currentlyEnabled_S (MState rs ∅ dev0_state)).
+    cbn [sregs]. rewrite Hm. reflexivity.
+Qed.
+
+Lemma hval_track_trap_ti (D Drw : gset register) (rs : regstate)
+    (is_i : bool) (cause : mword 6) :
+  (forall r : register, ti_Db r = true -> r ∈ D) ->
+  hval D Drw rs (track_trap Supervisor is_i cause) tt rs.
+Proof.
+  intros HD. apply (hval_at_ti D Drw rs _ tt HD).
+  - apply goodb_track_trap_S;
+      [ apply ti_Db_ms | apply ti_Db_sc | apply ti_Db_sv | apply ti_Db_se ].
+  - apply exec_track_trap_S.
+Qed.
+
+(* ==================================================================== *)
+(* The mstatus / scause towers the trap builds, in the model's order.    *)
+(* ==================================================================== *)
+Definition ti_ms1 (e : mword 1) (ms : mword 64) : mword 64 :=
+  update_subrange_vec_dec ms 23 23 e.
+Definition ti_ms2 (e : mword 1) (ms : mword 64) : mword 64 :=
+  update_subrange_vec_dec (ti_ms1 e ms) 5 5 (_get_Mstatus_SIE (ti_ms1 e ms)).
+Definition ti_ms3 (e : mword 1) (ms : mword 64) : mword 64 :=
+  update_subrange_vec_dec (ti_ms2 e ms) 1 1 ('b"0").
+Definition ti_ms4 (e : mword 1) (ms : mword 64) : mword 64 :=
+  update_subrange_vec_dec (ti_ms3 e ms) 8 8 ('b"1").
+Lemma ti_ms4_trap (e : mword 1) (ms : mword 64) : ti_ms4 e ms = trap_ms e ms.
+Proof. reflexivity. Qed.
+
+Definition ti_sc1 (sc : mword 64) (i : InterruptType) : mword 64 :=
+  update_subrange_vec_dec sc (64 - 1) (64 - 1)
+    (bool_to_bit (trapCause_is_interrupt (Interrupt i))).
+Definition ti_sc2 (sc : mword 64) (i : InterruptType) : mword 64 :=
+  update_subrange_vec_dec (ti_sc1 sc i) (64 - 2) 0
+    (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i))).
+Lemma ti_sc2_trap (sc : mword 64) (i : InterruptType) :
+  ti_sc2 sc i = trap_scause sc i.
+Proof. reflexivity. Qed.
+
+Lemma hregwrite_val_at_write_reg (r : register) (v : type_of_register r) :
+  hregwrite_val_at r (Defs.write_reg r v) = Some v.
+Proof.
+  cbn [Defs.write_reg hregwrite_val_at].
+  match goal with
+  | |- context [ match ?d with | left _ => _ | right _ => _ end ] =>
+      destruct d as [Heq|Hne]
+  end; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel. reflexivity.
+Qed.
+
+Lemma hregwrite_resume_write_reg (r : register) (v : type_of_register r) :
+  hregwrite_resume (Defs.write_reg r v) = Interface.Ret tt.
+Proof. reflexivity. Qed.
+
+Section TrapSwp.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Lemma ti_frames (dqp dqm dqv : dfrac) (ms sc sv se : mword 64)
+      (p : Privilege) (npc pc0 mis stv : mword 64) (e : mword 1) :
+    (hreg_frame (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Drw ∗
+     hreg_frame_ro (ti_Df dqp dqm dqv)
+       (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Dro : iProp Σ)
+    ⊣⊢ (mstatus ↦ᵣ ms ∗ scause ↦ᵣ sc ∗ stval ↦ᵣ sv ∗ sepc ↦ᵣ se ∗
+         cur_privilege ↦ᵣ p ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+         reg_pointsto (R_bitvector_64 PC) dqp pc0 ∗
+         reg_pointsto misa dqm mis ∗ reg_pointsto stvec dqv stv ∗
+         reg_pointsto elp DfracDiscarded e).
+  Proof.
+    rewrite /hreg_frame /hreg_frame_ro /ti_Drw /ti_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite ti_rs_ms ti_rs_sc ti_rs_sv ti_rs_se ti_rs_priv ti_rs_npc
+            ti_rs_pc ti_rs_misa ti_rs_stvec ti_rs_elp.
+    rewrite ti_Df_pc ti_Df_misa ti_Df_stvec ti_Df_elp.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma ti_frames_in (dqp dqm dqv : dfrac) (ms sc sv se : mword 64)
+      (p : Privilege) (npc pc0 mis stv : mword 64) (e : mword 1) :
+    mstatus ↦ᵣ ms -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ sv -∗ sepc ↦ᵣ se -∗
+    cur_privilege ↦ᵣ p -∗ (R_bitvector_64 nextPC) ↦ᵣ npc -∗
+    reg_pointsto (R_bitvector_64 PC) dqp pc0 -∗
+    reg_pointsto misa dqm mis -∗ reg_pointsto stvec dqv stv -∗
+    reg_pointsto elp DfracDiscarded e -∗
+    (hreg_frame (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Drw ∗
+     hreg_frame_ro (ti_Df dqp dqm dqv)
+       (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Dro : iProp Σ).
+  Proof.
+    iIntros "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10". rewrite ti_frames. iFrame.
+  Qed.
+
+  Lemma ti_frames_out (dqp dqm dqv : dfrac) (ms sc sv se : mword 64)
+      (p : Privilege) (npc pc0 mis stv : mword 64) (e : mword 1) :
+    (hreg_frame (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Drw ∗
+     hreg_frame_ro (ti_Df dqp dqm dqv)
+       (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Dro : iProp Σ) -∗
+    (mstatus ↦ᵣ ms ∗ scause ↦ᵣ sc ∗ stval ↦ᵣ sv ∗ sepc ↦ᵣ se ∗
+     cur_privilege ↦ᵣ p ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     reg_pointsto (R_bitvector_64 PC) dqp pc0 ∗
+     reg_pointsto misa dqm mis ∗ reg_pointsto stvec dqv stv ∗
+     reg_pointsto elp DfracDiscarded e).
+  Proof. rewrite ti_frames. iIntros "H". iExact "H". Qed.
+
+  Lemma ti_rw_ext (rs rs' : regstate) :
+    reg_agree_on (ti_Drw ∪ ti_Dro) rs rs' ->
+    hreg_frame rs ti_Drw -∗ (hreg_frame rs' ti_Drw : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ ti_Drw
+      (reg_agree_mono (ti_Drw ∪ ti_Dro) ti_Drw _ _ ltac:(set_solver) Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma ti_ro_ext (Df : register -> dfrac) (rs rs' : regstate) :
+    reg_agree_on (ti_Drw ∪ ti_Dro) rs rs' ->
+    hreg_frame_ro Df rs ti_Dro -∗ (hreg_frame_ro Df rs' ti_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext Df _ _ ti_Dro
+      (reg_agree_mono (ti_Drw ∪ ti_Dro) ti_Dro _ _ ltac:(set_solver) Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Local Ltac tinorm L :=
+    iDestruct (ti_rw_ext _ _ (L _ _ _ _ _ _ _ _ _ _ _) with "Hrw") as "Hrw";
+    iDestruct (ti_ro_ext _ _ _ (L _ _ _ _ _ _ _ _ _ _ _) with "Hro") as "Hro".
+
+  (* ------------------------------------------------------------------ *)
+  (* [zicfilp_preserve_elp_on_trap Supervisor]: mstatus.SPELP := elp, then *)
+  (* THE WRITE THE SPAN CANNOT TAKE -- [reset_elp], writing elp with the   *)
+  (* value the [hw_config] pin already fixes.                              *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_zicfilp_trap_S (dqp dqm dqv : dfrac) (ms sc sv se : mword 64)
+      (p : Privilege) (npc pc0 mis stv : mword 64) (e : mword 1) :
+    e = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    gen_cert -∗
+    reg_pointsto elp DfracDiscarded e -∗
+    hreg_frame (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Drw -∗
+    hreg_frame_ro (ti_Df dqp dqm dqv)
+      (ti_rs ms sc sv se p npc pc0 mis stv e) ti_Dro -∗
+    swp (zicfilp_preserve_elp_on_trap Supervisor)
+      (fun _ =>
+         hreg_frame (ti_rs (ti_ms1 e ms) sc sv se p npc pc0 mis stv e) ti_Drw ∗
+         hreg_frame_ro (ti_Df dqp dqm dqv)
+           (ti_rs (ti_ms1 e ms) sc sv se p npc pc0 mis stv e) ti_Dro).
+  Proof.
+    intros He. iIntros "#Hcert #Help Hrw Hro".
+    unfold zicfilp_preserve_elp_on_trap. cbn match.
+    iApply (swp_bind0_use _ _
+              (fun _ : unit =>
+                 hreg_frame (ti_rs (ti_ms1 e ms) sc sv se p npc pc0 mis stv e)
+                   ti_Drw ∗
+                 hreg_frame_ro (ti_Df dqp dqm dqv)
+                   (ti_rs (ti_ms1 e ms) sc sv se p npc pc0 mis stv e) ti_Dro)%I
+              _ with "[Hrw Hro] [-]").
+    { iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+      { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ mstatus
+                  ti_disj ti_in_ms with "Hcert Hrw Hro"). }
+      iIntros (w2) "(-> & Hrw & Hro)". rewrite ti_rs_ms.
+      iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+      { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ elp
+                  ti_disj ti_in_elp with "Hcert Hrw Hro"). }
+      iIntros (w3) "(-> & Hrw & Hro)". rewrite ti_rs_elp.
+      iApply (swp_mono with "[] [-]");
+        [| iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ mstatus (ti_ms1 e ms)
+                     ti_disj ti_w_ms with "Hcert Hrw Hro") ].
+      iIntros (u) "[Hrw Hro]".
+      iDestruct (ti_rw_ext _ _
+        (ti_set_ms ms (ti_ms1 e ms) sc sv se p npc pc0 mis stv e)
+        with "Hrw") as "Hrw".
+      iDestruct (ti_ro_ext _ _ _
+        (ti_set_ms ms (ti_ms1 e ms) sc sv se p npc pc0 mis stv e)
+        with "Hro") as "Hro". iFrame. }
+    iIntros (u) "[Hrw Hro]". unfold reset_elp. subst e.
+    iApply (swp_write_reg_same elp DfracDiscarded _ _ _
+              (hregwrite_val_at_write_reg elp _) with "Hcert Help [-]").
+    iIntros "_". rewrite hregwrite_resume_write_reg.
+    iApply swp_ret. iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE TRAP.  [trap_handler Supervisor (Interrupt ii) pc0 None None]     *)
+  (* node by node along the model's own binds -- the [swp] twin of         *)
+  (* [WpIntrCore.exec_trap_handler_S_intr].                                *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_trap_handler_S_intr (dqp dqm dqv : dfrac) (ii : InterruptType)
+      (ms sc sv se npc pc0 mis stv : mword 64) (e : mword 1) :
+    e = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    eq_vec (_get_Misa_S mis) ('b"1") = true ->
+    trapVectorMode_forwards (_get_Mtvec_Mode stv) = TV_Direct ->
+    gen_cert -∗
+    reg_pointsto elp DfracDiscarded e -∗
+    hreg_frame (ti_rs ms sc sv se Supervisor npc pc0 mis stv e) ti_Drw -∗
+    hreg_frame_ro (ti_Df dqp dqm dqv)
+      (ti_rs ms sc sv se Supervisor npc pc0 mis stv e) ti_Dro -∗
+    swp (trap_handler Supervisor (Interrupt ii) pc0 None None)
+      (fun tgt => ⌜tgt = stvec_base stv⌝ ∗
+         hreg_frame (ti_rs (ti_ms4 e ms) (ti_sc2 sc ii) (zeros' 64) pc0
+                       Supervisor npc pc0 mis stv e) ti_Drw ∗
+         hreg_frame_ro (ti_Df dqp dqm dqv)
+           (ti_rs (ti_ms4 e ms) (ti_sc2 sc ii) (zeros' 64) pc0
+              Supervisor npc pc0 mis stv e) ti_Dro).
+  Proof.
+    intros He HmisaS Htvd. iIntros "#Hcert #Help Hrw Hro".
+    unfold trap_handler. cbn zeta.
+    change (orb (get_config_print_exception tt) (get_config_print_interrupt tt))
+      with false.
+    cbn match. rewrite bind0_retM.
+    (* -- hartSupports Ext_Zicfilp -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span ti_Drw ti_Dro _ _ _ _ true ti_disj
+                (hval_hS_Zicfilp_ti (ti_Drw ∪ ti_Dro) ti_Drw
+                   (ti_rs ms sc sv se Supervisor npc pc0 mis stv e) ti_Db_in)
+                with "Hcert Hrw Hro"). }
+    iIntros (w1) "(-> & Hrw & Hro)". cbn match.
+    (* -- zicfilp_preserve_elp_on_trap Supervisor (incl. the elp reset) -- *)
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_zicfilp_trap_S dqp dqm dqv ms sc sv se Supervisor npc pc0
+                mis stv e He with "Hcert Help Hrw Hro"). }
+    iIntros (u0) "[Hrw Hro]". cbn match.
+    (* -- currentlyEnabled Ext_S, then the assertion -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span ti_Drw ti_Dro _ _ _ _ true ti_disj
+                (hval_cE_S_ti (ti_Drw ∪ ti_Dro) ti_Drw
+                   (ti_rs (ti_ms1 e ms) sc sv se Supervisor npc pc0 mis stv e)
+                   ti_Db_in
+                   ltac:(rewrite ti_rs_misa; exact HmisaS))
+                with "Hcert Hrw Hro"). }
+    iIntros (w2) "(-> & Hrw & Hro)".
+    unfold Defs.assert_exp'. cbn match. rewrite bind_returnM.
+    (* -- scause: read, write c1, read, write c2 -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ scause
+                ti_disj ti_in_sc with "Hcert Hrw Hro"). }
+    iIntros (w3) "(-> & Hrw & Hro)". rewrite ti_rs_sc.
+    rewrite bind_bind0_wr.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ scause (ti_sc1 sc ii)
+                ti_disj ti_w_sc with "Hcert Hrw Hro"). }
+    iIntros (u1) "[Hrw Hro]". tinorm ti_set_sc.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ scause
+                ti_disj ti_in_sc with "Hcert Hrw Hro"). }
+    iIntros (w4) "(-> & Hrw & Hro)". rewrite ti_rs_sc.
+    rewrite bind_bind0_wr.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ scause (ti_sc2 sc ii)
+                ti_disj ti_w_sc with "Hcert Hrw Hro"). }
+    iIntros (u2) "[Hrw Hro]". tinorm ti_set_sc.
+    (* -- mstatus: SPIE := SIE -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ mstatus
+                ti_disj ti_in_ms with "Hcert Hrw Hro"). }
+    iIntros (w5) "(-> & Hrw & Hro)". rewrite ti_rs_ms.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ mstatus
+                ti_disj ti_in_ms with "Hcert Hrw Hro"). }
+    iIntros (w6) "(-> & Hrw & Hro)". rewrite ti_rs_ms.
+    rewrite bind_bind0_wr.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ mstatus (ti_ms2 e ms)
+                ti_disj ti_w_ms with "Hcert Hrw Hro"). }
+    iIntros (u3) "[Hrw Hro]". tinorm ti_set_ms.
+    (* -- mstatus: SIE := 0 -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ mstatus
+                ti_disj ti_in_ms with "Hcert Hrw Hro"). }
+    iIntros (w7) "(-> & Hrw & Hro)". rewrite ti_rs_ms.
+    rewrite bind_bind0_wr.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ mstatus (ti_ms3 e ms)
+                ti_disj ti_w_ms with "Hcert Hrw Hro"). }
+    iIntros (u4) "[Hrw Hro]". tinorm ti_set_ms.
+    (* -- mstatus: SPP := 1 (via the cur_privilege read) -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ mstatus
+                ti_disj ti_in_ms with "Hcert Hrw Hro"). }
+    iIntros (w8) "(-> & Hrw & Hro)". rewrite ti_rs_ms.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ cur_privilege
+                ti_disj ti_in_priv with "Hcert Hrw Hro"). }
+    iIntros (w9) "(-> & Hrw & Hro)". rewrite ti_rs_priv. cbn match.
+    rewrite bind_returnM.
+    (* -- the four writes: mstatus SPP, stval, sepc, cur_privilege -- *)
+    repeat rewrite bind0_bind0_wr.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ mstatus (ti_ms4 e ms)
+                ti_disj ti_w_ms with "Hcert Hrw Hro"). }
+    iIntros (u5) "[Hrw Hro]". tinorm ti_set_ms.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ stval (zeros' 64)
+                ti_disj ti_w_sv with "Hcert Hrw Hro"). }
+    iIntros (u6) "[Hrw Hro]". tinorm ti_set_sv.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ sepc pc0
+                ti_disj ti_w_se with "Hcert Hrw Hro"). }
+    iIntros (u7) "[Hrw Hro]". tinorm ti_set_se.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ cur_privilege Supervisor
+                ti_disj ti_w_priv with "Hcert Hrw Hro"). }
+    iIntros (u8) "[Hrw Hro]". tinorm ti_set_priv.
+    (* -- track_trap, the scause read-back, prepare_trap_vector -- *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+      { iApply (swp_span ti_Drw ti_Dro _ _ _ _ tt ti_disj
+                  (hval_track_trap_ti (ti_Drw ∪ ti_Dro) ti_Drw
+                     (ti_rs (ti_ms4 e ms) (ti_sc2 sc ii) (zeros' 64) pc0
+                        Supervisor npc pc0 mis stv e) _ _ ti_Db_in)
+                  with "Hcert Hrw Hro"). }
+      iIntros (u9) "(_ & Hrw & Hro)".
+      iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ scause
+                ti_disj ti_in_sc with "Hcert Hrw Hro"). }
+    iIntros (w10) "(-> & Hrw & Hro)".
+    unfold prepare_trap_vector. cbn match.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ stvec
+                ti_disj ti_in_stvec with "Hcert Hrw Hro"). }
+    iIntros (w11) "(-> & Hrw & Hro)". rewrite ti_rs_stvec.
+    unfold tvec_addr. rewrite Htvd. cbn match.
+    iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* [handle_interrupt ii Supervisor] at the frame: PC read, the trap,     *)
+  (* [set_next_pc].                                                        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_handle_interrupt_S_frame (dqp dqm dqv : dfrac) (ii : InterruptType)
+      (ms sc sv se npc pc0 mis stv : mword 64) (e : mword 1) :
+    e = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    eq_vec (_get_Misa_S mis) ('b"1") = true ->
+    trapVectorMode_forwards (_get_Mtvec_Mode stv) = TV_Direct ->
+    gen_cert -∗
+    reg_pointsto elp DfracDiscarded e -∗
+    hreg_frame (ti_rs ms sc sv se Supervisor npc pc0 mis stv e) ti_Drw -∗
+    hreg_frame_ro (ti_Df dqp dqm dqv)
+      (ti_rs ms sc sv se Supervisor npc pc0 mis stv e) ti_Dro -∗
+    swp (handle_interrupt ii Supervisor)
+      (fun _ =>
+         hreg_frame (ti_rs (ti_ms4 e ms) (ti_sc2 sc ii) (zeros' 64) pc0
+                       Supervisor (stvec_base stv) pc0 mis stv e) ti_Drw ∗
+         hreg_frame_ro (ti_Df dqp dqm dqv)
+           (ti_rs (ti_ms4 e ms) (ti_sc2 sc ii) (zeros' 64) pc0
+              Supervisor (stvec_base stv) pc0 mis stv e) ti_Dro).
+  Proof.
+    intros He HmisaS Htvd. iIntros "#Hcert #Help Hrw Hro".
+    unfold handle_interrupt.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned ti_Drw ti_Dro _ _ (R_bitvector_64 PC)
+                ti_disj ti_in_pc with "Hcert Hrw Hro"). }
+    iIntros (w0) "(-> & Hrw & Hro)". rewrite ti_rs_pc.
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_trap_handler_S_intr dqp dqm dqv ii ms sc sv se npc pc0
+                mis stv e He HmisaS Htvd with "Hcert Help Hrw Hro"). }
+    iIntros (tgt) "(-> & Hrw & Hro)".
+    unfold set_next_pc. cbn match.
+    iApply (swp_bind0_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned ti_Drw ti_Dro _ _ (R_bitvector_64 nextPC)
+                (stvec_base stv) ti_disj ti_w_npc with "Hcert Hrw Hro"). }
+    iIntros (u) "[Hrw Hro]". tinorm ti_set_npc.
+    iApply swp_ret. iFrame.
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE HEADLINE, at the caller's individual cells.                       *)
+  (* ==================================================================== *)
   Lemma swp_handle_interrupt_S (ii : InterruptType)
       (pc0 ms_v sc_old sv_old se_old np_old stvec_v misa0 : mword 64)
       (elp_v : mword 1) {dqp dqm dqv : dfrac} :
+    eq_vec elp_v (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     trapVectorMode_forwards (_get_Mtvec_Mode stvec_v) = TV_Direct ->
     gen_cert -∗
@@ -326,7 +994,29 @@ Section IntrEngine.
          cur_privilege ↦ᵣ Supervisor ∗
          (R_bitvector_64 nextPC) ↦ᵣ stvec_base stvec_v).
   Proof.
-  Admitted.
+    intros Hnp HmisaS Htvd.
+    pose proof (elp_no_lp elp_v Hnp) as He.
+    iIntros "#Hcert HPC Hmisa Hstv #Help Hms Hsc Hsv Hse Hpriv Hnpc".
+    iDestruct (ti_frames_in dqp dqm dqv ms_v sc_old sv_old se_old Supervisor
+                 np_old pc0 misa0 stvec_v elp_v
+                 with "Hms Hsc Hsv Hse Hpriv Hnpc HPC Hmisa Hstv Help")
+      as "[Hrw Hro]".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_handle_interrupt_S_frame dqp dqm dqv ii ms_v sc_old
+                   sv_old se_old np_old pc0 misa0 stvec_v elp_v
+                   He HmisaS Htvd with "Hcert Help Hrw Hro") ].
+    iIntros (u) "[Hrw Hro]".
+    iDestruct (ti_frames_out with "[$Hrw $Hro]")
+      as "(Hms & Hsc & Hsv & Hse & Hpriv & Hnpc & HPC & Hmisa & Hstv & _)".
+    rewrite ti_ms4_trap ti_sc2_trap. iFrame.
+  Qed.
+
+End TrapSwp.
+
+Section IntrEngine.
+  Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ==================================================================== *)
   (* §3 THE S-MODE CYCLE BODY: [run_hart_active] FROM THE [instr] BUNDLE.  *)
@@ -876,7 +1566,7 @@ Proof.
                       "[-HPC Hstv Hms Hscause Hstval Hsepc Hpriv HnPC]
                        [HPC Hstv Hms Hscause Hstval Hsepc Hpriv HnPC]").
             2:{ iApply (swp_handle_interrupt_S ii pc0 mst0 sc_old sv_old se_old
-                          pc0 handler misa0 elp0 HmS Htvd
+                          pc0 handler misa0 elp0 Helpnp HmS Htvd
                           with "Hcert HPC Hmisa Hstv Help Hms Hscause Hstval
                                 Hsepc Hpriv HnPC"). }
             iIntros (u)
