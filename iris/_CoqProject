@@ -95,6 +95,7 @@ WpMmodeLeafBase.v
 WpMmodeSwpBase.v
 WpMmodeJump.v
 WpMmodeCsrSwp.v
+HartSCsr.v
 MbootVocab.v
 MemAccessGen.v
 WpMmodeItype.v
@@ -267,6 +268,7 @@ SpecKernelvec.v
 ProofKernelvec.v
 LinkKernelvec.v
 WpSmodeIntr.v
+WpSconfEngine.v
 WpSconfAlu.v
 WpSconfMem.v
 WpSmodeHalf.v
@@ -580,7 +582,6 @@ DinodeEnc.v
 DirentEnc.v
 ElfEnc.v
 PathElems.v
-WpSconfSrliw.v
 CodeWriteHead.v
 CodeInstallTrans.v
 CodeInitlog.v
