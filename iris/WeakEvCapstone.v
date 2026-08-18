@@ -309,6 +309,15 @@ Lemma elab_ws_ne σ c l c' :
   c' <> c -> elab_ws σ c l c' = wgws σ c'.
 Proof. intros Hne. destruct l; rewrite //= gws_insert_ne //. Qed.
 
+(** ... and the D3 twin, for the announced instruction bits. *)
+Lemma eib_apply_at σ c oib :
+  eib_apply σ c oib c = default (wgib σ c) oib.
+Proof. destruct oib; [apply gib_insert_eq|reflexivity]. Qed.
+
+Lemma eib_apply_ne σ c oib c' :
+  c' <> c -> eib_apply σ c oib c' = wgib σ c'.
+Proof. intros Hne. destruct oib; [by apply gib_insert_ne|reflexivity]. Qed.
+
 (** The two projections of §0's slots, at the two agent kinds.  The side
     condition and the log effect are LITERALLY [WeakEvInst]'s (that is what
     the factorization bought); the view effect differs only by the pointwise
@@ -346,28 +355,30 @@ Lemma pf_ws_disk P σ l :
 Proof. by destruct l. Qed.
 
 (** ... and the four shapes of a projected configuration after one step. *)
-Lemma ecfg_of_hart_upd P σ (c : CPU) (h' : ehst) l k ors d' :
-  ecfg_of (ep_hset P c h') (elab_apply σ c l k ors d')
+Lemma ecfg_of_hart_upd P σ (c : CPU) (h' : ehst) l k ors oib d' :
+  ecfg_of (ep_hset P c h') (elab_apply σ c l k ors oib d')
   = WPCfg (img_z (wgimg σ)) (elab_log σ c l k) d'
       (<[fin_to_nat c
          := WPAgent (PHart c (ehart_m h') (default (wgregs σ c) ors)
-                       (ehart_fn h')) (elab_ws σ c l c) ∅]> (eags P σ)).
+                       (ehart_fn h') (default (wgib σ c) oib))
+              (elab_ws σ c l c) ∅]> (eags P σ)).
 Proof.
   have Hne : forall c', c' <> c ->
-    ehart_ag (ep_hset P c h') (elab_apply σ c l k ors d') c'
+    ehart_ag (ep_hset P c h') (elab_apply σ c l k ors oib d') c'
     = ehart_ag P σ c'.
   { intros c' Hc'. rewrite /ehart_ag /ep_hset /=.
     destruct (decide (c' = c)) as [->|_]; [done|].
     by rewrite /elab_apply /= (eregs_apply_ne σ c ors c' Hc')
-               (elab_ws_ne σ c l c' Hc'). }
-  have Hag : ehart_ag (ep_hset P c h') (elab_apply σ c l k ors d') c
+               (elab_ws_ne σ c l c' Hc') (eib_apply_ne σ c oib c' Hc'). }
+  have Hag : ehart_ag (ep_hset P c h') (elab_apply σ c l k ors oib d') c
              = WPAgent (PHart c (ehart_m h') (default (wgregs σ c) ors)
-                          (ehart_fn h')) (elab_ws σ c l c) ∅.
+                          (ehart_fn h') (default (wgib σ c) oib))
+                 (elab_ws σ c l c) ∅.
   { rewrite /ehart_ag /ep_hset /=.
     destruct (decide (c = c)) as [_|]; [|done].
-    by rewrite /elab_apply /= eregs_apply_at. }
+    by rewrite /elab_apply /= eregs_apply_at eib_apply_at. }
   have Heq := eags_upd_hart P (ep_hset P c h') σ
-                (elab_apply σ c l k ors d') c Hne eq_refl.
+                (elab_apply σ c l k ors oib d') c Hne eq_refl.
   by rewrite /ecfg_of Heq Hag.
 Qed.
 
@@ -392,14 +403,16 @@ Lemma ecfg_of_reg P σ (c : CPU) rs' :
   ecfg_of P (ewg_reg σ c rs')
   = WPCfg (img_z (wgimg σ)) (wglog σ) (wgdev σ)
       (<[fin_to_nat c
-         := WPAgent (PHart c (ehart_m (ep_h P c)) rs' (ehart_fn (ep_h P c)))
+         := WPAgent (PHart c (ehart_m (ep_h P c)) rs' (ehart_fn (ep_h P c))
+                       (wgib σ c))
               (wgws σ c) ∅]> (eags P σ)).
 Proof.
   have Hne : forall c', c' <> c ->
     ehart_ag P (ewg_reg σ c rs') c' = ehart_ag P σ c'.
   { intros c' Hc'. rewrite /ehart_ag /ewg_reg /=. by rewrite greg_insert_ne. }
   have Hag : ehart_ag P (ewg_reg σ c rs') c
-             = WPAgent (PHart c (ehart_m (ep_h P c)) rs' (ehart_fn (ep_h P c)))
+             = WPAgent (PHart c (ehart_m (ep_h P c)) rs' (ehart_fn (ep_h P c))
+                          (wgib σ c))
                  (wgws σ c) ∅.
   { rewrite /ehart_ag /ewg_reg /=. by rewrite greg_insert_eq. }
   have Heq := eags_upd_hart P P σ (ewg_reg σ c rs') c Hne eq_refl.
@@ -414,13 +427,13 @@ Qed.
     [pf_violation_free_hart].  Every arm, no exception: since M5 the disk
     reads through its label like everybody else. *)
 
-Lemma elab_apply_elabel_ok σ c l k ors d' :
+Lemma elab_apply_elabel_ok σ c l k ors oib d' :
   elab_ok σ c l ->
   (forall aq base tvs, l <> LLoad aq true base tvs []) ->
   (* D2: the three dependency-only labels have no [elabel_ok] image, so the
      bracket needs to know the step emitted none. *)
   lb_depfree l ->
-  elabel_ok σ c l (elab_apply σ c l k ors d').
+  elabel_ok σ c l (elab_apply σ c l k ors oib d').
 Proof.
   intros Hok Hlat Hdf.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
@@ -447,33 +460,33 @@ Qed.
 (** The hart's program half assembles into an [epf_step]: at a boundary
     ([ep_h P c = None], i.e. the program state's monad is [Ret tt]) that is
     [EPFBoundary], otherwise [EPFCycle]. *)
-Lemma epf_step_of_hart P σ (c : CPU) l m' ors fn' d' :
+Lemma epf_step_of_hart P σ (c : CPU) l m' ors fn' d' oib :
   ethread_live σ (ep_gen P) ->
   pstep_node c (ehart_m (ep_h P c)) (wgregs σ c) (ehart_fn (ep_h P c))
-    (wgdev σ) l m' ors fn' d' ->
+    (wgib σ c) (wgdev σ) l m' ors fn' d' oib ->
   elab_ok σ c l ->
   epf_step (fin_to_nat c) l (P, σ)
     (ep_hset P c (Some (m', fn')),
      elab_apply σ c l
-       (pcls_ev (pa_st (ehart_ag P σ c)) l (wgws σ c)) ors d').
+       (pcls_ev (pa_st (ehart_ag P σ c)) l (wgws σ c)) ors oib d').
 Proof.
   intros Hlive Hps Hok.
   set k := pcls_ev (pa_st (ehart_ag P σ c)) l (wgws σ c).
   have Hlat : forall aq base tvs, l <> LLoad aq true base tvs [].
   { intros aq base tvs ->. by eapply pstep_node_lat_free. }
   have Hdf : lb_depfree l by eapply pstep_node_depfree.
-  have Hlbl := elab_apply_elabel_ok σ c l k ors d' Hok Hlat Hdf.
+  have Hlbl := elab_apply_elabel_ok σ c l k ors oib d' Hok Hlat Hdf.
   have Hcy : ecycle_step (ep_gen P) σ c (ehart_m (ep_h P c))
                (ehart_fn (ep_h P c)) (Sail (ep_gen P) c m' fn')
-               (elab_apply σ c l k ors d').
-  { apply ecycle_step_factor. by exists l, m', ors, fn', d'. }
+               (elab_apply σ c l k ors oib d').
+  { apply ecycle_step_factor. by exists l, m', ors, fn', d', oib. }
   destruct (ep_h P c) as [[m fn]|] eqn:Hh.
   - by apply (EPFCycle c l P σ m fn (Some (m', fn'))).
-  - (* the boundary: the monad is [Ret tt], and the program half emits
-       [LSilent] and nothing else there *)
+  - (* the boundary: the monad is [Ret tt], the program half emits [LSilent]
+       and nothing else, and (D3) it CLEARS the announced bits *)
     rewrite /pstep_node /ehart_m /ehart_fn /pnode_step /= in Hps.
-    destruct Hps as (tick & -> & -> & -> & -> & ->).
-    rewrite (elab_apply_silent σ c k).
+    destruct Hps as (tick & -> & -> & -> & -> & -> & ->).
+    rewrite (elab_apply_ib σ c k None).
     by apply (EPFBoundary c P σ tick).
 Qed.
 
@@ -528,19 +541,19 @@ Proof.
   destruct (eags_lookup_inv P σ i ag Hlk) as [(c & -> & ->)|(-> & ->)].
   - (* A HART *)
     rewrite pf_ok_hart in Hok. rewrite /= in Hps.
-    destruct st' as [cpu' m' rs' fn'|dp']; [|by destruct Hps].
-    destruct Hps as (-> & ors & -> & [Hnode|Hplic]).
+    destruct st' as [cpu' m' rs' fn' ib'|dp']; [|by destruct Hps].
+    destruct Hps as (-> & ors & oib & -> & -> & [Hnode|Hplic]).
     + (* the cycle event *)
       eexists _, _. split; [by apply epf_step_of_hart|].
       rewrite ecfg_of_hart_upd /pf_cfg /=.
       by rewrite ?pf_log_hart ?pf_ws_hart.
     + (* the PLIC wire *)
-      destruct Hplic as (-> & -> & -> & -> & ->).
+      destruct Hplic as (-> & -> & -> & -> & -> & ->).
       eexists P, _. split; [by apply (EPFPlic c P σ)|].
       rewrite ecfg_of_reg /pf_cfg /=. by rewrite ?pf_ws_hart.
   - (* THE DISK AGENT *)
     rewrite /= in Hps.
-    destruct st' as [cpu' m' rs' fn'|dp']; [by destruct Hps|].
+    destruct st' as [cpu' m' rs' fn' ib'|dp']; [by destruct Hps|].
     have Hnr : forall aq rl base tvs data,
                  l <> LRmw aq rl base tvs data [] [].
     { intros aq rl base tvs data ->. by eapply pstep_disk_no_rmw. }
@@ -572,7 +585,8 @@ Lemma ecfg_of_hset P σ (c : CPU) (h' : ehst) :
   ecfg_of (ep_hset P c h') σ
   = WPCfg (img_z (wgimg σ)) (wglog σ) (wgdev σ)
       (<[fin_to_nat c
-         := WPAgent (PHart c (ehart_m h') (wgregs σ c) (ehart_fn h'))
+         := WPAgent (PHart c (ehart_m h') (wgregs σ c) (ehart_fn h')
+                       (wgib σ c))
               (wgws σ c) ∅]> (eags P σ)).
 Proof.
   have Hne : forall c', c' <> c ->
@@ -580,7 +594,8 @@ Proof.
   { intros c' Hc'. rewrite /ehart_ag /ep_hset /=.
     by destruct (decide (c' = c)) as [->|_]. }
   have Hag : ehart_ag (ep_hset P c h') σ c
-             = WPAgent (PHart c (ehart_m h') (wgregs σ c) (ehart_fn h'))
+             = WPAgent (PHart c (ehart_m h') (wgregs σ c) (ehart_fn h')
+                          (wgib σ c))
                  (wgws σ c) ∅.
   { rewrite /ehart_ag /ep_hset /=. by destruct (decide (c = c)) as [_|]. }
   have Heq := eags_upd_hart P (ep_hset P c h') σ σ c Hne eq_refl.
@@ -601,34 +616,40 @@ Proof.
                 |l0 P σ dp' dws' σ' Hlive Hst Hl
                 |P σ σ' Hlive Hu
                 |c P σ Hlive]; simpl.
-  - (* the boundary *)
+  - (* the boundary — D3: it CLEARS the announced bits, which is the
+       [elab_apply] shape [elab_apply_ib] names *)
     exists LSilent.
     have Hstep := wp_pf_step_intro pstep_ev pcls_ev (fin_to_nat c) LSilent
                     (ecfg_of P σ) (ehart_ag P σ c)
-                    (PHart c (riscv_step tick) (wgregs σ c) None) (wgdev σ)
-                    (eags_hart P σ c).
-    rewrite ecfg_of_hset. rewrite /pf_cfg /pf_log /pf_ws /= in Hstep.
+                    (PHart c (riscv_step tick) (wgregs σ c) None None)
+                    (wgdev σ) (eags_hart P σ c).
+    rewrite -(elab_apply_ib σ c
+                (pcls_ev (pa_st (ehart_ag P σ c)) LSilent (wgws σ c)) None)
+            ecfg_of_hart_upd.
+    rewrite /pf_cfg /pf_log /pf_ws /= in Hstep.
     apply Hstep; [|exact I].
     rewrite /pstep_ev /= /ehart_ag /= Hh /=.
-    split; [reflexivity|]. exists None. split; [reflexivity|].
+    split; [reflexivity|]. exists None, (Some None). split_and!;
+      [reflexivity|reflexivity|].
     left. rewrite /pstep_node /pnode_step /=. by exists tick.
   - (* one cycle event *)
     apply ecycle_step_factor in Hcy
-      as (l1 & m1 & ors & fn1 & d1 & He & Hps & Hok & ->).
+      as (l1 & m1 & ors & fn1 & d1 & oib & He & Hps & Hok & ->).
     rewrite (ehexp_sail (ep_gen P) c h') in He. simplify_eq.
     exists l1.
-    have Hst0 : pa_st (ehart_ag P σ c) = PHart c m0 (wgregs σ c) fn0.
+    have Hst0 : pa_st (ehart_ag P σ c) = PHart c m0 (wgregs σ c) fn0 (wgib σ c).
     { by rewrite /ehart_ag /= Hh. }
     have Hstep := wp_pf_step_intro pstep_ev pcls_ev (fin_to_nat c) l1
                     (ecfg_of P σ) (ehart_ag P σ c)
                     (PHart c (ehart_m h') (default (wgregs σ c) ors)
-                       (ehart_fn h')) d1
+                       (ehart_fn h') (default (wgib σ c) oib)) d1
                     (eags_hart P σ c).
     rewrite ecfg_of_hart_upd -Hst0.
     rewrite /pf_cfg pf_log_hart pf_ws_hart in Hstep.
     apply Hstep; [|by rewrite pf_ok_hart].
     rewrite /pstep_ev Hst0 /=.
-    split; [reflexivity|]. exists ors. split; [reflexivity|]. by left.
+    split; [reflexivity|]. exists ors, oib. split_and!;
+      [reflexivity|reflexivity|]. by left.
   - (* one disk event *)
     apply edisk_step_factor in Hst
       as (l1 & dp1 & d1 & He & Hps & Hok & ->). simplify_eq.
@@ -657,14 +678,15 @@ Proof.
                     (PHart c (ehart_m (ep_h P c))
                        (register_set sig_seip
                           (bool_to_bit (dev_seip (wgdev σ) (fin_to_nat c)))
-                          (wgregs σ c)) (ehart_fn (ep_h P c)))
+                          (wgregs σ c)) (ehart_fn (ep_h P c)) (wgib σ c))
                     (wgdev σ) (eags_hart P σ c).
     rewrite ecfg_of_reg.
     rewrite /pf_cfg /pf_log /pf_ws /= in Hstep.
     apply Hstep; [|exact I].
     rewrite /pstep_ev /= /ehart_ag /=.
     split; [reflexivity|].
-    eexists (Some _). split; [reflexivity|]. right. by rewrite /pstep_plic.
+    eexists (Some _), None. split_and!; [reflexivity|reflexivity|].
+    right. by rewrite /pstep_plic.
 Qed.
 
 Theorem epf_run_wp_pf_run ρ ρ' :
@@ -710,8 +732,12 @@ Qed.
     value ([WeakEvLang.ELoop]'s program state) with the boot register file,
     and the disk with no residual device program. *)
 
+(** D3: the hart's announced bits come off σ exactly as its register file
+    does, so the fresh-era premise ledger of the capstone is UNCHANGED — no
+    "[wgib σ0 c = None]" fact is needed anywhere. *)
 Definition eps_init (σ : wgstate) : list pexv6 :=
-  ((fun c : CPU => PHart c (Interface.Ret tt) (wgregs σ c) None) <$> enum CPU)
+  ((fun c : CPU => PHart c (Interface.Ret tt) (wgregs σ c) None (wgib σ c))
+   <$> enum CPU)
   ++ [PDisk None].
 
 Lemma map_is_fmap {A B} (f : A -> B) (l : list A) : map f l = f <$> l.
@@ -769,7 +795,7 @@ Lemma pcls_ev_obl : pcls_obl pcls_ev.
 Proof.
   split.
   - intros p rl base data ws ws' Hrel.
-    destruct p as [cpu m rs fn|dp]; simpl.
+    destruct p as [cpu m rs fn ib|dp]; simpl.
     + rewrite /pnode_wclass. destruct m as [y|T oc k]; [reflexivity|].
       destruct oc; try reflexivity. by apply wm_class_of_relp.
     + rewrite /ddev_class. by apply wm_class_of_relp.

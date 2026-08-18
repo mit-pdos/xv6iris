@@ -331,6 +331,17 @@ End interp.
 Section core.
   Context `{!riscvGS Σ, !weakGS Σ}.
 
+  (** D3, THE INVISIBILITY LEMMA.  [WeakGhost.weak_state_interp] mentions
+      [wgregs]/[wgimg]/[wglog]/[wgws]/[wgdev]/[wggen]/[wgpow] and NOTHING
+      ELSE, so a σ-step that moves only the announced instruction bits is
+      invisible to it — BY CONVERSION, not by a proof.  This is what lets
+      the [InstrAnnounce] node and the instruction boundary stay silent for
+      every WP rule, and it is the reason the D3 acceptance test passes for
+      the reflective silent stepper. *)
+  Lemma weak_state_interp_ib (σ : wgstate) (c : CPU) (v : oib32) :
+    weak_state_interp (ewg_ib σ c v) = weak_state_interp σ.
+  Proof. reflexivity. Qed.
+
   Lemma ewp_ecycle (gen : nat) (c : CPU) (m : M unit)
       (fn : option (bool * bool * bool * bool)) :
     gen = 0%nat ->
@@ -373,13 +384,19 @@ Section core.
       by rewrite /ethread_live Hgen Hgen0; split.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hcl".
     iSplitR.
-    { iPureIntro. exists [], (ECycle gen c (riscv_step false) None), σ, [].
+    { iPureIntro. exists [], (ECycle gen c (riscv_step false) None),
+        (ewg_ib σ c None), [].
       by apply eprim_step_loop_live. }
     iIntros (e2 σ2 efs Hstep) "!>".
     apply eprim_step_loop_inv in Hstep as (-> & -> & Harm).
     destruct Harm as [(_ & -> & (tick & ->))|(Hnl & _)];
       [|by destruct (Hnl Hlive)].
-    iIntros "_". iMod "Hcl" as "_". iModIntro. iFrame "Hσ".
+    iIntros "_". iMod "Hcl" as "_". iModIntro.
+    (* D3: the RESTART clears [wgib], which the state interpretation cannot
+       see ([weak_state_interp_ib] — a CONVERSION, so [iFrame] closes it
+       with no rewriting at all).  That is the whole point of putting the
+       announced bits in σ and not in a ghost. *)
+    iFrame "Hσ".
     iSplitL; [|done]. iApply "H".
   Qed.
 
@@ -516,20 +533,38 @@ Proof.
   - by injection Heq as <- <-.
 Qed.
 
+(** D3: THE σ-EFFECT OF A SILENT NODE, as a named three-way disjunction.
+
+    Before D3 it was two-way — the node either wrote the register file or
+    moved nothing.  The [InstrAnnounce] node now writes the hart's ANNOUNCED
+    INSTRUCTION BITS ([WeakEvLang.ewg_ib]); that is a third shape, and it is
+    the ONLY thing D3 adds here.  It costs the WP tier NOTHING, because
+    [weak_state_interp_ib] is a conversion: no rule below changes its
+    statement, no leaf sees it, and the reflective cursor keeps treating the
+    announce as silent (so no [vm_cast] node count moves). *)
+Definition esil_sigma (σ : wgstate) (c : CPU) (rs' : regstate) (σ' : wgstate)
+    : Prop :=
+  σ' = ewg_reg σ c rs'
+  \/ (rs' = wgregs σ c /\ exists v : oib32, σ' = ewg_ib σ c v)
+  \/ (rs' = wgregs σ c /\ σ' = σ).
+
 (** THE SEMANTIC BRIDGE: a silent node IS an arm of [ecycle_step], and its
     successor is the only one there. *)
 Lemma esil_node_ecycle (gen : nat) (σ : wgstate) (c : CPU) (D : gset register)
     (m m' : M unit) (rs' : regstate) :
   esil_node D (wgregs σ c) m = Some (rs', m') ->
-  ecycle_step gen σ c m None (ECycle gen c m' None) (ewg_reg σ c rs')
-  \/ (rs' = wgregs σ c /\
-      ecycle_step gen σ c m None (ECycle gen c m' None) σ).
+  exists σ' : wgstate,
+    ecycle_step gen σ c m None (ECycle gen c m' None) σ' /\
+    esil_sigma σ c rs' σ'.
 Proof.
   intros Hnode. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
     injection Hnode as <- <-;
-    solve [ right; by split | left; by split ].
+    solve [ eexists; (split; [by split|]);
+              right; left; (split; [reflexivity|by eexists])
+          | eexists; (split; [by split|]); right; right; by split
+          | eexists; (split; [by split|]); left; reflexivity ].
 Qed.
 
 Lemma esil_node_ecycle_inv (gen : nat) (σ : wgstate) (c : CPU)
@@ -537,15 +572,15 @@ Lemma esil_node_ecycle_inv (gen : nat) (σ : wgstate) (c : CPU)
     (e' : eexpr) (σ' : wgstate) :
   esil_node D (wgregs σ c) m = Some (rs', m') ->
   ecycle_step gen σ c m None e' σ' ->
-  e' = ECycle gen c m' None /\
-  (σ' = ewg_reg σ c rs' \/ (rs' = wgregs σ c /\ σ' = σ)).
+  e' = ECycle gen c m' None /\ esil_sigma σ c rs' σ'.
 Proof.
   intros Hnode Hcy. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode, Hcy; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
     injection Hnode as <- <-; destruct Hcy as (-> & ->);
     (split; [reflexivity|]);
-    solve [ right; by split | by left ].
+    solve [ right; left; (split; [reflexivity|by eexists])
+          | right; right; by split | by left ].
 Qed.
 
 (* ====================================================================== *)
@@ -824,8 +859,8 @@ Section batch.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iSplitR.
     { iPureIntro.
-      destruct (esil_node_ecycle gen σ c D m m1 rs2 Hnode2) as [Hc|[_ Hc]];
-        do 2 eexists; exact Hc. }
+      destruct (esil_node_ecycle gen σ c D m m1 rs2 Hnode2) as (σ1 & Hc & _).
+      by do 2 eexists. }
     iNext. iIntros (e' σ') "%Hcy". iMod "Hmask" as "_".
     destruct (esil_node_ecycle_inv gen σ c D rs2 m1 m e' σ' Hnode2 Hcy)
       as (-> & Hσ').
@@ -851,8 +886,14 @@ Section batch.
           | injection Hnode as Hq1 Hq2; simpl in Hnode2;
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
             iModIntro; iFrame "Hri"; by iApply (ereg_frame_ext c rs rs D) ]. }
-    iModIntro. destruct Hσ' as [->|[-> ->]].
+    iModIntro. destruct Hσ' as [->|[[-> (v & ->)]|[-> ->]]].
     - iSplitL "Hri Hcl"; [by iApply "Hcl"|]. by iApply "H".
+    - (* D3: THE ANNOUNCE.  [weak_state_interp (ewg_ib σ c v)] IS
+         [weak_state_interp σ] — a conversion, so the very same proof term
+         that closed the σ-identity arm closes this one. *)
+      iSplitL "Hri Hcl".
+      { iApply weak_state_interp_reg_id. by iApply "Hcl". }
+      by iApply "H".
     - iSplitL "Hri Hcl".
       { iApply weak_state_interp_reg_id. by iApply "Hcl". }
       by iApply "H".

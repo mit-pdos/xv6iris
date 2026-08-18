@@ -142,27 +142,64 @@ Definition epower_fork (gen : nat) : list eexpr :=
 
 Definition ewg_reg (σ : wgstate) (c : CPU) (rs : regstate) : wgstate :=
   WGState (<[c := rs]> (wgregs σ)) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ)
-          (wggen σ) (wgpow σ).
+          (wggen σ) (wgpow σ) (wgib σ).
 
 Definition ewg_dev (σ : wgstate) (d : dev_state) : wgstate :=
-  WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) d (wggen σ) (wgpow σ).
+  WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) d (wggen σ) (wgpow σ) (wgib σ).
 
 Definition ewg_ws (σ : wgstate) (c : CPU) (ws : wstate) : wgstate :=
   WGState (wgregs σ) (wgimg σ) (wglog σ) (<[c := ws]> (wgws σ)) (wgdev σ)
-          (wggen σ) (wgpow σ).
+          (wggen σ) (wgpow σ) (wgib σ).
 
 Definition ewg_store (σ : wgstate) (c : CPU) (ws : wstate) (lg : list wmsg)
     : wgstate :=
   WGState (wgregs σ) (wgimg σ) lg (<[c := ws]> (wgws σ)) (wgdev σ)
-          (wggen σ) (wgpow σ).
+          (wggen σ) (wgpow σ) (wgib σ).
 
 Definition ewg_rmw (σ : wgstate) (c : CPU) (rs : regstate) (ws : wstate)
     (lg : list wmsg) : wgstate :=
   WGState (<[c := rs]> (wgregs σ)) (wgimg σ) lg (<[c := ws]> (wgws σ))
-          (wgdev σ) (wggen σ) (wgpow σ).
+          (wgdev σ) (wggen σ) (wgpow σ) (wgib σ).
 
 Definition ewg_log (σ : wgstate) (lg : list wmsg) : wgstate :=
-  WGState (wgregs σ) (wgimg σ) lg (wgws σ) (wgdev σ) (wggen σ) (wgpow σ).
+  WGState (wgregs σ) (wgimg σ) lg (wgws σ) (wgdev σ) (wggen σ) (wgpow σ) (wgib σ).
+
+(** *** D3: THE INSTRUCTION-BITS FIELD
+
+    The announce carries a [bvn] — 16 bits for an RVC halfword, 32 for a base
+    word — and we ZERO-EXTEND it to [mword 32].  That is lossless and
+    unambiguous, because an RVC halfword has [bits[1:0] <> 0b11]
+    ([WeakDeps.ib_compressed] is exactly that test), so the decoder can tell
+    the two apart from the 32-bit value alone. *)
+Notation oib32 := (option (SailStdpp.Values.mword 32)) (only parsing).
+
+Definition ib_of_bvn (o : bvn) : SailStdpp.Values.mword 32 :=
+  Z_to_bv 32 (bvn_unsigned o).
+
+(** The sixth named σ-shape: the hart's announced instruction bits move, and
+    NOTHING ELSE does.  [WeakGhost.weak_state_interp] does not mention
+    [wgib], so this shape is INVISIBLE to the state interpretation — which is
+    what [WeakEvLift.weak_state_interp_ib] records and what lets the announce
+    node stay silent for the reflective cursor (D3 acceptance test). *)
+Definition ewg_ib (σ : wgstate) (c : CPU)
+    (v : option (SailStdpp.Values.mword 32)) : wgstate :=
+  WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ) (wggen σ)
+          (wgpow σ) (<[c := v]> (wgib σ)).
+
+Lemma ewg_ib_regs σ c v : wgregs (ewg_ib σ c v) = wgregs σ.
+Proof. reflexivity. Qed.
+Lemma ewg_ib_log σ c v : wglog (ewg_ib σ c v) = wglog σ.
+Proof. reflexivity. Qed.
+Lemma ewg_ib_ws σ c v : wgws (ewg_ib σ c v) = wgws σ.
+Proof. reflexivity. Qed.
+Lemma ewg_ib_dev σ c v : wgdev (ewg_ib σ c v) = wgdev σ.
+Proof. reflexivity. Qed.
+Lemma ewg_ib_img σ c v : wgimg (ewg_ib σ c v) = wgimg σ.
+Proof. reflexivity. Qed.
+Lemma ewg_ib_at σ c v : wgib (ewg_ib σ c v) c = v.
+Proof. apply gib_insert_eq. Qed.
+Lemma ewg_ib_ne σ c v c' : c' ≠ c -> wgib (ewg_ib σ c v) c' = wgib σ c'.
+Proof. apply gib_insert_ne. Qed.
 
 (* ====================================================================== *)
 (** ** 3. The fused-RMW ingredients
@@ -283,7 +320,12 @@ Section hart.
            terminal value, i.e. AT an instruction boundary, and fetches a
            fresh instruction.  The old two-step "pop to [ELoop], then
            fetch" is one step now — [Ret tt] IS the boundary token. *)
-        exists tick : bool, e' = Sail gen c (riscv_step tick) None /\ σ' = σ
+        exists tick : bool, e' = Sail gen c (riscv_step tick) None /\
+          (* D3: THE INSTRUCTION BOUNDARY CLEARS THE ANNOUNCED BITS.  A hart
+             sitting at [Ret tt] is between instructions, so it has no
+             current instruction and no dependency roles — which is exactly
+             [WeakDeps.deps_of_ib None = ORnone]. *)
+          σ' = ewg_ib σ c None
     | Interface.Next oc k =>
         (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
          | Interface.RegRead r _ => fun k =>
@@ -374,8 +416,17 @@ Section hart.
          | Interface.Barrier b => fun k =>
              e' = ECycle gen c (k tt) (ebar_park b) /\
              σ' = ewg_ws σ c (efence_apply ws0 (ebar_now b))
-         | Interface.InstrAnnounce _ => fun k =>
-             e' = ECycle gen c (k tt) None /\ σ' = σ
+         (* D3: THE ANNOUNCE NODE RECORDS THE INSTRUCTION BITS.  This is the
+            one place the machine learns which registers the current
+            instruction reads and writes (deps design §2.4); everything
+            downstream is [WeakDeps.deps_of_bits] of this word.  The node is
+            otherwise silent: no log, no view, no register. *)
+         | Interface.InstrAnnounce ob => fun k =>
+             e' = ECycle gen c (k tt) None /\ σ' = ewg_ib σ c (Some (ib_of_bvn ob))
+         (* [BranchAnnounce] STAYS SILENT: it fires only on the TAKEN arm of a
+            redirect, whereas RVWMO ppo 11 (and PARM's [step_if]) order after
+            a branch whether or not it is taken.  The control view is raised
+            at the ANNOUNCE instead, from [deps_ctrl] of the bits. *)
          | Interface.BranchAnnounce _ _ => fun k =>
              e' = ECycle gen c (k tt) None /\ σ' = σ
          | Interface.CacheOp _ => fun k =>
@@ -603,7 +654,7 @@ Definition eprim_step
   (e = EPower /\ e' = EPower /\ κ = [] /\
     ((wgpow σ = true /\ efs = [] /\
        σ' = WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ)
-                    (S (wggen σ)) false)
+                    (S (wggen σ)) false (wgib σ))
      \/
      (wgpow σ = false /\ efs = epower_fork (wggen σ) /\ eboot_shape σ σ'))).
 
@@ -623,7 +674,7 @@ Definition weak_ev_lang : language := Language weak_ev_lang_mixin.
 Lemma eprim_step_loop_inv gen cpu σ κ e' σ' efs :
   eprim_step (ELoop gen cpu) σ κ e' σ' efs ->
   κ = [] /\ efs = [] /\
-  ((ethread_live σ gen /\ σ' = σ /\
+  ((ethread_live σ gen /\ σ' = ewg_ib σ cpu None /\
     exists tick : bool, e' = ECycle gen cpu (riscv_step tick) None)
    \/ (~ ethread_live σ gen /\ e' = ELoop gen cpu /\ σ' = σ)).
 Proof.
@@ -698,7 +749,7 @@ Lemma eprim_step_power_inv σ κ e' σ' efs :
   e' = EPower /\ κ = [] /\
   ((wgpow σ = true /\ efs = [] /\
      σ' = WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ)
-                  (S (wggen σ)) false)
+                  (S (wggen σ)) false (wgib σ))
    \/ (wgpow σ = false /\ efs = epower_fork (wggen σ) /\ eboot_shape σ σ')).
 Proof.
   intros [(? & ? & ? & ? & Heq & _)
@@ -878,7 +929,8 @@ Qed.
 
 Lemma eprim_step_loop_live gen cpu σ (tick : bool) :
   ethread_live σ gen ->
-  eprim_step (ELoop gen cpu) σ [] (ECycle gen cpu (riscv_step tick) None) σ [].
+  eprim_step (ELoop gen cpu) σ [] (ECycle gen cpu (riscv_step tick) None)
+    (ewg_ib σ cpu None) [].
 Proof.
   intros Hl. left. exists gen, cpu, (Interface.Ret tt), None.
   split_and!; try reflexivity. left. split; [exact Hl|].
@@ -919,7 +971,7 @@ Lemma eprim_step_power_off σ :
   wgpow σ = true ->
   eprim_step EPower σ [] EPower
     (WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ)
-             (S (wggen σ)) false) [].
+             (S (wggen σ)) false (wgib σ)) [].
 Proof.
   intros Hon. right; right; right; right. split_and!; try reflexivity.
   left. by split_and!.

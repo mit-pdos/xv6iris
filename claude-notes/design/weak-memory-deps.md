@@ -429,6 +429,92 @@ program (`virtio_prog`) needs no operand info: it is not an ISA program;
 its labels carry empty `srcs` (its ordering is aq/fence-based, exactly as
 today).
 
+### 2.6 D3-1 LANDED (2026-08-18) — `wgib`, `deps_of_bits`, and the
+   machine-checked fact that the ANNOUNCE IS INVISIBLE TO THE WP TIER
+
+D3 is staged in two: **D3-1** (this block) puts the instruction bits where
+the instance can decode them and proves that doing so moves NO WP statement;
+**D3-2** (§2.7) turns the decoded roles into operand lists on the labels.
+D3-1 is the half that is *supposed* to be free, and it is: the acceptance
+test passes for every listed lemma with byte-identical statements.
+
+**`WeakDeps.v` — the decoder (NEW FILE, ~560 lines, self-contained).**
+`deps_of_bits : mword 32 → op_roles` with
+`op_roles = ORnone | ORload rd rs1 | ORstore rs1 rs2 | ORamo rd rs1 rs2 |
+ORbranch rs1 rs2 | ORjalr rd rs1 | ORjal rd | ORalu rd srcs` over register
+NUMBERS, and four total projections `deps_ctrl` (ppo 11), `deps_asrc`
+(ppo 9), `deps_vsrc` (ppo 10), `deps_rd` (PARM's `step_assign`) that turn a
+role into `list dsrc` / `option (wreg * list dsrc)`.  `x0` is dropped by
+`wreg_of_num` — once, so every projection inherits the rule.  Coverage:
+base RV64I (R/I/S/B/U/J), M (they are `OP`/`OP-32`), A (`lr`, `sc`, the
+AMOs), Zicsr (→ `ORnone`, D-4), and the C extension quadrants 0/1/2 (the
+whole list the stage brief names).  Anything unrecognised → `ORnone`, the
+safe under-approximation.  **69 `vm_compute` tests** are recorded as
+`Example`s over real `rv64` encodings (including `c.sw a4,0(a5) = 0xc398`,
+the `started` publisher's own store, and `amoswap.w.aq`), so a regression in
+the bit surgery cannot pass the build.
+
+Decoder deviations recorded in the file header: **DEC-1** `c.jal` is
+RV32-only (on `rv64d`, `op=01, funct3=001` is `c.addiw`, and that is what
+the decoder returns); **DEC-2** an AMO's `rd` inherits the READ half's view
+(`[DLdRes]`) where PARM gives `sc`'s `rd` the exclusive write's timestamp —
+smaller, hence WEAKER, free; **DEC-3** `lui`/`auipc`/`jal`/`jalr` have an
+EMPTY source list but still emit a destination, because `step_assign`
+OVERWRITES `rd`'s view and dropping the write would leave a stale (larger)
+view — the write is the point.
+
+**`wgstate` gains ONE field, `wgib : CPU → option (mword 32)`.**  Not the
+register file (it is not a register), not the expression (every WP statement
+mentions the expression, and the acceptance test is that no WP statement
+moves).  The `InstrAnnounce` arm of `WeakEvLang.emonad_step` sets it
+(`ewg_ib σ c (Some (ib_of_bvn ob))`, zero-extending the announced `bvn`,
+which is lossless because an RVC halfword has `bits[1:0] ≠ 0b11`); the
+boundary arm (`Ret tt` → `riscv_step tick`) clears it.  `BranchAnnounce`
+stays silent, deliberately: it fires only on the TAKEN arm of a redirect,
+whereas RVWMO ppo 11 and PARM's `step_if` order after a branch whether or
+not it is taken, so the control view must be raised at the ANNOUNCE (D3-2).
+
+**THE INVISIBILITY, machine-checked.**  `WeakGhost.weak_state_interp` is
+UNCHANGED and mentions `wgregs/wgimg/wglog/wgws/wgdev/wggen/wgpow` and
+nothing else, so `WeakEvLift.weak_state_interp_ib :
+weak_state_interp (ewg_ib σ c v) = weak_state_interp σ` **holds by
+`reflexivity`** — a conversion, not a rewrite.  Consequences, all built:
+
+- `WeakEvLift.esil_node` keeps the announce arm SILENT (the reflective
+  cursor does not move), so NO `vm_cast` node count moves anywhere;
+- the two-way disjunction `esil_node_ecycle`/`_inv` used to return became
+  the named three-way `esil_sigma σ c rs' σ' := σ' = ewg_reg σ c rs' ∨
+  (rs' = wgregs σ c ∧ ∃ v, σ' = ewg_ib σ c v) ∨ (rs' = wgregs σ c ∧ σ' = σ)`
+  — the ONLY statement in the WP tier that D3-1 moves, and it is an internal
+  bridge lemma, not a rule;
+- `ewp_ecycle`, `ewp_eloop`, `ewp_ev_ret`, `ewp_ev_sil_node`,
+  `ewp_ev_sil_rtc`, `ewp_ev_batch`, every `ewp_ev_seq_*`, every RAM-event
+  rule, `WeakEvFunnel.ewp_ev_sil_node2`/`ewp_ev_walk`, `WeakEvExecEff`'s
+  `epure`/`erun` rules and EVERY leaf: **statements byte-identical**, and the
+  announce arm of each proof closes with the same proof term as the
+  σ-identity arm.
+
+**The instance.**  `WeakEvPf.pexv6.PHart` gains `ib : oib32`, fed from
+`wgib σ c` by `ehart_ag` exactly as `rs` is fed from `wgregs σ c`;
+`WeakEvInst.pnode_step`/`pstep_node`/`pstep_plic`/`pstep_hart` gain an `ib`
+INPUT and an `oib : option oib32` OUTPUT (the `ors` idiom: `None` = "this
+node does not move them", which is what keeps `elab_apply_silent` & co.
+record eta-equalities and keeps FUNCTIONAL EXTENSIONALITY out of the
+development — a `<[c := wgib σ c]> (wgib σ) = wgib σ` would have needed it).
+`elab_apply` gains the `oib` slot and one new shape lemma,
+`elab_apply_ib σ c k v : elab_apply σ c LSilent k None (Some v) (wgdev σ) =
+ewg_ib σ c v`.  `WeakEvPf.elabel_ok` is UNCHANGED (it constrains `wglog σ'`
+and `wgws σ' c`, and the announce moves neither); `EPFBoundary`'s successor
+state becomes `ewg_ib σ c None`.
+
+**The capstone's premise ledger is UNCHANGED** — no `wgib σ0 c = None`
+fresh-era fact was needed, because `eps_init σ` reads the hart's bits off σ
+(`PHart c (Ret tt) (wgregs σ c) None (wgib σ c)`) exactly as it reads the
+register file, so `ecfg_of_init` still needs only `wglog σ = []` and
+`∀ c, wgws σ c = ws_init`.  `xv6_ev_weak_robust` and `robust_main` are
+byte-identical to `e1b67ace`; `Print Assumptions` unchanged (five `rv64d`
+axioms / closed); `lemma_diff --ref e1b67ace` CLEAN.
+
 ## 3. Layer-1 proof impact (what re-lands, what is new)
 
 - **W1 (machine) / front-loading (`WeakPromiseFact`)**: `wp_swap` and the

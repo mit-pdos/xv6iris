@@ -177,6 +177,11 @@ Proof. reflexivity. Qed.
 Inductive pexv6 :=
 | PHart (cpu : CPU) (m : M unit) (rs : regstate)
         (fn : option (bool * bool * bool * bool))
+        (* D3: THE ANNOUNCED INSTRUCTION BITS.  Program state, not memory
+           state: [pstep_ev] decodes it ([WeakDeps.deps_of_bits]) to compute
+           the labels' operand lists.  It comes from σ's [wgib] exactly as
+           the register file comes from σ's [wgregs]. *)
+        (ib : oib32)
 | PDisk (dp : option (DM dres)).
 
 Definition ehart_m (h : ehst) : M unit :=
@@ -190,7 +195,8 @@ Lemma ehexp_sail gen c h : ehexp gen c h = Sail gen c (ehart_m h) (ehart_fn h).
 Proof. by destruct h as [[m fn]|]. Qed.
 
 Definition ehart_ag (P : epool) (σ : wgstate) (c : CPU) : wpagent pexv6 :=
-  WPAgent (PHart c (ehart_m (ep_h P c)) (wgregs σ c) (ehart_fn (ep_h P c)))
+  WPAgent (PHart c (ehart_m (ep_h P c)) (wgregs σ c) (ehart_fn (ep_h P c))
+             (wgib σ c))
           (wgws σ c) ∅.
 
 Definition edisk_ag (P : epool) : wpagent pexv6 :=
@@ -324,8 +330,9 @@ Inductive epf_step :
     nat -> wlabel -> (epool * wgstate) -> (epool * wgstate) -> Prop :=
 | EPFBoundary (c : CPU) (P : epool) (σ : wgstate) (tick : bool) :
     ethread_live σ (ep_gen P) -> ep_h P c = None ->
+    (* D3: the RESTART clears the hart's announced bits *)
     epf_step (fin_to_nat c) LSilent (P, σ)
-      (ep_hset P c (Some (riscv_step tick, None)), σ)
+      (ep_hset P c (Some (riscv_step tick, None)), ewg_ib σ c None)
 | EPFCycle (c : CPU) (l : wlabel) (P : epool) (σ : wgstate)
            (m : M unit) (fn : option (bool * bool * bool * bool))
            (h' : ehst) (σ' : wgstate) :

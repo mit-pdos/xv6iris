@@ -154,15 +154,15 @@ Proof. intros Hcf x s' Hrun. by eapply wrun_wexec. Qed.
     lemma all spell the post-state the same way. *)
 
 Definition wg_dev (g : wgstate) (d' : dev_state) : wgstate :=
-  WGState (wgregs g) (wgimg g) (wglog g) (wgws g) d' (wggen g) (wgpow g).
+  WGState (wgregs g) (wgimg g) (wglog g) (wgws g) d' (wggen g) (wgpow g) (wgib g).
 
 Definition wg_regs (g : wgstate) (gr' : CPU -> regstate) : wgstate :=
-  WGState gr' (wgimg g) (wglog g) (wgws g) (wgdev g) (wggen g) (wgpow g).
+  WGState gr' (wgimg g) (wglog g) (wgws g) (wgdev g) (wggen g) (wgpow g) (wgib g).
 
 Definition wg_dma (g : wgstate) (d' : dev_state) (w : gmap Arch.pa (bv 8))
     : wgstate :=
   WGState (wgregs g) (wgimg g) (wglog g ++ wmsgs_of_map w) (wgws g) d'
-          (wggen g) (wgpow g).
+          (wggen g) (wgpow g) (wgib g).
 
 (* ====================================================================== *)
 (** ** 3. The hart rule *)

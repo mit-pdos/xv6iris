@@ -868,6 +868,7 @@ SpecWritei.v
 ProofWriteiParts.v
 ProofWritei.v
 WeakMem.v
+WeakDeps.v
 WeakLitmus.v
 WeakLitmusProj.v
 WeakPromise.v

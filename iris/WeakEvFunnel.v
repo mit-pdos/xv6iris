@@ -437,8 +437,8 @@ Section frame.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iSplitR.
     { iPureIntro.
-      destruct (esil_node_ecycle gen σ c Dr m m1 rs2 Hnode2') as [Hc|[_ Hc]];
-        do 2 eexists; exact Hc. }
+      destruct (esil_node_ecycle gen σ c Dr m m1 rs2 Hnode2') as (σ1 & Hc & _).
+      by do 2 eexists. }
     iNext. iIntros (e' σ') "%Hcy". iMod "Hmask" as "_".
     destruct (esil_node_ecycle_inv gen σ c Dr rs2 m1 m e' σ' Hnode2' Hcy)
       as (-> & Hσ').
@@ -464,8 +464,15 @@ Section frame.
           | injection Hnode as Hq1 Hq2; simpl in Hnode2;
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
             iModIntro; iFrame "Hri"; by iApply (ereg_fr_ext c rs rs Dr q) ]. }
-    iModIntro. destruct Hσ' as [->|[-> ->]].
+    (* D3: the third arm is the [InstrAnnounce] node's [wgib] write, which
+       [WeakGhost.weak_state_interp] cannot see ([WeakEvLift.esil_sigma] /
+       [weak_state_interp_ib]) — so it closes exactly as the σ-identity arm
+       does, and this rule's STATEMENT does not move. *)
+    iModIntro. destruct Hσ' as [->|[[-> (v & ->)]|[-> ->]]].
     - iSplitL "Hri Hcl"; [by iApply "Hcl"|]. by iApply "H".
+    - iSplitL "Hri Hcl".
+      { iApply weak_state_interp_reg_id. by iApply "Hcl". }
+      by iApply "H".
     - iSplitL "Hri Hcl".
       { iApply weak_state_interp_reg_id. by iApply "Hcl". }
       by iApply "H".

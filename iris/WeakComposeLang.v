@@ -696,12 +696,12 @@ Definition wplic_write (g : wgstate) (cpu : CPU) : wgstate :=
   WGState (<[cpu := register_set sig_seip
                       (bool_to_bit (dev_seip (wgdev g) (fin_to_nat cpu)))
                       (wgregs g cpu)]> (wgregs g))
-          (wgimg g) (wglog g) (wgws g) (wgdev g) (wggen g) (wgpow g).
+          (wgimg g) (wglog g) (wgws g) (wgdev g) (wggen g) (wgpow g) (wgib g).
 
 Definition wdisk_write (g : wgstate) (d' : dev_state)
     (w : gmap Arch.pa (bv 8)) : wgstate :=
   WGState (wgregs g) (wgimg g) (wglog g ++ wmsgs_of_map w) (wgws g)
-          d' (wggen g) (wgpow g).
+          d' (wggen g) (wgpow g) (wgib g).
 
 (** The three [wlaux] updates: a hart's private device fabric advances to
     what its own block's accesses produced, a hart's interrupt stream

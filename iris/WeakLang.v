@@ -62,6 +62,16 @@ Record wgstate := WGState {
   wgdev  : dev_state;
   wggen  : nat;
   wgpow  : bool;
+  (** D3 (deps design §2.4/§2.5): THE INSTRUCTION BITS OF THE INSTRUCTION
+      THE HART IS EXECUTING — [Some w] between the [InstrAnnounce] node and
+      the instruction boundary, [None] at the boundary.  It is the ONE piece
+      of decode information RVWMO's syntactic dependencies need, and it is
+      kept HERE rather than in the register file (it is not a register) or
+      in the expression (every WP statement mentions the expression, and the
+      D3 acceptance test is that no WP statement moves).
+      [WeakGhost.weak_state_interp] does not mention it: no ghost, no
+      leaf-visible resource, no obligation. *)
+  wgib   : CPU -> option (SailStdpp.Values.mword 32);
 }.
 
 (** pointwise update of a single hart's weak state — the [wstate] twin of
@@ -80,6 +90,27 @@ Lemma gws_insert_ne (gw : CPU -> wstate) (c c' : CPU) (ws : wstate) :
   c' ≠ c -> (<[c := ws]> gw) c' = gw c'.
 Proof.
   intros Hne. rewrite /insert /gws_insert.
+  destruct (decide (c' = c)) as [->|_]; [congruence|reflexivity].
+Qed.
+
+(** ... and the same for the D3 instruction-bits field. *)
+Global Instance gib_insert :
+    Insert CPU (option (SailStdpp.Values.mword 32))
+      (CPU -> option (SailStdpp.Values.mword 32)) :=
+  fun cpu v gi c => if decide (c = cpu) then v else gi c.
+
+Lemma gib_insert_eq (gi : CPU -> option (SailStdpp.Values.mword 32)) (c : CPU) v :
+  (<[c := v]> gi) c = v.
+Proof.
+  rewrite /insert /gib_insert.
+  destruct (decide (c = c)) as [_|Hne]; [reflexivity|congruence].
+Qed.
+
+Lemma gib_insert_ne (gi : CPU -> option (SailStdpp.Values.mword 32))
+    (c c' : CPU) v :
+  c' ≠ c -> (<[c := v]> gi) c' = gi c'.
+Proof.
+  intros Hne. rewrite /insert /gib_insert.
   destruct (decide (c' = c)) as [->|_]; [congruence|reflexivity].
 Qed.
 
@@ -111,7 +142,7 @@ Definition whart_view (g : wgstate) (c : CPU) : wmstate :=
     which is what lets M1c's state interpretation hold it as a constant. *)
 Definition whart_write (g : wgstate) (c : CPU) (s : wmstate) : wgstate :=
   WGState (<[c := wm_regs s]> (wgregs g)) (wgimg g) (wm_log s)
-          (<[c := wm_ws s]> (wgws g)) (wm_dev s) (wggen g) (wgpow g).
+          (<[c := wm_ws s]> (wgws g)) (wm_dev s) (wggen g) (wgpow g) (wgib g).
 
 Lemma whart_view_img g c : wm_img (whart_view g c) = wgimg g.
 Proof. reflexivity. Qed.
@@ -510,7 +541,7 @@ Definition wprim_step
       exists d',
         uart_step (wgdev g) d' /\
         g' = WGState (wgregs g) (wgimg g) (wglog g) (wgws g) d'
-                     (wggen g) (wgpow g))
+                     (wggen g) (wgpow g) (wgib g))
      \/ (~ wthread_live g gen /\ g' = g)))
   \/
   (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
@@ -518,7 +549,7 @@ Definition wprim_step
       exists d' w,
         wdisk_step (wgdev g) (wflat (wgimg g) (wglog g)) d' w /\
         g' = WGState (wgregs g) (wgimg g) (wglog g ++ wmsgs_of_map w) (wgws g)
-                     d' (wggen g) (wgpow g))
+                     d' (wggen g) (wgpow g) (wgib g))
      \/ (~ wthread_live g gen /\ g' = g)))
   \/
   (exists gen, e = PlicLoopE gen /\ e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
@@ -526,13 +557,13 @@ Definition wprim_step
       exists gr',
         plic_step (wgdev g) (wgregs g) gr' /\
         g' = WGState gr' (wgimg g) (wglog g) (wgws g) (wgdev g)
-                     (wggen g) (wgpow g))
+                     (wggen g) (wgpow g) (wgib g))
      \/ (~ wthread_live g gen /\ g' = g)))
   \/
   (e = PowerLoopE /\ e' = PowerLoopE /\ κ = [] /\
     ((wgpow g = true /\ efs = [] /\
        g' = WGState (wgregs g) (wgimg g) (wglog g) (wgws g) (wgdev g)
-                    (S (wggen g)) false)
+                    (S (wggen g)) false (wgib g))
      \/
      (wgpow g = false /\ efs = power_fork (wggen g) /\
        wboot_shape g g'))).
@@ -578,7 +609,7 @@ Lemma wprim_step_uart_inv gen g κ e' g' efs :
     exists d',
       uart_step (wgdev g) d' /\
       g' = WGState (wgregs g) (wgimg g) (wglog g) (wgws g) d'
-                   (wggen g) (wgpow g))
+                   (wggen g) (wgpow g) (wgib g))
    \/ (~ wthread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & Heq & _)
@@ -595,7 +626,7 @@ Lemma wprim_step_disk_inv gen g κ e' g' efs :
     exists d' w,
       wdisk_step (wgdev g) (wflat (wgimg g) (wglog g)) d' w /\
       g' = WGState (wgregs g) (wgimg g) (wglog g ++ wmsgs_of_map w) (wgws g)
-                   d' (wggen g) (wgpow g))
+                   d' (wggen g) (wgpow g) (wgib g))
    \/ (~ wthread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & Heq & _)
@@ -613,7 +644,7 @@ Lemma wprim_step_plic_inv gen g κ e' g' efs :
     exists gr',
       plic_step (wgdev g) (wgregs g) gr' /\
       g' = WGState gr' (wgimg g) (wglog g) (wgws g) (wgdev g)
-                   (wggen g) (wgpow g))
+                   (wggen g) (wgpow g) (wgib g))
    \/ (~ wthread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & Heq & _)
@@ -628,7 +659,7 @@ Lemma wprim_step_power_inv g κ e' g' efs :
   e' = PowerLoopE /\ κ = [] /\
   ((wgpow g = true /\ efs = [] /\
      g' = WGState (wgregs g) (wgimg g) (wglog g) (wgws g) (wgdev g)
-                  (S (wggen g)) false)
+                  (S (wggen g)) false (wgib g))
    \/ (wgpow g = false /\ efs = power_fork (wggen g) /\ wboot_shape g g')).
 Proof.
   intros [(? & ? & Heq & _)
@@ -810,7 +841,7 @@ Lemma wprim_step_power_off g :
   wgpow g = true ->
   wprim_step PowerLoopE g [] PowerLoopE
     (WGState (wgregs g) (wgimg g) (wglog g) (wgws g) (wgdev g)
-             (S (wggen g)) false) [].
+             (S (wggen g)) false (wgib g)) [].
 Proof.
   intros Hon. right; right; right; right. split_and!; try reflexivity.
   left. by split_and!.

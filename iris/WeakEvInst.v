@@ -159,7 +159,7 @@ Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
   | LRmw _ _ _ _ _ _ _ => WCexcl
   | LStore _ _ _ _ _ =>
       match p with
-      | PHart _ m _ _ => pnode_wclass m ws
+      | PHart _ m _ _ _ => pnode_wclass m ws
       (* M5: the device's stores are plain explicit stores, so their class
          is [WeakEvLang.ddev_class] — [WCrel] exactly when the disk's own
          [w_relp] is armed, i.e. right after its [DFence]. *)
@@ -193,31 +193,35 @@ Definition ebar_label (b : barrier_kind) : wlabel :=
   end.
 
 (** THE MONAD-NODE DISPATCH.  [ors] is the register write (deviation (D1)). *)
-Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
+Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
     (l : wlabel) (m' : M unit) (ors : option regstate)
-    (fn' : option (bool * bool * bool * bool)) (d' : dev_state) : Prop :=
+    (fn' : option (bool * bool * bool * bool)) (d' : dev_state)
+    (oib : option oib32) : Prop :=
   match m with
   | Interface.Ret _ =>
       (* THE BOUNDARY: the hart is at the monad's terminal value and fetches
          a fresh instruction. *)
       exists tick : bool,
         l = LSilent /\ m' = riscv_step tick /\ ors = None /\ fn' = None /\
-        d' = d
+        d' = d /\
+        (* D3: THE BOUNDARY CLEARS THE ANNOUNCED BITS ([WeakEvLang]'s
+           [ewg_ib σ c None]) — a hart between instructions has no roles. *)
+        oib = Some None
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
        | Interface.RegRead r _ => fun k =>
            l = LSilent /\ m' = k (register_lookup r rs) /\ ors = None /\
-           fn' = None /\ d' = d
+           fn' = None /\ d' = d /\ oib = None
        | Interface.RegWrite r _ v => fun k =>
            l = LSilent /\ m' = k tt /\ ors = Some (register_set r v rs) /\
-           fn' = None /\ d' = d
+           fn' = None /\ d' = d /\ oib = None
        | Interface.MemRead n req => fun k =>
            if dev_addr (Interface.ReadReq.pa req)
            then (* MMIO READ — FABRIC-TOUCHING, hence the marker [LDev] *)
              exists w : bv (8 * n),
                dev_read d (Interface.ReadReq.pa req) n = Some (w, d') /\
                l = LDev /\ m' = k (inl (w, None)) /\ ors = None /\
-               fn' = None
+               fn' = None /\ oib = None
            else
              ak_coh (classify (Interface.ReadReq.access_kind req)) = false /\
              ((* the PLAIN RAM read; NO [read_ok] here — that is the
@@ -229,7 +233,8 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
                     tvs.*2 !! j = Some (nth_byte w j)) /\
                  l = LLoad (ak_sync (classify (Interface.ReadReq.access_kind req)))
                        false (pa_z (Interface.ReadReq.pa req)) tvs [] /\
-                 m' = k (inl (w, None)) /\ ors = None /\ fn' = None /\ d' = d)
+                 m' = k (inl (w, None)) /\ ors = None /\ fn' = None /\ d' = d /\
+                 oib = None)
               \/
               (* THE FUSED RMW; NO [read_ok]/[excl_ok] here either *)
               (ak_latest (classify (Interface.ReadReq.access_kind req)) = true /\
@@ -244,47 +249,63 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
                  ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2 /\
                  l = LRmw (ak_sync (classify (Interface.ReadReq.access_kind req)))
                        rl (pa_z (Interface.ReadReq.pa req)) tvs data [] [] /\
-                 m' = m2 /\ ors = Some rs1 /\ fn' = None /\ d' = d))
+                 m' = m2 /\ ors = Some rs1 /\ fn' = None /\ d' = d /\
+                 oib = None))
        | Interface.MemWrite n req => fun k =>
            if dev_addr (Interface.WriteReq.pa req)
            then (* MMIO WRITE — FABRIC-TOUCHING, hence the marker [LDev] *)
              dev_write d (Interface.WriteReq.pa req) n
                (Interface.WriteReq.value req) = Some d' /\
-             l = LDev /\ m' = k (inl None) /\ ors = None /\ fn' = None
+             l = LDev /\ m' = k (inl None) /\ ors = None /\ fn' = None /\
+             oib = None
            else
              n <> 0%N /\
              l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
                    (pa_z (Interface.WriteReq.pa req))
                    (wbytes n (Interface.WriteReq.value req)) [] [] /\
-             m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d
+             m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
+             oib = None
        | Interface.Barrier b => fun k =>
            l = ebar_label b /\ m' = k tt /\ ors = None /\
-           fn' = ebar_park b /\ d' = d
-       | Interface.InstrAnnounce _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           fn' = ebar_park b /\ d' = d /\ oib = None
+       (* D3: THE ANNOUNCE RECORDS THE BITS.  Silent for the log, the
+          views and the register file — a σ-write of [wgib] alone. *)
+       | Interface.InstrAnnounce ob => fun k =>
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = Some (Some (ib_of_bvn ob))
        | Interface.BranchAnnounce _ _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.CacheOp _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.TlbOp _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.TakeException _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.ReturnException _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.TranslationStart _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.TranslationEnd _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.CycleCount => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.Message _ => fun k =>
-           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.GetCycleCount => fun k =>
-           l = LSilent /\ m' = k (0%Z) /\ ors = None /\ fn' = None /\ d' = d
+           l = LSilent /\ m' = k (0%Z) /\ ors = None /\ fn' = None /\ d' = d /\
+           oib = None
        | Interface.Choose _ => fun k =>
            exists ch, l = LSilent /\ m' = k ch /\ ors = None /\ fn' = None /\
-             d' = d
+             d' = d /\ oib = None
        (* GenericFail / Discard / a raised Sail exception: STUCK. *)
        | _ => fun _ => False
        end) k
@@ -294,33 +315,37 @@ Definition pnode_step (m : M unit) (rs : regstate) (d : dev_state)
     the PLIC disjunct that needs it); it is kept so that [pstep_node] and
     [pstep_plic] have the SAME signature. *)
 Definition pstep_node (cpu : CPU) (m : M unit) (rs : regstate)
-    (fn : option (bool * bool * bool * bool)) (d : dev_state)
+    (fn : option (bool * bool * bool * bool)) (ib : oib32) (d : dev_state)
     (l : wlabel) (m' : M unit) (ors : option regstate)
-    (fn' : option (bool * bool * bool * bool)) (d' : dev_state) : Prop :=
+    (fn' : option (bool * bool * bool * bool)) (d' : dev_state)
+    (oib : option oib32) : Prop :=
   match fn with
   | Some (pr, pw, sr, sw) =>
       (* THE PARKED FENCE GATES EVERYTHING (WeakEvLang delta (D5)). *)
-      l = LFence pr pw sr sw /\ m' = m /\ ors = None /\ fn' = None /\ d' = d
-  | None => pnode_step m rs d l m' ors fn' d'
+      l = LFence pr pw sr sw /\ m' = m /\ ors = None /\ fn' = None /\ d' = d /\
+      oib = None
+  | None => pnode_step m rs ib d l m' ors fn' d' oib
   end.
 
 (** THE PLIC WIRE — a FABRIC-TOUCHING arm, its own disjunct (P1).  It is the
     PLIC thread's step DELIVERED TO HART [cpu]: available at ANY hart state,
     moving neither the monad nor the parked fence nor the fabric. *)
 Definition pstep_plic (cpu : CPU) (m : M unit) (rs : regstate)
-    (fn : option (bool * bool * bool * bool)) (d : dev_state)
+    (fn : option (bool * bool * bool * bool)) (ib : oib32) (d : dev_state)
     (l : wlabel) (m' : M unit) (ors : option regstate)
-    (fn' : option (bool * bool * bool * bool)) (d' : dev_state) : Prop :=
-  l = LDev /\ m' = m /\ fn' = fn /\ d' = d /\
+    (fn' : option (bool * bool * bool * bool)) (d' : dev_state)
+    (oib : option oib32) : Prop :=
+  l = LDev /\ m' = m /\ fn' = fn /\ d' = d /\ oib = None /\
   ors = Some (register_set sig_seip (bool_to_bit (dev_seip d (fin_to_nat cpu)))
                 rs).
 
 Definition pstep_hart (cpu : CPU) (m : M unit) (rs : regstate)
-    (fn : option (bool * bool * bool * bool)) (d : dev_state)
+    (fn : option (bool * bool * bool * bool)) (ib : oib32) (d : dev_state)
     (l : wlabel) (m' : M unit) (ors : option regstate)
-    (fn' : option (bool * bool * bool * bool)) (d' : dev_state) : Prop :=
-  pstep_node cpu m rs fn d l m' ors fn' d'
-  \/ pstep_plic cpu m rs fn d l m' ors fn' d'.
+    (fn' : option (bool * bool * bool * bool)) (d' : dev_state)
+    (oib : option oib32) : Prop :=
+  pstep_node cpu m rs fn ib d l m' ors fn' d' oib
+  \/ pstep_plic cpu m rs fn ib d l m' ors fn' d' oib.
 
 (** THE DISK AGENT (M5).  One disjunct per node of the residual device
     program plus the three fabric arms; the UART thread is kept SEPARATE
@@ -388,10 +413,10 @@ Definition pstep_disk (dp : option (DM dres)) (d : dev_state) (l : wlabel)
 Definition pstep_ev (p : pexv6) (d : dev_state) (l : wlabel)
     (p' : pexv6) (d' : dev_state) : Prop :=
   match p, p' with
-  | PHart cpu m rs fn, PHart cpu' m' rs' fn' =>
+  | PHart cpu m rs fn ib, PHart cpu' m' rs' fn' ib' =>
       cpu' = cpu /\
-      exists ors, rs' = default rs ors /\
-        pstep_hart cpu m rs fn d l m' ors fn' d'
+      exists ors oib, rs' = default rs ors /\ ib' = default ib oib /\
+        pstep_hart cpu m rs fn ib d l m' ors fn' d' oib
   | PDisk dp, PDisk dp' => pstep_disk dp d l dp' d'
   | _, _ => False
   end.
@@ -467,10 +492,21 @@ Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
   | _ => wglog σ
   end.
 
+(** D3: the [eregs_apply] twin for the announced instruction bits.  [None]
+    means "this node does not move them", exactly as for the register file;
+    that is what keeps [elab_apply_silent] & co. record eta-equalities and
+    keeps FUNCTIONAL EXTENSIONALITY out of the development. *)
+Definition eib_apply (σ : wgstate) (c : CPU) (oib : option oib32)
+    : CPU -> oib32 :=
+  match oib with
+  | Some v => <[c := v]> (wgib σ)
+  | None => wgib σ
+  end.
+
 Definition elab_apply (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
-    (ors : option regstate) (d' : dev_state) : wgstate :=
+    (ors : option regstate) (oib : option oib32) (d' : dev_state) : wgstate :=
   WGState (eregs_apply σ c ors) (wgimg σ) (elab_log σ c l k)
-          (elab_ws σ c l) d' (wggen σ) (wgpow σ).
+          (elab_ws σ c l) d' (wggen σ) (wgpow σ) (eib_apply σ c oib).
 
 (** THE DISK AGENT'S VERSION.  Its [wstate] lives in the EXPRESSION
     ([WeakEvLang.EDisk]'s [dws]), not in σ, so the transformer splits in two:
@@ -515,7 +551,7 @@ Definition edlab_log (σ : wgstate) (l : wlabel) (k : wm_class) : list wmsg :=
 Definition edlab_apply (σ : wgstate) (l : wlabel) (k : wm_class)
     (d' : dev_state) : wgstate :=
   WGState (wgregs σ) (wgimg σ) (edlab_log σ l k) (wgws σ) d' (wggen σ)
-          (wgpow σ).
+          (wgpow σ) (wgib σ).
 
 (* ====================================================================== *)
 (** ** 4. [elab_apply] IS the language's named σ-updater
@@ -526,55 +562,62 @@ Definition edlab_apply (σ : wgstate) (l : wlabel) (k : wm_class)
 Lemma fence_post_id ws : fence_post ws false false false false = ws.
 Proof. rewrite /fence_post /=. by destruct ws. Qed.
 
-Lemma elab_apply_silent σ c k : elab_apply σ c LSilent k None (wgdev σ) = σ.
+Lemma elab_apply_silent σ c k : elab_apply σ c LSilent k None None (wgdev σ) = σ.
 Proof. rewrite /elab_apply /=. by destruct σ. Qed.
 
 Lemma elab_apply_dev σ c k d' :
-  elab_apply σ c LSilent k None d' = ewg_dev σ d'.
+  elab_apply σ c LSilent k None None d' = ewg_dev σ d'.
 Proof. reflexivity. Qed.
 
 (** ... and the same at the FABRIC MARKER, whose memory half is [LSilent]'s
     verbatim.  These are what the MMIO arms and the PLIC wire use since M5. *)
 Lemma elab_apply_ldev σ c k d' :
-  elab_apply σ c LDev k None d' = ewg_dev σ d'.
+  elab_apply σ c LDev k None None d' = ewg_dev σ d'.
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_ldev_reg σ c k rs' :
-  elab_apply σ c LDev k (Some rs') (wgdev σ) = ewg_reg σ c rs'.
+  elab_apply σ c LDev k (Some rs') None (wgdev σ) = ewg_reg σ c rs'.
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_reg σ c k rs' :
-  elab_apply σ c LSilent k (Some rs') (wgdev σ) = ewg_reg σ c rs'.
+  elab_apply σ c LSilent k (Some rs') None (wgdev σ) = ewg_reg σ c rs'.
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_load σ c k aq lat base tvs :
-  elab_apply σ c (LLoad aq lat base tvs []) k None (wgdev σ)
+  elab_apply σ c (LLoad aq lat base tvs []) k None None (wgdev σ)
   = ewg_ws σ c (load_post_run (wgws σ c) aq base tvs.*1).
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_fence σ c k pr pw sr sw :
-  elab_apply σ c (LFence pr pw sr sw) k None (wgdev σ)
+  elab_apply σ c (LFence pr pw sr sw) k None None (wgdev σ)
   = ewg_ws σ c (fence_post (wgws σ c) pr pw sr sw).
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_store σ c k rl base data :
-  elab_apply σ c (LStore rl base data [] []) k None (wgdev σ)
+  elab_apply σ c (LStore rl base data [] []) k None None (wgdev σ)
   = ewg_store σ c
       (store_post_run (wgws σ c) rl base (length data) (S (length (wglog σ))))
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
 Proof. reflexivity. Qed.
 
 Lemma elab_apply_rmw σ c k aq rl base tvs data rs1 :
-  elab_apply σ c (LRmw aq rl base tvs data [] []) k (Some rs1) (wgdev σ)
+  elab_apply σ c (LRmw aq rl base tvs data [] []) k (Some rs1) None (wgdev σ)
   = ewg_rmw σ c rs1
       (store_post_run (load_post_run (wgws σ c) aq base tvs.*1) rl base
          (length data) (S (length (wglog σ))))
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
 Proof. reflexivity. Qed.
 
+(** D3: THE ANNOUNCE AND THE BOUNDARY — a σ-write of [wgib] and nothing
+    else.  [WeakGhost.weak_state_interp] does not mention [wgib], so this
+    shape is invisible to every WP rule (the acceptance test). *)
+Lemma elab_apply_ib σ c k v :
+  elab_apply σ c LSilent k None (Some v) (wgdev σ) = ewg_ib σ c v.
+Proof. reflexivity. Qed.
+
 (** The barrier arm: the label of (D2) reproduces [efence_apply] exactly. *)
 Lemma elab_apply_barrier σ c k b :
-  elab_apply σ c (ebar_label b) k None (wgdev σ)
+  elab_apply σ c (ebar_label b) k None None (wgdev σ)
   = ewg_ws σ c (efence_apply (wgws σ c) (ebar_now b)).
 Proof.
   destruct b; try reflexivity.
@@ -620,67 +663,69 @@ Local Ltac efac4 := split; [|split; [|split]].
 
 Local Ltac esil_case :=
   split;
-  [ intros (-> & ->); do 5 eexists; efac4;
+  [ intros (-> & ->); do 6 eexists; efac4;
     [reflexivity|split_and!; reflexivity|exact I
     |by rewrite elab_apply_silent]
-  | intros (l & m' & ors & fn' & d' & He & Hp & _ & Hs);
-    destruct Hp as (-> & -> & -> & -> & ->); subst;
+  | intros (l & m' & ors & fn' & d' & oib & He & Hp & _ & Hs);
+    destruct Hp as (-> & -> & -> & -> & -> & ->); subst;
     split; [reflexivity|by rewrite elab_apply_silent] ].
 
 Local Ltac estuck_case :=
   split; [by intros []
-         |intros (? & ? & ? & ? & ? & ? & HF & ?); destruct HF].
+         |intros (? & ? & ? & ? & ? & ? & ? & HF & ?); destruct HF].
 
 Theorem ecycle_step_factor gen σ (c : CPU) (m : M unit)
     (fn : option (bool * bool * bool * bool)) e' σ' :
   ecycle_step gen σ c m fn e' σ' <->
   exists (l : wlabel) (m' : M unit) (ors : option regstate)
-         (fn' : option (bool * bool * bool * bool)) (d' : dev_state),
+         (fn' : option (bool * bool * bool * bool)) (d' : dev_state)
+         (oib : option oib32),
     e' = Sail gen c m' fn' /\
-    pstep_node c m (wgregs σ c) fn (wgdev σ) l m' ors fn' d' /\
+    pstep_node c m (wgregs σ c) fn (wgib σ c) (wgdev σ) l m' ors fn' d' oib /\
     elab_ok σ c l /\
     σ' = elab_apply σ c l
-           (pcls_ev (PHart c m (wgregs σ c) fn) l (wgws σ c)) ors d'.
+           (pcls_ev (PHart c m (wgregs σ c) fn (wgib σ c)) l (wgws σ c))
+           ors oib d'.
 Proof.
   rewrite /ecycle_step /pstep_node.
   destruct fn as [[[[pr pw] sr] sw]|].
   { (* THE PARKED FENCE gates everything *)
     split.
-    - intros (-> & ->). do 5 eexists. efac4;
+    - intros (-> & ->). do 6 eexists. efac4;
         [reflexivity|split_and!; reflexivity|exact I
         |by rewrite elab_apply_fence].
-    - intros (l & m' & ors & fn' & d' & He & Hp & _ & Hs).
-      destruct Hp as (-> & -> & -> & -> & ->). subst.
+    - intros (l & m' & ors & fn' & d' & oib & He & Hp & _ & Hs).
+      destruct Hp as (-> & -> & -> & -> & -> & ->). subst.
       split; [reflexivity|by rewrite elab_apply_fence]. }
   rewrite /emonad_step /pnode_step.
   destruct m as [y|T oc k].
   { (* THE BOUNDARY: the terminal value fetches a fresh instruction *)
     split.
-    - intros (tick & -> & ->). do 5 eexists. efac4;
-        [reflexivity|by exists tick|exact I|by rewrite elab_apply_silent].
-    - intros (l & m' & ors & fn' & d' & He & (tick & -> & -> & -> & -> & ->)
-              & _ & Hs); subst.
-      exists tick. split; [reflexivity|by rewrite elab_apply_silent]. }
+    - intros (tick & -> & ->). do 6 eexists. efac4;
+        [reflexivity|by exists tick|exact I|by rewrite elab_apply_ib].
+    - intros (l & m' & ors & fn' & d' & oib & He
+              & (tick & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
+      exists tick. split; [reflexivity|by rewrite elab_apply_ib]. }
   destruct oc; simpl; try esil_case; try estuck_case.
   - (* RegWrite *)
     split.
-    + intros (-> & ->). do 5 eexists. efac4;
+    + intros (-> & ->). do 6 eexists. efac4;
         [reflexivity|split_and!; reflexivity|exact I
         |by rewrite elab_apply_reg].
-    + intros (l & m' & ors & fn' & d' & He & Hp & _ & Hs).
-      destruct Hp as (-> & -> & -> & -> & ->). subst.
+    + intros (l & m' & ors & fn' & d' & oib & He & Hp & _ & Hs).
+      destruct Hp as (-> & -> & -> & -> & -> & ->). subst.
       split; [reflexivity|by rewrite elab_apply_reg].
   - (* MemRead *)
     destruct (dev_addr _).
     + (* MMIO READ — the fabric answers (P1) *)
       split.
-      * intros (w & d1 & Hrd & -> & ->). do 5 eexists. efac4;
+      * intros (w & d1 & Hrd & -> & ->). do 6 eexists. efac4;
           [reflexivity
           |exists w; split_and!; [exact Hrd|reflexivity..]
           |exact I
           |by rewrite elab_apply_ldev].
-      * intros (l & m' & ors & fn' & d' & He & (w & Hrd & -> & -> & -> & ->)
-                & _ & Hs); subst.
+      * intros (l & m' & ors & fn' & d' & oib & He
+                & (w & Hrd & -> & -> & -> & -> & ->) & _ & Hs); subst.
         exists w, d'. split_and!; [exact Hrd|reflexivity|].
         by rewrite elab_apply_ldev.
     + split.
@@ -689,14 +734,14 @@ Proof.
                          Hlen & Hby & Hrd & Hex & Hne & Hlend & Hsil & Hwr
                          & -> & ->)]).
         { (* the PLAIN RAM read *)
-          do 5 eexists. efac4;
+          do 6 eexists. efac4;
             [reflexivity
             |split; [exact Hcoh|]; left; split; [exact Hlat|];
              exists w, tvs; split_and!; [exact Hlen|exact Hby|reflexivity..]
             |split; [reflexivity|exact Hrd]
             |by rewrite elab_apply_load]. }
         { (* the FUSED RMW *)
-          do 5 eexists. efac4;
+          do 6 eexists. efac4;
             [reflexivity
             |split; [exact Hcoh|]; right; split; [exact Hlat|];
              exists w, tvs, data, rl, m1, m2, rs1;
@@ -706,11 +751,12 @@ Proof.
                [reflexivity|reflexivity|exact Hne|exact Hlend|exact Hrd
                |exact Hex]
             |by rewrite elab_apply_rmw]. }
-      * intros (l & m' & ors & fn' & d' & He &
-                (Hcoh & [(Hlat & w & tvs & Hlen & Hby & -> & -> & -> & -> & ->)
+      * intros (l & m' & ors & fn' & d' & oib & He &
+                (Hcoh & [(Hlat & w & tvs & Hlen & Hby & -> & -> & -> & -> & ->
+                          & ->)
                         |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
                           Hlen & Hby & Hne & Hlend & Hsil & Hwr & -> & -> & ->
-                          & -> & ->)]) & Hok & Hs); subst.
+                          & -> & -> & ->)]) & Hok & Hs); subst.
         { split; [exact Hcoh|]. left. split; [exact Hlat|].
           exists w, tvs. split_and!;
             [exact Hlen|exact Hby|by destruct Hok as (_ & Hrd)|reflexivity
@@ -725,36 +771,47 @@ Proof.
     destruct (dev_addr _).
     + (* MMIO WRITE — the fabric absorbs it (P1) *)
       split.
-      * intros (d1 & Hwr & -> & ->). do 5 eexists. efac4;
+      * intros (d1 & Hwr & -> & ->). do 6 eexists. efac4;
           [reflexivity|split_and!; [exact Hwr|reflexivity..]|exact I
           |by rewrite elab_apply_ldev].
-      * intros (l & m' & ors & fn' & d' & He & (Hwr & -> & -> & -> & ->)
-                & _ & Hs); subst.
+      * intros (l & m' & ors & fn' & d' & oib & He
+                & (Hwr & -> & -> & -> & -> & ->) & _ & Hs); subst.
         exists d'. split_and!; [exact Hwr|reflexivity|].
         by rewrite elab_apply_ldev.
     + split.
-      * intros (Hn & -> & ->). do 5 eexists. efac4;
+      * intros (Hn & -> & ->). do 6 eexists. efac4;
           [reflexivity|split_and!; [exact Hn|reflexivity..]
           |split_and!; [reflexivity|reflexivity|by apply wbytes_ne]|].
         rewrite elab_apply_store /= wbytes_length. reflexivity.
-      * intros (l & m' & ors & fn' & d' & He & (Hn & -> & -> & -> & -> & ->)
-                & _ & Hs); subst.
+      * intros (l & m' & ors & fn' & d' & oib & He
+                & (Hn & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
         split; [exact Hn|]. split; [reflexivity|].
         rewrite elab_apply_store /= wbytes_length. reflexivity.
+  - (* D3: THE ANNOUNCE — a σ-write of [wgib] and nothing else.  It is the
+       ONE arm whose [oib] is not [None], which is why it does not fall to
+       [esil_case]; its label, log, views and register file are [LSilent]'s
+       verbatim, so [weak_state_interp] cannot see it (acceptance test). *)
+    split.
+    + intros (-> & ->). do 6 eexists. efac4;
+        [reflexivity|split_and!; reflexivity|exact I
+        |by rewrite elab_apply_ib].
+    + intros (l & m' & ors & fn' & d' & oib & He
+              & (-> & -> & -> & -> & -> & ->) & _ & Hs); subst.
+      split; [reflexivity|by rewrite elab_apply_ib].
   - (* Barrier — the inert [fence.i] label is deviation (D2) *)
     split.
-    + intros (-> & ->). do 5 eexists. efac4;
+    + intros (-> & ->). do 6 eexists. efac4;
         [reflexivity|split_and!; reflexivity| |by rewrite elab_apply_barrier].
       rewrite /elab_ok. by destruct b.
-    + intros (l & m' & ors & fn' & d' & He & (-> & -> & -> & -> & ->) & _ & Hs);
-        subst.
+    + intros (l & m' & ors & fn' & d' & oib & He
+              & (-> & -> & -> & -> & -> & ->) & _ & Hs); subst.
       split; [reflexivity|by rewrite elab_apply_barrier].
   - (* Choose *)
     split.
-    + intros (ch & -> & ->). do 5 eexists. efac4;
+    + intros (ch & -> & ->). do 6 eexists. efac4;
         [reflexivity|by exists ch|exact I|by rewrite elab_apply_silent].
-    + intros (l & m' & ors & fn' & d' & He & (ch & -> & -> & -> & -> & ->)
-              & _ & Hs); subst.
+    + intros (l & m' & ors & fn' & d' & oib & He
+              & (ch & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
       exists ch. split; [reflexivity|by rewrite elab_apply_silent].
 Qed.
 
@@ -763,10 +820,10 @@ Qed.
 Theorem eplic_step_factor σ σ' :
   eplic_step σ σ' <->
   exists (c : CPU) (l : wlabel) (ors : option regstate) (d' : dev_state),
-    (forall (m : M unit) (fn : option (bool * bool * bool * bool)),
-       pstep_plic c m (wgregs σ c) fn (wgdev σ) l m ors fn d') /\
+    (forall (m : M unit) (fn : option (bool * bool * bool * bool)) (ib : oib32),
+       pstep_plic c m (wgregs σ c) fn ib (wgdev σ) l m ors fn d' None) /\
     elab_ok σ c l /\
-    σ' = elab_apply σ c l WCplain ors d'.
+    σ' = elab_apply σ c l WCplain ors None d'.
 Proof.
   rewrite /eplic_step /pstep_plic. split.
   - intros (c & ->).
@@ -774,10 +831,10 @@ Proof.
       (Some (register_set sig_seip
                (bool_to_bit (dev_seip (wgdev σ) (fin_to_nat c)))
                (wgregs σ c))), (wgdev σ).
-    split_and!; [by intros m fn; split_and!|exact I|].
+    split_and!; [by intros m fn ib; split_and!|exact I|].
     by rewrite elab_apply_ldev_reg.
   - intros (c & l & ors & d' & Hp & _ & Hs).
-    destruct (Hp (Interface.Ret tt) None) as (-> & _ & _ & -> & ->).
+    destruct (Hp (Interface.Ret tt) None None) as (-> & _ & _ & -> & _ & ->).
     exists c. by rewrite Hs elab_apply_ldev_reg.
 Qed.
 
@@ -919,28 +976,31 @@ Qed.
     PLIC wire are one disjunct of the same program step. *)
 Corollary ecycle_step_pstep_hart gen σ (c : CPU) m fn e' σ' :
   ecycle_step gen σ c m fn e' σ' ->
-  exists (l : wlabel) (m' : M unit) (ors : option regstate) fn' (d' : dev_state),
+  exists (l : wlabel) (m' : M unit) (ors : option regstate) fn' (d' : dev_state)
+         (oib : option oib32),
     e' = Sail gen c m' fn' /\
-    pstep_hart c m (wgregs σ c) fn (wgdev σ) l m' ors fn' d' /\
+    pstep_hart c m (wgregs σ c) fn (wgib σ c) (wgdev σ) l m' ors fn' d' oib /\
     elab_ok σ c l /\
     σ' = elab_apply σ c l
-           (pcls_ev (PHart c m (wgregs σ c) fn) l (wgws σ c)) ors d'.
+           (pcls_ev (PHart c m (wgregs σ c) fn (wgib σ c)) l (wgws σ c))
+           ors oib d'.
 Proof.
   intros H. apply ecycle_step_factor in H
-    as (l & m' & ors & fn' & d' & ? & ? & ? & ?).
-  exists l, m', ors, fn', d'. split_and!; [done|by left|done|done].
+    as (l & m' & ors & fn' & d' & oib & ? & ? & ? & ?).
+  exists l, m', ors, fn', d', oib. split_and!; [done|by left|done|done].
 Qed.
 
 Corollary eplic_step_pstep_hart σ σ' :
   eplic_step σ σ' ->
   exists (c : CPU) (l : wlabel) (ors : option regstate) (d' : dev_state),
-    (forall (m : M unit) fn,
-       pstep_hart c m (wgregs σ c) fn (wgdev σ) l m ors fn d') /\
+    (forall (m : M unit) fn (ib : oib32),
+       pstep_hart c m (wgregs σ c) fn ib (wgdev σ) l m ors fn d' None) /\
     elab_ok σ c l /\
-    σ' = elab_apply σ c l WCplain ors d'.
+    σ' = elab_apply σ c l WCplain ors None d'.
 Proof.
   intros H. apply eplic_step_factor in H as (c & l & ors & d' & Hp & ? & ?).
-  exists c, l, ors, d'. split_and!; [|done|done]. intros m fn. right. apply Hp.
+  exists c, l, ors, d'. split_and!; [|done|done].
+  intros m fn ib. right. apply Hp.
 Qed.
 
 (* ====================================================================== *)
@@ -955,8 +1015,8 @@ Qed.
     on the read VALUES only ([tvs.*2]), never on the timestamps — which is
     what lets the robustness replay re-time a run. *)
 
-Lemma pnode_step_lat_free m rs d aq base tvs m' ors fn' d' :
-  ~ pnode_step m rs d (LLoad aq true base tvs []) m' ors fn' d'.
+Lemma pnode_step_lat_free m rs ib d aq base tvs m' ors fn' d' oib :
+  ~ pnode_step m rs ib d (LLoad aq true base tvs []) m' ors fn' d' oib.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -973,16 +1033,16 @@ Proof.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
 
-Lemma pstep_node_lat_free cpu m rs fn d aq base tvs m' ors fn' d' :
-  ~ pstep_node cpu m rs fn d (LLoad aq true base tvs []) m' ors fn' d'.
+Lemma pstep_node_lat_free cpu m rs fn ib d aq base tvs m' ors fn' d' oib :
+  ~ pstep_node cpu m rs fn ib d (LLoad aq true base tvs []) m' ors fn' d' oib.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
   - apply pnode_step_lat_free.
 Qed.
 
-Lemma pstep_hart_lat_free cpu m rs fn d aq base tvs m' ors fn' d' :
-  ~ pstep_hart cpu m rs fn d (LLoad aq true base tvs []) m' ors fn' d'.
+Lemma pstep_hart_lat_free cpu m rs fn ib d aq base tvs m' ors fn' d' oib :
+  ~ pstep_hart cpu m rs fn ib d (LLoad aq true base tvs []) m' ors fn' d' oib.
 Proof.
   intros [H|(H & _)]; [by eapply pstep_node_lat_free|done].
 Qed.
@@ -1056,16 +1116,16 @@ Theorem pstep_ev_lat_free p d aq base tvs p' d' :
   ~ pstep_ev p d (LLoad aq true base tvs []) p' d'.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
     try (by intros []).
-  - intros (_ & ors & _ & H). by eapply pstep_hart_lat_free.
+  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_lat_free.
   - apply pstep_disk_lat_free.
 Qed.
 
-Lemma pnode_step_ts_load m rs d aq base tvs tvs' m' ors fn' d' :
-  pnode_step m rs d (LLoad aq false base tvs []) m' ors fn' d' ->
+Lemma pnode_step_ts_load m rs ib d aq base tvs tvs' m' ors fn' d' oib :
+  pnode_step m rs ib d (LLoad aq false base tvs []) m' ors fn' d' oib ->
   tvs'.*2 = tvs.*2 ->
-  pnode_step m rs d (LLoad aq false base tvs' []) m' ors fn' d'.
+  pnode_step m rs ib d (LLoad aq false base tvs' []) m' ors fn' d' oib.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -1079,8 +1139,8 @@ Proof.
       have Hlen' : length tvs' = length tvs0.
       { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
       split; [exact Hcoh|]. left. split; [exact Hlat|].
-      exists w, tvs'. split_and!; [by rewrite Hlen'|by rewrite Hts| | | | |];
-        by destruct Hrest as (-> & -> & -> & ->).
+      exists w, tvs'. split_and!; [by rewrite Hlen'|by rewrite Hts| | | | | |];
+        by destruct Hrest as (-> & -> & -> & -> & ->).
   - (* MemWrite *) destruct (dev_addr _).
     + by intros (? & ? & _).
     + by intros (_ & ? & _).
@@ -1088,10 +1148,10 @@ Proof.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
 
-Lemma pnode_step_ts_rmw m rs d aq rl base tvs tvs' data m' ors fn' d' :
-  pnode_step m rs d (LRmw aq rl base tvs data [] []) m' ors fn' d' ->
+Lemma pnode_step_ts_rmw m rs ib d aq rl base tvs tvs' data m' ors fn' d' oib :
+  pnode_step m rs ib d (LRmw aq rl base tvs data [] []) m' ors fn' d' oib ->
   tvs'.*2 = tvs.*2 ->
-  pnode_step m rs d (LRmw aq rl base tvs' data [] []) m' ors fn' d'.
+  pnode_step m rs ib d (LRmw aq rl base tvs' data [] []) m' ors fn' d' oib.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -1103,7 +1163,7 @@ Proof.
                        Hlen & Hby & Hne & Hlend & Hsil & Hwr & Hl & Hrest)])
               Hts; [by simplify_eq|].
       inversion Hl; subst; clear Hl.
-      destruct Hrest as (-> & -> & -> & ->).
+      destruct Hrest as (-> & -> & -> & -> & ->).
       have Hlen' : length tvs' = length tvs0.
       { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
       split; [exact Hcoh|]. right. split; [exact Hlat|].
@@ -1117,20 +1177,20 @@ Proof.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
 
-Lemma pstep_node_ts_load cpu m rs fn d aq base tvs tvs' m' ors fn' d' :
-  pstep_node cpu m rs fn d (LLoad aq false base tvs []) m' ors fn' d' ->
+Lemma pstep_node_ts_load cpu m rs fn ib d aq base tvs tvs' m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d (LLoad aq false base tvs []) m' ors fn' d' oib ->
   tvs'.*2 = tvs.*2 ->
-  pstep_node cpu m rs fn d (LLoad aq false base tvs' []) m' ors fn' d'.
+  pstep_node cpu m rs fn ib d (LLoad aq false base tvs' []) m' ors fn' d' oib.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
   - apply pnode_step_ts_load.
 Qed.
 
-Lemma pstep_node_ts_rmw cpu m rs fn d aq rl base tvs tvs' data m' ors fn' d' :
-  pstep_node cpu m rs fn d (LRmw aq rl base tvs data [] []) m' ors fn' d' ->
+Lemma pstep_node_ts_rmw cpu m rs fn ib d aq rl base tvs tvs' data m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs data [] []) m' ors fn' d' oib ->
   tvs'.*2 = tvs.*2 ->
-  pstep_node cpu m rs fn d (LRmw aq rl base tvs' data [] []) m' ors fn' d'.
+  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs' data [] []) m' ors fn' d' oib.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (? & _).
@@ -1143,10 +1203,10 @@ Theorem pstep_ev_ts_load p d aq base tvs tvs' p' d' :
   pstep_ev p d (LLoad aq false base tvs' []) p' d'.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
     try (by intros ? ?).
-  - intros (-> & ors & -> & [H|(H & _)]) Hts; [|done].
-    split; [reflexivity|]. exists ors. split; [reflexivity|].
+  - intros (-> & ors & oib & -> & -> & [H|(H & _)]) Hts; [|done].
+    split; [reflexivity|]. exists ors, oib. split_and!; [reflexivity..|].
     left. by eapply pstep_node_ts_load.
   - apply pstep_disk_ts_load.
 Qed.
@@ -1157,10 +1217,10 @@ Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data p' d' :
   pstep_ev p d (LRmw aq rl base tvs' data [] []) p' d'.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
     try (by intros ? ?).
-  - intros (-> & ors & -> & [H|(H & _)]) Hts; [|done].
-    split; [reflexivity|]. exists ors. split; [reflexivity|].
+  - intros (-> & ors & oib & -> & -> & [H|(H & _)]) Hts; [|done].
+    split; [reflexivity|]. exists ors, oib. split_and!; [reflexivity..|].
     left. by eapply pstep_node_ts_rmw.
   - intros H. by apply pstep_disk_no_rmw in H.
 Qed.
@@ -1174,23 +1234,24 @@ Qed.
     LABEL, this is a case analysis in which every arm whose label is not
     [LDev] mentions the fabric exactly once, as [d' = d]. *)
 
-Lemma pnode_step_dev_free m rs d l m' ors fn' d' :
-  pnode_step m rs d l m' ors fn' d' -> l <> LDev ->
-  d' = d /\ forall d0, pnode_step m rs d0 l m' ors fn' d0.
+Lemma pnode_step_dev_free m rs ib d l m' ors fn' d' oib :
+  pnode_step m rs ib d l m' ors fn' d' oib -> l <> LDev ->
+  d' = d /\ forall d0, pnode_step m rs ib d0 l m' ors fn' d0 oib.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
-  { intros (tick & Hl & -> & -> & -> & ->) _. split; [reflexivity|].
+  { intros (tick & Hl & -> & -> & -> & -> & ->) _. split; [reflexivity|].
     intros d0. exists tick. by split_and!. }
   destruct oc; simpl;
-    try (intros (Hl & -> & -> & -> & ->) _; split; [reflexivity|];
+    try (intros (Hl & -> & -> & -> & -> & ->) _; split; [reflexivity|];
          intros d0; by split_and!);
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + intros (w & Hrd & Hl & _) Hne. by destruct (Hne Hl).
-    + intros (Hcoh & [(Hlat & w & tvs & Hlen & Hby & Hl & -> & -> & -> & ->)
+    + intros (Hcoh & [(Hlat & w & tvs & Hlen & Hby & Hl & -> & -> & -> & ->
+                       & ->)
                      |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
                        Hlen & Hby & Hnl & Hlend & Hsil & Hwr & Hl
-                       & -> & -> & -> & ->)]) _;
+                       & -> & -> & -> & -> & ->)]) _;
         (split; [reflexivity|]); intros d0.
       * split; [exact Hcoh|]. left. split; [exact Hlat|].
         exists w, tvs. by split_and!.
@@ -1198,18 +1259,18 @@ Proof.
         exists w, tvs, data, rl, m1, m2, rs1. by split_and!.
   - (* MemWrite *) destruct (dev_addr _).
     + intros (Hwr & Hl & _) Hne. by destruct (Hne Hl).
-    + intros (Hn & Hl & -> & -> & -> & ->) _. split; [reflexivity|].
+    + intros (Hn & Hl & -> & -> & -> & -> & ->) _. split; [reflexivity|].
       intros d0. by split_and!.
-  - (* Choose *) intros (ch & Hl & -> & -> & -> & ->) _.
+  - (* Choose *) intros (ch & Hl & -> & -> & -> & -> & ->) _.
     split; [reflexivity|]. intros d0. exists ch. by split_and!.
 Qed.
 
-Lemma pstep_node_dev_free cpu m rs fn d l m' ors fn' d' :
-  pstep_node cpu m rs fn d l m' ors fn' d' -> l <> LDev ->
-  d' = d /\ forall d0, pstep_node cpu m rs fn d0 l m' ors fn' d0.
+Lemma pstep_node_dev_free cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d l m' ors fn' d' oib -> l <> LDev ->
+  d' = d /\ forall d0, pstep_node cpu m rs fn ib d0 l m' ors fn' d0 oib.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
-  - intros (Hl & -> & -> & -> & ->) _. split; [reflexivity|].
+  - intros (Hl & -> & -> & -> & -> & ->) _. split; [reflexivity|].
     intros d0. by split_and!.
   - apply pnode_step_dev_free.
 Qed.
@@ -1254,11 +1315,12 @@ Proof.
   have Hne : l <> LDev.
   { intros ->. by rewrite /pdev_ev in Hm. }
   revert Hs. rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; try done.
-  - intros (-> & ors & -> & [Hn|(Hl & _)]); [|by destruct (Hne Hl)].
-    destruct (pstep_node_dev_free _ _ _ _ _ _ _ _ _ _ Hn Hne) as (-> & Hall).
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; try done.
+  - intros (-> & ors & oib & -> & -> & [Hn|(Hl & _)]); [|by destruct (Hne Hl)].
+    destruct (pstep_node_dev_free _ _ _ _ _ _ _ _ _ _ _ _ Hn Hne)
+      as (-> & Hall).
     split; [reflexivity|]. intros d0. split; [reflexivity|].
-    exists ors. split; [reflexivity|]. left. apply Hall.
+    exists ors, oib. split_and!; [reflexivity..|]. left. apply Hall.
   - intros Hs. destruct (pstep_disk_dev_free _ _ _ _ _ Hs Hne) as (-> & Hall).
     split; [reflexivity|]. intros d0. apply Hall.
 Qed.
@@ -1270,8 +1332,8 @@ Qed.
     inversion ([WeakEvCapstone.wp_pf_step_inv]) takes as its premise, and
     it is what makes every [_d] step function in the machine's arms collapse
     to its dependency-free instance BY CONVERSION. *)
-Lemma pnode_step_depfree m rs d l m' ors fn' d' :
-  pnode_step m rs d l m' ors fn' d' -> lb_depfree l.
+Lemma pnode_step_depfree m rs ib d l m' ors fn' d' oib :
+  pnode_step m rs ib d l m' ors fn' d' oib -> lb_depfree l.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & -> & _). }
@@ -1288,20 +1350,20 @@ Proof.
   - (* Choose *) by intros (ch & -> & _).
 Qed.
 
-Lemma pstep_node_depfree cpu m rs fn d l m' ors fn' d' :
-  pstep_node cpu m rs fn d l m' ors fn' d' -> lb_depfree l.
+Lemma pstep_node_depfree cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d l m' ors fn' d' oib -> lb_depfree l.
 Proof.
   rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
   - by intros (-> & _).
   - apply pnode_step_depfree.
 Qed.
 
-Lemma pstep_plic_depfree cpu m rs fn d l m' ors fn' d' :
-  pstep_plic cpu m rs fn d l m' ors fn' d' -> lb_depfree l.
+Lemma pstep_plic_depfree cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_plic cpu m rs fn ib d l m' ors fn' d' oib -> lb_depfree l.
 Proof. rewrite /pstep_plic. by intros (-> & _). Qed.
 
-Lemma pstep_hart_depfree cpu m rs fn d l m' ors fn' d' :
-  pstep_hart cpu m rs fn d l m' ors fn' d' -> lb_depfree l.
+Lemma pstep_hart_depfree cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_hart cpu m rs fn ib d l m' ors fn' d' oib -> lb_depfree l.
 Proof.
   intros [H|H]; [by eapply pstep_node_depfree|by eapply pstep_plic_depfree].
 Qed.
@@ -1324,8 +1386,8 @@ Qed.
 Theorem pstep_ev_depfree p d l p' d' : pstep_ev p d l p' d' -> lb_depfree l.
 Proof.
   rewrite /pstep_ev.
-  destruct p as [cpu m rs fn|dp], p' as [cpu' m' rs' fn'|dp']; simpl;
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
     try (by intros []).
-  - intros (_ & ors & _ & H). by eapply pstep_hart_depfree.
+  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_depfree.
   - apply pstep_disk_depfree.
 Qed.
