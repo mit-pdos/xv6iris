@@ -1441,7 +1441,7 @@ Evidence:
 | `InstrBytes.mmode_config_cert` | `gen_cert` out of the bundle without consuming it | every leaf's obligation needs it and the bundle is gone by then |
 | `MinstretInv.minstret_inv := emp` | a persistent no-op | so three upstream leaves keep their statements; **delete when green** |
 | `HartSCsr.v` | the S-MODE (privilege-generic) CSR engines: `swp_doCSR_r_p` / `_w_p` / `_rw_p`, the two `execute`-level wrappers, the `pw_*` frame kit at a parametric privilege, and `hval_check_CSR_result_S` | `WpMmodeCsrSwp` with the privilege, the certificate's read set and its reference state as PARAMETERS.  The measured fact that makes it cheap: `goodb D_m (check_CSR_result csr Supervisor at_) dstateS = true` for every S CSR the kernel touches, so the whole `cw_*`/`cr_*` footprint kit carries over and only the reference TOWER needed the privilege.  Three engines rather than one because `doCSR` branches on the access type twice and both branches are conversions at a concrete one |
-| `HartSMem.v` | the S-MODE DATA-ACCESS engines: `swp_execute_LOAD_S`, `swp_execute_STORE_S`, `swp_execute_AMOSWAP_S`, and the twelve instantiations | `HartMLoad`/`HartMStore` one privilege over.  THREE things change and nothing else does: the TRANSLATION is an obligation whose conclusion is `SRegime.sr_swp_translate`'s verbatim (so the engine is regime-agnostic and everything after it runs at the landing file `rsf`), the PMP check is `PtTreeAdue.swp_pmpCheck_S` at the kernel's TOR entry 0, and the WIDTH is a parameter.  RAM and MMIO are ONE tower: the sections are parametric in an address class (`Acls`/`Pma` plus the five facts derived from it) and in the memory obligation (`Mobl`/`Wobl`), so a device access -- which still goes through `read_ram`/`write_ram`, since `within_mmio_readable` is FALSE outside the CLINT, and is routed to the device by the STEP RELATION -- is the same proof at a different instantiation |
+| `HartSMem.v` | the S-MODE DATA-ACCESS engines: `swp_execute_LOAD_S`, `swp_execute_STORE_S`, `swp_execute_AMOSWAP_S`, and the twelve instantiations | `HartMLoad`/`HartMStore` one privilege over.  THREE things change and nothing else does: the TRANSLATION is an obligation whose conclusion is `SRegime.sr_swp_translate`'s verbatim (so the engine is regime-agnostic and everything after it runs at the landing file `rsf`), the PMP check is `PtTreeAdue.swp_pmpCheck_S` at the kernel's TOR entry 0, and the WIDTH is a parameter.  RAM and MMIO are ONE tower: the sections are parametric in an address class (`Acls`/`Pma` plus the five facts derived from it) and in the memory obligation (`Mobl`/`Wobl`), so a device access -- which still goes through `read_ram`/`write_ram`, since `within_mmio_readable` is FALSE outside the CLINT, and is routed to the device by the STEP RELATION -- is the same proof at a different instantiation.  Since the leaf sweep it also carries the EXISTENTIAL-value LOAD chain (`_ex`, for atomic-update and MMIO reads), the width-generic RAM nodes and engines (`swp_read_ram_node_w`, `swp_execute_{LOAD,STORE}_ram_Sw`), and the mode-generic AMOSWAP (`swp_execute_AMOSWAP_S_ex_mode`) |
 
 ### THE S-MODE DATA ENGINES ARE BUILT (`HartSMem.v`), and three things about them recur
 
@@ -1581,6 +1581,85 @@ both about the state of the tree rather than about any leaf:
    `WpSconfLock.v`.  Checked by name against both files' global lists.
 
 ## THE LEAF SWEEP: state, and the rule that makes it cheap
+
+### THE MEMORY / MMIO FAMILIES ARE CONVERTED, and four things about them recur
+
+`WpSconfMem` (28 leaves), `WpSconfLock` (9) and `WpPlic` (3) are green and
+fast (12 s / 16 s / 11 s).  **Every statement in WpSconfLock and WpPlic is
+byte-identical, and 26 of WpSconfMem's 28 are**; the two that are not are the
+subject of the first finding.
+
+1. **AN ATOMIC-UPDATE MEMORY LEAF MUST BE GIVEN THE ADDRESS *CLAIM*, BECAUSE
+   PER NODE THE ACCESS TRANSLATES BEFORE IT READS.**  The translation needs
+   the window's claim -- its `ppn`, canonicality, RAM-ness and tier pin --
+   and the atomic update is opened at the memory NODE, several nodes later.
+   A LINEAR atomic update cannot be peeked at and put back, so the claim
+   cannot be recovered from it; and it is not derivable from anything else,
+   because the address is the caller's.  The claim is PERSISTENT and says
+   nothing about the VALUE, so it rides beside the update as
+   `WpSconfMem.wordw_claim`.  Every caller already has it: an owner of the
+   window reads it off its own points-to (`wordw_claim_of` -- and
+   `iDestruct … as "#H"` at a Persistent conclusion does NOT consume the
+   points-to, which is what makes this free), and an invariant-backed caller
+   off ONE peek-open of its (persistent) accessor
+   (`WpSconfLock.lock_claims` opens `lock_openable` once and returns both
+   fields' claims plus the credential).  This is the sweep's second forced
+   statement change and it is confined to the two ENGINES; no leaf moved.
+   **A DEVICE leaf needs no such premise** -- a device page is mapped by the
+   kernel table at every tier, so `hw_config`'s static claims give the ppn
+   outright (`kmap_class_rw` + `kmap_static_claims_at`, `pa_of_id`).
+
+2. **AN ATOMIC WINDOW'S LOADED WORD IS EXISTENTIAL ALL THE WAY DOWN THE LOAD
+   CHAIN, AND SO IS EVERY MMIO READ.**  A lock word or a device register is
+   named only inside the read node's own callback, so `bytes` cannot be a
+   parameter of the engine.  `HartSMem` carries `_ex` twins for the whole
+   chain -- `swp_read_ram_node{1,2,4,8}_ex`, `swp_dev_read_node{1,4}_ex`,
+   `swp_checked_mem_read_S_ex`, `swp_mem_read_S_ex`,
+   `swp_translate_and_read_value_S_ex`, `swp_vmem_read_addr_S_gen_ex`,
+   `swp_vmem_read_S_gen_ex`, `swp_execute_LOAD_S_gen_ex` -- plus the
+   `Mobl_{ram,dev1,dev4}_ex` obligations and the RAM/dev instances.  The node
+   is a parameter in its existential form (`Mex` in, value-indexed `Rr`
+   back), so the value-known chain is the instance `Rr b := ⌜b = bytes⌝ ∗ R`
+   and nothing existing moved.  The STORE side needs no twin: `Wobl` mentions
+   only the written value.
+
+3. **`vmem_width` IS A FOUR-WAY DISJUNCTION OF LITERALS, AND THAT IS HOW A
+   WIDTH-GENERIC LEAF GETS A PER-WIDTH NODE.**  The memory node is the one
+   thing that cannot be width-generic (its request record is a TYPE index),
+   but a leaf stated at a symbolic `width` recovers it by destructing its own
+   `vmem_width` premise: `swp_read_ram_node_w` / `_w_ex` /
+   `swp_write_ram_node_w`, and the `swp_execute_{LOAD,STORE}_ram_Sw{,_ex}`
+   engines built on them.  That is what let `wp_load_s_sconf_au` /
+   `wp_store_s_sconf_au` stay width-generic instead of splitting into four.
+
+4. **THE AMO ENGINE HAD TO GO MODE-GENERIC.**  `swp_execute_AMOSWAP_S_ex`
+   pinned `satp.MODE = Sv39`, but a lock leaf runs at `strans_regime`, whose
+   Bare arm is not Sv39 (acquire runs before kvminithart).
+   `swp_execute_AMOSWAP_S_ex_mode` takes the mode as a parameter and the
+   Sv39 statement stays as its instance.  **Before pinning a mode in an
+   engine, ask whether a `strans_regime` leaf will call it.**
+
+   Two tactic notes that cost real time here: the `ltac:`-in-argument-position
+   trap fires again at the tower lookups (`ltac:(rewrite sda_rs_satp; …)`
+   fails with "does not match any subterm") -- POSE all of them as named
+   `assert`s before the engine `iApply`, as `wp_load_s_sconf_au` does; and
+   `iMod` does NOT fire directly on a `WP Loop` goal, so a leaf that needs a
+   fupd outside a node callback writes `iApply fupd_wp` first (`swp_fupd` is
+   the same move inside a `swp`, and needs `(CID := CID)`).
+
+### THE DOWNSTREAM TAIL BLOCKS `ProofKvminithart`, and the block is not a leaf
+
+`ProofKvminithart`'s leaves are all byte-identical, but the file cannot be
+compiled: its transitive closure still holds ten stale `.vo`, and the first
+that does not rebuild is **`TrampStepPt.v`, which names the DELETED
+`SmodeCore.wp_exec_step_decode_execute_inv_priv`**.  `TransPt` sits on it and
+`ProofKvminithart` sits on `TransPt`.  So the trampoline/page-table tail
+needs its own port before any kvminithart-shaped whole-function proof can be
+re-checked.  **`make -n` reports ZERO compile lines for that cone** -- the
+mtime artefact from durable-notes; the tell is the "a `.vo` older than a
+`.vo` it DEPENDS on, iterated to a fixpoint" scan over `.CoqMakefile.d`,
+which finds 982 stale `.vo` tree-wide and exactly ten in this cone.
+
 
 ### THE S-MODE LEAF SWEEP IS DONE for the register-only families (2026-08-18)
 
@@ -1836,8 +1915,9 @@ tlb-existential post is the pending one-line fix); S-mode leaf sweep A
 SIE-moving ones wait on b'/ms'; timer via a node seam) in progress, D
 (WpSmodePt*: WpSmodePtEngine SRET engine, WpSmodePtFetch producer face,
 memory half waits on `sr_swp_mode` + the tlb-existential post) in progress,
-C (WpSconfMem/Lock, PLIC, virtio, UART, kvminithart, WFI) NOT started --
-relaunch when D lands WpSmodePtLeaves and drop WpSconfMem's Require of it.
+C (the MEMORY and MMIO families): `WpSconfMem`, `WpSconfLock` and `WpPlic`
+are DONE; `WpVirtioDev` / `ProofUart` / `WpSmodeWfi` in progress;
+`ProofKvminithart` is BLOCKED on the downstream tail (below).
 User tier: P0-P6 done, P3's `u_fetch_pure` assembly in progress (needs
 `goodb_pte_is_invalid` at an abstract word), P4b (classify arms) waits on
 P7's UserTotalU, P7 on UserTotalU/UserStepFull/UserActiveClass §3-5.
