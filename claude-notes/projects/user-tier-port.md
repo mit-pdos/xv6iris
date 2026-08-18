@@ -1053,7 +1053,7 @@ P5 twins (`UserExecFacts.v`, `UserCsr.v`) returns nothing — a U-mode EXECUTE
 never writes `elp` (the Zicfilp gate is off at U), so the execute families
 instantiate at `Du_w` unchanged.
 
-## 10. P4a — THE DATA-ACCESS TWINS, AND THE TOOLKIT THEY FORCED (2026-08-18)
+## 11. P4a — THE DATA-ACCESS TWINS, AND THE TOOLKIT THEY FORCED (2026-08-18)
 
 ### `HartMemAsm.v` — the general-`mm` assembly toolkit (new leaf file)
 
