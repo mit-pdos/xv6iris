@@ -1011,6 +1011,120 @@ Section HartSCsr.
      reg_pointsto misa DfracDiscarded MISA_C).
   Proof. rewrite (pr0_frames pr dqp). iIntros "H". iExact "H". Qed.
 
+  (* ONE EXTRA READ CELL, at a parametric privilege.  [WpMmodeCsrSwp]'s
+     [cw2_*] family with the tower's privilege a parameter: everything but
+     [cw2_rs] is privilege-free and is reused.  Supervisor's [csrw stimecmp]
+     is the one leaf that needs five cells -- menvcfg (whose STCE bit gates
+     the write) beside mcounteren (whose TM bit does) and the three pins. *)
+  Definition pw2_rs (pr : Privilege) (r : register) (v0 : type_of_register r)
+      (r2 : register) (v2 : type_of_register r2) : regstate :=
+    register_set r2 v2 (pw_rs pr r v0).
+
+  Lemma pw2_rs_r2 (pr : Privilege) (r : register) (v0 : type_of_register r)
+      (r2 : register) (v2 : type_of_register r2) :
+    register_lookup r2 (pw2_rs pr r v0 r2 v2) = v2.
+  Proof. rewrite /pw2_rs. apply register_lookup_set. Qed.
+
+  Lemma pw2_rs_r (pr : Privilege) (r : register) (v0 : type_of_register r)
+      (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 -> register_lookup r (pw2_rs pr r v0 r2 v2) = v0.
+  Proof.
+    intros (_ & _ & Hne). rewrite /pw2_rs.
+    etransitivity;
+      [apply irrelevant_register_set; exact (register_beq_false r r2 Hne)|].
+    apply pw_rs_r.
+  Qed.
+
+  Lemma pw2_rs_priv (pr : Privilege) (r : register) (v0 : type_of_register r)
+      (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 -> register_lookup cur_privilege (pw2_rs pr r v0 r2 v2) = pr.
+  Proof.
+    intros (Hfr & (_ & _ & H3) & _). rewrite /pw2_rs.
+    etransitivity; [apply irrelevant_register_set; exact H3|].
+    apply (pw_rs_priv pr r v0 Hfr).
+  Qed.
+
+  Lemma pw2_rs_sec (pr : Privilege) (r : register) (v0 : type_of_register r)
+      (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 ->
+    register_lookup mseccfg (pw2_rs pr r v0 r2 v2) = Values.mword_of_int 0.
+  Proof.
+    intros (Hfr & (_ & H2 & _) & _). rewrite /pw2_rs.
+    etransitivity; [apply irrelevant_register_set; exact H2|].
+    apply (pw_rs_sec pr r v0 Hfr).
+  Qed.
+
+  Lemma pw2_rs_misa (pr : Privilege) (r : register) (v0 : type_of_register r)
+      (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 -> register_lookup misa (pw2_rs pr r v0 r2 v2) = MISA_C.
+  Proof.
+    intros (Hfr & (H1 & _ & _) & _). rewrite /pw2_rs.
+    etransitivity; [apply irrelevant_register_set; exact H1|].
+    apply (pw_rs_misa pr r v0 Hfr).
+  Qed.
+
+  Lemma pw2_frames (pr : Privilege) (dq dq2 : dfrac) (r : register)
+      (v0 : type_of_register r) (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 ->
+    (hreg_frame (pw2_rs pr r v0 r2 v2) (cw_Drw r) ∗
+     hreg_frame_ro (cw2_Df dq dq2 r2) (pw2_rs pr r v0 r2 v2) (cw2_Dro r2)
+     : iProp Σ)
+    ⊣⊢ (reg_pointsto r (DfracOwn 1) v0 ∗
+        reg_pointsto r2 dq2 v2 ∗
+        reg_pointsto cur_privilege dq pr ∗
+        reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+        reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hok. pose proof Hok as (Hfr & Hfr2 & _).
+    rewrite /hreg_frame /hreg_frame_ro /cw_Drw /cw2_Dro.
+    rewrite (big_sepS_union _ ({[r2]} : gset register) cw_Dro).
+    2:{ destruct (cw_fresh_ne r2 Hfr2) as (N1 & N2 & N3).
+        rewrite /cw_Dro. apply disjoint_singleton_l. intro Hin.
+        repeat (apply elem_of_union in Hin as [Hin|Hin]);
+          apply elem_of_singleton in Hin;
+          first [ exact (N3 (eq_sym Hin)) | exact (N1 (eq_sym Hin))
+                | exact (N2 (eq_sym Hin)) ]. }
+    rewrite /cw_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite (pw2_rs_r pr r v0 r2 v2 Hok) (pw2_rs_r2 pr r v0 r2 v2)
+      (pw2_rs_priv pr r v0 r2 v2 Hok) (pw2_rs_sec pr r v0 r2 v2 Hok)
+      (pw2_rs_misa pr r v0 r2 v2 Hok).
+    rewrite (cw2_Df_r2 dq dq2 r2 Hfr2) (cw2_Df_priv dq dq2 r2 Hfr2)
+      (cw2_Df_sec dq dq2 r2) (cw2_Df_misa dq dq2 r2).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma pw2_frames_in (pr : Privilege) (dq dq2 : dfrac) (r : register)
+      (v0 : type_of_register r) (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 ->
+    reg_pointsto r (DfracOwn 1) v0 -∗ reg_pointsto r2 dq2 v2 -∗
+    reg_pointsto cur_privilege dq pr -∗
+    reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    (hreg_frame (pw2_rs pr r v0 r2 v2) (cw_Drw r) ∗
+     hreg_frame_ro (cw2_Df dq dq2 r2) (pw2_rs pr r v0 r2 v2) (cw2_Dro r2)
+     : iProp Σ).
+  Proof.
+    intros Hok. iIntros "H1 H2 H3 H4 H5".
+    rewrite (pw2_frames pr dq dq2 r v0 r2 v2 Hok). iFrame.
+  Qed.
+
+  Lemma pw2_frames_out (pr : Privilege) (dq dq2 : dfrac) (r : register)
+      (v0 : type_of_register r) (r2 : register) (v2 : type_of_register r2) :
+    cw2_ok r r2 ->
+    (hreg_frame (pw2_rs pr r v0 r2 v2) (cw_Drw r) ∗
+     hreg_frame_ro (cw2_Df dq dq2 r2) (pw2_rs pr r v0 r2 v2) (cw2_Dro r2)
+     : iProp Σ) -∗
+    (reg_pointsto r (DfracOwn 1) v0 ∗ reg_pointsto r2 dq2 v2 ∗
+     reg_pointsto cur_privilege dq pr ∗
+     reg_pointsto mseccfg DfracDiscarded (Values.mword_of_int 0) ∗
+     reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    intros Hok. rewrite (pw2_frames pr dq dq2 r v0 r2 v2 Hok).
+    iIntros "H". iExact "H".
+  Qed.
+
   (* ================================================================== *)
   (* §7 THE LEGALITY CHECK AT SUPERVISOR.                                 *)
   (*                                                                     *)
