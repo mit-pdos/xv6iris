@@ -3112,12 +3112,12 @@ Section SmodeCorePt.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
     (* the PMP grant, off the cells the wrapper now takes raw -- it used to
-       ride inside [SmodePte.pmp_config] within [sr_inv R] *)
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+       ride inside [SmodePte.pmp_config] within [sr_inv R].  Taken WHOLE
+       ([pmp_ent0_ok], all six conjuncts) rather than as the four the FETCH
+       needs, because the leaf's obligation is handed it as well: a data
+       access checks W/R too, and it cannot recover them from the residue
+       (Bare's is [True]). *)
+    pmp_ent0_ok pcfg paddr ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -3132,8 +3132,11 @@ Section SmodeCorePt.
     instr pc is_rvc i -∗
     spt_fetch_tr (s_Df_mix dq) Res pc mstatus0 satp0 mie_v mdv0 menvcfg0
       pcfg paddr -∗
-    (* THE LEAF'S OBLIGATION *)
+    (* THE LEAF'S OBLIGATION.  The PMP grant travels INTO it: a data leaf
+       runs [HartSMem]'s PMP checks and [SRegime.sr_swp_side_ok], and
+       neither fact is recoverable inside the obligation otherwise. *)
     (∀ tv' : type_of_register tlb,
+       ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
        cur_privilege ↦ᵣ{ dq } Supervisor -∗
        mstatus ↦ᵣ{ dq } mstatus0 -∗
        mie ↦ᵣ{ dq } mie_v -∗
@@ -3171,7 +3174,8 @@ Section SmodeCorePt.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmp.
+    pose proof Hpmp as (HA & Hord & HX & HW & HR & Hcov).
     iIntros "#Hhw #Hminv Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
              Htlbc HRes Hpc Hinstr Htr Hex Hcont".
     iDestruct (spt_frames_intro dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
@@ -3258,8 +3262,9 @@ Section SmodeCorePt.
         as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc & Hpriv & Hmst
              & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg & #Hmisa & #Hsec & #Hpma
              & #Hhtif & #Help & #Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
+      iSpecialize ("Hex" $! tv' with "[%]"); [ exact Hpmp | ].
       iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hhs] [-]");
-        [| iApply ("Hex" $! tv' with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
+        [| iApply ("Hex" with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
                      Hpaddr Htlbc HRes' HPC HnPC Hany") ].
       iIntros (e) "(-> & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
                     Hpaddr & Htlbr & Hpcs & Hany)".
@@ -3302,11 +3307,7 @@ Section SmodeCorePt.
       (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
       (Rl : mword 64 -> iProp Σ) {dq : dfrac} :
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    pmp_ent0_ok pcfg paddr ->
     smode_config γ dq -∗
     satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
     tlb ↦ᵣ tlbv -∗ Res tlbv -∗
@@ -3321,6 +3322,7 @@ Section SmodeCorePt.
          pcfg paddr) -∗
     (∀ (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
        (tv' : type_of_register tlb),
+       ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
        cur_privilege ↦ᵣ{ dq } Supervisor -∗
        mstatus ↦ᵣ{ dq } mstatus0 -∗
        mie ↦ᵣ{ dq } mie_v -∗
@@ -3353,7 +3355,7 @@ Section SmodeCorePt.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HA Hord HX Hcov.
+    intros Hpmp.
     iIntros "Hsm Hsatp Hpcfg Hpaddr Htlbc HRes Hpc Hinstr Htr Hex Hcont".
     iDestruct (smode_config_unbundle with "Hsm")
       as "(#Hhw & #Hminv & Hhs & Hpriv & Hmst & Hmiebundle & Hmenvbundle)".
@@ -3365,7 +3367,7 @@ Section SmodeCorePt.
     iApply (wp_instr_s_config_regime Res pc is_rvc i mstatus0 mie_v mdv0
               menvcfg0 satp0 pcfg paddr tlbv mstatus0 mie_v mdv0 menvcfg0
               satp0 pcfg paddr Rl (dq := dq)
-              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmp
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
                     Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [Htr] [Hex]
                     [Hcont Hsie]").
@@ -3461,6 +3463,7 @@ Section SmodeCorePt.
          mie_v mdv0 menvcfg0 pcfg paddr) -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
        (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
        cur_privilege ↦ᵣ{ dq } Supervisor -∗
        mstatus ↦ᵣ{ dq } mstatus0 -∗
        mie ↦ᵣ{ dq } mie_v -∗
@@ -3508,7 +3511,8 @@ Section SmodeCorePt.
     iApply (wp_instr_s_config_regime (spt_res_pt root_ppn) pc is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr Rl (dq := dq)
-              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
+              ltac:(unfold pmp_ent0_ok; split_and!; assumption)
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
                     Hpcfg Hpaddr Htlbc [Hsnap] Hpc Hinstr [Htr] [Hex]
                     [Hcont]").
@@ -3578,6 +3582,7 @@ Section SmodeCorePt.
        tlb value *)
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
        (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ sr_swp_satp_ok R satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
        cur_privilege ↦ᵣ{ dq } Supervisor -∗
        mstatus ↦ᵣ{ dq } mstatus0 -∗
        mie ↦ᵣ{ dq } mie_v -∗
@@ -3620,25 +3625,24 @@ Section SmodeCorePt.
              Hinstr Htr Hex Hcont".
     iDestruct (sr_swp_open R with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
-    destruct Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
     iApply (wp_instr_s_config_regime (sr_swp_res_at R satp0) pc is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mstatus1 mie1 mdv1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
-              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HA Hord HX Hcov
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
                     Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [Htr] [Hex] [Hcont]").
     - iApply ("Htr" $! satp0 pcfg paddr with "[%] [%]");
-        [ exact Hsatpok
-        | unfold pmp_ent0_ok; split_and!; assumption ].
-    - iApply ("Hex" $! satp0 pcfg paddr).
+        [ exact Hsatpok | exact Hpmpok ].
+    - iIntros (tv') "_".
+      iApply ("Hex" $! satp0 pcfg paddr tv' with "[%] [%]");
+        [ exact Hsatpok | exact Hpmpok ].
     - iNext. iIntros (npc tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
          HRes Hpc HRl".
       iApply ("Hcont" $! npc with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
                  [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
-      iApply (sr_swp_close R satp0 tv1 pcfg paddr Hsatpok
-                ltac:(unfold pmp_ent0_ok; split_and!; assumption)
+      iApply (sr_swp_close R satp0 tv1 pcfg paddr Hsatpok Hpmpok
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
 
@@ -3665,6 +3669,7 @@ Section SmodeCorePt.
     (∀ (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
        (pcfg : type_of_register pmpcfg_n)
        (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ sr_swp_satp_ok R satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
        cur_privilege ↦ᵣ{ dq } Supervisor -∗
        mstatus ↦ᵣ{ dq } mstatus0 -∗
        mie ↦ᵣ{ dq } mie_v -∗
