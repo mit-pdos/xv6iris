@@ -180,6 +180,7 @@ SmodeCore.v
 PtTreeAdue.v
 KptTree.v
 KptShare.v
+HartSMem.v
 SmodeCorePt.v
 WpSmodeGpr.v
 WpSmodeMemGen.v
