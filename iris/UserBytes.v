@@ -51,6 +51,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import HartMemRun PtBytes.
 Require Import PtreeType CommonWalk Pt4kWalk PtTree.
 Require Import RiscvFetchExec PtTreeAdue SmodePte UptTree UserPtTree.
+Require Import UserBits.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -498,6 +499,63 @@ Lemma u_mem_wf_not_dev (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) :
   u_mem_wf P t mm -> a ∈ (dom mm : gset Arch.pa) -> dev_addr a = false.
 Proof.
   intros (_ & _ & _ & _ & _ & Hram & _) Ha. by apply addr_is_ram_not_dev, Hram.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE DATA-PAGE COUNTERPART OF [u_mem_wf_owned].                          *)
+(*                                                                        *)
+(* [u_mem_wf_owned] answers the PTE side (an 8-byte slot that is one of    *)
+(* the tree's own maps).  A data access is the other half, and the memory  *)
+(* arms need it at EVERY width: a [k]-byte access at an aligned [va] whose *)
+(* vpn is MAPPED lands inside the mapped page, and every offset of that    *)
+(* page is in [ud_data P] by [udata_cov] -- which [u_mem_wf]'s data        *)
+(* clause says is exactly the domain of the non-tree half of [mm].  The    *)
+(* window step is [UserBits.pa_window] under [off_bound_div], i.e. the     *)
+(* pure content of [UserMemPt.udata_read_word_g]'s coverage half, which    *)
+(* until now was only available inside an Iris proof.                      *)
+(* ---------------------------------------------------------------------- *)
+Lemma u_walk_pa_window (k : Z) (pte0 va : mword 64) (j : nat) :
+  0 < k -> (k | 4096) ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  (j < Z.to_nat k)%nat ->
+  pa_add (u_walk_pa pte0 va) j = u_walk_pa pte0 (add_vec_int va (Z.of_nat j)).
+Proof.
+  intros Hk Hdvd Hal Hj.
+  pose proof (off_bound_div va k Hk Hdvd Hal) as Hb.
+  exact (pa_window _ va j ltac:(lia)).
+Qed.
+
+Lemma u_mem_wf_owned_data (P : uptd) (t : ptree) (mm : pamap)
+    (k : Z) (w va : mword 64) :
+  0 < k -> (k | 4096) ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true.
+Proof.
+  intros Hk Hdvd Hal (md & _ & _ & Hmm & Hdm & _ & Hcov & _) Hl.
+  apply bytes_owned_of_dom. intros j Hj.
+  assert (Hjk : (j < Z.to_nat k)%nat) by lia.
+  rewrite (u_walk_pa_window k w va j Hk Hdvd Hal Hjk).
+  apply elem_of_dom. rewrite Hmm.
+  apply lookup_union_is_Some. right.
+  apply (proj1 (Hdm _)).
+  exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl).
+Qed.
+
+(* and the device half at a data address, so an arm gets BOTH pure
+   obligations from one [u_mem_wf] and one [udata_cov] hit *)
+Lemma u_mem_wf_not_dev_data (P : uptd) (t : ptree) (mm : pamap)
+    (w va : mword 64) :
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  dev_addr (u_walk_pa w va) = false.
+Proof.
+  intros Hwf Hl.
+  apply (u_mem_wf_not_dev P t mm _ Hwf).
+  destruct Hwf as (md & _ & _ & Hmm & Hdm & _ & Hcov & _).
+  apply elem_of_dom. rewrite Hmm. apply lookup_union_is_Some. right.
+  apply (proj1 (Hdm _)). exact (Hcov (svpn_of va) w va Hl).
 Qed.
 
 (* ===================================================================== *)
