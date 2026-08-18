@@ -448,3 +448,257 @@ was invisible so far is that our full machine has unconditional promises:
   containment argument; (b) otherwise generalize the exhibit to replay
   walker A/D updates up to idempotence (the pf twin performs the CAS
   itself).  Neither is a side condition; both are model/theorem work.
+
+## 9. LANDED (L2-M2) — 2026-08-18
+
+Whole tree green; `Print Assumptions` UNCHANGED (`robust_main` closed under
+the global context, `WeakEvCapstone.xv6_ev_weak_robust` at the five `rv64d`
+axioms); every new theorem of `iris/WeakRobustL2b.v` closed under the global
+context; no `Admitted`/`Axiom`; `lemma_diff --ref 212a5edd` shows additions
+only.  New file `iris/WeakRobustL2b.v` (≈1050 lines), after
+`WeakRobustL2.v` in `_CoqProject`; nothing else in the tree depends on it,
+which is why the two capstones cannot have moved.
+
+### 9.1 The SCC skeleton (§1 of the file)
+
+Generic in a DECIDABLE edge relation `R` on `gev` with
+`Rwf : ∀ x y, R x y → gev_wf TS x ∧ gev_wf TS y` and (for the head lemmas
+only) `Rpo : ∀ x y, gpo TS x y → R x y`.  Instantiated at `gdep2 TS` (the
+design's names) and at `gdep3 TS DS` (what the replay needs — §8.2).
+
+```coq
+Definition sccR   R e f := rtc R e f ∧ rtc R f e.
+Definition oncycR R e   := tc R e e.                 (* = WeakRobustMain.on_cyc at gdep2 *)
+Definition sanc TS R e  := anc R (gev_enum TS) e.    (* the COMPUTED ancestor closure *)
+
+Definition sccR_min TS R f :=                        (* MINIMAL IN THE SCC DAG *)
+  ¬ Exists (λ x, oncycb TS R x ∧ tcb TS R x f ∧ ¬ sccb TS R f x) (gev_enum TS).
+
+Definition Uanc TS R f x := tcb TS R x f ∧ ¬ sccb TS R f x.     (* the design's U *)
+Definition scc_headR TS R f h :=
+  sccR R f h ∧ ∀ k, (k < h.2)%nat → ¬ sccR R f (h.1, k).
+```
+
+**Everything is decidable through `anc`.**  `tc R x y` holds iff some
+`R`-successor of `x` lies in `anc R (gev_enum TS) y` — an `Exists` over a
+computed list (`tcb`/`tcb_iff`); `rtcb`, `sccb`, `oncycb` follow, and
+`sccR_min` is stated as the negation of a decidable `Exists` so that the
+DECISION and the WITNESS EXTRACTION (`dec_stable`) are both free.  No
+classical axiom, no `Finite` instance beyond `gev_enum`.
+
+**Existence** (`sccR_min_exists : oncycR R e → ∃ f, oncycR R f ∧ sccR_min TS R f
+∧ rtc R f e`) is a descent on `length (sanc TS R e)`: if `e` is not minimal
+there is an on-cycle `x` with `tc R x e` and `¬ rtc R e x`, and then
+`sanc x ⊊ sanc e` — every ancestor of `x` is an ancestor of `e`
+(`sanc_incl`), `e ∈ sanc e`, and `e ∉ sanc x` (it would give `rtc R e x`) —
+so `e :: sanc x` is a `NoDup` sublist of `sanc e` and the measure drops
+(`sanc_len_lt`).
+
+**`U` is acyclic and downward closed.**  `Uanc_not_oncyc`/`Uanc_acyc`: at a
+MINIMAL component nothing in the strict ancestry is on a cycle (else
+`sccR_min_spec` would put it in the component).  `Uanc_dc` /`Ustrict_dc` /
+`Ustrict3_dc`: `dc TS R (Uanc TS R f)`.  `scc_headR_exists` builds the
+least-index event of an agent in the component; `scc_headR_po_pred` shows
+every po-predecessor of a head is in `U` (`Rpo` + head minimality);
+`scc_headR_not_U` that the head itself is not.
+
+The `gdep2` names the design asked for: `scc`, `scc_min`, `Ustrict`,
+`scc_min_exists`, `Ustrict_not_on_cyc`, `Ustrict_acyclic`, `Ustrict_dc`,
+`Ustrict_wf`.
+
+### 8.2 FINDING — the head-prestate replay runs on `gdep3`, not `gdep2`
+
+`WeakRobustSim.Qinv_step` demands that every **`gdep3`** predecessor of the
+event being replayed is already processed (the fabric clause: a
+fabric-touching event must be handed the fabric it recorded).  A `gdep2`-only
+`U` is NOT `gdep3`-downward-closed, so the SCC skeleton the replay consumes
+has to be the `gdep3` one: `scc3`, `scc_min3`, `Ustrict3`, and the
+`gdep3` instances of every lemma above.  The two graphs agree on WHICH
+EVENTS ARE ON A CYCLE — `on_cyc_gdep3 : ptraces_wit → dev_wit_ok →
+(oncycR (gdep3 TS DS) e ↔ on_cyc TS e)`, the ⇒ direction being A0′'s
+`gdep3_acyclic_at_wit` — but they need NOT agree on the components, and
+nothing below assumes they do.
+
+### 8.3 The generalized cone replay, and `head_prestate_pf_real`
+
+`WeakRobustMain.cone_Qinv` replays the `gdep3`-ancestry of ONE root and
+needs that root OFF every cycle (`Hrr`, `Hconeacyc`) — which a segment head
+is not.  `U_Qinv` is the minimal generalization, same proof with the cone
+replaced by an abstract set:
+
+```coq
+Theorem U_Qinv (U : gev → Prop) `{!∀ e, Decision (U e)} :
+  (∀ e, U e → gev_wf TS e) → dc TS (gdep3 TS DS) U →
+  (∀ e, U e → ¬ tc (gdep3 TS DS) e e) →
+  ∃ order, Qinv pstep pcls TS DS img d0 ps order ∧
+           (∀ e, e ∈ order ↔ (gev_wf TS e ∧ U e)).
+```
+
+(`Ured TS DS U := gdep3 ∩ U²`, `topo_sort` at `gev_enum_S TS U`, the same
+`Qinv_step` prefix induction.  `cone_Qinv` is the instance at
+`U := Ucone`; it was left untouched.)
+
+```coq
+Theorem head_prestate_pf_real f h T :
+  oncycR (gdep3 TS DS) f → sccR_min TS (gdep3 TS DS) f →
+  scc_headR TS (gdep3 TS DS) f h → pt_trs TS !! h.1 = Some T →
+  ∃ order cf agn,
+    Qinv pstep pcls TS DS img d0 ps order ∧
+    (∀ e, e ∈ order ↔ (gev_wf TS e ∧ Uanc TS (gdep3 TS DS) f e)) ∧
+    rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
+    pc_img cf = img ∧ pc_log cf = pf_log TS order ∧
+    at_ags T !! h.2 = Some agn ∧
+    pc_ags cf !! h.1 = Some (WPAgent (pa_st agn)
+      (aevs_post (pi TS order) (take h.2 (at_evs T)) ws_init) ∅).
+```
+
+The positioning fact is `nproc_of_po_prefix`, NOT `WeakRobustSim.nproc_cur`:
+`nproc_cur` asks for EVERY `gdep2` predecessor of the event to be processed,
+and a segment head's cross-agent rf predecessor is ON THE CYCLE, hence not in
+`U`.  `nproc` counts only the agent's own events, so the po-prefix suffices —
+that is the whole content of the replacement (six lines, `qorder_mem` twice).
+
+`cycle_min_scc_heads` packages §1+§2 end to end: from ANY `on_cyc TS e0`, a
+minimal `gdep3` component none of whose strict ancestors is on a cycle, and,
+for every agent with an event in it, its head `h` together with a pf-run
+whose agent `h.1` sits at `at_ags T !! h.2`.
+
+### 8.4 FINDING — C5 cannot be discharged inside the SCC (`scc_no_bad`)
+
+Machine-checked, one line:
+
+```coq
+Lemma bad_min_not_on_cyc nh TS DS e1 e2 :
+  bad nh TS DS e1 e2 → bad_min nh TS DS e2 → ¬ on_cyc TS e2.
+```
+
+`WeakRobustMain.bad_edge_violates` takes `bad_min nh TS DS b2` and its FIRST
+use of it is at the bad edge itself, yielding `¬ tc (gdep3 TS DS) b2 b2`: the
+exhibit replays the STRICT `gdep3`-ancestor cone OF THE READER and then
+appends the reader, so an on-cycle reader is its own ancestor and the replay
+is circular.  There is therefore **no way to refute a bad edge that enters a
+minimal SCC by replaying anything at that SCC** — the design's C5 as written
+("the minimal bad edge's cone is pf-real and φ refutes it") is a statement
+about a bad edge OFF every cycle.  So L2-M2 takes
+
+```coq
+Definition scc_no_bad nh TS DS := ∀ e1 e2, bad nh TS DS e1 e2 → ¬ on_cyc TS e2.
+Lemma scc_no_bad_strong : scc_no_bad nh TS DS ↔ bad_wf_strong nh TS DS.   (* by [done] *)
+```
+
+as a hypothesis — it is CONVERTIBLE with `WeakRobustMain.bad_wf_strong`, the
+"strong-residue shortcut" that file already recorded — and records the
+φ-derived route as a theorem:
+
+```coq
+Theorem scc_no_bad_of_phi … :
+  sf_edges nh TS DS → pf_violation_free_hart cls_of pub_of nh pstep pcls img d0 ps →
+  bad_wf nh TS DS → scc_no_bad nh TS DS.
+```
+
+(`bad_wf` says SOME bad edge is minimal; by `bad_min_not_on_cyc` that one is
+off every cycle, the exhibit applies to it and φ refutes it, so NO bad edge
+exists at all.  The exhibit consumes the per-edge premise, which `sf_edges`
+supplies — the circularity is only apparent.)
+
+### 8.5 `sf_edges` — the site facts as TRACE SHAPES
+
+```coq
+Definition sf_shape TS j T kr a ts k' : Prop :=
+  (* C1/C2 *) disciplined T kr k'
+  (* C3 *) ∨ (∃ evr k0 ev0 rd0 srcs0 hs kc rend evc ctrl,
+       at_evs T !! kr = Some evr ∧ (a, ts) ∈ lb_reads (ae_lb evr) ∧
+       (S kr ≤ k0)%nat ∧ no_instr T (S kr) k0 ∧
+       at_evs T !! k0 = Some ev0 ∧ ae_lb ev0 = LRegW rd0 srcs0 ∧ DLdRes ∈ srcs0 ∧
+       rchain T (S k0) rd0 hs ∧ rchain_end (S k0) rd0 hs = (kc, rend) ∧
+       at_evs T !! kc = Some evc ∧ ae_lb evc = LCtrl ctrl ∧ DReg rend ∈ ctrl ∧
+       (kc < k')%nat)
+  (* C4 *) ∨ (∃ L i ka_i kr_i ta_i tw_i tr_i ka_j kr_j ta_j tw_j tr_j esrc evaj,
+       i ≠ j ∧ cs_window TS L i ka_i kr_i ta_i tw_i tr_i
+             ∧ cs_window TS L j ka_j kr_j ta_j tw_j tr_j ∧
+       win_excl TS L i tw_i tr_i ∧ win_excl TS L j tw_j tr_j ∧
+       (ta_i < tr_j)%nat ∧ (ta_i < ts)%nat ∧ (ts < tr_i)%nat ∧
+       at_evs T !! ka_j = Some evaj ∧ lb_aq (ae_lb evaj) = true ∧
+       esrc.1 ≠ j ∧ gev_ts TS esrc = Some ta_j ∧ (ka_j < kr)%nat)
+  (* already discharged *) ∨ fcov T k' ts.
+
+Definition sf_edges nh TS DS : Prop :=          (* = edges_split_cyc with sf_shape for edge_ok_f *)
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+    on_cyc TS e2 → pt_trs TS !! e2.1 = Some T → (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    (∃ y, gmile TS (e2.1, k') y) →
+    sf_shape TS e2.1 T e2.2 a ts k' ∨ bad nh TS DS e1 e2.
+```
+
+`sf_shape_edge_ok_f` discharges `edge_ok_f T kr k' ts` from each shape with
+L2-M1's lemmas: C1/C2 is `edge_ok_f`'s own left disjunct; C3 is
+`fcov_of_dep_chain` (its `read_unforwarded` side condition is DISCHARGED
+here, not required of the site — the edge is cross-agent, so
+`foreign_ts_of_fulfil` + `foreign_ts_unforwarded`); C4 is
+`cs_read_covered_window` (giving `covered T kr ts`) then
+`edge_ok_edge_ok_f`.  Hence
+`sf_edges_edges_split_cyc : ptraces_wf → ptraces_fwd_own → sf_edges nh TS DS
+→ edges_split_cyc nh TS DS`.
+
+**FINDING — `sf_edges` is NOT logically weaker than `edges_split_cyc`; it is
+EQUIVALENT** (`edges_split_cyc_sf_edges` is the converse, three lines: the
+two halves of `edge_ok_f` are two of the four shapes).  That is forced: any
+SOUND shape implies `edge_ok_f`, so a discharge theorem in this direction can
+only ever produce an equivalence, and the task's "strictly weaker" is not
+achievable by this route.  What `sf_edges` buys is VOCABULARY, not strength:
+its obligations are statements about the LABELS of one agent's trace (a
+`pr∧sw` fence or an `aq` bit; a `LRegW`/`LCtrl` register chain; two lock
+windows with `win_excl`), which a site can exhibit from the program text,
+whereas `edge_ok_f`'s `fcov` is a statement about the machine's view
+arithmetic, which it cannot.  The genuine weakening of the per-edge premise
+was already banked at A0″ (`edges_split` ⇒ `edges_split_ms` ⇒
+`edges_split_cyc`).
+
+### 8.6 The theorems
+
+```coq
+Theorem l2_gdep2_acyclic pstep TS (Hwf : ptraces_wf pstep TS) (Hfo : ptraces_fwd_own TS)
+    nh DS : ee_ok TS → sf_edges nh TS DS → scc_no_bad nh TS DS → gdep2_acyclic TS.
+Theorem l2_gdep3_acyclic … : ptraces_wit TS DS → dev_wit_ok TS DS → … → gdep3_acyclic TS DS.
+Theorem l2_gdep2_acyclic_phi … : … → sf_edges → pf_violation_free_hart → bad_wf → gdep2_acyclic TS.
+
+Theorem robust_main_l2 pstep pcls pdev nh img d0 ps c mid TS DS :
+  lat_free_prog pstep → ts_oblivious pstep → pcls_obl pcls →
+  rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+  ptraces_dev_of pstep pdev TS DS mid c →
+  (the FULFIL ACCOUNTING, verbatim robust_main_acyc's) →
+  (∀ a, co_tc TS a) →
+  ee_ok TS →
+  sf_edges nh TS DS → scc_no_bad nh TS DS → dev_wit_ok TS DS →   (* ← replaces gdep3_acyclic *)
+  cls_canonical pcls TS →
+  ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
+        prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
+```
+
+`robust_main_l2`'s hypothesis list, in order: `lat_free_prog`,
+`ts_oblivious`, `pcls_obl`, the promise run, `ptraces_dev_of`, the fulfil
+accounting, `∀ a, co_tc TS a`, `ee_ok TS`, `sf_edges nh TS DS`,
+`scc_no_bad nh TS DS`, `dev_wit_ok TS DS`, `cls_canonical pcls TS`.
+Relative to `robust_main_acyc` it ADDS `ee_ok` and the hart count `nh` (both
+consumed by the walk) and REPLACES `gdep3_acyclic TS DS` by the three
+Layer-2 obligations; `ptraces_wf`/`ptraces_fwd_own`/`ptraces_wit` are
+re-derived from the promise run exactly as `robust_main_bundle` does.
+
+### 8.7 What L2-M2 did NOT close
+
+- `sf_edges` is a HYPOTHESIS.  Its C1/C2/C3 disjuncts are dischargeable per
+  site from the trace; C4 carries SF-1 (`win_excl`) unchanged; C6 (none of
+  the four) is still the residue.  L2-M3's `w_rdw`/`w_lock` exports and
+  L2-M4's byte→lock map (§5's ⚑ α/β decision) are untouched.
+- `head_prestate_pf_real` is BUILT but not yet SPENT: the design's §4
+  argument ("lock-mediated reads cannot be cycle entries", which would turn
+  C4 from a hypothesis into a theorem about the pf-real prefix) needs the
+  pre-state to be connected to the pool's residual monad and to `Ψ`.  That is
+  L2-M3 work; §1/§2 exist precisely so it has a place to stand.
+- `scc_no_bad` is a HYPOTHESIS (with `scc_no_bad_of_phi` as its φ route) —
+  see the FINDING in §8.4.
+- The `gdep2` and `gdep3` SCC skeletons are both built, but no lemma relates
+  their COMPONENTS (only their on-cycle sets, `on_cyc_gdep3`).  Nothing needs
+  it yet; a future segment argument on `gdep2` cycles that wants the `gdep3`
+  replay would.
