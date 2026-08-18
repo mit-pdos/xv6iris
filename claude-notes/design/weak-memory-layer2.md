@@ -157,3 +157,94 @@ directly.  Everything else in §3–4 is machine work.
 - **L2-M3**: `w_rdw`/`w_lock` in the machine + the export; SF-2 from the
   export; L2-co from `bytes_ok`; L2-dev.
 - **L2-M4**: SF-1/SF-3 by (α) or (β) per the decision.
+
+## 7. LANDED (A0″, L2-M1) — 2026-08-18
+
+Whole tree green; `Print Assumptions` unchanged (`robust_main` closed,
+`WeakEvCapstone.xv6_ev_weak_robust` at the 5 rv64d axioms);
+`WeakRobustL2.v` closed under the global context; no `Admitted`/`Axiom`.
+
+### 7.1 A0″ — the cycle-relativized interface (`iris/WeakRobustMain.v`)
+
+```coq
+Definition on_cyc TS (e : gev) : Prop := tc (gdep2 TS) e e.
+
+Lemma on_cyc_mr TS u x :
+  on_cyc TS u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → on_cyc TS x.
+
+Definition edges_split_cyc nh TS DS : Prop :=          (* = edges_split_ms + [on_cyc TS e2] *)
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+    on_cyc TS e2 →                                     (* ← THE ONLY ADDITION *)
+    pt_trs TS !! e2.1 = Some T → (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    (∃ y, gmile TS (e2.1, k') y) →
+    edge_ok_f T e2.2 k' ts ∨ bad nh TS DS e1 e2.
+
+Lemma edges_split_ms_cyc          : edges_split_ms nh TS DS → edges_split_cyc nh TS DS.
+Lemma edges_split_edges_split_cyc : ptraces_wf pstep TS → edges_split nh TS DS →
+                                    edges_split_cyc nh TS DS.
+```
+
+The relativization costs NOTHING, and that is the point:
+
+```coq
+Theorem gdep2_acyclic_on_cyc TS (W : gev → Prop) :
+  ptraces_wf pstep TS → ptraces_fwd_own TS →
+  rf_edges_ok_on_ms TS (λ e, W e ∧ on_cyc TS e) → ee_ok TS →
+  (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
+  ∀ e, W e → ¬ tc (gdep2 TS) e e.
+```
+
+The walk's only consumer of the premise (`mile_mu_gain_on`) is reached
+only from `on_cycle2_advance_on`, whose `on_cycle2_on` carries
+`mile_mu TS mu v u ∧ rtc (gdep2 TS) u v` — i.e. a cycle THROUGH the
+reader `u`.  So `W` may always be intersected with `on_cyc` (which is
+itself closed under mutual reachability, `on_cyc_mr`), and at the
+conclusion's `e` the cycle hypothesis IS the extra conjunct.  Everything
+below runs through this one lemma.
+
+Re-landed on `edges_split_cyc`, statements otherwise VERBATIM:
+`rf_edges_ok_on_min` (now at `W ∩ on_cyc`), `cone_acyc2_of_min`,
+`cone_acyc_of_min`, `cone_acyc_of_min_nil`, `gdep2_acyclic_bad_free`,
+`gdep2_acyclic_main`, `gdep3_acyclic_main`, `main_premises`,
+`main_premises_nil`, and — as pure pass-through of a WEAKER premise —
+`WeakComposeLang.tb_facts` and the four `Hsplit` section contexts of
+`WeakRobustCone`/`WeakSailCone`.  `robust_main`, `robust_main_bundle`,
+`robust_transport` and `WeakEvCapstone.xv6_ev_weak_robust` keep their
+statements; `main_premises` got strictly weaker, so every supplier owes
+less.
+
+### 7.2 `robust_main_acyc` — the acyclicity-consuming entry point
+
+```coq
+Lemma robust_main_acyc img d0 ps c mid TS DS :
+  lat_free_prog pstep → ts_oblivious pstep → pcls_obl pcls →
+  rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+  ptraces_dev_of pstep pdev TS DS mid c →
+  (∀ p m i, pc_log mid !! p = Some m → wm_tid m = Some i →           (* fulfil accounting *)
+     ∃ T, pt_trs TS !! i = Some T ∧
+       (∃ k ev, at_evs T !! k = Some ev ∧ ae_ts ev = Some (S p)) ∧
+       (∀ k1 k2 ev1 ev2, at_evs T !! k1 = Some ev1 → ae_ts ev1 = Some (S p) →
+          at_evs T !! k2 = Some ev2 → ae_ts ev2 = Some (S p) → k1 = k2)) →
+  (∀ a, co_tc TS a) →                                                 (* L2-co *)
+  gdep3_acyclic TS DS →                                               (* L2-acyc + L2-dev *)
+  cls_canonical pcls TS →
+  ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
+        prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
+```
+
+THE EXACT HYPOTHESIS LIST — ten, in order: `lat_free_prog pstep`,
+`ts_oblivious pstep`, `pcls_obl pcls`, the promise run to `mid`, the
+traced/fabric decomposition `ptraces_dev_of`, the FULFIL ACCOUNTING,
+`∀ a, co_tc TS a`, `gdep3_acyclic TS DS`, `cls_canonical pcls TS`.
+(The accounting is genuinely consumed — `ptraces_of_writes_fulfilled`
+needs it; it was NOT dead weight in `robust_main_bundle`.)
+
+WHAT DISAPPEARS relative to `robust_main_bundle`: the whole graph
+package (`edges_split_cyc`, `bad_wf`, `ee_ok`, `dev_wit_ok`,
+`ptraces_bytes_ok`), `pf_violation_free_hart`, and the hart count `nh` —
+they enter only through `gdep3_acyclic_main` and `co_serialized_pkg`,
+both of which `robust_main_bundle` now calls before delegating.
+`robust_main_bundle` is proved as a corollary (same statement), and
+`robust_main`/`robust_transport` through it.

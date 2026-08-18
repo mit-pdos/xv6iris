@@ -543,6 +543,67 @@ Proof.
   by eapply H.
 Qed.
 
+(* ------------------------------------------------------------------ *)
+(** ** A0'': THE CYCLE-RELATIVIZED PREMISE
+
+    [edges_split_ms] still quantifies over EVERY cross-rf edge.  xv6 has
+    harmless edges that violate any per-edge form regardless of how the
+    coverage is evaluated — the walker's A/D CAS traffic being the
+    canonical one (design/weak-memory-layer2.md §1): hart [k]'s implicit
+    page-walk CAS publishes a [WCexcl] message that hart [j]'s later walk
+    reads, and nothing in RVWMO orders an implicit walk read before an
+    unrelated later store of [j], so [ts_CAS < ts_f] simply fails.  No
+    cycle can pass through it either, which is the point.
+
+    The walk NEVER applies the premise off a cycle: its only consumer,
+    [mile_mu_gain_on], is called from [on_cycle2_advance_on], whose
+    [on_cycle2_on] carries [mile_mu TS mu v u ∧ rtc (gdep2 TS) u v] —
+    and that pair IS a cycle through the reader [u] ([mile_mu_gdep2]
+    gives [gdep2 v u]).  So the reader may always be assumed [on_cyc],
+    and [edges_split_cyc] — the weakest per-bundle form — is what Layer 2
+    has to serve. *)
+
+(** The cycle predicate, and the closure property the relativized walk
+    asks of its [W]: mutual [gdep2]-reachability preserves it. *)
+Definition on_cyc {P D : Type} (TS : ptraces P D) (e : gev) : Prop :=
+  tc (gdep2 TS) e e.
+
+Lemma on_cyc_mr {P D : Type} (TS : ptraces P D) u x :
+  on_cyc TS u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → on_cyc TS x.
+Proof.
+  rewrite /on_cyc. intros HWu Hux Hxu.
+  eapply tc_rtc_l; [exact Hxu|]. eapply tc_rtc_r; [exact HWu|exact Hux].
+Qed.
+
+(** [edges_split_ms] with the reader restricted to a cycle. *)
+Definition edges_split_cyc {P D : Type} (nh : nat) (TS : ptraces P D)
+    (DS : pdevs D) : Prop :=
+  ∀ e1 e2 T ts a k' ev',
+    gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
+    on_cyc TS e2 →
+    pt_trs TS !! e2.1 = Some T →
+    (e2.2 < k')%nat →
+    at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
+    (∃ y, gmile TS (e2.1, k') y) →
+    edge_ok_f T e2.2 k' ts ∨ bad nh TS DS e1 e2.
+
+Lemma edges_split_ms_cyc {P D : Type}
+    (nh : nat) (TS : ptraces P D) (DS : pdevs D) :
+  edges_split_ms nh TS DS → edges_split_cyc nh TS DS.
+Proof.
+  intros H e1 e2 T ts a k' ev' Hts Hrd Hne _ HT Hlt Hev Hsome Hms.
+  by eapply H.
+Qed.
+
+Lemma edges_split_edges_split_cyc {P D : Type}
+    (pstep : P → D → wlabel → P → D → Prop)
+    (nh : nat) (TS : ptraces P D) (DS : pdevs D) :
+  ptraces_wf pstep TS → edges_split nh TS DS → edges_split_cyc nh TS DS.
+Proof.
+  intros Hwf H. apply edges_split_ms_cyc.
+  by eapply edges_split_edges_split_ms.
+Qed.
+
 (** THE RESIDUE (worklist item (3)).  [bad_min TS e2]: no bad edge's
     target is a STRICT ancestor of [e2] — the minimality the exhibit
     picks.  [bad_wf]: whenever a bad edge exists, some bad edge is
@@ -732,6 +793,31 @@ Section walk.
     eapply rtc_transitive; [exact Hry|exact Hrx].
   Qed.
 
+  (** A0'': THE PREMISE MAY ALWAYS ASSUME ITS READER IS ON A CYCLE.
+
+      [on_cycle2_on] carries a cycle through its reader [u]
+      ([mile_mu TS mu v u] gives [gdep2 v u] and the walk's own
+      [rtc (gdep2 TS) u v] closes it), so relativizing to
+      [W ∩ on_cyc] costs nothing: [on_cyc] is itself closed under mutual
+      reachability ([on_cyc_mr]), and at the conclusion's [e] the cycle
+      hypothesis IS the extra conjunct.  This is the ONLY place A0'' is
+      spent; every consumer below runs through it. *)
+  Theorem gdep2_acyclic_on_cyc TS (W : gev → Prop) :
+    ptraces_wf pstep TS → ptraces_fwd_own TS →
+    rf_edges_ok_on_ms TS (λ e, W e ∧ on_cyc TS e) → ee_ok TS →
+    (∀ u x, W u → rtc (gdep2 TS) u x → rtc (gdep2 TS) x u → W x) →
+    ∀ e, W e → ¬ tc (gdep2 TS) e e.
+  Proof.
+    intros Hwf Hfo Hrf Hee Hcl.
+    have Hcl2 : ∀ u x, (W u ∧ on_cyc TS u) → rtc (gdep2 TS) u x →
+                       rtc (gdep2 TS) x u → (W x ∧ on_cyc TS x).
+    { intros u x [HWu Hcu] Hux Hxu.
+      split; [by eapply Hcl|by eapply on_cyc_mr]. }
+    intros e HWe Hc.
+    eapply (gdep2_acyclic_on TS (λ e0, W e0 ∧ on_cyc TS e0)
+              Hwf Hfo Hrf Hee Hcl2 e (conj HWe Hc) Hc).
+  Qed.
+
 End walk.
 
 (** THE STRONG-RESIDUE SHORTCUT (recorded, not used below).  If the
@@ -749,21 +835,17 @@ Definition bad_wf_strong {P D : Type} (nh : nat) (TS : ptraces P D)
 Theorem gdep2_acyclic_bad_free {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (nh : nat) (TS : ptraces P D) (DS : pdevs D) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
-  edges_split_ms nh TS DS → bad_wf_strong nh TS DS →
+  edges_split_cyc nh TS DS → bad_wf_strong nh TS DS →
   gdep2_acyclic TS.
 Proof.
   intros Hwf Hfo Hee Hsplit Hbs.
-  have Hrf : rf_edges_ok_on_ms TS (λ e, tc (gdep2 TS) e e).
-  { intros e1 e2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome Hms.
-    destruct (Hsplit e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms)
+  have Hrf : rf_edges_ok_on_ms TS (λ e, True ∧ on_cyc TS e).
+  { intros e1 e2 T ts a k' ev' Hts Hrd Hne [_ HW] HT Hlt Hev Hsome Hms.
+    destruct (Hsplit e1 e2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome Hms)
       as [Hok|Hbad]; [exact Hok|]. by destruct (Hbs e1 e2 Hbad HW). }
-  have Hcl : ∀ u x, tc (gdep2 TS) u u → rtc (gdep2 TS) u x →
-                    rtc (gdep2 TS) x u → tc (gdep2 TS) x x.
-  { intros u x HWu Hux Hxu. eapply tc_rtc_l; [exact Hxu|].
-    eapply tc_rtc_r; [exact HWu|exact Hux]. }
-  intros e He.
-  by eapply (gdep2_acyclic_on pstep TS (λ e0, tc (gdep2 TS) e0 e0)
-               Hwf Hfo Hrf Hee Hcl e He).
+  intros e.
+  by eapply (gdep2_acyclic_on_cyc pstep TS (λ _, True) Hwf Hfo Hrf Hee
+               (λ u x _ _ _, I) e I).
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -1129,13 +1211,17 @@ Qed.
     these, and a section discharge would make their argument lists depend
     on which variables each proof happens to use. *)
 
+(** A0'': the cone premise is served at [W ∩ on_cyc], which is exactly
+    what [edges_split_cyc] asks for — the [on_cyc] conjunct IS its extra
+    hypothesis. *)
 Lemma rf_edges_ok_on_min {P D : Type} (TS : ptraces P D) (DS : pdevs D)
     (nh : nat) (b2 : gev) :
-  edges_split_ms nh TS DS → bad_min nh TS DS b2 →
-  rf_edges_ok_on_ms TS (λ e, tc (gdep3 TS DS) e b2).
+  edges_split_cyc nh TS DS → bad_min nh TS DS b2 →
+  rf_edges_ok_on_ms TS (λ e, tc (gdep3 TS DS) e b2 ∧ on_cyc TS e).
 Proof.
-  intros Hsplit Hmin f1 f2 T ts a k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome Hms.
-  destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms)
+  intros Hsplit Hmin f1 f2 T ts a k' ev' Hts Hrd Hne [HW Hcy] HT Hlt Hev
+    Hsome Hms.
+  destruct (Hsplit f1 f2 T ts a k' ev' Hts Hrd Hne Hcy HT Hlt Hev Hsome Hms)
     as [Hok|Hbad]; [exact Hok|].
   by destruct (Hmin f1 f2 Hbad HW).
 Qed.
@@ -1165,11 +1251,11 @@ Qed.
 Lemma cone_acyc2_of_min {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
     (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
-  edges_split_ms nh TS DS → bad_min nh TS DS b2 →
+  edges_split_cyc nh TS DS → bad_min nh TS DS b2 →
   ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep2 TS) e e.
 Proof.
   intros Hwf Hfo Hee Hsplit Hmin.
-  apply (gdep2_acyclic_on pstep TS (λ e, tc (gdep3 TS DS) e b2) Hwf Hfo
+  apply (gdep2_acyclic_on_cyc pstep TS (λ e, tc (gdep3 TS DS) e b2) Hwf Hfo
            (rf_edges_ok_on_min TS DS nh b2 Hsplit Hmin) Hee
            (anc_mr TS DS b2)).
 Qed.
@@ -1178,7 +1264,7 @@ Lemma cone_acyc_of_min {P D : Type} (pstep : P → D → wlabel → P → D → 
     (TS : ptraces P D) (DS : pdevs D) (nh : nat) (b2 : gev) :
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
   ptraces_wit TS DS → dev_wit_ok TS DS →
-  edges_split_ms nh TS DS → bad_min nh TS DS b2 →
+  edges_split_cyc nh TS DS → bad_min nh TS DS b2 →
   ∀ e, tc (gdep3 TS DS) e b2 → ¬ tc (gdep3 TS DS) e e.
 Proof.
   intros Hwf Hfo Hee Hwit Hwok Hsplit Hmin e He.
@@ -1199,7 +1285,7 @@ Corollary cone_acyc_of_min_nil {P D : Type}
   ptraces_wf pstep TS → ptraces_fwd_own TS → ee_ok TS →
   (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
      ae_dev ev = None) →
-  edges_split_ms nh TS (PDevs d []) → bad_min nh TS (PDevs d []) b2 →
+  edges_split_cyc nh TS (PDevs d []) → bad_min nh TS (PDevs d []) b2 →
   ∀ e, tc (gdep2 TS) e b2 → ¬ tc (gdep2 TS) e e.
 Proof.
   intros Hwf Hfo Hee Hdf Hsplit Hmin e He Hc.
@@ -1277,7 +1363,9 @@ Section exhibit.
   Context (Hfo : ptraces_fwd_own TS).
   Context (Hee : ee_ok TS).
   Context (nh : nat).
-  Context (Hsplit : edges_split_ms nh TS DS).
+  (** A0'': the WEAKEST per-bundle per-edge form — the reader is on a
+      cycle.  [edges_split_ms_cyc] is the implication from the old one. *)
+  Context (Hsplit : edges_split_cyc nh TS DS).
 
   (** THE EXHIBIT: a minimal bad edge builds a promise-free run to a
       VIOLATING configuration — and the violation is HART-RESTRICTED
@@ -1478,11 +1566,14 @@ Section exhibit.
     gdep2_acyclic TS.
   Proof.
     intros Hvf Hbwf.
-    eapply (gdep2_acyclic_edges_ok pstep TS Hwf Hfo); [|exact Hee].
-    intros e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms.
-    destruct (Hsplit e1 e2 T ts b k' ev' Hts Hrd Hne HT Hlt Hev Hsome Hms)
-      as [Hok|Hbad]; [exact Hok|].
-    by destruct (no_bad_edge Hvf Hbwf e1 e2 Hbad).
+    have Hrf : rf_edges_ok_on_ms TS (λ e, True ∧ on_cyc TS e).
+    { intros e1 e2 T ts b k' ev' Hts Hrd Hne [_ HW] HT Hlt Hev Hsome Hms.
+      destruct (Hsplit e1 e2 T ts b k' ev' Hts Hrd Hne HW HT Hlt Hev Hsome Hms)
+        as [Hok|Hbad]; [exact Hok|].
+      by destruct (no_bad_edge Hvf Hbwf e1 e2 Hbad). }
+    intros e.
+    by eapply (gdep2_acyclic_on_cyc pstep TS (λ _, True) Hwf Hfo Hrf Hee
+                 (λ u x _ _ _, I) e I).
   Qed.
 
   (** …and the FABRIC-ORDERED graph is acyclic too, by A0′: [gdev] is
@@ -1513,7 +1604,7 @@ End exhibit.
 
 Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D)
     (DS : pdevs D) : Prop :=
-  edges_split_ms nh TS DS ∧ bad_wf nh TS DS ∧ ee_ok TS ∧
+  edges_split_cyc nh TS DS ∧ bad_wf nh TS DS ∧ ee_ok TS ∧
   dev_wit_ok TS DS ∧
   (∃ sync, ptraces_bytes_ok TS sync).
 
@@ -1521,7 +1612,7 @@ Definition main_premises {P D : Type} (nh : nat) (TS : ptraces P D)
     residue is free and [gdep3] is [gdep2], so a caller that runs at a
     marker which never fires owes exactly what W2c's package asked for. *)
 Lemma main_premises_nil {P D : Type} (nh : nat) (TS : ptraces P D) (d : D) :
-  edges_split_ms nh TS (PDevs d []) → bad_wf nh TS (PDevs d []) → ee_ok TS →
+  edges_split_cyc nh TS (PDevs d []) → bad_wf nh TS (PDevs d []) → ee_ok TS →
   (∃ sync, ptraces_bytes_ok TS sync) →
   main_premises nh TS (PDevs d []).
 Proof.
@@ -1556,6 +1647,86 @@ Section main.
       and [cls_canonical pcls TS] is discharged at the capstone by
       [WeakRetag]'s retag — neither belongs in the per-bundle package
       the caller assembles from the graph obligations. *)
+  (* ---------------------------------------------------------------- *)
+  (** *** A0'': THE ACYCLICITY-CONSUMING FORM
+
+      [robust_main_bundle]'s body with the GRAPH OBLIGATIONS replaced by
+      the two CONCLUSIONS its proof derives from them: coherence-order
+      containment ([co_tc], derived from the byte classification by
+      [WeakRobustSer.co_serialized_pkg]) and acyclicity of the
+      fabric-ordered dependency graph ([gdep3_acyclic], derived from
+      [edges_split_cyc] + [bad_wf] + [ee_ok] + [dev_wit_ok] +
+      [pf_violation_free_hart] by [gdep3_acyclic_main]).
+
+      NOTHING ELSE OF THE PACKAGE IS USED: [pf_violation_free_hart] and
+      the hart count [nh] disappear with the exhibit, and so does the
+      fulfil accounting (it was never consumed — [writes_fulfilled] comes
+      from [ptraces_of_writes_fulfilled]).  This is the entry point Layer
+      2 targets: it discharges [gdep3_acyclic] DIRECTLY, by minimal-cycle
+      analysis, rather than through the per-edge sufficient conditions
+      ([design/weak-memory-layer2.md] §2). *)
+  Lemma robust_main_acyc img d0 ps c mid TS DS :
+    lat_free_prog pstep → ts_oblivious pstep →
+    pcls_obl pcls →
+    rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+    ptraces_dev_of pstep pdev TS DS mid c →
+    (** the FULFIL ACCOUNTING, verbatim [robust_main_bundle]'s: it is what
+        [WeakRobustSer.ptraces_of_writes_fulfilled] consumes *)
+    (∀ p m i, pc_log mid !! p = Some m → wm_tid m = Some i →
+       ∃ T, pt_trs TS !! i = Some T ∧
+         (∃ k ev, at_evs T !! k = Some ev ∧ ae_ts ev = Some (S p)) ∧
+         (∀ k1 k2 ev1 ev2,
+            at_evs T !! k1 = Some ev1 → ae_ts ev1 = Some (S p) →
+            at_evs T !! k2 = Some ev2 → ae_ts ev2 = Some (S p) → k1 = k2)) →
+    (∀ a, co_tc TS a) →
+    gdep3_acyclic TS DS →
+    cls_canonical pcls TS →
+    ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
+          prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
+  Proof.
+    intros Hlf Hobl Hclsobl Hprom Hofd Hacct Hco Hacyc Hcls.
+    have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
+    have Hdinit : pd_init DS = pc_dev mid by destruct Hofd as (_ & ? & _).
+    destruct Hofd as (Hof & _).
+    have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
+    have Hla : log_authored (pc_log mid).
+    { eapply log_authored_promise_run;
+        [apply (log_authored_init img d0 ps)|exact Hprom]. }
+    have Hwfl : writes_fulfilled TS
+      by eapply (ptraces_of_writes_fulfilled pstep TS mid c).
+    have Hlne : log_ne (pc_log mid).
+    { eapply log_ne_promise_run; [apply (log_ne_init img d0 ps)|exact Hprom]. }
+    have Hinit : cfg_ws_init mid.
+    { eapply cfg_ws_init_promise_run;
+        [apply (cfg_ws_init_init img d0 ps)|exact Hprom]. }
+    have Hwsi : ptraces_ws_init TS by eapply (ptraces_of_ws_init pstep TS mid c).
+    destruct (promise_run_shape (wp_init img d0 ps) mid Hprom)
+      as (Hpimg & Hplen & Hpdev & Hpst).
+    have Hof' := Hof.
+    destruct Hof' as (Himg0 & Hlog0 & Hlent & Hwft & Hfst & Hlst
+                      & Hclogc & Hcimgc & Hclenc).
+    have Himg1 : pt_img TS = img by rewrite Himg0 Hpimg.
+    have Hlen1 : length (pt_trs TS) = length ps.
+    { by rewrite Hlent Hplen /wp_init /= length_map. }
+    have Hdata1 : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ [].
+    { rewrite Hlog0. exact Hlne. }
+    have Hps1 : ∀ j T ag0, pt_trs TS !! j = Some T →
+                  at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0).
+    { intros j T ag0 HT Hag0.
+      have Hmid : pc_ags mid !! j = Some ag0 by rewrite -(Hfst j T HT).
+      destruct (Hpst j ag0 Hmid) as (ag & Hag & Hst).
+      rewrite /wp_init /= list_lookup_fmap in Hag.
+      destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
+      injection Hag as <-. by rewrite Hst. }
+    have Hd01 : pd_init DS = d0 by rewrite Hdinit Hpdev.
+    eapply (sim_full pstep pcls pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl
+              Hlf Hobl Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 Hwit Hd01 c Hacyc).
+    - by rewrite Himg0 Hcimgc.
+    - by rewrite Hlog0 Hclogc.
+    - by rewrite Hclenc Hplen /wp_init /= length_map.
+    - exact Hlst.
+  Qed.
+
   (** THE BUNDLE FORM (M5/B4).  [robust_main]'s body with the traced
       decomposition taken as an ARGUMENT rather than produced internally
       by [wp_behavior_fulfil_once_dev].  Factored out because the
@@ -1590,6 +1761,7 @@ Section main.
     have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
     have Hdinit : pd_init DS = pc_dev mid by destruct Hofd as (_ & ? & _).
     destruct Hpkg as (Hsplit & Hbwf & Hee & Hwok & (sync & Hbytes)).
+    have Hofd' := Hofd.
     destruct Hofd as (Hof & _).
     (* the derived bundle facts — as in [wp_behavior_robust] *)
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
@@ -1634,12 +1806,8 @@ Section main.
     { eapply (gdep3_acyclic_main pstep pcls pdev TS img d0 ps Hwf Hwsi Hco Hwfl
                 Hlf Hobl Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 DS Hwit Hd01 Hwok
                 Hfo Hee nh Hsplit Hvf Hbwf). }
-    eapply (sim_full pstep pcls pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl
-              Hlf Hobl Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 Hwit Hd01 c Hacyc).
-    - by rewrite Himg0 Hcimgc.
-    - by rewrite Hlog0 Hclogc.
-    - by rewrite Hclenc Hplen /wp_init /= length_map.
-    - exact Hlst.
+    by eapply (robust_main_acyc img d0 ps c mid TS DS Hlf Hobl Hclsobl Hprom
+                 Hofd' Hacct Hco Hacyc Hcls).
   Qed.
 
   (** THE LAYER-1 ROBUSTNESS THEOREM, in its original per-behavior form:
