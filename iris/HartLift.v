@@ -100,6 +100,7 @@ Fixpoint hrun_silent {X : Type} (n : nat) (D : gset register) (rs : regstate)
       end
   end.
 
+
 (* the RELATIONAL silent step at footprint [D], for the once-proven
    induction ([wp_hsil_rtc]) *)
 Definition hsilD (D : gset register) (x y : M unit * regstate) : Prop :=
@@ -159,6 +160,68 @@ Definition hcur : Type := hcurX unit.
 Definition hsil {X : Type} (n : nat) (D : gset register) (x : hcurX X)
     : hcurX X :=
   hrun_silent n D x.1 x.2.
+
+(* ---------------------------------------------------------------------- *)
+(* STEPPING [hsil] BY REWRITE, the way [HartSpan]'s [hfrun_read] /          *)
+(* [hfrun_write] / [hfrun_ret] step the footprint walker.  Same discipline: *)
+(* reduce the SPINE with a whitelisted cbn, then advance the walker one     *)
+(* node at a time by [rewrite].  All four are [reflexivity].                *)
+(*                                                                        *)
+(* [hsil_add] takes the place [hfrun_bind] takes for the other walker, and  *)
+(* is cheaper: a window that crosses model-function boundaries is split by  *)
+(* ADDING FUEL, not by re-walking the callee inline.                        *)
+(* ---------------------------------------------------------------------- *)
+Lemma hsil_ret {X : Type} (n : nat) (D : gset register) (rs : regstate)
+    (x : X) :
+  hsil n D (rs, Interface.Ret x) = (rs, Interface.Ret x).
+Proof. destruct n; reflexivity. Qed.
+
+(* SPLIT ON MEMBERSHIP rather than carrying an [if]: a rewrite-chain always
+   knows whether the register is in the footprint, and the [if] form cannot be
+   closed by [reflexivity] the way [hfrun_read]'s [bool_decide] one can. *)
+Lemma hsil_read_in {X : Type} (n : nat) (D : gset register) (rs : regstate)
+    (r : register) (ak : option unit) (k : type_of_register r -> M X) :
+  r ∈ D ->
+  hsil (S n) D (rs, Interface.Next (Interface.RegRead r ak) k)
+  = hsil n D (rs, k (register_lookup r rs)).
+Proof.
+  intros HD. unfold hsil. cbn [fst snd hrun_silent hsil_node].
+  rewrite (decide_True_pi HD). reflexivity.
+Qed.
+
+Lemma hsil_write_in {X : Type} (n : nat) (D : gset register) (rs : regstate)
+    (r : register) (ak : option unit) (v : type_of_register r)
+    (k : unit -> M X) :
+  r ∈ D ->
+  hsil (S n) D (rs, Interface.Next (Interface.RegWrite r ak v) k)
+  = hsil n D (register_set r v rs, k tt).
+Proof.
+  intros HD. unfold hsil. cbn [fst snd hrun_silent hsil_node].
+  rewrite (decide_True_pi HD). reflexivity.
+Qed.
+
+(* the walker STOPS: any node [hsil_node] refuses (a memory event, a failure,
+   an early return, an unowned register) is a fixpoint at every fuel *)
+Lemma hsil_stuck {X : Type} (n : nat) (D : gset register) (rs : regstate)
+    (m : M X) :
+  hsil_node D rs m = None -> hsil n D (rs, m) = (rs, m).
+Proof.
+  intros Hnode. destruct n; [reflexivity|].
+  cbn [hsil hrun_silent]. by rewrite Hnode.
+Qed.
+
+Lemma hsil_add {X : Type} (a b : nat) (D : gset register) (rs : regstate)
+    (m : M X) :
+  hsil (a + b) D (rs, m) = hsil b D (hsil a D (rs, m)).
+Proof.
+  revert rs m. induction a as [|a IH]; intros rs m; [reflexivity|].
+  cbn [Nat.add hsil hrun_silent fst snd].
+  destruct (hsil_node D rs m) as [[rs1 m1]|] eqn:Hnode.
+  - change (hrun_silent (a + b) D rs1 m1) with (hsil (a + b) D (rs1, m1)).
+    change (hrun_silent a D rs1 m1) with (hsil a D (rs1, m1)).
+    exact (IH rs1 m1).
+  - symmetry. exact (hsil_stuck b D rs m Hnode).
+Qed.
 
 (* The TOTAL RESUME functions -- "the certification's answer at this event".
    A read is answered by the VALUE READ, passed as a [Z]: the width lives in

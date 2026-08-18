@@ -28,7 +28,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartSwp.
+Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartSwp HartSpan.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -190,6 +190,42 @@ Qed.
 (*    frame along the walk, in one bupd.                                    *)
 (* ====================================================================== *)
 
+
+
+(* ---------------------------------------------------------------------- *)
+(* THE TWO WALKERS MEET.  [hsil] is the wp layer's DETERMINISTIC silent      *)
+(* walk; [hspan] is the swp layer's INTERFERED one, and the port's whole     *)
+(* bridge machinery ([hval], [hfrun], [swp_span]) is built on the latter.    *)
+(* Every [hsil] step is an [hspan] step -- [hsil_node]'s guards are strictly *)
+(* stronger ([hspan_node] reads any register; [hsil_node] wants it in [D])   *)
+(* and interference is satisfied reflexively -- so a characterization proved *)
+(* the swp way applies to the deterministic walk the fused rule names.       *)
+(* ---------------------------------------------------------------------- *)
+Lemma hsil_node_hspani {X : Type} (D : gset register) (rs rs' : regstate)
+    (m m' : M X) :
+  hsil_node D rs m = Some (rs', m') -> hspani D D (m, rs) (m', rs').
+Proof.
+  intros Hnode. exists rs. split; [intros r _; reflexivity|].
+  destruct m as [y | T oc k]; [by cbn in Hnode|].
+  destruct oc; cbn in Hnode |- *; try discriminate Hnode;
+    first
+      [ (case_decide as HrD; [|discriminate Hnode];
+         injection Hnode as <- <-; split; [exact HrD | reflexivity])
+      | (case_decide as HrD; [|discriminate Hnode];
+         injection Hnode as <- <-; reflexivity)
+      | (injection Hnode as <- <-; reflexivity) ].
+Qed.
+
+Lemma hsil_hspan {X : Type} (D : gset register) (k : nat) (rs : regstate)
+    (m : M X) :
+  hspan D D (m, rs) ((hsil k D (rs, m)).2, (hsil k D (rs, m)).1).
+Proof.
+  revert rs m. induction k as [|k IH]; intros rs m; [reflexivity|].
+  cbn [hsil hrun_silent fst snd].
+  destruct (hsil_node D rs m) as [[rs1 m1]|] eqn:Hnode; [|reflexivity].
+  eapply rtc_l; [exact (hsil_node_hspani D rs rs1 m m1 Hnode)|].
+  exact (IH rs1 m1).
+Qed.
 
 (* ====================================================================== *)
 (* 0. THE CONTEXT COMMUTATION, which is what lets the fused rule be used    *)
