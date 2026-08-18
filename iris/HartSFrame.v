@@ -409,4 +409,34 @@ Section SFrames.
     by rewrite !bi.sep_assoc.
   Qed.
 
+  (* DIRECTED frame extensions, for [HartMFrame]'s reason: [hreg_frame_ext]
+     is a [⊣⊢], and rewriting with it inside a proofmode goal fires on the
+     WHOLE entailment, context included.  Proved once here where the goal is
+     two lines long; call sites become [iDestruct]. *)
+  Lemma s_agree_rw (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' -> reg_agree_on s_Drw rs rs'.
+  Proof. intros Hag r Hr. apply Hag. set_solver. Qed.
+
+  Lemma s_agree_ro (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' -> reg_agree_on s_Dro rs rs'.
+  Proof. intros Hag r Hr. apply Hag. set_solver. Qed.
+
+  Lemma s_rw_ext (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' ->
+    hreg_frame rs s_Drw -∗ (hreg_frame rs' s_Drw : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ s_Drw (s_agree_rw _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma s_ro_ext (dq : dfrac) (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' ->
+    hreg_frame_ro (s_Df dq) rs s_Dro -∗
+    (hreg_frame_ro (s_Df dq) rs' s_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext _ _ _ s_Dro (s_agree_ro _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+
 End SFrames.

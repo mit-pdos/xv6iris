@@ -27,6 +27,7 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language weakestpre.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins
         SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -264,6 +265,117 @@ Section sframes.
               ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec
               ?s_rs_pma ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp
               ?s_rs_mie ?s_rs_mdl ?s_rs_menv.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* s_cycle -- THE S-MODE INSTANCE of [swp_exec_step_decode_execute].      *)
+  (*                                                                      *)
+  (* [WpInstr.mm_cycle]'s twin, and its header predicted exactly this: the *)
+  (* S-mode wrapper writes its own thirty-line twin of THAT rule and reuses *)
+  (* the generic one unchanged.  So it does.  Everything about the cycle    *)
+  (* -- boundary, interrupt check, minstret, tick, PC commit -- is in the  *)
+  (* generic rule, which knows nothing about privilege regimes; all this   *)
+  (* adds is the two bundle<->frame bridges above.                         *)
+  (* ==================================================================== *)
+  Local Ltac srs :=
+    by rewrite ?s_rs_PC ?s_rs_nPC ?s_rs_ms ?s_rs_mi ?s_rs_cy ?s_rs_ti
+       ?s_rs_ip ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+       ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec ?s_rs_pma
+       ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp ?s_rs_mie ?s_rs_mdl
+       ?s_rs_menv.
+
+  Lemma s_cycle (pc npc : mword 64) (root_ppn : mword 44) (Psi : iProp Σ)
+      (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv tlbv' : type_of_register tlb) :
+    sconf_ms_facts mst0 ->
+    and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
+    menv0 = MENVCFG_S ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
+      = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword)
+      (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    hw_config -∗ minstret_inv -∗
+    hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv)
+      s_Drw -∗
+    hreg_frame_ro (s_Df (DfracOwn 1))
+      (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv) s_Dro -∗
+    (* the body, at the prelude's file: the flag the prelude wrote, computed
+       AT SUPERVISOR -- which is only sayable because [minstret_inc_flag]
+       takes the privilege *)
+    (hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+                   cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                   pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv) s_Drw -∗
+     hreg_frame_ro (s_Df (DfracOwn 1))
+       (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+          cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+          pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv) s_Dro -∗
+       swp (run_hart_active 0)
+         (fun st => ∃ w : mword 32,
+            ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+            hreg_frame (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor)
+                          cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+                          senv0 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv')
+              s_Drw ∗
+            hreg_frame_ro (s_Df (DfracOwn 1))
+              (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor)
+                 cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv') s_Dro ∗ Psi)) -∗
+    (* what the bridge could not carry, back in for the rebuild *)
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) -∗
+    sret_tie mst0 -∗
+    tlb_snap_ok tlbv' -∗
+    kpt_inv root_ppn -∗
+    ▷ (hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf -∗ pc_is npc -∗
+       tlb_res_pt root_ppn -∗ Psi -∗ WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR Hcov.
+    iIntros "#Hhw #Hmi_inv Hrw Hro Hbody Hsie Hsret Hsnap Hkpt Hcont".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iApply (swp_exec_step_decode_execute s_Drw s_Dro (s_Df (DfracOwn 1))
+              (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv)
+              (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+                 cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv)
+              (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor)
+                 cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv') Psi
+              s_disj s_w_cy s_w_ti s_w_ip s_in_priv s_in_hart s_in_mc
+              s_in_micfg s_w_mi s_in_mi s_w_ms s_in_ms s_w_PC s_in_PC
+              s_in_nPC ltac:(srs) ltac:(srs) ltac:(srs)
+              (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv)
+              with "Hcert Hrw Hro Hbody [Hcont Hsie Hsret Hsnap Hkpt]").
+    iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
+    destruct Hag as (mi & Hag).
+    pose proof (s_tick_agree pc npc ms (minstret_inc_flag mc micfg Supervisor)
+                  cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                  pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv' mi rs3 Hag) as Hag'.
+    iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+    iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
+    iDestruct (s_frames_elim npc root_ppn mi
+                 (minstret_inc_flag mc micfg Supervisor) _ _ _ mst0 mc micfg
+                 misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 menv0 pcfg paddr
+                 tlbv' Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR
+                 Hcov with "Hhw Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt")
+      as "(Hhs & Hsc & Hpc & Htlb)".
+    iApply ("Hcont" with "Hhs Hsc Hpc Htlb HPsi").
   Qed.
 
 
