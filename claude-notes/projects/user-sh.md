@@ -114,30 +114,92 @@ links that block after `base`; the rescan splits it, returning
 
 ## STATE
 
-Proved and axiom-clean: `UmodeFrame.v` (the gcc 16-byte prologue/epilogue,
-protocol- and program-generic: `uv_slot16`, `wp_uv_prologue16`,
-`wp_uv_epilogue16`), `UProofShLib.v` (the nine syscall stubs, `sbrk`,
-`strlen`, `strchr`) and `UProofShMem.v` (`memset`, `free`).  `strlen` is
-instruction-for-instruction echo's and its proof replayed.
+**Proved and axiom-clean (22 of the 30 reachable functions):**
 
-Contracts written and compiling for all 21 functions: `USpecSh.v` (layout,
-stubs, library, heap, IO, `runcmd`, `main`, the top statement) and
-`USpecShParse.v` (the tokenization model, `peek`, `gettoken`, the four
-`parse*`, `nulterminate`).
+| file | lines | functions |
+|---|---|---|
+| `UmodeFrame.v` | — | the gcc 16-byte prologue/epilogue, protocol- and program-generic (`uv_slot16`, `wp_uv_prologue16`, `wp_uv_epilogue16`) |
+| `UProofShLib.v` | 2055 | the nine syscall stubs, `sbrk`, `strlen`, `strchr` |
+| `UProofShMem.v` | 1817 | `memset`, `free` |
+| `UProofShHeap.v` | 4038 | `malloc`, `execcmd` |
+| `UProofShLex.v` | 5643 | `peek`, `gettoken` |
+| `UProofShIo.v` | 3691 | `gets`, `getcmd` |
+| `UProofShInput.v` | 130 | not a function — the CONCRETE-INPUT GLUE (below) |
 
-Left to prove: `malloc`, `execcmd`,
-`peek`, `gettoken`, `parseredirs`, `parseexec`/`parsepipe`/`parseline`,
-`nulterminate`, `parsecmd`, `gets`, `getcmd`, `fork1`, `runcmd`, `main`,
-`start`.
+`strlen` is instruction-for-instruction echo's and its proof replayed.
 
-**Two rules this effort produced, both in durable-notes.md**: a hedged
-conjunct (`⌜P \/ True⌝`) is a false statement that compiles, and a function
-that writes a caller's buffer disturbs TWO windows — its own frame and the
-buffer — so `uM_only` is the wrong shape and `uM_only_in` (over a list of
-windows) is the right one.  A third, local to the specs: `sh_frame_ok`
-exists because `uv_stack` only guarantees the frame is above 4096 while
-sh's TEXT runs to 8192, so without it a prologue spill can clobber the
-program image and no `ui_sh_*` fact survives.
+**In flight**, one lane each: `UProofShParse.v` (`parseredirs`, `parseexec`,
+`parsepipe`, `parseline`), `UProofShCmd.v` (`nulterminate`, `parsecmd`),
+`UProofShTop.v` (`fork1`, `runcmd`), `UProofShMain.v` (`main`, `start`).
+The last three carry the functions they cannot yet `Require` as section
+`Hypothesis`es — visible in the closed lemma's type, discharged by a
+one-line `apply`, and (unlike an `Admitted`) impossible to land by accident.
+
+**`UProofShInput.v` — why a file of pure lemmas earns its place.** The
+parser's contracts are general in the buffer `bs` and its tokenization
+`toks`; the theorem is about one buffer. This file discharges the general
+premises AT that buffer and computes what the postconditions then say:
+`sh_echo_toks = [(0,4); (5,10); (11,17)]`, `sh_echo_tokens`,
+`sh_echo_no_symbols`, `sh_echo_no_nul`, `sh_echo_toks_sep`, and the payoff
+`sh_echo_path_eq` / `sh_echo_argv_eq` identifying `sh_tok_bytes` of those
+boundaries with `sh_echo_path` / `sh_echo_argv`. It is deliberately pure:
+a tokenization model is exactly the kind of definition that can be quietly
+off by one — at a separator, or at the trailing newline where `ShTokNil`
+must apply at offset 17 and NOT 18 — and computing it on the real input is
+far cheaper than discovering the error inside a WP proof. The model was
+also checked NEGATIVELY: `sh_tokens sh_echo_input 0 [(0,5);(5,10);(11,17)]`
+is refutable, so the inductive is not accidentally satisfiable.
+
+**Four rules this effort produced, all in durable-notes.md**: a hedged
+conjunct (`⌜P \/ True⌝`) is a false statement that compiles; a function
+that writes a caller's buffer disturbs TWO windows, so `uM_only` is the
+wrong shape and `uM_only_in` the right one; a premise can be satisfiable
+in isolation and REFUTABLE AT THE CALL SITE (three times over here, always
+a `.bss` claim stated over too wide a range); and a stack budget is
+arithmetic about the call chain, so it must be spelled as the sum, not as
+a rounded constant. A fifth, local to the specs: `sh_frame_ok` exists
+because `uv_stack` only guarantees the frame is above 4096 while sh's TEXT
+runs to 8192, so without it a prologue spill can clobber the program image
+and no `ui_sh_*` fact survives.
+
+**The defect ledger: 29 found by proving, 7 of them false alarms, 1
+vacuous, 1 unusable-at-the-call-site.** The single highest-value
+instruction to a proof lane has been *report contract drift rather than
+work around it* — every one of the structural defects above came back that
+way, and none of them would have failed a build.
+
+## WHAT THE THEOREM IS CONDITIONAL ON (read this before quoting it)
+
+Three protocol assumptions are listed above, each one conjunct in one arm.
+There is a fourth conditionality, and it is TREE-WIDE rather than specific
+to sh: **no program's layout has ever been exhibited.**
+
+`sh_layout pt hbase hlen` — like `sync_layout`, `echo_layout` and
+`init_layout` — is a HYPOTHESIS of every theorem in the Umode tier, and
+nothing anywhere in this development constructs a `uptd` satisfying one.
+Grepping `uleaf_ok` finds it only ever in hypothesis position or as a
+conclusion derived from one; no concrete leaf word is built. So every user
+-program theorem here reads "IF such a page table exists, then ...".
+
+This is not a defect and not vacuity in any established sense — the layout
+is what `exec` would set up, and the kernel's `exec` is not yet connected
+to the user tier, so assuming it is the right structure. But it has never
+been checked to be SATISFIABLE, and an unsatisfiable layout would make
+every one of these theorems vacuously true with nothing in the build to
+say so. That is precisely the failure mode this project has now hit four
+times at smaller scale (durable-notes: "satisfiable in isolation,
+refutable at the call site").
+
+**Closing it is the single most valuable next piece of work on the tier.**
+The shape: exhibit a `uptd` whose `ud_um` maps sh's two text pages, its
+data page and its heap pages to a user RWX leaf, and prove `sh_layout` of
+it. The obstacle is that `uleaf_ok` quantifies over all A/D variants
+(`forall a d : mword 1, ...`), so a witness needs `bv 1` case analysis
+before `vm_compute` will reduce `pte_check_ok` — a bare `vm_compute` with
+`a`/`d` still abstract HANGS rather than fails, which is the trap already
+recorded in durable-notes. It is a contained job, but it is about the
+tier's foundations rather than about sh, so it is recorded here and not
+smuggled into this effort.
 
 ## The machinery this needs on top of echo's
 

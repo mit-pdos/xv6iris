@@ -1493,8 +1493,11 @@ Section UProofShLex.
   Proof.
     intros Hpre Hsp Hst Hps Hes Htoks Hcellp Hoff Htnn Htbs Htnz Htrd Htbelow
            Hret2.
-    destruct Hpre as (Hlay & Himg & Htab & Hbuf & Hnosym & Hrd & Hwr & Hs0p &
+    destruct Hpre as (Hlay & Himg & Htab & Hbuf & Hnosym & Hrd & Hwr & Hs0lo &
                       Hs0hi & Hfr & Hbufhi).
+    (* [sh_parse_pre]'s 8th conjunct is now [8208 <= s0] (the buffer is above
+       the loaded image); the block lemmas below only need it positive. *)
+    assert (Hs0p : 0 < s0) by lia.
     destruct Hcellp as (Hcell & Hpsrd & Hcellw & Hpsal & Hpshi & Hpshi2).
     unfold sh_frame_ok in Hfr.
     pose proof (shl_hlo _ _ _ Hlay) as Hhlo. unfold SH_DATA_PG in Hhlo.
@@ -4875,8 +4878,11 @@ Section UProofShLex.
   Proof.
     intros Hpre Hsp Hst Hps Hes Hqr Heqr Hcellp Hqw Heqw Hdis1 Hdis2 Hdis3
            Hoff Hret2.
-    destruct Hpre as (Hlay & Himg & Htab & Hbuf & Hnosym & Hrd & Hwr & Hs0p &
+    destruct Hpre as (Hlay & Himg & Htab & Hbuf & Hnosym & Hrd & Hwr & Hs0lo &
                       Hs0hi & Hfr & Hbufhi).
+    (* [sh_parse_pre]'s 8th conjunct is now [8208 <= s0] (the buffer is above
+       the loaded image); the block lemmas below only need it positive. *)
+    assert (Hs0p : 0 < s0) by lia.
     destruct Hcellp as (Hcell & Hpsrd & Hcellw & Hpsal & Hpshi & Hpshi2).
     pose proof Hfr as Hfr0. unfold sh_frame_ok in Hfr.
     pose proof (shl_hlo _ _ _ Hlay) as Hhlo. unfold SH_DATA_PG in Hhlo.

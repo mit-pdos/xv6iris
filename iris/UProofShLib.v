@@ -11,7 +11,7 @@
      wp_sh_exit      exit      @0xc86   li a7,2;  ecall        (IoNoRet)
      wp_sh_sys_sbrk  sys_sbrk  @0xd0e   li a7,12; ecall; ret   (IoSbrk)
      wp_sh_close     close     @0xcae   li a7,21; ecall; ret   (IoPureRet)
-     wp_sh_wait      wait      @0xc8e   li a7,3;  ecall; ret   (IoPureRet)
+     wp_sh_wait0     wait(0)   @0xc8e   li a7,3;  ecall; ret   (IoWaitNull)
      wp_sh_sbrk      sbrk      @0xc52   frame; li a1,1; call sys_sbrk; unframe
      wp_sh_strlen    strlen    @0xa30   prologue; scan loop; epilogue
      wp_sh_strchr    strchr    @0xa82   prologue; scan loop; epilogue
@@ -279,25 +279,71 @@ Section UProofShLib.
               with "Hcg Hpc Hcont").
   Qed.
 
-  Lemma wp_sh_wait (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile) :
-    wp_sh_pureret_body (CID := CIDp) C pt gin gbrk hbase hlen Q
-      ShSyms.wait SYS_wait M m.
+  (* --- wait(0) @0xc8e: the arm is [IoWaitNull], NOT [IoPureRet] ------ *)
+  (* This stub used to be stated as [wp_sh_pureret_body ShSyms.wait
+     SYS_wait], whose premise list contains
+     [Hsem : xv6_io_sem SYS_wait = IoPureRet].  That equation is FALSE --
+     [UmodeIo.xv6_io_sem_wait] says the arm is [IoWaitNull] -- so the lemma
+     was VACUOUS: it compiled, it was true, and [main], its only caller,
+     could never supply [Hsem].  ([IoPureRet] would also have been the
+     wrong SHAPE: wait(p) with p <> 0 writes the exit status through p, so
+     the "image unchanged" arm is only sound for wait(0).)
+
+     [IoWaitNull]'s arm therefore demands one more thing OF THE PROCESS --
+     [uint a0 = 0], i.e. "this call is wait(0), the only form the arm
+     specifies" -- and that is the premise below.  main supplies it with
+     the `c.li a0,0' at 0x932.  Everything else is [wp_sh_close]'s shape:
+     the shared head, the arm, the shared tail.
+
+     Stated inline rather than as a [wp_sh_..._body] in USpecSh.v only
+     because that file is not this lane's; it should move there. *)
+  Lemma wp_sh_wait0 (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile) :
+    forall (Hpre : sh_layout pt hbase hlen /\ sh_text_sub M /\
+                   is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true)
+      (Ha0 : uint (m !!! Regidx a0_idx) = 0),
+    uv_cap_gpr (CID := CIDp) C pt Psh M m -∗
+    pc_is (CID := CIDp) (mword_of_int ShSyms.wait) -∗
+    (∀ (CID : CpuId) (ret : mword 64),
+       uv_cap_gpr (CID := CID) C pt Psh M
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int SYS_wait : mword 64)]> m)) -∗
+       pc_is (CID := CID) (m !!! Regidx ra_idx) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpre Hsem. destruct Hpre as (Hlay & Htext & Hret2).
+    intros Hpre Ha0. destruct Hpre as (Hlay & Htext & Hret2).
     destruct sh_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                               _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                               _ & _ & Hswait & _).
     iIntros "Hcg Hpc Hcont".
     iEval (rewrite Hswait) in "Hpc".
-    iApply (wp_sh_pureret_gen CIDp 0xc8e SYS_wait M m
+    iApply (wp_sh_stub_head CIDp 0xc8e SYS_wait M m
               (ui_sh_c8e pt M (shl_text pt hbase hlen Hlay) Htext)
               (ui_sh_c90 pt M (shl_text pt hbase hlen Hlay) Htext)
-              (ui_sh_c94 pt M (shl_text pt hbase hlen Hlay) Htext)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) Hsem Hret2
-              with "Hcg Hpc Hcont").
+              ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc [Hcont]").
+    iIntros "#Hcap".
+    change (xv6_io_sem SYS_wait) with IoWaitNull.
+    cbn [uio_arm].
+    assert (Hwa0 : <[Regidx a7_idx := (mword_of_int SYS_wait : mword 64)]> m
+                     !!! Regidx a0_idx = m !!! Regidx a0_idx)
+      by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
+                  ltac:(vm_compute; discriminate)).
+    iSplitR.
+    { iPureIntro. rewrite Hwa0. exact Ha0. }
+    rewrite /uio_ret.
+    iIntros (CID2 ret) "Hrun".
+    assert (Eret : add_vec_int (mword_of_int (0xc8e + 2) : mword 64) 4
+                   = mword_of_int (0xc8e + 6))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Eret) in "Hrun".
+    iApply (wp_sh_stub_tail CID2 0xc8e SYS_wait M M m ret
+              (ui_sh_c94 pt M (shl_text pt hbase hlen Hlay) Htext) Hret2
+              with "Hcap Hrun [Hcont]").
+    iIntros (CID3) "Hcg Hpc".
+    iApply ("Hcont" $! CID3 ret with "Hcg Hpc").
   Qed.
 
   (* [dup] @0xcfe and [chdir] @0xcf6 are the syscall stubs this scenario

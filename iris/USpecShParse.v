@@ -89,11 +89,38 @@ Section USpecShParse.
     sh_buf_ok M s0 bs /\ sh_no_symbols bs /\
     uv_rd pt M s0 (Z.of_nat (length bs) + 1) /\
     uv_wr pt M s0 (Z.of_nat (length bs) + 1) /\
-    0 < s0 /\ s0 + Z.of_nat (length bs) + 1 <= 2 ^ 38 /\
+    (* ABOVE THE LOADED IMAGE, not merely positive.  Every function here
+       WRITES the buffer, and [sh_layout] gives the text pages Fetch+Load
+       without ever denying Store -- so [uv_wr pt M s0 …] at a text address
+       is perfectly consistent, and a buffer there would destroy
+       [sh_text_sub]/[sh_data_sub] and with them every [ui_sh_*] fact.
+       8208 = SH_FREEP is the sharp bound: it clears the text (8192) AND
+       the two static tables at 0x2000..0x2010, which the lexer reads on
+       every token.  [wp_sh_getcmd_body] already carries the analogue. *)
+    8208 <= s0 /\ s0 + Z.of_nat (length bs) + 1 <= 2 ^ 38 /\
     (* the frame misses the program image and the heap ... *)
     sh_frame_ok hbase hlen sp0 n /\
     (* ... and the command buffer misses the frame *)
     s0 + Z.of_nat (length bs) + 1 <= uint sp0 - n.
+
+  (* [a,a+n) and [b,b+k) do not overlap. *)
+  Definition sh_disj (a n b k : Z) : Prop := a + n <= b \/ b + k <= a.
+
+  (* The command buffer misses the two allocator statics and the heap.
+     Without it NO caller can carry [sh_buf_ok] across a [parse*] call:
+     those are exactly the windows the run's single [malloc] disturbs, and
+     a postcondition that does not exclude them leaves the buffer's bytes
+     unknown -- which is fatal, because [nulterminate] and then the [exec]
+     arm both read the buffer AFTER the allocation.  True of `buf.0' at
+     0x2020: it sits BETWEEN freep (0x2010) and base (0x2088). *)
+  Definition sh_buf_clear (s0 len : Z) : Prop :=
+    sh_disj s0 len SH_FREEP 8 /\ sh_disj s0 len SH_BASE 16 /\
+    (* BELOW the heap, not merely disjoint from it.  As a [sh_disj] this
+       admitted the other arm, [hbase + 65536 <= s0], which leaves the argv
+       strings unbounded above and makes [sh_exec_below]'s [p + |bs_i| < B]
+       unprovable at [parsecmd].  The buffer really is below: `buf.0' is at
+       0x2020 and [shl_hlo] puts [hbase] at 0x3000 or above. *)
+    s0 + len <= hbase.
 
   (* A `char **' cell a caller passes down.  The code LOADS through it
      (`s = *ps'), so a store-permitting leaf is not enough; it is 8-aligned
@@ -243,8 +270,7 @@ Section USpecShParse.
       (Hps : m !!! Regidx a1_idx = (mword_of_int psaddr : mword 64))
       (Hes : m !!! Regidx a2_idx
                = (mword_of_int (s0 + Z.of_nat (length bs)) : mword 64))
-      (Hcell : uM_bytes M psaddr 8 (mword_of_int (s0 + Z.of_nat off) : mword 64))
-      (Hcellw : uv_wr pt M psaddr 8)
+      (Hcell : sh_ptr_cell M psaddr (s0 + Z.of_nat off) sp0)
       (Hoff : (off <= length bs)%nat)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -255,6 +281,11 @@ Section USpecShParse.
        ⌜uM_bytes M' psaddr 8
           (mword_of_int (s0 + Z.of_nat (off + sh_skipws (drop off bs)))
            : mword 64)⌝ -∗
+       (* it advances [ps] and spills into its own frame (and peek's), and
+          nothing else -- in particular the execcmd node its caller just
+          allocated, and the command buffer, both survive it *)
+       ⌜uM_only_in M M' [sh_win (psaddr) (8);
+                         sh_win (uint sp0 - (112 + 64 + 16)) (112 + 64 + 16)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -290,13 +321,18 @@ Section USpecShParse.
       (Hps : m !!! Regidx a0_idx = (mword_of_int psaddr : mword 64))
       (Hes : m !!! Regidx a1_idx
                = (mword_of_int (s0 + Z.of_nat (length bs)) : mword 64))
-      (Hcell : uM_bytes M psaddr 8 (mword_of_int (s0 + Z.of_nat off) : mword 64))
-      (Hcellw : uv_wr pt M psaddr 8)
+      (Hcell : sh_ptr_cell M psaddr (s0 + Z.of_nat off) sp0)
+      (Hbufc : sh_buf_clear s0 (Z.of_nat (length bs) + 1))
       (Hoff : (off <= length bs)%nat)
       (Htoks : sh_tokens bs off toks)
       (Hmax : (length toks < 10)%nat)                (* MAXARGS *)
-      (* the heap is untouched: this is the run's single malloc *)
-      (Hfreep0 : uM_bytes M SH_FREEP 8 (mword_of_int 0 : mword 64))
+      (* the heap is untouched: this is the run's single malloc.  BOTH
+         windows are needed -- [freep == 0] alone is what sends malloc down
+         the [morecore] path, but the rescan afterwards reads [base.s.size]
+         as eight bytes, four of which are union padding no instruction
+         writes. *)
+      (Hfreep0  : sh_zeroed M SH_FREEP 0 8)
+      (Hbasesz0 : sh_zeroed M (SH_BASE + 8) 0 8)
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -308,9 +344,30 @@ Section USpecShParse.
        ⌜cmd = hbase + 65536 - 16 * (sh_nunits SH_EXECCMD_SZ - 1)⌝ -∗
        ⌜uM_bytes M' cmd 4 (mword_of_int 1 : mword 32)⌝ -∗
        ⌜sh_execcmd_argv M' cmd s0 toks⌝ -∗
+       (* WHERE THE PARSE LEFT [*ps].  Without this the contract says
+          nothing about the cell it was handed, and every caller is stuck at
+          its very next [peek]: [wp_sh_peek_body] wants
+          [sh_ptr_cell M psaddr (s0 + Z.of_nat off) sp0], and [uM_only_in]
+          gives only that the cell's BYTES still exist, never their value.
+          It blocked parsepipe, parseline and parsecmd alike.
+          The value is exact, not a weakening: on a buffer with no symbol
+          bytes the parse always consumes to the end -- the arg loop exits
+          on [sh_tokens bs off []], i.e. [off + sh_skipws (drop off bs) =
+          length bs], and the [gettoken] that reported end-of-input has
+          already advanced [*ps] there. *)
+       ⌜uM_bytes M' psaddr 8
+          (mword_of_int (s0 + Z.of_nat (length bs)) : mword 64)⌝ -∗
        ⌜uv_rd pt M' cmd SH_EXECCMD_SZ⌝ -∗
-       (* the buffer itself is untouched by parsing *)
-       ⌜uM_only M M' hbase 65536 \/ True⌝ -∗
+       (* THE conjunct that lets a caller carry anything across the parse:
+          the heap (which the single malloc carves), the two allocator
+          statics, the [ps] cell and the frame are disturbed, and NOTHING
+          else -- so the text, the static tables and, with [sh_buf_clear],
+          the command buffer all survive.  This was once written as
+          [⌜uM_only ... \/ True⌝], which [right; exact I] discharges: a
+          false economy that says nothing at all. *)
+       ⌜uM_only_in M M' [sh_win hbase 65536; sh_win SH_FREEP 8;
+                         sh_win SH_BASE 16; sh_win (psaddr) (8);
+                         sh_win (uint sp0 - budget) (budget)]⌝ -∗
        ubrk gbrk (hbase + 65536) -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -325,7 +382,7 @@ Section USpecShParse.
      each token becomes a C string in place.  This is what turns the token
      BOUNDARIES parseexec recorded into the argv vector exec observes. *)
   Definition wp_sh_nulterminate_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (cmd s0 : Z) (bs : list (bv 8))
+      (sp0 : mword 64) (cmd s0 : Z) (bs : list (bv 8)) (off : nat)
       (toks : list (nat * nat)) :=
     forall (Hpre : sh_parse_pre M s0 bs sp0 32)
       (Hsp : m !!! Regidx sp_idx = sp0)
@@ -334,8 +391,30 @@ Section USpecShParse.
       (Htype : uM_bytes M cmd 4 (mword_of_int 1 : mword 32))
       (Hargv : sh_execcmd_argv M cmd s0 toks)
       (Hrd : uv_rd pt M cmd SH_EXECCMD_SZ)
-      (Hsep : forall (i : nat) (t : nat * nat), toks !! i = Some t ->
-                (fst t < snd t <= length bs)%nat)
+      (* THE NODE IS MALLOC'S, and saying so once settles three separate
+         needs: [cmd <> 0] (with cmd = 0 the [c.beqz a0] at 0x7fa returns
+         immediately and the [ustr_at] postcondition is FALSE for every
+         non-final token), 8-alignment for the [lwu]/[c.ld] at 0x804/0x81a/
+         0x822/0x82a, and node-vs-frame disjointness.  It is exactly the
+         conjunct [wp_sh_parse_body] already produces. *)
+      (Hnode : cmd = hbase + 65536 - 16 * (sh_nunits SH_EXECCMD_SZ - 1))
+      (* ... and the buffer misses the node, or the NUL stores corrupt
+         argv/eargv and [sh_execcmd_argv M' cmd s0 toks] is FALSE. *)
+      (Hbufc : sh_buf_clear s0 (Z.of_nat (length bs) + 1))
+      (Hmax : (length toks < 10)%nat)          (* MAXARGS; eargv[i] is at
+                                                  cmd + 88 + 8i and must
+                                                  stay inside the node *)
+      (* NOT [Hsep].  That premise said only that each token is a non-empty
+         range inside [bs], which ADMITS OVERLAPPING TOKENS: at
+         [toks = [(0,5); (2,3)]] the loop writes a NUL at [s0+3] while the
+         postcondition demands [bs !! 3] there and [sh_buf_ok] says every
+         byte of [bs] is non-NUL.  The contract was FALSE, not merely
+         unprovable.  [sh_tokens] is the real invariant, and it implies both
+         [Hsep] and the separation the loop needs -- strictly, and only
+         because [sh_no_symbols] forces a token to stop on whitespace, so
+         the next scan skips at least one byte. *)
+      (Hoff : (off <= length bs)%nat)
+      (Htoks : sh_tokens bs off toks)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.nulterminate) -∗
@@ -345,7 +424,10 @@ Section USpecShParse.
        ⌜forall (i : nat) (t : nat * nat), toks !! i = Some t ->
           ustr_at M' (s0 + Z.of_nat (fst t)) (sh_tok_bytes bs t)⌝ -∗
        ⌜sh_execcmd_argv M' cmd s0 toks⌝ -∗
-       ⌜uM_only M M' s0 (Z.of_nat (length bs)) \/ True⌝ -∗
+       (* it writes NULs into the BUFFER, and spills into its own frame;
+          the execcmd node and the image are untouched *)
+       ⌜uM_only_in M M' [sh_win s0 (Z.of_nat (length bs) + 1);
+                         sh_win (uint sp0 - 32) (32)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -361,10 +443,12 @@ Section USpecShParse.
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 (64 + 48 + 48 + 128 + 112 + 64 + 16))
       (Hs : m !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
+      (Hbufc : sh_buf_clear s0 (Z.of_nat (length bs) + 1))
       (Htoks : sh_tokens bs 0%nat toks)
       (Hne : (0 < length toks < 10)%nat)
       (Hlen : Z.of_nat (length bs) < 2 ^ 31)
-      (Hfreep0 : uM_bytes M SH_FREEP 8 (mword_of_int 0 : mword 64))
+      (Hfreep0  : sh_zeroed M SH_FREEP 0 8)
+      (Hbasesz0 : sh_zeroed M (SH_BASE + 8) 0 8)
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -377,11 +461,21 @@ Section USpecShParse.
        ⌜uM_bytes M' cmd 4 (mword_of_int 1 : mword 32)⌝ -∗
        ⌜uM_bytes M' (cmd + 8) 8 (mword_of_int p0 : mword 64)⌝ -∗
        ⌜p0 <> 0⌝ -∗
-       (* THE handoff to runcmd, and thence to the exec arm *)
-       ⌜uexec_args M' p0 (cmd + 8)
+       (* THE handoff to runcmd, and thence to the exec arm -- in the
+          BOUNDED form (USpecSh.v §0c).  [uexec_args] alone cannot be
+          carried across runcmd's prologue, because its string pointers are
+          existential; parsecmd CAN prove the bounded form, because it
+          knows where every string is (element [i] is at [s0 + fst t]). *)
+       ⌜sh_exec_below M' p0 (cmd + 8)
            (sh_tok_bytes bs (default (0%nat, 0%nat) (toks !! 0%nat)))
-           (sh_tok_bytes bs <$> toks)⌝ -∗
+           (sh_tok_bytes bs <$> toks) (hbase + hlen)⌝ -∗
        ⌜uv_rd pt M' cmd SH_EXECCMD_SZ⌝ -∗
+       (* and what [main] needs to keep: the text and the static tables. *)
+       ⌜uM_only_in M M' [sh_win hbase 65536; sh_win SH_FREEP 8;
+                         sh_win SH_BASE 16;
+                         sh_win s0 (Z.of_nat (length bs) + 1);
+                         sh_win (uint sp0 - (64 + 48 + 48 + 128 + 112 + 64 + 16))
+                                (64 + 48 + 48 + 128 + 112 + 64 + 16)]⌝ -∗
        ubrk gbrk (hbase + 65536) -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗

@@ -25,7 +25,8 @@
    header-size field is FOUR bytes (a C [uint], written by [sw] at 0x1208
    and read by [lw] at 0x1136 -- the union's other four bytes are padding
    that nothing writes and [uM_grown] does not constrain);
-   [wp_sh_malloc_first_body] carries [Hbss] instead of [Hfreep0];
+   [wp_sh_malloc_first_body] carries the .bss premises rather than a
+   bare [freep = 0];
    [wp_sh_execcmd_body] carries [sh_frame_ok … 128] and states its image
    effect.
 
@@ -39,12 +40,33 @@
    .bss cells the premise quantifies over (0x11f6 [freep := &base],
    0x11fa [base.s.ptr := &base]), so M[8208] is the low byte of 8328.
    What free actually needs about [base.s.size] is its own [Hbasesz], and
-   THAT is what malloc's head establishes from ITS [Hbss].  Recorded here
+   THAT is what malloc's head establishes from its own .bss premises.
+   Recorded here
    because of the shape of the bug rather than the bug: an UNSATISFIABLE
    PREMISE is the mirror of a hedged conjunct -- it is invisible to the
    callee's own proof, which compiles fine with one more unused
    hypothesis, and only the CALLER ever discovers the lemma has gone
    vacuous.
+
+   (D6), found by the parser lane and fixed in USpecSh.v / USpecShParse.v:
+   [Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88] was the WRONG PREMISE
+   for malloc and execcmd, for the same reason one level up.  Its range
+   0x2010..0x2098 COVERS `buf.0' at 0x2020, so it asserts the command
+   buffer is all zeros -- true on entry to main, and FALSE at the only
+   site that ever calls malloc, since [parseexec] reaches it after [gets]
+   has filled that buffer with the command.  Both lemmas were correct and
+   UNUSABLE.  What the proof actually consumes is two eight-byte windows
+   and nothing between them: offsets [0,8) for [freep == 0], and offsets
+   [128,136) -- [base.s.size] plus the four padding bytes above it, which
+   no instruction writes -- for the rescan.  Those two are now the
+   premises ([Hfreep0], [Hbasesz0]).  [main] and [start] keep the
+   whole-.bss claim, which is where it is true and where it belongs.
+
+   The general shape, now three times over in this file alone: a premise
+   that is perfectly satisfiable IN ISOLATION can still be refutable AT
+   THE CALL SITE, and nothing in the callee's own build -- not the
+   compiler, not [Print Assumptions] -- can see it.  Only writing the
+   caller finds it.
 
    NOT drift, checked and correct: the window list of
    [wp_sh_malloc_first_body] covers what the code writes.  malloc's own
@@ -2224,7 +2246,7 @@ Section UProofShHeap.
       (sp0 : mword 64) (nbytes : Z) :
     wp_sh_malloc_first_body (CID := CIDp) C pt gin gbrk hbase hlen Q M m sp0 nbytes.
   Proof.
-    intros Hlay Htext Hsp Hst Hn Hnr Hbss Hbssw Hfr Hret2.
+    intros Hlay Htext Hsp Hst Hn Hnr Hfreep0 Hbasesz0 Hbssw Hfr Hret2.
     assert (Hmalloc : ShSyms.malloc = 0x118c)
       by (destruct sh_syms_pins
             as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_); exact H).
@@ -2237,7 +2259,8 @@ Section UProofShHeap.
     unfold SH_DATA_PG in Hhlo. unfold sh_frame_ok in Hfr.
     change (2 ^ 38) with 274877906944 in Hhhi, Hcan.
     change SH_FREEP with 8208 in *. change SH_BASE with 8328 in *.
-    change (SH_DATA_PG + 0x10) with 8208 in Hbss.
+    change SH_FREEP with 8208 in Hfreep0.
+    change (SH_BASE + 8) with 8336 in Hbasesz0.
     unfold sh_nunits in *.
     pose proof (Z.div_mod (nbytes + 15) 16 ltac:(lia)) as Hdm.
     pose proof (Z.mod_pos_bound (nbytes + 15) 16 ltac:(lia)) as Hmb.
@@ -2597,7 +2620,7 @@ Section UProofShHeap.
               (Hne3 (8208 + Z.of_nat j) ltac:(lia))
               (Hne2 (8208 + Z.of_nat j) ltac:(lia))
               (Hne1 (8208 + Z.of_nat j) ltac:(lia)).
-      rewrite nth_byte_moi0. exact (Hbss (Z.of_nat j) ltac:(lia)). }
+      rewrite nth_byte_moi0. exact (Hfreep0 (Z.of_nat j) ltac:(lia)). }
     iApply (wp_uv_ld C pt Psh M4 m9 (mword_of_int 0x11ae)
               (mword_of_int 3686 : mword 12) a0_idx a0_idx
               wfp (mword_of_int 8208) (mword_of_int 0)
@@ -3079,8 +3102,7 @@ Section UProofShHeap.
                 (Hne2 (8336 + Z.of_nat j) ltac:(lia))
                 (Hne1 (8336 + Z.of_nat j) ltac:(lia)).
         rewrite nth_byte_moi0.
-        replace (8336 + Z.of_nat j) with (8208 + (128 + Z.of_nat j)) by lia.
-        exact (Hbss (128 + Z.of_nat j) ltac:(lia)). }
+        exact (Hbasesz0 (Z.of_nat j) ltac:(lia)). }
     assert (RBwr : uv_wr pt M11 8208 136)
       by exact (uv_wr_dom pt M M11 8208 136 Hdom11 Hbssw).
     assert (RBst : uv_stack pt M11 sp0 96)
@@ -3259,7 +3281,7 @@ Section UProofShHeap.
       (sp0 : mword 64) :
     wp_sh_execcmd_body (CID := CIDp) C pt gin gbrk hbase hlen Q M m sp0.
   Proof.
-    intros Hlay Htext Hsp Hst Hbss Hbssw Hfr Hret2.
+    intros Hlay Htext Hsp Hst Hfreep0 Hbasesz0 Hbssw Hfr Hret2.
     assert (Hesym : ShSyms.execcmd = 0x1d2)
       by (destruct sh_syms_pins as (_&_&_&_&_&_&H&_); exact H).
     pose proof (shl_text _ _ _ Hlay) as Hl.
@@ -3272,7 +3294,8 @@ Section UProofShHeap.
     unfold SH_DATA_PG in Hhlo. unfold sh_frame_ok in Hfr.
     change (2 ^ 38) with 274877906944 in Hhhi, Hcan.
     change SH_FREEP with 8208 in *. change SH_BASE with 8328 in *.
-    change (SH_DATA_PG + 0x10) with 8208 in Hbss.
+    change SH_FREEP with 8208 in Hfreep0.
+    change (SH_BASE + 8) with 8336 in Hbasesz0.
     rewrite Z.rem_mod_nonneg in Hhb; [ | lia | lia ].
     assert (Hnu12 : sh_nunits 168 = 12) by (vm_compute; reflexivity).
     assert (Hub0 : bv_unsigned ubyte0 = 0) by (vm_compute; reflexivity).
@@ -3485,8 +3508,10 @@ Section UProofShHeap.
               (Y3 sp_idx ltac:(vm_compute; discriminate))
               (Y2 sp_idx ltac:(vm_compute; discriminate)). exact Hsp1. }
     (* the .bss and the stack, as malloc needs them *)
-    assert (Hbss3 : sh_zeroed M3 8208 0 136)
-      by (intros j Hj; rewrite (HeqM3 (8208 + j) ltac:(lia)); exact (Hbss j Hj)).
+    assert (Hfreep03 : sh_zeroed M3 8208 0 8)
+      by (intros j Hj; rewrite (HeqM3 (8208 + j) ltac:(lia)); exact (Hfreep0 j Hj)).
+    assert (Hbasesz03 : sh_zeroed M3 8336 0 8)
+      by (intros j Hj; rewrite (HeqM3 (8336 + j) ltac:(lia)); exact (Hbasesz0 j Hj)).
     assert (Hbssw3 : uv_wr pt M3 8208 136)
       by exact (uv_wr_dom pt M M3 8208 136 Hdom3 Hbssw).
     assert (Hst96_3 : uv_stack pt M3 (mword_of_int (uint sp0 - 32)) 96)
@@ -3494,7 +3519,7 @@ Section UProofShHeap.
     (* ---- the call: malloc(168) ---- *)
     iApply (wp_sh_malloc_first CID7 M3 e4 (mword_of_int (uint sp0 - 32)) 168
               Hlay Htext3 Hsp4 Hst96_3 Ha0_4
-              ltac:(rewrite Hnu12; lia) Hbss3 Hbssw3
+              ltac:(rewrite Hnu12; lia) Hfreep03 Hbasesz03 Hbssw3
               ltac:(unfold sh_frame_ok; rewrite Hu32; lia)
               ltac:(rewrite Hra4; vm_compute; reflexivity)
               with "Hcg Hbrk Hpc [Hcont]").

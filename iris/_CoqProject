@@ -204,6 +204,11 @@ UProofShMem.v
 UProofShHeap.v
 UProofShLex.v
 UProofShIo.v
+UProofShInput.v
+UProofShParse.v
+UProofShCmd.v
+UProofShTop.v
+UProofShMain.v
 UCodeInit.v
 UmodeInitIo.v
 USpecInit.v

@@ -114,6 +114,94 @@ Definition sh_win (a n : Z) : Z * Z := (a, n).
 Lemma sh_win_fst (a n : Z) : fst (sh_win a n) = a.   Proof. reflexivity. Qed.
 Lemma sh_win_snd (a n : Z) : snd (sh_win a n) = n.   Proof. reflexivity. Qed.
 
+(* ===================================================================== *)
+(* §0c A BOUNDED exec description, and why [uexec_args] is not enough.     *)
+(*                                                                        *)
+(* [uexec_args] pins the BYTES of the path and of every argv element, but  *)
+(* [uargv_at]'s per-element clause makes the string pointers EXISTENTIAL:  *)
+(*                                                                        *)
+(*   forall i bs, args !! i = Some bs -> exists p, ... /\ ustr_at M p bs   *)
+(*                                                                        *)
+(* so nothing OUTSIDE the predicate can say where those strings live, and  *)
+(* therefore [uexec_args M ...] CANNOT BE TRANSPORTED across an image      *)
+(* change.  [runcmd] spills ra/s0/s1 into its own frame before it reads    *)
+(* argv[0], and no premise stated BESIDE [uexec_args] can prove that the   *)
+(* spill window misses strings whose addresses are not nameable.  The      *)
+(* bound has to go INSIDE the predicate; that is all this adds.            *)
+(*                                                                        *)
+(* [B] is instantiated at [hbase + hlen] everywhere: sh's parser puts      *)
+(* every string in the .bss command buffer (below [hbase], by              *)
+(* [shl_hlo]) and the execcmd node inside the heap, while [sh_frame_ok]    *)
+(* puts every frame above it.  So one bound separates the data the exec    *)
+(* describes from every frame that could disturb it.                       *)
+(* ===================================================================== *)
+
+Definition sh_exec_below (M : gmap Z (bv 8)) (pa pv : Z)
+    (path : list (bv 8)) (args : list (list (bv 8))) (B : Z) : Prop :=
+  0 <= pa /\
+  pa + Z.of_nat (length path) < B /\
+  ustr_at M pa path /\
+  pv + 8 * Z.of_nat (length args) + 8 <= B /\
+  uM_bytes M (pv + 8 * Z.of_nat (length args)) 8 (mword_of_int 0 : mword 64) /\
+  (forall (i : nat) (bs : list (bv 8)), args !! i = Some bs ->
+     exists p : Z,
+       uM_bytes M (pv + 8 * Z.of_nat i) 8 (mword_of_int p : mword 64) /\
+       ustr_at M p bs /\ 0 <= p /\ p + Z.of_nat (length bs) < B).
+
+(* it says everything [uexec_args] does ... *)
+Lemma sh_exec_below_args (M : gmap Z (bv 8)) (pa pv B : Z)
+    (path : list (bv 8)) (args : list (list (bv 8))) :
+  sh_exec_below M pa pv path args B -> uexec_args M pa pv path args.
+Proof.
+  intros (_ & _ & Hs & _ & Hnul & Hi). split; [ exact Hs | split ].
+  - intros i bs Hb. destruct (Hi i bs Hb) as (p & H1 & H2 & _ & _).
+    exists p. exact (conj H1 H2).
+  - exact Hnul.
+Qed.
+
+Lemma sh_bytes_below {n : N} (M M' : gmap Z (bv 8)) (b : Z) (k : nat)
+    (w : bv n) (a q : Z) :
+  uM_only M M' a q -> b + Z.of_nat k <= a -> uM_bytes M b k w -> uM_bytes M' b k w.
+Proof.
+  intros [_ E] Hb Hw j Hj.
+  rewrite (E (b + Z.of_nat j) ltac:(lia)). exact (Hw j Hj).
+Qed.
+
+Lemma sh_str_below (M M' : gmap Z (bv 8)) (p : Z) (bs : list (bv 8))
+    (a q : Z) :
+  uM_only M M' a q -> p + Z.of_nat (length bs) < a -> ustr_at M p bs ->
+  ustr_at M' p bs.
+Proof.
+  intros [_ E] Hb [Hbody Hnul]. split.
+  - intros j b Hj. pose proof (lookup_lt_Some bs j b Hj) as Hlt.
+    rewrite (E (p + Z.of_nat j) ltac:(lia)). exact (Hbody j b Hj).
+  - rewrite (E (p + Z.of_nat (length bs)) ltac:(lia)). exact Hnul.
+Qed.
+
+(* ... and, unlike it, survives a disturbance ABOVE the bound. *)
+Lemma sh_exec_below_only (M M' : gmap Z (bv 8)) (pa pv B a q : Z)
+    (path : list (bv 8)) (args : list (list (bv 8))) :
+  uM_only M M' a q -> B <= a ->
+  sh_exec_below M pa pv path args B -> sh_exec_below M' pa pv path args B.
+Proof.
+  intros Honly HB (Hp0 & Hpb & Hs & Hvb & Hnul & Hi).
+  split_and!.
+  - exact Hp0.
+  - exact Hpb.
+  - exact (sh_str_below M M' pa path a q Honly ltac:(lia) Hs).
+  - exact Hvb.
+  - exact (sh_bytes_below M M' (pv + 8 * Z.of_nat (length args)) 8 _ a q
+             Honly ltac:(lia) Hnul).
+  - intros i bs Hb. destruct (Hi i bs Hb) as (p & H1 & H2 & H3 & H4).
+    pose proof (lookup_lt_Some args i bs Hb) as Hlt.
+    exists p. split_and!.
+    + exact (sh_bytes_below M M' (pv + 8 * Z.of_nat i) 8 _ a q
+               Honly ltac:(lia) H1).
+    + exact (sh_str_below M M' p bs a q Honly ltac:(lia) H2).
+    + exact H3.
+    + exact H4.
+Qed.
+
 Section USpecSh.
   Context `{!riscvGS Σ} `{!uioG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -475,10 +563,20 @@ Section USpecSh.
       (Hst : uv_stack pt M sp0 (64 + 16 + 16))    (* own + free + sbrk *)
       (Hn : m !!! Regidx a0_idx = (mword_of_int nbytes : mword 64))
       (Hnr : 0 < nbytes /\ 16 * sh_nunits nbytes <= 65536)
-      (* the whole .bss is zeroed by [exec] -- this subsumes freep = 0 and
-         is what makes [base.s.size]'s upper four bytes zero, which no
-         instruction writes *)
-      (Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88)
+      (* THE TWO WINDOWS malloc really reads, and nothing between them.
+         This used to be [sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88] -- the
+         whole .bss.  That range runs 0x2010..0x2098 and so COVERS `buf.0'
+         at 0x2020, i.e. it asserted the command buffer was all zeros.  It
+         is therefore FALSE at the only site that calls malloc: [parseexec]
+         reaches it after [gets] has filled that buffer with the command.
+         The lemma proved fine and said nothing wrong on its own; it simply
+         could never be applied.  A premise can be vacuous AT ITS CALL SITE
+         while being perfectly satisfiable in isolation, and no amount of
+         [Print Assumptions] on the callee will show it. *)
+      (Hfreep0  : sh_zeroed M SH_FREEP 0 8)        (* freep == 0        *)
+      (Hbasesz0 : sh_zeroed M (SH_BASE + 8) 0 8)   (* base.s.size == 0, *)
+      (* ... including the four bytes of union padding above it, which no
+         instruction ever writes and which the 8-byte read needs. *)
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
       (Hfr : sh_frame_ok hbase hlen sp0 96)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
@@ -514,7 +612,10 @@ Section USpecSh.
       (Htext : sh_text_sub M)
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 (32 + 64 + 16 + 16))
-      (Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88)
+      (* the same two windows [wp_sh_malloc_first_body] wants; execcmd only
+         passes them through *)
+      (Hfreep0  : sh_zeroed M SH_FREEP 0 8)
+      (Hbasesz0 : sh_zeroed M (SH_BASE + 8) 0 8)
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
       (Hfr : sh_frame_ok hbase hlen sp0 128)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
@@ -547,6 +648,13 @@ Section USpecSh.
       (Htext : sh_text_sub M)
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hst : uv_stack pt M sp0 16)
+      (* [uv_stack] alone gives only [4096 <= uint sp0 - n], while sh's text
+         keys run to 8192 and its data keys to 12288 -- so without this the
+         prologue spill may legally land on the program image and no
+         [ui_sh_*] fact survives it.  fork1 and runcmd were the only two
+         frame-carving contracts in this file missing it, and both were
+         UNPROVABLE as stated. *)
+      (Hfr : sh_frame_ok hbase hlen sp0 16)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.fork1) -∗
@@ -718,8 +826,17 @@ Section USpecSh.
       (Htype : uM_bytes M cmd 4 (mword_of_int 1 : mword 32))
       (Hp0 : uM_bytes M (cmd + 8) 8 (mword_of_int p0 : mword 64))
       (Hp0nz : p0 <> 0)
-      (* what the exec will be observed to name *)
-      (Hexec : uexec_args M p0 (cmd + 8) path args)
+      (* the switch does [lw]/[lwu] at cmd+0 and the EXEC arm [ld a0,8(cmd)],
+         so the node must be 4- and 8-aligned; [uM_bytes] and [uv_rd] are
+         byte-wise and imply nothing.  malloc's node satisfies this. *)
+      (Hal : Z.rem cmd 16 = 0)
+      (Hchi : cmd + SH_EXECCMD_SZ <= hbase + hlen)
+      (* what the exec will be observed to name -- in the BOUNDED form, see
+         §0c.  Plain [uexec_args] here is not merely weak: its string
+         pointers are existential, so it cannot be carried across runcmd's
+         own prologue spill, and the contract could not be used at all. *)
+      (Hbel : sh_exec_below M p0 (cmd + 8) path args (hbase + hlen))
+      (Hfr : sh_frame_ok hbase hlen sp0 48)
       (Hrd : uv_rd pt M cmd SH_EXECCMD_SZ),
     UVG m M -∗
     Q path args -∗
@@ -727,19 +844,30 @@ Section USpecSh.
     WP (Loop : expr riscv_lang).
 
   (* main(): prime the fds, then the REPL.  DIVERGES via exit(0). *)
+  (* NOT parametric in the input.  It carried an unconstrained
+     [(input : list (bv 8))], which read universally claims sh is safe on
+     ANY stdin -- unprovable, and not the theorem: on an arbitrary stream
+     the REPL is not finite (fixing the input is exactly what removes the
+     [iLöb]), and the single [Q sh_echo_path sh_echo_argv] could not be
+     spent.  Naming [sh_echo_input] here is shorter AND honest. *)
   Definition wp_sh_main_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (input : list (bv 8)) :=
+      (sp0 : mword 64) :=
     forall (Hlay : sh_layout pt hbase hlen)
       (Himg : sh_img_sub M)
       (Hsp : m !!! Regidx sp_idx = sp0)
-      (Hst : uv_stack pt M sp0 512)
+      (* main's own frame is 64 (`addi sp,sp,-64' @0x8e2) and the deepest
+         chain below it is parsecmd's 480.  This once said 512 -- SHORT BY
+         32, so no proof of main could have closed.  Spelled out as a sum so
+         the two numbers cannot drift apart again unseen. *)
+      (Hst : uv_stack pt M sp0 (64 + (64 + 48 + 48 + 128 + 112 + 64 + 16)))
       (Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88)
       (Hbssw : uv_wr pt M (SH_DATA_PG + 0x10) 0x88)
       (Htab : sh_tables_ok M)
-      (Hstkhi : hbase + hlen <= uint sp0 - 512)
+      (Hstkhi : hbase + hlen
+                  <= uint sp0 - (64 + (64 + 48 + 48 + 128 + 112 + 64 + 16)))
       (Hstk : uint sp0 <= 2 ^ 38),
     UVG m M -∗
-    ustdin gin input -∗
+    ustdin gin sh_echo_input -∗
     ubrk gbrk hbase -∗
     Q sh_echo_path sh_echo_argv -∗
     pc_is (mword_of_int ShSyms.main) -∗
@@ -759,7 +887,7 @@ Section USpecSh.
   (* ------------------------------------------------------------------- *)
 
   Definition wp_sh_start_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (input : list (bv 8)) :=
+      (sp0 : mword 64) :=
     forall (Hlay : sh_layout pt hbase hlen)
       (Himg : sh_img_sub M)
       (Hsp : m !!! Regidx sp_idx = sp0)
@@ -771,7 +899,7 @@ Section USpecSh.
       (Hstk : uint sp0 <= 2 ^ 38)
       (Hstkhi : hbase + hlen <= uint sp0 - 576),
     UVG m M -∗
-    ustdin gin input -∗
+    ustdin gin sh_echo_input -∗
     ubrk gbrk hbase -∗
     (* the right to conclude [Q] for THESE arguments, consumed exactly once
        -- at the [exec].  A run that exec'd anything else could not spend it,

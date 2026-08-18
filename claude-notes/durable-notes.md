@@ -243,6 +243,71 @@ Two rules follow:
   jointly satisfiable, or delete one.** A four-line `Lemma … -> … -> False`
   attempt is cheap and is the only thing that finds this.
 
+### The commoner variant: SATISFIABLE IN ISOLATION, REFUTABLE AT THE CALL SITE
+
+Contradictory premises are the extreme case and the rare one. The variant
+that keeps recurring is milder and just as invisible: a premise that is
+perfectly satisfiable on its own, so the callee's proof compiles and
+`Print Assumptions` is clean, but that is **false in the state the only
+caller is actually in**. The lemma is correct and unusable, and nothing
+discovers it until someone writes the caller.
+
+Three instances in `sh` alone, all the same shape — a premise about the
+program's `.bss` stated over too WIDE an address range:
+
+| where | the range | why it is false there |
+|---|---|---|
+| `wp_sh_free_first_body` | `sh_zeroed M (SH_DATA_PG+0x10) 0 0x88` | `free` runs from `morecore`, i.e. after `malloc`'s head has already written `freep` and `base.s.ptr` |
+| `wp_sh_malloc_first_body` | same | the range covers `buf.0` at 0x2020, so it says the command buffer is all zeros — but `parseexec` reaches `malloc` after `gets` filled it |
+| `wp_sh_execcmd_body` | same | ditto, one frame up |
+
+The fix each time was the same: **state the windows the proof actually
+reads, and nothing between them.** `malloc` consumes exactly offsets
+`[0,8)` (`freep == 0`) and `[128,136)` (`base.s.size`, plus the four bytes
+of union padding above it that no instruction writes and that only the
+zeroing establishes). So the premises became
+
+    (Hfreep0  : sh_zeroed M SH_FREEP 0 8)
+    (Hbasesz0 : sh_zeroed M (SH_BASE + 8) 0 8)
+
+and the whole-`.bss` claim survives only in `main`/`start`, which is where
+it is true.
+
+The habit that catches it: when a premise covers a RANGE, list what else
+lives in that range and ask whether the caller has written any of it yet.
+A range premise is a claim about every byte in it, including the ones you
+were not thinking about. Grepping the layout constants for addresses inside
+the range takes a minute and is the whole check.
+
+### FIXING A DEFINITION CAN TURN A DOWNSTREAM LEMMA VACUOUS INSTEAD OF BREAKING IT
+
+The reassuring assumption about a definition change is that everything
+depending on it either still compiles or fails loudly. That is true when
+the definition appears in a lemma's CONCLUSION. When it appears in a
+PREMISE, the third outcome is available and it is silent: the lemma still
+compiles, and is now unusable.
+
+`UmodeIo.xv6_io_sem SYS_wait` was `IoPureRet`, which was wrong — `wait(p)`
+for `p ≠ 0` writes through `p`, so the arm cannot claim the image is
+untouched. It was corrected to `IoWaitNull`. But `UProofShLib.wp_sh_wait`
+proves `wp_sh_pureret_body ShSyms.wait SYS_wait`, whose premise list
+contains
+
+    Hsem : xv6_io_sem SYS_wait = IoPureRet
+
+and that equation is now FALSE. Nothing broke. The lemma is still there,
+still proved, still axiom-clean — and no caller can ever supply `Hsem`, so
+`main`, its only caller, had no usable `wait` contract at all. The gap was
+found months of proof-work later, by the first person to actually call it.
+
+**After changing a definition, grep for it in PREMISE position, not just
+for compile failures.** A premise mentioning a changed definition is a
+place where the build's silence means nothing. The `_body`-with-`Hsem`
+idiom is especially exposed — parameterising a contract by a semantic
+equation makes every instantiation a claim that can quietly go false — so
+prefer a contract that COMPUTES the arm to one that takes the arm's
+identity as a hypothesis.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
@@ -261,6 +326,33 @@ by `str.replace` dropped its return-value conjunct, so the contract stopped
 saying what `sbrk` returns — which is the one thing its only caller needs.
 After any edit to a `_body` definition, diff the conjunct COUNT, not just
 the compile result.
+
+## A STACK-BUDGET PREMISE IS ARITHMETIC — SPELL IT AS THE SUM, NOT A ROUND NUMBER
+
+`uv_stack pt M sp0 n` looks like a formality and is not: `n` is a claim
+about the deepest call chain below this function, and if it is too small
+the contract is simply **unprovable**, which is a defect that surfaces only
+when someone sits down to prove the body — potentially thousands of lines
+of work later.
+
+`wp_sh_main_body` asked for 512. `main`'s own frame is 64 (`addi sp,sp,-64`
+@0x8e2) and the deepest chain below it is `parsecmd`'s 480, so the honest
+number is 544. It was short by 32, and nothing could have revealed that
+except attempting the proof: the premise is *weaker* than needed, so no
+caller complains either — `wp_sh_start_body` happily supplies 576.
+
+**Write the budget as the sum of its parts**, exactly as the contract below
+it spells its own:
+
+    (Hst : uv_stack pt M sp0 (64 + (64 + 48 + 48 + 128 + 112 + 64 + 16)))
+
+not `544`, and certainly not a number rounded up "for safety". A rounded
+constant loses the correspondence with the chain, so the next person to add
+a frame cannot tell whether it still fits, and the two numbers drift apart
+with nothing to notice. If a comment records the arithmetic (as
+`wp_sh_start_body`'s does), the sum in the premise and the sum in the
+comment must be the same expression — otherwise the comment is the thing
+that gets updated and the premise is the thing that is wrong.
 
 ## A FUNCTION THAT WRITES A CALLER'S BUFFER DISTURBS *TWO* WINDOWS
 
@@ -1316,6 +1408,12 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - **AN `own`-GHOST-STEP WHOSE FRAGMENT IS AN OP-TERM MUST BE STATED AS A GOAL AND `iApply`ed, NEVER `iMod`ed WITH EXPLICIT ARGUMENTS — the failure is a silent divergence, not an error.** Minting two fragments in one step (`link_update_alloc z a a' (b1 ⋅ b2)`) via `iMod` with every argument explicit spins forever at the `iMod` sentence (>14 min at 100 % CPU, stable RSS, no message); the IDENTICAL proof stated as `iAssert (|==> auth' ∗ frag (b1 ⋅ b2))%I … as ">[Hauth Hfr]"` with `iApply (link_update_alloc with "Ha")` inside — unification against the stated goal instead of elaborated arguments — completes in seconds. `iCombine "H1 H2" as "H"` on two `own`s of singleton auth-maps over a wide product CMRA diverges the same way (its `IsOp`/`CombineSepAs` search); combine with `iDestruct (own_op with "[$H1 $H2]") as "H"` + `iEval (rewrite singleton_op -auth_frag_op) in "H"` (all `=`-rewrites, no setoid search). And a `≡`-split of a fragment (`full ≡ half ⋅ half`) must NOT be setoid-rewritten under `own` inside `iEval` (fails fast with *"setoid rewrite failed: UNDEFINED EVARS"*) — do the `rewrite -Hsp` in the PURE local-update subgoal, where `local_update_proper` carries it. (All three found landing V5''s fractional parent register in `IcacheRef.link_mint_linkdp`/`link_spend_linkdp`.)
 - **A `prod_local_update'` CHAIN OVER A WIDE NESTED `prodUR` COSTS SECONDS PER `apply` — ~8 s each at a 7-component element, and in a long Section EVERY apply pays it** (in a small scratch file only the first does). A file with a dozen movers over such an element takes minutes for the algebra section alone. When widening a ledger element, budget for it — or fold the per-component chain into ONE composed helper lemma so each mover pays the elaboration once. (`IcacheRef.v` after the V4+V5' widening.)
 - **A STALE `iDestruct` PATTERN CAN SPLIT A NESTED CONJUNCTION AND BIND THE WRONG RESOURCE — silently, and it surfaces far away.** When a bundled predicate loses a conjunct, an intro pattern with the OLD arity does not necessarily fail: if one of the remaining conjuncts is itself a separating conjunction, the extra slots happily split IT instead. A four-slot `"(_ & _ & #Hdev & _)"` against a now-three-conjunct bundle bound `#Hdev` to the FIRST COMPONENT of the third conjunct (itself a 4-way `∗`) with no arity error, and failed eight lines later at an application wanting the whole thing — reported as "cannot instantiate … with (uart_inv γd)". **When you change the shape of a bundled predicate, grep for every `iDestruct` of it and re-count**; the error, when it comes, names the consumer and not the pattern.
+- **TWO `bv` BYTES WITH THE SAME VALUE NEED NOT BE THE SAME TERM, AND THE ERROR PRINTS THEM IDENTICALLY.** Reading an IMAGE byte into a `uM_bytes` window fails with *"Unable to unify \"Some 54%bv\" with \"Some 54%bv\""* — the two really are equal as bitvectors, but one is `Z_to_bv 8 0x36` (what the dump holds) and the other is `nth_byte w 0` (what the window wants), and they carry DIFFERENT `bv_is_wf` proofs. `vm_compute; reflexivity` cannot bridge it, and the message gives you nothing to work with because both sides print as their common value. The route: get `M !! k = Some (Z_to_bv 8 …)` from `sh_data_sub` first, `rewrite` it, then close with `f_equal; apply bv_eq; vm_compute; reflexivity` — `bv_eq` is what discards the proof component. (Hit reading `runcmd`'s jump table out of `ShData.sh_data`; a byte introduced EXISTENTIALLY never hits it, which is why most image reads in this tree do not.)
+- **`vm_compute` INSIDE AN `ltac:(…)` WHOSE ARGUMENT POSITION IS STILL AN EVAR HANGS; `lia` THERE FAILS WITH A MISLEADING MESSAGE.** `exact (some_lemma _ ltac:(vm_compute; reflexivity))` — where the `_` is inferred from the goal only AFTER the `ltac:` runs — spins forever rather than erroring, and costs you the "is this a slow proof or a hang?" question. `coqc -time` localises it in one run; reach for that before bisecting. In the same position `lia` does fail, but it reports **"Cannot find witness"**, which reads like an arithmetic gap and is not one — it means the goal still had an evar in it. In both cases the fix is to name the value: `assert (H : …) by (vm_compute; reflexivity)` and pass `H`, or supply the `_` explicitly. (Cost 22 minutes once and recurred three more times, once per `_`-inferred address, while proving `nulterminate`.)
+- **A `*)` INSIDE A COMMENT SILENTLY CLOSES IT, AND THE ERROR APPEARS SOMEWHERE ELSE ENTIRELY.** Quoting C in a comment is enough to do it: `a5 := *(int*)(0x13b0 …)` ends the comment at `t*)`, and the rest of the intended comment becomes code. The symptom is `Nested proofs are discouraged` reported many lines later, at a `Lemma` that is perfectly fine — and every `Proof.`/`Qed.` pair still balances, so bisecting on `Qed.` lines finds nothing. The mirror case, a stray `(*` inside a comment (`(*eargv[i] = 0)`), gives `Unterminated comment` at EOF. **Write a comment-nesting checker and run it first**; a dozen lines of Python finds both in seconds. This tree has now been bitten by the pair three times (once mangling a comment via a careless regex substitution).
+- **`split_and!` on `0 <= x < N` produces TWO goals, not one.** The conjunction is `0 <= x /\ x < N`. Any following bullet list is then off by one, and the error surfaces as a *rewrite* failure inside the next bullet ("The LHS of Hend (S i) does not match any subterm") rather than as a goal-count complaint. Count the goals after `split_and!` on any range hypothesis.
+- **A CALLER'S `uM_only_in` WINDOW MUST COVER THE LOCALS IT PASSES DOWN, NOT JUST THE CALLEE'S FRAME.** The instinct "everything below my sp" is wrong for any function that hands a callee the address of one of its OWN locals. `parseexec` passes `&q`/`&eq` to `gettoken`; those cells live at `sp0-120`/`sp0-128`, inside parseexec's frame but ABOVE the region the callee carves — so the arg loop's window is `(uint sp0 - 320, 208)`, not 192. It must reach 16 bytes further up than the callee's frame, and still stop short of the caller's own spill slots, or the epilogue loses `ra`/`s0`. Get this wrong in either direction and the failure is a `uM_only_in` that cannot be established, reported at the caller.
+- **A `rewrite` BETWEEN A `bv ?n` AND AN `mword 64` FAILS SAYING IT CANNOT FIND A TERM THAT IS PLAINLY THERE.** `rewrite <- H` with `H : m1 !!! Regidx r = m !!! Regidx r` fails with *"Found no subterm matching `m !!! Regidx ra_idx`"* inside a `uM_bytes M a 8 (m !!! Regidx ra_idx)` goal — because `uM_bytes`' value argument is a `bv ?n` with the width still an evar, while the equation is at `mword 64`, and **the two width indices print identically**. No stronger rewrite helps. State the whole spill/reload tower at the SOURCE file's spelling (`m1 !!! r`, `f1 !!! r`) and convert once at the end, in the final `ucallee_saved`, where both sides are honestly `mword 64`. Same family as the `Some 54%bv` / `Some 54%bv` unification failure above: when a message shows you two identical-looking terms, suspect an index or a proof component, not the values.
 - **Some files are deliberately ssreflect-FREE, and that decides where a definition may live.** `Pt4kWalk.v` has 27 vanilla `rewrite … by …` rewrites, so it cannot `Require` anything that pulls in the iris proofmode — which `PageGeom.v` does (it needs ssreflect's `rewrite … in H |- *` for the two `uint`/`bv_unsigned` bridges it inherited from `KallocInv.v`). So a `page_base`-spelled restatement of a `Pt4kWalk` fact has to live in `PtBuild.v`, not in `Pt4kWalk.v`, even though there is no dependency CYCLE. Before planning a relocation into a low file, check whether that file uses `rewrite … by …`; the failure mode is a parse error at the first such rewrite, far from the import you added.
 - **BUILD A CALLEE'S PRECONDITION BUNDLE WITH A NAMED `assert`, NEVER AN INLINE `ltac:`.** A conjunctive premise like `init_layout pt /\ init_text_sub M /\ is_aligned_vaddr (Virtaddr (mreg !!! Regidx ra_idx)) 2 = true` supplied as `(conj Hlay (conj Htext ltac:(rewrite Hmra; vm_compute; reflexivity)))` fails with *"The LHS of Hmra (mreg !!! Regidx ra_idx) does not match any subterm of the goal"* — by the time the `ltac:` runs, elaboration has zeta-expanded the `set`-bound register file, so the goal names the raw insert tower and the rewrite has nothing to hit. `assert (Hpre : <the whole conjunction>). { split_and!; [ … | … | rewrite Hmra; vm_compute; reflexivity ]. }` and pass `Hpre` works every time. Hit four times across UProofInitLib.v / UProofInit.v; the same shape is why `wp_init_write`'s three pure premises are named asserts too.
 - In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails) — and a comma list is not rescued by the modifiers either: `rewrite H1, !H2` and `rewrite H1, <- H2` die with *"Syntax error: [ltac_use_default] expected after [tactic]"*, pointing at the `!`/`<-` rather than at the comma. Split them. `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.
