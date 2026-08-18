@@ -371,32 +371,58 @@ invariant.  The one real difference in the peel: `pmpaddr_n` must be peeled
 D-PINNED rather than value-dead, because at Supervisor the match's outcome is
 load-bearing.
 
+#### The `kptN` seam is BUILT (`HartSKpt.v`), and it exposed the real remaining shape
+
+`kpt_maps_across` / `kpt_open_slots` / `kpt_slot_node` / `kpt_pte2_node` /
+`kpt_pte1_node` / `kpt_leaf_node`, plus `read_bytes_of_bytes` (the pure
+`read_bytes` converse, which the tree did not have -- `text_read_bytes` and
+`phys_read_bytes` both END there but each bundles the step with its own
+resource).  `Print Assumptions kpt_leaf_node`: closed under the global
+context.  The invariant is opened per read node and closed again BEFORE the
+node's mask shift, because everything the walk needs out of it is pure
+(`pt_slot_mem` is a fact about `mem`, not a resource) -- so nothing is held
+across a node boundary.
+
+**THE LEAF'S A/D BITS ARE NOT PINNED ACROSS OPENINGS.**  Three reads, three
+openings, three possibly-different live trees; `kpt_lb_agree` reconciles them
+only up to `ptree_canon`, and `ptree_maps_canon` is exact on levels 2 and 1
+but CANONICALISES the leaf.  Another hart may set A/D between this walk's
+reads, and stating the leaf read any tighter would be false of the machine.
+The bridge back is `PtAdBits.pte_canon_inv` (`pte_canon q0 = pte_canon p0 →
+∃ a d, q0 = pte_set_ad p0 a d`) and `pte_set_ad_ppn` (the PPN survives), both
+of which already exist -- the machinery anticipated the variance.
+
 #### What is left, in order
 
-1. **The `kptN` per-node seam** -- the next unit, and the one with real design
-   in it.  `swp_read_pte_S`'s memory obligation is an ATOMIC-STEP fupd, so the
-   invariant is opened inside ONE node and closed before the next; that is
-   sound because the table is read-only after boot (the reason it is shareable
-   at all).  What it needs from the exec side, which already has all of it:
-   `KptShare.kpt_body`'s `ptree_own` holds each slot as
-   `u_pte_addr … ↦ₚ₈{dq} …` (`PtTree.pt_page_own`), `pt_slot_mem` is the
-   per-byte form, and `pt_read_pte_slot` is the exec fact built from it.
-   Two gaps: (a) a PURE `read_bytes` converse (per-byte facts →
-   `read_bytes mm pa n = Some w`) -- it does NOT exist; `HartLift2.text_read_bytes`
-   and `HartPilot.phys_read_bytes` both bundle it with their resource step, and
-   the pure tail they share is `read_bytes_ne` + `read_bytes_spec` +
-   `bv_eq_of_bytes`; (b) the values read at the three levels must be the SAME
-   across three separate openings -- that is what `kpt_lb` / `kpt_lb_agree`
-   (canonical agreement against a persistent snapshot) is for, and it is the
-   same mechanism `tlb_res_pt_translateAddr_at` uses to reconcile the hart's
-   TLB snapshot with the live tree.  **Watch `kmap_at`'s persistence**: it is
-   needed at three nodes, so if it is not persistent it has to be threaded.
-2. **`swp_translate_kpt`** -- assembly: `PtTreeAdue.swp_translateAddr_pt_front`
-   into (`swp_translate_hit` | `swp_translate_miss`), the arm picked by
-   destructing the slot in `tlbv`, which the caller holds in its own frame.
-3. **The regime field** `sr_swp_translate` (shape recorded above) + its two
+1. **RELAX THE LEAF READ OBLIGATION** through `CommonWalk.swp_rec_walk_leaf` →
+   `swp_pt_walk_user` → `swp_translate_TLB_miss_user` →
+   `HartSTrans.swp_translate_miss`: the leaf's post becomes
+   `∃ q0, ⌜r = Ok q0⌝ ∗ ⌜pte_canon q0 = pte_canon pte0⌝`, the returned PPN
+   stays pinned (`pte_set_ad_ppn`), and the installed TLB entry -- hence the
+   post-FILE -- becomes existential in `q0`.  All four lemmas were written
+   this session, so this is cheap to iterate.
+2. **THE SVADU WRITE-BACK, AS A NODE.**  This is the piece the A/D finding
+   uncovered and it was NOT on this list before.  `swp_translate_hit` and
+   `swp_translate_miss` both carry `update_PTE_Bits … = None` -- i.e. they
+   cover only the case where memory already has the bits.  Since the live leaf
+   may have them UNSET, the other case is reachable and the walk then performs
+   a memory WRITE.  The exec side already splits exactly this way and names
+   both arms: `PtTreeAdue`'s `_upd` (`update_PTE_Bits = Some`: memory written,
+   entry refreshed with the new word) and `_refresh` (`= None`: nothing
+   written).  **Both arms exist for the HIT path too**
+   (`exec_translate_TLB_hit_pt_upd`), so this is not miss-only.  The swp piece
+   needed is the write twin of `swp_checked_mem_read_pte8` -- a
+   `checked_mem_write` node at `(Store PageTableEntry)`/`Supervisor`/8 -- and
+   the `kptN` seam for it is HARDER than the read seam, because a write is not
+   pure: it must take `ptree_own` out of the invariant, update it, and put it
+   back, all inside one node.
+3. **`swp_translate_kpt`** -- assembly: `PtTreeAdue.swp_translateAddr_pt_front`
+   into (`swp_translate_hit` | `swp_translate_miss`), each with its `_upd` /
+   `_refresh` arm; the hit/miss arm picked by destructing the slot in `tlbv`,
+   which the caller holds in its own frame.
+4. **The regime field** `sr_swp_translate` (shape recorded above) + its two
    instances.
-4. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
+5. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
    `WpSmodeIntr.wp_instr_s_intr` the same way at the kpt instance.
 
 ### What `WpIntrInv` actually needs
