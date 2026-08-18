@@ -1,16 +1,12 @@
-(* WpIntrInv.v -- the GENERAL S-mode interrupt invariant and the
-   interrupt-absorbing step engine (the tick-aware redesign of the old
-   pinned-cell interrupt capstone).
+(* WpIntrInv.v -- the S-mode INTERRUPT-ABSORBING STEP ENGINE, per node.
 
-   THE DESIGN.  The SIE ghost variable is CANONICAL per hart --
-   [IntrDefs.sie_gname] = [sie_name cpu_id], exactly like [reg_name] /
+   THE DESIGN OF THE SIE GHOST.  The SIE ghost variable is CANONICAL per hart
+   -- [IntrDefs.sie_gname] = [sie_name cpu_id], exactly like [reg_name] /
    [strans_name] -- so nothing in this tier carries a ghost argument: the
    ambient [CpuId] determines the ghost.  It is split into THREE pieces:
 
      - 1/2 rides with the mstatus cell, tied to the LIVE [mstatus.SIE] bit
-       (this is the half [smode_config] bundles; in the interrupts-ENABLED
-       regime the client holds it inside [intr_config], the SIE=1 mirror of
-       [smode_config]);
+       (the half [sconf] bundles);
      - 1/4 is the KERNEL-CODE token: client code keeps it to reason about
        whether interrupts are currently enabled or disabled (push_off /
        pop_off bookkeeping);
@@ -20,472 +16,745 @@
 
    Changing SIE therefore requires ALL THREE pieces (1/2 + 1/4 + 1/4 = 1,
    [sie_ghost_flip]), so interrupts cannot be enabled without the installed
-   handler resource in hand.  [intr_res] WAS AN IRIS INVARIANT [intr_inv]
-   until 2026-08-11, and the flipping instruction used to open it across its
-   own step to borrow the quarter; it is now plain ownership riding inside
-   [trap_csrs], and the flip leaves take it as an ordinary resource.  See
-   [IntrDefs.v] §5 for why (the short version: an invariant pins the trap
-   VECTOR forever, which user mode cannot live with, and the persistence it
-   bought was per-hart and therefore useless after a park).
+   handler resource in hand.
 
-   THE ENGINE.  [wp_exec_step_intr] slots into the clock_inv / minstret_inv
-   reduction machinery: it is a Löb loop over the joint step rule
-   [wp_exec_step_retire_or_intr] (built on [wp_exec_step_minstret], so the
-   clock tick is already absorbed one layer down).  At each step it reads the
-   dispatch inputs mip / sig_meip / sig_seip DIRECTLY OFF the machine state σ
-   (they live in [clock_inv] / [wire_inv] and can never be pinned by cells --
-   a tick may rewrite MTIP/STIP at every step, the PLIC wire step may flip
-   sig_seip at any time), and cases on the outcome:
+   THE ENGINE.  [wp_exec_step_intr] runs ONE S-mode instruction at [pc0] with
+   interrupts enabled, absorbing an arbitrary number of pending interrupts
+   first (Löb induction over the trap + handler round trip).  It is a
+   per-NODE engine now: one iteration is one [HartStepAny.swp_exec_step_any]
+   at an S-mode frame, whose body is the fetch/decode/execute walk
+   ([HartRunGen.swp_run_hart_active_gen] and its three siblings) with the
+   dispatch discharged by [WpIntrCore.swp_dispatchInterrupt_S] and the fetch
+   by [HartSTrans.swp_fetch_S*] over the converted page walk.  The two arms:
 
-     - PENDING: it takes the interrupt -- reads [stvec] and the handler WP
-       out of [intr_res] for the trap step, drives the trap tower
-       ([exec_handle_interrupt_S]), runs the handler via that
-       [intr_handler_spec] (which returns idempotently to the interrupted
-       pc with SIE re-enabled and the frame [intr_frame] intact), and re-enters
-       itself by Löb induction -- so an ARBITRARY number of back-to-back
-       interrupts is absorbed;
-     - NONE: it hands the caller's σ-callback the PURE fact
-       [exec (dispatchInterrupt Supervisor) σ = Some (None, σ)] -- no
-       interrupt needs to be taken -- so the higher-level per-instruction
-       logic runs the instruction WITHOUT owning mip or the wire pins, and
-       without fupd-style specs passing an interrupt-pending cell around.
+     - PENDING: the trap itself is [swp_handle_interrupt_S] (WpIntrCore.v),
+       a hand-walk of [handle_interrupt i Supervisor] over the trap CSRs
+       ([sie_cap]'s enabled arm supplies sepc/scause/stval/stvec).  After the
+       cycle's own tail the engine flips the SIE ghost, updates [sret_bits],
+       assembles [ihs_entry_of], runs [intr_handler_spec_apply] and re-enters
+       the Löb ON THE HART THE HANDLER RETURNED TO;
+     - RETIRE: the caller's obligation gets the S-mode bundles as CELLS and
+       owes one [swp (execute i)].
+
+   THE FOOTPRINT SPLIT, and why it is not [WpSFrames]'s.  The cycle rule
+   needs a frame for the WHOLE cycle -- the boundary, the prelude, the tick.
+   The leaf needs [sconf] and [sie_cap] DURING the instruction, and those own
+   cells ([cur_privilege], [mstatus], [mie], [mideleg], [menvcfg], [satp],
+   [tlb], the two PMP cells) that no frame may hold at the same time.  The
+   resolution is that only the cells nothing else claims stay in the cycle's
+   frame -- [i_Drw] / [i_Dro] below -- and the frame is ENLARGED to
+   [HartSFrame]'s [s_Drw] / [s_Dro] exactly around the dispatch, the fetch
+   and the trap, where the bundle is open anyway.
+
+   [nextPC] IS THE ONE CELL HELD AT A HALF, and that is load-bearing rather
+   than an economy.  The cycle rule's continuation only says that the file it
+   lands on agrees with [wrap_post rs2 mi] for SOME [rs2] the body chose, so
+   the landing pc is an existential and the resources the arms carry (the
+   leaf's continuation, the handler's entry package) are indexed by it.  The
+   second half of [nextPC], kept out of the frame by the arm, turns that
+   existential into an EQUATION by [reg_pointsto_agree] -- one cell doing the
+   job a stronger cycle rule would otherwise have to do.
 
    The per-trap frame is the CONCRETE [intr_frame]: [stack_own] of depth AT
    LEAST [kv_frame_slots] below the interrupted sp -- the kernel must
-   maintain that much free stack at every interrupts-enabled instruction --
-   plus menvcfg and tlb_inv_pt.  [kernelvec_handler_spec] proves the real
-   kernelvec ([wp_kernelvec], ProofKernelvec.v) satisfies the contract;
-   [SpecKernelvec.v] is the interface, [LinkKernelvec.v] the instantiation. *)
-From Stdlib Require Import ZArith Bool.
+   maintain that much free stack at every interrupts-enabled instruction.
+   [kernelvec_handler_spec] proves the real kernelvec ([wp_kernelvec],
+   ProofKernelvec.v) satisfies the contract; [SpecKernelvec.v] is the
+   interface, [LinkKernelvec.v] the instantiation. *)
+From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var invariants.
-From iris.program_logic Require Import language lifting.
+From iris.bi.lib Require Import fractional.
+From iris.program_logic Require Import language lifting weakestpre.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr RegFile HartTp.
-Require Import SmodeCore.
+Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
+        HartMCycle HartStepAny HartRunGen HartSFrame HartSTrans.
+Require Import SmodeCore WpSFrames KptShare KptPt KMap SRegime StackOwn.
 Require Import MstatusBits WpIntrCore.
 Require Export IntrDefs.
 Local Open Scope Z_scope.
 Import Defs.
 
-Section WpIntrInv.
+(* ===================================================================== *)
+(* §1 THE CYCLE'S OWN FOOTPRINT.                                          *)
+(*                                                                       *)
+(* Exactly the cells [HartStepAny.swp_exec_step_any] demands and nothing  *)
+(* else: PC / nextPC / the two minstret cells / the three clock cells /   *)
+(* hart_state / cur_privilege / the two counter-config cells.  Every      *)
+(* other S-mode cell belongs to [sconf] or [sie_cap] and is lent to the   *)
+(* frame only for the stretches that need it (§2).                        *)
+(* ===================================================================== *)
+Definition i_Drw : gset register :=
+  {[ (R_bitvector_64 PC : register);
+     (R_bitvector_64 minstret : register);
+     (R_bool minstret_increment : register);
+     (R_bitvector_64 mcycle : register);
+     (R_bitvector_64 mtime : register);
+     (R_bitvector_64 mip : register) ]}.
+
+Definition i_Dro : gset register :=
+  {[ (R_bitvector_64 nextPC : register);
+     (hart_state : register);
+     (cur_privilege : register);
+     (R_bitvector_32 mcountinhibit : register);
+     (R_bitvector_64 minstretcfg : register) ]}.
+
+Lemma i_disj : i_Drw ## i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+
+Lemma i_w_PC : (R_bitvector_64 PC : register) ∈ i_Drw.
+Proof. rewrite /i_Drw. set_solver. Qed.
+Lemma i_w_ms : (R_bitvector_64 minstret : register) ∈ i_Drw.
+Proof. rewrite /i_Drw. set_solver. Qed.
+Lemma i_w_mi : (R_bool minstret_increment : register) ∈ i_Drw.
+Proof. rewrite /i_Drw. set_solver. Qed.
+Lemma i_w_cy : (R_bitvector_64 mcycle : register) ∈ i_Drw.
+Proof. rewrite /i_Drw. set_solver. Qed.
+Lemma i_w_ti : (R_bitvector_64 mtime : register) ∈ i_Drw.
+Proof. rewrite /i_Drw. set_solver. Qed.
+Lemma i_w_ip : (R_bitvector_64 mip : register) ∈ i_Drw.
+Proof. rewrite /i_Drw. set_solver. Qed.
+
+Lemma i_in_PC : (R_bitvector_64 PC : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_nPC : (R_bitvector_64 nextPC : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_ms : (R_bitvector_64 minstret : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_mi : (R_bool minstret_increment : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_priv : (cur_privilege : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_hart : (hart_state : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_mc : (R_bitvector_32 mcountinhibit : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+Lemma i_in_micfg : (R_bitvector_64 minstretcfg : register) ∈ i_Drw ∪ i_Dro.
+Proof. rewrite /i_Drw /i_Dro. set_solver. Qed.
+
+(* the two counter-config cells are frozen ([minstret_res] holds them at
+   [↦ᵣ□]); [nextPC] is the HALF (see the header). *)
+Definition i_Df : register -> dfrac := fun r =>
+  if decide (r = (R_bitvector_32 mcountinhibit : register)) then DfracDiscarded
+  else if decide (r = (R_bitvector_64 minstretcfg : register)) then DfracDiscarded
+  else if decide (r = (R_bitvector_64 nextPC : register)) then DfracOwn (1/2)
+  else DfracOwn 1.
+
+Lemma i_Df_mc : i_Df (R_bitvector_32 mcountinhibit) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma i_Df_micfg : i_Df (R_bitvector_64 minstretcfg) = DfracDiscarded.
+Proof. reflexivity. Qed.
+Lemma i_Df_nPC : i_Df (R_bitvector_64 nextPC) = DfracOwn (1/2).
+Proof. reflexivity. Qed.
+
+Section IFrames.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma i_rw_split (rs : regstate) :
+    (hreg_frame rs i_Drw : iProp Σ) ⊣⊢
+    ((R_bitvector_64 PC) ↦ᵣ register_lookup (R_bitvector_64 PC) rs ∗
+     (R_bitvector_64 minstret) ↦ᵣ register_lookup (R_bitvector_64 minstret) rs ∗
+     (R_bool minstret_increment) ↦ᵣ
+       register_lookup (R_bool minstret_increment) rs ∗
+     (R_bitvector_64 mcycle) ↦ᵣ register_lookup (R_bitvector_64 mcycle) rs ∗
+     (R_bitvector_64 mtime) ↦ᵣ register_lookup (R_bitvector_64 mtime) rs ∗
+     (R_bitvector_64 mip) ↦ᵣ register_lookup (R_bitvector_64 mip) rs)%I.
+  Proof.
+    rewrite /hreg_frame /i_Drw.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma i_ro_split (rs : regstate) :
+    (hreg_frame_ro i_Df rs i_Dro : iProp Σ) ⊣⊢
+    (reg_pointsto (R_bitvector_64 nextPC) (DfracOwn (1/2))
+       (register_lookup (R_bitvector_64 nextPC) rs) ∗
+     reg_pointsto hart_state (DfracOwn 1) (register_lookup hart_state rs) ∗
+     reg_pointsto cur_privilege (DfracOwn 1)
+       (register_lookup cur_privilege rs) ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded
+       (register_lookup (R_bitvector_32 mcountinhibit) rs) ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded
+       (register_lookup (R_bitvector_64 minstretcfg) rs))%I.
+  Proof.
+    rewrite /hreg_frame_ro /i_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite !i_Df_nPC !i_Df_mc !i_Df_micfg.
+    unfold i_Df.
+    repeat (rewrite decide_False; [|discriminate]).
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma i_agree_rw (rs rs' : regstate) :
+    reg_agree_on (i_Drw ∪ i_Dro) rs rs' -> reg_agree_on i_Drw rs rs'.
+  Proof. intros Hag r Hr. apply Hag. set_solver. Qed.
+
+  Lemma i_agree_ro (rs rs' : regstate) :
+    reg_agree_on (i_Drw ∪ i_Dro) rs rs' -> reg_agree_on i_Dro rs rs'.
+  Proof. intros Hag r Hr. apply Hag. set_solver. Qed.
+
+  Lemma i_rw_ext (rs rs' : regstate) :
+    reg_agree_on (i_Drw ∪ i_Dro) rs rs' ->
+    hreg_frame rs i_Drw -∗ (hreg_frame rs' i_Drw : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ i_Drw (i_agree_rw _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma i_ro_ext (rs rs' : regstate) :
+    reg_agree_on (i_Drw ∪ i_Dro) rs rs' ->
+    hreg_frame_ro i_Df rs i_Dro -∗ (hreg_frame_ro i_Df rs' i_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext _ _ _ i_Dro (i_agree_ro _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  (* the half-cell calculus [nextPC] rides on *)
+  Lemma reg_half (r : register) (v : type_of_register r) :
+    (reg_pointsto r (DfracOwn 1) v : iProp Σ) ⊣⊢
+    (reg_pointsto r (DfracOwn (1/2)) v ∗ reg_pointsto r (DfracOwn (1/2)) v).
+  Proof.
+    rewrite -(fractional (Φ := fun q => reg_pointsto r (DfracOwn q) v)
+                (1/2)%Qp (1/2)%Qp).
+    by rewrite Qp.half_half.
+  Qed.
+
+  Lemma reg_half_join (r : register) (v : type_of_register r) :
+    reg_pointsto r (DfracOwn (1/2)) v -∗ reg_pointsto r (DfracOwn (1/2)) v -∗
+    (reg_pointsto r (DfracOwn 1) v : iProp Σ).
+  Proof. rewrite reg_half. iIntros "H1 H2". iFrame. Qed.
+
+  Lemma reg_half_split (r : register) (v : type_of_register r) :
+    reg_pointsto r (DfracOwn 1) v -∗
+    (reg_pointsto r (DfracOwn (1/2)) v ∗
+     reg_pointsto r (DfracOwn (1/2)) v : iProp Σ).
+  Proof. rewrite reg_half. iIntros "H". iExact "H". Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* THE ENLARGEMENT.  [x_cells] is exactly what [HartSFrame]'s footprint  *)
+  (* has and the cycle's does not: the config cells [sconf] owns, the      *)
+  (* translation cells [tlb_res_pt] owns, the [hw_config] pins -- and the  *)
+  (* SECOND HALF of nextPC.  Joining it to the cycle frame gives the       *)
+  (* S-mode frame every dispatch / fetch / trap rule is stated at.         *)
+  (* ------------------------------------------------------------------ *)
+  Definition x_cells (rs : regstate) : iProp Σ :=
+    (reg_pointsto (R_bitvector_64 nextPC) (DfracOwn (1/2))
+       (register_lookup (R_bitvector_64 nextPC) rs) ∗
+     reg_pointsto mstatus (DfracOwn 1) (register_lookup mstatus rs) ∗
+     reg_pointsto mie (DfracOwn 1) (register_lookup mie rs) ∗
+     reg_pointsto mideleg (DfracOwn 1) (register_lookup mideleg rs) ∗
+     reg_pointsto menvcfg (DfracOwn 1) (register_lookup menvcfg rs) ∗
+     reg_pointsto satp (DfracOwn 1) (register_lookup satp rs) ∗
+     reg_pointsto tlb (DfracOwn 1) (register_lookup tlb rs) ∗
+     reg_pointsto pmpcfg_n (DfracOwn 1) (register_lookup pmpcfg_n rs) ∗
+     reg_pointsto pmpaddr_n (DfracOwn 1) (register_lookup pmpaddr_n rs) ∗
+     reg_pointsto misa DfracDiscarded (register_lookup misa rs) ∗
+     reg_pointsto mseccfg DfracDiscarded (register_lookup mseccfg rs) ∗
+     reg_pointsto pma_regions DfracDiscarded (register_lookup pma_regions rs) ∗
+     reg_pointsto htif_tohost_base DfracDiscarded
+       (register_lookup htif_tohost_base rs) ∗
+     reg_pointsto elp DfracDiscarded (register_lookup elp rs) ∗
+     reg_pointsto senvcfg DfracDiscarded (register_lookup senvcfg rs))%I.
+
+  Lemma i_to_s (rs : regstate) :
+    hreg_frame rs i_Drw -∗ hreg_frame_ro i_Df rs i_Dro -∗ x_cells rs -∗
+    (hreg_frame rs s_Drw ∗ hreg_frame_ro (s_Df (DfracOwn 1)) rs s_Dro : iProp Σ).
+  Proof.
+    rewrite i_rw_split i_ro_split s_rw_split s_ro_split /x_cells.
+    iIntros "(HPC & Hms & Hmi & Hcy & Hti & Hip)".
+    iIntros "(HnP1 & Hhs & Hpriv & Hmc & Hmicfg)".
+    iIntros "(HnP2 & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Htlb & Hpcfg &
+              Hpaddr & Hmisa & Hsec & Hpma & Hhtif & Help & Hsenv)".
+    iDestruct (reg_half_join (R_bitvector_64 nextPC) _ with "HnP1 HnP2")
+      as "HnP".
+    iFrame.
+  Qed.
+
+  Lemma s_to_i (rs : regstate) :
+    hreg_frame rs s_Drw -∗ hreg_frame_ro (s_Df (DfracOwn 1)) rs s_Dro -∗
+    (hreg_frame rs i_Drw ∗ hreg_frame_ro i_Df rs i_Dro ∗ x_cells rs : iProp Σ).
+  Proof.
+    rewrite i_rw_split i_ro_split s_rw_split s_ro_split /x_cells.
+    iIntros "(HPC & HnP & Hms & Hmi & Hcy & Hti & Hip & Htlb)".
+    iIntros "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & Hmc & Hmicfg & Hmisa &
+              Hsec & Hpma & Hhtif & Help & Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
+    iDestruct (reg_half_split (R_bitvector_64 nextPC) _ with "HnP")
+      as "[HnP1 HnP2]".
+    iFrame.
+  Qed.
+
+End IFrames.
+
+(* ===================================================================== *)
+(* §2 THE TRAP, AS A WALK.                                                *)
+(*                                                                       *)
+(* [WpIntrCore.exec_handle_interrupt_S] is the same fact on the exec      *)
+(* side; this is its per-node twin, at a frame that must additionally     *)
+(* hold the four trap CSRs ([sie_cap]'s enabled arm owns sepc / scause /  *)
+(* stval, and [intr_res] owns stvec).  [goodb] cannot carry it -- the     *)
+(* stretch WRITES -- so it is a hand walk, and it SPLITS at the zicfilp   *)
+(* elp reset, the one write to a cell no frame may own                    *)
+(* ([HartRegNode.swp_write_reg_same]; the other client is MRET's).        *)
+(* ===================================================================== *)
+Definition trap_rs (rs : regstate) (ii : InterruptType)
+    (pc0 sc_old stvec_v ms_v : mword 64) (elp_v : mword 1) : regstate :=
+  register_set (R_bitvector_64 nextPC) (stvec_base stvec_v)
+ (register_set cur_privilege Supervisor
+ (register_set sepc pc0
+ (register_set stval (zeros' 64)
+ (register_set scause (trap_scause sc_old ii)
+ (register_set mstatus (trap_ms elp_v ms_v) rs))))).
+
+(* every S-mode tower lookup, in one tactic *)
+Ltac srs :=
+  rewrite ?s_rs_PC ?s_rs_nPC ?s_rs_ms ?s_rs_mi ?s_rs_cy ?s_rs_ti
+    ?s_rs_ip ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+    ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec ?s_rs_pma
+    ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp ?s_rs_mie ?s_rs_mdl
+    ?s_rs_menv.
+
+Section IntrEngine.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* =================================================================== *)
-  (* §6 The dispatch outcome read straight off σ.  mip lives in            *)
-  (* [clock_inv] and the wire pins in [wire_inv], so no cell can name      *)
-  (* their values; but [dispatchInterrupt] is a FUNCTION of σ, so the      *)
-  (* outcome is [s_dispatch] of σ's OWN lookups -- no ownership needed     *)
-  (* beyond the client's misa/mie/mideleg/mstatus pins.                    *)
-  (* =================================================================== *)
-  Lemma dispatch_S_transient (σ : mstate) (misa0 mie_v mdv0 ms : mword 64)
-      {dqm dqi dqd dqs : dfrac} :
+  Lemma swp_handle_interrupt_S (ii : InterruptType)
+      (pc0 ms_v sc_old sv_old se_old np_old stvec_v misa0 : mword 64)
+      (elp_v : mword 1) {dqp dqm dqv : dfrac} :
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    mstate_interp σ -∗
-    misa ↦ᵣ{ dqm } misa0 -∗
-    mie ↦ᵣ{ dqi } mie_v -∗
-    mideleg ↦ᵣ{ dqd } mdv0 -∗
-    mstatus ↦ᵣ{ dqs } ms -∗
-    ⌜ exec (dispatchInterrupt Supervisor) σ
-        = Some (s_dispatch (register_lookup mip σ.(sregs))
-                           (register_lookup sig_meip σ.(sregs))
-                           (register_lookup sig_seip σ.(sregs))
-                           mie_v mdv0 ms, σ) ⌝.
+    trapVectorMode_forwards (_get_Mtvec_Mode stvec_v) = TV_Direct ->
+    gen_cert -∗
+    reg_pointsto (R_bitvector_64 PC) dqp pc0 -∗
+    reg_pointsto misa dqm misa0 -∗
+    reg_pointsto stvec dqv stvec_v -∗
+    reg_pointsto elp DfracDiscarded elp_v -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_old -∗
+    stval ↦ᵣ sv_old -∗
+    sepc ↦ᵣ se_old -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    (R_bitvector_64 nextPC) ↦ᵣ np_old -∗
+    swp (handle_interrupt ii Supervisor)
+      (fun _ =>
+         reg_pointsto (R_bitvector_64 PC) dqp pc0 ∗
+         reg_pointsto misa dqm misa0 ∗
+         reg_pointsto stvec dqv stvec_v ∗
+         mstatus ↦ᵣ trap_ms elp_v ms_v ∗
+         scause ↦ᵣ trap_scause sc_old ii ∗
+         stval ↦ᵣ (zeros' 64) ∗
+         sepc ↦ᵣ pc0 ∗
+         cur_privilege ↦ᵣ Supervisor ∗
+         (R_bitvector_64 nextPC) ↦ᵣ stvec_base stvec_v).
   Proof.
-    iIntros (HmisaS Hmm) "[Hreg Hmem] Hmisa Hmie Hmdl Hms".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmdl") as %Lmdl.
-    iDestruct (reg_valid_dq with "Hreg Hms") as %Lms.
-    iPureIntro.
-    apply exec_dispatchInterrupt_S_reduce;
-      [ | reflexivity | reflexivity | reflexivity
-        | exact Lmie | exact Lmdl | exact Lms | exact Hmm ].
-    rewrite exec_currentlyEnabled_S Lmisa HmisaS. reflexivity.
+  Admitted.
+
+  (* ==================================================================== *)
+  (* §3 THE S-MODE CYCLE BODY: [run_hart_active] FROM THE [instr] BUNDLE.  *)
+  (*                                                                      *)
+  (* [WpInstrRun.swp_run_hart_active_instr_ex]'s S-mode twin: the fetch    *)
+  (* shape is read off [instr] and the fetch obligation is discharged by   *)
+  (* [HartSTrans.swp_fetch_S] / [_S_rvc2] / [_S_base2] over the walking    *)
+  (* translation ([SRegime.kpt_swp_translate]) and the text window         *)
+  (* ([InstrBytes.text_fetch_obl] at the TRANSLATED pa).  The dispatch is  *)
+  (* [WpIntrCore.swp_dispatchInterrupt_S], so the conclusion is the        *)
+  (* disjunction the machine picks between.                               *)
+  (*                                                                      *)
+  (* THE LANDING FILE IS EXISTENTIAL: a walking fetch may FILL the TLB, so *)
+  (* the file the execute runs at is [rs] or [rs] with [tlb] rewritten,    *)
+  (* and the [tlb_snap_ok] the caller gets back is at the landing file's   *)
+  (* tlb -- which is exactly what the fill's own rule re-establishes.      *)
+  (* ==================================================================== *)
+  Lemma swp_run_hart_active_instr_S (rs : regstate) (root_ppn : mword 44)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (mip_v mdv_v ms_v : mword 64) (W Rr : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup misa rs = MISA_C ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup menvcfg rs = MENVCFG_S ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup mstatus rs = ms_v ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    register_lookup mip rs = mip_v ->
+    register_lookup mie rs = MIE_S ->
+    register_lookup mideleg rs = mdv_v ->
+    and_vec MIE_S (not_vec mdv_v) = zeros' 64 ->
+    register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED ->
+    pma_allows_all (register_lookup pma_regions rs) ->
+    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs))
+      = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid
+      (autocast (T := mword) (register_lookup satp rs) : mword 64))
+      = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn
+      (autocast (T := mword) (register_lookup satp rs) : mword 64)) = root_ppn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rs) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n rs) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n rs) 0))
+      ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n rs) 0))
+      ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n rs) 0))
+      ('b"1") = true ->
+    (ram_base + ram_size
+       <= uint (vec_access_dec (register_lookup pmpaddr_n rs) 0) * 4)%Z ->
+    gen_cert -∗
+    kmap_static_claims -∗
+    instr pc is_rvc i -∗
+    kpt_inv root_ppn -∗
+    tlb_snap_ok (register_lookup tlb rs) -∗
+    resv_frag cpu_id None -∗
+    W -∗
+    hreg_frame rs s_Drw -∗
+    hreg_frame_ro (s_Df (DfracOwn 1)) rs s_Dro -∗
+    (* the trap payload: the dispatch answered [Some], nothing has run *)
+    (∀ ii pr,
+       ⌜∃ meip seip : mword 1,
+          s_dispatch mip_v meip seip MIE_S mdv_v ms_v = Some (ii, pr)⌝ -∗
+       W -∗
+       hreg_frame rs s_Drw -∗ hreg_frame_ro (s_Df (DfracOwn 1)) rs s_Dro -∗
+       tlb_snap_ok (register_lookup tlb rs) -∗ resv_frag cpu_id None -∗
+       Qi ii pr) -∗
+    (* the instruction: at the fetch's landing file, nextPC committed *)
+    (∀ rsf : regstate,
+       ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ -∗
+       W -∗
+       hreg_frame (register_set (R_bitvector_64 nextPC)
+                     (add_vec_int pc (if is_rvc then 2 else 4)) rsf) s_Drw -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (register_set (R_bitvector_64 nextPC)
+            (add_vec_int pc (if is_rvc then 2 else 4)) rsf) s_Dro -∗
+       tlb_snap_ok (register_lookup tlb rsf) -∗
+       resv_any cpu_id -∗
+       swp (execute i) (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Rr)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (∃ w : mword 32,
+                      ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗ Rr)).
+  Proof.
+  Admitted.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* THE 25 CELLS, both ways.  [WpSFrames.s_frames_intro] / [_elim] do    *)
+  (* this WITH the bundles; the engine needs the bare cell form as well,  *)
+  (* because it re-forms the bundles in the middle of a cycle (to hand    *)
+  (* them to the leaf) and takes them apart again afterwards.             *)
+  (* ------------------------------------------------------------------ *)
+
+  Section SCells.
+    Context (pc npc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+            (pcfg : type_of_register pmpcfg_n)
+            (paddr : type_of_register pmpaddr_n)
+            (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+            (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+            (satp0 mie0 mdv0 menv0 : mword 64)
+            (tlbv : type_of_register tlb).
+
+    Local Notation SRS :=
+      (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+
+    Definition s_cells : iProp Σ :=
+      ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+       (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+       (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+       (R_bitvector_64 mip) ↦ᵣ ip ∗ tlb ↦ᵣ tlbv ∗
+       cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ mst0 ∗
+       hart_state ↦ᵣ HART_ACTIVE tt ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+       reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+       reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+       reg_pointsto misa DfracDiscarded misa0 ∗
+       reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+       reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+       reg_pointsto htif_tohost_base DfracDiscarded None ∗
+       reg_pointsto elp DfracDiscarded elp0 ∗
+       reg_pointsto senvcfg DfracDiscarded senv0 ∗
+       satp ↦ᵣ satp0 ∗ mie ↦ᵣ mie0 ∗ mideleg ↦ᵣ mdv0 ∗ menvcfg ↦ᵣ menv0)%I.
+
+    Lemma s_frames_cells :
+      (hreg_frame SRS s_Drw ∗ hreg_frame_ro (s_Df (DfracOwn 1)) SRS s_Dro
+       : iProp Σ) ⊣⊢ s_cells.
+    Proof.
+      rewrite s_rw_split s_ro_split /s_cells. srs.
+      iSplit.
+      - iIntros "(H1 & H2)".
+        iDestruct "H1" as "(?&?&?&?&?&?&?&?)".
+        iDestruct "H2" as "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
+        iFrame.
+      - iIntros "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
+        iFrame.
+    Qed.
+  End SCells.
+
+  (* ------------------------------------------------------------------ *)
+  (* [sconf] and [tlb_res_pt] as CELLS + FACTS.  Both directions, because  *)
+  (* the engine opens them for the fetch and closes them for the leaf.     *)
+  (* Unlike [WpSFrames.s_frames_intro] these EXPORT the PMP and satp facts *)
+  (* rather than swallowing them: the walking fetch's own rule asks for    *)
+  (* every one of them.                                                   *)
+  (* ------------------------------------------------------------------ *)
+  Lemma sconf_to_cells :
+    sconf -∗ ∃ mst0 mdv0 : mword 64,
+      ⌜ sconf_ms_facts mst0 ⌝ ∗
+      ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝ ∗
+      hw_config ∗ minstret_inv ∗
+      cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ mst0 ∗
+      ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗ sret_tie mst0 ∗
+      mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗ menvcfg ↦ᵣ MENVCFG_S.
+  Proof.
+    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmsx" as (mst0) "(Hms & Hhalf & Htie & %Hmsf)".
+    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvx" as (menv0) "(Hmenv & _ & _ & _ & _ & %Hmenvval)".
+    subst menv0. iExists mst0, mdv0.
+    iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+    iPureIntro. split; assumption.
   Qed.
 
-  (* =================================================================== *)
-  (* §7 The joint step rule: ONE machine step that either RETIRES an       *)
-  (* instruction or TAKES a pending interrupt -- the σ-callback chooses    *)
-  (* the branch AFTER seeing σ (the dispatch inputs are functions of σ,    *)
-  (* unknowable outside the step).  Merge of [wp_exec_step_hart_active_inv]*)
-  (* (MinstretInv.v) and [wp_exec_step_interrupt_inv] (WpIntrCore.v),      *)
-  (* directly over [wp_exec_step_minstret]: retire bumps minstret, an      *)
-  (* interrupt does not; both continuations come back under the step's ▷.  *)
-  (* =================================================================== *)
-  Lemma wp_exec_step_retire_or_intr {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ,
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ( (* the instruction retires *)
-         ∃ (retval : mword 32) (s_exec : mstate),
-           ⌜ exec (run_hart_active 0) σ
-               = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
-           PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-           mstate_interp s_exec ∗
-           (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-            PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-            ▷ WP (Loop : expr riscv_lang)) )
-       ∨
-       ( (* a pending interrupt is taken (no fetch, no retire, no bump) *)
-         ∃ (i : InterruptType) (p : Privilege) (s_trap : mstate),
-           ⌜ exec (run_hart_active 0) σ = Some (Step_Pending_Interrupt (i, p), σ) ⌝ ∗
-           ⌜ exec (handle_interrupt i p) σ = Some (tt, s_trap) ⌝ ∗
-           PC ↦ᵣ (register_lookup PC s_trap.(sregs)) ∗
-           mstate_interp s_trap ∗
-           ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-              PC ↦ᵣ (register_lookup nextPC s_trap.(sregs)) -∗
-              WP (Loop : expr riscv_lang)) )) -∗
-    WP (Loop : expr riscv_lang).
+  Lemma sconf_of_cells (mst0 mdv0 : mword 64) :
+    sconf_ms_facts mst0 ->
+    and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
+    hw_config -∗ minstret_inv -∗
+    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mst0 -∗
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) -∗ sret_tie mst0 -∗
+    mie ↦ᵣ MIE_S -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ MENVCFG_S -∗ sconf.
   Proof.
-    iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
-    iIntros (σ) "[Hreg Hmem] Hbody".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
-      as "[Hret | Hintr]".
-    { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    - (* ---- retire: verbatim wp_exec_step_hart_active_inv ---- *)
-      iDestruct "Hret" as (retval s_exec) "(%Hha & Hpc & [Hreg Hmem] & Hcont)".
-      iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_exec.
-      iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
-      assert (Hhart_a :
-        register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
-          = HART_ACTIVE tt).
-      { rewrite ?sregs_set_reg.
-        rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-      iDestruct (reg_valid with "Hreg Hmst") as %Lmst_e.
-      iMod (reg_update _ PC _ (register_lookup nextPC s_exec.(sregs)) with "Hreg Hpc")
-        as "[Hreg Hpc]".
-      assert (Hmst_tick :
-        register_lookup minstret
-          (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs) = mst).
-      { rewrite ?sregs_set_reg.
-        rewrite irrelevant_register_set; [exact Lmst_e | reflexivity]. }
-      iDestruct ("Hcont" with "Hhs Hpc") as "HWP".
-      destruct b.
-      + iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
-          as "[Hreg Hmst]".
-        iModIntro. iExists _. iSplitR.
-        { iPureIntro.
-          exact (exec_riscv_step_hart_active σ s_exec retval true
-                   Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
-        iNext.
-        iModIntro. rewrite /mstate_interp. cbn [sregs mem]. rewrite Hmst_tick.
-        rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
-        iSplitL "Hmst Hmi".
-        { iExists (add_vec_int mst 1), true. iFrame. }
-        iExact "HWP".
-      + iModIntro. iExists _. iSplitR.
-        { iPureIntro.
-          exact (exec_riscv_step_hart_active σ s_exec retval false
-                   Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
-        iNext.
-        iModIntro. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg.
-        iFrame "Hreg Hmem".
-        iSplitL "Hmst Hmi".
-        { iExists mst, false. iFrame. }
-        iExact "HWP".
-    - (* ---- interrupt: verbatim wp_exec_step_interrupt_inv ---- *)
-      iDestruct "Hintr" as (i p s_trap) "(%Hha & %Hhi & Hpc & [Hreg Hmem] & Hcont)".
-      iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_trap.
-      assert (Hhart_a :
-        register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
-          = HART_ACTIVE tt).
-      { rewrite ?sregs_set_reg.
-        rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-      iModIntro. iExists _. iSplitR.
-      { iPureIntro.
-        exact (exec_riscv_step_interrupt σ s_trap i p b
-                 Hsi Hhart_a Hha Hhi Hhart_trap). }
-      iNext.
-      iMod (reg_update _ PC _ (register_lookup nextPC s_trap.(sregs)) with "Hreg Hpc")
-        as "[Hreg Hpc]".
-      iModIntro. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi".
-      { iExists mst, b. iFrame. }
-      iApply ("Hcont" with "Hhs Hpc").
+    intros Hmsf Hmm.
+    iIntros "#Hhw #Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+    rewrite /sconf. iFrame "Hhw Hminv Hpriv".
+    iSplitL "Hms Hhalf Htie".
+    { iExists mst0. iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
+    iSplitL "Hmie Hmdl".
+    { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+    iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
+    split_and!; try reflexivity; vm_compute; reflexivity.
   Qed.
 
-End WpIntrInv.
+  Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) : Prop :=
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR /\
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false /\
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true /\
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true /\
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true /\
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z.
+
+  Definition satp_facts (satp0 : mword 64) (root_ppn : mword 44) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) /\
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
+      = (mword_of_int 0 : mword 16) /\
+    autocast (T := mword)
+      (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn.
+
+  Lemma tlb_res_to_cells (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ satp_facts satp0 root_ppn ⌝ ∗ ⌜ pmp_facts pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      tlb_snap_ok tlbv ∗ kpt_inv root_ppn.
+  Proof.
+    iIntros "H". iDestruct "H" as (satp0 tlbv)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iExists satp0, tlbv, pcfg, paddr.
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkinv".
+    iPureIntro. split.
+    - rewrite /satp_facts. split_and!; assumption.
+    - rewrite /pmp_facts. split_and!; assumption.
+  Qed.
+
+  Lemma tlb_res_of_cells (root_ppn : mword 44) (satp0 : mword 64)
+      (tlbv : type_of_register tlb) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    satp_facts satp0 root_ppn -> pmp_facts pcfg paddr ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+    pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    tlb_snap_ok tlbv -∗ kpt_inv root_ppn -∗ tlb_res_pt root_ppn.
+  Proof.
+    intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "Hsatp Htlb Hpcfg Hpaddr Hsnap #Hkinv".
+    iExists satp0, tlbv. iFrame "Hsatp Htlb Hsnap Hkinv".
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+              with "Hpcfg Hpaddr").
+  Qed.
+
+End IntrEngine.
 
 (* ===================================================================== *)
-(* §8 THE ENGINE: run the point just before an instruction at [pc0] with   *)
-(* interrupts ENABLED.  Takes an arbitrary number of pending interrupts    *)
-(* (Löb induction over the trap + handler round trip), then hands the      *)
-(* caller's σ-callback the pure no-pending fact and lets the instruction   *)
-(* execute.                                                               *)
-(*                                                                        *)
-(* IT TAKES THE FOLDED BUNDLE AND ITS CALLBACK IS HART-GENERIC, and those  *)
-(* two facts are the same fact.  A trap can park the interrupted thread    *)
-(* (kerneltrap yields on a timer tick when this cpu has a current proc),   *)
-(* so the instruction after the absorbing loop executes on the hart the    *)
-(* LAST trap returned to -- hence the callback sits inside                 *)
-(* [WpNext.wp_next true p].  Everything the loop threads is therefore      *)
-(* per-hart and has to CROSS rather than be framed: the mstatus cell and   *)
-(* its tied SIE half, the trap CSRs, the [sret_bits] travelling half, the  *)
-(* per-cpu bookkeeping, the translation slot, the register file.  The one  *)
-(* vehicle that crosses is [sie_cap_gpr], which is exactly why the handler *)
-(* contract's pre and post are the bundle: THE CONTRACT'S POSTCONDITION IS *)
-(* THIS LEMMA'S OWN PRECONDITION, at whatever hart resumed.                *)
-(*                                                                        *)
-(* OUTSIDE THE SECTION, and it has to be: the Löb is taken over a          *)
-(* statement that QUANTIFIES the hart ([iLöb as "IH" forall (CID0)]), so   *)
-(* the binder must be dischargeable -- a section variable is not.  That    *)
-(* also means every hart-indexed term written fresh in the proof below     *)
-(* means [CID0], the hart the loop is currently on, which is what the      *)
-(* re-entry at [c'] has to be careful about.                              *)
-(*                                                                        *)
-(* NO [handler], NO [root_ppn], NO [intr_config]/[intr_frame] PARAMETERS.  *)
-(* The installed vector is existential inside [intr_res], the kernel root  *)
-(* inside [strans_inv]'s KPT arm, menvcfg and mie inside [sconf]; the      *)
-(* engine reads each out per trap.  [intr_config] / [intr_frame] and the   *)
-(* funnel's assemble/disassemble dance around them are gone with it.       *)
+(* §4 THE ENGINE: one S-mode instruction at [pc0] with interrupts ON.     *)
+(*                                                                       *)
+(* OUTSIDE THE SECTION, and it has to be: the Löb is taken over a         *)
+(* statement that QUANTIFIES the hart ([iLöb as "IH" forall (CID0)]), so  *)
+(* the binder must be dischargeable -- a section variable is not.  That   *)
+(* also means every hart-indexed term written fresh in the proof below    *)
+(* means [CID0], the hart the loop is currently on, which is what the     *)
+(* re-entry at [c'] has to be careful about.                             *)
+(*                                                                       *)
+(* IT TAKES THE FOLDED BUNDLE AND ITS CALLBACK IS HART-GENERIC, and those *)
+(* two facts are the same fact.  A trap can park the interrupted thread   *)
+(* (kerneltrap yields on a timer tick when this cpu has a current proc),  *)
+(* so the instruction after the absorbing loop executes on the hart the   *)
+(* LAST trap returned to -- hence the callback sits inside               *)
+(* [WpNext.wp_next true p].                                              *)
+(*                                                                       *)
+(* THE CALLBACK'S [▷] IS OUTERMOST, and that placement is forced.  The    *)
+(* engine's own machine step offers exactly ONE later, at                 *)
+(* [HartMCycle.wp_loop_cycle]'s body; the Löb hypothesis and the caller's *)
+(* continuation both have to be stripped by it, and only what is in the   *)
+(* CONTEXT when that [iNext] runs can be.  A [▷] sitting inside the       *)
+(* callback (on the leaf's own [WP Loop], where the whole-cycle engine    *)
+(* used to put it) would arrive through the cycle rule's [Psi] slot,      *)
+(* AFTER the [iNext], and could never be discharged.  Outermost is also   *)
+(* the WEAKEST premise -- [P ⊢ ▷ P] -- so no caller pays for the move.    *)
 (* ===================================================================== *)
+Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
+  register_lookup hart_state rs2 = HART_ACTIVE tt /\
+  register_lookup (R_bool minstret_increment) rs2 = flag /\
+  register_lookup cur_privilege rs2 = Supervisor.
+
 Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
-    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64) :
+    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
+    (is_rvc : bool) (i : instruction)
+    (R : mword 64 -> regfile -> nat -> iProp Σ) :
   ret_pc pc0 = pc0 ->
   sie_cap_gpr kt m av true p -∗
   pc_is pc0 -∗
-  wp_next true p (fun CID =>
-    ∀ σ,
-      ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
-      sconf -∗
-      sie_cap kt m av true p -∗
-      gpr_file (tp_pin m) -∗
-      pc_is pc0 -∗
-      mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-      ∃ (retval : mword 32) (s_exec : mstate),
-        ⌜ exec (run_hart_active 0) σ
-            = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
-        PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-        mstate_interp s_exec ∗
-        (hart_state ↦ᵣ HART_ACTIVE tt -∗
-         PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-         ▷ WP (Loop : expr riscv_lang))) -∗
+  instr pc0 is_rvc i -∗
+  ▷ wp_next true p (fun CID =>
+      (sconf -∗
+       sie_cap kt m av true p -∗
+       gpr_file (tp_pin m) -∗
+       (R_bitvector_64 PC) ↦ᵣ pc0 -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+            ∃ (npc : mword 64) (m' : regfile) (av' : nat),
+              (R_bitvector_64 PC) ↦ᵣ pc0 ∗
+              (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+              resv_any cpu_id ∗
+              sconf ∗ sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
+              R npc m' av'))
+      ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
+           sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗ R npc m' av' -∗
+           WP (Loop : expr riscv_lang))) -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros Hpc0.
-  iIntros "Hcg Hpc Hbody".
-  (* the whole state crosses, so the Löb generalises the HART as well as the
-     resources: after a trap that parked the thread, the loop re-enters on
-     the hart the handler came back on. *)
+  iIntros "Hcg Hpc #Hinstr Hbody".
   iRevert "Hcg Hpc Hbody".
   iLöb as "IH" forall (CID0).
   iIntros "Hcg Hpc Hbody".
-  (* ---- open the bundle: this is where [intr_config_of_v2] used to be, and
-         the funnel's copy of it is gone with the two [intr_config] lemmas. ---- *)
+  (* ---- open the bundle: cells out, non-cell residue kept aside ---- *)
   iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
-  (* [Hrcpt] is the enabled arm's KPT RECEIPT (IntrDefs §6b).  The engine
-     neither reads nor moves it -- a trap cannot change which table is
-     installed -- it just hands it to the handler, which owes the arm back. *)
-  iDestruct "Harm" as "(Hq1 & Hires & Hrcpt & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclm & Hcpu)".
-  (* Bare ∧ SIE = '1' is impossible: the arm's [intr_res] OWNS stvec and the
-     Bare slot owns the same cell.  Two owned cells conflict directly -- this
-     used to need an [iInv] under an [fupd_wp] to reach the invariant's copy. *)
-  iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-  { iEval (rewrite /intr_res) in "Hires".
-    iDestruct "Hires" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
-    iDestruct "Hbstv" as (v0) "Hbstv".
-    iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
-  iDestruct "Hkpt" as (root_ppn) "Htlb".
-  iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-  iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
-  (* THE LIVE SIE BIT IS THE ARM INDEX: the tied half and the arm's eighth
-     are fragments of one ghost, so agreement reads it off with no case
-     split.  This is the fact [intr_ms_facts] used to carry as a premise. *)
+  iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn)
+    "(Hstk & Hbit1 & Htlbres & Harm & #Hwit)".
+  rewrite {1}/sie_arm.
+  iDestruct "Harm" as
+    "(Hq1 & Hires & #Hkpt & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclm & Hcpu)".
+  (* the installed handler comes out ONCE, at the top: [#Hsp] is persistent
+     and therefore survives every later split, which is what lets the trap
+     arm apply the contract in the cycle's continuation. *)
+  iEval (rewrite /intr_res) in "Hires".
+  iDestruct "Hires" as (handler vb) "(%Htvd & %Hsb & Hq4 & Hstv & #Hsp)".
+  iDestruct "Hsepcx" as (se_old) "Hsepc".
+  iDestruct "Hscausex" as (sc_old) "Hscause".
+  iDestruct "Hstvalx" as (sv_old) "Hstval".
+  iDestruct "Hsppc" as (vca vcb) "Hsppc".
+  iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
+    "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie & Hmdl &
+      Hmenv)".
   iDestruct (ghost_var_agree with "Hhalf Hq1") as %HSIE1.
-  iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
-  iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
-  subst menvcfg0.
+  iDestruct (tlb_res_to_cells with "Htlbres") as (satp0 tlbv pcfg paddr)
+    "(%Hsatpf & %Hpmpf & Hsatp & Htlb & Hpcfg & Hpaddr & Hsnap & #Hkinv)".
+  iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+  iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
+  iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-  pose proof (elp_no_lp elp0 Help_np) as Help0.
-  iApply (wp_exec_step_retire_or_intr with "Hminv Hhs").
-  iIntros (σ) "Hsi".
-  iDestruct (dispatch_S_transient σ misa0 MIE_S mdv0 ms HmisaS Hmm
-               with "Hsi Hmisa Hmie Hmdl Hms") as %Hdisp0.
-  match type of Hdisp0 with _ = Some (?D, _) =>
-    destruct D as [[i pr] |] eqn:Hdres end.
-  - (* ---- an interrupt is pending: take it, run the handler, Löb ---- *)
-    pose proof (s_dispatch_Some_S _ _ _ _ _ _ _ _ Hdres); subst pr.
-    (* open [intr_res] for this step: stvec (read by the trap), the vector's
-       two pure facts, the ghost quarter (spent by the flip below), and the
-       handler contract.  The contract arrives UNDER ITS LATER -- the [▷] that
-       replaced [inv]'s guard, and the fixpoint's -- and the trap step's own
-       [iNext] strips it, so the guard is paid for by a step that exists
-       anyway. *)
-    iEval (rewrite /intr_res) in "Hires".
-    iDestruct "Hires" as (handler vb) "(%Htvd & %Hsb & Hq4 & Hstv & #Hsp)".
-    iDestruct "Hsepcx" as (sepc_old) "Hsepc".
-    iDestruct "Hscausex" as (scause_old) "Hscause".
-    iDestruct "Hstvalx" as (stval_old) "Hstval".
-    iDestruct "Hsppc" as (vca vcb) "Hsppc".
-    iDestruct "Hcpu" as "(Hcells & Hcnt)".
-    iDestruct "Hpc" as "[Hpcr Hnpc]".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid with "Hreg Hscause") as %Lsc.
-    iDestruct (reg_valid with "Hreg Hstv") as %Lstvec.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (HmisaS' : eq_vec (_get_Misa_S (register_lookup misa σ.(sregs))) ('b"1") = true)
-      by (rewrite Lmisa; exact HmisaS).
-    pose proof (exec_run_hart_active_pending σ i Supervisor Lpriv Hdisp0) as Hha.
-    pose proof (exec_handle_interrupt_S σ i pc0 ms scause_old handler elp0
-                  Lpriv Lms Lsc Lstvec Lelp HmisaS' Htvd Lpc) as Hhi.
-    match type of Hhi with _ = Some (_, ?T) => set (s_trap := T) in Hhi end.
-    (* thread the trap's writes through the ghost cells, in tower order *)
-    pose (ms_e := update_subrange_vec_dec ms 23 23 elp0).
-    pose (c1v := update_subrange_vec_dec scause_old (64 - 1) (64 - 1)
-                   (bool_to_bit (trapCause_is_interrupt (Interrupt i)))).
-    pose (c2v := update_subrange_vec_dec c1v (64 - 2) 0
-                   (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i)))).
-    (* the scause word IS [IntrDefs.trap_scause], which is what lets the
-       cause layer ([s_cause_ok_of_dispatch]) speak about it -- one spelling
-       of the tower, not two kept in step by hand. *)
-    assert (Hc2 : c2v = trap_scause scause_old i) by reflexivity.
-    pose proof (s_cause_ok_of_dispatch (register_lookup mip σ.(sregs)) mdv0 ms
-                  scause_old (register_lookup sig_meip σ.(sregs))
-                  (register_lookup sig_seip σ.(sregs)) i Supervisor Hdres) as Hcause.
-    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
-    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
-    pose (ms_c := update_subrange_vec_dec ms_b 8 8 ('b"1")).
-    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
-    assert (Hlkelp : register_lookup elp (register_set mstatus ms_e σ.(sregs))
-                     = landing_pad_bits_backwards NO_LP_EXPECTED).
-    { rewrite irrelevant_register_set; [ rewrite Lelp; exact Help0 | vm_compute; reflexivity ]. }
-    iDestruct (reg_interp_set_same _ elp _ Hlkelp with "Hreg") as "Hreg".
-    iMod (reg_update _ scause _ c1v with "Hreg Hscause") as "[Hreg Hscause]".
-    iMod (reg_update _ scause _ c2v with "Hreg Hscause") as "[Hreg Hscause]".
-    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ ms_c with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ stval _ (zeros' 64) with "Hreg Hstval") as "[Hreg Hstval]".
-    iMod (reg_update _ sepc _ pc0 with "Hreg Hsepc") as "[Hreg Hsepc]".
-    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-    iMod (reg_update _ nextPC _ (stvec_base handler) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    (* ---- THE GHOST FLIP '1' -> '0', with all four fractions in hand.  This
-           is the move the trap makes and the [sret] undoes, and it is why the
-           arm has to be OPEN here: the tied half (1/2), the arm's eighth, the
-           count's eighth and [intr_res]'s quarter are exactly the four, and
-           each of the four goes to a DIFFERENT conjunct of what the handler
-           is handed ([sconf], [sie_arm_of _ false], [cpu_hart 0 false],
-           [intr_res]). ---- *)
-    iEval (rewrite /intr_count) in "Hcnt".
-    iMod (sie_ghost_flip_off sie_gname (_get_Mstatus_SIE ms) ('b"1") ('b"1") vb
-            with "Hhalf Hq1 Hcnt Hq4") as "(Hhalf & Hq1 & Hcnt & Hq4)".
-    (* ---- and the SPP/SPIE mirror MOVES with it, which no SIE flip does:
-           the trap writes SPP := 1 and SPIE := old SIE = 1, so BOTH halves
-           are updated together -- possible only because the enabled arm was
-           holding the travelling one. ---- *)
-    iEval (rewrite /sret_tie) in "Htie".
-    iMod (sret_bits_update _ _ vca vcb ('b"1" : mword 1) ('b"1" : mword 1)
-            with "Htie Hsppc") as "[Htie Hsppc]".
-    iModIntro. iRight.
-    iExists i, Supervisor, s_trap.
-    iSplitR; [iPureIntro; exact Hha |].
-    iSplitR; [iPureIntro; exact Hhi |].
-    assert (LpcT : register_lookup PC s_trap.(sregs) = pc0).
-    { unfold s_trap. lk. exact Lpc. }
-    rewrite LpcT.
-    iSplitL "Hpcr"; [iExact "Hpcr" |].
-    iSplitL "Hreg Hmem".
-    { unfold s_trap; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iNext.
-    iIntros "Hhs Hpcr".
-    assert (LnT : register_lookup nextPC s_trap.(sregs) = stvec_base handler).
-    { unfold s_trap. lk. reflexivity. }
-    iEval (rewrite LnT Hsb) in "Hpcr".
-    iEval (rewrite Hsb) in "Hnpc".
-    assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
-    iEval (rewrite Htm) in "Hms".
-    (* ---- ASSEMBLE THE HANDLER'S ENTRY PACKAGE.  Nothing here is invented:
-           every conjunct is a piece the enabled arm was carrying, at the
-           value the trap just wrote.  The stack carve is not even touched --
-           [trap_res true + av] is the index at both arms. ---- *)
-    assert (Htie_eq : sret_tie (trap_ms elp0 ms)
-                      = sret_bits ('b"1" : mword 1) ('b"1" : mword 1)).
-    { rewrite /sret_tie trap_ms_SPP trap_ms_SPIE HSIE1. reflexivity. }
-    iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]" as "Hsc".
-    { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
-      iSplitL "Hms Hhalf Htie".
-      { iExists (trap_ms elp0 ms). iFrame "Hms".
-        rewrite Htie_eq. iFrame "Htie".
-        rewrite trap_ms_SIE. iFrame "Hhalf".
-        iPureIntro. exact (sconf_ms_facts_trap elp0 ms Hmsf). }
-      iSplitL "Hmie Hmdl".
-      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
-      iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
-      repeat split; try assumption; reflexivity. }
-    iAssert (intr_res kt) with "[Hq4 Hstv]" as "Hires".
-    { iApply (intr_res_intro handler ('b"0" : mword 1) Htvd Hsb with "Hq4 Hstv").
-      iNext. iExact "Hsp". }
-    iAssert (ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 (trap_scause scause_old i)
-               (zeros' 64) handler)
-      with "[Hhs Hsc Hstk Hbit1 Htlb Hq1 Hfile Hsppc Hsepc Hscause Hstval
-             Hcells Hcnt Hclm Hires Hrcpt Hpcr Hnpc]" as "Hentry".
-    { rewrite /ihs_entry_of /sie_cap_gpr_of /sie_cap_of /sie_arm_of.
-      rewrite Hc2.
-      iFrame "Hhs Hsc Hstk Hfile Hsppc Hsepc Hscause Hstval Hclm Hrcpt Hwit".
-      iSplitL "Hbit1 Htlb Hq1".
-      { iSplitL "Hbit1 Htlb".
-        - iApply (strans_inv_intro root_ppn with "Hbit1 Htlb").
-        - iExact "Hq1". }
-      iSplitL "Hcells Hcnt".
-      { rewrite /cpu_hart /intr_count. iFrame "Hcells Hcnt". }
-      iSplitL "Hires".
-      { iEval (rewrite intr_res_of_eq) in "Hires". iExact "Hires". }
-      iFrame "Hpcr Hnpc". }
-    (* ---- run the handler, and re-enter the Löb ON THE HART IT RETURNED TO ---- *)
-    iApply (intr_handler_spec_apply handler m av p pc0 (trap_scause scause_old i)
-              (zeros' 64) Hpc0 Hcause with "Hsp Hentry").
-    iIntros (c' Hs').
-    rewrite /ihs_post_of. iIntros "Hcg Hpc".
-    (* the caller's own obligation is anchored at the hart we STARTED on;
-       [wp_next_retarget] moves it, and [Hs'] -- the guard the contract's
-       [wp_next] carries -- is exactly its premise.  This is where [wp_next]'s
-       second escape hatch pays for itself: at [p = zero_reg] the handler
-       promises it came back here. *)
-    iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hbody") as "Hbody".
-    iApply ("IH" $! c' with "Hcg Hpc Hbody").
-  - (* ---- nothing pending: the caller's instruction executes ---- *)
-    iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hbody") as "Hbody".
-    iSpecialize ("Hbody" $! σ with "[%]"); [exact Hdisp0 |].
-    iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]" as "Hsc".
-    { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
-      iSplitL "Hms Hhalf Htie".
-      { iExists ms. iFrame "Hms Hhalf Htie". iPureIntro. exact Hmsf. }
-      iSplitL "Hmie Hmdl".
-      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
-      iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
-      repeat split; try assumption; reflexivity. }
-    iMod ("Hbody" with "Hsc [Hstk Hbit1 Htlb Hq1 Hires Hrcpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu] Hfile Hpc Hsi")
-      as (retval s_exec) "(%Hha & Hpc' & Hsi' & Hcont)".
-    { rewrite /sie_cap /sie_arm. iFrame "Hstk".
-      iSplitL "Hbit1 Htlb".
-      { iApply (strans_inv_intro root_ppn with "Hbit1 Htlb"). }
-      iFrame "Hq1 Hires Hrcpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu Hwit". }
-    iModIntro. iLeft.
-    iExists retval, s_exec.
-    iSplitR; [iPureIntro; exact Hha |].
-    iFrame "Hpc' Hsi'". iExact "Hcont".
-Qed.
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
+      %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
+      %Hmisaval & %Hsecval & #Hkmapb)".
+  iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+  pose proof (elp_no_lp elp0 Helpnp) as Help0.
+  (* ---- the cycle's own frame: the six writable cells, the five read-only
+         ones, and the SECOND HALF of nextPC kept back (see the header) ---- *)
+  iDestruct (reg_half_split (R_bitvector_64 nextPC) pc0 with "HnPC")
+    as "[HnP1 HnP2]".
+  iAssert (hreg_frame (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+            (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbv) i_Drw)
+    with "[HPC Hmsr Hmi Hcy Hti Hip]" as "Hirw".
+  { rewrite i_rw_split. srs. iFrame. }
+  iAssert (hreg_frame_ro i_Df (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+            (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tlbv) i_Dro)
+    with "[HnP1 Hhs Hpriv]" as "Hiro".
+  { rewrite i_ro_split. srs. iFrame "HnP1 Hhs Hpriv Hmc Hmicfg". }
+  iApply (wp_loop_cycle i_Drw i_Dro i_Df
+            (fun rsx => exists (rs2 : regstate) (mi : mword 64),
+               intr_Q (minstret_inc_flag mc micfg Supervisor) rs2 /\
+               rsx = wrap_post rs2 mi)
+            ((* --- RETIRE: the leaf kept the bundles; the wrapper kept the pc half --- *)
+             (∃ (npc : mword 64) (m' : regfile) (av' : nat),
+                reg_pointsto (R_bitvector_64 nextPC) (DfracOwn (1/2)) npc ∗
+                sconf_priv_closer ∗ (∃ ms : mword 64, sconf_msown ms) ∗
+                sie_cap kt m' av' true p ∗ gpr_file (tp_pin m') ∗
+                resv_any cpu_id ∗ R npc m' av' ∗
+                (∀ (npc0 : mword 64) (m0 : regfile) (av0 : nat),
+                   sie_cap_gpr kt m0 av0 true p -∗ pc_is npc0 -∗
+                   R npc0 m0 av0 -∗ WP (Loop : expr riscv_lang)))
+             ∨
+             (* --- TRAP: the entry package, minus what the frame holds --- *)
+             (∃ (hv sc mstT mdvT : mword 64),
+                ⌜ s_cause_ok sc ⌝ ∗ ⌜ sconf_ms_facts mstT ⌝ ∗
+                ⌜ and_vec MIE_S (not_vec mdvT) = zeros' 64 ⌝ ∗
+                reg_pointsto (R_bitvector_64 nextPC) (DfracOwn (1/2)) hv ∗
+                mstatus ↦ᵣ mstT ∗
+                ghost_var sie_gname (1/2) (_get_Mstatus_SIE mstT) ∗
+                sret_tie mstT ∗
+                mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdvT ∗ menvcfg ↦ᵣ MENVCFG_S ∗
+                sret_bits ('b"1" : mword 1) ('b"1" : mword 1) ∗
+                sepc ↦ᵣ pc0 ∗ scause ↦ᵣ sc ∗ stval ↦ᵣ (zeros' 64) ∗
+                sie_cap kt m (trap_res true + av) false p ∗
+                kpt_on cpu_id ∗ cpu_hart 0 false p ∅ ∗ cpu_claim p ∗
+                intr_res kt ∗ intr_handler_spec kt hv ∗
+                gpr_file (tp_pin m) ∗ resv_any cpu_id ∗
+                wp_next true p (fun CID =>
+                  (sconf -∗ sie_cap kt m av true p -∗ gpr_file (tp_pin m) -∗
+                   (R_bitvector_64 PC) ↦ᵣ pc0 -∗
+                   (R_bitvector_64 nextPC) ↦ᵣ
+                     (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
+                   resv_any cpu_id -∗
+                   swp (execute i)
+                     (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                        ∃ (npc : mword 64) (m' : regfile) (av' : nat),
+                          (R_bitvector_64 PC) ↦ᵣ pc0 ∗
+                          (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+                          resv_any cpu_id ∗
+                          sconf ∗ sie_cap kt m' av' true p ∗
+                          gpr_file (tp_pin m') ∗ R npc m' av'))
+                  ∗ (∀ (npc : mword 64) (m' : regfile) (av' : nat),
+                       sie_cap_gpr kt m' av' true p -∗ pc_is npc -∗
+                       R npc m' av' -∗ WP (Loop : expr riscv_lang)))))%I
+            i_disj i_w_cy i_w_ti i_w_ip
+            with "Hcert Hresv [-] []").
+  { admit. }
+  { admit. }
+Admitted.
