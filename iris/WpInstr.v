@@ -47,7 +47,7 @@ Section WpInstr.
   (* the S-mode wrapper writes its own thirty-line twin of THIS and reuses  *)
   (* that rule unchanged.                                                  *)
   (* ==================================================================== *)
-  Lemma mm_cycle (pc npc : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
+  Lemma mm_cycle_w (pc npc : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
       {dq : dfrac} (Psi : iProp Σ)
       (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
@@ -60,12 +60,13 @@ Section WpInstr.
     resv_any cpu_id -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
-    (hreg_frame (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗ hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
+    (resv_frag cpu_id None -∗
+     hreg_frame (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗ hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
        swp (run_hart_active 0)
          (fun st => ∃ w : mword 32,
                     ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
                     hreg_frame (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw ∗
-                    hreg_frame_ro (mm_Df dq) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro ∗ Psi)) -∗
+                    hreg_frame_ro (mm_Df dq) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro ∗ Psi ∗ resv_any cpu_id)) -∗
     ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_is npc -∗ Psi -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -93,8 +94,41 @@ Section WpInstr.
                      HmIE HMPRV HSXL HKF with "Hhw Hfrag Hrw Hro")
           as "(Hmm & Hpmpc & Hpc)".
         iApply ("Hcont" with "Hmm Hpmpc Hpc HPsi"). }
-    (* the leaf's body does not see the reservation: it is held aside here
-       and handed back beside [Psi] *)
+    (* the body owns the reservation across the instruction and gives it
+       back beside [Psi]: a store's write node consumes it. *)
+    iIntros "Hfrag Hrw Hro". iApply ("Hbody" with "Hfrag Hrw Hro").
+  Qed.
+
+  (* the FRAG-FREE instance, for the 33 leaves whose execute never touches
+     memory: the reservation is held aside and handed straight back. *)
+  Lemma mm_cycle (pc npc : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
+      {dq : dfrac} (Psi : iProp Σ)
+      (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+    eq_vec (_get_Mstatus_MIE mst0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    mstatus_kernel_facts mst0 ->
+    hw_config -∗
+    resv_any cpu_id -∗
+    hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
+    hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
+    (hreg_frame (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗ hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
+       swp (run_hart_active 0)
+         (fun st => ∃ w : mword 32,
+                    ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                    hreg_frame (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw ∗
+                    hreg_frame_ro (mm_Df dq) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro ∗ Psi)) -∗
+    ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_is npc -∗ Psi -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HmIE HMPRV HSXL HKF.
+    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
+    iApply (mm_cycle_w pc npc pmpcfg0 Psi ms bmi cy ti ip mst0 mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 HmIE HMPRV HSXL HKF
+              with "Hhw Hfrag Hrw Hro [Hbody] Hcont").
     iIntros "Hfrag Hrw Hro".
     iApply (swp_mono with "[Hfrag] [-]"); [|iApply ("Hbody" with "Hrw Hro")].
     iIntros (st). iDestruct 1 as (w) "(-> & Hrw & Hro & HPsi)".
@@ -115,7 +149,7 @@ Section WpInstr.
      [m'] parameter demands; here the obligation produces the file and the
      continuation quantifies it, with the leaf's rider [R] indexed by it.
      [wp_instr] is the instance that names the file. *)
-  Lemma wp_instr_ex (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+  Lemma wp_instr_exw (pc npc : mword 64) (is_rvc : bool) (i : instruction)
       (m : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
       {dq : dfrac} (R : regfile -> iProp Σ) :
     pmp_allows_all pmpcfg0 ->
@@ -130,10 +164,12 @@ Section WpInstr.
     (gpr_file m -∗
      (R_bitvector_64 PC) ↦ᵣ pc -∗
      (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+     resv_frag cpu_id None -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    (R_bitvector_64 PC) ↦ᵣ pc ∗
                    (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+                   resv_any cpu_id ∗
                    ∃ mf : regfile, gpr_file mf ∗ R mf)) -∗
     ▷ (∀ mf : regfile, mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
        pc_is npc -∗ gpr_file mf -∗ R mf -∗
@@ -151,7 +187,7 @@ Section WpInstr.
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iDestruct (hw_config_kmap with "Hhw") as "#Hkm".
     (* ONE cycle step.  The fetch-shape dispatch is below it, not above. *)
-    iApply (mm_cycle pc npc pmpcfg0 (∃ mf : regfile, gpr_file mf ∗ R mf)%I
+    iApply (mm_cycle_w pc npc pmpcfg0 (∃ mf : regfile, gpr_file mf ∗ R mf)%I
               ms bmi cy ti ip mst0
               mc micfg misa0 mseccfg0 senv0 pmar0 elp0 HmIE HMPRV HSXL HKF
               with "Hhw Hfrag Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
@@ -173,9 +209,9 @@ Section WpInstr.
         + rewrite mm_rs_sec. exact Hsecval. }
     pose proof (hfrun_lpad (mm_Drw ∪ mm_Dro) mm_Drw (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0)
                   mm_in_elp ltac:(rewrite mm_rs_elp; exact Helpnp)) as Hlp.
-    iIntros "Hrw Hro".
+    iIntros "Hfrag Hrw Hro".
     iApply (swp_run_hart_active_instr mm_Drw mm_Dro (mm_Df dq)
-              (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) pc is_rvc i pmar0 pmpcfg0 (∃ mf : regfile, gpr_file mf ∗ R mf)%I
+              (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) pc is_rvc i pmar0 pmpcfg0 ((∃ mf : regfile, gpr_file mf ∗ R mf) ∗ resv_any cpu_id)%I
               mm_disj mm_in_priv mm_in_misa mm_in_mst mm_in_PC mm_w_nPC
               mm_in_pma mm_in_pcfg mm_in_htif
               ltac:(mmrs) ltac:(mmrs) ltac:(mmrs) ltac:(mmrs) ltac:(mmrs)
@@ -183,7 +219,7 @@ Section WpInstr.
               ltac:(rewrite mm_rs_misa; exact HmC)
               ltac:(rewrite mm_rs_mst; exact HmIE)
               Hpmp Hpmaall Hstat Hdok Hlp
-              with "Hcert Hkm Hinstr Hrw Hro [Hgpr Hex]").
+              with "Hcert Hkm Hinstr Hrw Hro [Hgpr Hex Hfrag]").
     (* the ONE nextPC transport, at the symbolic width: [mm_npc_agree] is
        stated for an arbitrary written value, so the four shapes need not be
        apart here. *)
@@ -196,8 +232,8 @@ Section WpInstr.
     iDestruct (mm_rw_open with "Hrw")
       as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
     iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hro] [-]");
-      [| iApply ("Hex" with "Hgpr HPC HnPC") ].
-    iIntros (u) "(-> & HPC & HnPC & HEx)".
+      [| iApply ("Hex" with "Hgpr HPC HnPC Hfrag") ].
+    iIntros (u) "(-> & HPC & HnPC & Hresv & HEx)".
     iSplitR; [done|].
     iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
     { iApply mm_rw_close. iFrame "HPC HnPC Hms Hmi Hcy Hti Hip". }
@@ -206,7 +242,43 @@ Section WpInstr.
                 (mm_ro_nPC pc (add_vec_int pc (if is_rvc then 2 else 4)) npc
                    ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc
                    micfg misa0 mseccfg0 senv0 pmar0 elp0) with "Hro"). }
-    iFrame "HEx".
+    iFrame "HEx Hresv".
+  Qed.
+
+  (* the frag-free instance: the reservation rides straight through. *)
+  Lemma wp_instr_ex (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+      (m : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
+      {dq : dfrac} (R : regfile -> iProp Σ) :
+    pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    mmode_config dq -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc is_rvc i -∗
+    (gpr_file m -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
+     (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   (R_bitvector_64 PC) ↦ᵣ pc ∗
+                   (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+                   ∃ mf : regfile, gpr_file mf ∗ R mf)) -∗
+    ▷ (∀ mf : regfile, mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+       pc_is npc -∗ gpr_file mf -∗ R mf -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hpmp Hstat.
+    iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iApply (wp_instr_exw pc npc is_rvc i m pmpcfg0 R Hpmp Hstat
+              with "Hmm Hpmpc Hpc Hgpr Hinstr [Hex] Hcont").
+    iIntros "Hf HPC HnPC Hfrag".
+    iApply (swp_mono with "[Hfrag] [-]");
+      [| iApply ("Hex" with "Hf HPC HnPC") ].
+    iIntros (e) "(-> & HPC & HnPC & HEx)".
+    iSplitR; [done|]. iFrame "HPC HnPC HEx".
+    iApply (resv_any_intro with "Hfrag").
   Qed.
 
   (* ==================================================================== *)
@@ -253,6 +325,55 @@ Section WpInstr.
       iApply (swp_mono with "[] [-]"); [| iApply ("Hex" with "Hf HPC HnPC") ].
       iIntros (e) "(-> & Hf & HPC & HnPC & HR)".
       iSplitR; [done|]. iFrame "HPC HnPC".
+      iExists m'. iFrame "Hf HR". done.
+    - iNext. iIntros (mf) "Hmm Hpmpc Hpc Hf [-> HR]".
+      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf HR").
+  Qed.
+
+  (* ==================================================================== *)
+  (* wp_instr_w -- THE WRAPPER FOR A LEAF WHOSE EXECUTE TOUCHES MEMORY.    *)
+  (*                                                                      *)
+  (* Identical to [wp_instr] but for the reservation: a RAM write node     *)
+  (* (HartMStore's chain, HartMLoad's exclusive read) consumes             *)
+  (* [resv_frag cpu_id _] and hands one back, so the obligation is given   *)
+  (* the fragment the cycle boundary has just cleared and returns it at    *)
+  (* whatever the instruction left.  [wp_instr] is the instance for the    *)
+  (* leaves that never reach a memory event.                              *)
+  (* ==================================================================== *)
+  Lemma wp_instr_w (pc npc : mword 64) (is_rvc : bool) (i : instruction)
+      (m m' : regfile) (pmpcfg0 : type_of_register pmpcfg_n)
+      {dq : dfrac} (R : iProp Σ) :
+    pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
+    mmode_config dq -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc is_rvc i -∗
+    (gpr_file m -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
+     (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+     resv_frag cpu_id None -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m' ∗
+                   (R_bitvector_64 PC) ↦ᵣ pc ∗
+                   (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+                   resv_any cpu_id ∗ R)) -∗
+    ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+       pc_is npc -∗ gpr_file m' -∗ R -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hpmp Hstat.
+    iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
+    iApply (wp_instr_exw pc npc is_rvc i m pmpcfg0
+              (fun mf => ⌜mf = m'⌝ ∗ R)%I Hpmp Hstat
+              with "Hmm Hpmpc Hpc Hgpr Hinstr [Hex] [Hcont]").
+    - iIntros "Hf HPC HnPC Hfrag".
+      iApply (swp_mono with "[] [-]");
+        [| iApply ("Hex" with "Hf HPC HnPC Hfrag") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & Hresv & HR)".
+      iSplitR; [done|]. iFrame "HPC HnPC Hresv".
       iExists m'. iFrame "Hf HR". done.
     - iNext. iIntros (mf) "Hmm Hpmpc Hpc Hf [-> HR]".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf HR").
