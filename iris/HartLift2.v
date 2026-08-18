@@ -24,13 +24,16 @@ Local Open Scope Z_scope.
 (* 1. The stepper.                                                         *)
 (* ====================================================================== *)
 
-Definition hsil_node2 (Drw Dro : gset register) (rs : regstate)
-    (m : M unit) : option (regstate * M unit) :=
+(* X-GENERIC, for the reason [HartLift]'s [hsil_node] is: the swp layer's
+   inner monad is an [M X], and the fused AMO rule's window has to be
+   commuted with an opaque context there. *)
+Definition hsil_node2 {X : Type} (Drw Dro : gset register) (rs : regstate)
+    (m : M X) : option (regstate * M X) :=
   match m with
   | Interface.Ret _ => None
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T
-             return (T -> M unit) -> option (regstate * M unit) with
+             return (T -> M X) -> option (regstate * M X) with
        | Interface.RegRead r _ => fun k =>
            if decide (r ∈ Drw ∪ Dro)
            then Some (rs, k (register_lookup r rs)) else None
@@ -53,8 +56,8 @@ Definition hsil_node2 (Drw Dro : gset register) (rs : regstate)
        end) k
   end.
 
-Fixpoint hrun_silent2 (n : nat) (Drw Dro : gset register) (rs : regstate)
-    (m : M unit) : regstate * M unit :=
+Fixpoint hrun_silent2 {X : Type} (n : nat) (Drw Dro : gset register)
+    (rs : regstate) (m : M X) : regstate * M X :=
   match n with
   | 0%nat => (rs, m)
   | S n' =>
@@ -64,8 +67,64 @@ Fixpoint hrun_silent2 (n : nat) (Drw Dro : gset register) (rs : regstate)
       end
   end.
 
-Definition hsil2 (n : nat) (Drw Dro : gset register) (x : hcur) : hcur :=
+Definition hsil2 {X : Type} (n : nat) (Drw Dro : gset register)
+    (x : hcurX X) : hcurX X :=
   hrun_silent2 n Drw Dro x.1 x.2.
+
+(* ---------------------------------------------------------------------- *)
+(* STEPPING [hsil2] BY REWRITE -- [HartLift]'s [hsil_read_in] family at the *)
+(* TWO-footprint walker, which is the one the swp layer can actually use:   *)
+(* it reads from [Drw ∪ Dro] but writes only in [Drw], matching the frame   *)
+(* split ([hreg_frame] full / [hreg_frame_ro] fractional) exactly.          *)
+(* ---------------------------------------------------------------------- *)
+Lemma hsil2_ret {X : Type} (n : nat) (Drw Dro : gset register)
+    (rs : regstate) (x : X) :
+  hsil2 n Drw Dro (rs, Interface.Ret x) = (rs, Interface.Ret x).
+Proof. destruct n; reflexivity. Qed.
+
+Lemma hsil2_read_in {X : Type} (n : nat) (Drw Dro : gset register)
+    (rs : regstate) (r : register) (ak : option unit)
+    (k : type_of_register r -> M X) :
+  r ∈ Drw ∪ Dro ->
+  hsil2 (S n) Drw Dro (rs, Interface.Next (Interface.RegRead r ak) k)
+  = hsil2 n Drw Dro (rs, k (register_lookup r rs)).
+Proof.
+  intros HD. unfold hsil2. cbn [fst snd hrun_silent2 hsil_node2].
+  rewrite (decide_True_pi HD). reflexivity.
+Qed.
+
+Lemma hsil2_write_in {X : Type} (n : nat) (Drw Dro : gset register)
+    (rs : regstate) (r : register) (ak : option unit)
+    (v : type_of_register r) (k : unit -> M X) :
+  r ∈ Drw ->
+  hsil2 (S n) Drw Dro (rs, Interface.Next (Interface.RegWrite r ak v) k)
+  = hsil2 n Drw Dro (register_set r v rs, k tt).
+Proof.
+  intros HD. unfold hsil2. cbn [fst snd hrun_silent2 hsil_node2].
+  rewrite (decide_True_pi HD). reflexivity.
+Qed.
+
+Lemma hsil2_stuck {X : Type} (n : nat) (Drw Dro : gset register)
+    (rs : regstate) (m : M X) :
+  hsil_node2 Drw Dro rs m = None -> hsil2 n Drw Dro (rs, m) = (rs, m).
+Proof.
+  intros Hnode. destruct n; [reflexivity|].
+  cbn [hsil2 hrun_silent2]. by rewrite Hnode.
+Qed.
+
+Lemma hsil2_add {X : Type} (a b : nat) (Drw Dro : gset register)
+    (rs : regstate) (m : M X) :
+  hsil2 (a + b) Drw Dro (rs, m) = hsil2 b Drw Dro (hsil2 a Drw Dro (rs, m)).
+Proof.
+  revert rs m. induction a as [|a IH]; intros rs m; [reflexivity|].
+  cbn [Nat.add hsil2 hrun_silent2 fst snd].
+  destruct (hsil_node2 Drw Dro rs m) as [[rs1 m1]|] eqn:Hnode.
+  - change (hrun_silent2 (a + b) Drw Dro rs1 m1)
+      with (hsil2 (a + b) Drw Dro (rs1, m1)).
+    change (hrun_silent2 a Drw Dro rs1 m1) with (hsil2 a Drw Dro (rs1, m1)).
+    exact (IH rs1 m1).
+  - symmetry. exact (hsil2_stuck b Drw Dro rs m Hnode).
+Qed.
 
 Definition hsil2D (Drw Dro : gset register)
     (x y : M unit * regstate) : Prop :=

@@ -28,7 +28,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartSwp HartSpan.
+Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartLift2 HartSwp HartSpan.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -307,6 +307,94 @@ Proof.
       cbn [hsil hrun_silent] in Hnr. rewrite Hnode in Hnr. exact Hnr.
     + cbn [fst snd] in *. rewrite Hnode.
       rewrite (hsil_node_mctx_none C D rs m HC Hop0 Hnode). reflexivity.
+Qed.
+
+
+(* ---- the same two facts at the TWO-footprint walker, which is the one the
+   swp layer's frame split can supply.  [hsil2] reads from [Drw ∪ Dro] and
+   writes only in [Drw], so its [hspan] instance is [hspan (Drw ∪ Dro) Drw]. *)
+
+Lemma hsil_node2_hspani {X : Type} (Drw Dro : gset register)
+    (rs rs' : regstate) (m m' : M X) :
+  hsil_node2 Drw Dro rs m = Some (rs', m') ->
+  hspani (Drw ∪ Dro) Drw (m, rs) (m', rs').
+Proof.
+  intros Hnode. exists rs. split; [intros r _; reflexivity|].
+  destruct m as [y | T oc k]; [by cbn in Hnode|].
+  destruct oc; cbn in Hnode |- *; try discriminate Hnode;
+    first
+      [ (case_decide as HrD; [|discriminate Hnode];
+         injection Hnode as <- <-; split; [exact HrD | reflexivity])
+      | (case_decide as HrD; [|discriminate Hnode];
+         injection Hnode as <- <-; reflexivity)
+      | (injection Hnode as <- <-; reflexivity) ].
+Qed.
+
+Lemma hsil2_hspan {X : Type} (Drw Dro : gset register) (k : nat)
+    (rs : regstate) (m : M X) :
+  hspan (Drw ∪ Dro) Drw (m, rs)
+    ((hsil2 k Drw Dro (rs, m)).2, (hsil2 k Drw Dro (rs, m)).1).
+Proof.
+  revert rs m. induction k as [|k IH]; intros rs m; [reflexivity|].
+  cbn [hsil2 hrun_silent2 fst snd].
+  destruct (hsil_node2 Drw Dro rs m) as [[rs1 m1]|] eqn:Hnode; [|reflexivity].
+  eapply rtc_l; [exact (hsil_node2_hspani Drw Dro rs rs1 m m1 Hnode)|].
+  exact (IH rs1 m1).
+Qed.
+
+Lemma hsil_node2_mctx {X : Type} (C : M X -> M unit) (Drw Dro : gset register)
+    (rs rs' : regstate) (m m' : M X) :
+  mctx C ->
+  hsil_node2 Drw Dro rs m = Some (rs', m') ->
+  hsil_node2 Drw Dro rs (C m) = Some (rs', C m').
+Proof.
+  intros HC Hnode. destruct m as [y | T oc k]; [by simpl in Hnode|].
+  assert (Hx : is_extra oc = false)
+    by (destruct oc; cbn in Hnode |- *; try reflexivity; discriminate Hnode).
+  rewrite (HC T oc k Hx).
+  destruct oc; cbn in Hnode |- *; try discriminate Hnode;
+    repeat (case_decide; [|discriminate Hnode]);
+    injection Hnode as <- <-; reflexivity.
+Qed.
+
+Lemma hsil_node2_mctx_none {X : Type} (C : M X -> M unit)
+    (Drw Dro : gset register) (rs : regstate) (m : M X) :
+  mctx C ->
+  hsil_opaque m = false ->
+  hsil_node2 Drw Dro rs m = None ->
+  hsil_node2 Drw Dro rs (C m) = None.
+Proof.
+  intros HC Hop Hnode. destruct m as [y | T oc k]; [by cbn in Hop|].
+  cbn in Hop. rewrite (HC T oc k Hop).
+  destruct oc; cbn in Hnode |- *;
+    first [ discriminate Hop
+          | (case_decide; [discriminate Hnode | reflexivity])
+          | discriminate Hnode
+          | reflexivity ].
+Qed.
+
+Lemma hsil2_mctx {X : Type} (C : M X -> M unit) (Drw Dro : gset register)
+    (k : nat) (rs : regstate) (m : M X) :
+  mctx C ->
+  (forall j : nat, (j < k)%nat ->
+     hsil_opaque ((hsil2 j Drw Dro (rs, m)).2) = false) ->
+  hsil2 k Drw Dro (rs, C m)
+  = ((hsil2 k Drw Dro (rs, m)).1, C ((hsil2 k Drw Dro (rs, m)).2)).
+Proof.
+  intros HC. revert rs m. induction k as [|k IH]; intros rs m Hnr.
+  - reflexivity.
+  - assert (Hop0 : hsil_opaque m = false)
+      by (specialize (Hnr 0%nat ltac:(lia)); cbn in Hnr; exact Hnr).
+    cbn [hsil2 hrun_silent2 fst snd] in *.
+    destruct (hsil_node2 Drw Dro rs m) as [[rs1 m1]|] eqn:Hnode.
+    + rewrite (hsil_node2_mctx C Drw Dro rs rs1 m m1 HC Hnode).
+      change (hrun_silent2 k Drw Dro rs1 (C m1))
+        with (hsil2 k Drw Dro (rs1, C m1)).
+      change (hrun_silent2 k Drw Dro rs1 m1) with (hsil2 k Drw Dro (rs1, m1)).
+      apply (IH rs1 m1).
+      intros j Hj. specialize (Hnr (S j) ltac:(lia)).
+      cbn [hsil2 hrun_silent2 fst snd] in Hnr. rewrite Hnode in Hnr. exact Hnr.
+    + rewrite (hsil_node2_mctx_none C Drw Dro rs m HC Hop0 Hnode). reflexivity.
 Qed.
 
 Section amo.
