@@ -1105,7 +1105,7 @@ Section ProofUvmalloc.
       iPoseProof (uai_58 with "Htext") as "Hi58".
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
       iDestruct (proc_pt_grow_uvm Pi (Z.lor xperm 18) (svpn_of av) r t' m_ad
                    Hperm Hwf Hview Hmadnone Hvpnb26 Hrep' Hbase'' Hpv
                    with "Hkmapb Hptree Hpage Hown") as "Hpt".

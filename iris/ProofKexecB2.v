@@ -1334,7 +1334,7 @@ Section KexecB2Loops.
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-          #Hkmapb)".
+          #Hkmapb & _)".
       iDestruct (proc_pt_page_acc P (svpn_of vai) w0 Hum0 with "Hkmapb Hpt")
         as "[Hpage Hgive]".
       iDestruct (kxc_page_take (page_base (pte_ppn w0)) nn ltac:(lia)

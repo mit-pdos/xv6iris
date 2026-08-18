@@ -964,7 +964,7 @@ Section ProofCopyinstr.
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
     assert (Hrootc : Pc.(ud_root) = P.(ud_root))
       by (destruct Hext as ((Hr & _) & _); exact Hr).
     (* the exit continuation, named so the joins below can take it *)

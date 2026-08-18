@@ -1057,7 +1057,7 @@ Section ProofFreewalk.
     iIntros "Hcg Hcnt #Htext Hpc Hptree #Henv Hcont".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
     iDestruct (fw_open lvl t with "Hptree") as "[#Hcl Htodo]".
     iDestruct "Hcl" as "#(%Hkd & %Hpv & Hkat)".
     iAssert (pt_node_claim (pt_base t)) as "#Hclaim".

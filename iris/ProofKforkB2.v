@@ -211,7 +211,7 @@ Section KforkTfLoop.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static tfsrc Hpvsrc with "Hkmapb") as "#Hptcsrc".
     iPoseProof (pt_node_claim_from_static tfdst Hpvdst with "Hkmapb") as "#Hptcdst".
     assert (Hwslen36 : length ws = 36%nat) by (unfold TFWORDS in Hwslen; exact Hwslen).

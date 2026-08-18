@@ -1569,7 +1569,7 @@ Section ProofAllocproc.
           iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
             "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
               %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-              %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+              %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
           iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
                        with "Hkmapb [Hpgown]")
             as (tfws) "Htfpage".
@@ -1980,7 +1980,7 @@ Section ProofAllocproc.
         iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
           "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
             %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-            %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+            %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
         iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
                      with "Hkmapb [Hpgown]")
           as (tfws) "Htfpage".

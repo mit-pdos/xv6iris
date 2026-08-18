@@ -1488,7 +1488,7 @@ Section ProofCopyout.
       - (* writable: borrow the freshly faulted page and copy *)
         iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
         iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-          "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+          "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
         iDestruct (proc_pt_page_acc_vmfault Pc (svpn_of va0) r Hrpv with "Hkmapb Hpt")
           as "[Hpage Hgive]".
         iDestruct (cpu_own_transport CIDm6 CIDms2 lvl eb p b ltac:(wp_next_chain)
@@ -1598,7 +1598,7 @@ Section ProofCopyout.
     - (* writable: borrow the mapped page and copy *)
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
       iDestruct (proc_pt_page_acc Pc (svpn_of va0) w0 Hum0 with "Hkmapb Hpt")
         as "[Hpage Hgive]".
       iDestruct (cpu_own_transport CID0 CIDh2 lvl eb p b ltac:(wp_next_chain)
