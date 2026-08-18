@@ -817,4 +817,87 @@ Section HartSCsr.
              (dm_sub D HD1 HD2 HD3) (agree_dm_S rs Hp Hs Hm) Hgb Hex).
   Qed.
 
+  (* ================================================================== *)
+  (* §8 TWO NODE-LEVEL SEAMS the timer leaves need.                       *)
+  (*                                                                     *)
+  (* (a) A PINNED READ AT THE [hval] LAYER.  [WpMmodeCsrSwp.hval_read_any] *)
+  (* ∀-peels a read of a register NOBODY owns; its mirror peels a read of  *)
+  (* one the caller's frame DOES pin, which the span answers from the      *)
+  (* frame ([hspan_node]'s RegRead case reads the chain's own file, and    *)
+  (* [hspani] only perturbs it off [D]).  Needed wherever a check is       *)
+  (* value-DEPENDENT on one owned cell and value-BLIND on an unowned one   *)
+  (* -- Supervisor's [csrr time], whose legality is mcounteren.TM (owned,  *)
+  (* persistently) while scounteren is read and ignored.                   *)
+  (* ================================================================== *)
+  Lemma hspani_read_pinned_inv {X : Type} (D Drw : gset register)
+      (r : register) (m : M X) (rs : regstate) (c : M X * regstate) :
+    hregread_at r m = true ->
+    hspani D Drw (m, rs) c ->
+    exists rs1 : regstate,
+      reg_agree_on D rs1 rs /\
+      c = (hregread_resume r (register_lookup r rs1) m, rs1).
+  Proof.
+    intros Hat (rs1 & Hag & Hnode).
+    destruct (hregread_at_inv r m Hat) as (ak & K & -> & Hres).
+    cbn [hspan_node fst snd] in Hnode.
+    exists rs1. split; [exact Hag|]. rewrite Hres. exact Hnode.
+  Qed.
+
+  Lemma hval_read_pinned {X : Type} (D Drw : gset register) (r : register)
+      (rs : regstate) (m : M X) (x : X) (rs' : regstate) :
+    r ∈ D ->
+    hregread_at r m = true ->
+    hval D Drw rs (hregread_resume r (register_lookup r rs) m) x rs' ->
+    hval D Drw rs m x rs'.
+  Proof.
+    intros Hin Hat Hrest rs0 l Hag Hchain Hstop.
+    assert (Hns : hspan_stops Drw m = false).
+    { destruct (hregread_at_inv r m Hat) as (ak & K & -> & _). reflexivity. }
+    apply hspan_peel in Hchain; [| exact Hns | exact Hstop].
+    destruct Hchain as (c & Hstep & Hchain).
+    destruct (hspani_read_pinned_inv D Drw r m rs0 c Hat Hstep)
+      as (rs1 & Hag1 & ->).
+    assert (Heq : register_lookup r rs1 = register_lookup r rs)
+      by (rewrite (Hag1 r Hin); exact (Hag r Hin)).
+    rewrite Heq in Hchain.
+    apply (Hrest rs1 l); [| exact Hchain | exact Hstop].
+    intros q Hq. rewrite (Hag1 q Hq). exact (Hag q Hq).
+  Qed.
+
+  (* ================================================================== *)
+  (* (b) THE REGISTER-WRITE SEAM.  A leaf whose CSR cell lives in an       *)
+  (* INVARIANT cannot hold it open across the instruction -- an invariant  *)
+  (* cannot stay open across a multi-node [swp] stretch -- but the write   *)
+  (* is ONE node, and a node rule is mask-changing, so the invariant can    *)
+  (* be opened around exactly that node.  This is the ordinary atomic      *)
+  (* ACCESSOR shape: hand over the cell at any value, take it back at the  *)
+  (* written one.  [HartRegNode.swp_hart_regwrite] already exposes the      *)
+  (* σ-callback with the ⊤→∅→⊤ dance, so this is that rule with the state  *)
+  (* interpretation consumed on the caller's behalf.                       *)
+  (* ================================================================== *)
+  Lemma swp_write_reg_acc (r : register) (w : type_of_register r)
+      (E : coPset) (Φ : unit -> iProp Σ) :
+    gen_cert -∗
+    (|={⊤,E}=> ∃ v0 : type_of_register r,
+        reg_pointsto r (DfracOwn 1) v0 ∗
+        (reg_pointsto r (DfracOwn 1) w ={E,⊤}=∗ Φ tt)) -∗
+    swp (Defs.write_reg r w) Φ.
+  Proof.
+    iIntros "#Hcert Hacc".
+    iApply (swp_hart_regwrite r w with "Hcert").
+    { cbn [hregwrite_val_at Defs.write_reg].
+      destruct (decide _) as [Heq|Hne]; [|congruence].
+      assert (Heq = eq_refl) as -> by apply proof_irrel. reflexivity. }
+    iIntros (σ) "Hsi". rewrite /mstate_interp.
+    iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
+    iMod "Hacc" as (v0) "[Hpt Hcl]".
+    iMod (reg_update _ r _ w with "Hreg Hpt") as "[Hreg Hpt]".
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hclose". iNext. iMod "Hclose" as "_".
+    iMod ("Hcl" with "Hpt") as "HΦ". iModIntro.
+    iSplitL "Hreg Hmem Hdev";
+      [rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg; by iFrame|].
+    rewrite hregwrite_resume_red. iApply swp_ret. iExact "HΦ".
+  Qed.
+
 End HartSCsr.
