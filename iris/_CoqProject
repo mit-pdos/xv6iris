@@ -193,6 +193,7 @@ KptGoodb.v
 KptShare.v
 HartSMem.v
 SmodeCorePt.v
+WpSmodePtFetch.v
 WpSmodeGpr.v
 WpSmodeMemGen.v
 WpMemsetS.v
