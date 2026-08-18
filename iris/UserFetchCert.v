@@ -19,7 +19,22 @@
 (*                                                                        *)
 (* Layout: section 1 the 4-byte fetch READ, certified; section 2 the fetch *)
 (* composer's two shells; section 3 the [u_mem_wf] projections the walk    *)
-(* and the read need; section 4 [u_fetch_pure].                            *)
+(* and the read need; section 4 the byte-level ADUE absorption; section 5  *)
+(* what the write-back does NOT touch and the fetched word; section 6 the  *)
+(* [translateAddr] probes at the fetch, certified; section 7               *)
+(* [u_fetch_pure] itself.                                                  *)
+(*                                                                        *)
+(* ONLY THE 4-ALIGNED FETCH IS HERE.  The 2-aligned split fetch (a         *)
+(* compressed instruction at an odd halfword, and the 2+2 straddle that    *)
+(* translates TWICE) has its exec facts in [UserFetch]                     *)
+(* ([exec_fetch_rvc_2] / [exec_fetch_base_2] / the two fault arms) and its  *)
+(* composer in [UserFetchPt.user_pt_fetch_instr_2], but NO [goodmb] twin   *)
+(* of either exists yet: section 2 certifies [fetch_bytes] and [fetch]     *)
+(* at width 4 only.  A [u_fetch_pure_2] needs those two twins first;       *)
+(* everything else it wants (the walk certificate, the [u_mem_wf]          *)
+(* projections, the landing algebra) is width-independent and is already   *)
+(* here -- it would run the section-7 script TWICE, threading the second   *)
+(* translation's [u_mem_step] through [u_mem_step_trans].                   *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -33,6 +48,12 @@ Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte.
 Require Import CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
 Require Import ExecCommon UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
 Require Import UserBytes PtWalkCert.
+(* [SmodeCore.ram_fetch_pmp] -- the RAM window's PMP grant -- is the one
+   thing section 7 needs from the S-mode core. *)
+Require Import SmodeCore.
+(* the tier's PURE pair convention: [u_state], [u_exec_pins], [Du_r]/[Du_w].
+   [UserClassifyAsm] is Iris-free; nothing below is an [iProp]. *)
+Require Import UserFrame UserExec UserClassify UserClassifyAsm.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1165,4 +1186,347 @@ Proof.
   replace (satpMode_of_bits RV64 ('b"1000" : mword 4)) with (Some Sv39)
     by (vm_compute; reflexivity).
   cbn match. reflexivity.
+Qed.
+
+(* THE LEAF'S PERMISSION CHECK, certified at an ABSTRACT leaf word.
+   [check_PTE_permission] is not register-free in general: on the
+   R=0,W=1,X=0 encoding it reads [menvcfg] and then ASSERTS on
+   menvcfg.SSE, which no abstract state decides, and its leading
+   [assert_exp (W -> (R || !X))] is an error node on W=1,R=0,X=1.  At a
+   leaf the fetch is PERMITTED on, [pte_check_ok] rules both out -- read
+   at [dstateM] (menvcfg = 0) each would make [exec] answer something
+   other than [PTE_Check_Success] -- and what is left reads nothing, so
+   the certificate holds at EVERY footprint.  That is the shape
+   [PtWalkCert.goodmb_ptree_translateAddr]'s [Hgchk] premise wants.
+   (Its natural home is beside [uleaf_ok] in [UserPtTree.v].) *)
+Lemma goodb_check_PTE_permission_fetch (w' : mword 64) (mxr do_sum : bool)
+    (Db : register -> bool) (s : mstate) :
+  pte_check_ok (InstructionFetch tt) User mxr do_sum w' ->
+  goodb Db (check_PTE_permission (InstructionFetch tt) User mxr do_sum
+              (Mk_PTE_Flags (subrange_vec_dec w' 7 0)) (ext_bits_of_PTE w') tt) s = true.
+Proof.
+  unfold pte_check_ok. intro Hchk.
+  pose proof (Hchk dstateM) as Hc0.
+  destruct (mword1_cases (_get_PTE_Flags_U (Mk_PTE_Flags (subrange_vec_dec w' 7 0)))) as [HU|HU];
+  destruct (mword1_cases (_get_PTE_Flags_R (Mk_PTE_Flags (subrange_vec_dec w' 7 0)))) as [HR|HR];
+  destruct (mword1_cases (_get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec w' 7 0)))) as [HW|HW];
+  destruct (mword1_cases (_get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec w' 7 0)))) as [HX|HX];
+  unfold check_PTE_permission in Hc0 |- *;
+  rewrite ?HU, ?HR, ?HW, ?HX in Hc0 |- *;
+  first [ solve [ vm_compute; reflexivity ]
+        | solve [ vm_compute in Hc0; discriminate Hc0 ] ].
+Time Qed.
+
+(* ===================================================================== *)
+(* 7. [u_fetch_pure] -- THE PURE FETCH COMPOSER.                          *)
+(*                                                                        *)
+(* [UserFetchPt.user_pt_fetch_instr] with its [reg_interp] /               *)
+(* [gen_heap_interp] / [utlb_inv_pt] / [udata_own] premises replaced by    *)
+(* [UserClassifyAsm.u_exec_pins] + [UserBytes.u_mem_wf], a [goodmb]        *)
+(* conjunct added, and the post-state said out loud.  Stated at the        *)
+(* tier's reference state [u_state rsf mm] (section 9 of the worklist), so *)
+(* the successor state is LITERALLY [u_state rsf' mm'] -- which is what    *)
+(* [base_exec_total_u] / [rvc_exec_total_u] are stated over, so the caller *)
+(* feeds this straight into them with no state algebra in between.         *)
+(*                                                                        *)
+(* THE FIVE CONJUNCTS, and who consumes each:                              *)
+(*   - the [exec] fact, with [UserFetch.exec_fetch_ok_4]'s own             *)
+(*     if-isRVC shape: [HartRunFull.run_fetch_base] / [run_fetch_rvc].     *)
+(*   - the certificate at [Du_r]/[Du_w] and at the map the hart holds:     *)
+(*     [HartMemRun.swp_hmrun_of_exec], for the fetch node.                 *)
+(*   - the landing FILE ([rsf] itself, or ONE [tlb] write): every other    *)
+(*     ambient pin -- [post_fetch_cfg], [u_hw_pins], [u_cfg_pins],         *)
+(*     [u_pt_pins] -- transports across it by [irrelevant_register_set],   *)
+(*     which is what lets the caller rebuild [u_exec_pins P t' rsf'].      *)
+(*   - [tlb_ok_pt] at the NEW tree: [u_exec_pins]' fourth conjunct.        *)
+(*   - [u_mem_step]: [UserBytes.u_mem_step_wf] gives [u_mem_wf P t' mm'],  *)
+(*     and [UserClassifyAsm.u_landing_map] turns                            *)
+(*     [swp_hmrun_of_exec]'s existential post map into [mm'].              *)
+(*                                                                        *)
+(* The three [translateAddr] outcomes are handled ONCE, in [Hland]: a TLB  *)
+(* hit changes nothing, a fill writes [tlb] and keeps the tree, and the    *)
+(* Svadu write-back does both and moves the tree by [ptree_set_leaf]       *)
+(* ([u_mem_step_writeback] + [UptTree.upt_tree_spec_set_leaf] +            *)
+(* [PtTree.tlb_ok_pt_fill_self] / [tlb_ok_pt_set_leaf]).  Nothing after    *)
+(* [Hland] looks at which arm ran.                                         *)
+(* ===================================================================== *)
+
+Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (w va : mword 64) (mi : bool) :
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (InstructionFetch tt) w ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  post_fetch_cfg (u_state rsf mm) va mi ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
+    exec (fetch tt) (u_state rsf mm)
+      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               else F_Base (autocast (T := mword) iw)), u_state rsf' mm') /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+    (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    u_mem_step P t t' mm mm'.
+Proof.
+  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
+  destruct Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
+  destruct Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
+  destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
+  destruct Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
+  destruct Lms as (Lsxl & _).
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc & Hwfm & Hspec).
+  pose proof Hspec as (Hbase & _).
+  destruct (upt_spec_maps (ud_root P) (ud_tfp P) (ud_um P) t (svpn_of va) w
+              Hspec (or_intror (or_intror Hl)))
+    as (p2 & p1 & a0 & d0 & Hmaps).
+  pose proof Hmaps as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ &
+                       Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hl0 & Hnap & Hpb0).
+  (* the leaf's per-variant classification *)
+  assert (Hvar : forall a d : mword 1,
+            pte_valid (pte_set_ad w a d) /\ pte_leaf (pte_set_ad w a d) /\
+            pte_no_napot (pte_set_ad w a d) /\ pte_pbmt0 (pte_set_ad w a d))
+    by exact (upt_variant (ud_tfp P) (ud_um P) (svpn_of va) w Hwfm
+                (or_intror (or_intror Hl))).
+  (* the three slots, as reads and as ownership *)
+  assert (Hsm2 : pt_slot_mem (u_state rsf mm) (pt_addr2 t (svpn_of va)) p2)
+    by exact (u_slot_mem_at P t mm rsf (pt_base t) (vpn_idx 2 (svpn_of va)) p2 Hwf
+                (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hsm1 : pt_slot_mem (u_state rsf mm) (pt_addr1 p2 (svpn_of va)) p1)
+    by exact (u_slot_mem_at P t mm rsf (u_next_base p2) (vpn_idx 1 (svpn_of va)) p1 Hwf
+                (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hsm0 : pt_slot_mem (u_state rsf mm) (pt_addr0 p1 (svpn_of va))
+                   (pte_set_ad w a0 d0))
+    by exact (u_slot_mem_at P t mm rsf (u_next_base p1) (vpn_idx 0 (svpn_of va)) _ Hwf
+                (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hown2 : bytes_owned mm (pt_addr2 t (svpn_of va)) 8 = true)
+    by exact (u_slot_owned P t mm _ p2 Hwf (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hown1 : bytes_owned mm (pt_addr1 p2 (svpn_of va)) 8 = true)
+    by exact (u_slot_owned P t mm _ p1 Hwf (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hown0 : bytes_owned mm (pt_addr0 p1 (svpn_of va)) 8 = true)
+    by exact (u_slot_owned P t mm _ _ Hwf (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
+  (* the three read-only probes of [translateAddr]'s front matter *)
+  assert (Htm : exec (translationMode User) (u_state rsf mm)
+                = Some (Sv39, u_state rsf mm))
+    by exact (exec_translationMode_U_sv39 usatp (u_state rsf mm) Lsxl Hsatp Hmode).
+  assert (Htmg : goodb Du_r (translationMode User) (u_state rsf mm) = true)
+    by exact (goodb_translationMode_U Du_r usatp (u_state rsf mm)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                Lsxl Hsatp Hmode).
+  assert (Heff : exec (effectivePrivilege (InstructionFetch tt)
+                        (register_lookup mstatus (u_state rsf mm).(sregs)) User)
+                   (u_state rsf mm) = Some (User, u_state rsf mm))
+    by exact (exec_effectivePrivilege_fetch _ User (u_state rsf mm)).
+  assert (Hssx : exec (is_shadow_stack_access (InstructionFetch tt)) (u_state rsf mm)
+                 = Some (false, u_state rsf mm))
+    by exact (exec_is_shadow_stack_fetch (u_state rsf mm)).
+  (* the PMA grants *)
+  assert (Hpmar : pma_allows_pte_read
+                    (register_lookup pma_regions (u_state rsf mm).(sregs)))
+    by exact (pma_allows_all_pte_read _ Hall).
+  assert (Hpmaw : pma_allows_pte_write
+                    (register_lookup pma_regions (u_state rsf mm).(sregs)))
+    by exact (Hpmaw_of _ Hall).
+  (* the leaf's permission check and the three validity tests, certified *)
+  assert (Hgchk : forall (a d : mword 1) (mxr do_sum : bool)
+                    (Db : register -> bool) (s0 : mstate),
+            goodb Db (check_PTE_permission (InstructionFetch tt) User mxr do_sum
+                        (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+                        (ext_bits_of_PTE (pte_set_ad w a d)) tt) s0 = true).
+  { intros a d mxr do_sum Db s0.
+    exact (goodb_check_PTE_permission_fetch (pte_set_ad w a d) mxr do_sum Db s0
+             (Hleaf a d mxr do_sum)). }
+  assert (Hg2 : forall (Db : register -> bool) (s0 : mstate),
+            goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec p2 7 0))
+                        (ext_bits_of_PTE p2)) s0 = true)
+    by (intros Db s0; exact (goodb_pte_is_invalid_valid p2 Db s0 Hv2)).
+  assert (Hg1 : forall (Db : register -> bool) (s0 : mstate),
+            goodb Db (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec p1 7 0))
+                        (ext_bits_of_PTE p1)) s0 = true)
+    by (intros Db s0; exact (goodb_pte_is_invalid_valid p1 Db s0 Hv1)).
+  assert (Hg0 : forall (a d : mword 1) (Db : register -> bool) (s0 : mstate),
+            goodb Db (pte_is_invalid
+                        (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+                        (ext_bits_of_PTE (pte_set_ad w a d))) s0 = true)
+    by (intros a d Db s0;
+        exact (goodb_pte_is_invalid_valid _ Db s0 (proj1 (Hvar a d)))).
+  (* THE TRANSLATION, exec side and certificate side *)
+  destruct (KptTree.ptree_translateAddr_cases (InstructionFetch tt) User
+              (ud_root P) va w (u_walk_pa w va) usatp t (register_lookup tlb rsf)
+              p2 p1 a0 d0 (u_state rsf mm)
+              Hleaf Hcanon eq_refl (fun a d => proj2 (proj2 (proj2 (Hvar a d))))
+              Hbase Hmaps Htlbok Hsm2 Hsm1 Hsm0
+              Hmisa Lmenv Hhtif Lcp Htm Heff Hssx Hsatp Hppn Hasid eq_refl
+              HA Hord HRp HWp Hcovp Hpmar Hpmaw)
+    as (sf & Htr & Harms).
+  assert (Htrg : goodmb Du_r Du_w
+                   (translateAddr (Virtaddr va) (InstructionFetch tt))
+                   (u_state rsf mm) mm = true).
+  { apply (goodmb_ptree_translateAddr Du_r Du_w (InstructionFetch tt) User
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity)
+             (ud_root P) t va w (u_walk_pa w va) usatp (register_lookup tlb rsf)
+             p2 p1 a0 d0 (u_state rsf mm) mm
+             Hleaf Hgchk Hcanon eq_refl
+             (fun a d => proj2 (proj2 (proj2 (Hvar a d))))
+             Hbase Hmaps Htlbok Hg2 Hg1 Hg0 Hsm2 Hsm1 Hsm0 Hown2 Hown1 Hown0
+             Hmisa Lmenv Hhtif Lcp Htm Htmg Heff
+             (goodb_effectivePrivilege_fetch Du_r
+                (register_lookup mstatus (u_state rsf mm).(sregs)) User (u_state rsf mm))
+             Hssx (goodb_is_shadow_stack_fetch Du_r (u_state rsf mm))
+             Hsatp Hppn Hasid eq_refl HA Hord HRp HWp Hcovp Hpmar Hpmaw). }
+  (* WHERE THE TRANSLATION LANDED: the three arms, each with its tree, its
+     file and its [u_mem_step].  Nothing after this point looks at which. *)
+  assert (Hland : exists (rsf' : regstate) (mm' : pamap) (t' : ptree),
+            sf = u_state rsf' mm' /\
+            (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
+            tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+            u_mem_step P t t' mm mm').
+  { destruct Harms as [-> | [-> | (a1 & d1 & ->)]].
+    - exists rsf, mm, t. split_and!;
+        [ reflexivity | left; reflexivity | exact Htlbok
+        | exact (u_mem_step_refl P t mm Hwf) ].
+    - eexists _, mm, t. split_and!.
+      + reflexivity.
+      + right. eexists. reflexivity.
+      + rewrite register_lookup_set.
+        exact (tlb_ok_pt_fill_self (mword_of_int 0) t (register_lookup tlb rsf)
+                 (svpn_of va) p2 p1 _ Hmaps Htlbok).
+      + exact (u_mem_step_refl P t mm Hwf).
+    - assert (Habs : pte_set_ad (pte_set_ad w a0 d0) a1 d1 = pte_set_ad w a1 d1)
+        by exact (pte_set_ad_absorb w a0 d0 a1 d1).
+      assert (Hv' : pte_valid (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj1 (Hvar a1 d1))).
+      assert (Hl' : pte_leaf (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj1 (proj2 (Hvar a1 d1)))).
+      assert (Hn' : pte_no_napot (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj1 (proj2 (proj2 (Hvar a1 d1))))).
+      assert (Hp' : pte_pbmt0 (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
+      assert (Hspec' : upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P)
+                (ptree_set_leaf t (svpn_of va)
+                   (pte_set_ad (pte_set_ad w a0 d0) a1 d1))).
+      { rewrite Habs.
+        exact (upt_tree_spec_set_leaf (ud_root P) (ud_tfp P) (ud_um P) t
+                 (svpn_of va) w p2 p1 a0 d0 a1 d1 Hwfm Hspec
+                 (or_intror (or_intror Hl)) Hmaps). }
+      eexists _, _,
+        (ptree_set_leaf t (svpn_of va) (pte_set_ad (pte_set_ad w a0 d0) a1 d1)).
+      split_and!.
+      + reflexivity.
+      + right. eexists. reflexivity.
+      + rewrite register_lookup_set.
+        exact (tlb_ok_pt_fill_self (mword_of_int 0)
+                 (ptree_set_leaf t (svpn_of va)
+                    (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+                 (register_lookup tlb rsf) (svpn_of va) p2 p1 _
+                 (ptree_set_leaf_maps_self t (svpn_of va) p2 p1
+                    (pte_set_ad w a0 d0) _ Hmaps Hv' Hl' Hn' Hp')
+                 (tlb_ok_pt_set_leaf (mword_of_int 0) t (register_lookup tlb rsf)
+                    (svpn_of va) p2 p1 (pte_set_ad w a0 d0) a1 d1
+                    Hmaps Hv' Hl' Hn' Hp' Htlbok)).
+      + exact (u_mem_step_writeback P t mm (svpn_of va) p2 p1
+                 (pte_set_ad w a0 d0) _ Hwf Hmaps Hspec'). }
+  destruct Hland as (rsf' & mm' & t' & Hsf & Hfile & Htlbok' & Hstep).
+  (* THE INSTRUCTION READ, at the state the walk landed on.  The four
+     bytes are in the OWNED map at BOTH ends: at [mm'] with the values the
+     machine reads, and at [mm] -- the map the certificate is stated over
+     -- as ownership.  [u_mem_step] is what carries the first. *)
+  assert (Hwf' : u_mem_wf P t' mm')
+    by exact (u_mem_step_wf P t t' mm mm' Hwf Hstep).
+  destruct (u_fetch_bytes P t' mm' w va Hwf' Hl Hal) as (iw & Hbytes).
+  assert (Hown4 : bytes_owned mm (u_walk_pa w va) 4 = true).
+  { destruct (u_fetch_bytes P t mm w va Hwf Hl Hal) as (iw0 & Hb0).
+    apply bytes_owned_of_dom. intros j Hj. apply elem_of_dom.
+    exists (nth_byte iw0 j). apply Hb0. lia. }
+  assert (Hramj : forall j : nat, (j < 4)%nat ->
+            addr_is_ram (pa_add (u_walk_pa w va) j)).
+  { intros j Hj. destruct Hwf' as (mdx & _ & _ & _ & _ & Hr & _).
+    apply Hr. apply elem_of_dom. exists (nth_byte iw j). apply Hbytes. lia. }
+  assert (Hram0 : addr_is_ram (u_walk_pa w va))
+    by (rewrite <- (pa_add_0 (u_walk_pa w va)); apply Hramj; lia).
+  assert (Hram3 : addr_is_ram (pa_add (u_walk_pa w va) 3))
+    by (apply Hramj; lia).
+  (* the config cells the read consults survive the TLB write *)
+  assert (Tr : forall r : register, register_beq r (tlb : register) = false ->
+            register_lookup r rsf' = register_lookup r rsf).
+  { intros r Hne. destruct Hfile as [-> | (tv & ->)];
+      [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+  assert (HA' : pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) = TOR)
+    by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA).
+  assert (Hord' : zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n rsf') 0) = false)
+    by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord).
+  assert (HX' : eq_vec (_get_Pmpcfg_ent_X
+      (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) ('b"1") = true)
+    by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HXp).
+  assert (Hcovp' : (ram_base + ram_size
+      <= uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0) * 4)%Z)
+    by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp).
+  assert (Hall' : pma_allows_all (register_lookup pma_regions rsf'))
+    by (rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall).
+  assert (Hhtif' : register_lookup htif_tohost_base rsf' = None)
+    by (rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif).
+  assert (Lcp' : register_lookup cur_privilege rsf' = User)
+    by (rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Lcp).
+  assert (Lsxl' : _get_Mstatus_SXL (register_lookup mstatus rsf') = 'b"10")
+    by (rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Lsxl).
+  destruct (pma_all_ram Hall' (u_walk_pa w va) 4
+              (pma_access_ram _ _ _ Hram0 Hram3
+                 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl))
+    as (region & Hpmam & Hexecp & _).
+  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0)) 4)
+      (uint (u_walk_pa w va)) (uint (to_bits 64 4)) = PMP_Match)
+    by exact (ram_fetch_pmp (u_walk_pa w va) _ 4 3 ltac:(lia) ltac:(lia)
+                ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                Hram0 Hram3 Hcovp').
+  assert (Halp : is_aligned_paddr (Physaddr (u_walk_pa w va)) 4 = true)
+    by exact (pa4_aligned _ va Hal).
+  assert (Hclint : exec (within_clint (Physaddr (u_walk_pa w va)) 4)
+                     (u_state rsf' mm') = Some (false, u_state rsf' mm'))
+    by exact (within_clint_false (u_walk_pa w va) 4 (u_state rsf' mm')
+                (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)).
+  assert (Hsigw : exec (within_sig (Physaddr (u_walk_pa w va)) 4)
+                    (u_state rsf' mm') = Some (false, u_state rsf' mm'))
+    by exact (within_sig_false (u_walk_pa w va) 4 (u_state rsf' mm')
+                (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)).
+  assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA
+                        (Physaddr (u_walk_pa w va)) 4 false false false)
+                  (u_state rsf' mm') = Some (Ok iw, u_state rsf' mm'))
+    by exact (exec_mem_read_fetch_4_U PBMT_PMA (u_walk_pa w va) region iw
+                (u_state rsf' mm') HA' Hord' Hrange HX' Hpmam Halp Hexecp
+                Hclint Hsigw
+                (within_htif_false (u_walk_pa w va) 4 (u_state rsf' mm') Hhtif')
+                (addr_is_ram_not_dev _ Hram0) Hbytes Lcp').
+  assert (Hmrg : goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
+                          (Physaddr (u_walk_pa w va)) 4 false false false)
+                   (u_state rsf' mm') mm = true)
+    by exact (goodmb_mem_read_fetch_4_U Du_r Du_w PBMT_PMA (u_walk_pa w va)
+                region iw (u_state rsf' mm') mm
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                HA' Hord' Hrange HX' Hpmam Halp Hexecp Hclint Hsigw Hhtif'
+                (addr_is_ram_not_dev _ Hram0) Hown4 Hbytes Lcp').
+  (* ...and the fetch on top of the two *)
+  rewrite Hsf in Htr.
+  exists iw, rsf', mm', t'. split_and!.
+  - exact (exec_fetch_ok_4 (u_state rsf mm) (u_state rsf' mm') va
+             (u_walk_pa w va) iw Lpc Hal Htr Hmr).
+  - exact (goodmb_fetch_ok_4 Du_r Du_w (u_state rsf mm) (u_state rsf' mm') mm
+             va (u_walk_pa w va) iw ltac:(vm_compute; reflexivity)
+             Lpc Hal Htr Htrg Hmr Hmrg).
+  - exact Hfile.
+  - exact Htlbok'.
+  - exact Hstep.
 Qed.
