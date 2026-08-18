@@ -372,6 +372,7 @@ WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
 WpSconfSret.v
+WpSconfSfence.v
 WpPushOffCsr.v
 CodeMycpu.v
 ProcGeom.v
