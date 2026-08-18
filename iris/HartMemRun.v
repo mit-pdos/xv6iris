@@ -33,7 +33,21 @@
    [hmrun_of_exec] (below, stated; the certificate side): every whole-cycle
    [exec] fact the user tier has becomes a walker fact under a FOOTPRINT
    CERTIFICATE [goodmb] -- [WpDecodeBridge.goodb] with the memory accesses
-   admitted when their footprint is inside the owned bytes. *)
+   admitted when their footprint is inside the owned bytes.
+
+   AND AT [mm := ∅] THIS FILE IS ALSO THE REGISTER-WRITE ENGINE THE TREE
+   LACKED.  [goodb] refuses every [RegWrite] and [HartGoodb.hval_of_goodb]
+   demands [exec m dst = Some (x, dst)] -- the SAME state -- so no stretch
+   that writes a register can go through them.  [goodmb] takes register
+   writes ([andb (Dw r) ...]) and [hmrun_of_exec] takes [exec m s = Some
+   (x, s')] with [s' <> s], while [bytes_own ∅ = emp] and [∅ ⊆ s.(mem)]
+   cost nothing.  So
+
+     [swp_hmrun_of_exec ... (mm := ∅)] IS THE REGISTER-WRITING ANALOGUE OF
+     [HartGoodb.hval_of_goodb],
+
+   which is what the trap towers (U-mode and S-mode), MRET's walk and
+   [reset_elp] want.  Section 4b is the toolkit for exactly that shape. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -1003,6 +1017,132 @@ Lemma mm_after_cer (Dr Dw : register -> bool) {X : Type}
   goodmb Dr Dw m s mm = true ->
   mm_after (Defs.catch_early_return m) s mm = mm_after m s mm.
 Proof. apply (mm_after_try_catch Dr Dw m _). Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4b. THE REGISTER-ONLY STRETCH: [goodmb] AT [mm := ∅].                    *)
+(*                                                                         *)
+(* [goodb] REFUSES every register WRITE ([WpDecodeBridge.goodb]'s           *)
+(* [| _ => false]) and [HartGoodb.hval_of_goodb] demands                    *)
+(* [exec m dst = Some (x, dst)] -- the SAME state -- so a stretch that      *)
+(* WRITES registers cannot go through [goodb] at all.  [goodmb] AT          *)
+(* [mm := ∅] IS the engine the tree lacked for those: it takes writes       *)
+(* ([andb (Dw r) ...]) and [hmrun_of_exec] takes [exec m s = Some (x, s')]  *)
+(* with [s' <> s], while [bytes_own ∅ = emp] and [∅ ⊆ s.(mem)] make the two *)
+(* memory premises free.  In one sentence:                                  *)
+(*                                                                         *)
+(*   [swp_hmrun_of_exec ... (mm := ∅)] IS THE REGISTER-WRITING ANALOGUE OF  *)
+(*   [HartGoodb.hval_of_goodb].                                            *)
+(*                                                                         *)
+(* At [∅] the certificate also forbids every memory EVENT outright -- an    *)
+(* [n]-byte footprint is owned by the empty map only for [n = 0] -- so the  *)
+(* map cannot move ([mm_after_empty]).  That is what collapses the          *)
+(* [mm_after] argument of every bind equation back to [∅] and leaves the    *)
+(* four [_empty] combinators below as the WHOLE toolkit a register-only     *)
+(* twin needs: one application per bind, three premises each, no map        *)
+(* bookkeeping anywhere.                                                    *)
+(* ---------------------------------------------------------------------- *)
+
+(* the empty map owns no byte, so it owns a footprint only when it is empty *)
+Lemma bytes_owned_empty (pa : Arch.pa) (n : N) :
+  bytes_owned ∅ pa n = true -> N.to_nat n = 0%nat.
+Proof.
+  unfold bytes_owned. destruct (N.to_nat n) as [|k] eqn:Hk; [reflexivity|].
+  cbn [seq forallb]. rewrite lookup_empty.
+  rewrite bool_decide_eq_false_2; [discriminate|]. by intros [? ?].
+Qed.
+
+Lemma write_bytes_empty (pa : Arch.pa) (n : N) {wd : N} (v : bv wd) :
+  N.to_nat n = 0%nat -> write_bytes ∅ pa n v = ∅.
+Proof. intros Hk. unfold write_bytes. rewrite Hk. reflexivity. Qed.
+
+(* THE MAP DOES NOT MOVE.  This is the whole reason the register-only twins
+   need no [mm_after] reasoning: a certificate at [∅] is a certificate that
+   the stretch makes no memory event. *)
+Lemma mm_after_empty (Dr Dw : register -> bool) {E X} (m : Defs.monad E X) :
+  forall s : mstate, goodmb Dr Dw m s ∅ = true -> mm_after m s ∅ = ∅.
+Proof.
+  induction m as [y | T oc k IH]; intros s Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [goodmb mm_after] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [_ Hg]. by apply (IH _ s). }
+  { apply andb_prop in Hg as [_ Hg]. by apply (IH tt _). }
+  { apply andb_prop in Hg as [_ Hg2].
+    destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+      [by apply (IH _ s)|reflexivity]. }
+  { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [_ Hfp].
+    rewrite (write_bytes_empty _ nb _ (bytes_owned_empty _ nb Hfp)) in Hg2 |- *.
+    by apply (IH (inl None) _). }
+  all: first [ by apply (IH tt s) | by apply (IH 0%Z s) ].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* The three LEAF nodes, as reduction equations ([HartSpan]'s discipline:   *)
+(* the head is stepped by [rewrite], never by [cbn] against a folded model  *)
+(* term).  Everything a register-only stretch is built from is one of them. *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_returnm (Dr Dw : register -> bool) {E X} (x : X) (s : mstate)
+    (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw (Defs.returnm x : Defs.monad E X) s mm = true.
+Proof. reflexivity. Qed.
+
+Lemma goodmb_read_reg (Dr Dw : register -> bool) {E} (r : register) (s : mstate)
+    (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw (Defs.read_reg r : Defs.monad E _) s mm = Dr r.
+Proof. unfold Defs.read_reg. cbn [goodmb]. by destruct (Dr r). Qed.
+
+Lemma goodmb_write_reg (Dr Dw : register -> bool) {E} (r : register)
+    (v : type_of_register r) (s : mstate) (mm : gmap Arch.pa (bv 8)) :
+  goodmb Dr Dw (Defs.write_reg r v : Defs.monad E _) s mm = Dw r.
+Proof. unfold Defs.write_reg. cbn [goodmb]. by destruct (Dw r). Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE FOUR ASSEMBLY COMBINATORS.  Each is [goodmb_bind*] with the map      *)
+(* argument already collapsed by [mm_after_empty], stated in the direction  *)
+(* a twin's proof uses it: certificate for the head, [exec] fact for the    *)
+(* head, certificate for the tail AT THE POST STATE -> certificate for the  *)
+(* chain.  A twin is one application per bind and nothing else.             *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_bind_empty (Dr Dw : register -> bool) {X Y} (m : M X) (f : X -> M Y)
+    (s s' : mstate) (x : X) :
+  goodmb Dr Dw m s ∅ = true ->
+  exec m s = Some (x, s') ->
+  goodmb Dr Dw (f x) s' ∅ = true ->
+  goodmb Dr Dw (Defs.bind m f) s ∅ = true.
+Proof.
+  intros Hg He Hf. rewrite (goodmb_bind Dr Dw m f s s' ∅ x Hg He).
+  by rewrite (mm_after_empty Dr Dw m s Hg).
+Qed.
+
+Lemma goodmb_bind0_empty (Dr Dw : register -> bool) {Y} (m : M unit) (n : M Y)
+    (s s' : mstate) :
+  goodmb Dr Dw m s ∅ = true ->
+  exec m s = Some (tt, s') ->
+  goodmb Dr Dw n s' ∅ = true ->
+  goodmb Dr Dw (Defs.bind0 m n) s ∅ = true.
+Proof. intros Hg He Hn. exact (goodmb_bind_empty Dr Dw m (fun _ => n) s s' tt Hg He Hn). Qed.
+
+Lemma goodmb_bindR_empty (Dr Dw : register -> bool) {R X Y : Type}
+    (m : Defs.monadR R exception X) (f : X -> Defs.monadR R exception Y)
+    (s s' : mstate) (x : X) :
+  goodmb Dr Dw m s ∅ = true ->
+  execR m s = Some (inr x, s') ->
+  goodmb Dr Dw (f x) s' ∅ = true ->
+  goodmb Dr Dw (Defs.bind m f) s ∅ = true.
+Proof.
+  intros Hg He Hf. rewrite (goodmb_bindR Dr Dw m f s s' ∅ x Hg He).
+  by rewrite (mm_after_empty Dr Dw m s Hg).
+Qed.
+
+Lemma goodmb_bind0R_empty (Dr Dw : register -> bool) {R Y : Type}
+    (m : Defs.monadR R exception unit) (n : Defs.monadR R exception Y)
+    (s s' : mstate) :
+  goodmb Dr Dw m s ∅ = true ->
+  execR m s = Some (inr tt, s') ->
+  goodmb Dr Dw n s' ∅ = true ->
+  goodmb Dr Dw (Defs.bind0 m n) s ∅ = true.
+Proof. intros Hg He Hn. exact (goodmb_bindR_empty Dr Dw m (fun _ => n) s s' tt Hg He Hn). Qed.
 
 (* ====================================================================== *)
 (* 5. THE COMPOSITE RULE: an [exec] fact plus its certificate, in [swp].    *)
