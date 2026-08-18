@@ -96,7 +96,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import KptPt KMap.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import RegFile.
@@ -296,95 +295,8 @@ Local Ltac regne := reg_ne_side.
 (*  hart, and [bd_cont_shift] re-anchors it; a block lemma that does not   *)
 (*  move the hart forwards it as the IDENTITY.                            *)
 (* ===================================================================== *)
-(* ===================================================================== *)
-(* THE ADDRESS CLAIM for the four escrow-opening accesses to buffer [k].  *)
-(*                                                                        *)
-(* The per-node memory forms take [WpSconfMem.wordw_claim] BESIDE their   *)
-(* atomic update: an access TRANSLATES several nodes before the memory    *)
-(* node where the (linear, one-shot) update is opened, so the window's    *)
-(* mapping cannot be read out of the update -- and not out of the escrow  *)
-(* either, whose accessors are ghost UPDATES that cannot be peeked and    *)
-(* put back.  For a kernel-DATA address the claim needs no resource but   *)
-(* the ambient static bundle ([KMap.kmap_static_claims_at] + [pa_of_id]), *)
-(* and [bcache] is a .bss object, so its buffers' fields are kdata by     *)
-(* ARITHMETIC -- [BcacheInv.bnode_unsigned] is the whole geometry.        *)
-(* (Twin: [ProofIget.ig_wordw_claim_u], [ProofIunlock]'s.)                *)
-(* ===================================================================== *)
-
-Lemma bd_bnode_base_unsigned (k : nat) :
-  (k < NBUF)%nat ->
-  bv_unsigned (bnode k) = (buf_base + buf_stride * Z.of_nat k + 0)%Z.
-Proof. intros Hk. rewrite Z.add_0_r. exact (bnode_unsigned k Hk). Qed.
-
-Lemma bd_bnode_field_unsigned (k j : nat) :
-  (k < NBUF)%nat -> (j < 1112)%nat ->
-  bv_unsigned (pa_add (bnode k) j)
-  = (buf_base + buf_stride * Z.of_nat k + Z.of_nat j)%Z.
-Proof.
-  intros Hk Hj.
-  rewrite ByteCursor.pa_add_unsigned (bnode_unsigned k Hk).
-  apply bv_wrap_small.
-  assert (Hbm : bv_modulus 64 = 18446744073709551616%Z) by (vm_compute; reflexivity).
-  rewrite Hbm.
-  assert (Hkz : (Z.of_nat k <= 29)%Z) by (unfold NBUF in Hk; lia).
-  assert (Hjz : (Z.of_nat j <= 1111)%Z) by lia.
-  assert (Hjn : (0 <= Z.of_nat j)%Z) by lia.
-  unfold buf_stride, buf_base, KernelSyms.bcache. lia.
-Qed.
-
-Lemma bd_field_range (k : nat) (d : Z) :
-  (k < NBUF)%nat -> (0 <= d < 1112)%Z ->
-  (2147512320 <= buf_base + buf_stride * Z.of_nat k + d < 2281701376)%Z.
-Proof.
-  intros Hk Hd.
-  assert (Hkz : (Z.of_nat k <= 29)%Z) by (unfold NBUF in Hk; lia).
-  assert (Hkn : (0 <= Z.of_nat k)%Z) by lia.
-  unfold buf_stride, buf_base, KernelSyms.bcache. lia.
-Qed.
-
-Lemma bd_field_rem4 (k : nat) (d : Z) :
-  (0 <= d)%Z -> (4 | d)%Z ->
-  Z.rem (buf_base + buf_stride * Z.of_nat k + d) 4 = 0%Z.
-Proof.
-  intros Hd0 [m Hm].
-  assert (Hkn : (0 <= Z.of_nat k)%Z) by lia.
-  assert (Hnn : (0 <= buf_base + buf_stride * Z.of_nat k + d)%Z)
-    by (unfold buf_stride, buf_base, KernelSyms.bcache; lia).
-  rewrite Z.rem_mod_nonneg; [| exact Hnn | lia].
-  replace (buf_base + buf_stride * Z.of_nat k + d)%Z
-    with (4 * (536895622 + 278 * Z.of_nat k + m))%Z
-    by (rewrite Hm; unfold buf_stride, buf_base, KernelSyms.bcache; lia).
-  rewrite Z.mul_comm. apply Z_mod_mult.
-Qed.
-
 Section BreadDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-
-  (* the claim, off the ambient static bundle and one arithmetic fact --
-     see the header block above. *)
-  Lemma bd_wordw_claim_u (width : Z) (a : Arch.pa) (n : Z) :
-    bv_unsigned a = n ->
-    (2147512320 <= n < 2281701376)%Z ->
-    Z.rem n width = 0%Z ->
-    kmap_static_claims -∗ wordw_claim (KTR := KT0) width a.
-  Proof.
-    intros Hn Hrange Hrem. iIntros "#Hb".
-    assert (Hkd : addr_is_kdata a).
-    { unfold addr_is_kdata, text_end, ram_base, ram_size.
-      rewrite RiscvExtras.uint_unsigned Hn. lia. }
-    assert (Hcan : (uint (a : mword 64) < 274877906944)%Z)
-      by (rewrite RiscvExtras.uint_unsigned Hn; lia).
-    assert (Hal : is_aligned_paddr (Physaddr a) width = true).
-    { unfold is_aligned_paddr. apply Z.eqb_eq.
-      rewrite RiscvExtras.uint_unsigned Hn. exact Hrem. }
-    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw
-                 (kdata_svpn_class a Hkd) with "Hb") as "#Hk0".
-    rewrite /wordw_claim. iSplitR; [iPureIntro; exact Hal |].
-    iExists (kpt_leaf_ppn (svpn_of a)). rewrite (pa_of_id a Hcan).
-    iFrame "Hk0". iPureIntro. split_and!;
-      [ exact Hcan | exact (addr_is_kdata_ram a Hkd)
-      | exact (ktier_pin_of_id KT0 (kpt_leaf_ppn (svpn_of a)) a (pa_of_id a Hcan)) ].
-  Qed.
 
   Definition bd_cont `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
@@ -765,7 +677,23 @@ Section BreadBlocks.
                   = b_valid (bpa k)).
     { rgne. rewrite HMs1 bd_s0. rewrite /b_valid /bpa. apply kv_addv_zero. }
     (* ---- +0xb4 c.lw a5,0(s1): the CHECKOUT, at this one instruction ---- *)
-    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#HkmA Hcg]".
+    (* THE CHECKOUT RUNS HERE, one fupd BEFORE the load: [escrow_swap_checkout]
+       hands the new escrow body straight back, so nothing stays open across
+       the step, and the load's atomic update is then over a cell this thread
+       already holds -- which is also where its ADDRESS CLAIM comes from
+       ([wordw_claim_of], off the very points-to it puts in the update). *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iDestruct (escrow_swap_checkout bn V k q dev bno
+                 with "Hbodyp Hbown Hrtok Hrdev Hrbno") as "[Hbodyp Hpark2]".
+    iDestruct "Hpark2" as (vb0 bs0) "(Hvld & Hbdev & Hbuf & Hpay)".
+    iMod ("Hclosep" with "[Hbodyp]") as "_".
+    { iApply bi.later_intro. iExact "Hbodyp". }
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_valid (bpa k)) (DfracOwn 1)
+                 (if vb0 then (mword_of_int 1 : mword 32)
+                  else (mword_of_int 0 : mword 32)) ltac:(lia)
+                 with "Hvld") as "#HclaimA".
+    iModIntro.
     iApply (wp_lw_au_s_sconf (dqm := DfracOwn 1) true
               (mword_of_int (KernelSyms.bread + 0xb4)) Ra5 Rs1 (mword_of_int 0 : mword 12)
               M (K - 6)%nat
@@ -777,25 +705,16 @@ Section BreadBlocks.
                     b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
                     buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
                     buf_pay bn V k vb dev bno bs)%I)
-              (⊤ ∖ ↑minstretN ∖ ↑bioN) eb
+              (⊤ ∖ ↑minstretN) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hib4 [] [Hbown Hrtok Hrdev Hrbno]").
-    { rewrite Hva /b_valid /bpa.
-      iApply (bd_wordw_claim_u 4 _ _ (bd_bnode_base_unsigned k Hk)
-                (bd_field_range k 0 Hk ltac:(lia))
-                (bd_field_rem4 k 0 ltac:(lia) ltac:(exists 0%Z; reflexivity))
-                with "HkmA"). }
-    { iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (escrow_swap_checkout bn V k q dev bno
-                   with "Hbody Hbown Hrtok Hrdev Hrbno") as "[Hbody Hpark2]".
-      iDestruct "Hpark2" as (vb bs) "(Hvld & Hbdev & Hbuf & Hpay)".
-      iModIntro.
-      iExists (if vb then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)).
+              with "Hcg Hpc Hib4 [] [Hvld Hbdev Hbuf Hpay]").
+    { rewrite Hva. iExact "HclaimA". }
+    { iModIntro.
+      iExists (if vb0 then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)).
       iEval (rewrite -Hva) in "Hvld". iFrame "Hvld".
-      iIntros "Hvld". iEval (rewrite Hva) in "Hvld".
-      iMod ("Hclose" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
-      iModIntro. iExists vb, bs. iSplitR; [by iPureIntro|].
+      iIntros "Hvld". iEval (rewrite Hva) in "Hvld". iModIntro.
+      iExists vb0, bs0. iSplitR; [by iPureIntro|].
       iFrame "Hvld Hbdev Hbuf Hpay". }
     iIntros (vld CIDt1 Hst1) "Hcg Hpc H".
     iDestruct "H" as (vb bs) "(%Hpin & Hvld & Hbdev & Hbuf & Hpay)".
@@ -1456,19 +1375,17 @@ Section BreadBlocks.
       as "(%Hpure & Hauth & Hcell & Hdevs & Hbnos & Hpool & Hclose)".
     destruct Hpure as [Hmiss Huniq].
     (* ---- +0x90 sw s2,8(s1) : b->dev = dev ---- *)
-    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#HkmB Hcg]".
+    (* the ADDRESS CLAIM, straight off the half of the dev cell the caller
+       already holds -- [wordw_claim_of]'s conclusion is persistent, so
+       [Hdevs] is still here for the update. *)
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_dev (bpa k)) (DfracOwn (1/2))
+                 (devs k) ltac:(lia) with "Hdevs") as "#HclaimB".
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.bread + 0x90)) Rs2 Rs1
               (mword_of_int 8 : mword 12) M (trap_res eb + (K - 6))%nat
               (own (bn_auth bn) (● Mg) ∗ b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev)%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
               with "Hcg Hpc Hi90 [] [Hauth Hdevs]").
-    { rewrite Hadev /b_dev /bpa.
-      iApply (bd_wordw_claim_u 4 _ _
-                (bd_bnode_field_unsigned k 8 Hk ltac:(lia))
-                (bd_field_range k (Z.of_nat 8) Hk ltac:(lia))
-                (bd_field_rem4 k (Z.of_nat 8) ltac:(lia)
-                   ltac:(exists 2%Z; vm_compute; reflexivity))
-                with "HkmB"). }
+    { rewrite Hadev. iExact "HclaimB". }
     { iInv "Hesc" as ">Hbody" "Hclose2".
       iDestruct (escrow_recyc_dev bn V k Mg (devs k) dev HMk Hdv
                    with "Hauth Hbody Hdevs") as "(Hauth & Hfull & Hback)".
@@ -1487,7 +1404,8 @@ Section BreadBlocks.
        THE CACHE MEMBERSHIP MOVES HERE, so this is where the pool exchange
        happens and where the escrow enters its mid-recycle window (cells
        only, dev cell FULL, the recycle token out in our hand). *)
-    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#HkmC Hcg]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_blockno (bpa k)) (DfracOwn (1/2))
+                 (bnos k) ltac:(lia) with "Hbnos") as "#HclaimC".
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.bread + 0x94)) Rs3 Rs1
               (mword_of_int 12 : mword 12) M (trap_res eb + (K - 6))%nat
               (own (bn_auth bn) (● Mg) ∗ bmid bn k ∗ pool_blk V (uint bno) ∗
@@ -1495,13 +1413,7 @@ Section BreadBlocks.
                bio_pool V (bfun_upd bnos k bno))%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
               with "Hcg Hpc Hi94 [] [Hauth Hdevs Hbnos Hpool]").
-    { rewrite Habno /b_blockno /bpa.
-      iApply (bd_wordw_claim_u 4 _ _
-                (bd_bnode_field_unsigned k 12 Hk ltac:(lia))
-                (bd_field_range k (Z.of_nat 12) Hk ltac:(lia))
-                (bd_field_rem4 k (Z.of_nat 12) ltac:(lia)
-                   ltac:(exists 3%Z; vm_compute; reflexivity))
-                with "HkmC"). }
+    { rewrite Habno. iExact "HclaimC". }
     { iInv "Hesc" as ">Hbody" "Hclose2".
       iDestruct (escrow_recyc_bno bn V k Mg bnos dev bno
                    HMk Hk Hcov Hmiss Huniq Hdv
@@ -1523,7 +1435,20 @@ Section BreadBlocks.
        the recycle token refutes both normal arms, so what we reopen is the
        window we parked; the stored 0 makes the arm INVALID and deposits the
        new block's pool bundle for whoever wins the sleeplock race. *)
-    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#HkmD Hcg]".
+    (* the valid word is nobody's here, so its claim comes off one PEEK of the
+       mid arm: [escrow_open_mid] / [escrow_close_mid] are an open/close pair
+       with no ghost move, so the cell is looked at and put straight back. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyq" "Hcloseq".
+    iDestruct (escrow_open_mid bn V k with "Hbmid Hbodyq") as "(Hbmid & Hmidq & _)".
+    iDestruct "Hmidq" as (vldq bnoq bsq) "(%Hpinq & Hvldq & Hdevfullq & Hbufq)".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_valid (bpa k)) (DfracOwn 1)
+                 vldq ltac:(lia) with "Hvldq") as "#HclaimD".
+    iMod ("Hcloseq" with "[Hvldq Hdevfullq Hbufq]") as "_".
+    { iNext. iApply (escrow_close_mid bn V k).
+      rewrite /buf_mid. iExists vldq, bnoq, bsq. iFrame.
+      iPureIntro. exact Hpinq. }
+    iModIntro.
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.bread + 0x98)) Rz Rs1
               (mword_of_int 0 : mword 12) M (trap_res eb + (K - 6))%nat
               (own (bn_auth bn) (● Mg) ∗
@@ -1531,11 +1456,7 @@ Section BreadBlocks.
                b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno)%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
               with "Hcg Hpc Hi98 [] [Hauth Hbmid HpoolB Hbnos]").
-    { rewrite Hava /b_valid /bpa.
-      iApply (bd_wordw_claim_u 4 _ _ (bd_bnode_base_unsigned k Hk)
-                (bd_field_range k 0 Hk ltac:(lia))
-                (bd_field_rem4 k 0 ltac:(lia) ltac:(exists 0%Z; reflexivity))
-                with "HkmD"). }
+    { rewrite Hava. iExact "HclaimD". }
     { iInv "Hesc" as ">Hbody" "Hclose2".
       iDestruct (escrow_recyc_valid bn V k bno Hcov
                    with "Hbmid Hbody Hbnos HpoolB") as "(Hvld & Hbnos & Hback)".
