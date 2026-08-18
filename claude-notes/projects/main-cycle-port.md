@@ -684,6 +684,47 @@ sees the leaf as SOME A/D variant.  Hence:
 5. **`wp_instr_s_regime`** via `sm_frames_intro` → `s_cycle` → the field, and
    `WpSmodeIntr.wp_instr_s_intr` the same way at the kpt instance.
 
+### THE USER TIER (`UserExec` and its 44 dependents) -- what its port needs
+
+`UserExec` is red on `clock_inv` (gone: mip lives in `pc_is`'s `clock_res`),
+but that is the tip: the whole U-mode step engine (`UserStep`,
+`UserActiveClass`, `UserArms`, `UserMemArms`, `UserTotalU`, `UserMemClassify`
+-- ~11k lines) is written against `wp_exec_step_minstret`, the σ-CALLBACK
+whole-cycle rule that hands the prover the ENTIRE `mstate_interp σ` and
+takes back a successor -- exactly the shape per-node stepping invalidates
+(§5).  Its exec facts (`base_exec_total_u`, `rvc_exec_total_u`, the
+per-family arms) are whole-cycle `exec` facts at a symbolic σ.
+
+The leverage, DECIDED (2026-08-18): a MEMORY-INCLUSIVE FUNCTIONAL WALKER
+and its swp rule -- `hfrun` with bytes.  A user hart OWNS everything its
+cycle touches (all its registers in `user_regs`, every mapped page in
+`user_pt_inv`, contents existential), so interference cannot reach the
+cycle; what the σ-callback rule got for free must be recovered as
+ownership.  Shape:
+  - `hmrun n D Drw S rs mm m = Some (x, rs', mm')` -- `hfrun` extended with
+    a byte map `mm : gmap pa (bv 8)` over the owned footprint `S`: a RAM
+    read reads `mm` (must be within `dom mm`), a RAM write updates it,
+    exclusive/conditional accesses likewise (the walker is oblivious to the
+    reservation; the swp rule threads `resv_frag`), MMIO is refused;
+  - `swp_hmrun`: `gen_cert -∗ resv_any -∗ hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗ ([∗ map] a ↦ b ∈ mm, a ↦ₚ b) -∗ swp m (fun v
+    => ⌜v = x⌝ ∗ frames rs' ∗ ([∗ map] a ↦ b ∈ mm', a ↦ₚ b) ∗ resv_any)` --
+    proved ONCE by induction on the monad from `HartEvents`' node rules
+    (`swp_hart_ram_read/_excl/_write/_write_cond`) exactly as `swp_hfrun`
+    is proved from the register-node rules;
+  - `hmrun_of_exec`: `exec m σ = Some (x, σ') → footprint certificate →
+    hmrun … (mm := σ.mem restricted to S) … = Some (x, σ'.sregs, σ'.mem
+    restricted to S)` -- so every exec fact the user tier already has
+    becomes a walker fact under a certificate.  The certificate is a
+    `goodb`-style boolean, `goodmb Db Sb m σ` (registers in `Db`, every
+    RAM access's footprint inside `Sb`), discharged per instruction family
+    where the exec facts are proved (`vm_compute` at data-free stretches,
+    assembled along binds as `goodb` is).
+Then the U-mode engine ports mechanically: `wp_exec_step_minstret` σ-callback
+sites become `swp_hmrun` at the user frame's own resources; the exec-total
+lemmas stay as they are and gain a `goodmb` twin each.  This is the largest
+remaining chunk of the port; it starts after `SmodeCorePt`.
+
 ### What `WpIntrInv` actually needs
 
 Its two rules are the last whole-cycle-shaped ones in the interrupt path:
