@@ -431,6 +431,8 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        adequacy (pool = [PowerLoop]) supersedes this at milestone M6. *)
     (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
     (Hgid : gen_id = 0%nat)
+    (* no reservation is outstanding at the start (design §3a) *)
+    (Hresv0 : forall c, g.(gresv) c = None)
     (* THE CRASH PREDICATE MUST HOLD BEFORE ANYTHING RUNS -- mkfs's
        obligation -- AT THE INITIAL DISK IMAGE.  A BUILD-FROM-NOTHING
        ENTAILMENT UNDER AN UPDATE, not a plain one: once [Pc] owns ghosts (a
@@ -491,6 +493,9 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
           own p->lock: at UNUSED nobody has claimed the slot. *)
        ([∗ list] j ∈ seq 0 nproc,
           ghost_var (pstate_name j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
+       (* every hart's reservation mirror, at [None] (design §3a): the
+          client threads it into [pc_is] *)
+       ([∗ set] c ∈ (fin_to_set CPU : gset CPU), resv_frag c None) ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio)) ∗
        (* the crash-spanning invariant, allocated over [Pc] below: the client
@@ -571,7 +576,9 @@ Proof.
      real one is minted by [initlog]'s swap. *)
   iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => []))) as (γmir) "_".
   iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks).
+  (* the reservation mirror, at the (all-[None]) machine map *)
+  iMod (ghost_map_alloc (resv_map g.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   (* THE FS TIE, minted at the machine's own disk image and split: one half
      goes into [state_interp]'s fixed conjunct below, the other into
@@ -617,7 +624,7 @@ Proof.
   iDestruct (@boot_data_own Σ HR g Hram with "Hkbundle Hdata") as "Hdata".
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark Hpst HuF HpF HvF]")
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark Hpst Hresvfrags HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
@@ -631,6 +638,8 @@ Proof.
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
+    iSplitL "Hresvfrags".
+    { rewrite (resv_map_none _ Hresv0) big_sepM_gset_to_gmap. iExact "Hresvfrags". }
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|].
     iSplitL "HvF"; [iExact "HvF"|].
@@ -671,8 +680,12 @@ Proof.
     iSplitL "HuA HpA HvA".
     { iSplitL "HuA"; [iExact "HuA"|].
       iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
-    iExists ∅. iFrame "Hdiskauth". iPureIntro.
-    intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
+    iSplitL "Hdiskauth".
+    { iExists ∅. iFrame "Hdiskauth". iPureIntro.
+      intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
+    (* the reservation mirror and its (vacuous) snapshot invariant *)
+    iFrame "Hresvauth". iPureIntro.
+    intros c r Hc. rewrite Hresv0 in Hc. discriminate. }
   iSplitL "Hwps Hwpu Hwpd Hwpp".
   { (* the WPs of the initial threads: the harts, then the three devices *)
     rewrite big_sepL2_replicate_r; [|done].
@@ -732,7 +745,8 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId} (g
     (Hvisr : virtio_isr_ok g.(gdev).(dvirtio))
     (* the single-generation form: generation 0, power on (see the theorem) *)
     (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
-    (Hgid : gen_id = 0%nat) :
+    (Hgid : gen_id = 0%nat)
+    (Hresv0 : forall c, g.(gresv) c = None) :
   forall t2 g2 e2,
     rtc erased_step (cpu_pool [], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -745,10 +759,10 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
            (fun (_ _ _ : gname) (_ : Z -> bv 8) => True%I) Hram
-           Hpow Hgen0 Hgid).
+           Hpow Hgen0 Hgid Hresv0).
   { iIntros (γsw γreg γst) "_". iModIntro. done. }
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
             #Hcinv & #Hcert)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt
@@ -869,6 +883,8 @@ Section power.
      ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 (0%fin : CPU)) ∗
      ([∗ list] j ∈ seq 0 nproc,
         ghost_var (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
+     (* every hart's reservation mirror, at [None] (design §3a) *)
+     ([∗ set] c ∈ (fin_to_set CPU : gset CPU), c ↪[era_resv_name HE] None) ∗
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
      ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
@@ -1019,7 +1035,8 @@ Section power.
       iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => [])))
         as (γmir) "Hmir".
       iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks).
+      iMod (ghost_map_alloc (resv_map g2.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -1036,11 +1053,15 @@ Section power.
       iMod "Hback" as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
-                Hdfrags Hmir]")
+                Hdfrags Hmir Hresvfrags]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
         iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir".
         iFrame "Helems".
+        iSplitL "Hresvfrags".
+        { destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
+          rewrite (resv_map_none _ Hnone) big_sepM_gset_to_gmap.
+          iExact "Hresvfrags". }
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
         iSplitR; [|iExact "HRelem"].
@@ -1077,7 +1098,12 @@ Section power.
         { iSplitL "HuA"; [iExact "HuA"|].
           iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
         (* the fresh era's image auth, at the reset machine's own disk *)
-        iExact "Hdauth". }
+        iSplitL "Hdauth"; [iExact "Hdauth"|].
+        (* the reservation mirror: minted at the reset machine's all-[None]
+           map, and the snapshot invariant is vacuous there *)
+        iFrame "Hresvauth". iPureIntro.
+        destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
+        intros c r Hc. rewrite Hnone in Hc. discriminate. }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
       rewrite /power_fork big_sepL_app big_sepL_fmap /=.

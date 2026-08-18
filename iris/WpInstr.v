@@ -57,6 +57,7 @@ Section WpInstr.
     _get_Mstatus_SXL mst0 = 'b"10" ->
     mstatus_kernel_facts mst0 ->
     hw_config -∗
+    resv_any cpu_id -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
     (hreg_frame (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗ hreg_frame_ro (mm_Df dq) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) mm_Dro -∗
@@ -70,28 +71,35 @@ Section WpInstr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HmIE HMPRV HSXL HKF.
-    iIntros "#Hhw Hrw Hro Hbody Hcont".
+    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iApply (swp_exec_step_decode_execute mm_Drw mm_Dro (mm_Df dq)
-              (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) Psi
+              (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (Psi ∗ resv_any cpu_id)%I
               mm_disj mm_w_cy mm_w_ti mm_w_ip mm_in_priv mm_in_hart mm_in_mc
               mm_in_micfg mm_w_mi mm_in_mi mm_w_ms mm_in_ms mm_w_PC mm_in_PC
               mm_in_nPC ltac:(mmrs) ltac:(mmrs) ltac:(mmrs)
               (mm_pre_agree pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0)
-              with "Hcert Hrw Hro Hbody [Hcont]").
-    iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
-    destruct Hag as (mi & Hag).
-    pose proof (mm_tick_agree pc npc ms (minstret_inc_flag mc micfg Machine)
-                  cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 senv0
-                  pmar0 elp0 mi rs3 Hag) as Hag'.
-    iDestruct (mm_rw_ext _ _ Hag' with "Hrw") as "Hrw".
-    iDestruct (mm_ro_ext dq _ _ Hag' with "Hro") as "Hro".
-    iDestruct (mm_frames_elim dq npc pmpcfg0 mi (minstret_inc_flag mc micfg Machine)
-                 _ _ _ mst0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
-                 HmIE HMPRV HSXL HKF with "Hhw Hrw Hro")
-      as "(Hmm & Hpmpc & Hpc)".
-    iApply ("Hcont" with "Hmm Hpmpc Hpc HPsi").
+              with "Hcert Hfrag Hrw Hro [Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        destruct Hag as (mi & Hag).
+        pose proof (mm_tick_agree pc npc ms (minstret_inc_flag mc micfg Machine)
+                      cy ti ip mst0 pmpcfg0 mc micfg misa0 mseccfg0 senv0
+                      pmar0 elp0 mi rs3 Hag) as Hag'.
+        iDestruct (mm_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+        iDestruct (mm_ro_ext dq _ _ Hag' with "Hro") as "Hro".
+        iDestruct (mm_frames_elim dq npc pmpcfg0 mi (minstret_inc_flag mc micfg Machine)
+                     _ _ _ mst0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+                     HmIE HMPRV HSXL HKF with "Hhw Hfrag Hrw Hro")
+          as "(Hmm & Hpmpc & Hpc)".
+        iApply ("Hcont" with "Hmm Hpmpc Hpc HPsi"). }
+    (* the leaf's body does not see the reservation: it is held aside here
+       and handed back beside [Psi] *)
+    iIntros "Hfrag Hrw Hro".
+    iApply (swp_mono with "[Hfrag] [-]"); [|iApply ("Hbody" with "Hrw Hro")].
+    iIntros (st). iDestruct 1 as (w) "(-> & Hrw & Hro & HPsi)".
+    iExists w. iFrame "Hrw Hro HPsi". iSplitR; [done|].
+    iApply (resv_any_intro with "Hfrag").
   Qed.
 
   (* ==================================================================== *)
@@ -135,7 +143,7 @@ Section WpInstr.
     intros Hpmp Hstat.
     iIntros "Hmm Hpmpc Hpc Hgpr Hinstr Hex Hcont".
     iDestruct (mm_frames_intro dq pc pmpcfg0 with "Hmm Hpmpc Hpc")
-      as "[#Hhw Hfr]".
+      as "(#Hhw & Hfrag & Hfr)".
     iDestruct "Hfr" as (ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0 senv0
         pmar0 elp0)
       "(%HmIE & %HMPRV & %HSXL & %HKF & %HmS & %HmC & %HmA & %Hmisaval &
@@ -146,7 +154,7 @@ Section WpInstr.
     iApply (mm_cycle pc npc pmpcfg0 (∃ mf : regfile, gpr_file mf ∗ R mf)%I
               ms bmi cy ti ip mst0
               mc micfg misa0 mseccfg0 senv0 pmar0 elp0 HmIE HMPRV HSXL HKF
-              with "Hhw Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
+              with "Hhw Hfrag Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
     2:{ iNext. iIntros "Hmm Hpmpc Hpc HEx".
         iDestruct "HEx" as (mf) "[Hgpr HR]".
         iApply ("Hcont" with "Hmm Hpmpc Hpc Hgpr HR"). }

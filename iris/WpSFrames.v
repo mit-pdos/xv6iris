@@ -56,7 +56,7 @@ Section sframes.
   Lemma s_frames_intro (pc : mword 64) (root_ppn : mword 44) :
     hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf -∗ pc_is pc -∗
     tlb_res_pt root_ppn -∗
-    hw_config ∗ minstret_inv ∗
+    hw_config ∗ minstret_inv ∗ resv_any cpu_id ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
@@ -97,7 +97,7 @@ Section sframes.
     iDestruct "Hmie" as (mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenv" as (menv0)
       "(Hmenvc & %HPBMTE & %HPMM & %HLPE & %HFIOM & %Hmenvval)".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iDestruct "Htlb" as (satp0 tlbv)
@@ -109,7 +109,7 @@ Section sframes.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
         %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
         %Hmisaval & %Hsecval & _)".
-    iFrame "Hhw Hmi_inv".
+    iFrame "Hhw Hmi_inv Hresv".
     iExists ms, bmi, cy, ti, ip, mst0, mc, micfg, misa0, mseccfg0,
             (mword_of_int 0 : mword 64), pmar0, elp0, satp0, mdv0, menv0,
             pcfg, paddr, tlbv.
@@ -170,10 +170,11 @@ Section sframes.
     sret_tie mst0 -∗
     tlb_snap_ok tlbv -∗
     kpt_inv root_ppn -∗
+    resv_any cpu_id -∗
     hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ pc_is npc ∗ tlb_res_pt root_ppn.
   Proof.
     intros Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR Hcov.
-    iIntros "#Hhw #Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt".
+    iIntros "#Hhw #Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt Hresv".
     rewrite s_rw_split s_ro_split.
     rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip
       s_rs_tlb.
@@ -193,8 +194,8 @@ Section sframes.
       { iExists mdv0. by iFrame "Hmie Hmdl". }
       iExists menv0. iFrame "Hmenvc". subst menv0.
       iPureIntro. split_and!; vm_compute; reflexivity. }
-    iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
-    { iFrame "HPC HnPC".
+    iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip Hresv".
+    { iFrame "HPC HnPC Hresv".
       iSplitL "Hms Hmi".
       { iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg". }
       iExists cy, ti, ip. by iFrame. }
@@ -346,12 +347,13 @@ Section sframes.
     sret_tie mst0 -∗
     tlb_snap_ok tlbv' -∗
     kpt_inv root_ppn -∗
+    resv_any cpu_id -∗
     ▷ (hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf -∗ pc_is npc -∗
        tlb_res_pt root_ppn -∗ Psi -∗ WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR Hcov.
-    iIntros "#Hhw #Hmi_inv Hrw Hro Hbody Hsie Hsret Hsnap Hkpt Hcont".
+    iIntros "#Hhw #Hmi_inv Hrw Hro Hbody Hsie Hsret Hsnap Hkpt Hfrag Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iApply (swp_exec_step_decode_execute s_Drw s_Dro (s_Df (DfracOwn 1))
               (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -361,27 +363,32 @@ Section sframes.
                  pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv)
               (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor)
                  cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
-                 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv') Psi
+                 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv') (Psi ∗ resv_any cpu_id)%I
               s_disj s_w_cy s_w_ti s_w_ip s_in_priv s_in_hart s_in_mc
               s_in_micfg s_w_mi s_in_mi s_w_ms s_in_ms s_w_PC s_in_PC
               s_in_nPC ltac:(srs) ltac:(srs) ltac:(srs)
               (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv)
-              with "Hcert Hrw Hro Hbody [Hcont Hsie Hsret Hsnap Hkpt]").
-    iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
-    destruct Hag as (mi & Hag).
-    pose proof (s_tick_agree pc npc ms (minstret_inc_flag mc micfg Supervisor)
-                  cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
-                  pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv' mi rs3 Hag) as Hag'.
-    iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
-    iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
-    iDestruct (s_frames_elim npc root_ppn mi
-                 (minstret_inc_flag mc micfg Supervisor) _ _ _ mst0 mc micfg
-                 misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 menv0 pcfg paddr
-                 tlbv' Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR
-                 Hcov with "Hhw Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt")
-      as "(Hhs & Hsc & Hpc & Htlb)".
-    iApply ("Hcont" with "Hhs Hsc Hpc Htlb HPsi").
+              with "Hcert Hfrag Hrw Hro [Hbody] [Hcont Hsie Hsret Hsnap Hkpt]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        destruct Hag as (mi & Hag).
+        pose proof (s_tick_agree pc npc ms (minstret_inc_flag mc micfg Supervisor)
+                      cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                      pmar0 elp0 satp0 MIE_S mdv0 menv0 tlbv' mi rs3 Hag) as Hag'.
+        iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+        iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
+        iDestruct (s_frames_elim npc root_ppn mi
+                     (minstret_inc_flag mc micfg Supervisor) _ _ _ mst0 mc micfg
+                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 menv0 pcfg paddr
+                     tlbv' Hmsf Hmm Hmenvval Hmode Hasid Hppn HA Hord HX HW HR
+                     Hcov with "Hhw Hmi_inv Hrw Hro Hsie Hsret Hsnap Hkpt Hfrag")
+          as "(Hhs & Hsc & Hpc & Htlb)".
+        iApply ("Hcont" with "Hhs Hsc Hpc Htlb HPsi"). }
+    iIntros "Hfrag Hrw Hro".
+    iApply (swp_mono with "[Hfrag] [-]"); [|iApply ("Hbody" with "Hrw Hro")].
+    iIntros (st). iDestruct 1 as (w) "(-> & Hrw & Hro & HPsi)".
+    iExists w. iFrame "Hrw Hro HPsi". iSplitR; [done|].
+    iApply (resv_any_intro with "Hfrag").
   Qed.
 
 
@@ -497,6 +504,49 @@ Section sframes.
   Qed.
 
 
+  (* the reservation, carried past a body that does not see it: the frag
+     the cycle handed the wrapper rides beside [Psi] into the continuation,
+     through both arms of the dispatch. *)
+  Lemma s_body_frag (Df : register -> dfrac) (Q : regstate -> Prop)
+      (Psi : iProp Σ) (rr : option resv) :
+    resv_frag cpu_id rr -∗
+    swp (run_hart_active 0)
+      (fun st => ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
+         match st with
+         | Step_Execute (Retire_Success tt, _) =>
+             hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗ Psi
+         | Step_Pending_Interrupt (i, p) =>
+             swp (handle_interrupt i p)
+               (fun _ => hreg_frame rs2 s_Drw ∗
+                         hreg_frame_ro Df rs2 s_Dro ∗ Psi)
+         | _ => False
+         end) -∗
+    swp (run_hart_active 0)
+      (fun st => ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
+         match st with
+         | Step_Execute (Retire_Success tt, _) =>
+             hreg_frame rs2 s_Drw ∗ hreg_frame_ro Df rs2 s_Dro ∗
+             (Psi ∗ resv_any cpu_id)
+         | Step_Pending_Interrupt (i, p) =>
+             swp (handle_interrupt i p)
+               (fun _ => hreg_frame rs2 s_Drw ∗
+                         hreg_frame_ro Df rs2 s_Dro ∗
+                         (Psi ∗ resv_any cpu_id))
+         | _ => False
+         end).
+  Proof.
+    iIntros "Hfrag H".
+    iApply (swp_mono with "[Hfrag] H").
+    iIntros (st). iDestruct 1 as (rs2) "(%HQ & Hst)". iExists rs2.
+    iSplitR; [done|].
+    destruct st as [[[] w]|[i p]| | ]; try done.
+    - iDestruct "Hst" as "(Hrw & Hro & HPsi)". iFrame "Hrw Hro HPsi".
+      iApply (resv_any_intro with "Hfrag").
+    - iApply (swp_mono with "[Hfrag] Hst").
+      iIntros (u) "(Hrw & Hro & HPsi)". iFrame "Hrw Hro HPsi".
+      iApply (resv_any_intro with "Hfrag").
+  Qed.
+
   (* ==================================================================== *)
   (* wp_instr_s -- THE S-MODE WRAPPER, on the base that fits.              *)
   (*                                                                      *)
@@ -540,6 +590,7 @@ Section sframes.
       = Some (false, (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) ->
     gen_cert -∗
+    resv_any cpu_id -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
     hreg_frame_ro Df (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
@@ -600,17 +651,20 @@ Section sframes.
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗ resv_any cpu_id -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi HQex Hb0 Hb1 Hal Hnrvc Hdec Hlpad.
-    iIntros "#Hcert Hrw Hro Hdisp Htr Hcmr Hex Hcont".
-    iApply (s_cycle_any Df pc Psi Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
+    iIntros "#Hcert Hfrag Hrw Hro Hdisp Htr Hcmr Hex Hcont".
+    iApply (s_cycle_any Df pc (Psi ∗ resv_any cpu_id)%I Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
               senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 pcfg paddr tlbv
               HQhart HQmi
-              with "Hcert Hrw Hro [Hdisp Htr Hcmr Hex] Hcont").
-    iIntros "Hrw Hro".
+              with "Hcert Hfrag Hrw Hro [Hdisp Htr Hcmr Hex] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfrag"). exact Hag. }
+    iIntros "Hfrag Hrw Hro".
+    iApply (s_body_frag Df Q Psi None with "Hfrag").
     (* the generic run_hart_active gives a DISJUNCTION; the two-armed cycle
        wants the MATCH.  One [swp_mono] between them, and it is where the
        trap payload lines up with the handler slot. *)
@@ -683,6 +737,7 @@ Section sframes.
       = Some (false, (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) ->
     gen_cert -∗
+    resv_any cpu_id -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
     hreg_frame_ro Df (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
@@ -755,17 +810,20 @@ Section sframes.
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗ resv_any cpu_id -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi HQex Hb0 Hb1 Hal Hrvc HmisaC Hdec Hlpad.
-    iIntros "#Hcert Hrw Hro Hdisp Htr Hcmr Hexp Hex Hcont".
-    iApply (s_cycle_any Df pc Psi Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
+    iIntros "#Hcert Hfrag Hrw Hro Hdisp Htr Hcmr Hexp Hex Hcont".
+    iApply (s_cycle_any Df pc (Psi ∗ resv_any cpu_id)%I Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
               senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 pcfg paddr tlbv
               HQhart HQmi
-              with "Hcert Hrw Hro [Hdisp Htr Hcmr Hexp Hex] Hcont").
-    iIntros "Hrw Hro".
+              with "Hcert Hfrag Hrw Hro [Hdisp Htr Hcmr Hexp Hex] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfrag"). exact Hag. }
+    iIntros "Hfrag Hrw Hro".
+    iApply (s_body_frag Df Q Psi None with "Hfrag").
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_run_hart_active_gen_rvc s_Drw s_Dro Df
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
@@ -835,6 +893,7 @@ Section sframes.
       = Some (false, (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) ->
     gen_cert -∗
+    resv_any cpu_id -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
     hreg_frame_ro Df (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
@@ -905,17 +964,20 @@ Section sframes.
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗ resv_any cpu_id -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi HQex Hb0 Hb1 Hal Hrvc HmisaC Hdec Hlpad.
-    iIntros "#Hcert Hrw Hro Hdisp Htr Hcmr Hexp Hex Hcont".
-    iApply (s_cycle_any Df pc Psi Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
+    iIntros "#Hcert Hfrag Hrw Hro Hdisp Htr Hcmr Hexp Hex Hcont".
+    iApply (s_cycle_any Df pc (Psi ∗ resv_any cpu_id)%I Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
               senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 pcfg paddr tlbv
               HQhart HQmi
-              with "Hcert Hrw Hro [Hdisp Htr Hcmr Hexp Hex] Hcont").
-    iIntros "Hrw Hro".
+              with "Hcert Hfrag Hrw Hro [Hdisp Htr Hcmr Hexp Hex] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfrag"). exact Hag. }
+    iIntros "Hfrag Hrw Hro".
+    iApply (s_body_frag Df Q Psi None with "Hfrag").
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_run_hart_active_gen_rvc s_Drw s_Dro Df
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
@@ -984,6 +1046,7 @@ Section sframes.
       = Some (false, (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv')) ->
     gen_cert -∗
+    resv_any cpu_id -∗
     hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
                     misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw -∗
     hreg_frame_ro Df (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
@@ -1063,17 +1126,20 @@ Section sframes.
             Q rs2 /\ reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs3
                         (wrap_post rs2 mi)⌝ -∗
          hreg_frame rs3 s_Drw -∗
-         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗
+         hreg_frame_ro Df rs3 s_Dro -∗ Psi -∗ resv_any cpu_id -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HQhart HQmi HQex Hb0 Hb1 Hal Hnrvc HmisaC Hdec Hlpad.
-    iIntros "#Hcert Hrw Hro Hdisp Htr1 Hcmr1 Htr2 Hcmr2 Hex Hcont".
-    iApply (s_cycle_any Df pc Psi Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
+    iIntros "#Hcert Hfrag Hrw Hro Hdisp Htr1 Hcmr1 Htr2 Hcmr2 Hex Hcont".
+    iApply (s_cycle_any Df pc (Psi ∗ resv_any cpu_id)%I Q ms bmi cy ti ip mst0 mc micfg misa0 mseccfg0
               senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 pcfg paddr tlbv
               HQhart HQmi
-              with "Hcert Hrw Hro [Hdisp Htr1 Hcmr1 Htr2 Hcmr2 Hex] Hcont").
-    iIntros "Hrw Hro".
+              with "Hcert Hfrag Hrw Hro [Hdisp Htr1 Hcmr1 Htr2 Hcmr2 Hex] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        iApply ("Hcont" with "[%] Hrw Hro HPsi Hfrag"). exact Hag. }
+    iIntros "Hfrag Hrw Hro".
+    iApply (s_body_frag Df Q Psi None with "Hfrag").
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_run_hart_active_gen s_Drw s_Dro Df
                    (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0 pcfg paddr mc micfg
@@ -1127,7 +1193,7 @@ Section sframes.
   Lemma sm_frames_intro (γ : gname) (dq : dfrac) (pc : mword 64)
       (root_ppn : mword 44) :
     smode_config γ dq -∗ pc_is pc -∗ tlb_res_pt root_ppn -∗
-    hw_config ∗ minstret_inv ∗
+    hw_config ∗ minstret_inv ∗ resv_any cpu_id ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
@@ -1163,7 +1229,7 @@ Section sframes.
     iDestruct "Hmie" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
     iDestruct "Hmenv" as (menv0)
       "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iDestruct "Htlb" as (satp0 tlbv)

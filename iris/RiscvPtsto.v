@@ -1732,6 +1732,17 @@ Proof.
     by rewrite decide_False.
 Qed.
 
+(* the all-[None] map (every era begins there): what the boot allocation
+   hands out, one [None] fragment per hart *)
+Lemma resv_map_none (f : CPU -> option resv) :
+  (forall c, f c = None) ->
+  resv_map f = gset_to_gmap None (fin_to_set CPU : gset CPU).
+Proof.
+  intros Hf. apply map_eq. intros c.
+  rewrite resv_map_lookup lookup_gset_to_gmap option_guard_True;
+    [ by rewrite Hf | apply elem_of_fin_to_set ].
+Qed.
+
 (* THE PRESERVING CASE, which is what lets the rules whose arms never touch
    the reservation (register nodes, announces, plain and MMIO READS) keep
    [wp_hart_step]'s reservation-agnostic form: writing back the value that is

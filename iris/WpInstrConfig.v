@@ -272,6 +272,7 @@ Section WpInstrConfig.
     mstatus ↦ᵣ ms0 -∗
     pmpcfg_n ↦ᵣ pcfg0 -∗
     pc_is pc -∗
+    resv_any cpu_id ∗
     ∃ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
       (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
       (elp0 : type_of_register elp),
@@ -289,7 +290,7 @@ Section WpInstrConfig.
            mseccfg0 pmar0 elp0 senv0) mm_Dro.
   Proof.
     iIntros "#Hhw Hhs Hpriv Hmstatus Hpmpc Hpc".
-    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)". iFrame "Hresv".
     iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
     iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -322,6 +323,7 @@ Section WpInstrConfig.
       (ms : mword 64) (bmi : bool) (cy ti ip mst1 : mword 64)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+    resv_any cpu_id -∗
     hreg_frame (mc_rs priv1 npc npc ms bmi cy ti ip mst1 pcfg1 mc micfg
                   misa0 mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df (DfracOwn 1))
@@ -330,7 +332,7 @@ Section WpInstrConfig.
     hart_state ↦ᵣ HART_ACTIVE tt ∗ cur_privilege ↦ᵣ priv1 ∗
     mstatus ↦ᵣ mst1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pc_is npc.
   Proof.
-    iIntros "Hrw Hro".
+    iIntros "Hresv Hrw Hro".
     rewrite mm_rw_split mm_ro_split.
     rewrite mc_rs_PC mc_rs_nPC mc_rs_ms mc_rs_mi mc_rs_cy mc_rs_ti mc_rs_ip.
     rewrite mc_rs_priv mc_rs_mst mc_rs_hart mc_rs_pcfg mc_rs_mc
@@ -340,7 +342,7 @@ Section WpInstrConfig.
     iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & #Hmc & #Hmicfg & _)".
     iFrame "Hhs Hpriv Hmst Hpcfg".
     rewrite /pc_is /minstret_res /clock_res.
-    iFrame "HPC HnPC".
+    iFrame "HPC HnPC Hresv".
     iSplitL "Hms Hmi".
     - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
     - iExists cy, ti, ip. by iFrame.
@@ -418,6 +420,7 @@ Section WpInstrConfig.
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
       (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
     hw_config -∗
+    resv_any cpu_id -∗
     hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0
                   mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
     hreg_frame_ro (mm_Df (DfracOwn 1))
@@ -444,10 +447,10 @@ Section WpInstrConfig.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hhw Hrw Hro Hbody Hcont".
+    iIntros "#Hhw Hfrag Hrw Hro Hbody Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iApply (swp_exec_step_decode_execute mm_Drw mm_Dro (mm_Df (DfracOwn 1))
-              (mm_rs pc pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mc_rs priv1 pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) Psi
+              (mm_rs pc pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (mc_rs priv1 pc npc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 pmar0 elp0 senv0) (Psi ∗ resv_any cpu_id)%I
               mm_disj mm_w_cy mm_w_ti mm_w_ip mm_in_priv mm_in_hart mm_in_mc
               mm_in_micfg mm_w_mi mm_in_mi mm_w_ms mm_in_ms mm_w_PC mm_in_PC
               mm_in_nPC ltac:(mmrs)
@@ -458,19 +461,24 @@ Section WpInstrConfig.
                     | by rewrite mm_rs_mc mm_rs_micfg mm_rs_priv ])
               (mm_pre_agree pc ms bmi cy ti ip mst0 pcfg0 mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0)
-              with "Hcert Hrw Hro Hbody [Hcont]").
-    iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
-    destruct Hag as (mi & Hag).
-    pose proof (mc_tick_agree priv1 pc npc ms (minstret_inc_flag mc micfg Machine)
-                  cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 senv0
-                  pmar0 elp0 mi rs3 Hag) as Hag'.
-    iDestruct (mm_rw_ext _ _ Hag' with "Hrw") as "Hrw".
-    iDestruct (mm_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
-    iDestruct (mc_frames_elim priv1 npc pcfg1 mi
-                 (minstret_inc_flag mc micfg Machine) _ _ _ mst1 mc micfg misa0
-                 mseccfg0 senv0 pmar0 elp0 with "Hrw Hro")
-      as "(Hhs & Hpriv & Hmst & Hpcfg & Hpc)".
-    iApply ("Hcont" with "Hhs Hpriv Hmst Hpcfg Hpc HPsi").
+              with "Hcert Hfrag Hrw Hro [Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [HPsi Hfrag]".
+        destruct Hag as (mi & Hag).
+        pose proof (mc_tick_agree priv1 pc npc ms (minstret_inc_flag mc micfg Machine)
+                      cy ti ip mst1 pcfg1 mc micfg misa0 mseccfg0 senv0
+                      pmar0 elp0 mi rs3 Hag) as Hag'.
+        iDestruct (mm_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+        iDestruct (mm_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
+        iDestruct (mc_frames_elim priv1 npc pcfg1 mi
+                     (minstret_inc_flag mc micfg Machine) _ _ _ mst1 mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 with "Hfrag Hrw Hro")
+          as "(Hhs & Hpriv & Hmst & Hpcfg & Hpc)".
+        iApply ("Hcont" with "Hhs Hpriv Hmst Hpcfg Hpc HPsi"). }
+    iIntros "Hfrag Hrw Hro".
+    iApply (swp_mono with "[Hfrag] [-]"); [|iApply ("Hbody" with "Hrw Hro")].
+    iIntros (st). iDestruct 1 as (w) "(-> & Hrw & Hro & HPsi)".
+    iExists w. iFrame "Hrw Hro HPsi". iSplitR; [done|].
+    iApply (resv_any_intro with "Hfrag").
   Qed.
 
   (* ==================================================================== *)
@@ -525,7 +533,7 @@ Section WpInstrConfig.
     intros Hpmp HmIE Hstat.
     iIntros "#Hhw _ Hhs Hpriv Hms Hpmpc Hpc Hgpr Hinstr Hex Hcont".
     iDestruct (mc_frames_intro pc ms0 pmpcfg0
-                 with "Hhw Hhs Hpriv Hms Hpmpc Hpc") as "Hfr".
+                 with "Hhw Hhs Hpriv Hms Hpmpc Hpc") as "[Hfrag Hfr]".
     iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0
         pmar0 elp0)
       "(%HmS & %HmC & %HmA & %Hmisaval & %Hsecval & %Hpmaall & %Helpnp &
@@ -534,7 +542,7 @@ Section WpInstrConfig.
     iDestruct (hw_config_kmap with "Hhw") as "#Hkm".
     iApply (mc_cycle pc npc priv1 pmpcfg0 pmpcfg1 (gpr_file m' ∗ R)%I
               ms bmi cy ti ip ms0 ms1 mc micfg misa0 mseccfg0 senv0 pmar0
-              elp0 with "Hhw Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
+              elp0 with "Hhw Hfrag Hrw Hro [Hgpr Hinstr Hex] [Hcont]").
     2:{ iNext. iIntros "Hhs Hpriv Hms Hpmpc Hpc [Hgpr HR]".
         iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc Hpc Hgpr HR"). }
     assert (Hdok : decode_ok (mm_Drw ∪ mm_Dro) (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip ms0 pmpcfg0 mc micfg misa0 mseccfg0 pmar0 elp0 senv0)).
