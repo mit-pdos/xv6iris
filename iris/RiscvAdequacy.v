@@ -661,7 +661,7 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ HR))).
   cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth HtieS".
+  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth HtieS Hresvauth".
   { (* the initial state interpretation: generation 0, power on, the one
        registered era, its image map empty *)
     rewrite /power_interp /fs_tie_interp /disk_tie.
@@ -1073,7 +1073,7 @@ Section power.
         iExact "Hstartlb". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
-      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie".
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth".
       { rewrite /state_interp /=.
         unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].

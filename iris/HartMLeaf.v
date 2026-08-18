@@ -817,7 +817,7 @@ Section leaf.
     iIntros "#Hcert Hfrag Hrw Hro Hmem Hwmem".
     iApply (swp_run_hart_active_rvc Drw Dro Df rs
               (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2) rs)
-              hp_pc hp_wf _ _ pmar0 pcfg 8 R Hdisj
+              hp_pc hp_wf _ _ pmar0 pcfg 8 (R ∗ resv_frag cpu_id None)%I Hdisj
               HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
               Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC
               Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
