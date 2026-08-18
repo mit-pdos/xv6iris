@@ -632,7 +632,13 @@ Section stepany.
     resv_any cpu_id -∗
     hreg_frame rs1 Drw -∗
     hreg_frame_ro Df rs1 Dro -∗
-    (resv_frag cpu_id None -∗
+    (* UNDER A LATER.  The body runs at the NEXT language step -- the cycle's
+       tick has to happen first -- so a caller may build it from a resource it
+       only gets after a step, which is what an interrupt-arm Loeb hypothesis
+       is.  It costs the proof nothing: the [wp_loop_cycle_ex] branch this
+       feeds is already under its own [iNext], and that one [iNext] strips
+       this [▷] with it. *)
+    ▷ (resv_frag cpu_id None -∗
      hreg_frame rsA Drw -∗ hreg_frame_ro Df rsA Dro -∗
        swp (run_hart_active 0)
          (fun st => ∃ rs2 : regstate, ⌜Q rs2⌝ ∗

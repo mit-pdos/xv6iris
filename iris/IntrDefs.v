@@ -1664,11 +1664,95 @@ Section IntrDefsBase.
     - rewrite Hk. vm_compute. reflexivity.
   Qed.
 
+  (* the WITNESSED translate: [kpt_on] pins the slot at KPT, so the Bare arm
+     is refuted outright rather than reconciled -- which is what lets a
+     NON-identity claim (a KSTACK / trampoline va) translate at all.  Same
+     dispatch as [strans_absorb_wit], one layer up. *)
+  Lemma strans_swp_translate_wit :
+    forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (tlb : register) ∈ Drw ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      strans_swp_side acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ kpt_on cpu_id -∗ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        strans_swp_res rs -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      strans_swp_res rsf ∗ resv_any cpu_id).
+  Proof.
+    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
+      HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
+      Hside.
+    iIntros "Hwit #Hat #Hcert Hfrag Hres Hrw Hro".
+    iEval (rewrite /strans_swp_res /strans_res_at) in "Hres".
+    iDestruct "Hres" as "[(Hpend & Hstv & %Hmb) | (Hkpt & %Hmk & Hres)]".
+    - (* the witness says KPT; the Bare arm's ghost says otherwise *)
+      iDestruct (kpt_on_pending_False with "Hwit Hpend") as %[].
+    - destruct Hside as [Hbs | Hks].
+      { destruct Hbs as (Hmode & _). rewrite Hmk in Hmode.
+        exfalso. vm_compute in Hmode. discriminate. }
+      iApply (swp_mono with "[Hkpt] [-]");
+        [| iApply (kpt_swp_translate (strans_root rs) acc Drw Dro Df rs dst Db
+                     va pa ppn kp rr
+                     Hdisj Hacc Hallow HDmst HDpriv HDsatp HWtlb HDpma HDcfg
+                     HDaddr HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa
+                     Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat I Hks
+                     with "Hat Hcert Hfrag Hres Hrw Hro") ].
+      iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & Hres & Hany)".
+      iSplitR; [done |]. iExists rsf. iFrame "Hrw Hro Hany".
+      iSplitR; [iPureIntro; exact Hshape |].
+      rewrite /strans_swp_res /strans_res_at.
+      rewrite (strans_satp_landing rs rsf Hshape).
+      iRight. iFrame "Hkpt". iFrame "Hres".
+      iPureIntro. exact Hmk.
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
             strans_absorb strans_transform strans_tmode
             (kpt_on cpu_id) _ strans_absorb_wit
             strans_swp_res strans_swp_side strans_swp_translate
+            strans_swp_translate_wit
             strans_res_at strans_satp_ok strans_swp_res_agree
             strans_swp_open strans_swp_close
             (fun _ _ H => H) strans_swp_side_ok

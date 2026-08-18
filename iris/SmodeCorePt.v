@@ -2612,7 +2612,13 @@ Section SmodeCorePt.
                     by rewrite s_rs_mc s_rs_micfg s_rs_priv)
               (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
-              with "Hcert Hfrag Hrw Hro Hbody Hcont").
+              with "Hcert Hfrag Hrw Hro [Hbody] Hcont").
+    (* [swp_exec_step_any_ex]'s body premise is UNDER A LATER (the body runs
+       at the next language step, so a caller may build it from a resource a
+       step produces).  Absorbed here rather than threaded: no consumer of
+       [spt_cycle] or of the wrappers needs it, and threading it would put an
+       [iNext] in every leaf's obligation for nothing. *)
+    iNext. iExact "Hbody".
   Qed.
 
 
