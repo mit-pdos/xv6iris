@@ -1147,6 +1147,133 @@ Lemma goodmb_bind0R_empty (Dr Dw : register -> bool) {R Y : Type}
   goodmb Dr Dw (Defs.bind0 m n) s ∅ = goodmb Dr Dw n s' ∅.
 Proof. intros Hg He. exact (goodmb_bindR_empty Dr Dw m (fun _ => n) s s' tt Hg He). Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* AN EARLY-RETURN REGION THAT ACTUALLY EARLY-RETURNS.                      *)
+(*                                                                         *)
+(* [goodmb_cer] carries a certificate for a body that makes NO             *)
+(* [ExtraOutcome] -- the one direction [HartGoodb.goodb_try_catch] has --   *)
+(* and that is not enough for the tier's [catch_early_return] regions,      *)
+(* whose whole point is to THROW ([execute_ZICBOZ], [execute_SSAMOSWAP],    *)
+(* [run_hart_active]'s trap arms).  [goodmb] refuses an [ExtraOutcome]      *)
+(* node outright, so such a body has no certificate at all and             *)
+(* [goodmb_cer] is unusable on it.                                          *)
+(*                                                                         *)
+(* The wrapper must therefore stay ON while the chain is peeled: this is    *)
+(* the bind equation for [catch_early_return (bind m f)], where the HEAD    *)
+(* returns normally ([inr]) and the wrapper travels to the tail.  The walk  *)
+(* ends at a thrown tail, where [catch_early_return] absorbs the throw and  *)
+(* the certificate is [reflexivity] (the [HartRunGen.mcer_early_return]     *)
+(* conversion: [catch_early_return (bind (early_return r) K) = Ret r]).     *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_cer_bind (Dr Dw : register -> bool) {X Y : Type}
+    (m : Defs.monadR X exception Y) (f : Y -> Defs.monadR X exception X)
+    (s s' : mstate) (mm : gmap Arch.pa (bv 8)) (x : Y) :
+  goodmb Dr Dw m s mm = true ->
+  execR m s = Some (inr x, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Defs.bind m f)) s mm
+  = goodmb Dr Dw (Defs.catch_early_return (f x)) s' (mm_after m s mm).
+Proof.
+  revert s mm. induction m as [y | T oc k IH]; intros s mm Hg He.
+  - cbn [execR] in He.
+    assert (Hx : x = y) by congruence. assert (Hs : s' = s) by congruence.
+    subst x s'. reflexivity.
+  - destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                   | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                   | A ao | gmsg | | | cty | | msg ];
+      cbn [goodmb execR mm_after Defs.bind Interface.iMon_bind
+           Defs.catch_early_return Defs.try_catch] in Hg, He |- *;
+      try discriminate Hg.
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+      by apply (IH tt _ mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+      rewrite Hfp. cbn [negb andb] in Hg2 |- *.
+      destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+        [|discriminate Hg2].
+      cbn beta iota in He. by apply (IH _ s mm). }
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+      apply negb_true_iff in Hdev. rewrite Hdev in He |- *. rewrite Hfp.
+      cbn [negb andb]. cbn beta iota in He. by apply (IH (inl None) _ _). }
+    all: first [ by apply (IH tt s mm) | by apply (IH 0%Z s mm) ].
+Qed.
+
+Lemma goodmb_cer_bind_empty (Dr Dw : register -> bool) {X Y : Type}
+    (m : Defs.monadR X exception Y) (f : Y -> Defs.monadR X exception X)
+    (s s' : mstate) (x : Y) :
+  goodmb Dr Dw m s ∅ = true ->
+  execR m s = Some (inr x, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Defs.bind m f)) s ∅
+  = goodmb Dr Dw (Defs.catch_early_return (f x)) s' ∅.
+Proof.
+  intros Hg He. rewrite (goodmb_cer_bind Dr Dw m f s s' ∅ x Hg He).
+  by rewrite (mm_after_empty Dr Dw m s Hg).
+Qed.
+
+Lemma goodmb_cer_bind0_empty (Dr Dw : register -> bool) {X : Type}
+    (m : Defs.monadR X exception unit) (n : Defs.monadR X exception X)
+    (s s' : mstate) :
+  goodmb Dr Dw m s ∅ = true ->
+  execR m s = Some (inr tt, s') ->
+  goodmb Dr Dw (Defs.catch_early_return (Defs.bind0 m n)) s ∅
+  = goodmb Dr Dw (Defs.catch_early_return n) s' ∅.
+Proof.
+  intros Hg He. exact (goodmb_cer_bind_empty Dr Dw m (fun _ => n) s s' tt Hg He).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE CERTIFICATE AT [∅] IS A CERTIFICATE AT ANY MAP.  Only [dom mm] is    *)
+(* ever consulted, and the [bytes_owned] tests are MONOTONE in it, so a     *)
+(* register-only twin proved at the empty map is usable by a caller         *)
+(* standing on the whole user image -- which is why every register-only     *)
+(* family may be stated at [∅] and nothing is lost.                          *)
+(* ---------------------------------------------------------------------- *)
+Lemma bytes_owned_dom_mono (mm1 mm2 : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N) :
+  dom mm1 ⊆ dom mm2 -> bytes_owned mm1 pa n = true -> bytes_owned mm2 pa n = true.
+Proof.
+  intros Hd. unfold bytes_owned.
+  induction (seq 0 (N.to_nat n)) as [|j js IH]; [done|].
+  cbn [forallb]. intros Hf. apply andb_prop in Hf as [H1 H2].
+  rewrite (IH H2) andb_true_r.
+  apply bool_decide_eq_true_1 in H1. apply bool_decide_eq_true_2.
+  apply elem_of_dom. apply Hd. by apply elem_of_dom.
+Qed.
+
+Lemma foldr_ins_dom_mono (pa : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
+    (mm1 mm2 : gmap Arch.pa (bv 8)) :
+  dom mm1 ⊆ dom mm2 ->
+  dom (foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm1 js)
+  ⊆ dom (foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm2 js).
+Proof.
+  intros H. induction js as [|j js IH]; cbn [foldr]; [exact H|].
+  rewrite !dom_insert_L. set_solver.
+Qed.
+
+Lemma goodmb_map_mono (Dr Dw : register -> bool) {E X} (m : Defs.monad E X) :
+  forall (s : mstate) (mm1 mm2 : gmap Arch.pa (bv 8)),
+    dom mm1 ⊆ dom mm2 ->
+    goodmb Dr Dw m s mm1 = true -> goodmb Dr Dw m s mm2 = true.
+Proof.
+  induction m as [y | T oc k IH]; intros s mm1 mm2 Hd Hg; [reflexivity|].
+  destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
+                 | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
+                 | A ao | gmsg | | | cty | | msg ];
+    cbn [goodmb] in Hg |- *; try discriminate Hg.
+  { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+    by apply (IH _ s mm1 mm2). }
+  { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
+    by apply (IH tt _ mm1 mm2). }
+  { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+    rewrite Hdev (bytes_owned_dom_mono mm1 mm2 _ nb Hd Hfp). cbn [andb].
+    destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
+      [by apply (IH _ s mm1 mm2)|discriminate Hg2]. }
+  { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
+    rewrite Hdev (bytes_owned_dom_mono mm1 mm2 _ nb Hd Hfp). cbn [andb].
+    apply (IH (inl None) _ _ _ (foldr_ins_dom_mono _ _ _ mm1 mm2 Hd) Hg2). }
+  all: first [ by apply (IH tt s mm1 mm2) | by apply (IH 0%Z s mm1 mm2) ].
+Qed.
+
 (* ====================================================================== *)
 (* 5. THE COMPOSITE RULE: an [exec] fact plus its certificate, in [swp].    *)
 (*                                                                         *)
