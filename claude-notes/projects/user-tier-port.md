@@ -1805,13 +1805,15 @@ against a 4-aligned baseline of ~100, and the 3x blow-up in the Pt layer is
 exactly the two-walk threading that `u_mem_step_trans` / `u_tlb_only_trans`
 now do for free.
 
-**So the order is: §14.4 first, as a P3-class package (fold the two
-`_trans` lemmas back, genericise the fetch read certificates to width 2,
-then `u_fetch_pure_2` and a `u_fetch_fault_pure_2`), THEN §14.3's five
-items.**  Do not start §5 expecting to finish it: items 1/3/4/5 are each
-writable against interfaces that exist, but `active_class` cannot compile
-until the 2-aligned branches have producers, and the no-admits rule means
-there is no green intermediate state to land.
+**§14.4 LANDED FIRST, as a P3-class package, and §14.3's five items are what
+is left.**  All five producers `active_class`' case tree needs now exist and
+are pure: `u_fetch_pure` / `u_fetch_fault_pure` for the 4-aligned arm, and
+`u_fetch_pure_2` / `u_fetch_or_fault_pure_2_second` /
+`u_fetch_fault_pure_2_first` for the 2-aligned one.  What §5 still owes is
+the `swp` layer over them (§14.3 items 1–3), the four trap arms (item 4) and
+the assembly (item 5) — and note that `active_class` cannot compile until
+ALL of its branches have producers, so there is no green intermediate state
+between "no §5" and "all of §5".
 
 A last tell that this was a real hole and not a reading error: **neither
 `u_fetch_pure` nor `u_fetch_fault_pure` has a single consumer anywhere in
@@ -1886,8 +1888,32 @@ mirrors `UserFetch.split_head`.  Three things they settled:
   conclusion, so `intros _` fails with *"This variable is used in
   conclusion"*.  Use `intros ?`.
 
-What §14.4 still owes is `u_fetch_pure_2` and its two fault siblings.  The
-shape for those three, decided against what `HartRunFull.run_fetch_post`
+**§14.4 IS DONE.**  The three composers are in `UserFaultCert`:
+`u_fetch_pure_2` (both halves fetchable → `F_RVC` or `F_Base`),
+`u_fetch_or_fault_pure_2_second` (low half ok, next page bad → `F_RVC` or
+`F_Error` at `va+2`) and `u_fetch_fault_pure_2_first` (low half faults →
+`F_Error` at `va`, state unmoved).  Each runs `u_walk_fetch_pure` once or
+twice and `u_fetch_read_ok` at width 2, composing landings with
+`u_tlb_only_trans` / `u_exec_pins_only` and maps with `u_mem_step_trans`.
+
+**BOTH DISJUNCTS OF THE `_second` LEMMA ARE LIVE, and that is the geometry
+rather than a weak statement**: the model reads the second halfword ONLY
+when the first is not compressed, so a compressed low half retires however
+bad the next page is.  One lemma therefore covers a two-outcome case, which
+is why there are three composers and not four.
+
+**THE SUBTLETY FOR ANY FUTURE TWO-WALK COMPOSER.**  The second walk and the
+second read produce certificates stated at the map the FIRST walk landed on,
+while the lemma owes ONE certificate at the ORIGINAL map.
+`HartMemRun.goodmb_dom` fed by `UserBytes.u_mem_step_dom` transports them —
+and the transport must happen BEFORE a shell is applied, because the shells
+take every certificate at one shared map.
+
+Two premises turned out to be free: `post_fetch_cfg`'s fifth conjunct
+already carries `is_aligned_vaddr (Virtaddr va) 2 = true`, and `u_hw_pins`'
+misa pin gives `_get_Misa_C … = 'b"1"` by `vm_compute`.
+
+The shape all three use, decided against what `HartRunFull.run_fetch_post`
 actually consumes:
 
 ```coq
