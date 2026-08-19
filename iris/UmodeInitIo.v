@@ -69,7 +69,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeSyscall UmodeIo.
+Require Import UmodeCap UmodeAbi UmodeSyscall UmodeIo.
 Local Open Scope Z_scope.
 Import Defs.
 

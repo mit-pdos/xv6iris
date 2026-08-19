@@ -918,3 +918,48 @@ Proof.
   intros Hkeys Hdisj [_ E] Hsub k b Hk.
   rewrite (E k (Hdisj k (Hkeys k b Hk))). exact (Hsub k b Hk).
 Qed.
+
+(* the 4-byte twin of [uv_slot8_facts] -- what a [lw]/[sw] of a C `uint'
+   field needs.  The K&R allocator's [size] fields are read this way. *)
+Lemma uv_slot4_facts (a : Z) (va : mword 64) :
+  0 <= a -> a mod 4 = 0 -> a + 4 <= 2 ^ 38 ->
+  va = (mword_of_int a : mword 64) ->
+  uint va = a /\
+  uva_canon va /\
+  Z.rem (uint va) 4096 <= 4092 /\
+  is_aligned_vaddr (Virtaddr va) 4 = true.
+Proof.
+  intros Ha0 Ha4 Hahi Hva.
+  change (2 ^ 38) with 274877906944 in Hahi.
+  assert (Hu : uint va = a) by (rewrite Hva; apply uint_moi; unfold Z64; lia).
+  assert (Hm : a mod 4096 <= 4092).
+  { assert (Hd : (4 | 4096)) by (exists 1024; reflexivity).
+    pose proof (Znumtheory.Zmod_div_mod 4 4096 a ltac:(lia) ltac:(lia) Hd) as Hq.
+    pose proof (Z.mod_pos_bound a 4096 ltac:(lia)) as Hb.
+    pose proof (Z.div_mod (a mod 4096) 4 ltac:(lia)) as Hdm.
+    rewrite <- Hq in Hdm. rewrite Ha4 in Hdm. lia. }
+  split_and!.
+  - exact Hu.
+  - apply uva_canon_small. rewrite <- uint_unsigned. rewrite Hu. lia.
+  - rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Hm | lia | lia ].
+  - unfold is_aligned_vaddr. apply Z.eqb_eq. cbn [bits_of_virtaddr].
+    rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Ha4 | lia | lia ].
+Qed.
+
+(* The ELIMINATOR.  Using [uM_only_in] means showing a key is outside every
+   window, and doing that by hand is an [elem_of_cons] / [destruct] / [lia]
+   chase at each site -- the largest single piece of boilerplate the sh
+   proofs carry.  Stated with the window quantified so a caller discharges
+   one goal per window and never touches the list structure. *)
+Lemma uM_only_in_out (M M' : gmap Z (bv 8)) (ws : list (Z * Z)) (k : Z) :
+  uM_only_in M M' ws ->
+  (forall w : Z * Z, w ∈ ws -> ~ (fst w <= k < fst w + snd w)) ->
+  M' !! k = M !! k.
+Proof.
+  intros [_ E] Hout. apply E. intros (w & Hw & Hin). exact (Hout w Hw Hin).
+Qed.
+
+(* ... and its introduction twin: a key inside a NAMED window is in the list *)
+Lemma uM_in_windows_here (ws : list (Z * Z)) (a n k : Z) :
+  (a, n) ∈ ws -> a <= k < a + n -> uM_in_windows ws k.
+Proof. intros Hw Hk. exists (a, n). split; [ exact Hw | exact Hk ]. Qed.

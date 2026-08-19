@@ -54,7 +54,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall.
+Require Import UmodeCap UmodeAbi UmodeSyscall.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -140,7 +140,9 @@ Inductive uio_sem : Type :=
   | IoRead            (* read(fd, buf, n)      -- consumes stdin, writes buf *)
   | IoWrite           (* write(fd, buf, n)     -- reads buf, returns *)
   | IoOpen            (* open(path, flags)     -- reads path, returns fd >= 3 *)
-  | IoPureRet         (* close / dup / chdir / wait *)
+  | IoPureRet         (* close / dup *)
+  | IoWaitNull        (* wait(0)               -- see the arm; wait(p) is NOT this *)
+  | IoPathRet         (* chdir(path)           -- reads a path, returns *)
   | IoFork            (* fork()                -- returns 0 or a positive pid *)
   | IoExec            (* exec(path, argv)      -- reads both; does not return *)
   | IoSbrk            (* sbrk(n, eager)        -- hands over n fresh bytes *)
@@ -172,6 +174,20 @@ Section UmodeIo.
     | IoPureRet => uio_ret g va M
     | IoNoRet   => emp%I
     | IoUnused  => False%I
+
+    (* [wait(p)] with p <> 0 WRITES the exit status through p, so an arm
+       claiming the image is unchanged would be false for it and could never
+       be discharged on the kernel side.  This arm is a PARTIAL specification
+       and says so: it covers wait(0) only, which is the only form sh (and
+       init) ever calls.  Generalising it means an image effect like
+       [IoRead]'s. *)
+    | IoWaitNull =>
+        (⌜uint (g !!! Regidx a0_idx) = 0⌝ ∗ uio_ret g va M)%I
+
+    (* [chdir] READS its path argument; an arm that demanded nothing about it
+       would oblige the kernel to cope with a garbage pointer. *)
+    | IoPathRet =>
+        (⌜uio_str_arg M (uint (g !!! Regidx a0_idx))⌝ ∗ uio_ret g va M)%I
 
     | IoWrite =>
         (⌜uv_rd pt M (uint (g !!! Regidx a1_idx)) (uint (g !!! Regidx a2_idx))⌝ ∗
@@ -237,8 +253,8 @@ Definition xv6_io_sem (n : Z) : uio_sem :=
   else if bool_decide (n = SYS_open)  then IoOpen
   else if bool_decide (n = SYS_close) then IoPureRet
   else if bool_decide (n = SYS_dup)   then IoPureRet
-  else if bool_decide (n = SYS_chdir) then IoPureRet
-  else if bool_decide (n = SYS_wait)  then IoPureRet
+  else if bool_decide (n = SYS_chdir) then IoPathRet
+  else if bool_decide (n = SYS_wait)  then IoWaitNull
   else if bool_decide (n = SYS_fork)  then IoFork
   else if bool_decide (n = SYS_exec)  then IoExec
   else if bool_decide (n = SYS_sbrk)  then IoSbrk
@@ -256,8 +272,8 @@ Lemma xv6_io_sem_write : xv6_io_sem SYS_write = IoWrite.   Proof. reflexivity. Q
 Lemma xv6_io_sem_open  : xv6_io_sem SYS_open  = IoOpen.    Proof. reflexivity. Qed.
 Lemma xv6_io_sem_close : xv6_io_sem SYS_close = IoPureRet. Proof. reflexivity. Qed.
 Lemma xv6_io_sem_dup   : xv6_io_sem SYS_dup   = IoPureRet. Proof. reflexivity. Qed.
-Lemma xv6_io_sem_chdir : xv6_io_sem SYS_chdir = IoPureRet. Proof. reflexivity. Qed.
-Lemma xv6_io_sem_wait  : xv6_io_sem SYS_wait  = IoPureRet. Proof. reflexivity. Qed.
+Lemma xv6_io_sem_chdir : xv6_io_sem SYS_chdir = IoPathRet.  Proof. reflexivity. Qed.
+Lemma xv6_io_sem_wait  : xv6_io_sem SYS_wait  = IoWaitNull. Proof. reflexivity. Qed.
 Lemma xv6_io_sem_fork  : xv6_io_sem SYS_fork  = IoFork.    Proof. reflexivity. Qed.
 Lemma xv6_io_sem_exec  : xv6_io_sem SYS_exec  = IoExec.    Proof. reflexivity. Qed.
 Lemma xv6_io_sem_sbrk  : xv6_io_sem SYS_sbrk  = IoSbrk.    Proof. reflexivity. Qed.
