@@ -160,3 +160,179 @@ real licences); the regime *indexing itself* (`ireg_regime`/`ireg_fsh` —
 ireclaim's round-trip is the one place it cannot be specialized away);
 the `ireg_open` threading (boot exists, so it cannot hide inside
 `ireg_inv`); the K bumps (physical).
+
+---
+
+## 5. SIMP-2, designed: the reference package + the boot-free fs predicate
+
+*(2026-08-19, the SIMP-2 design pass.  Verified at the lane's `simp-1` tip
+`9e51d849ad`; probe `ZZSimp2.v` on the lane, untracked, compiling, zero
+admits, satisfiability-first per iclaim-ledger.md §5⁗⁗.)*
+
+SIMP-2 has two halves that interact at `inode_held` and must land
+together.  The user's strategic goal for the second half: a SINGLE
+runtime file-system predicate that IGNORES BOOTING, so that forkret's
+first branch — the `wp_forkret_nf_ax` IOU — owes the fs nothing but
+"carry one persistent assertion".
+
+### 5.1 The reference package
+
+THE KEY FACT (found, not designed): **`inode_held` is already the
+package** (`IcacheRef.v:2908` — reference ∗ `runit_any`, flavour
+existential), and the walker cone + both rest homes already speak it.
+SIMP-2 therefore does not invent a package; it pushes the SAME shape
+down into the four fs contracts that still speak the unbundled trio:
+
+    inode_refb b k q dev inum := inode_ref k q dev inum
+                                 ∗ runit b (bv_unsigned inum)
+    inode_refp                := inode_refb false        (plain form)
+    inode_claimed ty k q d n  := inode_ref … ∗ runit_claim …
+                                 ∗ iclaim … ty            (ialloc's receipt)
+
+Probed (`ZZSimp2.v` P1/P2, all Qed):
+  - `inode_refb_intro` — SAT witness: exactly `SpecIget`'s two post rows.
+  - `inode_refp_spend` — `inode_refp ⊣⊢ inode_ref ∗ runit_any`: exactly
+    `SpecIput`'s two premise rows, so the restatement is a *rename*.
+  - `inode_claimed_intro` — SAT: exactly `SpecIalloc`'s three receipt rows.
+  - `inode_claimed_to_ClaimK` — the elim IS `ireg_wd_lic (ClaimK ty)`
+    beside the surviving reference: create's fill supply, one destruct.
+  - The share-lend a package-shaped `SpecIdup` needs is LANDED machinery
+    (`inode_ref_carve`, `IcacheRef.v:2797`; `inode_ref_short`) — nothing
+    new to prove.
+
+The contract restatements, with the projected shrink:
+
+| body | today | after | delta |
+|---|---|---|---|
+| `wp_iget_sconf_body` post | `inode_ref` + `runit (is_claim l)` (2 rows) | `inode_refb (is_claim l)` (1 row) | −1 row |
+| `wp_iput_sconf_body` pre | `inode_ref` + `runit_any` (2 rows) | `inode_refp` (1 row) | −1 row |
+| `wp_iunlockput_*` pre (both bodies) | ditto | ditto | −1 row each |
+| `wp_idup_sconf_body` | share + `runit_any` pre; share + `∃qn ref` + 2×`runit_any` post (6 rows) | `inode_held v` pre; `inode_held v ∗ inode_held v` post (3 rows) | −3 rows |
+| `SpecIalloc` receipt | ref + `runit_claim` + `iclaim ty` (3 rows) | `inode_claimed ty` (1 row) | −2 rows |
+| `SpecIlock` ClaimK/PlainK arms | reshaped to take the package projections | — | 0 rows |
+
+Net: the five fs contracts end SHORTER than they were BEFORE the
+campaign (pre-campaign iget returned a bare reference; post-SIMP-2 it
+returns one package that the rest of the tree already wants).
+
+Notes for the executor:
+  - `SpecIdup`-over-`inode_held` is the one non-rename: its callers
+    (`ProofKforkB4`'s cwd, `ProofNamex`) HOLD `inode_held` already —
+    the contract meets them where they are.  The mover's share comes
+    off the package by `inode_ref_carve`; the leftover count fragment
+    rides beside the lent share and rejoins (the carve is ⊣⊢).
+  - The claim flavour never reaches iput: the conversion at ilock's
+    ClaimK arm (`ireg_withdraw`) turns `inode_claimed` into `inode_refp`
+    before any close.  `inode_refb true` therefore needs NO spend form.
+  - `inode_held`'s definition gains nothing; it BECOMES definable as
+    `∃ k q inum, ⌜…⌝ ∗ inode_refp k q icfg_dev inum` — one unfold shorter.
+
+### 5.2 `fs_ready`: the boot-free fs predicate
+
+THE SECOND KEY FACT: **`FsSyscalls.fs_world` is already the predicate**
+— 19 ambient conjuncts, persistent (`fs_world_persistent`), containing
+`ireg_open` and NO boot state — but it has NO PRODUCER (like upstream's
+`syscall_env`: satisfiability unchecked) and only the two friendly
+lemmas consume it.  SIMP-2 promotes it:
+
+  1. **Rename/rehome** `fs_world` → `FsReady.fs_ready` (its own leaf
+     file below the Spec layer, so every Spec can import it), keeping
+     the 19-conjunct definition.  `fs_world := fs_ready` remains as an
+     alias; `sysc_fs_env fn` restates as its field-tie equations ∗
+     `fs_ready (fn's projections)` ∗ the proc-specific extras.
+  2. **THE SEAL — probed** (`ZZSimp2.v` P3, both Qed): `fs_ready_seal`
+     (`ireg_boot ==∗ ireg_open` — the boot token DIES into the sealed
+     regime; nothing boot-shaped survives) and `fs_ready_establish`
+     (the bundle-missing-only-its-regime plus `ireg_boot` completes
+     `fs_ready` in one bupd).  Booting is over the instant the
+     predicate exists — the user's "the predicate can ignore booting"
+     made formal.  The executor's step 1: the constituent PACK at the
+     real seal site (main, at fsinit's return), verified against
+     ProofMain/ProofFsinit — stated INSIDE FsReady.v's own section
+     (see the live finding below).
+  3. **Adoption**: every runtime fs Spec's persistent-ambient rows
+     collapse to one `fs_ready` premise (audit at the executor's step:
+     the syscall layer is bundle-fed already via `sysc_fs_env`; the
+     fs-internal Specs — SpecIput's ~7 ambient rows, SpecIget's 4,
+     SpecIlock's, SpecDirlookup's… — take `fs_ready` + their
+     consumables).  fsinit/ireclaim KEEP constituent forms (they run
+     pre-seal, and MUST NOT take fs_ready — that is the design's
+     boot-freedom, enforced by the type).
+  4. Pure ties (`dev = icfg_dev` etc.) ride as today (`sysc_fs_env`'s
+     pattern).
+
+### 5.3 The forkret delta (the acceptance criterion)
+
+`LinkForkretNF.v`'s own header states the current situation: the
+not-forked arm calls fsinit and kexec, and forkret holds the fs
+environment "only INSIDE the residue closer … If the arm's proof needs
+those resources up front, this contract grows a premise."  I.e. today,
+proving the axiom means growing it by the CONSTITUENT pile (15+ rows,
+with the boot/regime story unresolved at that altitude).
+
+Under SIMP-2 the delta is one row: `fs_ready … -∗` (persistent) —
+definitionally the ∗ of every fs constituent a runtime continuation
+wants (the projection family is an iDestruct one-liner INSIDE
+FsReady.v's section; see the live finding).  The fs-side obligation of
+forkret's first branch becomes: *the boot chain sealed (fs_ready
+exists), forkret carries it.*  The remaining content of the IOU is
+then scheduler/trapframe work with NO fs entanglement — which is
+exactly what makes it plausibly provable at last.
+
+A LIVE FINDING from the probe, load-bearing for the executor:
+`fs_world` today is elaborated over auto-generalized instance binders
+(`icfg` among them — the class-used-as-INDEX trap, durable-notes), so
+its unfolded conjuncts do NOT syntactically match re-typed copies in a
+foreign section: the icache/region-family conjuncts were unframeable
+from the probe's section until the shadowing `ICFG` binder was dropped,
+and `is_itable2`/`itable_inv`/`ic_escrows`/`ireg_inv`/`ireg_open`
+remained baked-instance-mismatched even then.  This fragility is itself
+an argument FOR the rehoming: `FsReady.v` states `fs_ready` over an
+EXPLICIT `Context`, and every projection/pack lemma lives inside that
+section.  Executor step 1 carries a tripwire for it.
+
+### 5.4 The SIMP-2 executable brief (dependency order)
+
+  1. `FsReady.v` (rehomed `fs_world` = `fs_ready` + the establishment
+     lemma from the probe + the projection lemma family).  Wire the
+     SEAL into the boot chain (main, at fsinit's return); `fs_world` /
+     `sysc_fs_env` become derived forms.  TRIPWIRE: a constituent
+     missing at the seal site (report what ProofMain actually lacks).
+  2. The package defs (`inode_refb/refp/claimed`, from the probe) in
+     `IcacheRef.v` beside `inode_held`; restate `inode_held` over
+     `inode_refp`.
+  3. `SpecIget` post → `inode_refb (is_claim l)`; ProofIget packs
+     (probe's intro); callers re-thread (they currently destruct two
+     rows — now one).
+  4. `SpecIput`/`SpecIunlockput` pre → `inode_refp` (rename by
+     `inode_refp_spend`); callers re-thread.
+  5. `SpecIalloc` receipt → `inode_claimed ty`; `ProofCreate`'s fill
+     presents it via `inode_claimed_to_ClaimK`.
+  6. `SpecIdup` → `inode_held` in / `inode_held ∗ inode_held` out;
+     ProofIdup re-proves over the carve; kfork cone re-threads (its
+     sites get SHORTER — they stop unpacking).
+  7. fs_ready adoption sweep over the fs-internal Specs (the ~7-row
+     collapses), then the syscall layer's `sysc_fs_env` restatement.
+  8. GATE: whole tree green to fixpoint; three tops at the standing
+     six; the contract-shrink table (this section's projections,
+     measured); `fs-ghost-state.md` updated in the same series (the
+     standing rule); lemma_diff justified.
+  TRIPWIRES: any Spec GAINING a row; the seal site missing a
+  constituent; SpecIdup's carve not closing at a caller; red growth.
+
+### 5.5 Probe results (ZZSimp2.v, lane, untracked)
+
+| lemma | status |
+|---|---|
+| `inode_refb_intro` (SAT, iget's rows) | Qed |
+| `inode_refp_spend` (⊣⊢, iput's rows) | Qed |
+| `inode_claimed_intro` (SAT, ialloc's rows) | Qed |
+| `inode_claimed_to_ClaimK` (create's fill supply) | Qed |
+| `fs_ready_seal` (`ireg_boot ==∗ ireg_open`) | Qed, closed |
+| `fs_ready_establish` (pack-wand ∗ ireg_boot ==∗ fs_world) | Qed, at the standing platform axioms |
+
+All zero-admit; five of six closed under the global context (the
+establishment's statement mentions `fs_world`, whose constants carry
+the standing platform base — the same closure every top theorem has).
+The projection lemma was NOT probeable in a foreign section (the live
+finding above) and moved to executor step 1.
