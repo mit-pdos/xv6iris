@@ -355,25 +355,39 @@ Note the comment already in `SmodeCorePt.v` at the KPT pinning ("The Bare
 branch spells `_D s_Drwb s_frame_ok_Drwb` out") — that instruction is what
 diverges; the concrete instance is what is actually needed.
 
+**THE FOLDED ENGINE CANNOT BE A THIN WRAPPER — write it fresh.**  The plan
+was to build it as two wrappers, one over `wp_instr_s_config_regime` and one
+over `_b`.  That does not work, and the reason is in the old engine's own
+signature: it takes the LANDING `satp1 pcfg1 paddr1` as PARAMETERS, and
+`wp_instr_s_config_sr` pins them to the entry values (it passes `satp0 pcfg
+paddr` twice, `SmodeCorePt.v:3963-3965`).  That is fine when the leaf is
+handed the CELLS — it visibly gives back the same ones.  With the slot FOLDED
+the engine cannot see that the leaf preserved them: all it gets back is
+`sr_inv R`, and `sr_slot_reopen` returns whatever values are now in there.
+
+So the landing satp/PMP have to become EXISTENTIAL, bound in `spt_cycle`'s `Q`
+alongside `npc`/`ms1`/`mdv1`/the clock cells — which is strictly more general
+than today (a leaf that moves satp becomes expressible) but means the folded
+engine is a fresh ~250-line proof over `spt_cycle` / `spt_cycle_b`, not a
+wrapper.  Both cell-handout engines stay as they are; nothing above them
+moves.
+
 **WHERE THE BARE ENGINE STANDS (2026-08-19, end of session).**
 `SmodeCorePt.spt_run_hart_active_instr_S_b` is LANDED and green — the
 concrete-statement cure works, and its arities came from reading the section
 source (see the commit; `About` / `Print Implicit` are both useless on these).
-But `wp_instr_s_config_regime_b`, the Bare cell-handout engine built on it,
-**still does not terminate** — killed at 500 s with the run engine already
-concrete and a `Timeout 120` sitting on the `spt_dispatch_none_D s_Drwb`
-application, which did not fire.  So there is a SECOND divergence site in that
-proof and it is not the dispatch.
+`wp_instr_s_config_regime_b` is LANDED and green too (slowest sentence 0.7 s).
 
-**Do not bisect that by hand with `Timeout` — use the streaming profiler**,
-which is the tree's own recipe for exactly this (durable-notes: "A COMPILE
-THAT NEVER FINISHES IS LOCALISED BY `coqc -time`, WHICH STREAMS — the LAST
-LINE IN THE LOG IS THE STALLING SENTENCE").  Redirect to a file, `tail` it,
-and map `Chars A - B` to a line with `head -c B <f>.v | wc -l`.  The
-candidates it will land on are the remaining `_b` applications in that proof:
-`spt_cycle_b`, `spt_frames_intro_b` / `_open_b` / `_close_b` / `_elim_b`, and
-the two `s_rw_ext_D s_Drwb` uses.  Whichever it is, the cure is already known
-— give that one a concrete stored statement too.
+**Its second stall was NOT a §3 case, and the profiler is what found it.**
+Two `Timeout` guesses cost two 8-minute hangs; one `coqc -time` run named the
+sentence outright — `spt_frames_elim_b`, applied at `tv`.  `s_tick_agree_b`
+lands the tower at `register_lookup tlb rs3` (it cannot name the value the
+cycle started with, since `s_Drwb ∪ s_Dro` has no tlb in it), so naming `tv`
+there makes the unifier compare two OPAQUE 22-deep register towers — the 3^N
+bomb, not a write-set divergence.  Applying it at the landing file's own slot
+is the entire fix.  **Profile, don't guess**: `coqc -time` streams, the last
+line is the stalling sentence, and `head -c B <f>.v | wc -l` maps it to a
+line.
 
 **STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
 absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
