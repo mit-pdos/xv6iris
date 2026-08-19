@@ -507,9 +507,15 @@ Qed.
 (* are already in RiscvExtras.)                                            *)
 (* The W-byte fetch access at a RAM address matches TOR entry 0: both ends in
    RAM, hence in [0, pmpaddr0*4) given the coverage fact. *)
+(* THE WIDTH BOUND IS 16, NOT 8.  Nothing in the range match needs a bound at
+   all ([SmodePte.ram_pmp_match_w] takes none); the only use is the non-wrap
+   side condition of [uint_pa_add] on the last byte, which any bound far below
+   2^64 discharges.  It is 16 because that is the widest access the decoder can
+   produce -- AMOCAS.Q ([word_width_wide]) -- and pinning it at 8 is what would
+   otherwise force a twin lemma for the 128-bit atomic. *)
 Lemma ram_fetch_pmp (a pmpaddr0 : mword 64) (w : Z) (k : nat) :
   0 < w ->
-  (w <= 8)%Z ->
+  (w <= 16)%Z ->
   uint (to_bits 64 w) = w ->
   (Z.of_nat k + 1 = w)%Z ->
   addr_is_ram a ->

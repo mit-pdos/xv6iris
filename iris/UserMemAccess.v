@@ -503,9 +503,16 @@ Qed.
 (*     rl); res = true throughout.                                         *)
 (* ===================================================================== *)
 
+(* THE POST-WRITE STATE IS A PARAMETER, NOT A [write_bytes] LITERAL.  The
+   width-generic conditional RAM leaf ([UserMemCert.exec_write_ram_cond_gen])
+   cannot NAME the bytes it wrote -- its post map is [write_bytes .. v] at an
+   EXISTENTIAL [v] -- so a composer built on it can never produce the literal
+   form.  Taking [sw] opaquely is the same discipline the plain-store arm's
+   [exec_vmem_write_addr_intra] already follows, and it is what lets
+   [UserMemCert.u_sc_pure] feed this lemma directly. *)
 Lemma exec_vmem_write_addr_sc (width : Z) (va pa : mword 64) (dat : mword (8*width))
     (aq rl maq mrl : bool) (ep ep' : Privilege) (md : SATPMode) (plan : Phys_Mem_Access_Info)
-    (s s' : mstate) :
+    (s s' sw : mstate) :
   let acc := StoreConditional (aq, rl, Data) in
   let wv := autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0)
             : mword (8 * width) in
@@ -519,7 +526,7 @@ Lemma exec_vmem_write_addr_sc (width : Z) (va pa : mword 64) (dat : mword (8*wid
   (* success (match_reservation = true): ea + write with the SC flags *)
   exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA maq mrl true) s' = Some (Ok tt, s') ->
   exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA maq mrl true) s'
-    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)) ->
+    = Some (Ok true, sw) ->
   (* fail (match_reservation = false): the access is still CHECKED -- and the
      check now answers with a splitting plan, not with [None] -- and no write
      happens *)
@@ -530,12 +537,10 @@ Lemma exec_vmem_write_addr_sc (width : Z) (va pa : mword 64) (dat : mword (8*wid
   exec (vmem_write_addr (Virtaddr va) width dat acc maq mrl true) s
     = Some (Ok (match_reservation (bits_of_physaddr (Physaddr pa))),
             if match_reservation (bits_of_physaddr (Physaddr pa))
-            then MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)
-            else s').
+            then sw else s').
 Proof.
   intros acc wv Hw Halign Heff Htm Htr Hea Hwv Heff' Hpac.
   assert (Hpos : 0 < width) by (apply vmem_width_pos; exact Hw).
-  set (sw := MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)).
   unfold vmem_write_addr.
   rewrite exec_catch_early_return.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
@@ -592,7 +597,7 @@ Qed.
 Lemma goodmb_vmem_write_addr_sc (Dr Dw : register -> bool) (width : Z)
     (va pa : mword 64) (dat : mword (8*width)) (aq rl maq mrl : bool)
     (ep ep' : Privilege) (md : SATPMode) (plan : Phys_Mem_Access_Info)
-    (s s' : mstate) mm :
+    (s s' sw : mstate) mm :
   let acc := StoreConditional (aq, rl, Data) in
   let wv := autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0)
             : mword (8 * width) in
@@ -611,7 +616,7 @@ Lemma goodmb_vmem_write_addr_sc (Dr Dw : register -> bool) (width : Z)
   exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA maq mrl true) s' = Some (Ok tt, s') ->
   goodmb Dr Dw (mem_write_ea (Physaddr pa) width acc PBMT_PMA maq mrl true) s' mm = true ->
   exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA maq mrl true) s'
-    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)) ->
+    = Some (Ok true, sw) ->
   goodmb Dr Dw (mem_write_value (Physaddr pa) width wv acc PBMT_PMA maq mrl true) s' mm = true ->
   exec (effectivePrivilege acc (register_lookup mstatus s'.(sregs))
           (register_lookup cur_privilege s'.(sregs))) s' = Some (ep', s') ->
@@ -633,7 +638,6 @@ Proof.
     by (rewrite goodmb_read_reg; exact HDm).
   assert (Hcpg' : goodmb Dr Dw (Defs.read_reg cur_privilege : M _) s' mm = true)
     by (rewrite goodmb_read_reg; exact HDcp).
-  set (sw := MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)).
   unfold vmem_write_addr. apply goodmb_cer.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
   erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
@@ -1943,6 +1947,7 @@ Proof.
   intros acc wv Hw Halign Heff Htm Htr Hmprv Hcp Hpc Hea Hwv Heff' Hpac Hoff.
   destruct resv; cbn match in Hwv, Hpac.
   - left. exact (exec_vmem_write_addr_sc width va pa dat aq rl maq mrl ep ep' md plan s s'
+                   (MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev))
                    Hw Halign Heff Htm Htr Hea Hwv Heff' Hpac).
   - right. exact (exec_vmem_write_addr_sc_fault width va pa pa pc dat aq rl maq mrl ep ep' md s s'
                     Hw Halign Heff Htm Htr Hcp Hpc Hea Hwv Heff' Hpac Hoff).
@@ -1993,7 +1998,9 @@ Proof.
          Hea Heag Hwv Hwvg Heff' Heff'g Hpac Hpacg Hoff.
   destruct resv; cbn match in Hwv, Hpac.
   - exact (goodmb_vmem_write_addr_sc Dr Dw width va pa dat aq rl maq mrl ep ep' md
-             plan s s' mm HDm HDcp Hw Halign Heff Heffg Htm Htmg Htr Htrg
+             plan s s'
+             (MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev))
+             mm HDm HDcp Hw Halign Heff Heffg Htm Htmg Htr Htrg
              Hea Heag Hwv Hwvg Heff' Heff'g Hpac Hpacg).
   - exact (goodmb_vmem_write_addr_sc_fault Dr Dw width va pa pa pc dat aq rl maq mrl
              ep ep' md s s' mm HDm HDcp HDpc Hw Halign Heff Heffg Htm Htmg Htr Htrg

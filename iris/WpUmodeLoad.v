@@ -517,7 +517,7 @@ Section UmodeLoadMem.
                 (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sig2.(sregs)) 0)) 4)
                 (uint pa) (uint (to_bits 64 k)) = PMP_Match).
       { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-        exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+        exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                  ltac:(clear -Hk; lia) Hram0 Hramk Hcovp). }
       exact (exec_mem_read_data_U k Hk Hread_plain PBMT_PMA pa region dv sig2
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))

@@ -1422,7 +1422,7 @@ Section MisPhys.
     assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
               (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
               (uint (add_vec_int pa (Z.of_nat k * bytes))) (uint (to_bits 64 bytes)) = PMP_Match)
-      by exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hb Hb8 Hbu
+      by exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hb ltac:(lia) Hbu
                   ltac:(lia) Hr0 HrL Hcovp).
     destruct Hacc as [ [ Ha HRp ] | [ Ha HWp ] ]; subst acc.
     - exact (exec_pmpCheck_user_grant_load _ bytes s HA Hord Hrange HRp).
@@ -1480,7 +1480,7 @@ Section MisPhys.
     assert (HrL : addr_is_ram (pa_add (add_vec_int pa (Z.of_nat k * bytes))
                                  (Z.to_nat bytes - 1)))
       by exact (chunk_ram bytes N k (Z.to_nat bytes - 1)%nat Hb Hw Hk Hlast).
-    exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hb Hb8 Hbu
+    exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hb ltac:(lia) Hbu
              ltac:(lia) Hr0 HrL Hcovp).
   Qed.
 
@@ -1917,7 +1917,7 @@ Section MisPhys.
         assert (Hr0k : addr_is_ram (add_vec_int pa (Z.of_nat k * bytes))).
         { rewrite <- (pa_add_0 (add_vec_int pa (Z.of_nat k * bytes))).
           exact (chunk_ram bytes N k 0%nat Hbpos Hwidth Hk ltac:(lia)). }
-        exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hbpos Hb8 Hbuint
+        exact (ram_fetch_pmp _ _ bytes (Z.to_nat bytes - 1)%nat Hbpos ltac:(lia) Hbuint
                  ltac:(lia) Hr0k
                  (chunk_ram bytes N k (Z.to_nat bytes - 1)%nat Hbpos Hwidth Hk ltac:(lia))
                  Hcovp).

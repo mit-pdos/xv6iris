@@ -1984,3 +1984,155 @@ same gap, and it is a real one:
   `(aq && rl, rl)`.
 
 Neither is a day's work, but neither is a copy of the LR arm either.
+
+## 17. P4b IS 19 / 19 — SC and AMO, the last two memory arms
+
+### THE SC GAP IS AT `vmem_write_addr`, NOT AT `mem_write_value`
+
+§16 read the missing outcome as "an SC whose reservation does not match
+returns `Ok false`" from `mem_write_value`.  It does not.  The physical
+write is unconditional in this interpreter — `exec_write_ram_cond_gen`
+closes by `reflexivity` at `Some (true, …)` for every conditional write
+kind, because `RiscvFetchExec.exec_MemWrite` answers `inl None` and the
+Sail wrapper reads `None` as success — so `u_sc_pure`'s `Ok true` was
+right all along.
+
+**The branch is one level up.**  `vmem_write_addr` at `StoreConditional`
+tests `match_reservation paddr` AFTER the walk, and the two arms call
+DIFFERENT things:
+
+| `match_reservation` | what the model calls | post map |
+|---|---|---|
+| true | `mem_write_ea` then `mem_write_value` | the write lands |
+| false | `phys_access_check` alone | unchanged |
+
+So the SC composer needed a FOURTH pair, not a restated third:
+`u_sc_pure` now also concludes
+`phys_access_check (StoreConditional …) PBMT_PMA User pa k true = Ok
+pma_ok_aligned` and its `goodmb` twin.  It costs one composition —
+`phys_access_check` is the same `pmpCheck`/`pmaCheck` the write path
+already proved, in the other order (pmp first, pma only on its `None`) —
+and it is what makes ONE lemma cover both reservation outcomes, so no
+second composer and no corollary were needed (`u_sc_pure` had no other
+call site).
+
+**The rule this instantiates:** when a certificate cannot see a value,
+look for the branch that consumes it, not for a weaker conclusion.  The
+arm's outcome bool stays existential (`exists b, … = Some (Ok b, …)`),
+exactly as `UserMemArmsBase.u_vmem_write_pure`'s already was.
+
+### A COMPOSER BUILT ON A WIDTH-GENERIC LEAF CAN NEVER MEET A `write_bytes` LITERAL
+
+`UserMemAccess.exec_vmem_write_addr_sc` / `goodmb_…` spelled their
+post-write state as `MState s'.(sregs) (write_bytes s'.(mem) pa …  wv)
+s'.(mdev)`.  That is unreachable from `u_sc_pure`, whose post map is
+`write_bytes mm' pa … vv` at an EXISTENTIAL `vv` — a width-generic
+`write_ram` cannot name the bytes it wrote.  Both now take the post-write
+state as a PARAMETER `sw`, which is the discipline
+`exec_vmem_write_addr_intra` (the plain-store arm's) already followed.
+Strictly more general; the one call site (`…_sc_disj`) passes the literal.
+**State a vmem-level lemma on an opaque post STATE, never on the
+`write_bytes` term that produced it** — the same rule as §16's "state an
+access-level lemma on a `regstate`, never on the geometry".
+
+### `arm_STORECON_u` — what it is made of
+
+`UserMemArmsA.v`.  The LR arm's three-arm tree (misaligned → access fault
+before any walk; aligned+mapped → one page by construction, one walk;
+aligned+unmapped/denied → translate fault) with the write substituted:
+
+* `u_vmem_write_sc_pure` is the tree, at `vmem_write_addr`.  Both
+  reservation branches land in the SAME retiring disjunct — `destruct`
+  the `match_reservation` and hand out `mm2` / `mm'` with the matching
+  `u_mem_step`.  **`destruct <term> eqn:H` substitutes the scrutinee in
+  the HYPOTHESES too**, so a following `rewrite H in Hvwa` fails with
+  *"The LHS of H … does not match any subterm of the goal"*, naming the
+  hypothesis as "the goal"; `cbn match in Hvwa` is the whole step.
+* the fault arm is `exec/goodmb_vmem_write_addr_intra_terr` — both are
+  access-type generic, so the STORE arm's lemmas serve unchanged with
+  `or_introl Hal` for the alignment guard.
+* `exec/goodmb_execute_STORECON_u_retire` (§0b) is the `gpr_write_state`
+  shape fix, as LR's.  The extra step over LOADRES is the
+  `cancel_reservation` between the `wX` and the `returnM`; it is a TERM
+  axiom, so it moves neither state nor certificate.
+* the flag pair is NOT the access type's: `execute_STORECON` calls
+  `vmem_write` at `(aq && rl, rl)`, and `UserMemCert.wr_flags_ok_amo`
+  is exactly `wr_flags_ok (aq && rl) rl`.
+
+### AMO — P4b IS 19 / 19
+
+`arm_AMO_u`, `UserMemArmsA.v`.  Five things it needed, in the order they
+unblock each other; all five leave a forward-looking rule.
+
+**1. `ram_fetch_pmp`'s WIDTH BOUND IS 16, and a premise weakening is not
+free at the call sites.**  `SmodeCore.ram_fetch_pmp` pinned `w <= 8`,
+which is the only thing that capped `u_amo_pure` at `k <= 8`.  Nothing in
+the range match needs a bound (`SmodePte.ram_pmp_match_w` takes none);
+the sole use is `uint_pa_add`'s non-wrap side condition on the access's
+last byte, which any bound far below 2^64 discharges.  16 is
+`word_width_wide`'s top.  **`w <= 8` is not syntactically `w <= 16` and
+Coq does not coerce**, so the twelve call sites passing a NAMED
+`Hk8`/`Hb8` became `ltac:(lia)`; the sites already passing `ltac:(lia)`
+at a literal width were untouched.  It is a bottom-of-tree file: pay the
+600-700 file cone once, before building anything on top.
+
+**2. A COMPOSER WHOSE LATER CALL TAKES AN EARLIER CALL'S RESULT MUST
+OFFER IT UNDER THE EXISTENTIALS.**  `u_amo_pure` took the written value
+`v` as a PARAMETER while producing `dv` (the loaded value) and `rs'` (the
+landed file) existentially — and an AMO's written value is a function of
+BOTH.  So no call site could ever instantiate it: the lemma was
+unusable, and nothing in the build said so.  The write conjunct is now
+
+    (forall v, exists mm2, exec (mem_write_value ... v ...) ... = Some (Ok true, ...)
+                        /\ goodmb ... /\ u_mem_step P t t' mm mm2)
+
+INSIDE the block, with `mm2` moved in beside it.  **The rule: a later
+call whose argument is computed from an earlier call's RESULT goes under
+a `forall` inside the existential, never beside it.**  This is the
+same family as the vacuous-premise trap in `durable-notes.md` — a lemma
+that compiles, is axiom-clean, and no caller can use.  Corollary at the
+use site: `destruct (Hwrite _)` will NOT leave the value as an evar
+(*"Cannot infer this placeholder"*), so the arm names the model's per-op
+result explicitly — ten lines, transcribed.
+
+**3. The width-16 layer needed CERTIFICATES, not just reductions.**
+`UserMemClassifyAmo` had `exec_execute_AMO_u_store_16` / `_cas_ne_16` and
+nothing else; `goodmb` is not determined by `exec`.  Both twins are there
+now, plus `goodmb_rX_pair_bits_gpr` / `goodmb_wX_pair_bits_gpr`.  They
+are transcriptions of `UserMemArms`' width-<=8 twins with the two width
+branches taken the other way (`16 <=? 2*xlen_bytes` true, `16 <=?
+xlen_bytes` FALSE — which is what routes rs2/rd through the PAIR reads).
+`_read_err_16` was NOT needed and stays exec-only: under `u_amo_pure` the
+read cannot fault, because `RiscvFetchExec.pma_class_grants PmaRam`
+grants every op at every `n <= 16`.  That same fact is why width 16
+cannot be dismissed as a fault arm.
+**`goodmb_rX_bits_gpr` lives in `UserExecFacts`, which `UserMemArms` only
+LOADS** — `Require Import` is not transitive for the Import half — so the
+file needed its own `Require Import UserExecFacts`.
+
+**4. THE TWO-GPR LANDING IS A SIBLING, NOT A GENERALIZATION.**  AMOCAS.Q
+lands on `wpair_state` (rd AND rd+1).  `u_fix_wpair_state` /
+`u_tlb_wpair` / `u_mem_wpair` sit BESIDE `u_fix_gpr_state` / `u_tlb_gpr` /
+`u_mem_gpr` rather than subsuming them: `wpair_state` carries an outer
+`generic_neq (Regidx rd) zreg` guard that `gpr_write_state` has no
+counterpart for, so the one-write form is not an instance of the pair
+form and no landed arm changed.  The footprint side conditions needed
+nothing new — `Du_gpr_of_Z` / `_r` are already index-generic, so they
+apply at `add_vec_int rd 1` unchanged.  `UserMemArms.wgpr_state` IS
+`gpr_write_state` (`reflexivity`); the two names differ only in where the
+`regval_into_reg` coercion is spelled.
+
+**5. AMO IS THE ONE ARM WITH NO `vmem_*` LEVEL.**  `execute_AMO` inlines
+the whole read-modify-write, so `UserMemArms`' five execute pairs
+(`_store`, `_cas_ne`, `_read_err`, `_translate_err`, `_misaligned`) take
+the composer's facts DIRECTLY and the case tree runs at `execute`.  It is
+still LR's three-arm tree, crossed with two splits inside the mapped arm:
+the AMOCAS guard `op = AMOCAS && loaded <> rd` (a boolean PREMISE, not a
+case on the op) and the width (16 takes the pair operands).
+`_translate_err` and `_misaligned` are width-GENERIC and cover 16 for
+free — both early-return before the model reaches its `width <=?
+xlen_bytes` branch.  The mem-level aq/rl are not the access type's: the
+leaf reads at `(aq, aq && rl)` (`mem_flags_ok_amo`) and writes at
+`(aq && rl, rl)` (`wr_flags_ok_amo`).
+
+All nineteen arms carry their `arm_X_u_contract` typing check.

@@ -579,7 +579,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Halign : is_aligned_paddr (Physaddr pa) k = true)
     by exact (pa_aligned_div _ va k Hk Hkdvd Hal).
@@ -1902,7 +1902,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Hpmpe : exec (pmpCheck (Physaddr pa) k (LoadReserved (aq, rl, Data)) User) s'
                   = Some (None, s'))
@@ -2317,15 +2317,27 @@ Qed.
 (* ===================================================================== *)
 (* 13. [u_sc_pure] -- THE PURE U-MODE STORE-CONDITIONAL.                  *)
 (*                                                                       *)
-(* The mirror of [u_lr_pure].  Three model calls, as for a plain store:    *)
-(* the walk, the effective-address announcement and the value write, all   *)
-(* at [StoreConditional (aq, rl, Data)] and with [con = true] -- which is  *)
-(* what routes [pmaCheck] into its reservability arm and                   *)
-(* [write_kind_of_flags] into a CONDITIONAL kind.  The physical write      *)
-(* always lands (the reservation test is at the instruction level, not     *)
-(* here), so like the plain store it has one total outcome; the value is   *)
-(* existential because a width-generic [write_ram] cannot name the bytes   *)
-(* it wrote ([MemAccessGen.exec_write_ram_plain_gen]'s shape).             *)
+(* The mirror of [u_lr_pure], at [StoreConditional (aq, rl, Data)] and    *)
+(* with [con = true] -- which is what routes [pmaCheck] into its          *)
+(* reservability arm and [write_kind_of_flags] into a CONDITIONAL kind.   *)
+(*                                                                       *)
+(* IT COVERS BOTH RESERVATION OUTCOMES, AND THAT IS WHY IT ISSUES FOUR    *)
+(* CALLS, NOT THREE.  The conditional test is not inside the physical     *)
+(* write: [vmem_write_addr] itself branches on [match_reservation paddr]  *)
+(* AFTER the walk, and the two arms call DIFFERENT things --              *)
+(*   held -> [mem_write_ea] then [mem_write_value] (the write lands);     *)
+(*   lost -> [phys_access_check] alone (nothing is written).              *)
+(* The reservation is machine state no user-tier arm owns, so an arm      *)
+(* cannot force the branch and needs the certificate for BOTH.  Hence the *)
+(* fourth pair below.  It costs nothing: [phys_access_check] is the same  *)
+(* [pmpCheck] and [pmaCheck] the write path already needed, composed in   *)
+(* the other order.                                                       *)
+(*                                                                       *)
+(* The written value is existential because a width-generic [write_ram]   *)
+(* cannot name the bytes it wrote                                         *)
+(* ([MemAccessGen.exec_write_ram_plain_gen]'s shape); that is why         *)
+(* [UserMemAccess.exec_vmem_write_addr_sc] takes its post-write state as  *)
+(* a PARAMETER rather than as a [write_bytes] literal.                    *)
 (* ===================================================================== *)
 
 Lemma u_sc_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
@@ -2360,6 +2372,12 @@ Lemma u_sc_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w va)) k v
             (StoreConditional (aq, rl, Data)) PBMT_PMA maq mrl true)
       (u_state rs' mm') mm' = true /\
+    (* the LOST-reservation arm's own call: no write, only the re-check *)
+    exec (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA User
+            (Physaddr (u_walk_pa w va)) k true) (u_state rs' mm')
+      = Some (Ok pma_ok_aligned, u_state rs' mm') /\
+    goodmb Du_r Du_w (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA
+            User (Physaddr (u_walk_pa w va)) k true) (u_state rs' mm') mm' = true /\
     (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
     u_mem_step P t t' mm mm' /\
@@ -2421,7 +2439,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Hpmpe : exec (pmpCheck (Physaddr pa) k (StoreConditional (aq, rl, Data)) User) s'
                   = Some (None, s'))
@@ -2431,6 +2449,18 @@ Proof.
     by exact (goodmb_pmpCheck_user_grant_sc Du_r Du_w aq rl pa k s' mm'
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 HA Hord Hrange HW).
+  (* [phys_access_check] is the SAME two checks in the OTHER order -- pmp
+     first, and only on its [None] the pma plan -- so the lost-reservation
+     arm's certificate costs one composition of facts the write path already
+     needed. *)
+  assert (Hpace : exec (phys_access_check (StoreConditional (aq, rl, Data))
+                          PBMT_PMA User (Physaddr pa) k true) s'
+                  = Some (Ok pma_ok_aligned, s')).
+  { unfold phys_access_check.
+    rewrite (exec_bind_Some _ _ _ _ _ Hpmpe). cbn match. exact Hpmae. }
+  assert (Hpacg : goodmb Du_r Du_w (phys_access_check (StoreConditional (aq, rl, Data))
+                    PBMT_PMA User (Physaddr pa) k true) s' mm' = true).
+  { unfold phys_access_check. gmm_peel Hpmpg Hpmpe. cbn match. exact Hpmag. }
   assert (Hclint : exec (within_clint (Physaddr pa) k) s' = Some (false, s'))
     by exact (within_clint_false pa k s' (addr_is_ram_not_in_clint _ Hram0) Hk).
   assert (Hsig : exec (within_sig (Physaddr pa) k) s' = Some (false, s'))
@@ -2492,6 +2522,7 @@ Proof.
                   (StoreConditional (aq, rl, Data)) (register_lookup mstatus rs')
                   (register_lookup cur_privilege rs') s' mm' Lmprv)
                Heffe Hchkg Hchke)
+    | exact Hpace | exact Hpacg
     | exact Hfile | exact Htlbok' | exact Hstep
     | exact (u_mem_step_write_in P t t' mm mm' pa (Z.to_N k) vv
                (fun j Hj => proj2 (proj2 (Hwin j ltac:(lia)))) Hstep)
@@ -2689,13 +2720,24 @@ Qed.
 (* and writes at [(aq && rl, rl)] (UserMemClassifyAmo), and both of those  *)
 (* satisfy the shells' side conditions unconditionally.                    *)
 (*                                                                       *)
-(* Width up to 8.  The 128-bit AMOCAS.Q path has its own layer            *)
-(* ([UserMemClassifyAmo]'s width-16 section) and is not covered here.      *)
+(* WIDTH UP TO 16, WHICH IS EVERY WIDTH [word_width_wide] ADMITS -- the    *)
+(* 128-bit AMOCAS.Q included.  Nothing below the execute level cares about *)
+(* the pair-register geometry: the physical chain is width-generic and the *)
+(* RAM class grants every op at every n <= 16                              *)
+(* ([RiscvFetchExec.pma_class_grants]).  The bound used to be 8 only       *)
+(* because [SmodeCore.ram_fetch_pmp]'s was.                                *)
 (* ===================================================================== *)
 
+(* THE WRITE IS OFFERED AT AN ARBITRARY VALUE, UNDER THE EXISTENTIALS.  An  *)
+(* AMO's written value is computed from the value it LOADED (and, for the   *)
+(* rs2 operand, from the file the walk landed on), both of which this lemma *)
+(* only produces -- so a [v] taken as a PARAMETER, beside [dv] and [rs'] in *)
+(* the existential, could never be instantiated at the call site.  Hence    *)
+(* the write conjunct is a [forall v, exists mm2, …] INSIDE the block, and  *)
+(* [mm2] with it: the arm picks the value after it knows what it loaded.    *)
 Lemma u_amo_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
-    (k : Z) (w va : mword 64) (v : mword (8 * k)) (op : amoop) (aq rl : bool) :
-  0 < k -> k <= 8 -> (k | 4096) -> uint (to_bits 64 k) = k ->
+    (k : Z) (w va : mword 64) (op : amoop) (aq rl : bool) :
+  0 < k -> k <= 16 -> (k | 4096) -> uint (to_bits 64 k) = k ->
   is_aligned_vaddr (Virtaddr va) k = true ->
   ud_um P !! svpn_of va = Some w ->
   uleaf_ok (Atomic (op, aq, rl, Data, Data)) w ->
@@ -2705,7 +2747,7 @@ Lemma u_amo_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
   u_data_cfg rs ->
   u_exec_pins P t rs ->
   u_mem_wf P t mm ->
-  exists (dv : mword (8 * k)) (rs' : regstate) (mm' mm2 : pamap) (t' : ptree),
+  exists (dv : mword (8 * k)) (rs' : regstate) (mm' : pamap) (t' : ptree),
     exec (translateAddr (Virtaddr va) (Atomic (op, aq, rl, Data, Data)))
       (u_state rs mm)
       = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
@@ -2724,16 +2766,17 @@ Lemma u_amo_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     goodmb Du_r Du_w (mem_read (Atomic (op, aq, rl, Data, Data)) PBMT_PMA
             (Physaddr (u_walk_pa w va)) k aq (andb aq rl) true)
       (u_state rs' mm') mm' = true /\
-    exec (mem_write_value (Physaddr (u_walk_pa w va)) k v
-            (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
-      (u_state rs' mm') = Some (Ok true, u_state rs' mm2) /\
-    goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w va)) k v
-            (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
-      (u_state rs' mm') mm' = true /\
+    (forall v : mword (8 * k), exists mm2 : pamap,
+        exec (mem_write_value (Physaddr (u_walk_pa w va)) k v
+                (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
+          (u_state rs' mm') = Some (Ok true, u_state rs' mm2) /\
+        goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w va)) k v
+                (Atomic (op, aq, rl, Data, Data)) PBMT_PMA (andb aq rl) rl true)
+          (u_state rs' mm') mm' = true /\
+        u_mem_step P t t' mm mm2) /\
     (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
     u_mem_step P t t' mm mm' /\
-    u_mem_step P t t' mm mm2 /\
     u_data_cfg rs' /\ u_exec_pins P t' rs'.
 Proof.
   intros Hk Hk8 Hkdvd Huintk Hal Hl Hleaf Hcanon Hcfg Hpins Hwf.
@@ -2763,7 +2806,7 @@ Proof.
     by exact (proj1 (proj2 (Hwin (Z.to_nat k - 1)%nat ltac:(lia)))).
   destruct (pma_all_ram Hall pa k
               (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
-                 Hram0 Hramk (pma_width_le k 8 Hk Hk8 eq_refl)))
+                 Hram0 Hramk (pma_width_le k 16 Hk Hk8 eq_refl)))
     as (region & Hpmam & _ & Hrd & Hwrb & Hatom & _ & _ & _ & _).
   assert (Halign : is_aligned_paddr (Physaddr pa) k = true)
     by exact (pa_aligned_div _ va k Hk Hkdvd Hal).
@@ -2793,7 +2836,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Hpmpe : exec (pmpCheck (Physaddr pa) k ac User) s' = Some (None, s'))
     by exact (exec_pmpCheck_user_grant_amo op aq rl pa k s' HA Hord Hrange HR HW).
@@ -2845,25 +2888,12 @@ Proof.
                 (goodmb_read_kind_of_flags_resv Du_r Du_w aq (andb aq rl) s' mm'
                    (mem_flags_ok_amo aq rl))
                 Hpmpe Hpmpg Hmmiore Hmmiorg Hdev Hown (rk_resv_ram_ok rk Hrk) Hrame).
-  (* the WRITE half *)
+  (* the WRITE half.  The write KIND is value-independent, so it is derived
+     once, here; only the leaf and the two shells above it are re-derived per
+     [v] inside the block. *)
   destruct (exec_write_kind_of_flags_cond (andb aq rl) rl s' (wr_flags_ok_amo aq rl))
     as (wk & Hwk & Hwkf).
-  destruct (exec_write_ram_cond_gen wk k pa v s' Hwk Hdev) as (nn & vv & Hwre).
-  assert (Hchkwe : exec (checked_mem_write (Physaddr pa) k v ac PBMT_PMA User tt
-                           (andb aq rl) rl true) s'
-                   = Some (Ok true,
-                           MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N k) vv)
-                             s'.(mdev)))
-    by exact (exec_checked_mem_write_u k Hk ac PBMT_PMA User pa (andb aq rl) rl true
-                wk v s' _ Hcpe Hwkf Hpmpe Hmmiowe Hwre).
-  assert (Hchkwg : goodmb Du_r Du_w (checked_mem_write (Physaddr pa) k v ac PBMT_PMA
-                     User tt (andb aq rl) rl true) s' mm' = true)
-    by exact (goodmb_checked_mem_write_u Du_r Du_w k Hk ac PBMT_PMA User pa
-                (andb aq rl) rl true wk v s' _ mm' Hcpe Hcpg Hwkf
-                (goodmb_write_kind_of_flags_cond Du_r Du_w (andb aq rl) rl s' mm'
-                   (wr_flags_ok_amo aq rl))
-                Hpmpe Hpmpg Hmmiowe Hmmiowg Hdev Hown (wk_cond_ram_ok wk Hwk) Hwre).
-  exists dv, rs', mm', (write_bytes mm' pa (Z.to_N k) vv), t'. split_and!;
+  exists dv, rs', mm', t'. split_and!;
     [ exact Htr | exact Htrg
     | exact (exec_mem_write_ea_u k Hk pa ac PBMT_PMA User (andb aq rl) rl true wk s'
                Heffe Hcpe Hwkf Hpmpe)
@@ -2885,7 +2915,27 @@ Proof.
                   (register_lookup mstatus rs') (register_lookup cur_privilege rs')
                   s' mm' Lmprv)
                Heffe Hchkrg Hchkre)
-    | exact (exec_mem_write_value_of_checked_u ac PBMT_PMA pa k v true User
+    | | exact Hfile | exact Htlbok' | exact Hstep
+    | exact Hcfg0 | exact Hpins0 ].
+  (* the write, at an arbitrary value *)
+  intros v.
+  destruct (exec_write_ram_cond_gen wk k pa v s' Hwk Hdev) as (nn & vv & Hwre).
+  assert (Hchkwe : exec (checked_mem_write (Physaddr pa) k v ac PBMT_PMA User tt
+                           (andb aq rl) rl true) s'
+                   = Some (Ok true,
+                           MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N k) vv)
+                             s'.(mdev)))
+    by exact (exec_checked_mem_write_u k Hk ac PBMT_PMA User pa (andb aq rl) rl true
+                wk v s' _ Hcpe Hwkf Hpmpe Hmmiowe Hwre).
+  assert (Hchkwg : goodmb Du_r Du_w (checked_mem_write (Physaddr pa) k v ac PBMT_PMA
+                     User tt (andb aq rl) rl true) s' mm' = true)
+    by exact (goodmb_checked_mem_write_u Du_r Du_w k Hk ac PBMT_PMA User pa
+                (andb aq rl) rl true wk v s' _ mm' Hcpe Hcpg Hwkf
+                (goodmb_write_kind_of_flags_cond Du_r Du_w (andb aq rl) rl s' mm'
+                   (wr_flags_ok_amo aq rl))
+                Hpmpe Hpmpg Hmmiowe Hmmiowg Hdev Hown (wk_cond_ram_ok wk Hwk) Hwre).
+  exists (write_bytes mm' pa (Z.to_N k) vv). split_and!;
+    [ exact (exec_mem_write_value_of_checked_u ac PBMT_PMA pa k v true User
                (andb aq rl) rl true s' _ Heffe Hchkwe)
     | exact (goodmb_mem_write_value_of_checked_u Du_r Du_w ac PBMT_PMA pa k v true
                User (andb aq rl) rl true s' _ mm'
@@ -2894,8 +2944,6 @@ Proof.
                   (register_lookup mstatus rs') (register_lookup cur_privilege rs')
                   s' mm' Lmprv)
                Heffe Hchkwg Hchkwe)
-    | exact Hfile | exact Htlbok' | exact Hstep
     | exact (u_mem_step_write_in P t t' mm mm' pa (Z.to_N k) vv
-               (fun j Hj => proj2 (proj2 (Hwin j ltac:(lia)))) Hstep)
-    | exact Hcfg0 | exact Hpins0 ].
+               (fun j Hj => proj2 (proj2 (Hwin j ltac:(lia)))) Hstep) ].
 Qed.
