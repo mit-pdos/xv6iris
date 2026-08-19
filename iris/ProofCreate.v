@@ -1517,12 +1517,12 @@ Section ProofCreateMain.
   (* the two family accessors, at create's own persistent bundles *)
   Lemma cr_slk_acc (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->
-    (SpecDirlink.ic_sleeplocks cn -∗
+    (ic_sleeplocks cn -∗
      ∃ γil γisl : gname,
        is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /SpecDirlink.ic_sleeplocks.
+    iIntros (Hk) "H". rewrite /ic_sleeplocks.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -2468,7 +2468,7 @@ Section ProofCreateMain.
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
-    SpecDirlink.ic_sleeplocks cn -∗
+    ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
     ireg_open -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -4654,7 +4654,7 @@ Section ProofCreateMain.
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
-    SpecDirlink.ic_sleeplocks cn -∗
+    ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
     (* RULING B (iclaim-ledger.md §3.2): the sealed regime, for the
        [create_fresh_ty] span's [jal ialloc].  Persistent, borrowed. *)
@@ -7439,7 +7439,7 @@ Section ProofCreateMain.
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
-    SpecDirlink.ic_sleeplocks cn -∗
+    ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
     ireg_open -∗
     procs_inv γs -∗

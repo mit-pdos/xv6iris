@@ -93,7 +93,7 @@
    -fold persistent family, with [IcacheBoot.ic_sleeplocks_acc] to project the
    one the run picks.  That name is deliberate: N5a's ledger and IcacheBoot's
    own header both say new contracts should name THAT copy rather than
-   [SpecFileclose.ic_sleeplocks] or [SpecDirlink.ic_sleeplocks], which are
+   [ic_sleeplocks] or [ic_sleeplocks], which are
    character-identical earlier copies kept only to spare their consumers a
    recompile.
 

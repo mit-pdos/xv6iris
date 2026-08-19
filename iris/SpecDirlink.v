@@ -431,25 +431,17 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
     (cov : gset Z) (logstart : Z) : Prop :=
   InodeInv.ireg_blocks_ok inodestart nib cov logstart.
 
-Section DirlinkSpec.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+(* [ic_sleeplocks] lived here, as a second, byte-identical copy of
+   [SpecFileclose]'s.  Both are retired into [IcacheEscrow.ic_sleeplocks],
+   beside [ic_tok], which is what they are built from.
 
-  (* Every entry's inode sleeplock, in the shape [IcacheBoot.icache_alloc]
-     hands it out.  iput names ONE slot's lock; dirlink cannot know which
-     entry dirlookup's iget will return, so -- exactly as iget takes
-     [ic_escrows] rather than [ic_escrow] -- it takes the family.
-     Persistent, so it costs a caller nothing. *)
-  Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
-    ([∗ list] kk ∈ seq 0 NINODE,
-       ∃ γil γisl : gname,
-         is_sleeplock_gen γil γisl (i_lock (ientry kk)) "inode"%string
-                          (ic_tok cn kk) (slh_tok (icfg_isl kk)))%I.
-
-  Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
-  Proof. apply _. Qed.
-End DirlinkSpec.
+   THIS FILE'S COPY IS THE ONE THAT MATTERED.  [FsReady.v] required
+   *SpecDirlink* to reach it, and SpecDirlink reaches [ProcInv] through
+   [SpecWritei] (writei takes the process block for its user-memory copy) --
+   so one misplaced definition put the whole process layer inside the
+   dependency cone of [fs_ready], and made the file system look as though it
+   depended on process abstractions.  It does not.  See
+   [IcacheEscrow.ic_sleeplocks]. *)
 
 Definition wp_dirlink_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,

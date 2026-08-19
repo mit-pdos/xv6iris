@@ -1245,6 +1245,7 @@ LinkSysMkdir.v
 # SIMP-2: the runtime file system as ONE persistent assertion, with the seal
 # that produces it.  A leaf BELOW the syscall layer, so anything can import
 # the predicate without importing the syscall bodies.
+FsCfg.v
 FsReady.v
 FsSyscalls.v
 LinkFsSyscalls.v

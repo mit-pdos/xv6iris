@@ -71,6 +71,7 @@ Require Import WpLock.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
 Require Import IrefSlots InodeRegion.
+Require Import IcacheEscrow.  (* [ic_sleeplocks], hoisted out of the two function specs *)
 Require Import SpecFileclose.
 Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.

@@ -621,6 +621,43 @@ expected type is still an evar at splice time.
   you only ever pass along should be destructured for READING and
   reconstructed from the SAVED original, never from its pieces.
 
+## A PREDICATE'S DEPENDENCY CONE IS EVIDENCE; ITS PROSE IS NOT
+
+If some predicate's cone contains a layer it has no business containing,
+the conclusion is almost never "these layers are entangled" — it is that
+ONE definition is in the wrong file, and the cone is how you find it.
+
+Worked example (`design/fs-ghost-state.md` §7e): `FsReady.fs_ready`'s cone
+contained `ProcInv`, i.e. the whole process layer, which reads as "the file
+system depends on process abstractions".  It does not.  Two edges, one
+real: a vestigial `Require Import ProcInv` (checked: zero of the 132 names
+`ProcInv`/`ProcDefs` define were used), and `FsReady` → `SpecDirlink` →
+`SpecWritei` → `ProcInv`, where only the last hop is legitimate (writei
+takes the process block to copy user memory).  `SpecDirlink` was in the
+chain solely because it owned `ic_sleeplocks`, five lines of pure icache
+invariant, in a *function spec*.  Moving it beside `ic_tok` in
+`IcacheEscrow.v` took the process layer out of the file system's cone.
+
+Three practical points:
+
+- **Compute the cone; do not read imports.**  `iris/.CoqMakefile.d` already
+  IS the graph (`X.vo: … Y.vo …`).  A dozen lines of Python over it answers
+  "why does A depend on B" and "what breaks if I move this" exactly, and
+  the shortest path it prints is usually the whole diagnosis.
+- **The rule this sharpens** is the one `SpecFsinit.v` and `SpecDirlink.v`
+  already state — *a Spec file must not require another function's Spec*.
+  The sharper form: **a spec file must not OWN a definition the invariant
+  layer needs.**  A spec is allowed to depend downward; a definition it
+  owns forces everything that wants it to depend UPWARD, through the whole
+  function-spec cone, and nothing in the build reports that as wrong.
+- **"Leave the old name as an alias" is not always available.**  It works
+  for a `Prop` (`SpecDirlink.ireg_blocks_ok` is the tree's precedent) and
+  fails for anything a caller unfolds: five sites did
+  `rewrite /SpecDirlink.ic_sleeplocks` followed by `big_sepL_lookup`, which
+  needs the BODY one unfold away, and a transparent alias leaves them one
+  unfold short.  Check for `rewrite /<name>` at the call sites before
+  promising a zero-churn move.
+
 ## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
 
 When a class is a *definitional* one used as an INDEX rather than as a
