@@ -2622,6 +2622,13 @@ Each line is a ROOT: every file that merely depends on one is skipped by
 
 ### THE KVMINITHART LANE: THE SETTLED ANSWER (2026-08-19)
 
+**STATUS: the answer below is LANDED IN FULL as of `5cea2c9e` — `bare_inv`
+no longer owns the tlb cell, the pt tier's engine/leaf boundary is folded
+again, and `ProofMain` / `ProofMainSecondary` are green (8 red roots → 6).
+The state, the deletion inventory and the traps are in
+[`kvminithart-tlb-lane.md`](kvminithart-tlb-lane.md); what follows is the
+DESIGN and is unchanged.**
+
 **READ THIS BEFORE TOUCHING ANYTHING ABOUT THE `tlb` CELL.**  Three sessions
 went in circles here.  Two earlier write-ups in this file are WRONG and are
 superseded by what follows: "RULINGS ON THE TAIL-1 ITEMS" item 1 (ruling 1:

@@ -1,9 +1,11 @@
 # CHECKPOINT: the kvminithart TLB lane (handoff, 2026-08-19)
 
-Branch `hart-node-port`, clean at **`5f1cf2bf`**, nothing pushed.
-Baseline: **8 red roots**, unchanged all session —
-`ProofKvminithart`, `ProofMain`, `ProofMainSecondary`, `ProofUser`,
-`UserretPt`, `UservecExitPt`, `UserretEntryPt`, `WpUmodeStep`.
+**4b IS COMPLETE.**  Branch `hart-node-port`, clean at **`5cea2c9e`**,
+nothing pushed.  Red roots **8 → 6**: `ProofMain` and `ProofMainSecondary`
+went green with the flip (the revert of `52f89133` fixed their
+`iDestruct "Hhart"` over-destructure, exactly as predicted).  What is left is
+`ProofKvminithart` (4c) plus `ProofUser`, `UserretPt`, `UservecExitPt`,
+`UserretEntryPt`, `WpUmodeStep` (4d) — none of them this lane's.
 
 Read [`main-cycle-port.md`](main-cycle-port.md) — "THE KVMINITHART LANE: THE
 SETTLED ANSWER" and "THE FIFTEEN DATA-LEAF SITES" — before this file. This
@@ -58,6 +60,7 @@ written, built green, and REVERTED for this reason. Do not re-introduce it.
 | `9466bad8` | **`swp_run_hart_active_instr_S_res_b`** and the `iApply` diagnosis (see §3) |
 | `ff11e052` | **`WpSmodePtFetch.wp_instr_s_config_folded`** — the folded engine, both arms |
 | `5f1cf2bf` | **the twelve leaf conversions**; `sda_slot_acc_R` gains `⌜SD ⊆ sda_Drw⌝` |
+| `5cea2c9e` | **THE FLIP** — `bare_inv` loses the cell; 8 → 6 red roots |
 | (earlier session) | **`WpSmodeIntr.wp_instr_s_sconf_off_clock` is off `sie_cap_to_cells`** — two concrete branches on the arm; 14 s, statement unchanged |
 
 The nine data sites (`WpSconfLock` 1, `WpSconfMem` 2, `WpPlic` 2,
@@ -192,8 +195,9 @@ Two details worth keeping:
 
 `wp_wfi_s_sconf` is the ONLY consumer of that statement (grepped).
 
-### 4b. Flip `bare_inv` — **BLOCKED ON A RULING.  The checkpoint's own
-### premise for this step is FALSE; re-verified 2026-08-19.**
+### 4b. Flip `bare_inv` — **DONE (`5cea2c9e`).**  The history below is kept
+### because two of its rulings are still binding; the landed state is at
+### "THE FLIP, AS IT LANDED" near the end of this section.
 
 The plan stands except for one line of it.  What this note used to say:
 
@@ -596,25 +600,80 @@ FLIPPED the arm, so the re-open after the leaf is `sr_slot_acc` (not
 served: the walking one by PARKING its tlb cell in the closer, the Bare one
 directly.
 
-**STEPS 1 AND 2 ARE DONE; ONLY STEP 3, THE FLIP, IS LEFT.**  Step 1 was the
-record's `sr_slot_acc` (`87bcf24b`/`699d619f`); step 2 was
-`sda_slot_acc_R` (`ab61dc0f`), the folded engine (`ff11e052`) and the twelve
-leaves (`5f1cf2bf`).  The strangler held: the old cell-handout engines and
-the record's `sr_swp_open` / `sr_swp_close` are still inhabited and still
-carry `SmodeCorePt.wp_instr_s_sr` (consumerless), so every commit stayed
-green.
+### THE FLIP, AS IT LANDED (`5cea2c9e`) — the whole of 4b is now done
 
-**Step 3, the flip proper, is NOT started and is dispatched separately.**  It
-is the list under "The rest of 4b is unblocked once this lands" below: drop
-`tlb ↦ᵣ tlbv` from `bare_inv`; restrict `sie_cap_to_cells` / `_of_cells` to
-`b = true`; simplify the Bare branch of `sie_cap_frame_acc` /
-`sie_cap_cells_at` / `sda_slot_acc` / `sda_slot_acc_R` (each currently PARKS
-that cell in its closer — post-flip there is nothing to park, and the same
-goes for `wp_instr_s_config_folded`'s Bare branch, which parks it in
-`sr_close_at_b`); delete `wp_instr_s_config_sr` / `wp_instr_s_sr` and the two
-cell-handout engines with them; revert `52f89133`'s BootBridge / SpecMain
-routing.  kvminithart's / `ProofMain`'s / `ProofMainSecondary`'s
-`tlb ↦ᵣ tlbvec0` premises STAY.
+Step 1 was the record's `sr_slot_acc` (`87bcf24b`/`699d619f`); step 2 was
+`sda_slot_acc_R` (`ab61dc0f`), the folded engine (`ff11e052`) and the twelve
+leaves (`5f1cf2bf`); step 3 is this.  The strangler held — every commit
+stayed green, because the old cell-handout surface remained inhabited until
+the flip deleted it.
+
+**`SRegime.bare_inv` is `∃ satp0, satp ↦ᵣ satp0 ∗ ⌜Mode = Bare⌝ ∗
+pmp_config 0`, and nothing else.**  Do not put the cell back; §1.
+
+**THE DELETION INVENTORY** (each verified consumerless by grep FIRST):
+
+| deleted | why it had no consumer |
+|---|---|
+| `s_regime`'s `sr_swp_open` / `sr_swp_close` fields | only `SmodeCorePt.wp_instr_s_config_sr` |
+| `SRegime.bare_swp_open` / `bare_swp_close` | only `IntrDefs.strans_swp_open` / `_close`, which now refute the Bare arm |
+| `SmodeCorePt.wp_instr_s_config_sr` | only `wp_instr_s_sr` |
+| `SmodeCorePt.wp_instr_s_sr` | none anywhere (grep found a comment) |
+| `SmodeCorePt.wp_instr_s_config_regime_b` | none ever — the folded engine superseded it before it acquired one |
+
+451 lines out of `SmodeCorePt.v`.  **Kept, because they still have live
+consumers:** `kpt_swp_open` / `kpt_swp_close` (carry `kpt_slot_acc`,
+`kpt_slot_reopen`, `strans_swp_open` / `_close`) and
+`wp_instr_s_config_regime` (carries `wp_instr_s_regime` and
+`wp_instr_s_config_tlbinv_pt`).  Those last two are themselves consumerless
+and always were — they predate this lane, so deleting them is a separate
+cleanup decision, not the flip's; they are flagged here rather than taken.
+
+**THE THREE POSITIONAL `SRegime …` APPLICATIONS MOVE TOGETHER.**  Dropping
+two fields renumbers the constructor, so `bare_regime`, `kpt_share_regime`
+(both `SRegime.v`) and `strans_regime` (`IntrDefs.v`) had to be edited in the
+same commit.  This is inherent to changing the record — the `SrWalks`
+experiment hit it too (see above) — and it is why the flip cannot be split.
+
+**WHERE A CELL IS STILL HANDED OUT, THE PRICE IS THE RECEIPT.**
+`IntrDefs.strans_swp_open` / `_close` and `WpIntrInv.sie_cap_to_cells` /
+`_of_cells` now take `kpt_on cpu_id` and refute the Bare arm outright
+(`kpt_on_pending_False`).  Their single consumer — `WpIntrInv`'s SIE=1
+engine — opens with `sie_cap_on_kpt`, which hands the persistent receipt
+over on its first line, so no call site grew an obligation it did not
+already hold.  An arm-blind consumer could never have used them anyway:
+`sie_cap_on_kpt` already refutes Bare under interrupts-enabled.  Everything
+arm-blind goes through `sie_cap_frame_acc` / `sie_cap_cells_at` /
+`sda_slot_acc` / `sda_slot_acc_R`.
+
+*(This supersedes the older note below saying `sie_cap_of_cells` stays
+provable at generic `b` "because the Bare arm simply drops the incoming
+cell".  It is true, and it was rejected: silently discarding a full
+points-to makes the lemma weaker than it reads.  The receipt is free here,
+so take it.)*
+
+**THE PARKING SITES ARE GONE, BUT THE `tlbv` BINDER IS NOT.**
+`bare_slot_acc`, `strans_slot_acc`, `sie_cap_frame_acc`, `sie_cap_cells_at`
+and `sda_slot_acc` each used to hold the Bare arm's cell aside in their
+closer.  Post-flip there is nothing to hold — but `sr_slot_acc` still binds
+a `tlbv` EXISTENTIALLY (the walking disjunct and `sr_swp_res_at` are stated
+over it), so a cell-free arm still has to answer that binder.  **The trap:
+there is no tlb value in hand at Bare any more, and the obligation is easy
+to miss until the `iExists` fails.**  The answer is the new
+`SRegime.tlb_none`, the model's own reset value (`rv64d.v`'s
+`vector_init (pow2 6) None`); every Bare residue ignores the index, and
+`s_tlb_at s_Drwb _` is `emp`, so nothing constrains the choice.  No
+statement of any of the five moved, and no consumer of them moved either.
+`wp_instr_s_config_folded`'s `sr_close_at_b` was NOT affected: the cell it
+parks comes from the post-leaf `sr_slot_acc` returning the WALKING
+disjunct — a genuine arm flip — which still happens.
+
+**`52f89133` IS REVERTED**, and that is what turned two roots green:
+`BootBridge` routes `Htlb` back out beside the raw hart bundle and
+`SpecMain.main_hart_raw` gets its `tlb ↦ᵣ tlbvec0` conjunct back, so
+`ProofMain` / `ProofMainSecondary`'s `iDestruct "Hhart" as "(Hsbit & Htlb &
+Htcsr)"` matches again.  `SpecKvminithart.v` is not in the diff at all:
+kvminithart's premises never moved.
 
 ### (superseded analysis, kept for the record) why the naive reading said
 ### "the tlb cell is in the LEAF's obligation, not just the engine's" 
@@ -673,14 +732,22 @@ BootBridge / SpecMain routing.  kvminithart's / `ProofMain`'s /
 drops the incoming cell), so the only caller that would need a cell-free
 close is one framing at `s_Drwb` — and after 4a there is none.
 
-### 4c. kvminithart itself (closes 3 roots)
+### 4c. kvminithart itself (closes 1 root) — **THE NEXT THING TO DO**
+
+`ProofMain` / `ProofMainSecondary` are already closed: the flip's revert of
+`52f89133` fixed their `iDestruct "Hhart"` over-destructure, so this step
+now closes ONE root, not three.
 
 Port `ProofKvminithart`'s three raw blocks (+0x08, +0x1c, +0x20) onto
 `WpSconfSfence.wp_sfence_vma_s_sconf` (cell-premise, already landed) plus a
 `csrw satp` switch leaf whose composer half is landed
 (`WpSconfCsr.swp_write_CSR_satp_S`). The switch leaf takes the `tlb` cell as a
-caller argument and takes only satp/pmp from `strans_inv_acc_bare`. Then fix
-`ProofMain` / `ProofMainSecondary`'s `iDestruct "Hhart"` over-destructure.
+caller argument and takes only satp/pmp from `strans_inv_acc_bare` — which
+post-flip hands out satp and the PMP pair and NOTHING else, which is exactly
+what makes kvminithart's own `Htlb` survive from the flush at +0x08 to
+`tlb_res_pt_intro` at +0x1c.  The first error to meet is at
+`ProofKvminithart.v:133` (`iIntro: cannot turn (▷ sconf_step_obl …) into a
+universal quantifier` — the raw-step shape, not a missing lemma).
 
 **NOTE for 4c:** the satp switch FLIPS THE ARM inside its own `execute`. That
 is why `sie_cap_cells_at` exists; do not be surprised by it.
