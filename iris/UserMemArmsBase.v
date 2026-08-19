@@ -529,7 +529,7 @@ Section UserMemArmsBase.
                   (u_state rs mm) Lmprv).
     destruct (u_translate_fault_pure pt t mm rs acc e va Hflavor Hte1 Hte2 Hte3
                 Heff (exec_is_shadow_stack_u_acc acc (u_state rs mm) Hacc)
-                Lcp Lsxl Hpins Hwf) as (Htr & Htrg).
+                Lcp Lsxl Hpins (u_mem_wf_ok pt t mm Hwf)) as (Htr & Htrg).
     split_and!; [ exact Htr | exact Htrg | | ].
     - exact (exec_memory_exception va (register_lookup PC rs) e User
                (u_state rs mm) Lcp eq_refl).

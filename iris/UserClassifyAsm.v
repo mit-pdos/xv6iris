@@ -262,14 +262,71 @@ Proof.
 Qed.
 
 Lemma u_landing_map (P : uptd) (t t' : ptree) (mm mm' : pamap) (s' : mstate) :
-  u_mem_wf P t mm ->
-  u_mem_step P t t' mm s'.(mem) ->
+  u_mem_step_ok P t t' mm s'.(mem) ->
   mm' ⊆ s'.(mem) ->
   (dom mm' : gset Arch.pa) = dom mm ->
   mm' = s'.(mem).
 Proof.
-  intros Hwf Hstep Hsub Hdom. apply (u_map_eq mm' s'.(mem) Hsub).
-  rewrite Hdom. symmetry. exact (u_mem_step_dom P t t' mm s'.(mem) Hwf Hstep).
+  intros Hstep Hsub Hdom. apply (u_map_eq mm' s'.(mem) Hsub).
+  rewrite Hdom. symmetry. exact (proj1 (proj2 (proj2 Hstep))).
+Qed.
+
+(* THE WEAK STEP IS THE STRONG ONE, at a caller that holds [u_mem_wf].       *)
+(*                                                                          *)
+(* The pure fetch composers conclude [u_mem_step_ok], because the tiers that *)
+(* own only a NAMED image cannot pay [u_mem_wf]'s coverage clause.  The      *)
+(* SAFETY tier does pay it, and for it nothing is lost: [u_mem_step_ok]'s    *)
+(* domain equality plus the two disjoint decompositions pin the data half's  *)
+(* domain to [ud_data P] again, which is exactly the clause [u_mem_step] has *)
+(* and [u_mem_step_ok] does not.  So a safety-tier caller turns a composer's *)
+(* weak step back into the strong one with ONE application, and [u_swp_fetch]/*)
+(* [u_open]'s closer -- which speak [u_mem_step] -- need no restating.        *)
+Lemma u_mem_step_of_ok (P : uptd) (t t' : ptree) (mm mm' : pamap) :
+  u_mem_wf P t mm -> u_mem_step_ok P t t' mm mm' -> u_mem_step P t t' mm mm'.
+Proof.
+  intros (md & Hdisj & Hdj & Hmm & Hdm & _)
+         (Hshape & Hspec' & Hdom & md' & Hdj' & Hmm').
+  assert (HT : (dom (ptree_bytes 2 t') : gset Arch.pa) = dom (ptree_bytes 2 t))
+    by (symmetry; exact (ptree_bytes_dom_shape 2 t t' Hshape)).
+  assert (Hd : (dom md' : gset Arch.pa) = dom md).
+  { apply set_eq. intros a. split.
+    - intros Ha.
+      assert (Ha' : a ∈ (dom mm' : gset Arch.pa))
+        by (rewrite Hmm' dom_union_L; by apply elem_of_union_r).
+      rewrite Hdom Hmm dom_union_L in Ha'.
+      apply elem_of_union in Ha' as [HaT | HaD]; [| exact HaD].
+      exfalso.
+      (* NOT [rewrite ... in HaT]: the [dom] that [dom_union_L] produced is
+         only CONVERTIBLE to the one [HT] is keyed on, so state the goal and
+         let [exact] do the conversion. *)
+      assert (HaT' : a ∈ (dom (ptree_bytes 2 t') : gset Arch.pa))
+        by (rewrite HT; exact HaT).
+      apply elem_of_dom in HaT' as [b1 Hb1]. apply elem_of_dom in Ha as [b2 Hb2].
+      exact (proj1 (map_disjoint_spec _ _) Hdj' a b1 b2 Hb1 Hb2).
+    - intros Ha.
+      assert (Ha' : a ∈ (dom mm : gset Arch.pa))
+        by (rewrite Hmm dom_union_L; by apply elem_of_union_r).
+      rewrite <- Hdom in Ha'. rewrite Hmm' dom_union_L in Ha'.
+      apply elem_of_union in Ha' as [HaT | HaD]; [| exact HaD].
+      exfalso.
+      assert (HaT' : a ∈ (dom (ptree_bytes 2 t) : gset Arch.pa))
+        by (rewrite <- HT; exact HaT).
+      apply elem_of_dom in HaT' as [b1 Hb1]. apply elem_of_dom in Ha as [b2 Hb2].
+      exact (proj1 (map_disjoint_spec _ _) Hdj a b1 b2 Hb1 Hb2). }
+  split_and!; [ exact Hshape | exact Hspec' |].
+  exists md'. split_and!; [ exact Hdj' | exact Hmm' |].
+  (* every [dom] is asserted with its set type ascribed BEFORE [elem_of_dom]
+     runs: applied to an [is_Some] goal the lemma leaves [D] an evar, and
+     [rewrite Hd] then declines the resulting [dom] as a non-match. *)
+  intros a. split.
+  - intros Ha.
+    assert (Ha' : a ∈ (dom md : gset Arch.pa))
+      by (apply elem_of_dom; exact (proj1 (Hdm a) Ha)).
+    rewrite <- Hd in Ha'. apply elem_of_dom in Ha'. exact Ha'.
+  - intros Ha. apply (proj2 (Hdm a)).
+    assert (Ha' : a ∈ (dom md' : gset Arch.pa))
+      by (apply elem_of_dom; exact Ha).
+    rewrite Hd in Ha'. apply elem_of_dom in Ha'. exact Ha'.
 Qed.
 
 (* ===================================================================== *)
