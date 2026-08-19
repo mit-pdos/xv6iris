@@ -355,6 +355,26 @@ Note the comment already in `SmodeCorePt.v` at the KPT pinning ("The Bare
 branch spells `_D s_Drwb s_frame_ok_Drwb` out") — that instruction is what
 diverges; the concrete instance is what is actually needed.
 
+**WHERE THE BARE ENGINE STANDS (2026-08-19, end of session).**
+`SmodeCorePt.spt_run_hart_active_instr_S_b` is LANDED and green — the
+concrete-statement cure works, and its arities came from reading the section
+source (see the commit; `About` / `Print Implicit` are both useless on these).
+But `wp_instr_s_config_regime_b`, the Bare cell-handout engine built on it,
+**still does not terminate** — killed at 500 s with the run engine already
+concrete and a `Timeout 120` sitting on the `spt_dispatch_none_D s_Drwb`
+application, which did not fire.  So there is a SECOND divergence site in that
+proof and it is not the dispatch.
+
+**Do not bisect that by hand with `Timeout` — use the streaming profiler**,
+which is the tree's own recipe for exactly this (durable-notes: "A COMPILE
+THAT NEVER FINISHES IS LOCALISED BY `coqc -time`, WHICH STREAMS — the LAST
+LINE IN THE LOG IS THE STALLING SENTENCE").  Redirect to a file, `tail` it,
+and map `Chars A - B` to a line with `head -c B <f>.v | wc -l`.  The
+candidates it will land on are the remaining `_b` applications in that proof:
+`spt_cycle_b`, `spt_frames_intro_b` / `_open_b` / `_close_b` / `_elim_b`, and
+the two `s_rw_ext_D s_Drwb` uses.  Whichever it is, the cure is already known
+— give that one a concrete stored statement too.
+
 **STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
 absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
 the layering is already right, `WpSmodePtEngine.v` is `_CoqProject` 110 vs
