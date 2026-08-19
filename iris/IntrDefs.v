@@ -1787,7 +1787,7 @@ Section IntrDefsBase.
       ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
       satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       strans_res_at satp0 tlbv ∗
-      ( (tlb ↦ᵣ tlbv ∗
+      ( (tlb ↦ᵣ tlbv ∗ kpt_on cpu_id ∗
          (∀ tv' : type_of_register tlb,
             satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
             tlb ↦ᵣ tv' -∗ strans_res_at satp0 tv' -∗ strans_inv))
@@ -1836,6 +1836,7 @@ Section IntrDefsBase.
         "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
       pose proof Hsok as Hsok'. destruct Hsok' as (Hmode & Hasid & Hppn).
       subst root_ppn.
+      iDestruct (strans_kpt_on with "Hkpt") as "[Hkpt #Hon]".
       iExists satp0, pcfg, paddr, tlbv.
       iSplitR; [iPureIntro; right; exact Hsok |].
       iSplitR; [iPureIntro; exact Hpok |].
@@ -1843,7 +1844,7 @@ Section IntrDefsBase.
       iSplitL "Hkpt Hres".
       { rewrite /strans_res_at. iRight. iFrame "Hkpt Hres".
         iPureIntro. exact Hmode. }
-      iLeft. iFrame "Htlb".
+      iLeft. iFrame "Htlb Hon".
       iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
@@ -1854,6 +1855,46 @@ Section IntrDefsBase.
                 Hsok Hpok with "Hsatp Htlb Hpcfg Hpaddr Hres").
   Qed.
 
+  (* THE ARM FLIP IS ONE-WAY (Bare -> KPT, [strans_flip] over [mono_nat]),
+     so a holder of [kpt_on] re-opens on the walking arm again -- the Bare
+     arm's [strans_pending] is refuted by the receipt.  This is what lets an
+     engine hand the slot to a leaf FOLDED and still take its frames back at
+     the write set the cycle fixed. *)
+  Lemma strans_slot_reopen :
+    kpt_on cpu_id -∗ strans_inv -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      tlb ↦ᵣ tlbv ∗ strans_res_at satp0 tlbv ∗
+      (∀ tv' : type_of_register tlb,
+         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         tlb ↦ᵣ tv' -∗ strans_res_at satp0 tv' -∗ strans_inv).
+  Proof.
+    iIntros "#Hon [(Hpend & _ & _) | (Hkpt & Hk)]".
+    { iDestruct (kpt_on_pending_False with "Hon Hpend") as %[]. }
+    iDestruct "Hk" as (root_ppn) "Hres".
+    iDestruct (kpt_swp_open root_ppn with "Hres") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+    pose proof Hsok as Hsok'. destruct Hsok' as (Hmode & Hasid & Hppn).
+    subst root_ppn.
+    iExists satp0, pcfg, paddr, tlbv.
+    iSplitR; [iPureIntro; right; exact Hsok |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr Htlb".
+    iSplitL "Hkpt Hres".
+    { rewrite /strans_res_at. iRight. iFrame "Hkpt Hres".
+      iPureIntro. exact Hmode. }
+    iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
+    rewrite /strans_res_at.
+    iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
+    { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
+      vm_compute in Hbad. discriminate. }
+    iRight. iFrame "Hkpt". iExists (strans_root_of satp0).
+    iApply (kpt_swp_close (strans_root_of satp0) satp0 tv' pcfg paddr
+              Hsok Hpok with "Hsatp Htlb Hpcfg Hpaddr Hres").
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
             strans_absorb strans_transform strans_tmode
@@ -1861,7 +1902,8 @@ Section IntrDefsBase.
             strans_swp_res strans_swp_side strans_swp_translate
             strans_swp_translate_wit
             strans_res_at strans_satp_ok strans_swp_res_agree
-            strans_swp_open strans_swp_close strans_slot_acc
+            strans_swp_open strans_swp_close
+            (kpt_on cpu_id) _ strans_slot_reopen strans_slot_acc
             (fun _ _ H => H) strans_swp_side_ok
             strans_mode strans_swp_mode_ok.
 

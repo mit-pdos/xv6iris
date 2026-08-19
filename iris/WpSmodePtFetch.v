@@ -394,7 +394,7 @@ Section SPtData.
     iDestruct (sr_slot_acc R with "Hinv") as (satp0 pcfg paddr tlbv)
       "(%Hsok & %Hpok & Hsatp & Hpcfg & Hpaddr & Hres & [Harm | Harm])".
     - (* ---- THE WALKING ARM: the cell is the frame's ---- *)
-      iDestruct "Harm" as "(Htlb & Hcl)".
+      iDestruct "Harm" as "(Htlb & _ & Hcl)".
       iExists sda_Drw, satp0, pcfg, paddr, tlbv.
       iSplitR; [iPureIntro; exact sda_disj |].
       iSplitR; [iPureIntro; exact Hsok |].

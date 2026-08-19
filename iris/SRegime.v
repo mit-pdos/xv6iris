@@ -645,6 +645,29 @@ Section SRegimeDef.
         pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
         sr_swp_res_at satp0 tlbv -∗ sr_inv;
 
+    (* ---- THE WALKING ARM'S RECEIPT, AND THE RE-OPEN IT LICENSES --------
+       An engine hands the slot to its leaf FOLDED and must take it back at
+       the SAME write set -- the cycle fixed that set before the leaf ran.
+       A leaf may MOVE the slot (a satp switch does exactly that), so the
+       walking branch needs to know its arm survived.  It does, in both
+       instances that have one: the arm flip is one-way (Bare -> KPT), so a
+       holder of this persistent receipt re-opens on the walking arm again.
+       [WpIntrInv.s_kpt_wit] / [sie_cap_cells_at] are the same pattern one
+       layer up.  [bare_regime] takes [False] here -- its accessor never
+       produces the walking disjunct, so it never has to produce this. *)
+    sr_walk_wit : iProp Σ;
+    sr_walk_wit_pers : Persistent sr_walk_wit;
+    sr_slot_reopen :
+      sr_walk_wit -∗ sr_inv -∗
+      ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+        (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+        ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+        satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+        tlb ↦ᵣ tlbv ∗ sr_swp_res_at satp0 tlbv ∗
+        (∀ tv' : type_of_register tlb,
+           satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+           tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv);
+
     (* ---- THE SLOT, AS AN ARM-HONEST ACCESSOR ---------------------------
        [sr_swp_open] above hands the tlb CELL out unconditionally, and that
        is the port's own artifact: pre-port the slot went to the leaves
@@ -671,7 +694,7 @@ Section SRegimeDef.
         ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
         satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
         sr_swp_res_at satp0 tlbv ∗
-        ( (tlb ↦ᵣ tlbv ∗
+        ( (tlb ↦ᵣ tlbv ∗ sr_walk_wit ∗
            (∀ tv' : type_of_register tlb,
               satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
               tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv))
@@ -1153,7 +1176,7 @@ Section SRegimeDef.
       ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
       satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       (True : iProp Σ) ∗
-      ( (tlb ↦ᵣ tlbv ∗
+      ( (tlb ↦ᵣ tlbv ∗ (False : iProp Σ) ∗
          (∀ tv' : type_of_register tlb,
             satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
             tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv))
@@ -1189,13 +1212,26 @@ Section SRegimeDef.
               with "Hpcfg Hpaddr").
   Qed.
 
+  Lemma bare_slot_reopen :
+    (False : iProp Σ) -∗ bare_inv -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      tlb ↦ᵣ tlbv ∗ (True : iProp Σ) ∗
+      (∀ tv' : type_of_register tlb,
+         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv).
+  Proof. iIntros "[] _". Qed.
+
   Definition bare_regime : s_regime :=
     SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
             bare_tmode (False%I) _ bare_absorb_wit
             (fun _ => True%I) bare_swp_side bare_swp_translate
             bare_swp_translate_wit
             (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
-            bare_swp_open bare_swp_close bare_slot_acc
+            bare_swp_open bare_swp_close
+            (False%I) _ bare_slot_reopen bare_slot_acc
             (fun _ _ H => H) bare_swp_side_ok
             (fun _ => Bare) bare_swp_mode_ok.
 
@@ -1648,7 +1684,7 @@ Section SRegimeShared.
       ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
       satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       kpt_res_at root_ppn satp0 tlbv ∗
-      ( (tlb ↦ᵣ tlbv ∗
+      ( (tlb ↦ᵣ tlbv ∗ (True : iProp Σ) ∗
          (∀ tv' : type_of_register tlb,
             satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
             tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗
@@ -1673,7 +1709,32 @@ Section SRegimeShared.
     iSplitR; [iPureIntro; exact Hsok |].
     iSplitR; [iPureIntro; exact Hpok |].
     iFrame "Hsatp Hpcfg Hpaddr Hres".
-    iLeft. iFrame "Htlb".
+    iLeft. iFrame "Htlb". iSplitR; [done|].
+    iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
+    iApply (kpt_swp_close root_ppn satp0 tv' pcfg paddr Hsok Hpok
+              with "Hsatp Htlb Hpcfg Hpaddr Hres").
+  Qed.
+
+  (* the kernel table never leaves the walking arm, so its receipt is
+     trivial and the re-open is just the open again. *)
+  Lemma kpt_slot_reopen (root_ppn : mword 44) :
+    (True : iProp Σ) -∗ tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      tlb ↦ᵣ tlbv ∗ kpt_res_at root_ppn satp0 tlbv ∗
+      (∀ tv' : type_of_register tlb,
+         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗ tlb_res_pt root_ppn).
+  Proof.
+    iIntros "_ H".
+    iDestruct (kpt_swp_open root_ppn with "H") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+    iExists satp0, pcfg, paddr, tlbv.
+    iSplitR; [iPureIntro; exact Hsok |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr Htlb Hres".
     iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
     iApply (kpt_swp_close root_ppn satp0 tv' pcfg paddr Hsok Hpok
               with "Hsatp Htlb Hpcfg Hpaddr Hres").
@@ -1687,7 +1748,8 @@ Section SRegimeShared.
             (kpt_swp_translate root_ppn) (kpt_swp_translate_wit root_ppn)
             (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
             (kpt_swp_res_agree root_ppn) (kpt_swp_open root_ppn)
-            (kpt_swp_close root_ppn) (kpt_slot_acc root_ppn)
+            (kpt_swp_close root_ppn)
+            (True%I) _ (kpt_slot_reopen root_ppn) (kpt_slot_acc root_ppn)
             (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
             (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).
 
