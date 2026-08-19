@@ -410,7 +410,7 @@ Qed.
 (* ================================================================== *)
 (** * 6. [ob]-acyclicity
 
-    The preserved program order, lifted to operations.  Four arms:
+    The preserved program order, lifted to operations.  Five arms:
 
     - [po] INTO A WRITE operation.  In a promise-free machine a store always
       appends at the log's top, so it is above everything its agent has
@@ -422,8 +422,12 @@ Qed.
       (slice 1's [ord_pw]); the source publishes its own timestamp.
     - a FENCE with pred-R, succ-R, or an ACQUIRE (slice 1's [ord_pr]),
       from a READ operation whose timestamp is PUBLISHED ([pub_r]).
+    - RVWMO ppo RULE 7 ([rel_acq_po] below): a WRITE operation of a [.rl]
+      event, before ANY operation of a po-later [.aq] read of the same
+      agent.  Unconditional — the machine's [w_vRel]/[load_vpre] pair asks
+      for no fence and no RCsc handshake.
 
-    TWO RECORDED SEAMS, both inherited from slice 1's ppo fragment rather than
+    ONE RECORDED SEAM, inherited from slice 1's ppo fragment rather than
     introduced here:
 
     (a) the [ord_pr] arm requires the source operation NOT to write its byte.
@@ -434,8 +438,10 @@ Qed.
         which our fusion has no separate name for.  Slice 1's [ax_ord] makes
         the same restriction — its conclusion is about the published [t].)
 
-    (b) [pub_r] excludes an INTERNAL (forwarded) rf source and there is no
-        release-successor arm: slice 1's §7(3) gaps, unchanged here. *)
+    (b) [pub_r] excludes an INTERNAL (forwarded) rf source: slice 1's §7(3)
+        gap, unchanged here.  (The release-successor gap RVWMO calls ppo
+        rule 6 stays out of the model on purpose — the machine does not
+        enforce it; §7's release-PREDECESSOR arm is rule 7, which it does.) *)
 
 Lemma ord_pw_shape E e1 e2 :
   ord_pw E e1 e2 →
@@ -542,13 +548,208 @@ Proof.
     pose proof (vrNew_le_evpre E k2 s2 Hs2). lia.
 Qed.
 
+(* ------------------------------------------------------------------ *)
+(** *** RVWMO ppo RULE 7: a release write before a po-later acquire read
+
+    The machine enforces this pair UNCONDITIONALLY: [WeakMem.store_post]
+    raises the storing agent's [w_vRel] to the store's timestamp when the
+    label carries [.rl], and [WeakMem.load_vpre] joins [w_vRel] into the
+    pre-view of an [.aq] load — no fence in between, and no RCsc handshake
+    demanded.  Under RISC-V's all-RCsc reading of the annotations (every
+    [.aq]/[.rl] in the modelled alphabet is an RCsc annotation, there being
+    no [.aqrl]-free RCpc form here) this COINCIDES WITH RVWMO ppo RULE 7,
+    which orders a release-annotated [a] before an acquire-annotated [b] of
+    the same hart.  Rule 6 — the [.rl] SUCCESSOR half — is deliberately
+    absent: the machine does not enforce it (see [WeakAxiomatic]'s ppo map).
+
+    TWO relations, because soundness and the completeness axiom want
+    different reaches:
+
+    - [rel_acq_po] is the ppo edge itself, and is what enters [ppo_op].
+    - [rel_ord] is the ORD fragment it generates — rule 7 alone, or rule 7
+      followed by rule 5 (the acquire read's own [acq_po] successors).  The
+      composite is needed because the machine's acquire read ABSORBS
+      [w_vRel] into [w_vrNew] ([evpre_le_vrNew_post]), so the release
+      publication keeps ordering every step after the acquire, not just the
+      acquire itself.  The absorption happens only if the acquire read
+      actually reads a byte, whence the [rd_b] conjunct (an empty acquire
+      load moves no view at all). *)
+
+Definition lb_rl (l : lbl) : bool :=
+  match l with
+  | LStore rl _ _ _ => rl
+  | LRmw _ rl _ _ _ _ _ => rl
+  | _ => false
+  end.
+
+Definition rel_acq_po (E : exec) (e1 e2 : ev) : Prop :=
+  ∃ k1 k2 s1 s2, e1 = ev_at k1 ∧ e2 = ev_at k2 ∧ (k1 < k2)%nat ∧
+    ex_tr E !! k1 = Some s1 ∧ ex_tr E !! k2 = Some s2 ∧ es_ag s1 = es_ag s2 ∧
+    lb_is_w (es_lb s1) = true ∧ lb_rl (es_lb s1) = true ∧
+    lb_is_r (es_lb s2) = true ∧ lb_aq (es_lb s2) = true.
+
+Definition rel_ord (E : exec) (e1 e2 : ev) : Prop :=
+  rel_acq_po E e1 e2 ∨
+  ∃ em, rel_acq_po E e1 em ∧ (∃ a, rd_b E a em) ∧ acq_po E em e2.
+
+Lemma rel_acq_po_shape E e1 e2 :
+  rel_acq_po E e1 e2 →
+  ∃ k1 k2 s1 s2, e1 = ev_at k1 ∧ e2 = ev_at k2 ∧ (k1 < k2)%nat ∧
+    ex_tr E !! k1 = Some s1 ∧ ex_tr E !! k2 = Some s2 ∧ es_ag s1 = es_ag s2.
+Proof.
+  intros (k1 & k2 & s1 & s2 & -> & -> & Hlt & Hs1 & Hs2 & Hag & _).
+  exists k1, k2, s1, s2. by split_and!.
+Qed.
+
+(** The [w_vRel] fold, [store_fold_vwOld]'s missing twin.  (Belongs in
+    [WeakMem.v] next to the other upper-bound folds — the W4 lift batch of
+    [WeakAxiomatic3] §14(3); proved here because this slice may not edit it.) *)
+Lemma store_bytes_vRel_rl ws as_ t :
+  as_ ≠ [] → (t ≤ w_vRel (store_post_bytes ws true as_ t))%nat.
+Proof.
+  destruct as_ as [|a l]; [done|]. intros _.
+  change (store_post_bytes ws true (a :: l) t)
+    with (store_post_bytes (store_post ws true a t) true l t).
+  etrans; [apply (store_post_vRel_rl ws a t)|].
+  apply ws_le_vRel, store_post_bytes_le.
+Qed.
+
+Lemma store_run_vRel_rl ws base n t :
+  (0 < n)%nat → (t ≤ w_vRel (store_post_run ws true base n t))%nat.
+Proof.
+  intros Hn. rewrite /store_post_run. apply store_bytes_vRel_rl.
+  by destruct n as [|n]; [lia|].
+Qed.
+
+(** A RELEASE write's own timestamp is under its agent's [w_vRel] straight
+    after — [pub_w_vwOld]'s twin, on the release channel. *)
+Lemma pub_w_vRel E k s :
+  exec_wf E → ex_tr E !! k = Some s →
+  lb_is_w (es_lb s) = true → lb_rl (es_lb s) = true →
+  (ev_ts E (ev_at k) ≤ w_vRel (ews E (S k) (es_ag s)))%nat.
+Proof.
+  intros Hwf Hs Hw Hrl. pose proof (exec_step_at E k s Hwf Hs) as Hstep.
+  destruct (mstep_log_w _ _ _ _ Hstep Hw) as (base & vs & Hwr & Hne & _).
+  destruct (es_lb s) as [aq0 b0 t0 v0|rl b0 v0 kc|p1 p2 p3 p4|aq0 rl b0 t0 rv0 wv0 kc]
+    eqn:Hl; [by simplify_eq/=| |by simplify_eq/=|].
+  - simpl in Hrl. subst rl.
+    rewrite (exec_ws_store E k s true b0 v0 _ Hwf Hs Hl).
+    apply store_run_vRel_rl.
+    assert (v0 ≠ []) as Hne0 by (simpl in Hwr; by simplify_eq).
+    destruct v0; [done|simpl; lia].
+  - simpl in Hrl. subst rl.
+    rewrite (exec_ws_rmw E k s aq0 true b0 t0 rv0 wv0 _ Hwf Hs Hl).
+    apply store_run_vRel_rl.
+    assert (wv0 ≠ []) as Hne0 by (simpl in Hwr; by simplify_eq).
+    destruct wv0; [done|simpl; lia].
+Qed.
+
+(** ... and it is still there when the acquire read runs. *)
+Lemma rel_acq_vRel E e1 t k2 s2 :
+  exec_wf E → ex_tr E !! k2 = Some s2 →
+  rel_acq_po E e1 (ev_at k2) → pub_w E e1 t →
+  (t ≤ w_vRel (ews E k2 (es_ag s2)))%nat.
+Proof.
+  intros Hwf Hs2 Hrel Hpub.
+  destruct Hrel as (k1 & k2' & s1 & s2'' & -> & Hk & Hlt & Hs1 & Hs2'' &
+                    Hag & Hw1 & Hrl1 & _ & _).
+  assert (k2' = k2) as -> by (by simplify_eq).
+  assert (s2'' = s2) as -> by (rewrite Hs2 in Hs2''; by simplify_eq).
+  pose proof (lookup_lt_Some _ _ _ Hs2) as Hk2.
+  destruct Hpub as (_ & _ & ->). rewrite -Hag.
+  etrans; [exact (pub_w_vRel E k1 s1 Hwf Hs1 Hw1 Hrl1)|].
+  apply ws_le_vRel, (exec_ws_le E (S k1) k2 (es_ag s1) Hwf ltac:(lia) ltac:(lia)).
+Qed.
+
+(** THE RULE-7 DELIVERY LEMMA, the shape [ord_vrNew] has for rules 4/5: the
+    release publication is under the target's PRE-VIEW.  ([evpre], not
+    [w_vrNew]: at the acquire read itself the value sits in [w_vRel] and only
+    the pre-view joins it — the absorption into [w_vrNew] happens one step
+    later, which is the composite arm.) *)
+Lemma rel_ord_evpre E e1 t k2 s2 :
+  exec_wf E → ex_tr E !! k2 = Some s2 →
+  rel_ord E e1 (ev_at k2) → pub_w E e1 t →
+  (t ≤ evpre E (ev_at k2))%nat.
+Proof.
+  intros Hwf Hs2 Hcase Hpub.
+  destruct Hcase as [Hrel|(em & Hrel & (a & Hrd) & Hacq)].
+  - (* rule 7 alone: the acquire read IS the target *)
+    pose proof Hrel as Hrel'.
+    destruct Hrel' as (k1 & k2' & s1 & s2'' & -> & Hk & _ & _ & Hs2'' &
+                       _ & _ & _ & _ & Haq).
+    assert (k2' = k2) as -> by (by simplify_eq).
+    assert (s2'' = s2) as -> by (rewrite Hs2 in Hs2''; by simplify_eq).
+    rewrite (evpre_at E k2 s2 Hs2) /load_vpre Haq.
+    pose proof (rel_acq_vRel E _ t k2 s2 Hwf Hs2 Hrel Hpub). lia.
+  - (* rule 7 then rule 5: the acquire read absorbed [w_vRel] into [w_vrNew] *)
+    destruct Hacq as (km & k2' & sm & s2'' & -> & Hk & Hlt & Hsm & Hs2'' &
+                      Hagm & _ & Haqm).
+    assert (k2' = k2) as -> by (by simplify_eq).
+    assert (s2'' = s2) as -> by (rewrite Hs2 in Hs2''; by simplify_eq).
+    pose proof (lookup_lt_Some _ _ _ Hs2) as Hk2.
+    destruct Hrd as (kr & tr & vr & Hkr & Hr).
+    assert (kr = km) as -> by (by simplify_eq).
+    assert (Hkm : (t ≤ evpre E (ev_at km))%nat).
+    { rewrite (evpre_at E km sm Hsm) /load_vpre Haqm.
+      pose proof (rel_acq_vRel E _ t km sm Hwf Hsm Hrel Hpub). lia. }
+    etrans; [exact Hkm|].
+    etrans; [exact (evpre_le_vrNew_post E km sm a tr vr Hwf Hsm Hr)|].
+    etrans; [|exact (vrNew_le_evpre E k2 s2 Hs2)]. rewrite -Hagm.
+    apply ws_le_vrNew, (exec_ws_le E (S km) k2 (es_ag sm) Hwf ltac:(lia) ltac:(lia)).
+Qed.
+
+Lemma ppo_rel_gmo E a1 e1 a2 e2 :
+  exec_wf E → rel_acq_po E e1 e2 → wr_b E a1 e1 → gmo_op E (a1, e1) (a2, e2).
+Proof.
+  intros Hwf Hrel Hw1. pose proof Hrel as Hrel'.
+  destruct Hrel' as (k1 & k2 & s1 & s2 & -> & -> & Hlt & Hs1 & Hs2 & _).
+  pose proof (lookup_lt_Some _ _ _ Hs2) as Hk2.
+  assert (Hpub : pub_w E (ev_at k1) (ev_ts E (ev_at k1))).
+  { split_and!; [exact (proj1 Hw1)|by eexists|done]. }
+  pose proof (rel_ord_evpre E (ev_at k1) (ev_ts E (ev_at k1)) k2 s2 Hwf Hs2
+                (or_introl Hrel) Hpub) as Hev.
+  destruct (wr_b_dec E a2 (ev_at k2)) as [Hw2|Hn2].
+  - apply gmo_op_lt.
+    rewrite (opos_wr E a1 _ Hw1) (opos_wr E a2 _ Hw2) (ev_ts_at E k2).
+    pose proof (evpre_le_log E k2 Hwf ltac:(lia)). lia.
+  - apply gmo_op_wr_rd; [|exact Hw1|exact Hn2].
+    rewrite (opos_wr E a1 _ Hw1) (opos_nwr E a2 _ Hn2). lia.
+Qed.
+
+(** THE AXIOM the rule-7 arm contributes, in [ax_ord]'s "no stale read across
+    an ordering edge" shape: the release publication is below every write the
+    target read has an [fr] edge to.  Read as a cat cycle: it is the
+    irreflexivity of [rule7 ; rule5? ; fr ; gmo|W] — the return leg is the
+    TIMESTAMP order on writes, which is why [ob]-acyclicity over operations
+    does not subsume it (a foreign write below the release store is an
+    [ob]-sink) and why the model states it as its own local axiom, exactly as
+    it does for the fence/acquire fragment. *)
+Definition ax_rel_ord (E : exec) : Prop :=
+  ∀ e1 k2 s2 a w t,
+    ex_tr E !! k2 = Some s2 →
+    rel_ord E e1 (ev_at k2) → pub_w E e1 t →
+    fr_b E a (ev_at k2) w →
+    (t < ev_ts E w)%nat.
+
+Theorem sound_rel_ord E : exec_wf E → ax_rel_ord E.
+Proof.
+  intros Hwf e1 k2 s2 a w t Hs2 Hrel Hpub Hfr.
+  pose proof (rel_ord_evpre E e1 t k2 s2 Hwf Hs2 Hrel Hpub) as Hev.
+  destruct Hfr as ((w0 & Hrf0 & Hco) & Hne).
+  pose proof Hco as (Hw0 & Hw & Hlt).
+  destruct Hrf0 as (_ & k & t0 & v0 & Hkeq & Hr & Hts0).
+  assert (k = k2) as -> by (by simplify_eq).
+  pose proof (read_gap E k2 s2 a t0 v0 w Hwf Hs2 Hr Hw ltac:(lia)). lia.
+Qed.
+
 (** *** [ob] and the theorem *)
 
 Definition ppo_op (E : exec) : relation mop := λ o1 o2,
   (po E o1.2 o2.2 ∧ wr_b E o2.1 o2.2)
   ∨ (o1.1 = o2.1 ∧ po_loc_b E o1.1 o1.2 o2.2)
   ∨ (ord_pw E o1.2 o2.2 ∧ wr_b E o1.1 o1.2)
-  ∨ (ord_pr E o1.2 o2.2 ∧ ¬ wr_b E o1.1 o1.2 ∧ pub_r E o1.2 (ets E o1.1 o1.2)).
+  ∨ (ord_pr E o1.2 o2.2 ∧ ¬ wr_b E o1.1 o1.2 ∧ pub_r E o1.2 (ets E o1.1 o1.2))
+  ∨ (rel_acq_po E o1.2 o2.2 ∧ wr_b E o1.1 o1.2).
 
 Definition rf_op (E : exec) : relation mop := λ o1 o2,
   o1.1 = o2.1 ∧ rf_b E o1.1 o1.2 o2.2.
@@ -569,11 +770,13 @@ Lemma ppo_op_gmo E o1 o2 : exec_wf E → ppo_op E o1 o2 → gmo_op E o1 o2.
 Proof.
   intros Hwf Hppo. destruct o1 as [a1 e1], o2 as [a2 e2].
   rewrite /ppo_op /= in Hppo.
-  destruct Hppo as [[Hpo Hw2]|[[<- Hpl]|[[Hord Hw1]|(Hord & Hn1 & Hpub)]]].
+  destruct Hppo as [[Hpo Hw2]|[[<- Hpl]|[[Hord Hw1]|[(Hord & Hn1 & Hpub)
+                                                     |[Hrel Hw1]]]]].
   - by eapply ppo_w_gmo.
   - by eapply ppo_loc_gmo.
   - by eapply ppo_ord_pw_gmo.
   - by eapply ppo_ord_pr_gmo.
+  - by eapply ppo_rel_gmo.
 Qed.
 
 Lemma ob_op_gmo E o1 o2 : exec_wf E → ob_op E o1 o2 → gmo_op E o1 o2.
@@ -1217,12 +1420,15 @@ End counterexample.
       [co_b], [fr_b] were already byte-indexed, which is exactly what made the
       lift free.
 
-    - [ppo_op] has FOUR arms where §7's sketch had three ([fence_between +
-      acq_po + po_loc_b]).  The extra one is [po] INTO A WRITE OPERATION,
-      which is free in a promise-free machine (a store appends at the top of
-      the log) and subsumes every RVWMO ppo rule whose successor is a store —
+    - [ppo_op] has FIVE arms where §7's sketch had three ([fence_between +
+      acq_po + po_loc_b]).  One extra is [po] INTO A WRITE OPERATION, which
+      is free in a promise-free machine (a store appends at the top of the
+      log) and subsumes every RVWMO ppo rule whose successor is a store —
       including the succ-W fence cases that [ord_pw]/[ord_pr] (both succ-R)
-      never covered.  This is a strengthening.
+      never covered.  The other is RVWMO ppo RULE 7, [rel_acq_po] (§6),
+      added by A1c because the machine's [w_vRel]/[load_vpre] pair enforces
+      it and completeness is FALSE without it (the witness is
+      [WeakAxiomatic3] §13).  Both are strengthenings.
 
     - The [ord_pr] arm carries the side condition [¬ wr_b E a1 e1] (§6 seam
       (a)): the fused RMW's operation at a byte it WRITES is not claimed to be

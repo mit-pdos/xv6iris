@@ -8,71 +8,56 @@
     lemma open — VIEW DOMINATION — and stated
     [promise_free_complete] in full checkable form on top of it.
 
-    THIS FILE'S TWO RESULTS, and the headline is the second one:
+    THIS FILE'S RESULTS:
 
-    (1) THE POSITIVE THEOREM.  Completeness for the class of candidates that
-        are RELEASE-FREE and PUBLICATION-CLEAN ([cand_rl_free],
-        [cand_pub_clean] below) — every stale read allowed, which is where all
-        the weak-memory content of completeness lives, and a strict
-        generalisation of slice 2's [sc_cand_reachable] (that fragment has no
-        stale reads at all).  The proof is the view-domination induction §9(1)
-        asked for, one conjunct per view component.
+    (1) THE COMPLETENESS THEOREM.  Every candidate that is
+        PUBLICATION-CLEAN ([cand_pub_clean] below) and satisfies
+        [cand_axiomatic_ok] is machine-reachable — every stale read allowed,
+        which is where all the weak-memory content of completeness lives, and
+        a strict generalisation of slice 2's [sc_cand_reachable] (that
+        fragment has no stale reads at all).  The proof is the view-domination
+        induction §9(1) asked for, one conjunct per view component.
 
-    (2) §9(1)'s SPEC AS STATED IS FALSE, and this file says exactly why and
-        where.  There are TWO independent leaks, both of the same shape — the
-        machine delivers a view along a path that [ppo_op] has no arm for, so
-        the machine forbids runs the axioms permit and completeness fails:
+    (2) THE NAMED TOP LEVEL (§14): [srvwmo_consistent] and
+        [srvwmo_realizable], with the ppo residue table of the settled
+        axiomatization next to them.
 
-        (a) THE RELEASE/ACQUIRE LEAK.  [store_post] raises [w_vRel] on a [.rl]
-            store and [load_vpre] joins [w_vRel] on an [.aq] load, so a release
-            store orders every later acquire load of the SAME agent with no
-            fence at all.  RVWMO's ppo rule 7 orders such a pair only when
-            BOTH are RCsc-annotated, and [ppo_op] models neither rule.
-            Witness (§13, machine-checked): agent 1 stores byte [y];
-            agent 0 stores byte [x] with [rl]; agent 0 acquire-loads [y] and
-            reads timestamp 0.  Machine-blocked ([w_vRel = 2] is in the
-            load's floor and timestamp 1 writes [y] inside the window), yet
-            no [ppo_op] edge, no [ord_pw]/[ord_pr] edge, and no coherence
-            cycle exists — [cand_axiomatic_ok] holds.
+    ONE PREMISE, AND WHY IT IS THE ONLY ONE.  A premise here marks a place
+    where THE MACHINE IS STRONGER THAN THE MODELLED [ppo] — free for
+    SOUNDNESS, fatal for COMPLETENESS.  Slice 1 §7(3) and slice 2 §6(b)
+    recorded two such seams; both are now closed at the source, and only the
+    proof-side residue of the second remains as a hypothesis:
 
-        (b) THE FORWARD-BANK LEAK — SINCE REMOVED AT ITS SOURCE (D-7,
-            2026-08-17); see (b') below.  As it stood: [store_post] banked
-            [w_vwNew] and [fwd_view] handed that BANKED view to a plain read
-            of the agent's own store, whence [w_vrOld] and then, past a
-            [pr,sr] fence, [w_vrNew].  The source of such a value is a
-            publication that reached [w_vwNew] through a fence with [sw] —
-            and [ord_pw] / [ord_pr] both require [sr], so no single [ord]
-            edge, and in fact no [ob] path at all, connects the source to the
-            target read.
-            Witness (§14(1), argued in full, not machine-checked):
-            [store x; fence pw,sw; store y; load y (forwarded);
-            fence pr,sr; load a] against a foreign write of [a] below the
-            first store's timestamp.
+    (a) THE RELEASE/ACQUIRE SEAM — CLOSED BY STRENGTHENING THE MODEL.
+        [store_post] raises [w_vRel] on a [.rl] store and [load_vpre] joins
+        [w_vRel] on an [.aq] load, so a release store orders every later
+        acquire load of the SAME agent with no fence at all.  That pair is
+        RVWMO ppo rule 7, and it now IS in the model:
+        [WeakAxiomatic2.rel_acq_po] is [ppo_op]'s fifth arm and
+        [WeakAxiomatic2.ax_rel_ord] is the ordering axiom it generates (a
+        conjunct of [cand_axiomatic_ok]).  §13's witness — agent 1 stores
+        byte [y]; agent 0 stores byte [x] with [rl]; agent 0 acquire-loads
+        [y] and reads timestamp 0 — used to be machine-blocked yet
+        axiomatically consistent, which is what made completeness FALSE and
+        forced the old [cand_rl_free] premise; it is now axiomatically
+        INCONSISTENT ([ce_rl_true_inconsistent]) and the premise is gone.
 
-        (b') WHAT CHANGED.  [WeakMem.store_post] now banks PARM's
-            dependency-free [FwdItem] view [0] instead of [w_vwNew] (deps
-            design §2.3′ D-7: the fence floor was LARGER than PARM's and so
-            REMOVED hardware behaviours).  A forwarded plain read therefore
-            contributes [max vpre 0 = vpre] — nothing the pre-view did not
-            already carry — so the witness above no longer blocks in the
-            machine, and leak (b) is closed at its source rather than by a
-            premise.  [cand_pub_clean] is nevertheless KEPT here: the
-            induction below uses it at every read (via
-            [cand_pub_clean_pub_r]) to obtain [pub_r], and dropping it needs
-            §8's [w_vrOld]/[w_vrNew] conjuncts re-proved for a forwarded read
-            (whose contribution is now the pre-view, not its timestamp).
-            That re-proof is NOT attempted here, so the theorem below is
-            weaker than it now needs to be — not wrong.
+    (b) THE FORWARD-BANK SEAM — CLOSED BY WEAKENING THE MACHINE (D-7,
+        2026-08-17).  [store_post] used to bank [w_vwNew], and [fwd_view]
+        handed that BANKED view to a plain read of the agent's own store,
+        whence [w_vrOld] and then, past a [pr,sr] fence, [w_vrNew] — a path
+        no single [ord] edge covers ([ord_pw]/[ord_pr] both require [sr],
+        the bank's source needs [sw]).  It now banks PARM's dependency-free
+        [FwdItem] view [0], so a forwarded plain read contributes
+        [max vpre 0 = vpre] and the witness of §15(1) no longer blocks.
 
-        Both leaks are exactly the two seams slice 1 §7(3) and slice 2 §6(b)
-        RECORDED as places where the machine is stronger than the modelled
-        [ppo] — which is free for SOUNDNESS and fatal for COMPLETENESS.  The
-        two premises of (1) close them: [cand_rl_free] kills (a) outright
-        ([w_vRel] stays 0), and [cand_pub_clean] kills (b) by making every
-        read externally sourced or acquire, hence never forwarded
-        ([pub_r_fwd_view]), so no banked view ever enters a view component.
-        (Post-D-7 the bank holds [0], so (b) is dead on the machine side as
-        well; [cand_pub_clean] is retained because the PROOF still uses it.)
+        [cand_pub_clean] SURVIVES AS A PROOF-SIDE PREMISE ONLY: the induction
+        below uses it at every read (via [cand_pub_clean_pub_r]) to obtain
+        [pub_r], and dropping it needs §8's [w_vrOld]/[w_vrNew] conjuncts
+        re-proved for a forwarded read, whose contribution is now the
+        pre-view rather than its timestamp.  That re-proof is not attempted
+        here, so the theorem below is weaker than it now needs to be — not
+        wrong.
 
     Slice 2's definitions are used verbatim; nothing here weakens any of them.
     DEPENDENCY-FREE like its parents: stdpp + [WeakMem] + [WeakAxiomatic] +
@@ -412,10 +397,14 @@ Qed.
     - [ord_dom E i k n] — DELIVERED: some publication ≥ n is [ord]-before
       EVERY future step of agent [i].  Turns into [frdom] by [ax_ord].  This
       is the invariant of [w_vrNew] (and, when [aq], of the load pre-view).
-    - [rsrc] / [wsrc] — PENDING: some read (resp. write) publication ≥ n sits
-      po-before [k] in agent [i].  These are the invariants of [w_vrOld] and
-      [w_vwOld]; a fence with the matching pred bit and [sr] promotes them to
-      [ord_dom], which is exactly [fence_post]'s [v1] join.
+    - [rsrc] / [wsrc] / [relsrc] — PENDING: some read (resp. write, resp.
+      RELEASE write) publication ≥ n sits po-before [k] in agent [i].  These
+      are the invariants of [w_vrOld], [w_vwOld] and [w_vRel]; a fence with
+      the matching pred bit and [sr] promotes the first two to [ord_dom],
+      which is exactly [fence_post]'s [v1] join, and an ACQUIRE READ promotes
+      the third (RVWMO ppo rule 7 then rule 5 — [relsrc_acq]), which is
+      exactly [load_post_at]'s [aq] arm absorbing [load_vpre] into
+      [w_vrNew].
 
     [ord_dom] is stated with the target quantified — that is the technical
     heart: [fence_between] and [acq_po] are monotone in the target, so
@@ -435,7 +424,8 @@ Definition ord_dom (E : exec) (i : agent) (k : nat) (n : nat) : Prop :=
   ∀ k2 s2, (k ≤ k2)%nat → ex_tr E !! k2 = Some s2 → es_ag s2 = i →
     ∃ e1 t, (n ≤ t)%nat ∧
       ((ord_pw E e1 (ev_at k2) ∧ pub_w E e1 t) ∨
-       (ord_pr E e1 (ev_at k2) ∧ pub_r E e1 t)).
+       (ord_pr E e1 (ev_at k2) ∧ pub_r E e1 t) ∨
+       (rel_ord E e1 (ev_at k2) ∧ pub_w E e1 t)).
 
 Definition rsrc (E : exec) (i : agent) (k : nat) (n : nat) : Prop :=
   (n = 0)%nat ∨
@@ -445,6 +435,13 @@ Definition rsrc (E : exec) (i : agent) (k : nat) (n : nat) : Prop :=
 Definition wsrc (E : exec) (i : agent) (k : nat) (n : nat) : Prop :=
   (n = 0)%nat ∨
   ∃ k1 s1 t, (k1 < k)%nat ∧ ex_tr E !! k1 = Some s1 ∧ es_ag s1 = i ∧
+             pub_w E (ev_at k1) t ∧ (n ≤ t)%nat.
+
+(** [w_vRel]'s invariant: a po-earlier RELEASE write published it. *)
+Definition relsrc (E : exec) (i : agent) (k : nat) (n : nat) : Prop :=
+  (n = 0)%nat ∨
+  ∃ k1 s1 t, (k1 < k)%nat ∧ ex_tr E !! k1 = Some s1 ∧ es_ag s1 = i ∧
+             lb_is_w (es_lb s1) = true ∧ lb_rl (es_lb s1) = true ∧
              pub_w E (ev_at k1) t ∧ (n ≤ t)%nat.
 
 (** [w_vrOld]'s invariant: either already delivered, or pending. *)
@@ -543,6 +540,26 @@ Proof.
   - rewrite Nat.max_l; [lia|done].
 Qed.
 
+Lemma relsrc_le E i k n n' : (n' ≤ n)%nat → relsrc E i k n → relsrc E i k n'.
+Proof.
+  intros Hle [->|(k1 & s1 & t & ?&?&?&?&?&?&?)]; [left; lia|].
+  right. exists k1, s1, t. split_and!; [done|done|done|done|done|done|lia].
+Qed.
+
+Lemma relsrc_wk E i k k' n : (k ≤ k')%nat → relsrc E i k n → relsrc E i k' n.
+Proof.
+  intros Hle [->|(k1 & s1 & t & ?&?&?&?&?&?&?)]; [by left|].
+  right. exists k1, s1, t. split_and!; [lia|done|done|done|done|done|done].
+Qed.
+
+Lemma relsrc_max E i k n1 n2 :
+  relsrc E i k n1 → relsrc E i k n2 → relsrc E i k (Nat.max n1 n2).
+Proof.
+  intros H1 H2. destruct (decide (n1 ≤ n2)%nat) as [Hle|Hgt].
+  - rewrite (Nat.max_r _ _ Hle) //.
+  - rewrite Nat.max_l; [lia|done].
+Qed.
+
 Lemma rdom_le E i k n n' : (n' ≤ n)%nat → rdom E i k n → rdom E i k n'.
 Proof.
   intros Hle [H|H]; [left; by eapply ord_dom_le|right; by eapply rsrc_le].
@@ -568,12 +585,15 @@ Qed.
     edge carries a publication ≥ n" to "no [fr] successor sits at or below
     n". *)
 Lemma ord_dom_frdom E i k n :
-  ax_ord E → ord_dom E i k n → frdom E i k n.
+  ax_ord E → ax_rel_ord E → ord_dom E i k n → frdom E i k n.
 Proof.
-  intros Hax [->|Hd] a; [apply frdom_b_0|].
+  intros Hax Hrax [->|Hd] a; [apply frdom_b_0|].
   intros k2 s2 w Hk Hs2 Hag Hfr.
   destruct (Hd k2 s2 Hk Hs2 Hag) as (e1 & t & Hle & Hcase).
-  pose proof (Hax e1 k2 s2 a w t Hs2 Hcase Hfr). lia.
+  destruct Hcase as [Hc|[Hc|[Hro Hpub]]].
+  - pose proof (Hax e1 k2 s2 a w t Hs2 (or_introl Hc) Hfr). lia.
+  - pose proof (Hax e1 k2 s2 a w t Hs2 (or_intror Hc) Hfr). lia.
+  - pose proof (Hrax e1 k2 s2 a w t Hs2 Hro Hpub Hfr). lia.
 Qed.
 
 (** A [pr,sr] fence promotes a pending READ publication to a delivered one:
@@ -587,7 +607,7 @@ Proof.
   intros Hsf Hag Hlf [->|(k1 & s1 & t & Hlt & Hs1 & Hag1 & Hpub & Hle)];
     [by left|].
   right. intros k2 s2 Hk2 Hs2 Hag2. exists (ev_at k1), t. split; [exact Hle|].
-  right. split; [|exact Hpub]. left.
+  right; left. split; [|exact Hpub]. left.
   exists k1, k2, pw, sw. split_and!; [done|done|].
   exists kf, sf, s1, s2.
   split_and!; [lia|lia|done|done|done|congruence|congruence|done].
@@ -616,9 +636,52 @@ Lemma acq_ord_dom E i k1 s1 t :
   pub_r E (ev_at k1) t → ord_dom E i (S k1) t.
 Proof.
   intros Hs1 Hag Hisr Haq Hpub. right. intros k2 s2 Hk2 Hs2 Hag2.
-  exists (ev_at k1), t. split; [lia|]. right. split; [|exact Hpub].
+  exists (ev_at k1), t. split; [lia|]. right; left. split; [|exact Hpub].
   right. exists k1, k2, s1, s2. split_and!; [done|done|lia|done|done| |done|done].
   congruence.
+Qed.
+
+(** An ACQUIRE READ promotes a pending RELEASE publication to a delivered one:
+    RVWMO ppo rule 7 puts the release write before the acquire read, rule 5
+    ([acq_po]) puts the acquire read before every later step, and
+    [WeakAxiomatic2.rel_ord] is exactly that two-edge chain.  On the machine
+    it is [load_post_at]'s [aq] arm: the acquire absorbs [load_vpre] — and
+    hence [w_vRel] — into [w_vrNew], from where it is monotone forever.
+    The read must actually READ a byte; an empty acquire load moves no view,
+    and correspondingly builds no [rel_ord] edge. *)
+Lemma relsrc_acq E i k s n :
+  ex_tr E !! k = Some s → es_ag s = i →
+  lb_is_r (es_lb s) = true → lb_aq (es_lb s) = true →
+  (∃ a, rd_b E a (ev_at k)) →
+  relsrc E i k n → ord_dom E i (S k) n.
+Proof.
+  intros Hs Hag Hisr Haq Hrd
+         [->|(k1 & s1 & t & Hlt & Hs1 & Hag1 & Hw1 & Hrl1 & Hpub & Hle)];
+    [by left|].
+  right. intros k2 s2 Hk2 Hs2 Hag2. exists (ev_at k1), t. split; [exact Hle|].
+  right; right. split; [|exact Hpub]. right. exists (ev_at k). split_and!.
+  - exists k1, k, s1, s.
+    split_and!; [done|done|lia|done|done|congruence|done|done|done|done].
+  - exact Hrd.
+  - exists k, k2, s, s2.
+    split_and!; [done|done|lia|done|done|congruence|done|done].
+Qed.
+
+(** The same promotion AT the acquire read itself — where the value is still
+    in [w_vRel] and only [load_vpre] joins it, so there is no [ord_dom] to
+    state and the [fr] bound is read straight off [ax_rel_ord]. *)
+Lemma relsrc_frdom_at E i k s n :
+  ax_rel_ord E → ex_tr E !! k = Some s → es_ag s = i →
+  lb_is_r (es_lb s) = true → lb_aq (es_lb s) = true →
+  relsrc E i k n → ∀ a w, fr_b E a (ev_at k) w → (n < ev_ts E w)%nat.
+Proof.
+  intros Hax Hs Hag Hisr Haq
+         [->|(k1 & s1 & t & Hlt & Hs1 & Hag1 & Hw1 & Hrl1 & Hpub & Hle)] a w Hfr.
+  - destruct Hfr as ((w0 & _ & (_ & _ & Hlt0)) & _). lia.
+  - assert (Hra : rel_acq_po E (ev_at k1) (ev_at k)).
+    { exists k1, k, s1, s.
+      split_and!; [done|done|lia|done|done|congruence|done|done|done|done]. }
+    pose proof (Hax (ev_at k1) k s a w t Hs (or_introl Hra) Hpub Hfr). lia.
 Qed.
 
 (* ================================================================== *)
@@ -631,29 +694,34 @@ Qed.
     [store_fold_vrOld] / [store_fold_vrNew] / [store_fold_vRel_norl] /
     [store_fold_vwOld] / [store_fold_coh], and [fence_post_vrNew_pred]) now
     live in [WeakMem.v] next to [ws_bounded]'s preservation lemmas — the W4
-    lift batch, exactly as this file's §14(3) asked.  Nothing is restated
-    here; the uses below are against [WeakMem]'s copies. *)
+    lift batch, exactly as this file's §15(3) asked.  Nothing is restated
+    here; the uses below are against [WeakMem]'s copies.
+
+    ONE addition owes the same lift: the release channel's upper bound.
+    [store_fold_vRel_norl] (in [WeakMem]) says a non-release store leaves
+    [w_vRel] alone; this is its [.rl] companion, in [store_fold_vwOld]'s
+    conditional shape.  It belongs next to that one and is proved here only
+    because this slice may not edit [WeakMem.v]. *)
+
+Lemma store_fold_vRel P rl t as_ ws :
+  maxcl P → P (w_vRel ws) → (rl = true → P t) →
+  P (w_vRel (foldl (λ w a, store_post w rl a t) ws as_)).
+Proof.
+  intros Hcl. revert ws. induction as_ as [|a l IH]; intros ws Hc Ht; [exact Hc|].
+  simpl. apply IH; [|exact Ht]. rewrite /store_post /=.
+  destruct rl; [|exact Hc]. apply maxcl_max; [done|exact Hc|by apply Ht].
+Qed.
 
 (* ================================================================== *)
-(** * 6. The two premises that close the leaks, and the state calculus
+(** * 6. The one remaining premise, and the state calculus
 
-    [cand_rl_free] and [cand_pub_clean] are the two side conditions the
-    counterexamples of the header force.  Both are stated over the candidate's
-    own data and relations — no machine notion — so they are checkable
-    hypotheses of the same kind as [cand_axiomatic_ok]. *)
-
-Definition lb_rl (l : lbl) : bool :=
-  match l with
-  | LStore rl _ _ _ => rl
-  | LRmw _ rl _ _ _ _ _ => rl
-  | _ => false
-  end.
-
-(** No release store: [w_vRel] stays 0, so an acquire load's pre-view is its
-    [w_vrNew] and nothing else.  (Vacuously true of the xv6 kernel image,
-    which contains no release store — see W4's recorded polarity exception.) *)
-Definition cand_rl_free (c : cand) : Prop :=
-  ∀ k s, cd_tr c !! k = Some s → lb_rl (es_lb s) = false.
+    [cand_pub_clean] is the last side condition of the completeness theorem.
+    It is stated over the candidate's own data and relations — no machine
+    notion — so it is a checkable hypothesis of the same kind as
+    [cand_axiomatic_ok].  (Its predecessor [cand_rl_free] is GONE: the model
+    now carries RVWMO ppo rule 7 as [WeakAxiomatic2.rel_acq_po] /
+    [ax_rel_ord], so a release store is an ordering source rather than an
+    excluded shape — see §13.) *)
 
 (** Every byte read is ACQUIRE or EXTERNALLY sourced — i.e. exactly the side
     condition of [pub_r], per byte.  Equivalently: no read is forwarded from
@@ -788,6 +856,7 @@ Context (Hval : cand_values c).
 Context (Hrft : ax_rf_total E).
 Context (Hcohax : ax_coherence E).
 Context (Hordax : ax_ord E).
+Context (Hrelax : ax_rel_ord E).
 
 Lemma cand_read_ts_le k a t v :
   reads_at E k a t v → (t ≤ length (cd_log c k))%nat.
@@ -880,7 +949,7 @@ Definition invw (k : nat) (i : agent) (ws : wstate) : Prop :=
   ord_dom E i k (w_vrNew ws) ∧
   rdom E i k (w_vrOld ws) ∧
   wsrc E i k (w_vwOld ws) ∧
-  w_vRel ws = 0%nat.
+  relsrc E i k (w_vRel ws).
 
 Definition inv (k : nat) (i : agent) : Prop := invw k i (ews E k i).
 
@@ -891,7 +960,7 @@ Proof.
   - by eapply ord_dom_wk.
   - by eapply rdom_wk.
   - by eapply wsrc_wk.
-  - exact Hrel.
+  - by eapply relsrc_wk.
 Qed.
 
 Lemma maxcl_frdom_b i k a : maxcl (frdom_b E i k a).
@@ -902,6 +971,8 @@ Lemma maxcl_rdom i k : maxcl (rdom E i k).
 Proof. split; [left; by left|intros ??; apply rdom_max]. Qed.
 Lemma maxcl_wsrc i k : maxcl (wsrc E i k).
 Proof. split; [by left|intros ??; apply wsrc_max]. Qed.
+Lemma maxcl_relsrc i k : maxcl (relsrc E i k).
+Proof. split; [by left|intros ??; apply relsrc_max]. Qed.
 
 (** The value a read of byte [acc_addr base j] returns. *)
 Lemma cand_read_of k s base ts vs (j : nat) t :
@@ -939,11 +1010,26 @@ Proof.
   intros Hpc Hs Hag Hrd Hlen Haq Hnf Hinv.
   pose proof Hinv as (Hc & Hrn & Hro & Hwo & Hrel).
   set (ws := ews E k i).
+  (* AN EMPTY READ MOVES NOTHING — and builds no [rel_ord] edge either, which
+     is why the release delivery below may assume the load reads a byte. *)
+  destruct (decide (ts = [])) as [->|Hnil].
+  { assert (load_post_run ws aq base [] = ws) as ->
+      by rewrite /load_post_run /load_post_bytes //.
+    eapply invw_wk; [|exact Hinv]. lia. }
   set (ats := zip_with (λ (j : nat) (t : nat), (base + Z.of_nat j, t))
                        (seq 0 (length ts)) ts).
-  (* the pre-view is exactly [w_vrNew], since there are no release stores *)
-  assert (Hvpre : load_vpre ws aq = w_vrNew ws).
-  { rewrite /load_vpre -/ws Hrel. destruct aq; lia. }
+  (* THE RELEASE CHANNEL.  An [.aq] load's pre-view joins [w_vRel], and the
+     load itself is the [rel_ord] edge that delivers it — RVWMO ppo rule 7. *)
+  assert (Hrdb : ∃ a, rd_b E a (ev_at k)).
+  { destruct ts as [|t0 ts']; [by destruct (Hnil eq_refl)|].
+    destruct (cand_read_of k s base (t0 :: ts') vs 0%nat t0 Hs Hrd Hlen eq_refl)
+      as [v Hr].
+    exists (acc_addr base 0%nat), k, t0, v. by split. }
+  assert (Hreldel : ord_dom E i (S k) (if aq then w_vRel ws else 0%nat)).
+  { destruct aq; [|by left].
+    eapply (relsrc_acq E i k s); [by rewrite cand_ex_tr|exact Hag
+                                 |by eapply lb_rd_is_r|exact Haq|exact Hrdb|].
+    exact Hrel. }
   (* per-byte facts *)
   assert (Hread : ∀ p, p ∈ ats → ∃ v, reads_at E k p.1 p.2 v).
   { intros p Hp. destruct (elem_of_zip_seq base ts p Hp) as (j & Hj & ->).
@@ -959,48 +1045,56 @@ Proof.
   assert (Hrs : ∀ p, p ∈ ats → rsrc E i (S k) p.2).
   { intros p Hp. right. exists k, s, p.2.
     split_and!; [lia|by rewrite cand_ex_tr|done|by apply Hpub|lia]. }
-  (* the four conjuncts *)
-  rewrite /load_post_run /load_post_bytes -/ws -/ats Hvpre.
+  (* the five conjuncts *)
+  rewrite /load_post_run /load_post_bytes -/ws -/ats.
   split_and!.
   - intros a. apply load_fold_coh; [apply maxcl_frdom_b|exact Hfv| | |].
     + eapply frdom_b_wk; [|apply Hc]. lia.
-    + eapply ord_dom_frdom; [exact Hordax|]. eapply ord_dom_wk; [|exact Hrn]. lia.
+    + rewrite /load_vpre. apply maxcl_max; [apply maxcl_frdom_b| |].
+      * eapply ord_dom_frdom; [exact Hordax|exact Hrelax|].
+        eapply ord_dom_wk; [|exact Hrn]. lia.
+      * eapply ord_dom_frdom; [exact Hordax|exact Hrelax|exact Hreldel].
     + intros p Hp Heq. rewrite -Heq. by apply Hfrd.
   - destruct aq; last first.
     { rewrite load_fold_vrNew_plain. eapply ord_dom_wk; [|exact Hrn]. lia. }
     apply load_fold_vrNew; [apply maxcl_ord_dom|exact Hfv| | |].
     + eapply ord_dom_wk; [|exact Hrn]. lia.
-    + eapply ord_dom_wk; [|exact Hrn]. lia.
+    + rewrite /load_vpre. apply maxcl_max; [apply maxcl_ord_dom| |].
+      * eapply ord_dom_wk; [|exact Hrn]. lia.
+      * exact Hreldel.
     + intros p Hp. rewrite -Hag.
       apply (acq_ord_dom E (es_ag s) k s p.2);
         [by rewrite cand_ex_tr|done|by eapply lb_rd_is_r|by rewrite Haq|].
       by apply Hpub.
   - apply load_fold_vrOld; [apply maxcl_rdom|exact Hfv| | |].
     + eapply rdom_wk; [|exact Hro]. lia.
-    + left. eapply ord_dom_wk; [|exact Hrn]. lia.
+    + rewrite /load_vpre. apply maxcl_max; [apply maxcl_rdom| |].
+      * left. eapply ord_dom_wk; [|exact Hrn]. lia.
+      * left. exact Hreldel.
     + intros p Hp. right. by apply Hrs.
   - rewrite load_fold_vwOld. eapply wsrc_wk; [|exact Hwo]. lia.
-  - by rewrite load_fold_vRel.
+  - rewrite load_fold_vRel. eapply relsrc_wk; [|exact Hrel]. lia.
 Qed.
 
 Context (Hshape : cand_shape c).
-Context (Hrlf : cand_rl_free c).
 Context (Hatom : ax_atomicity E).
 
 (** *** The store arm
 
     A store publishes its own timestamp ([pub_w]), which is what [w_vwOld]
     records (pending), and raises [coh] on exactly the bytes it writes — where
-    the write event itself is the [po_loc] predecessor. *)
+    the write event itself is the [po_loc] predecessor.  A RELEASE store does
+    one thing more: it publishes on the release channel too ([relsrc]), which
+    the next acquire read of this agent will cash in. *)
 
-Lemma inv_store_fold k s base vs i ws :
+Lemma inv_store_fold k s base vs rl i ws :
   cd_tr c !! k = Some s → es_ag s = i →
-  lb_wr (es_lb s) = Some (base, vs) →
+  lb_wr (es_lb s) = Some (base, vs) → lb_rl (es_lb s) = rl →
   invw (S k) i ws →
-  invw (S k) i (store_post_run ws false base (length vs)
+  invw (S k) i (store_post_run ws rl base (length vs)
                   (ev_ts E (ev_at k))).
 Proof.
-  intros Hs Hag Hwr (Hc & Hrn & Hro & Hwo & Hrel).
+  intros Hs Hag Hwr Hrlb (Hc & Hrn & Hro & Hwo & Hrel).
   assert (Hm : es_wmsg s = Some (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s)))).
   { rewrite /es_wmsg Hwr //. }
   assert (HW : is_W E (ev_at k)).
@@ -1018,7 +1112,10 @@ Proof.
   - by rewrite store_fold_vrNew.
   - by rewrite store_fold_vrOld.
   - apply store_fold_vwOld; [apply maxcl_wsrc|exact Hwo|exact HwsT].
-  - by rewrite store_fold_vRel_norl.
+  - apply store_fold_vRel; [apply maxcl_relsrc|exact Hrel|].
+    intros ->. right. exists k, s, (ev_ts E (ev_at k)).
+    split_and!; [lia|by rewrite cand_ex_tr|exact Hag
+                |by eapply lb_wr_is_w|exact Hrlb|exact Hpw|lia].
 Qed.
 
 (** *** The fence arm — where PENDING becomes DELIVERED *)
@@ -1044,7 +1141,7 @@ Proof.
       by rewrite Hl.
   - rewrite /fence_post /=. eapply rdom_wk; [|exact Hro]. lia.
   - rewrite /fence_post /=. eapply wsrc_wk; [|exact Hwo]. lia.
-  - by rewrite /fence_post /=.
+  - rewrite /fence_post /=. eapply relsrc_wk; [|exact Hrel]. lia.
 Qed.
 
 (** *** One step of the invariant, all four label arms *)
@@ -1060,26 +1157,27 @@ Proof.
   destruct (decide (i = es_ag s)) as [->|Hne]; last first.
   { rewrite /inv (cand_ws_ne c k s i Hs Hne). eapply invw_wk; [|exact Hinv]. lia. }
   pose proof (Hshape k s Hs) as Hsh.
-  pose proof (Hrlf k s Hs) as Hrl.
   rewrite /inv.
   destruct (es_lb s) as [aq base ts vs|rl base vs kc|pr pw sr sw|
-                         aq rl base ts rvs wvs kc] eqn:Hl; simpl in Hsh, Hrl.
+                         aq rl base ts rvs wvs kc] eqn:Hl; simpl in Hsh.
   - (* load *)
     rewrite (cand_ws_load c k s aq base ts vs Hs Hl).
     apply (inv_load_fold k s base ts vs aq (es_ag s) Hpc Hs eq_refl);
       [by rewrite Hl|exact Hsh|by rewrite Hl| |exact Hinv].
     intros a t v Hr. exact (Hnf a t v Hr).
   - (* store *)
-    subst rl. rewrite (cand_ws_store c k s false base vs kc Hs Hl).
-    apply (inv_store_fold k s base vs (es_ag s)); [done|done|by rewrite Hl|].
+    rewrite (cand_ws_store c k s rl base vs kc Hs Hl).
+    apply (inv_store_fold k s base vs rl (es_ag s));
+      [done|done|by rewrite Hl|by rewrite Hl|].
     eapply invw_wk; [|exact Hinv]. lia.
   - (* fence *)
     rewrite (cand_ws_fence c k s pr pw sr sw Hs Hl).
     by apply (inv_fence k s pr pw sr sw (es_ag s)).
   - (* rmw: the load fold, then the store fold on top of it *)
-    subst rl. rewrite (cand_ws_rmw c k s aq false base ts rvs wvs kc Hs Hl).
+    rewrite (cand_ws_rmw c k s aq rl base ts rvs wvs kc Hs Hl).
     destruct Hsh as (Hne0 & Hlenw & Hlenr).
-    apply (inv_store_fold k s base wvs (es_ag s)); [done|done|by rewrite Hl|].
+    apply (inv_store_fold k s base wvs rl (es_ag s));
+      [done|done|by rewrite Hl|by rewrite Hl|].
     apply (inv_load_fold k s base ts rvs aq (es_ag s) Hpc Hs eq_refl);
       [by rewrite Hl|exact Hlenr|by rewrite Hl| |exact Hinv].
     intros a t v Hr. exact (Hnf a t v Hr).
@@ -1169,7 +1267,7 @@ Proof.
     + by left.
     + left; by left.
     + by left.
-    + done.
+    + by left.
   - destruct (lookup_lt_is_Some_2 (cd_tr c) k ltac:(lia)) as [s Hs].
     eapply (inv_step k s i Hpc Hs); [|apply IH; lia].
     intros a t v Hr. eapply (cand_nofwd n k s a t v Hn Hok Hpc); [lia|done|done].
@@ -1206,8 +1304,6 @@ Proof.
   assert (Hlb : log_byte (cd_img c) (cd_log c n) t a = Some v)
     by (by eapply Hval).
   (* the floor is a real timestamp, and it is dominated *)
-  assert (Hvpre : load_vpre ws (lb_aq (es_lb s)) = w_vrNew ws).
-  { rewrite /load_vpre Hrel. destruct (lb_aq (es_lb s)); lia. }
   assert (Hfloor : (Nat.max (load_vpre ws (lb_aq (es_lb s))) (coh ws a)
                     ≤ length (cd_log c n))%nat).
   { pose proof (load_vpre_bounded ws (lb_aq (es_lb s)) _ Hbnd).
@@ -1228,10 +1324,17 @@ Proof.
   assert (Hfr : fr_b E a (ev_at n) w).
   { split; [|exact Hne]. exists w0. split; [exact Hrf0|].
     split_and!; [exact (proj1 Hrf0)|exact Hwb|lia]. }
-  (* ... contradicted by the two dominating conjuncts *)
+  (* ... contradicted by the three dominating conjuncts: [coh], [w_vrNew],
+     and — for an ACQUIRE read — the release channel [w_vRel], whose
+     dominator is the rule-7 edge from the po-earlier release store. *)
   pose proof (Hc a n s w ltac:(lia) ltac:(by rewrite cand_ex_tr) eq_refl Hfr).
-  pose proof (ord_dom_frdom E (es_ag s) n (w_vrNew ws) Hordax Hrn a n s w
+  pose proof (ord_dom_frdom E (es_ag s) n (w_vrNew ws) Hordax Hrelax Hrn a n s w
                 ltac:(lia) ltac:(by rewrite cand_ex_tr) eq_refl Hfr).
+  assert (Hvpre : (load_vpre ws (lb_aq (es_lb s)) < ev_ts E w)%nat).
+  { rewrite /load_vpre. destruct (lb_aq (es_lb s)) eqn:Haq; [|lia].
+    pose proof (relsrc_frdom_at E (es_ag s) n s (w_vRel ws) Hrelax
+                  ltac:(by rewrite cand_ex_tr) eq_refl
+                  ltac:(by eapply lb_rd_is_r) Haq Hrel a w Hfr). lia. }
   lia.
 Qed.
 
@@ -1329,29 +1432,33 @@ End candidate.
 (* ================================================================== *)
 (** * 11. §9(1)'s statement, and the theorem this file proves
 
-    [cand_axiomatic_ok] transcribed verbatim from slice 2 §9(1). *)
+    [cand_axiomatic_ok] is slice 2 §9(1)'s, plus the rule-7 axiom the
+    release→acquire arm contributes ([WeakAxiomatic2.ax_rel_ord]; sound by
+    [sound_rel_ord], so it costs the soundness direction nothing). *)
 
 Definition cand_axiomatic_ok (c : cand) : Prop :=
-  axiomatic_ok (cand_exec c) ∧ (∀ o, ¬ tc (ob_op (cand_exec c)) o o).
+  axiomatic_ok (cand_exec c) ∧ ax_rel_ord (cand_exec c) ∧
+  (∀ o, ¬ tc (ob_op (cand_exec c)) o o).
 
 (** THE COMPLETENESS THEOREM OF THIS SLICE.  §9(1)'s
-    [promise_free_complete] with the two premises the counterexamples of §13/§14
-    force — and nothing else changed. *)
+    [promise_free_complete] with the ONE premise §15(1) still forces. *)
 Theorem promise_free_complete_clean c :
   cand_shape c → cand_values c →
-  cand_rl_free c → cand_pub_clean c →
+  cand_pub_clean c →
   cand_axiomatic_ok c →
   exec_wf (cand_exec c) ∧
   ex_tr (cand_exec c) = cd_tr c ∧ ex_img (cand_exec c) = cd_img c.
 Proof.
-  intros Hsh Hval Hrl Hpc ((Hrft & _ & _ & Hcohax & Hatom & Hordax & _ & _) & _).
-  exact (complete_clean c Hval Hrft Hcohax Hordax Hsh Hrl Hatom Hpc).
+  intros Hsh Hval Hpc
+    ((Hrft & _ & _ & Hcohax & Hatom & Hordax & _ & _) & Hrelax & _).
+  exact (complete_clean c Hval Hrft Hcohax Hordax Hrelax Hsh Hatom Hpc).
 Qed.
 
 (** ... and the same theorem with the hypothesis pared down to what the proof
-    actually uses.  FINDING: [ob]-acyclicity is NOT needed — four LOCAL axioms
-    are ([ax_rf_total], [ax_coherence], [ax_ord], [ax_atomicity]); the other
-    four conjuncts of [axiomatic_ok] and the whole [ob] conjunct are unused.
+    actually uses.  FINDING: [ob]-acyclicity is NOT needed — five LOCAL axioms
+    are ([ax_rf_total], [ax_coherence], [ax_ord], [ax_rel_ord],
+    [ax_atomicity]); the other four conjuncts of [axiomatic_ok] and the whole
+    [ob] conjunct are unused.
     Slice 2 §9(1) expected the opposite ("completeness genuinely needs the
     global axiom").  The reason it does not is recorded in the header: the
     [fence_between] / [acq_po] witnesses are monotone in the target, so a view
@@ -1359,14 +1466,14 @@ Qed.
     [ord] edge from the original publication, which is all [ax_ord] needs. *)
 Theorem promise_free_complete_local c :
   cand_shape c → cand_values c →
-  cand_rl_free c → cand_pub_clean c →
+  cand_pub_clean c →
   ax_rf_total (cand_exec c) → ax_coherence (cand_exec c) →
-  ax_ord (cand_exec c) → ax_atomicity (cand_exec c) →
+  ax_ord (cand_exec c) → ax_rel_ord (cand_exec c) → ax_atomicity (cand_exec c) →
   exec_wf (cand_exec c) ∧
   ex_tr (cand_exec c) = cd_tr c ∧ ex_img (cand_exec c) = cd_img c.
 Proof.
-  intros Hsh Hval Hrl Hpc Hrft Hcohax Hordax Hatom.
-  exact (complete_clean c Hval Hrft Hcohax Hordax Hsh Hrl Hatom Hpc).
+  intros Hsh Hval Hpc Hrft Hcohax Hordax Hrelax Hatom.
+  exact (complete_clean c Hval Hrft Hcohax Hordax Hrelax Hsh Hatom Hpc).
 Qed.
 
 (* ================================================================== *)
@@ -1525,24 +1632,36 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** * 13. COUNTEREXAMPLE (a): the release/acquire leak refutes §9(1)
+(** * 13. THE RELEASE/ACQUIRE WITNESS, on both sides of the model
 
     Three steps, two bytes, no fence:
 
       ts 1 : agent 1 stores byte 0
-      ts 2 : agent 0 stores byte 1 WITH [rl]
+      ts 2 : agent 0 stores byte 1, [rl] iff the section's [rl] is set
       then : agent 0 ACQUIRE-loads byte 0 and reads timestamp 0 (the image)
 
-    The machine REFUSES the third step: [store_post] put timestamp 2 into
-    agent 0's [w_vRel], [load_vpre] of an acquire joins it, and timestamp 1
-    writes byte 0 inside the window (0,2].  Yet the candidate satisfies every
-    axiom of [cand_axiomatic_ok] — there is no fence, so [ord_pw]/[ord_pr] are
-    empty, agent 0 touches each byte once so there is no [po_loc], and
-    [ppo_op] is empty outright, so [ob] is acyclic for the trivial reason.
+    [rl = true] — MACHINE-BLOCKED AND AXIOMATICALLY INCONSISTENT.  The
+    machine refuses the third step ([ce_rl_blocked]): [store_post] put
+    timestamp 2 into agent 0's [w_vRel], an acquire's [load_vpre] joins it
+    ([ce_rl_floor]: the floor is 2), and timestamp 1 writes byte 0 inside the
+    window (0,2].  The model refuses it too ([ce_rl_true_inconsistent]): the
+    release store is [rel_acq_po]-before the acquire load (RVWMO ppo rule 7),
+    the acquire load is [fr]-before agent 1's store of byte 0, and that store
+    sits at timestamp 1 BELOW the release store's timestamp 2 — which is what
+    [ax_rel_ord] forbids.  This candidate is exactly why the arm exists: with
+    [ppo_op] lacking it, the same trace passed every axiom while the machine
+    blocked it, and completeness was false ([cand_rl_free] used to be the
+    premise that excluded it).
 
-    RVWMO orders a release store before a later acquire load only when both
-    are RCsc (ppo rule 7); this machine orders them unconditionally.  That is
-    the leak, and [cand_rl_free] is exactly its negation. *)
+    [rl = false] — MACHINE-REACHABLE ([ce_rl_stale_reachable], via §11's
+    theorem) and not an SC candidate: agent 0 reads a value timestamp 1 has
+    already overwritten.  Nothing in the trace changes but the annotation, so
+    the pair is also the non-vacuity witness for the arm.
+
+    Note the return leg of the inconsistency: [fr] then the TIMESTAMP order
+    on writes, not an [ob_op] edge — agent 1's store is an [ob_op] sink here.
+    That is why the arm's axiomatic content is [ax_rel_ord] and not a cycle
+    in [ob_op] (whose acyclicity this candidate still satisfies). *)
 
 Section ce_rl.
 Context (rl : bool) (v : bv 8).
@@ -1700,14 +1819,32 @@ Proof.
   by apply (ce_rl_wr2 a).
 Qed.
 
-Lemma ce_rl_no_ppo o1 o2 : ¬ ppo_op (cand_exec (ce_rl rl v)) o1 o2.
+(** With no [.rl] anywhere in the trace there is no rule-7 edge, hence no
+    [rel_ord] edge at all. *)
+Lemma ce_rl_no_rel_acq e1 e2 :
+  rl = false → ¬ rel_acq_po (cand_exec (ce_rl rl v)) e1 e2.
 Proof.
-  intros [[Hpo Hw2]|[[Ha Hpl]|[[Hord _]|(Hord & _ & _)]]].
+  intros Hrl (k1 & k2 & s1 & s2 & -> & -> & Hlt & Hs1 & Hs2 & Hag & _ & Hrl1 & _).
+  rewrite cand_ex_tr in Hs1.
+  destruct (ce_rl_tr_inv k1 s1 Hs1) as [[-> ->]|[[-> ->]|[-> ->]]];
+    rewrite /= in Hrl1; congruence.
+Qed.
+
+Lemma ce_rl_no_rel_ord e1 e2 :
+  rl = false → ¬ rel_ord (cand_exec (ce_rl rl v)) e1 e2.
+Proof.
+  intros Hrl [H|(em & H & _ & _)]; by apply (ce_rl_no_rel_acq _ _ Hrl H).
+Qed.
+
+Lemma ce_rl_no_ppo : rl = false → ∀ o1 o2, ¬ ppo_op (cand_exec (ce_rl rl v)) o1 o2.
+Proof.
+  intros Hrl o1 o2 [[Hpo Hw2]|[[Ha Hpl]|[[Hord _]|[(Hord & _ & _)|[Hrel _]]]]].
   - destruct (ce_rl_po _ _ Hpo) as [_ Heq]. rewrite Heq in Hw2.
     by apply (ce_rl_wr2 o2.1).
   - by apply (ce_rl_no_poloc o1.1 o1.2 o2.2).
   - by destruct (ce_rl_no_fence o1.2 o2.2) as [H _].
   - by destruct (ce_rl_no_fence o1.2 o2.2) as [_ H].
+  - by apply (ce_rl_no_rel_acq o1.2 o2.2 Hrl Hrel).
 Qed.
 
 End ce_rl_ax.
@@ -1745,9 +1882,15 @@ Proof.
   by destruct Hcase as [[Hord _]|[Hord _]].
 Qed.
 
-Theorem ce_rl_axiomatic_ok : cand_axiomatic_ok (ce_rl rl v).
+Lemma ce_rl_ax_rel_ord : rl = false → ax_rel_ord (cand_exec (ce_rl rl v)).
 Proof.
-  split.
+  intros Hrl e1 k2 s2 a w t Hs2 Hro _ _.
+  by destruct (ce_rl_no_rel_ord rl v e1 (ev_at k2) Hrl Hro).
+Qed.
+
+Theorem ce_rl_axiomatic_ok : rl = false → cand_axiomatic_ok (ce_rl rl v).
+Proof.
+  intros Hrl. split_and!.
   - split_and!.
     + by apply cand_rf_total, ce_rl_values.
     + apply cand_rf_functional.
@@ -1757,8 +1900,9 @@ Proof.
     + apply ce_rl_ax_ord.
     + by apply cand_no_thin_air, ce_rl_values.
     + apply cand_po_ww_gmo.
+  - by apply ce_rl_ax_rel_ord.
   - apply (ob_op_acyc_simple (ce_rl rl v) (ce_rl_values rl v));
-      [apply ce_rl_no_ppo|apply ce_rl_no_rw].
+      [by apply ce_rl_no_ppo|apply ce_rl_no_rw].
 Qed.
 
 (** The floor the machine computes at the acquire load: [w_vRel] = 2. *)
@@ -1784,46 +1928,57 @@ Proof.
 Qed.
 
 (** ================================================================ *)
-(** ** THE REFUTATIONS
+(** ** THE WITNESS, ON THE MODEL SIDE
 
-    Both are stated against §9(1)'s own vocabulary, so they can be read as
-    "the conjecture, negated". *)
+    [ce_rl true v] fails [cand_axiomatic_ok] — the machine's refusal
+    ([ce_rl_blocked]) is now the model's refusal too.  The offending
+    configuration, spelled out: the release store [ev_at 1] (timestamp 2) is
+    [rel_acq_po]-before the acquire load [ev_at 2] (rule 7), the acquire load
+    is [fr]-before agent 1's store [ev_at 0] of byte 0 (it read the image at
+    timestamp 0, and [ev_at 0] wrote that byte at timestamp 1), and
+    [1 < 2] — so [ax_rel_ord] is violated. *)
+Section ce_rl_true.
+Context (v : bv 8).
+Local Notation Ec := (cand_exec (ce_rl true v)).
 
-(** (i) §9(1)'s [promise_free_complete] is FALSE. *)
-Theorem promise_free_complete_false :
-  ∃ c : cand,
-    cand_shape c ∧ cand_values c ∧ cand_axiomatic_ok c ∧
-    ¬ exec_wf (cand_exec c).
+Theorem ce_rl_true_inconsistent : ¬ cand_axiomatic_ok (ce_rl true v).
 Proof.
-  exists (ce_rl true (BV 8 0)). split_and!.
-  - apply ce_rl_shape.
-  - apply ce_rl_values.
-  - apply ce_rl_axiomatic_ok.
-  - apply (ce_rl_blocked (BV 8 0)).
+  intros (_ & Hrelax & _).
+  (* the two writes of byte 0: the image, and agent 1's store at timestamp 1 *)
+  assert (Hwi : wr_b Ec 0 ev_init) by (apply cand_wr_b_init; by eexists).
+  assert (Hw0 : wr_b Ec 0 (ev_at 0%nat)).
+  { apply (cand_wr_b (ce_rl true v) 0%nat (EStep 1 (LStore false 0 [v] WCplain))
+             (WMsg 0 [v] (Some 1%nat) WCplain) 0 eq_refl eq_refl).
+    rewrite /msg_byte /=. by eexists. }
+  assert (Hts0 : ev_ts Ec (ev_at 0%nat) = 1%nat).
+  { rewrite (cand_ev_ts (ce_rl true v) 0%nat ltac:(simpl; lia))
+            /cd_log /ce_rl /ce_rl_tr //. }
+  assert (Hts1 : ev_ts Ec (ev_at 1%nat) = 2%nat).
+  { rewrite (cand_ev_ts (ce_rl true v) 1%nat ltac:(simpl; lia))
+            /cd_log /ce_rl /ce_rl_tr //. }
+  (* the acquire load reads the image, and so is [fr]-before that store *)
+  assert (Hr : reads_at Ec 2%nat 0 0%nat v).
+  { exists (EStep 0 (LLoad true 0 [0]%nat [v])), 0, [0]%nat, [v], 0%nat.
+    split_and!; [done|done|done|done|rewrite /acc_addr; lia]. }
+  assert (Hfr : fr_b Ec 0 (ev_at 2%nat) (ev_at 0%nat)).
+  { split; [|done]. exists ev_init. split.
+    - split; [exact Hwi|]. exists 2%nat, 0%nat, v. by split_and!.
+    - split_and!; [exact Hwi|exact Hw0|rewrite Hts0 /ev_ts /=; lia]. }
+  (* the rule-7 edge, and the release store's publication *)
+  assert (Hra : rel_acq_po Ec (ev_at 1%nat) (ev_at 2%nat)).
+  { exists 1%nat, 2%nat, (EStep 0 (LStore true 1 [v] WCplain)),
+           (EStep 0 (LLoad true 0 [0]%nat [v])).
+    split_and!; [done|done|lia|done|done|done|done|done|done|done]. }
+  assert (Hpub : pub_w Ec (ev_at 1%nat) (ev_ts Ec (ev_at 1%nat))).
+  { split_and!; [|by eexists|done].
+    exists (EStep 0 (LStore true 1 [v] WCplain)). by split. }
+  pose proof (Hrelax (ev_at 1%nat) 2%nat (EStep 0 (LLoad true 0 [0]%nat [v]))
+                0 (ev_at 0%nat) (ev_ts Ec (ev_at 1%nat)) eq_refl
+                (or_introl Hra) Hpub Hfr).
+  lia.
 Qed.
 
-(** (ii) ... and so is the VIEW-DOMINATION lemma it rests on, at the same
-    witness: the floor is 2, the only candidate dominator is the init
-    operation (there is no [ppo_op] edge at all), and [opos] of an init
-    operation is 0. *)
-Theorem view_domination_false :
-  ∃ (c : cand) (k : nat) (s : estep) (i : agent) (a : Z),
-    cand_shape c ∧ cand_values c ∧ cand_axiomatic_ok c ∧
-    cd_tr c !! k = Some s ∧ es_ag s = i ∧
-    ¬ (∃ o : mop,
-         (o = (a, ev_init) ∨ ppo_op (cand_exec c) o (a, ev_at k)) ∧
-         (Nat.max (load_vpre (ms_ws (stt (cand_exec c) k) i) (lb_aq (es_lb s)))
-                  (coh (ms_ws (stt (cand_exec c) k) i) a)
-          ≤ opos (cand_exec c) o.1 o.2)%nat).
-Proof.
-  exists (ce_rl true (BV 8 0)), 2%nat, (EStep 0 (LLoad true 0 [0]%nat [BV 8 0])),
-         0%nat, 0.
-  split_and!; [apply ce_rl_shape|apply ce_rl_values|apply ce_rl_axiomatic_ok
-              |done|done|].
-  intros (o & [->|Hppo] & Hle).
-  - rewrite /= opos_init (ce_rl_floor (BV 8 0)) in Hle. lia.
-  - by apply (ce_rl_no_ppo true (BV 8 0) o (0, ev_at 2%nat)).
-Qed.
+End ce_rl_true.
 
 (** ================================================================ *)
 (** ** NON-VACUITY: the same trace WITHOUT the release annotation is
@@ -1838,10 +1993,8 @@ Proof.
   - eapply promise_free_complete_clean.
     + apply ce_rl_shape.
     + apply ce_rl_values.
-    + intros k s Hs. rewrite /ce_rl /ce_rl_tr /= in Hs.
-      by destruct k as [|[|[|k]]]; simplify_eq/=.
     + apply ce_rl_pub_clean.
-    + apply ce_rl_axiomatic_ok.
+    + by apply ce_rl_axiomatic_ok.
   - intros Hlat.
     destruct (Hlat 2%nat (EStep 0 (LLoad true 0 [0]%nat [v])) 0 [0]%nat [v]
                 eq_refl eq_refl 0%nat 0%nat eq_refl) as [_ Hnw].
@@ -1851,19 +2004,87 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** * 14. WHAT THIS SLICE DOES NOT DO
+(** * 14. THE NAMED TOP LEVEL: sRVWMO
+
+    sRVWMO is RVWMO with ONE ordering rule added — [ax_po_ww_gmo]'s
+    generalisation "po ∩ (M × W) ⊆ gmo", stores are never early — and with
+    its ppo fragment restricted to what the promise-free machine actually
+    enforces.  [srvwmo_consistent] is that model, over a candidate; the
+    realizability theorem is T1, the direction tier-1 safety consumes.
+
+    THE ppo RESIDUE TABLE (design doc "SETTLED AXIOMATIZATION", 2026-08-19).
+    sRVWMO's ppo = RVWMO rules 1–5, 7, 14.  Where each of the others went:
+
+<<
+      rule                             status here
+      -----------------------------------------------------------------
+      1–3  same-address pairs          IN   [po_loc_b] / [ax_coherence]
+      4    fence pred/succ             IN   [ord_pw] / [ord_pr] / [ax_ord]
+      5    acquire annotation on a     IN   [acq_po] (inside [ord_pr])
+      7    RCsc pair (rl before aq)    IN   [rel_acq_po] / [ax_rel_ord]
+                                            — this slice's arm; the machine's
+                                            form is unconditional, which
+                                            coincides with rule 7 under
+                                            RISC-V's all-RCsc annotations
+      14   b is a store (NEW)          IN   [ppo_op]'s first arm, in full
+      -----------------------------------------------------------------
+      6    release annotation on b     OMITTED: the machine does not enforce
+                                       it; its only non-redundant corner is a
+                                       release-annotated LOAD ([lr.rl]), which
+                                       no ISA-sane code emits
+      8    LR/SC pair                  REDUNDANT under 14 (right end a store)
+      10, 11, 13                       REDUNDANT under 14 (right end a store)
+      9  (store half)                  REDUNDANT under 14
+      9  (LOAD half: addr-dependent    OMITTED **BECAUSE OF D-8**, not by
+          loads)                       vacuity — [read_ok_d]'s [vaddr] floor
+                                       IS a live binding site; the xv6
+                                       instance's loads carry [asrc = []], so
+                                       the site is unreachable.  IF D-8 IS
+                                       EVER DROPPED, RULE 9's LOAD HALF COMES
+                                       STRAIGHT BACK INTO THE DEFINITION.
+      12   forwarding pipeline         OMITTED via the [dep_dom] domination
+                                       argument (every dependency view is
+                                       dominated by [w_vrOld] at every
+                                       pf-reachable state), which must LAND
+                                       separately
+>>
+
+    Exclusive pairs stay FUSED in this presentation: the projection re-fuses a
+    split machine pair (value-exact inside [excl_ok]'s window), and a DANGLING
+    exclusive read projects as a plain load with no atomicity obligation. *)
+
+Definition srvwmo_consistent (c : cand) : Prop :=
+  cand_shape c ∧ cand_values c ∧ cand_axiomatic_ok c.
+
+(** T1 FOR THIS FRAGMENT: an sRVWMO-consistent candidate is realized by the
+    promise-free machine, with the same trace and the same image.  The single
+    remaining premise is [cand_pub_clean]; deleting it is task A3(ii) (re-prove
+    §8's [w_vrOld]/[w_vrNew] conjuncts for a FORWARDED read, whose
+    contribution post-D-7 is the pre-view rather than its timestamp, plus the
+    ~150-line generalisation §15(1) prices). *)
+Theorem srvwmo_realizable c :
+  srvwmo_consistent c →
+  cand_pub_clean c →            (* A3(ii) deletes this *)
+  exec_wf (cand_exec c) ∧
+  ex_tr (cand_exec c) = cd_tr c ∧ ex_img (cand_exec c) = cd_img c.
+Proof.
+  intros (Hsh & Hval & Hax) Hpc. by apply promise_free_complete_clean.
+Qed.
+
+(* ================================================================== *)
+(** * 15. WHAT THIS SLICE DOES NOT DO
 
     As in slices 1 and 2, everything that does not close is a comment, not an
-    [Axiom]: [Print Assumptions] on [promise_free_complete_clean],
-    [promise_free_complete_local], [promise_free_complete_false],
-    [view_domination_false] and [ce_rl_stale_reachable] all report "Closed
+    [Axiom]: [Print Assumptions] on [srvwmo_realizable],
+    [promise_free_complete_clean], [promise_free_complete_local],
+    [ce_rl_true_inconsistent] and [ce_rl_stale_reachable] all report "Closed
     under the global context".
 
     ------------------------------------------------------------------
     (1) COUNTEREXAMPLE (b) — THE FORWARD-BANK LEAK — is ARGUED HERE AND NOT
-    MACHINE-CHECKED.  It is what forces the second premise, [cand_pub_clean],
-    and it is a genuinely different leak from §13's: it survives
-    [cand_rl_free].  The witness, in this file's vocabulary:
+    MACHINE-CHECKED.  It is what forces the one surviving premise,
+    [cand_pub_clean], and it is a genuinely different leak from §13's: it
+    survives a release-free trace.  The witness, in this file's vocabulary:
 
 <<
       Definition ce_fwd_tr : list estep :=
@@ -1919,41 +2140,38 @@ Qed.
     each a ten-line computation of the shape already landed in §13.
 
     ------------------------------------------------------------------
-    (2) THE TWO PREMISES ARE NOT COSMETIC, and the fix is a DESIGN decision.
-    Each of them corresponds to a place where THE MACHINE IS STRONGER THAN THE
-    MODELLED [ppo] — the polarity that is free for soundness and fatal for
-    completeness.  Three ways out, for the coordinator:
+    (2) WHY ONE PREMISE REMAINS, AND WHERE THE OTHER WENT.  A premise here
+    marks a place where THE MACHINE IS STRONGER THAN THE MODELLED [ppo] — the
+    polarity that is free for soundness and fatal for completeness.  Both
+    original leaks are now closed AT THE SOURCE rather than by a premise:
 
-    (a) KEEP THE PREMISES (what this file does).  [cand_rl_free] is vacuous
-        for the kernel (no release store in the image — W4's recorded polarity
-        exception), and [cand_pub_clean] excludes read-own-write, which the
-        kernel does do; so as a characterization this is a real restriction.
-    (b) STRENGTHEN [ppo_op] with the two missing arms — a release-store ->
-        acquire-load arm (RVWMO ppo rule 7 restricted to this machine's
-        unconditional version), and a "banked publication" arm of the shape
-        [src -(fence with sw)-> store -rfi-> read -(fence pr,sr)-> target].
-        The second is NOT a single edge: the store/forward step can repeat, so
-        the arm has to be a transitive closure — this is where §9(1)'s
-        "fence delivery is transitive" warning is genuinely binding, even
-        though the plain (unforwarded) path collapses to one [ord] edge.
-    (c) WEAKEN THE MACHINE to match [ppo_op] — drop [w_vRel] from
-        [load_vpre]'s acquire arm, and bank [0] instead of [w_vwNew].  Both
-        are ADEQUACY-SAFE in the sense that they only remove ordering, but
-        both change [WeakMem.v], i.e. they are Decision-3-level calls.
-        HALF OF (c) HAS LANDED (D-7, 2026-08-17, for an independent reason —
-        the fence floor was a behaviour-REDUCING deviation from RVWMO ppo 12):
-        [store_post] banks [0].  So (b)'s leak is gone and [cand_pub_clean] is
-        now only a PROOF-side premise; the [w_vRel] half of (c) is untouched
-        and [cand_rl_free] still corresponds to a real machine/[ppo_op] gap.
+    - the RELEASE/ACQUIRE leak, by STRENGTHENING THE MODEL: [ppo_op] carries
+      RVWMO ppo rule 7 ([rel_acq_po]) and [cand_axiomatic_ok] carries the
+      ordering axiom it generates ([ax_rel_ord], sound by
+      [WeakAxiomatic2.sound_rel_ord]).  §13's witness moved sides
+      ([ce_rl_true_inconsistent]) and [cand_rl_free] is gone.
+    - the FORWARD-BANK leak, by WEAKENING THE MACHINE: D-7 (2026-08-17) makes
+      [store_post] bank [0] instead of [w_vwNew], for the independent reason
+      that the old fence floor was a behaviour-REDUCING deviation from RVWMO
+      ppo 12.  The witness in (1) no longer blocks.
+
+    [cand_pub_clean] therefore survives as a PROOF-side premise only: §8's
+    [w_vrOld]/[w_vrNew] conjuncts are still stated for a read whose
+    contribution IS its timestamp, and a forwarded read now contributes the
+    pre-view instead.  Re-proving those two conjuncts is the whole cost of
+    deleting it (task A3(ii)), together with (1)'s generalisation if the
+    witness is to be mechanised rather than argued.
 
     ------------------------------------------------------------------
     (3) OWED LIFTS (for W4's batch), all proved here against [.vo]s this slice
-    may not edit: [maxcl] and the six upper-bound fold lemmas of §5
+    may not edit: [maxcl] and the upper-bound fold lemmas of §5
     ([load_fold_coh] / [load_fold_vrOld] / [load_fold_vrNew] /
     [store_fold_coh] / [store_fold_vwOld] / [fence_post_vrNew_pred], plus the
     five "this step does not touch that component" equalities) belong in
     [WeakMem.v] next to [ws_bounded]'s preservation lemmas — they are the
     missing THIRD kind of step-function fact (monotone / bounded / DOMINATED).
+    §5's own [store_fold_vRel] — the release channel's bound, proved here for
+    the same reason — belongs there too, next to [store_fold_vRel_norl].
     §1–§3's candidate-level log calculus ([tr_msgs_app], [cd_log_S],
     [cd_log_split], [cand_ev_ts], [cand_ts_writer], [cand_ts_inj],
     [cand_wr_b] / [cand_wr_b_inv]) belongs in [WeakAxiomatic2.v] next to
