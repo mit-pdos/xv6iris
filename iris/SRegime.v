@@ -332,6 +332,14 @@ Proof. intros H. rewrite (effectivePrivilege_mprv0 acc m p H). reflexivity. Qed.
 (* immediately before its [SRegime ...] construction.                      *)
 (* ===================================================================== *)
 
+(* THE EMPTY TLB, as a VALUE.  Post-flip the Bare arm owns no tlb cell, but
+   [sr_slot_acc] still binds a [tlbv] existentially (the walking disjunct and
+   [sr_swp_res_at] are stated over it), so a cell-free arm has to answer that
+   binder with something.  This is the model's own reset value
+   ([rv64d.v]'s [write_reg tlb (vector_init (pow2 6) None)]); nothing reads
+   it, because every Bare residue ignores its index. *)
+Definition tlb_none : type_of_register tlb := vector_init (pow2 6) None.
+
 Section SRegimeDef.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -627,24 +635,6 @@ Section SRegimeDef.
     sr_swp_res_agree : forall rs : regstate,
       sr_swp_res_at (register_lookup satp rs) (register_lookup tlb rs)
       ⊣⊢ sr_swp_res rs;
-    sr_swp_open :
-      sr_inv -∗
-      ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
-        (pcfg : type_of_register pmpcfg_n)
-        (paddr : type_of_register pmpaddr_n),
-        ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
-        satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
-        pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
-        sr_swp_res_at satp0 tlbv;
-    sr_swp_close : forall (satp0 : mword 64) (tlbv : type_of_register tlb)
-        (pcfg : type_of_register pmpcfg_n)
-        (paddr : type_of_register pmpaddr_n),
-      sr_swp_satp_ok satp0 ->
-      pmp_ent0_ok pcfg paddr ->
-      ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
-        pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-        sr_swp_res_at satp0 tlbv -∗ sr_inv;
-
     (* ---- THE WALKING ARM'S RECEIPT, AND THE RE-OPEN IT LICENSES --------
        An engine hands the slot to its leaf FOLDED and must take it back at
        the SAME write set -- the cycle fixed that set before the leaf ran.
@@ -669,16 +659,16 @@ Section SRegimeDef.
            tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv);
 
     (* ---- THE SLOT, AS AN ARM-HONEST ACCESSOR ---------------------------
-       [sr_swp_open] above hands the tlb CELL out unconditionally, and that
-       is the port's own artifact: pre-port the slot went to the leaves
-       FOLDED and the walk's TLB write was absorbed BELOW them.  Handing the
-       cell up forced the Bare arm to fund one, which is what put it in
-       [bare_inv] (6b5d1eb2) and buried kvminithart's flush.
+       There used to be an [sr_swp_open] / [sr_swp_close] pair here that
+       handed the tlb CELL out unconditionally, and that was the port's own
+       artifact: pre-port the slot went to the leaves FOLDED and the walk's
+       TLB write was absorbed BELOW them.  Handing the cell up forced the
+       Bare arm to fund one, which is what put it in [bare_inv] (6b5d1eb2)
+       and buried kvminithart's flush.  Both fields are GONE with the flip.
 
-       This field restores the pre-port boundary at the record.  It is an
-       ACCESSOR because at Bare the cell (while there still is one) has to
-       be HELD ASIDE across the body rather than handed over, and it is
-       DISJUNCTIVE because that is the honest shape:
+       This field is the pre-port boundary at the record.  It is an
+       ACCESSOR because the closing direction has to be a wand the body
+       carries, and it is DISJUNCTIVE because that is the honest shape:
 
          - the WALKING arm hands the cell over, because a Sv39 walk fills
            the TLB and the frame must own it;
@@ -792,19 +782,19 @@ Section SRegimeDef.
      supplies that.  Hence EVERY hart can be in its Bare arm at once, and
      the arm survives the kernel map's growth (a secondary hart spins on
      [started] in Bare long after the boot hart's satp switch). *)
-  (* THE tlb CELL IS A MEMBER, added 2026-08-18 with the swp layer.  At the
-     exec layer nobody owned it (it lived in the sigma the whole-instruction
-     rule handed out); at the swp layer the S-mode frame [HartSFrame.s_Drw]
-     OWNS it, because a Sv39 fetch WRITES it (the TLB fill) and
-     [SRegime.sr_swp_translate] demands [(tlb : register) ∈ Drw].  So every
-     S-mode translation slot must fund that cell, and [tlb_res_pt] already
-     did -- this is the Bare arm catching up.  The cell is unconstrained
-     here: Bare never reads or writes it. *)
+  (* THERE IS NO tlb CELL HERE, AND THAT IS THE WHOLE KVMINITHART LANE.
+     [6b5d1eb2] put one in, on the reading that the swp-layer S-mode frame
+     [HartSFrame.s_Drw] must own it at every arm.  It must not: at Bare
+     [translateAddr] is a bare [returnR] that never consults the TLB, so the
+     Bare frame runs at [s_Drwb] and funds nothing.  Owning it here resealed
+     kvminithart's [sfence.vma] flush into an existential -- and the pre-port
+     proof worked for an ARBITRARY [tlbvec0] precisely because the cell stays
+     in kvminithart's own hand.  See claude-notes/projects/
+     kvminithart-tlb-lane.md §1; do not put it back. *)
   Definition bare_inv : iProp Σ :=
-    (∃ (satp0 : mword 64) (tlbv : type_of_register tlb),
+    (∃ satp0 : mword 64,
        satp ↦ᵣ satp0 ∗
        ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4) ⌝ ∗
-       tlb ↦ᵣ tlbv ∗
        pmp_config (mword_of_int 0))%I.
 
   Lemma bare_absorb :
@@ -838,7 +828,7 @@ Section SRegimeDef.
   Proof.
     intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
     iIntros "Hat Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0 tlbv0) "(Hsatp & %Hmode & Htlb0 & Hpmp)".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
     (* honoring: the claim is ADMISSIBLE, i.e. the identity -- so the pa the
        caller derived from it is va itself, which is what Bare translates to *)
     assert (Hpa : pa = va).
@@ -855,7 +845,7 @@ Section SRegimeDef.
     iSplit; [iPureIntro; left; reflexivity |].
     iSplit; [iPureIntro; exact Hpmp |].
     iFrame "Hri Hgh".
-    iExists satp0, tlbv0. iFrame "Hsatp Htlb0 Hpmp". iPureIntro. exact Hmode.
+    iExists satp0. iFrame "Hsatp Hpmp". iPureIntro. exact Hmode.
   Qed.
 
   Lemma bare_transform :
@@ -871,7 +861,7 @@ Section SRegimeDef.
   Proof.
     intros acc ea σ Hacc Hcp HSXL Heff Hpml.
     iIntros "Hri Hinv".
-    iDestruct "Hinv" as (satp0 tlbv0) "(Hsatp & %Hmode & Htlb0 & Hpmp)".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iPureIntro.
     exact (exec_transform_effective_address_mode acc Bare ea σ Hcp Heff Hpml
@@ -886,7 +876,7 @@ Section SRegimeDef.
   Proof.
     intros σ HSXL.
     iIntros "Hri Hinv".
-    iDestruct "Hinv" as (satp0 tlbv0) "(Hsatp & %Hmode & Htlb0 & Hpmp)".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iPureIntro. exists Bare.
     exact (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode).
@@ -1013,47 +1003,14 @@ Section SRegimeDef.
     iPureIntro. left. reflexivity.
   Qed.
 
-  (* the BARE bundle face.  The residue is nothing, so open/close are just
-     [bare_inv]'s own destructor/constructor plus [pmp_config]'s.
-     ([bare_satp_ok] is stated ABOVE the record -- [sr_slot_acc]'s Bare
-     disjunct names it.) *)
+  (* the BARE residue is nothing.  ([bare_satp_ok] is stated ABOVE the
+     record -- [sr_slot_acc]'s Bare disjunct names it.)  There is no
+     [bare_swp_open] / [bare_swp_close] pair any more: the record's bundle
+     face went with the flip, since neither could hand out a tlb cell. *)
 
   Lemma bare_swp_res_agree (rs : regstate) :
     (True : iProp Σ) ⊣⊢ (True : iProp Σ).
   Proof. reflexivity. Qed.
-
-  Lemma bare_swp_open :
-    bare_inv -∗
-    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
-      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
-      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
-      satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
-      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗ (True : iProp Σ).
-  Proof.
-    iIntros "H". iDestruct "H" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
-    iDestruct "Hpmp" as (pcfg paddr)
-      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
-    iExists satp0, tlbv, pcfg, paddr.
-    iSplitR; [iPureIntro; exact Hmode |].
-    iSplitR;
-      [ iPureIntro; unfold pmp_ent0_ok; split_and!; assumption |].
-    iFrame "Hsatp Htlb Hpcfg Hpaddr".
-  Qed.
-
-  Lemma bare_swp_close (satp0 : mword 64) (tlbv : type_of_register tlb)
-      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
-    bare_satp_ok satp0 ->
-    pmp_ent0_ok pcfg paddr ->
-    ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
-      pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗ (True : iProp Σ) -∗ bare_inv.
-  Proof.
-    intros Hmode (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "Hsatp Htlb Hpcfg Hpaddr _".
-    rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
-    iSplitR; [iPureIntro; exact Hmode |].
-    iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
-              with "Hpcfg Hpaddr").
-  Qed.
 
   (* -------------------------------------------------------------------- *)
   (* THE SIDE CONDITIONS, INTRODUCED FROM THE PURE CONFIG FACTS A LEAF HAS. *)
@@ -1169,10 +1126,12 @@ Section SRegimeDef.
     iIntros "H". iDestruct "H" as %[].
   Qed.
 
-  (* THE BARE ARM's accessor: always the right disjunct.  While [bare_inv]
-     still owns a tlb cell the closer PARKS it -- a frame at Bare cannot
-     touch it, so pinning its value there is sound -- and when the cell
-     leaves [bare_inv] this proof simply stops mentioning one. *)
+  (* THE BARE ARM's accessor: always the right disjunct, and post-flip it
+     does not mention a tlb cell at all -- there is none to park.  The
+     [tlbv] the field existentially binds is still an OBLIGATION (the
+     walking disjunct and [sr_swp_res_at] are stated over it), so the Bare
+     arm answers it with [tlb_none]: its residue is [True] and ignores the
+     index entirely. *)
   Lemma bare_slot_acc :
     bare_inv -∗
     ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -1197,12 +1156,12 @@ Section SRegimeDef.
             satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
             (True : iProp Σ) -∗ bare_inv)) ).
   Proof.
-    iIntros "H". iDestruct "H" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+    iIntros "H". iDestruct "H" as (satp0) "(Hsatp & %Hmode & Hpmp)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     assert (Hpok : pmp_ent0_ok pcfg paddr)
       by (unfold pmp_ent0_ok; split_and!; assumption).
-    iExists satp0, pcfg, paddr, tlbv.
+    iExists satp0, pcfg, paddr, tlb_none.
     iSplitR; [iPureIntro; exact Hmode |].
     iSplitR; [iPureIntro; exact Hpok |].
     iFrame "Hsatp Hpcfg Hpaddr".
@@ -1210,7 +1169,7 @@ Section SRegimeDef.
     iRight. iSplitR; [iPureIntro; exact Hmode |].
     iSplitR; [iPureIntro; exact bare_swp_side_intro |].
     iIntros (tv') "Hsatp Hpcfg Hpaddr _".
-    rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+    rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
     iSplitR; [iPureIntro; exact Hmode |].
     iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
               with "Hpcfg Hpaddr").
@@ -1234,7 +1193,6 @@ Section SRegimeDef.
             (fun _ => True%I) bare_swp_side bare_swp_translate
             bare_swp_translate_wit
             (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
-            bare_swp_open bare_swp_close
             (False%I) _ bare_slot_reopen bare_slot_acc
             (fun _ _ H => H) bare_swp_side_ok
             (fun _ => Bare) bare_swp_mode_ok.
@@ -1751,8 +1709,7 @@ Section SRegimeShared.
             (kpt_swp_res root_ppn) (kpt_swp_side root_ppn)
             (kpt_swp_translate root_ppn) (kpt_swp_translate_wit root_ppn)
             (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
-            (kpt_swp_res_agree root_ppn) (kpt_swp_open root_ppn)
-            (kpt_swp_close root_ppn)
+            (kpt_swp_res_agree root_ppn)
             (True%I) _ (kpt_slot_reopen root_ppn) (kpt_slot_acc root_ppn)
             (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
             (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).

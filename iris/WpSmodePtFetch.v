@@ -546,9 +546,9 @@ End SPtData.
 (* ===================================================================== *)
 (* §3  THE FOLDED INSTRUCTION ENGINE.                                     *)
 (*                                                                       *)
-(* [SmodeCorePt.wp_instr_s_config_sr] hands its leaf the translation      *)
-(* slot's FOUR CELLS (satp / pmpcfg_n / pmpaddr_n / tlb) plus the         *)
-(* regime residue.  That is the port's own artifact -- pre-port           *)
+(* [SmodeCorePt]'s [wp_instr_s_config_sr] used to hand its leaf the       *)
+(* translation slot's FOUR CELLS (satp / pmpcfg_n / pmpaddr_n / tlb) plus *)
+(* the regime residue.  That was the port's own artifact -- pre-port      *)
 (* ([git show main:iris/SmodeCorePt.v]) the leaf took [sr_inv R] FOLDED   *)
 (* and the walk's TLB write was absorbed BELOW it -- and it is what       *)
 (* forces the Bare arm to fund a [tlb] cell it cannot have, since         *)
@@ -630,7 +630,7 @@ Section SPtFolded.
     pc_is pc -∗
     instr pc is_rvc i -∗
     (* THE LEAF'S OBLIGATION, with the slot FOLDED -- pre-port's boundary
-       verbatim.  Gone from it against [wp_instr_s_config_sr]'s: the
+       verbatim.  Gone from it against the deleted cell-handout surface: the
        [∀ satp0 pcfg paddr tv'] binder, [⌜sr_swp_satp_ok R satp0⌝],
        [⌜pmp_ent0_ok pcfg paddr⌝], the four cells and the residue.  A leaf
        that needs any of them takes them from [sda_slot_acc_R] instead --

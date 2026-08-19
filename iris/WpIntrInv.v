@@ -1944,9 +1944,18 @@ Section IntrEngine.
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + av) ∗
      sie_arm kt b p ∗ sr_ktier_wit strans_regime kt)%I.
 
+  (* THE RECEIPT IS THE PRICE OF THE tlb CELL, post-flip.  [strans_inv]'s
+     Bare arm no longer owns one ([SRegime.bare_inv] lost it with the flip),
+     so a cell-handing face can only serve the KPT arm and has to say so.
+     The one consumer is the SIE=1 engine below, which opens with
+     [sie_cap_on_kpt] and therefore holds [kpt_on cpu_id] (persistent) from
+     its first line -- an arm-blind engine could not have used this anyway,
+     since [IntrDefs.sie_cap_on_kpt] already refutes Bare under
+     interrupts-enabled.  Everything ARM-BLIND goes through
+     [sie_cap_frame_acc] / [sie_cap_cells_at] instead. *)
   Lemma sie_cap_to_cells (kt : ktier) (m : regfile) (av : nat) (b : bool)
       (p : mword 64) :
-    sie_cap kt m av b p -∗
+    kpt_on cpu_id -∗ sie_cap kt m av b p -∗
     ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
       ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
@@ -1954,8 +1963,8 @@ Section IntrEngine.
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Hwit)".
-    iDestruct (strans_swp_open with "Htr") as (satp0 tlbv pcfg paddr)
+    iIntros "#Hon (Hstk & Htr & Harm & #Hwit)".
+    iDestruct (strans_swp_open with "Hon Htr") as (satp0 tlbv pcfg paddr)
       "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
     iExists satp0, tlbv, pcfg, paddr.
     iSplitR; [iPureIntro; exact Hsok |].
@@ -2008,12 +2017,12 @@ Section IntrEngine.
     iIntros "(Hstk & Htr & Harm & #Hwit)".
     iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ---- Bare: the frame gets NO cell; the slot keeps it ---- *)
-      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+      iDestruct "Hb" as (satp0) "(Hsatp & %Hmode & Hpmp)".
       iDestruct "Hpmp" as (pcfg paddr)
         "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
       assert (Hpok : pmp_ent0_ok pcfg paddr)
         by (unfold pmp_ent0_ok; split_and!; assumption).
-      iExists s_Drwb, satp0, tlbv, pcfg, paddr.
+      iExists s_Drwb, satp0, tlb_none, pcfg, paddr.
       iSplitR; [iPureIntro; left; split; [reflexivity | exact Hmode] |].
       iSplitR; [iPureIntro; exact Hpok |].
       iSplitR; [rewrite /s_kpt_wit; iLeft; iPureIntro; reflexivity |].
@@ -2031,9 +2040,9 @@ Section IntrEngine.
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
           vm_compute in Hmode. discriminate. }
       iLeft. iFrame "Hpend Hstv".
-      (* the cell comes back at the value it went in at: the Bare frame never
-         held it, so nothing could have moved it *)
-      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      (* nothing to give back but satp and the PMP pair: post-flip the Bare
+         arm owns no tlb cell at all *)
+      rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
       iSplitR; [iPureIntro; exact Hmode |].
       iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
                 Hcov with "Hpcfg Hpaddr").
@@ -2127,12 +2136,12 @@ Section IntrEngine.
         { exfalso. rewrite /s_Drw /s_Drwb in Hbad. set_solver. }
         iDestruct (kpt_on_pending_False with "Hon Hpend") as %[]. }
       subst SD.
-      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+      iDestruct "Hb" as (satp0) "(Hsatp & %Hmode & Hpmp)".
       iDestruct "Hpmp" as (pcfg paddr)
         "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
       assert (Hpok : pmp_ent0_ok pcfg paddr)
         by (unfold pmp_ent0_ok; split_and!; assumption).
-      iExists satp0, tlbv, pcfg, paddr.
+      iExists satp0, tlb_none, pcfg, paddr.
       iSplitR; [iPureIntro; left; exact Hmode |].
       iSplitR; [iPureIntro; exact Hpok |].
       rewrite s_tlb_at_bare.
@@ -2149,7 +2158,7 @@ Section IntrEngine.
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
           vm_compute in Hmode. discriminate. }
       iLeft. iFrame "Hpend Hstv".
-      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
       iSplitR; [iPureIntro; exact Hmode |].
       iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
                 Hcov with "Hpcfg Hpaddr").
@@ -2229,16 +2238,16 @@ Section IntrEngine.
       (paddr : type_of_register pmpaddr_n) :
     strans_satp_ok satp0 ->
     pmp_ent0_ok pcfg paddr ->
-    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+    kpt_on cpu_id -∗ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
     pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
     strans_res_at satp0 tlbv -∗ sie_cap_rest kt m av b p -∗
     sie_cap kt m av b p.
   Proof.
     intros Hsok Hpok.
-    iIntros "Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & #Hwit)".
+    iIntros "#Hon Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & #Hwit)".
     rewrite /sie_cap. iFrame "Hstk Harm Hwit".
     iApply (strans_swp_close satp0 tlbv pcfg paddr Hsok Hpok
-              with "Hsatp Htlb Hpcfg Hpaddr Hres").
+              with "Hon Hsatp Htlb Hpcfg Hpaddr Hres").
   Qed.
 
 
@@ -2345,20 +2354,20 @@ Section IntrEngine.
     iIntros "Htr Hms Hpriv Hmenv #Hpmar #Hhtif #Hmisa".
     iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ================= THE BARE ARM: the EMPTY write set ============= *)
-      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+      iDestruct "Hb" as (satp0) "(Hsatp & %Hmode & Hpmp)".
       iDestruct "Hpmp" as (pcfg paddr)
         "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
       assert (Hpok : pmp_ent0_ok pcfg paddr)
         by (unfold pmp_ent0_ok; split_and!; assumption).
-      iDestruct (sda_frames_in_b dq mst0 menv0 satp0 pmar0 pcfg paddr tlbv
+      iDestruct (sda_frames_in_b dq mst0 menv0 satp0 pmar0 pcfg paddr tlb_none
                    with "Hms Hpriv Hmenv Hsatp Hpmar Hpcfg Hpaddr Hhtif
                          Hmisa") as "[Hrw Hro]".
-      iExists sda_Drwb, satp0, tlbv, pcfg, paddr.
+      iExists sda_Drwb, satp0, tlb_none, pcfg, paddr.
       iSplitR; [iPureIntro; exact sda_disj_b |].
       iSplitR; [iPureIntro; rewrite /sda_Drwb; apply empty_subseteq |].
       iSplitR; [iPureIntro; left; exact Hmode |].
       iSplitR; [iPureIntro; exact Hpok |].
-      iSplitR "Hrw Hro Hpend Hstv Htlb".
+      iSplitR "Hrw Hro Hpend Hstv".
       { (* the translation obligation, at the EMPTY write set *)
         rewrite /sda_tr_obl.
         iIntros (kt' acc kp va ppn rr) "%Hle %Hacc %Hallow %Hlt %Hpin
@@ -2366,15 +2375,15 @@ Section IntrEngine.
         (* POSED, not written inside the application: inside an [ltac:] the
            goal still carries the application's evars. *)
         assert (Hsd : strans_swp_side acc va ppn kp spf_Db sda_Drwb sda_Dro
-                   (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
-                   (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv)
+                   (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlb_none)
+                   (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlb_none)
                       ∅ dev0_state)).
         { apply (strans_swp_side_bare acc va ppn kp spf_Db sda_Drwb
                    sda_Dro _ _ Hacc).
           - rewrite sda_rs_satp. exact Hmode.
           - rewrite sda_rs_mst. exact HMPRV. }
         iApply (sda_translate_D strans_regime sda_Drwb kt kt' (Hle := Hle)
-                  dq acc kp mst0 menv0 satp0 pmar0 pcfg paddr tlbv va ppn
+                  dq acc kp mst0 menv0 satp0 pmar0 pcfg paddr tlb_none va ppn
                   rr Hacc Hallow Hmenv HSXL HMPRV
                   (or_introl Hmode) Hpok Hpma Hlt Hpin sda_disj_b Hsd
                   with "Hwit Hat Hcert Hfrag HRes Hrw Hro"). }
@@ -2393,9 +2402,9 @@ Section IntrEngine.
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
           vm_compute in Hmode. discriminate. }
       iLeft. iFrame "Hpend Hstv".
-      (* the cell was held ASIDE across the body -- Bare's frame does not
-         contain it -- so it comes back at the value it went in at. *)
-      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      (* post-flip there is no cell to hold aside: [bare_inv] is satp plus
+         the PMP pair, and that is all that goes back. *)
+      rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
       iSplitR; [iPureIntro; exact Hmode |].
       iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
                 Hcov with "Hpcfg Hpaddr").
@@ -2945,7 +2954,7 @@ Proof.
             iDestruct "Hsc'" as (mdv') "(%Hmsf' & %Hmm' & _ & _ & Hpriv' &
                                          Hms' & Hhalf' & Htie' & Hmie' &
                                          Hmdl' & Hmenv')".
-            iDestruct (sie_cap_to_cells with "Hcap'")
+            iDestruct (sie_cap_to_cells with "Hkpt Hcap'")
               as (satp1 tlb1 pcfg1 paddr1)
                  "(%Hsok1 & %Hpok1 & Hsatp1 & Htlb1 & Hpcfg1 & Hpaddr1 &
                    Hres1 & Hrest1)".
@@ -3024,7 +3033,7 @@ Proof.
           iSplitL "Hsatp1 Htlb1 Hpcfg1 Hpaddr1 Hres1 Hrest1".
           { iApply (sie_cap_of_cells kt m' av' b' p satp1 tlb1 pcfg1 paddr1
                       Hsok1 Hpok1
-                      with "Hsatp1 Htlb1 Hpcfg1 Hpaddr1 Hres1 Hrest1"). }
+                      with "Hkpt Hsatp1 Htlb1 Hpcfg1 Hpaddr1 Hres1 Hrest1"). }
           srs. iExact "HRv". }
     iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HPsi)".
     iExists (wrap_post rs2 mi). iSplitR; [iPureIntro; by exists rs2, mi|].

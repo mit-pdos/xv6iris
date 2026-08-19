@@ -1454,14 +1454,18 @@ Section IntrDefsBase.
   Proof. reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE BUNDLE FACE.  [strans_inv] hides the four cells the swp engine    *)
-  (* needs in its FRAME; open/close dispatch on the ghost bit and delegate *)
-  (* to the two instances' own faces.  The cross cases are refuted the     *)
-  (* same way the translate's are: the pure satp_ok says Bare while the    *)
-  (* residue's ghost says KPT, or the other way, and the two modes differ. *)
+  (* THE CELL-HANDOUT FACE, AND IT IS KPT-ONLY NOW.  [strans_inv] hides    *)
+  (* the four cells the SIE=1 engine wants in its FRAME, but post-flip the *)
+  (* Bare arm HAS NO tlb CELL, so neither direction can serve it: both     *)
+  (* take [kpt_on cpu_id] and refute the Bare arm outright                 *)
+  (* ([kpt_on_pending_False]).  That costs the one consumer nothing --     *)
+  (* [WpIntrInv]'s SIE=1 engine opens with [sie_cap_on_kpt], which hands   *)
+  (* the receipt over before anything else happens.  The remaining cross   *)
+  (* case is refuted the same way the translate's is: the pure satp_ok     *)
+  (* says Bare while the residue's ghost says KPT, and the modes differ.   *)
   (* ------------------------------------------------------------------ *)
   Lemma strans_swp_open :
-    strans_inv -∗
+    kpt_on cpu_id -∗ strans_inv -∗
     ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
       ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
@@ -1469,15 +1473,8 @@ Section IntrDefsBase.
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       strans_res_at satp0 tlbv.
   Proof.
-    iIntros "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
-    - iDestruct (bare_swp_open with "Hb") as (satp0 tlbv pcfg paddr)
-        "(%Hmode & %Hpmp & Hsatp & Htlb & Hpcfg & Hpaddr & _)".
-      iExists satp0, tlbv, pcfg, paddr.
-      iSplitR; [iPureIntro; left; exact Hmode |].
-      iSplitR; [iPureIntro; exact Hpmp |].
-      iFrame "Hsatp Htlb Hpcfg Hpaddr".
-      rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
-      iPureIntro. exact Hmode.
+    iIntros "#Hon [(Hpend & _ & _) | (Hkpt & Hk)]".
+    { iDestruct (kpt_on_pending_False with "Hon Hpend") as %[]. }
     - iDestruct "Hk" as (root_ppn) "Ht".
       iDestruct (kpt_swp_open root_ppn with "Ht") as (satp0 tlbv pcfg paddr)
         "(%Hsok & %Hpmp & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
@@ -1495,16 +1492,16 @@ Section IntrDefsBase.
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
     strans_satp_ok satp0 ->
     pmp_ent0_ok pcfg paddr ->
-    ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
-      pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-      strans_res_at satp0 tlbv -∗ strans_inv.
+    kpt_on cpu_id -∗ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+    pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    strans_res_at satp0 tlbv -∗ strans_inv.
   Proof.
-    intros Hsok Hpmp. iIntros "Hsatp Htlb Hpcfg Hpaddr Hres".
+    intros Hsok Hpmp. iIntros "#Hon Hsatp Htlb Hpcfg Hpaddr Hres".
     rewrite /strans_res_at.
     iDestruct "Hres" as "[(Hpend & Hstv & %Hmb) | (Hkpt & %Hmk & Hres)]".
-    - iLeft. iFrame "Hpend Hstv".
-      iApply (bare_swp_close satp0 tlbv pcfg paddr Hmb Hpmp
-                with "Hsatp Htlb Hpcfg Hpaddr [//]").
+    - (* the Bare residue cannot survive the receipt, and post-flip it could
+         not absorb the incoming cell either *)
+      iDestruct (kpt_on_pending_False with "Hon Hpend") as %[].
     - destruct Hsok as [Hbad | Hsok].
       { exfalso. rewrite /bare_satp_ok in Hbad. rewrite Hmk in Hbad.
         vm_compute in Hbad. discriminate. }
@@ -1805,13 +1802,13 @@ Section IntrDefsBase.
             strans_res_at satp0 tv' -∗ strans_inv)) ).
   Proof.
     iIntros "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
-    - (* ---- BARE: no cell to the frame; it stays parked here ---- *)
-      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+    - (* ---- BARE: there is NO cell here at all (the flip) ---- *)
+      iDestruct "Hb" as (satp0) "(Hsatp & %Hmode & Hpmp)".
       iDestruct "Hpmp" as (pcfg paddr)
         "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
       assert (Hpok : pmp_ent0_ok pcfg paddr)
         by (unfold pmp_ent0_ok; split_and!; assumption).
-      iExists satp0, pcfg, paddr, tlbv.
+      iExists satp0, pcfg, paddr, tlb_none.
       iSplitR; [iPureIntro; left; exact Hmode |].
       iSplitR; [iPureIntro; exact Hpok |].
       iFrame "Hsatp Hpcfg Hpaddr".
@@ -1826,7 +1823,7 @@ Section IntrDefsBase.
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
           vm_compute in Hmode. discriminate. }
       iLeft. iFrame "Hpend Hstv".
-      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
       iSplitR; [iPureIntro; exact Hmode |].
       iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
                 Hcov with "Hpcfg Hpaddr").
@@ -1902,7 +1899,6 @@ Section IntrDefsBase.
             strans_swp_res strans_swp_side strans_swp_translate
             strans_swp_translate_wit
             strans_res_at strans_satp_ok strans_swp_res_agree
-            strans_swp_open strans_swp_close
             (kpt_on cpu_id) _ strans_slot_reopen strans_slot_acc
             (fun _ _ H => H) strans_swp_side_ok
             strans_mode strans_swp_mode_ok.

@@ -1175,10 +1175,11 @@ Section WpSmodePtGprGamma.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hex Hsm Hinv Hpc Hfile Hinstr Hcont".
-    (* UNBUNDLE rather than ride [wp_instr_s_sr]: the bundle wrapper's fetch
-       obligation does not forward mstatus.MPRV, which the fetch producer
-       needs, and [smode_config] carries it.  So this is the raw-cell engine
-       above, with the bundle taken apart here and rebuilt at the seam. *)
+    (* UNBUNDLE rather than ride a [smode_config]-shaped wrapper: such a
+       wrapper's fetch obligation does not forward mstatus.MPRV, which the
+       fetch producer needs, and [smode_config] carries it.  So this is the
+       folded engine above, with the bundle taken apart here and rebuilt at
+       the seam. *)
     iDestruct (smode_config_unbundle with "Hsm")
       as "(#Hhw & #Hminv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0)
