@@ -30,7 +30,7 @@ Require Import CommonWalk Pt4kWalk KptPt PtAdBits PtTreeAdue SRegime.
 Require Import UserBytes UserFetchCert PtWalkCert UserClassifyAsm.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame HartMemRun.
 Require Import WpDecodeBridge KptGoodb.
-Require Import SmodeCorePt TrampStepPt.
+Require Import SmodeCorePt TrampStepPt WpSmodePtEngine.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -604,6 +604,31 @@ Proof.
   unfold upt_Dw. intros Hr. apply register_beq_eq in Hr. subst r. exact s_w_tlb.
 Qed.
 
+(* the same two at the DATA-access frame, which is what a memory leaf runs
+   the walk on ([WpSmodePtEngine.sda_Drw] / [sda_Dro]) *)
+Lemma upt_Dr_in_sda (r : register) : upt_Dr r = true -> r ∈ sda_Drw ∪ sda_Dro.
+Proof.
+  unfold upt_Dr. intros Hr.
+  repeat (apply orb_prop in Hr; destruct Hr as [Hr|Hr]);
+    apply register_beq_eq in Hr; subst r;
+    solve [ exact sda_in_misa | exact sda_in_menv | exact sda_in_mst
+          | exact sda_in_priv | exact sda_in_satp | exact sda_in_tlb
+          | exact sda_in_pcfg | exact sda_in_paddr | exact sda_in_pma
+          | exact sda_in_htif ].
+Qed.
+
+Lemma upt_Dw_in_sda (r : register) : upt_Dw r = true -> r ∈ sda_Drw.
+Proof.
+  unfold upt_Dw. intros Hr. apply register_beq_eq in Hr. subst r.
+  exact sda_w_tlb.
+Qed.
+
+(* the user table is Sv39, in the shape [HartSMem]'s engines want *)
+Lemma upt_swp_mode_ok (uroot : mword 44) (satp0 : mword 64) :
+  upt_satp_ok_pt uroot satp0 ->
+  satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0)) = Some Sv39.
+Proof. intros (Hmode & _ & _ & _). rewrite Hmode. vm_compute. reflexivity. Qed.
+
 Section UptTramp.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -852,7 +877,123 @@ Section UptTramp.
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
     iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
-              mie1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
+              mie1 menvcfg1 satp0 pcfg paddr Supervisor Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
+              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+    - iApply (utramp_fetch_tr uroot tfp um dq pc mstatus0 satp0 mie_v mdv0
+                menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
+                with "Hhw").
+    - iIntros (tv') "_".
+      iApply ("Hex" $! satp0 pcfg paddr tv' with "[%] [%]");
+        [ exact Hsatpok | exact Hpmpok ].
+    - iNext. iIntros (npc ms1 mdv1 tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc ms1 mdv1 with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+      iApply (upt_swp_close uroot tfp um satp0 tv1 pcfg paddr Hsatpok Hpmpok
+                with "Hsatp Htlbc Hpcfg Hpaddr HRes").
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE USER-LANDING TWIN.                                                *)
+  (*                                                                      *)
+  (* Every trampoline instruction RUNS at Supervisor -- the trap raised    *)
+  (* the privilege before the pc reached the trampoline page -- and all    *)
+  (* but one of them LANDS there too.  The exception is userret's [sret],  *)
+  (* which lands in User; this is [wp_instr_u_pt] with that one cell's     *)
+  (* post value spelled out.  Stated CONCRETELY rather than as a           *)
+  (* privilege-parametric wrapper, so that a leaf's [iApply] against the   *)
+  (* cycle's WP goal has nothing extra to unify.                           *)
+  (* ==================================================================== *)
+  Lemma wp_instr_u_pt_user (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (pc pa : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (mie1 menvcfg1 : mword 64)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    neq_vec (bits_of_virtaddr (Virtaddr pc))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub 39 1) 0)) = false ->
+    svpn_of pc = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub 39 1) 0)) = false ->
+    svpn_of (add_vec_int pc 2) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    utlb_inv_pt uroot tfp um -∗
+    pc_is pc -∗
+    instr pa is_rvc i -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ upt_satp_ok_pt uroot satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ upt_res_pt uroot tfp um tv' -∗
+       clock_res -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } User ∗
+                   mie ↦ᵣ{ dq } mie1 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ upt_res_pt uroot tfp um tv2) ∗
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   resv_any cpu_id)) -∗
+    ▷ (∀ npc ms1 mdv1 : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } User -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
+         mie ↦ᵣ{ dq } mie1 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg1 -∗
+         utlb_inv_pt uroot tfp um -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
+           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+             Hinstr Hex Hcont".
+    iDestruct (upt_swp_open uroot tfp um with "Hinv")
+      as (satp0 tlbv pcfg paddr)
+      "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
+    iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um) pc pa is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mie1 menvcfg1 satp0 pcfg paddr User Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp

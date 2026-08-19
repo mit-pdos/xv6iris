@@ -71,6 +71,316 @@ Local Ltac srs_lk_g :=
      ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp ?s_rs_mie ?s_rs_mdl
      ?s_rs_menv.
 
+
+(* ===================================================================== *)
+(* THE POST FILE AT AN ARBITRARY PRIVILEGE.                               *)
+(*                                                                       *)
+(* [HartSFrame.s_rs] pins [cur_privilege := Supervisor], which is right   *)
+(* for every S-mode instruction except the one that LEAVES S-mode -- the  *)
+(* trampoline's [sret] to user.  [SmodeCorePt.spt_cycle] is already       *)
+(* post-generic (its landing file is constrained only by the caller's     *)
+(* [Q]), so the ONLY Supervisor-pinned pieces of the step engine are the  *)
+(* three tower transports below: the cells->frame bridge, its inverse,    *)
+(* and the tick's agreement.  Each is its [s_rs] twin with the privilege  *)
+(* cell peeled off the front, so an S-mode caller pays nothing for the    *)
+(* generality.                                                           *)
+(* ===================================================================== *)
+
+Definition s_rs_p (p : Privilege) (pc npc ms : SailStdpp.Values.mword 64)
+    (bmi : bool) (cy ti ip mst0 : SailStdpp.Values.mword 64)
+    (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n)
+    (mc : SailStdpp.Values.mword 32)
+    (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+    (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+    (satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
+    (tlbv : type_of_register tlb) : regstate :=
+  register_set cur_privilege p
+    (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+
+Section SRsP.
+  Context (p : Privilege) (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool)
+          (cy ti ip mst0 : SailStdpp.Values.mword 64)
+          (pcfg : type_of_register pmpcfg_n)
+          (paddr : type_of_register pmpaddr_n)
+          (mc : SailStdpp.Values.mword 32)
+          (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+          (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+          (satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
+          (tlbv : type_of_register tlb).
+
+  Local Notation RSP := (s_rs_p p pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+
+  Lemma s_rs_p_priv : register_lookup cur_privilege RSP = p.
+  Proof. apply register_lookup_set. Qed.
+
+  Lemma s_rs_p_peel (r : register) :
+    register_beq r cur_privilege = false ->
+    register_lookup r RSP = register_lookup r (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+  Proof.
+    (* [exact], NOT [rewrite]: [s_rs]'s body IS a 25-deep [register_set]
+       tower, so an ssreflect rewrite with [irrelevant_register_set]'s
+       pattern searches inside it and detonates the record-update conversion
+       bomb ([SmodeCorePt.s_npc_agree]'s note).  Here the lemma IS the goal. *)
+    intro H.
+    exact (irrelevant_register_set r cur_privilege
+             (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) p H).
+  Qed.
+
+  Local Ltac lkp := rewrite s_rs_p_peel; [ | vm_compute; reflexivity ].
+
+  Lemma s_rs_p_PC : register_lookup (R_bitvector_64 PC) RSP = pc.
+  Proof. lkp. apply s_rs_PC. Qed.
+  Lemma s_rs_p_nPC : register_lookup (R_bitvector_64 nextPC) RSP = npc.
+  Proof. lkp. apply s_rs_nPC. Qed.
+  Lemma s_rs_p_ms : register_lookup (R_bitvector_64 minstret) RSP = ms.
+  Proof. lkp. apply s_rs_ms. Qed.
+  Lemma s_rs_p_mi : register_lookup (R_bool minstret_increment) RSP = bmi.
+  Proof. lkp. apply s_rs_mi. Qed.
+  Lemma s_rs_p_cy : register_lookup (R_bitvector_64 mcycle) RSP = cy.
+  Proof. lkp. apply s_rs_cy. Qed.
+  Lemma s_rs_p_ti : register_lookup (R_bitvector_64 mtime) RSP = ti.
+  Proof. lkp. apply s_rs_ti. Qed.
+  Lemma s_rs_p_ip : register_lookup (R_bitvector_64 mip) RSP = ip.
+  Proof. lkp. apply s_rs_ip. Qed.
+  Lemma s_rs_p_tlb : register_lookup tlb RSP = tlbv.
+  Proof. lkp. apply s_rs_tlb. Qed.
+  Lemma s_rs_p_mst : register_lookup mstatus RSP = mst0.
+  Proof. lkp. apply s_rs_mst. Qed.
+  Lemma s_rs_p_hart : register_lookup hart_state RSP = (HART_ACTIVE tt).
+  Proof. lkp. apply s_rs_hart. Qed.
+  Lemma s_rs_p_pcfg : register_lookup pmpcfg_n RSP = pcfg.
+  Proof. lkp. apply s_rs_pcfg. Qed.
+  Lemma s_rs_p_paddr : register_lookup pmpaddr_n RSP = paddr.
+  Proof. lkp. apply s_rs_paddr. Qed.
+  Lemma s_rs_p_mc : register_lookup (R_bitvector_32 mcountinhibit) RSP = mc.
+  Proof. lkp. apply s_rs_mc. Qed.
+  Lemma s_rs_p_micfg : register_lookup (R_bitvector_64 minstretcfg) RSP = micfg.
+  Proof. lkp. apply s_rs_micfg. Qed.
+  Lemma s_rs_p_misa : register_lookup misa RSP = misa0.
+  Proof. lkp. apply s_rs_misa. Qed.
+  Lemma s_rs_p_sec : register_lookup mseccfg RSP = mseccfg0.
+  Proof. lkp. apply s_rs_sec. Qed.
+  Lemma s_rs_p_pma : register_lookup pma_regions RSP = pmar0.
+  Proof. lkp. apply s_rs_pma. Qed.
+  Lemma s_rs_p_htif : register_lookup htif_tohost_base RSP = None.
+  Proof. lkp. apply s_rs_htif. Qed.
+  Lemma s_rs_p_elp : register_lookup elp RSP = elp0.
+  Proof. lkp. apply s_rs_elp. Qed.
+  Lemma s_rs_p_senv : register_lookup senvcfg RSP = senv0.
+  Proof. lkp. apply s_rs_senv. Qed.
+  Lemma s_rs_p_satp : register_lookup satp RSP = satp0.
+  Proof. lkp. apply s_rs_satp. Qed.
+  Lemma s_rs_p_mie : register_lookup mie RSP = mie0.
+  Proof. lkp. apply s_rs_mie. Qed.
+  Lemma s_rs_p_mdl : register_lookup mideleg RSP = mdv0.
+  Proof. lkp. apply s_rs_mdl. Qed.
+  Lemma s_rs_p_menv : register_lookup menvcfg RSP = menv0.
+  Proof. lkp. apply s_rs_menv. Qed.
+
+End SRsP.
+
+(* the tower transport, [HartSFrame.s_rs_agree] with the privilege free *)
+Lemma s_rs_p_agree (p : Privilege) (pc npc ms : SailStdpp.Values.mword 64)
+    (bmi : bool) (cy ti ip mst0 : SailStdpp.Values.mword 64)
+    (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n)
+    (mc : SailStdpp.Values.mword 32)
+    (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+    (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+    (satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
+    (tlbv : type_of_register tlb) (rs : regstate) :
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup (R_bitvector_64 nextPC) rs = npc ->
+    register_lookup (R_bitvector_64 minstret) rs = ms ->
+    register_lookup (R_bool minstret_increment) rs = bmi ->
+    register_lookup (R_bitvector_64 mcycle) rs = cy ->
+    register_lookup (R_bitvector_64 mtime) rs = ti ->
+    register_lookup (R_bitvector_64 mip) rs = ip ->
+    register_lookup tlb rs = tlbv ->
+    register_lookup mstatus rs = mst0 ->
+    register_lookup hart_state rs = (HART_ACTIVE tt) ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    register_lookup (R_bitvector_32 mcountinhibit) rs = mc ->
+    register_lookup (R_bitvector_64 minstretcfg) rs = micfg ->
+    register_lookup misa rs = misa0 ->
+    register_lookup mseccfg rs = mseccfg0 ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup elp rs = elp0 ->
+    register_lookup senvcfg rs = senv0 ->
+    register_lookup satp rs = satp0 ->
+    register_lookup mie rs = mie0 ->
+    register_lookup mideleg rs = mdv0 ->
+    register_lookup menvcfg rs = menv0 ->
+    register_lookup cur_privilege rs = p ->
+    reg_agree_on (s_Drw ∪ s_Dro) rs (s_rs_p p pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv).
+Proof.
+  intros H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 Hp.
+  intros r Hr. rewrite /s_Drw /s_Dro in Hr.
+  repeat (apply elem_of_union in Hr as [Hr|Hr]);
+    apply elem_of_singleton in Hr; subst r.
+  (* peel the privilege cell FIRST: on the [cur_privilege] goal the peel's
+     side condition is refutable, so that branch backtracks -- which is
+     cheaper than trying an [exact] whose unification would compare two
+     [register_lookup]s at different (dependently typed) registers. *)
+  all: first
+    [ rewrite s_rs_p_peel; [ | vm_compute; reflexivity ]
+    | (etransitivity; [ exact Hp | symmetry; apply s_rs_p_priv ]) ].
+  all: first
+    [ by []
+      | by rewrite H1 s_rs_PC
+      | by rewrite H2 s_rs_nPC
+      | by rewrite H3 s_rs_ms
+      | by rewrite H4 s_rs_mi
+      | by rewrite H5 s_rs_cy
+      | by rewrite H6 s_rs_ti
+      | by rewrite H7 s_rs_ip
+      | by rewrite H8 s_rs_tlb
+      | by rewrite H9 s_rs_mst
+      | by rewrite H10 s_rs_hart
+      | by rewrite H11 s_rs_pcfg
+      | by rewrite H12 s_rs_paddr
+      | by rewrite H13 s_rs_mc
+      | by rewrite H14 s_rs_micfg
+      | by rewrite H15 s_rs_misa
+      | by rewrite H16 s_rs_sec
+      | by rewrite H17 s_rs_pma
+      | by rewrite H18 s_rs_htif
+      | by rewrite H19 s_rs_elp
+      | by rewrite H20 s_rs_senv
+      | by rewrite H21 s_rs_satp
+      | by rewrite H22 s_rs_mie
+      | by rewrite H23 s_rs_mdl
+      | by rewrite H24 s_rs_menv ].
+Qed.
+
+Section SRsPFrames.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* [SmodeCorePt.spt_frames_close] at [cur_privilege := p] *)
+  Lemma spt_frames_close_p (dq : dfrac) (p : Privilege)
+      (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool)
+      (cy ti ip mst0 : SailStdpp.Values.mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (mc : SailStdpp.Values.mword 32)
+      (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
+      (tlbv : type_of_register tlb) :
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip ∗ tlb ↦ᵣ tlbv ∗
+     cur_privilege ↦ᵣ{ dq } p ∗ mstatus ↦ᵣ{ dq } mst0 ∗
+     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+     pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 ∗
+     satp ↦ᵣ satp0 ∗ mie ↦ᵣ{ dq } mie0 ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
+     menvcfg ↦ᵣ{ dq } menv0) -∗
+    hreg_frame (s_rs_p p pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drw ∗
+    hreg_frame_ro (s_Df_mix dq) (s_rs_p p pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro.
+  Proof.
+    iIntros "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc & Hpriv & Hmst
+              & Hhs & Hpcfg & Hpaddr & Hmc & Hmicfg & Hmisa & Hsec & Hpma
+              & Hhtif & Help & Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
+    rewrite s_rw_split s_ro_split_mix.
+    rewrite s_rs_p_PC s_rs_p_nPC s_rs_p_ms s_rs_p_mi s_rs_p_cy s_rs_p_ti
+      s_rs_p_ip s_rs_p_tlb s_rs_p_priv s_rs_p_mst s_rs_p_hart s_rs_p_pcfg
+      s_rs_p_paddr s_rs_p_mc s_rs_p_micfg s_rs_p_misa s_rs_p_sec s_rs_p_pma
+      s_rs_p_htif s_rs_p_elp s_rs_p_senv s_rs_p_satp s_rs_p_mie s_rs_p_mdl
+      s_rs_p_menv.
+    iFrame.
+  Qed.
+
+  (* [SmodeCorePt.spt_frames_elim] at [cur_privilege := p] *)
+  Lemma spt_frames_elim_p (dq : dfrac) (p : Privilege)
+      (npc ms : SailStdpp.Values.mword 64) (bmi : bool)
+      (cy ti ip : SailStdpp.Values.mword 64) (mc : SailStdpp.Values.mword 32)
+      (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (mstatus1 satp1 mie1 mdv1 menvcfg1 : SailStdpp.Values.mword 64)
+      (pcfg1 : type_of_register pmpcfg_n)
+      (paddr1 : type_of_register pmpaddr_n) (tv : type_of_register tlb) :
+    resv_any cpu_id -∗
+    hreg_frame (s_rs_p p npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg
+                  misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+      s_Drw -∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs_p p npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv) s_Dro -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗ cur_privilege ↦ᵣ{ dq } p ∗
+    mstatus ↦ᵣ{ dq } mstatus1 ∗ mie ↦ᵣ{ dq } mie1 ∗
+    mideleg ↦ᵣ{ dq } mdv1 ∗ menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pmpaddr_n ↦ᵣ paddr1 ∗
+    tlb ↦ᵣ tv ∗ pc_is npc.
+  Proof.
+    iIntros "Hresv Hrw Hro".
+    rewrite s_rw_split s_ro_split_mix.
+    rewrite s_rs_p_PC s_rs_p_nPC s_rs_p_ms s_rs_p_mi s_rs_p_cy s_rs_p_ti
+      s_rs_p_ip s_rs_p_tlb s_rs_p_priv s_rs_p_mst s_rs_p_hart s_rs_p_pcfg
+      s_rs_p_paddr s_rs_p_mc s_rs_p_micfg s_rs_p_misa s_rs_p_sec s_rs_p_pma
+      s_rs_p_htif s_rs_p_elp s_rs_p_senv s_rs_p_satp s_rs_p_mie s_rs_p_mdl
+      s_rs_p_menv.
+    iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Htlbc)".
+    iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg &
+                         #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv &
+                         Hsatp & Hmie & Hmdl & Hmenv)".
+    iFrame "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc".
+    rewrite /pc_is /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv".
+    iSplitL "Hms Hmi".
+    - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
+    - iExists cy, ti, ip. by iFrame.
+  Qed.
+
+End SRsPFrames.
+
+(* [WpSFrames.s_tick_agree] at [cur_privilege := p] *)
+Lemma s_tick_agree_p (p : Privilege) (pc npc ms : SailStdpp.Values.mword 64)
+    (bmi : bool) (cy ti ip mst0 : SailStdpp.Values.mword 64)
+    (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n) (mc : SailStdpp.Values.mword 32)
+    (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+    (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+    (satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
+    (tlbv : type_of_register tlb)
+    (mi : SailStdpp.Values.mword 64) (rs : regstate) :
+  reg_agree_on ((s_Drw ∪ s_Dro) ∖ tk_clock3) rs
+    (wrap_post (s_rs_p p pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) mi) ->
+  reg_agree_on (s_Drw ∪ s_Dro) rs
+    (s_rs_p p npc npc mi bmi
+       (register_lookup (R_bitvector_64 mcycle) rs)
+       (register_lookup (R_bitvector_64 mtime) rs)
+       (register_lookup (R_bitvector_64 mip) rs)
+       mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+       satp0 mie0 mdv0 menv0 tlbv).
+Proof.
+  intros Hag. apply s_rs_p_agree.
+  all: try reflexivity.
+  all: (etransitivity;
+        [ apply Hag; rewrite /s_Drw /s_Dro /tk_clock3; set_solver | ]).
+  all: try (by rewrite wrap_post_PC s_rs_p_nPC).
+  all: try (by rewrite wrap_post_ms).
+  all: rewrite wrap_post_other;
+    [| vm_compute; reflexivity | vm_compute; reflexivity ].
+  all: by rewrite ?s_rs_p_PC ?s_rs_p_nPC ?s_rs_p_ms ?s_rs_p_mi ?s_rs_p_cy
+            ?s_rs_p_ti ?s_rs_p_ip ?s_rs_p_tlb ?s_rs_p_priv ?s_rs_p_mst
+            ?s_rs_p_hart ?s_rs_p_pcfg ?s_rs_p_paddr ?s_rs_p_mc ?s_rs_p_micfg
+            ?s_rs_p_misa ?s_rs_p_sec ?s_rs_p_pma ?s_rs_p_htif ?s_rs_p_elp
+            ?s_rs_p_senv ?s_rs_p_satp ?s_rs_p_mie ?s_rs_p_mdl ?s_rs_p_menv.
+Qed.
+
 Section TrampFetchPt.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -591,6 +901,12 @@ Section TrampFetchPt.
   (* [Habs].  Everything else (the cells in, [swp (execute i)] with them   *)
   (* back, the existential landing tlb / clock / mstatus / mideleg, the    *)
   (* rider keyed on the landing pc) is the S wrapper's shape verbatim.     *)
+  (*                                                                      *)
+  (* THE RUNNING SIDE IS ALWAYS SUPERVISOR -- the trampoline is reached    *)
+  (* by a trap, which raises privilege before the pc gets there.  Only the *)
+  (* LANDING file is privilege-parametric, and only because one            *)
+  (* trampoline instruction leaves S-mode: userret's [sret] to user.       *)
+  (* Every wrapper below states its own [priv1] CONCRETELY.                *)
   (* ==================================================================== *)
   Lemma wp_instr_tramp_pt
       (Res : type_of_register tlb -> iProp Σ)
@@ -600,7 +916,7 @@ Section TrampFetchPt.
       (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
       (mie1 menvcfg1 satp1 : mword 64)
       (pcfg1 : type_of_register pmpcfg_n)
-      (paddr1 : type_of_register pmpaddr_n)
+      (paddr1 : type_of_register pmpaddr_n) (priv1 : Privilege)
       (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -650,7 +966,7 @@ Section TrampFetchPt.
        resv_any cpu_id -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   cur_privilege ↦ᵣ{ dq } priv1 ∗
                    mie ↦ᵣ{ dq } mie1 ∗
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗
@@ -664,7 +980,7 @@ Section TrampFetchPt.
                    resv_any cpu_id)) -∗
     ▷ (∀ (npc ms1 mdv1 : mword 64) (tv1 : type_of_register tlb),
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         cur_privilege ↦ᵣ{ dq } priv1 -∗
          mstatus ↦ᵣ{ dq } ms1 -∗
          mie ↦ᵣ{ dq } mie1 -∗
          mideleg ↦ᵣ{ dq } mdv1 -∗
@@ -696,26 +1012,26 @@ Section TrampFetchPt.
                                 (register_lookup mideleg rs2))%I)
               (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
                             (tv : type_of_register tlb),
-                 rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+                 rs2 = s_rs_p priv1 pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
               ms bmi cy ti ip mstatus0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
               satp0 mie_v mdv0 menvcfg0 pcfg paddr tlbv
               ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
-                    apply s_rs_hart)
+                    apply s_rs_p_hart)
               ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
-                    apply s_rs_mi)
+                    apply s_rs_p_mi)
               with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr] [Hcont]").
     2:{ (* ---- the continuation ---- *)
         iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl)".
         destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->).
-        iEval (rewrite s_rs_tlb) in "HRes".
-        iEval (rewrite s_rs_nPC s_rs_mst s_rs_mdl) in "HRl".
-        pose proof (s_tick_agree pc npc ms
+        iEval (rewrite s_rs_p_tlb) in "HRes".
+        iEval (rewrite s_rs_p_nPC s_rs_p_mst s_rs_p_mdl) in "HRl".
+        pose proof (s_tick_agree_p priv1 pc npc ms
                       (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
                       pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
                       satp1 mie1 mdv1 menvcfg1 tv mi rs3 Hag) as Hag'.
         iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
         iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hag' with "Hro") as "Hro".
-        iDestruct (spt_frames_elim dq npc mi
+        iDestruct (spt_frames_elim_p dq priv1 npc mi
                      (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
                      misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
                      menvcfg1 pcfg1 paddr1 tv with "Hfrag Hrw Hro")
@@ -732,7 +1048,7 @@ Section TrampFetchPt.
                    mie_v mdv0 menvcfg0 Res tlbv is_rvc i
                    (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
                                  (tv : type_of_register tlb),
-                      rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+                      rs2 = s_rs_p priv1 pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
                    (fun rs2 => (Res (register_lookup tlb rs2)
                                 ∗ resv_any cpu_id
                                 ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
@@ -784,10 +1100,10 @@ Section TrampFetchPt.
       iDestruct "Hclk" as (cy1 ti1 ip1) "(Hcy & Hti & Hip)".
       iDestruct "Hcfg" as (ms1 mdv1 npc) "(Hmst & Hmdl & HPC & HnPC & HRl)".
       iSplitR; [done|].
-      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv2).
+      iExists (s_rs_p priv1 pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv2).
       iSplitR;
         [ iPureIntro; by exists npc, ms1, mdv1, cy1, ti1, ip1, tv2 |].
-      iDestruct (spt_frames_close dq pc npc ms
+      iDestruct (spt_frames_close_p dq priv1 pc npc ms
                    (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
                    pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1
                    mie1 mdv1 menvcfg1 tv2
@@ -797,7 +1113,7 @@ Section TrampFetchPt.
       { iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg
                 Hpaddr Hsatp Hmie Hmdl Hmenv".
         by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv". }
-      rewrite s_rs_tlb s_rs_nPC s_rs_mst s_rs_mdl.
+      rewrite s_rs_p_tlb s_rs_p_nPC s_rs_p_mst s_rs_p_mdl.
       iFrame "Hrw Hro HRes' Hany HRl".
   Qed.
 
@@ -1144,7 +1460,7 @@ Section TrampFetchPt.
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
     iApply (wp_instr_tramp_pt (kpt_res_at root_ppn satp0) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
-              mie1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
+              mie1 menvcfg1 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
