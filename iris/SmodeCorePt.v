@@ -3414,6 +3414,17 @@ Section SmodeCorePt.
        spt_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
          mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res)%I.
 
+  Definition spt_fetch_tr_b (Df : register -> dfrac)
+      (Res : type_of_register tlb -> iProp Σ) (pc : mword 64)
+      (mst0 satp0 mie0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) : iProp Σ :=
+    (∀ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
+       (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+       (elp0 : type_of_register elp),
+       spt_tr_obl_D s_Drwb Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+         misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res)%I.
+
   (* ==================================================================== *)
   (* THE FETCH-TRANSLATION PRODUCER.                                       *)
   (*                                                                      *)
@@ -3928,6 +3939,241 @@ Section SmodeCorePt.
                           Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenv]")
         as "[Hrw Hro]".
       { iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Htlbc Hpriv Hmst Hhs Hpcfg
+                Hpaddr Hsatp Hmie Hmdl Hmenv".
+        by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv". }
+      rewrite s_rs_tlb s_rs_nPC s_rs_mst s_rs_mdl.
+      iFrame "Hrw Hro HRes' Hany HRl".
+  Qed.
+
+  Lemma wp_instr_s_config_regime_b
+      (Res : type_of_register tlb -> iProp Σ)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
+      (mie1 menvcfg1 satp1 : mword 64)
+      (pcfg1 : type_of_register pmpcfg_n)
+      (paddr1 : type_of_register pmpaddr_n)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    (* the PMP grant, off the cells the wrapper now takes raw -- it used to
+       ride inside [SmodePte.pmp_config] within [sr_inv R].  Taken WHOLE
+       ([pmp_ent0_ok], all six conjuncts) rather than as the four the FETCH
+       needs, because the leaf's obligation is handed it as well: a data
+       access checks W/R too, and it cannot recover them from the residue
+       (Bare's is [True]). *)
+    pmp_ent0_ok pcfg paddr ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    Res tlbv -∗
+    pc_is pc -∗
+    instr pc is_rvc i -∗
+    spt_fetch_tr_b (s_Df_mix dq) Res pc mstatus0 satp0 mie_v mdv0 menvcfg0
+      pcfg paddr -∗
+    (* THE LEAF'S OBLIGATION.  Three things travel into it that a
+       register-only leaf does not need and no MEMORY leaf can do without:
+
+         - the PMP grant, because [HartSMem]'s checks and
+           [SRegime.sr_swp_side_ok] both take it and neither is
+           recoverable inside the obligation (the residue is the regime's,
+           and Bare's is [True]);
+         - the three CLOCK cells ([MinstretInv.clock_res], mcycle / mtime
+           / mip -- already in [s_Drw]), without which [csrr time],
+           [csrr sip] and [csrw stimecmp] cannot be written at all.  They
+           are handed over at EXISTENTIAL values, because the wrapper's own
+           come out of [spt_frames_intro]'s existentials, and they come
+           back the same way -- the tick runs at the cycle BOUNDARY, so
+           nothing inside the instruction has to name them;
+         - and the leaf CHOOSES the post mstatus and mideleg.  That is
+           forced: [csrsi]/[csrci sstatus] and [sret] MOVE SIE, so a caller
+           on the SIE = 0 arm cannot name the mstatus the instruction
+           leaves behind.  They ride in ONE existential with the landing
+           pc, because the rider is keyed on all three. *)
+    (∀ tv' : type_of_register tlb,
+       ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       Res tv' -∗
+       clock_res -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mie ↦ᵣ{ dq } mie1 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+                   satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗
+                   pmpaddr_n ↦ᵣ paddr1 ∗
+                   (∃ tv2 : type_of_register tlb, Res tv2) ∗
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   resv_any cpu_id)) -∗
+    ▷ (∀ (npc ms1 mdv1 : mword 64) (tv1 : type_of_register tlb),
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
+         mie ↦ᵣ{ dq } mie1 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg1 -∗
+         satp ↦ᵣ satp1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pmpaddr_n ↦ᵣ paddr1 -∗
+         Res tv1 -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmp.
+    pose proof Hpmp as (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
+             HRes Hpc Hinstr Htr Hex Hcont".
+    iDestruct (spt_frames_intro_b dq pc mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg
+                 paddr tlbv
+                 with "Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
+                       Hpc") as "[Hfrag Hfr]".
+    iDestruct "Hfr" as (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0)
+      "(%Hmisaval & %Hpmaall & %Helpnp & Hrw & Hro)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof ("Htr" $! ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mc
+                  micfg misa0 mseccfg0 senv0 pmar0 elp0) as "#Htr0".
+    iApply (spt_cycle_b (s_Df_mix dq) pc
+              (fun rs2 => (Res (register_lookup tlb rs2) ∗ resv_any cpu_id
+                           ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
+                                (register_lookup mstatus rs2)
+                                (register_lookup mideleg rs2))%I)
+              (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
+                            (tv : type_of_register tlb),
+                 rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+              ms bmi cy ti ip mstatus0 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+              satp0 mie_v mdv0 menvcfg0 pcfg paddr tlbv
+              ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
+                    apply s_rs_hart)
+              ltac:(intros rs2 (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->);
+                    apply s_rs_mi)
+              with "Hcert Hfrag Hrw Hro [Hex HRes Hinstr] [Hcont]").
+    2:{ (* ---- the continuation ---- *)
+        iNext. iIntros (rs3 rs2 mi) "[%HQ %Hag] Hrw Hro (HRes & Hfrag & HRl)".
+        destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & tv & ->).
+        iEval (rewrite s_rs_tlb) in "HRes".
+        iEval (rewrite s_rs_nPC s_rs_mst s_rs_mdl) in "HRl".
+        pose proof (s_tick_agree_b pc npc ms
+                      (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
+                      pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+                      satp1 mie1 mdv1 menvcfg1 tv mi rs3 Hag) as Hag'.
+        iDestruct (s_rw_ext_D s_Drwb _ _ (s_agree_narrow_b _ _ Hag')
+                     with "Hrw") as "Hrw".
+        iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hag' with "Hro") as "Hro".
+        (* AT THE LANDING FILE'S OWN TLB SLOT.  [s_tick_agree_b] lands the
+           tower at [register_lookup tlb rs3] -- it cannot name the value the
+           cycle started with, since [s_Drwb ∪ s_Dro] has no tlb in it -- so
+           naming [tv] here would make the unifier compare two OPAQUE 22-deep
+           towers and never come back (durable-notes' 3^N bomb; localized
+           with [coqc -time], which streams). *)
+        iDestruct (spt_frames_elim_b dq npc mi
+                     (minstret_inc_flag mc micfg Supervisor) _ _ _ mc micfg
+                     misa0 mseccfg0 senv0 pmar0 elp0 ms1 satp1 mie1 mdv1
+                     menvcfg1 pcfg1 paddr1 (register_lookup tlb rs3)
+                     with "Hfrag Hrw Hro")
+          as "(Hhs & Hpriv & Hmst & Hmie & Hmdl & Hmenv & Hsatp & Hpcfg &
+               Hpaddr & Hpc)".
+        iApply ("Hcont" $! npc ms1 mdv1 tv with "Hhs Hpriv Hmst Hmie Hmdl Hmenv
+                  Hsatp Hpcfg Hpaddr HRes Hpc HRl"). }
+    (* ---- the body ---- *)
+    iIntros "Hfrag Hrw Hro".
+    iApply (swp_mono with "[] [-]");
+      [| iApply (spt_run_hart_active_instr_S_b
+                   (s_Df_mix dq) pc ms
+                   (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
+                   pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
+                   mie_v mdv0 menvcfg0 Res tlbv is_rvc i
+                   (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
+                                 (tv : type_of_register tlb),
+                      rs2 = s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+                   (fun rs2 => (Res (register_lookup tlb rs2)
+                                ∗ resv_any cpu_id
+                                ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
+                                     (register_lookup mstatus rs2)
+                                     (register_lookup mideleg rs2))%I)
+                   emp%I (fun _ _ => False%I)
+                   Hmisaval Hmenvval Helpnp (pma_all_ram Hpmaall)
+                   HA Hord HX Hcov
+                   with "Hcert Hinstr [] Hfrag HRes Hrw Hro [] Htr0
+                         [Hex]") ].
+    - iIntros (st) "[Hi | Hr]".
+      + iDestruct "Hi" as (ii pr) "(_ & Hf)". iDestruct "Hf" as %[].
+      + iDestruct "Hr" as (w) "(-> & Hr)".
+        iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HPsi)".
+        iExists rs2. iSplitR; [done|]. iFrame.
+    - done.
+    - Timeout 120 (iApply (spt_dispatch_none_D s_Drwb s_frame_ok_Drwb
+                (s_Df_mix dq) pc ms
+                (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0 pcfg
+                paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0
+                menvcfg0 Res tlbv emp%I (fun _ _ => False%I) Hmisaval HSIE Hmm
+                with "Hcert")).
+    - (* THE LEAF, at the file the fetch landed on *)
+      iIntros (tv') "_ HRes' Hany Hrw Hro".
+      pose proof (s_npc_agree pc pc
+                    (add_vec_int pc (if is_rvc then 2 else 4)) ms
+                    (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
+                    pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
+                    mie_v mdv0 menvcfg0 tv') as Hnp.
+      iDestruct (s_rw_ext_D s_Drwb _ _ (s_agree_narrow_b _ _ Hnp)
+                   with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext_gen (s_Df_mix dq) _ _ Hnp with "Hro") as "Hro".
+      iDestruct (spt_frames_open_b dq pc
+                   (add_vec_int pc (if is_rvc then 2 else 4)) ms
+                   (minstret_inc_flag mc micfg Supervisor) cy ti ip mstatus0
+                   pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0
+                   mie_v mdv0 menvcfg0 tv' with "Hrw Hro")
+        as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Hpriv & Hmst
+             & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg & #Hmisa & #Hsec & #Hpma
+             & #Hhtif & #Help & #Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
+      iSpecialize ("Hex" $! tv' with "[%]"); [ exact Hpmp | ].
+      iAssert clock_res with "[Hcy Hti Hip]" as "Hclk".
+      { iExists cy, ti, ip. iFrame "Hcy Hti Hip". }
+      iApply (swp_mono with "[Hms Hmi Hhs] [-]");
+        [| iApply ("Hex" with "Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg
+                     Hpaddr HRes' Hclk HPC HnPC Hany") ].
+      iIntros (e) "(-> & Hpriv & Hmie & Hmenv & Hsatp & Hpcfg &
+                    Hpaddr & Htlbr & Hclk & Hcfg & Hany)".
+      (* the leaf may have FILLED THE TLB (a data access walks too), so the
+         cell and the regime residue come back at the leaf's own landing
+         value, not at the one the fetch handed it; the clock cells and the
+         post mstatus / mideleg come back the same way *)
+      iDestruct "Htlbr" as (tv2) "HRes'".
+      iDestruct "Hclk" as (cy1 ti1 ip1) "(Hcy & Hti & Hip)".
+      iDestruct "Hcfg" as (ms1 mdv1 npc) "(Hmst & Hmdl & HPC & HnPC & HRl)".
+      iSplitR; [done|].
+      iExists (s_rs pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv2).
+      iSplitR;
+        [ iPureIntro; by exists npc, ms1, mdv1, cy1, ti1, ip1, tv2 |].
+      iDestruct (spt_frames_close_b dq pc npc ms
+                   (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
+                   pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1
+                   mie1 mdv1 menvcfg1 tv2
+                   with "[HPC HnPC Hms Hmi Hcy Hti Hip Hpriv Hmst Hhs
+                          Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenv]")
+        as "[Hrw Hro]".
+      { iFrame "HPC HnPC Hms Hmi Hcy Hti Hip Hpriv Hmst Hhs Hpcfg
                 Hpaddr Hsatp Hmie Hmdl Hmenv".
         by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv". }
       rewrite s_rs_tlb s_rs_nPC s_rs_mst s_rs_mdl.
