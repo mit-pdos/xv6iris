@@ -174,6 +174,24 @@ Definition wp_iupdate_sconf_body
      [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
      moves [nlink] at all. *)
   InodeRegion.di_nlink_stable dn dn0 ->
+  (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
+     flush no longer serves a type-CLEARING write.  It used to: the payout
+     [InodeRegion.ireg_out] case-splits on the type and the zero arm went
+     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     RULING A that mover RETIRES the freeze in the same step and therefore
+     takes the [ifreeze_post] token, which no generic caller of iupdate
+     holds -- so the free arm leaves this contract and becomes the
+     DEPOSIT's private mover ([EscrowDeposit]), where the token is in
+     hand.
+     TRIPWIRE t4, CHECKED ON THE LANE: the callers of the four generic
+     bodies are [ProofItrunc] (three sites -- itrunc runs BEFORE the type
+     is cleared, so [InodeLock.inode_ok]'s nonzero type is in hand),
+     [ProofWritei] (two sites, same), and [ProofIput] (one site -- the OLD
+     free path, which THIS campaign retires and whose proof is red by
+     design).  No landed green caller writes a type-0 record through
+     generic iupdate.  The two LINK bodies below already carried this
+     premise and are unchanged. *)
+  bv_unsigned (di_type dn) <> 0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -340,6 +358,24 @@ Definition wp_iupdate_gen_body
      [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
      moves [nlink] at all. *)
   InodeRegion.di_nlink_stable dn dn0 ->
+  (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
+     flush no longer serves a type-CLEARING write.  It used to: the payout
+     [InodeRegion.ireg_out] case-splits on the type and the zero arm went
+     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     RULING A that mover RETIRES the freeze in the same step and therefore
+     takes the [ifreeze_post] token, which no generic caller of iupdate
+     holds -- so the free arm leaves this contract and becomes the
+     DEPOSIT's private mover ([EscrowDeposit]), where the token is in
+     hand.
+     TRIPWIRE t4, CHECKED ON THE LANE: the callers of the four generic
+     bodies are [ProofItrunc] (three sites -- itrunc runs BEFORE the type
+     is cleared, so [InodeLock.inode_ok]'s nonzero type is in hand),
+     [ProofWritei] (two sites, same), and [ProofIput] (one site -- the OLD
+     free path, which THIS campaign retires and whose proof is red by
+     design).  No landed green caller writes a type-0 record through
+     generic iupdate.  The two LINK bodies below already carried this
+     premise and are unchanged. *)
+  bv_unsigned (di_type dn) <> 0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -506,6 +542,24 @@ Definition wp_iupdate_cred_body
      [InodeRegion.di_nlink_stable_refl] -- no writer at or below iupdate
      moves [nlink] at all. *)
   InodeRegion.di_nlink_stable dn dn0 ->
+  (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
+     flush no longer serves a type-CLEARING write.  It used to: the payout
+     [InodeRegion.ireg_out] case-splits on the type and the zero arm went
+     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     RULING A that mover RETIRES the freeze in the same step and therefore
+     takes the [ifreeze_post] token, which no generic caller of iupdate
+     holds -- so the free arm leaves this contract and becomes the
+     DEPOSIT's private mover ([EscrowDeposit]), where the token is in
+     hand.
+     TRIPWIRE t4, CHECKED ON THE LANE: the callers of the four generic
+     bodies are [ProofItrunc] (three sites -- itrunc runs BEFORE the type
+     is cleared, so [InodeLock.inode_ok]'s nonzero type is in hand),
+     [ProofWritei] (two sites, same), and [ProofIput] (one site -- the OLD
+     free path, which THIS campaign retires and whose proof is red by
+     design).  No landed green caller writes a type-0 record through
+     generic iupdate.  The two LINK bodies below already carried this
+     premise and are unchanged. *)
+  bv_unsigned (di_type dn) <> 0 ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -664,6 +718,24 @@ Definition wp_iupdate_credgen_body
   bv_unsigned inum < 16 * Z.of_nat nib ->
   InodeRegion.di_type_stable dn dn0 ->
   InodeRegion.di_nlink_stable dn dn0 ->
+  (* THE TYPE NARROWING (iclaim-ledger.md §3.1, RULING A).  The generic
+     flush no longer serves a type-CLEARING write.  It used to: the payout
+     [InodeRegion.ireg_out] case-splits on the type and the zero arm went
+     through [InodeRegion.ireg_free_au], which is iput's free.  Since
+     RULING A that mover RETIRES the freeze in the same step and therefore
+     takes the [ifreeze_post] token, which no generic caller of iupdate
+     holds -- so the free arm leaves this contract and becomes the
+     DEPOSIT's private mover ([EscrowDeposit]), where the token is in
+     hand.
+     TRIPWIRE t4, CHECKED ON THE LANE: the callers of the four generic
+     bodies are [ProofItrunc] (three sites -- itrunc runs BEFORE the type
+     is cleared, so [InodeLock.inode_ok]'s nonzero type is in hand),
+     [ProofWritei] (two sites, same), and [ProofIput] (one site -- the OLD
+     free path, which THIS campaign retires and whose proof is red by
+     design).  No landed green caller writes a type-0 record through
+     generic iupdate.  The two LINK bodies below already carried this
+     premise and are unchanged. *)
+  bv_unsigned (di_type dn) <> 0 ->
   di_addrs dn = bm_cells bm ->
   length (bm_dir bm) = NDIRECT ->
   (j < NPROC)%nat ->
@@ -811,6 +883,7 @@ Definition wp_iupdate_link_body
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+    (pin : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -863,6 +936,8 @@ Definition wp_iupdate_link_body
      to zero. *)
   di_nlink dn = add_vec (di_nlink dn0 : mword 16) (mword_of_int 1) ->
   di_nlink dn0 <> (mword_of_int 32767 : mword 16) ->
+  (* THE FREEZE-PIN PREMISE moved from the pure list to the resource one at
+     RULING A-prime; see below, just after [dinode_at]. *)
   di_addrs dn = bm_cells bm ->
   length (bm_dir bm) = NDIRECT ->
   (j < NPROC)%nat ->
@@ -886,6 +961,32 @@ Definition wp_iupdate_link_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
+  (* THE FREEZE-PIN PREMISE, IN ITS RULING A-prime FORM (iclaim-ledger.md
+     §3.9; [InodeRegion.ireg_write_link_fl]'s row).  The record whose count
+     this flush RAISES must not be mid-free -- a freeze is precisely the
+     state whose whole purpose is to make this flush impossible -- and there
+     are exactly two ways to show it is not.
+
+     THE PURE ARM, "the record is already named", is RULING A's and it is
+     free at mkdir's [dp->nlink++] (a live directory the caller has locked).
+     RULING A priced the whole row at that arm; IIIc proved it FALSE at
+     create's FRESH-CHILD mint ([ip->nlink = 1] at create+0xc4, whose
+     pre-record's count is ZERO by [fresh_shape]) and unavailable at
+     sys_link's [ip->nlink++] (xv6 has no [nlink == 0] guard there, and
+     namei's licence was borrowed and returned at the iget).
+
+     THE TOKEN ARM is A-prime's supply and it closes both.  A-custody puts
+     the inum's [ifreeze_off] on the payload's custody path, so a caller
+     holding the inode LOCKED is holding it: [SpecIlock]'s post hands it out
+     and [SpecIunlock]'s precondition takes it back.  Both failing sites are
+     inside their own critical section.
+
+     BORROWED AND RETURNED: the mover only READS the freeze column through
+     it, so it comes back in the postcondition below and the holder's
+     ilock/iunlock pair is undisturbed.  The arm is a PARAMETER rather than
+     a disjunction so that a caller which paid the token gets the TOKEN
+     back (see [InodeRegion.ireg_link_pin]'s header). *)
+  InodeRegion.ireg_link_pin pin (bv_unsigned inum) dn0 -∗
   p_pid pj ↦₄{dq} pidv -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -914,6 +1015,11 @@ Definition wp_iupdate_link_body
          continuation moves a character. *)
       dinode_at γi inum dn -∗
       ilink_fl fl (bv_unsigned inum) -∗
+      (* ...and the freeze-pin premise back, unspent (§3.9's
+         borrowed-and-returned).  A caller that came in on the pure arm gets
+         the pure arm back and ignores it; a caller that paid the token gets
+         the token back and re-parks with it at its iunlock. *)
+      InodeRegion.ireg_link_pin pin (bv_unsigned inum) dn0 -∗
       bslots bn 2 -∗
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1199,12 +1305,13 @@ Module Type IUPDATE.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+      (pin : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                           pidv dq dqd dqn dqs m K eb b lks.
+                           pin pidv dq dqd dqn dqs m K eb b lks.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
      at a flush that LOWERS [nlink] by one, spending the [ilink] that drop

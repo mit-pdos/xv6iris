@@ -83,14 +83,14 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= f60ff589b461deba936a917235a1ddf778ea7262
+XV6_REV ?= 4398009f09b7142feb9ec72ce08e37e83973168a
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 
 # User-space programs to dump into user-rocq/, as <xv6 program>:<Rocq module
 # prefix> pairs (the ELF is $(USER_DIR)/_<program>).  Adding one here also needs
 # its three .v listed in user-rocq/_CoqProject.
-USER_DUMPS ?= sync:Sync echo:Echo sh:Sh
+USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \

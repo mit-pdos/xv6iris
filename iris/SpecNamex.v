@@ -510,6 +510,15 @@ Definition wp_namex_sconf_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
+     Persistent, borrowed and never spent; it rides the SAME channel
+     [ireg_inv] does.  It is here because this contract reaches iput, whose
+     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
+     freezer exhibit the regime it freezes under.  A runtime caller hands
+     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
+     comes back; only ireclaim, which freezes before the seal is fired,
+     lends [ireg_boot] instead. *)
+  ireg_open -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -662,6 +671,15 @@ Definition wp_namex_gen_body
   ic_escrows cn gfs gi cov logstart -∗
   ic_sleeplocks cn -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
+     Persistent, borrowed and never spent; it rides the SAME channel
+     [ireg_inv] does.  It is here because this contract reaches iput, whose
+     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
+     freezer exhibit the regime it freezes under.  A runtime caller hands
+     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
+     comes back; only ireclaim, which freezes before the seal is fired,
+     lends [ireg_boot] instead. *)
+  ireg_open -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -804,7 +822,7 @@ Definition wp_namex_root_body
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
-    (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
@@ -831,6 +849,19 @@ Definition wp_namex_root_body
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn gfs gi cov logstart -∗
+  (* the inode region -- iget's premise since iclaim-ledger.md §3.3, and
+     GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
+     Persistent, relayed unchanged. *)
+  ireg_inv gi gfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
+     Persistent, borrowed and never spent; it rides the SAME channel
+     [ireg_inv] does.  It is here because this contract reaches iput, whose
+     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
+     freezer exhibit the regime it freezes under.  A runtime caller hands
+     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
+     comes back; only ireclaim, which freezes before the seal is fired,
+     lends [ireg_boot] instead. *)
+  ireg_open -∗
   iref_slot -∗
   (* the path: [pv] holds '/' and [pv+1] holds the terminator *)
   pa_add pv 0 ↦ₘ{dqp} SLASH -∗
@@ -854,10 +885,10 @@ Module Type NAMEX_ROOT.
              !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
-      wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
+      wp_namex_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks.
 End NAMEX_ROOT.

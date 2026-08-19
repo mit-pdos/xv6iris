@@ -661,7 +661,7 @@ Section ProofSysClose.
       iEval (rewrite Hpp1c) in "Hpc".
       (* ---- +0x1c: jal ra,myproc ---- *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_close + 0x1c))
-                (mword_of_int 1 : mword 5) (mword_of_int 2083628 : mword 21) A7 (av - 4)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2083556 : mword 21) A7 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1c").
       iIntros (CID12 Hs12) "Hcg Hpc".
@@ -670,7 +670,7 @@ Section ProofSysClose.
       change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) 4)]> A7) with B.
       assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2083628 : mword 21)) = mword_of_int KernelSyms.myproc)
+                       (sign_extend' 64 (mword_of_int 2083556 : mword 21)) = mword_of_int KernelSyms.myproc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmp) in "Hpc".
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)

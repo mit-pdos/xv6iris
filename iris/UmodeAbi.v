@@ -618,6 +618,117 @@ Proof.
   exact (uv_stack_slot pt M sp0 n d HS Hd0 Hdn Hd8).
 Qed.
 
+(* ------------------------------------------------------------------------ *)
+(* THE WIDTH-GENERIC SLOT.  [uv_stack_slot{,_moi}] above are the k = 8       *)
+(* readings; a 1-, 2- or 4-byte access into a frame needs the same six       *)
+(* conclusions at its own width, and [putc]'s [sb a1,-17(s0)] (init) is the  *)
+(* first caller that is not 8-aligned at all.  So the general form is        *)
+(* stated once, indexed by the access width [k], with the two premises that  *)
+(* make it work: [k] divides 8 (hence 16, hence both [sp0] and [n], which    *)
+(* [uv_stack] pins mod 16), and [d] is [k]-aligned.  The in-page bound       *)
+(* comes out as [<= 4096 - k], which at k = 8 is the 4088 the k = 8 reading  *)
+(* spells literally.                                                        *)
+(*                                                                          *)
+(* Prefer this over cloning per width (durable-notes: one general lemma over *)
+(* N special cases); [uv_stack_slot_moi] is kept as the k = 8 name because   *)
+(* every existing call site names it.                                       *)
+(* ------------------------------------------------------------------------ *)
+Lemma uv_stack_slotk_moi (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64)
+    (n d k : Z) (tgt : mword 64) :
+  uv_stack pt M sp0 n -> 0 < k -> 8 mod k = 0 ->
+  0 <= d -> d + k <= n -> Z.rem d k = 0 ->
+  tgt = (mword_of_int (uint sp0 - n + d) : mword 64) ->
+  uint tgt = uint sp0 - n + d /\
+  (exists w : mword 64,
+     ud_um pt !! svpn_of tgt = Some w /\
+     uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+  uva_canon tgt /\
+  Z.rem (uint tgt) 4096 <= 4096 - k /\
+  is_aligned_vaddr (Virtaddr tgt) k = true /\
+  (forall j : Z, 0 <= j < k -> exists b : bv 8, M !! (uint tgt + j) = Some b).
+Proof.
+  intros HS Hk0 Hk8 Hd0 Hdn Hdk Htgt.
+  pose proof HS as [Hal Hn0 Hn16 Hpg Hlo Hc Hleaf Hb].
+  rewrite !uint_unsigned in Hal, Hpg, Hlo, Hc, Hb.
+  rewrite Z.rem_mod_nonneg in Hdk; [ | lia | lia ].
+  rewrite Z.rem_mod_nonneg in Hpg; [ | lia | lia ].
+  rewrite Z.rem_mod_nonneg in Hal; [ | lia | lia ].
+  rewrite Z.rem_mod_nonneg in Hn16; [ | lia | lia ].
+  change (2 ^ 38) with 274877906944 in Hc.
+  (* k divides 8, hence 16 *)
+  assert (Hk16 : (k | 16)).
+  { destruct (Z.mod_divide 8 k ltac:(lia)) as [Hd _].
+    destruct (Hd Hk8) as [q Hq]. exists (2 * q). lia. }
+  assert (Htu : uint tgt = uint sp0 - n + d).
+  { rewrite Htgt. rewrite !uint_unsigned. apply moi_small. unfold Z64. lia. }
+  assert (Hpgd : (bv_unsigned sp0 - n) mod 4096 + d < 4096).
+  { pose proof (Z.mod_pos_bound (bv_unsigned sp0 - n) 4096 ltac:(lia)). lia. }
+  assert (Hlow : bv_unsigned (add_vec_int sp0 (- n)) = bv_unsigned sp0 - n)
+    by (apply uv_avi_neg; lia).
+  assert (Hu2 : bv_unsigned (add_vec_int (add_vec_int sp0 (- n)) d)
+                = bv_unsigned sp0 - n + d).
+  { rewrite (uint_add_vec_int_small (add_vec_int sp0 (- n)) d ltac:(lia)
+               ltac:(rewrite Hlow; lia)).
+    rewrite Hlow. reflexivity. }
+  assert (Haddr : add_vec_int (add_vec_int sp0 (- n)) d = tgt).
+  { rewrite Htgt. rewrite uint_unsigned. rewrite <- Hu2.
+    rewrite moi_of_unsigned. reflexivity. }
+  assert (Hspk : bv_unsigned sp0 mod k = 0).
+  { rewrite (Znumtheory.Zmod_div_mod k 16 (bv_unsigned sp0) ltac:(lia) ltac:(lia) Hk16).
+    rewrite Hal. apply Zmod_0_l. }
+  assert (Hnk : n mod k = 0).
+  { rewrite (Znumtheory.Zmod_div_mod k 16 n ltac:(lia) ltac:(lia) Hk16).
+    rewrite Hn16. apply Zmod_0_l. }
+  split_and!.
+  - exact Htu.
+  - destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld). exists w.
+    assert (Hv : svpn_of tgt = svpn_of (add_vec_int sp0 (- n))).
+    { rewrite <- Haddr.
+      apply (usvpn_window (add_vec_int sp0 (- n)) d ltac:(lia)).
+      rewrite Hlow. exact Hpgd. }
+    rewrite Hv. split_and!; assumption.
+  - apply uva_canon_small. rewrite <- uint_unsigned. rewrite Htu.
+    rewrite !uint_unsigned. lia.
+  - rewrite Htu. rewrite !uint_unsigned.
+    rewrite Z.rem_mod_nonneg; [ | lia | lia ].
+    assert (He : (bv_unsigned sp0 - n + d) mod 4096
+                 = (bv_unsigned sp0 - n) mod 4096 + d).
+    { rewrite <- Zplus_mod_idemp_l. apply Z.mod_small.
+      pose proof (Z.mod_pos_bound (bv_unsigned sp0 - n) 4096 ltac:(lia)). lia. }
+    rewrite He.
+    pose proof (Z.mod_pos_bound (bv_unsigned sp0 - n) 4096 ltac:(lia)). lia.
+  - unfold is_aligned_vaddr. apply Z.eqb_eq.
+    cbn [bits_of_virtaddr]. rewrite Htu. rewrite !uint_unsigned.
+    rewrite Z.rem_mod_nonneg; [ | lia | lia ].
+    rewrite Zplus_mod Zminus_mod Hspk Hnk Hdk. apply Zmod_0_l.
+  - intros j Hj. rewrite Htu. rewrite !uint_unsigned.
+    replace (bv_unsigned sp0 - n + d + j)
+      with (bv_unsigned sp0 - n + (d + j)) by lia.
+    apply Hb. lia.
+Qed.
+
+(* the ONE-BYTE reading, which is all a [sb] / [lbu] into a frame needs
+   ([wp_uv_sb] / [wp_uv_lbu] discharge alignment and the in-page bound
+   themselves): no alignment premise at all, and any offset. *)
+Lemma uv_stack_byte_moi (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64)
+    (n d : Z) (tgt : mword 64) :
+  uv_stack pt M sp0 n -> 0 <= d -> d + 1 <= n ->
+  tgt = (mword_of_int (uint sp0 - n + d) : mword 64) ->
+  uint tgt = uint sp0 - n + d /\
+  (exists w : mword 64,
+     ud_um pt !! svpn_of tgt = Some w /\
+     uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+  uva_canon tgt /\
+  (exists b : bv 8, M !! (uint tgt) = Some b).
+Proof.
+  intros HS Hd0 Hdn Htgt.
+  destruct (uv_stack_slotk_moi pt M sp0 n d 1 tgt HS ltac:(lia)
+              ltac:(reflexivity) Hd0 Hdn ltac:(apply Z.rem_1_r) Htgt)
+    as (Hu & Hl & Hcan & _ & _ & Hbs).
+  destruct (Hbs 0 ltac:(lia)) as (b & Hb). rewrite Z.add_0_r in Hb.
+  split_and!; [ exact Hu | exact Hl | exact Hcan | exists b; exact Hb ].
+Qed.
+
 (* ... and of the bottom of a budget (the post-prologue sp) *)
 Lemma uv_stack_sp_moi (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64) (n : Z) :
   uv_stack pt M sp0 n ->
@@ -807,3 +918,48 @@ Proof.
   intros Hkeys Hdisj [_ E] Hsub k b Hk.
   rewrite (E k (Hdisj k (Hkeys k b Hk))). exact (Hsub k b Hk).
 Qed.
+
+(* the 4-byte twin of [uv_slot8_facts] -- what a [lw]/[sw] of a C `uint'
+   field needs.  The K&R allocator's [size] fields are read this way. *)
+Lemma uv_slot4_facts (a : Z) (va : mword 64) :
+  0 <= a -> a mod 4 = 0 -> a + 4 <= 2 ^ 38 ->
+  va = (mword_of_int a : mword 64) ->
+  uint va = a /\
+  uva_canon va /\
+  Z.rem (uint va) 4096 <= 4092 /\
+  is_aligned_vaddr (Virtaddr va) 4 = true.
+Proof.
+  intros Ha0 Ha4 Hahi Hva.
+  change (2 ^ 38) with 274877906944 in Hahi.
+  assert (Hu : uint va = a) by (rewrite Hva; apply uint_moi; unfold Z64; lia).
+  assert (Hm : a mod 4096 <= 4092).
+  { assert (Hd : (4 | 4096)) by (exists 1024; reflexivity).
+    pose proof (Znumtheory.Zmod_div_mod 4 4096 a ltac:(lia) ltac:(lia) Hd) as Hq.
+    pose proof (Z.mod_pos_bound a 4096 ltac:(lia)) as Hb.
+    pose proof (Z.div_mod (a mod 4096) 4 ltac:(lia)) as Hdm.
+    rewrite <- Hq in Hdm. rewrite Ha4 in Hdm. lia. }
+  split_and!.
+  - exact Hu.
+  - apply uva_canon_small. rewrite <- uint_unsigned. rewrite Hu. lia.
+  - rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Hm | lia | lia ].
+  - unfold is_aligned_vaddr. apply Z.eqb_eq. cbn [bits_of_virtaddr].
+    rewrite Hu. rewrite Z.rem_mod_nonneg; [ exact Ha4 | lia | lia ].
+Qed.
+
+(* The ELIMINATOR.  Using [uM_only_in] means showing a key is outside every
+   window, and doing that by hand is an [elem_of_cons] / [destruct] / [lia]
+   chase at each site -- the largest single piece of boilerplate the sh
+   proofs carry.  Stated with the window quantified so a caller discharges
+   one goal per window and never touches the list structure. *)
+Lemma uM_only_in_out (M M' : gmap Z (bv 8)) (ws : list (Z * Z)) (k : Z) :
+  uM_only_in M M' ws ->
+  (forall w : Z * Z, w ∈ ws -> ~ (fst w <= k < fst w + snd w)) ->
+  M' !! k = M !! k.
+Proof.
+  intros [_ E] Hout. apply E. intros (w & Hw & Hin). exact (Hout w Hw Hin).
+Qed.
+
+(* ... and its introduction twin: a key inside a NAMED window is in the list *)
+Lemma uM_in_windows_here (ws : list (Z * Z)) (a n k : Z) :
+  (a, n) ∈ ws -> a <= k < a + n -> uM_in_windows ws k.
+Proof. intros Hw Hk. exists (a, n). split; [ exact Hw | exact Hk ]. Qed.

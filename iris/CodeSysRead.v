@@ -17,7 +17,6 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
-Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode10.
@@ -28,6 +27,7 @@ Require Import KernelDecode16.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
+Require Import KernelDecode22.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
@@ -67,9 +67,9 @@ Section CodeSysRead.
   Proof. mk_rvc (KernelSyms.sys_read + 0xc) (mword_of_int 0x4505 : mword 16)
     (mword_of_int (KernelSyms.sys_read + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4505 exec_execute_C_LI. Qed.
 
-  Lemma sri_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_read + 0xe) : mword 64) false (JAL (mword_of_int 2087720 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_read + 0xe) (mword_of_int 0xb29fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_read + 0xe) : mword 64) (JAL (mword_of_int 2087720 : mword 21, Regidx (mword_of_int 1))) kd_b29fd0ef. Qed.
+  Lemma sri_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_read + 0xe) : mword 64) false (JAL (mword_of_int 2087648 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_read + 0xe) (mword_of_int 0xae1fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_read + 0xe) : mword 64) (JAL (mword_of_int 2087648 : mword 21, Regidx (mword_of_int 1))) kd_ae1fd0ef. Qed.
 
   Lemma sri_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_read + 0x12) : mword 64) false (ITYPE (mword_of_int 4068 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (KernelSyms.sys_read + 0x12) (mword_of_int 0xfe440593 : mword 32)
@@ -79,9 +79,9 @@ Section CodeSysRead.
   Proof. mk_rvc (KernelSyms.sys_read + 0x16) (mword_of_int 0x4509 : mword 16)
     (mword_of_int (KernelSyms.sys_read + 0x16) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4509 exec_execute_C_LI. Qed.
 
-  Lemma sri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_read + 0x18) : mword 64) false (JAL (mword_of_int 2087682 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_read + 0x18) (mword_of_int 0xb03fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_read + 0x18) : mword 64) (JAL (mword_of_int 2087682 : mword 21, Regidx (mword_of_int 1))) kd_b03fd0ef. Qed.
+  Lemma sri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_read + 0x18) : mword 64) false (JAL (mword_of_int 2087610 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_read + 0x18) (mword_of_int 0xabbfd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_read + 0x18) : mword 64) (JAL (mword_of_int 2087610 : mword 21, Regidx (mword_of_int 1))) kd_abbfd0ef. Qed.
 
   Lemma sri_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_read + 0x1c) : mword 64) false (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI)).
   Proof. mk_base (KernelSyms.sys_read + 0x1c) (mword_of_int 0xfe840613 : mword 32)

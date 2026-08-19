@@ -20,6 +20,7 @@ Require Import KernelDecode00.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode06.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -80,9 +81,9 @@ Section CodeMyproc.
   Proof. mk_base (KernelSyms.myproc + 0x14) (mword_of_int 0x00011717 : mword 32)
     (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_00011717. Qed.
 
-  Lemma mpi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) false (ITYPE (mword_of_int 2762 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.myproc + 0x18) (mword_of_int 0xaca70713 : mword 32)
-    (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) (ITYPE (mword_of_int 2762 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_aca70713. Qed.
+  Lemma mpi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) false (ITYPE (mword_of_int 2778 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.myproc + 0x18) (mword_of_int 0xada70713 : mword 32)
+    (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) (ITYPE (mword_of_int 2778 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_ada70713. Qed.
 
   Lemma mpi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.myproc + 0x1c) (mword_of_int 0x97ba : mword 16)

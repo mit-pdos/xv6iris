@@ -309,7 +309,6 @@ Require Import FsCrash.
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
 Require Import InodeRegion.
-Require Import IcacheEscrow IcacheInv.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
 Require Import ProcInv.
@@ -543,7 +542,28 @@ Section SyscallVocab.
      is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
        (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail (fcn_kalloc fn) None ∗
-     fileclose_ic_env fn)%I.
+     fileclose_ic_env fn ∗
+     (* THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  This is the
+        field the ruling names, and today it costs NOTHING: [syscall_env] --
+        and therefore this -- is a Definition nobody constructs yet (see the
+        header's own "SATISFIABILITY IS UNCHECKED"), so no obligation comes
+        due here.  When the boot wiring lands, the constructor discharges it
+        from fsinit's returned [ireg_boot] through [IcacheRef.ity_shoot], at
+        exactly the owed site (forkret's first branch, whose
+        [LinkForkretNF.wp_forkret_nf_ax] is already in the accepted adequacy
+        baseline -- no new axiom).
+
+        WHY IT IS NOT INSIDE [fileclose_ic_env]: that bundle is also what
+        ireclaim and the boot-side closers carry, and at BOOT the seal has
+        not fired -- [ireg_boot] and [ireg_open] are jointly refutable
+        ([IcacheRef.ity_pending_shot_excl]), so a boot holder of the bundle
+        would be vacuous.  A SYSCALL is by construction after forkret, which
+        is exactly the regime this field asserts.
+
+        It is a NEW conjunct and it goes at the END, per this file's own
+        rule for [syscall_env]; the four [iDestruct] patterns over
+        [sysc_fs_env] below are updated to match. *)
+     ireg_open)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
      [Instance] takes its binders as a CONTEXT, so re-binding the Section's
@@ -592,9 +612,10 @@ Section SyscallVocab.
     iDestruct "Hfs" as
       "(%Hdev & %Hnib & %Hlogn & _ & _ & _ & _ & _ & _ & _ & _ & _ &
         _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic)".
+        #Hdlock & _ & _ & #Hic & _)".
     iDestruct "Hic" as
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg & #Hsl)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg &
+        #Hropen & #Hsl)".
     (* assembled conjunct by conjunct rather than with [iFrame "#"]: the
        fifteen are in the fabric's own order, and a mismatch then names the
        one that moved instead of leaving an unsolved goal. *)
@@ -610,6 +631,7 @@ Section SyscallVocab.
     iSplitR; [iExact "Hesc"    |].
     iSplitR; [iExact "Hsl"     |].
     iSplitR; [iExact "Hireg"   |].
+    iSplitR; [iExact "Hropen"  |].
     iSplitR; [iExact "Hprocs"  |].
     iSplitR; [iExact "Hdevi"   |].
     iSplitR; [iExact "Hgeom"   |].
@@ -1037,6 +1059,45 @@ Section SyscallVocab.
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
      proc_priv γf pj pid V)%I.
+
+  (* Build the arm bundle structurally, while its proof context contains only
+     the twelve resources being assembled.  In the capstone below, even a
+     named [iFrame] searches the goal's conjuncts; its final [proc_priv]
+     contains the 4096-word trapframe page, making that search seconds long. *)
+  Lemma sysc_arm_pre_intro `{CIDh : CpuId}
+      (γf : gname) (pj : mword 64) (γs : list gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
+      (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
+      (tgt : mword 64) (us : gset Z) :
+    pc_is tgt -∗
+    sie_cap_gpr KT1 M av true pj -∗
+    cpu_own 0%nat true pj true lks -∗
+    kernel_text -∗
+    procs_inv γs -∗
+    syscall_env γf pj bn fn -∗
+    bslots bn 3 -∗
+    fileclose_bm fn us -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+    fd_slots FDSPARE -∗
+    iref_slots IREFSPARE -∗
+    proc_priv γf pj pid V -∗
+    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks av M tgt us.
+  Proof.
+    iIntros "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv".
+    rewrite /sysc_arm_pre.
+    iSplitL "Hpc"; [iExact "Hpc" |].
+    iSplitL "Hcg"; [iExact "Hcg" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" |].
+    iSplitL "Htext"; [iExact "Htext" |].
+    iSplitL "Hprocs"; [iExact "Hprocs" |].
+    iSplitL "HR"; [iExact "HR" |].
+    iSplitL "Hbs"; [iExact "Hbs" |].
+    iSplitL "Hfc"; [iExact "Hfc" |].
+    iSplitL "Hip"; [iExact "Hip" |].
+    iSplitL "Hfd"; [iExact "Hfd" |].
+    iSplitL "Hir"; [iExact "Hir" |].
+    iExact "Hpriv".
+  Qed.
 
   (* the OUTER [wp_syscall_sconf_body]'s own continuation, named so every
      arm/the epilogue can take it as an explicit parameter rather than
@@ -2156,17 +2217,21 @@ Section SyscallArms.
        (see [sysc_fs_env]).  [SpecSysFork] spells the device at the AMBIENT
        [icfg_dev], so the tie is what bridges the two spellings. *)
     iDestruct "Hfsenv" as "(%Hdev & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-                            _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic)".
+                            _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic & _)".
+    (* the REGION handle comes out of the same bundle, one conjunct past
+       [ic_escrows]: idup's [ref++] is a ledger move since increment IVe
+       (iclaim-ledger.md §3.19), so [SpecSysFork] passes it down to kfork. *)
     iDestruct "Hic" as
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & _ & _)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & #Hireg & _)".
     iEval (rewrite Hdev) in "Hitable".
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
-              γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn) (fcn_nib fn)
+              γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
+              (fcn_inodestart fn) (fcn_nib fn)
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hkalloc Hpav Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -2277,7 +2342,7 @@ Section SyscallArms.
     (* the ties, then the icache bundle's own nine pure facts *)
     iDestruct "Hfsenv" as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic)".
+        %Hlg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic & _)".
     iDestruct "Hic" as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hireg & %Hcb & _)".
     (* ---- the three consumable families, carved to sys_exec's own shape ---- *)
@@ -2391,7 +2456,7 @@ Section SyscallArms.
     iDestruct "Hfsenv" as
       "(_ & _ & _ & _ & _ & _ & %Hdq & %Hbio & %Hpja & %Hjn & %Hlk & %Hlg &
         #Hpi & #Hpanic & #Hbio' & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & #Hkmem & #Hka & #Hic)".
+        #Hdlock & #Hkmem & #Hka & #Hic & _)".
     (* ---- the closer, walked down syscall's own frame ---- *)
     iDestruct "Hcont" as "[_ Hkcl]".
     iDestruct (stack_own_4_intro (m !!! Regidx csp_rs1)
@@ -3268,8 +3333,8 @@ Section SyscallMain.
       iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl bn fn dqi ip pid V lks av m D0 us Hk
                 Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
-      { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv". }
+      { iApply (sysc_arm_pre_intro with
+          "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv"). }
     - (* ---------------- OUT OF RANGE: the printk fallback ---------------- *)
       (* [a3num]'s value fits in [mword 32]'s signed range by construction
          (it IS a sign-extended 32-bit value), so [sysc_bltu_taken]'s extra
@@ -3348,8 +3413,8 @@ Section SyscallMain.
       iApply (sysc_fallback (CID := CID15) γf pj γs j bn fn dqi ip pid V lks av m B5 us
                 Hj eq_refl HB5armsp HB5s1 HB5other HB5avb
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
-      { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv". }
+      { iApply (sysc_arm_pre_intro with
+          "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv"). }
   Qed.
 
 End SyscallMain.

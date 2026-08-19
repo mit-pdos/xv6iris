@@ -112,8 +112,16 @@ Local Open Scope Z_scope.
 
 (* iput's own frame is 48 bytes; its deepest callee is bread (40) below
    itrunc's own frame, plus acquiresleep.  Sized like balloc's, one frame
-   deeper. *)
-Notation K_iput := (72%nat) (only parsing).
+   deeper.
+
+   72 -> 74 (THE SPLICE FINDING, iclaim-ledger.md 6.2).  The REORDERED free
+   path calls itrunc from the LOCKED block ([ip_free_locked], iput+0x6c) with
+   iput's own six frame slots already pushed, so the cone reserve it must
+   carry is [K_itrunc (68) <= K - 6], i.e. K >= 74 -- strictly stronger than
+   the 72 the pre-reorder walk needed.  Every landed caller was re-checked
+   against the new value; only [K_iunlockput] had to move with it (76 -> 78,
+   because ProofIunlockput calls iput at [K - 4]). *)
+Notation K_iput := (74%nat) (only parsing).
 (* itrunc's two (bitmap block + its closing iupdate) plus iput's own
    iupdate at +0x6c.  SPEND-AT-MOST: the fast path spends nothing. *)
 Definition iput_units : nat := 3%nat.
@@ -200,6 +208,20 @@ Definition wp_iput_sconf_body
   ic_escrow cn gfs gi cov logstart k -∗
   (* the inode region *)
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME, AT THE RUNTIME ARM (iclaim-ledger.md §6′, RULING G;
+     SPECIALIZED BY SIMP-1).  iput's free path FREEZES the inode
+     ([InodeRegion.ireg_freeze_au] at +0x50), and §2.3's boot-shelter clause
+     makes a freezer exhibit the regime it is freezing under.  A RUNTIME
+     thread's regime is the sealed [IcacheRef.ireg_open] -- persistent, fired
+     once by RULING B between fsinit and kexec("/init") -- so the indexed
+     form's "lend a copy, get a copy back" round-trip carried no information
+     at all here, and both the [(rg : bool)] binder and the return clause are
+     gone: this premise IS [ireg_regime true], and being persistent the
+     caller keeps its own copy across the call.  The ONE caller that freezes
+     under the other regime is ireclaim, whose [ireg_boot] is exclusive and
+     must come back; it reads [wp_iput_gen], which keeps the full indexed
+     round-trip. *)
+  ireg_open -∗
   (* the entry's sleeplock, over the CHECKOUT TOKEN alone *)
   (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
      the slot, keyed by the slot rather than by the lock -- which is what
@@ -207,8 +229,18 @@ Definition wp_iput_sconf_body
      on it (claude-notes/projects/iput-acquiresleep.md). *)
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                    (slh_tok (icfg_isl k)) -∗
-  (* ---- THE REFERENCE BEING DESTROYED ---- *)
-  inode_ref k q dev inum -∗
+  (* ---- THE REFERENCE BEING DESTROYED, WITH ITS PROVENANCE UNIT ----
+     ONE ROW (SIMP-2): [inode_refp] IS this pair -- the reference and the
+     unit minted at the iget that created it, copied at any idup of it,
+     and SPENT here.  iput's close -- last or not -- surrenders the unit
+     in the same ghost step that moves the in-core count, which is what
+     [InodeRegion.ireg_ref_ok]'s (R1) demands.  There is no flavour to
+     bind: under RULING C' the claim flavour is CONVERTED at ilock's
+     ClaimK arm, so the only unit that ever reaches an iput is the plain
+     one -- which is why the package's plain form suffices and the
+     restatement is a rename ([IcacheRef.inode_refp_spend], by
+     [reflexivity]). *)
+  inode_refp k q dev inum -∗
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -258,8 +290,10 @@ Definition wp_iput_sconf_body
          n = 1 arm held.  iget spends exactly one on both ITS arms, so
          iget/iput are a matched pair against the fixed IREFSLOTS supply. *)
       iref_slot -∗
-      (* ...AND NOTHING ELSE.  The reference is consumed; xv6's iput
-         returns void and the caller's pointer is dead. *)
+      (* ...AND NOTHING ELSE.  The regime does NOT come back: the runtime
+         arm's is persistent, so the caller never gave it up (SIMP-1).  The
+         reference is consumed; xv6's iput returns void and the caller's
+         pointer is dead. *)
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -338,7 +372,7 @@ Definition wp_iput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -376,13 +410,29 @@ Definition wp_iput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
+     iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
+     +0x50), and §2.3's boot-shelter clause makes a freezer exhibit the regime
+     it is freezing under: the sealed [IcacheRef.ireg_open] a RUNTIME thread
+     carries (persistent, fired once by RULING B between fsinit and
+     kexec("/init")), or the exclusive [ireg_boot] the pre-userspace thread
+     carries instead.  It is BORROWED, not consumed: the off-lock deposit at
+     +0xba retires the freeze and lifts the disjunction back out of the slot's
+     own clause ([EscrowDeposit.ireg_free_deposit_au]), and the two close arms
+     never spend it at all -- so it comes back on EVERY arm, below.  A runtime
+     caller passes [iLeft] on its persistent copy and may discard what comes
+     back; ireclaim, the one boot caller, lends [ireg_boot] and needs it
+     returned to run its next loop iteration. *)
+  ireg_regime rg -∗
   (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
      the slot, keyed by the slot rather than by the lock -- which is what
      lets iput, at [ip->ref == 1], prove the lock free instead of blocking
      on it (claude-notes/projects/iput-acquiresleep.md). *)
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                    (slh_tok (icfg_isl k)) -∗
-  inode_ref k q dev inum -∗
+  (* the reference being destroyed, WITH its provenance unit: ONE ROW
+     (SIMP-2), exactly as in the [_sconf] body above. *)
+  inode_refp k q dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
@@ -437,6 +487,8 @@ Definition wp_iput_gen_body
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
+      (* RULING G: the regime comes back, on every arm (see the premise). *)
+      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -484,8 +536,8 @@ Module Type IPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks rg.
 End IPUT.

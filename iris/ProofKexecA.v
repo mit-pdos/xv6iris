@@ -425,7 +425,7 @@ Section KexecABody.
        3) needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
     iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
@@ -438,10 +438,10 @@ Section KexecABody.
     (* ---- +0x020: jal ra,myproc ---- *)
     iPoseProof (kxc_020 with "Htext") as "Hi020".
     assert (Htmp : add_vec (mword_of_int (KXA + 0x20) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085218 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085146 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x20)) Rra
-              (mword_of_int 2085218 : mword 21) M1 (K - 68)%nat true
+              (mword_of_int 2085146 : mword 21) M1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc Hi020").
@@ -573,7 +573,7 @@ Section KexecABody.
                     destruct (length (path_elems (bview plen pfun))); lia)
               Hjp Hgs eq_refl
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
-                    Hslks Hireg Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
+                    Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcwd Hcref Hpath Hbs Hirs Hlog").
     iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
              Hbits Hppid Hcwd Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
@@ -911,7 +911,11 @@ Section KexecABody.
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
+        (* the payload's freeze token (§3.9, RULING A-prime) *)
+        ifreeze_off (bv_unsigned inumf) -∗
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
+        (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+        runit_any (bv_unsigned inumf) -∗
         log_op g n2 -∗
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -967,10 +971,10 @@ Section KexecABody.
        need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- the inode: slot, share, and the region facts ---- *)
-    iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & Href)".
+    iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & Href & Hru)".
     iEval (rewrite -Hdev) in "Href".
     rewrite inode_ref_shed. iDestruct "Href" as "[Hkeep Hshr]".
     (* SpecIlock v5 takes the share at a NAMED generation
@@ -1055,10 +1059,10 @@ Section KexecABody.
     iEval (rewrite Hpp036) in "Hpc".
     (* ---- +0x036: jal ra,ilock ---- *)
     assert (Htil : add_vec (mword_of_int (KXA + 0x36) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091624 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091552 : mword 21))
                    = mword_of_int KernelSyms.ilock) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x36)) Rra
-              (mword_of_int 2091624 : mword 21) Q1 (K - 68)%nat true
+              (mword_of_int 2091552 : mword 21) Q1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htil; vm_compute; reflexivity)
               with "Hcg Hpc Hi036").
@@ -1075,16 +1079,18 @@ Section KexecABody.
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
-              gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
+              gilk gislk cov logstart inodestart nib k (q/2)%Qp gy PlainK
+              dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true true lks
               ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
-                    Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
+                    Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
-             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity %Hfr_".
+             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
+             Hru %Hilkp".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x3a))
       by (rewrite HQ2ra; pcw).
     iEval (rewrite Hpc3a) in "Hpc".
@@ -1458,7 +1464,7 @@ Section KexecABody.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
                   n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hslpid Hdep
-                  Hidev Hiinum Hivalid Hload Hity Hkeep Hlog Hirs Hbm Hins Hbits
+                  Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
@@ -1529,10 +1535,10 @@ Section KexecABody.
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
                   with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
-                        Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
+                        Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                       Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
+                                       Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
         rewrite /kxc_frameA6.
         iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
         iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1602,10 +1608,10 @@ Section KexecABody.
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
                 with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
+                      Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
+                                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1785,7 +1791,11 @@ Section KexecAMain.
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
+        (* the payload's freeze token (§3.9, RULING A-prime) *)
+        ifreeze_off (bv_unsigned inumf) -∗
         inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
+        (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+        runit_any (bv_unsigned inumf) -∗
         log_op g n2 -∗
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

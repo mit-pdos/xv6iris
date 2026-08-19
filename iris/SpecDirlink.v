@@ -583,6 +583,15 @@ Definition wp_dirlink_sconf_body
   bitmap_res γfs bmapstart cov logstart size used -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
   ireg_inv γi γfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
+     Persistent, borrowed and never spent; it rides the SAME channel
+     [ireg_inv] does.  It is here because this contract reaches iput, whose
+     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
+     freezer exhibit the regime it freezes under.  A runtime caller hands
+     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
+     comes back; only ireclaim, which freezes before the seal is fired,
+     lends [ireg_boot] instead. *)
+  ireg_open -∗
   dinode_at γi dinum dn0 -∗
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗
@@ -857,6 +866,15 @@ Definition wp_dirlink_gen_body
   bitmap_res γfs bmapstart cov logstart size used -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
   ireg_inv γi γfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
+     Persistent, borrowed and never spent; it rides the SAME channel
+     [ireg_inv] does.  It is here because this contract reaches iput, whose
+     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
+     freezer exhibit the regime it freezes under.  A runtime caller hands
+     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
+     comes back; only ireclaim, which freezes before the seal is fired,
+     lends [ireg_boot] instead. *)
+  ireg_open -∗
   dinode_at γi dinum dn0 -∗
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗

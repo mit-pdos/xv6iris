@@ -278,12 +278,14 @@ Qed.
    cannot leak into a proof that ought to be threading a real one.
    (The fourth field is the liveness pool's gname, design/fs-icache.md
    §14.6; the fifth is the LINK LEDGER's, §20.2; the last is the per-slot
-   SLEEPLOCK gname family, claude-notes/projects/iput-acquiresleep.md step 4.
-   This is the ONE place in the tree that names a concrete [icfg].) *)
+   SLEEPLOCK gname family, claude-notes/projects/iput-acquiresleep.md step 4;
+   the last is the COUNT COUPLING's, claude-notes/projects/iclaim-ledger.md
+   §2.2.  This is the ONE place in the tree that names a concrete [icfg].) *)
 Local Instance adequacy_icfg : icfg :=
   MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat 1%positive 1%positive
          (LogDefs.MkLogNames 1%positive 1%positive 1%positive 1%positive)
-         0 (fun _ => 1%positive) (fun _ => 1%positive) 1%positive.
+         0 (fun _ => 1%positive) (fun _ => 1%positive) 1%positive 1%positive
+         1%positive 1%positive 1%positive.
 
 Definition xv6Σ : gFunctors :=
   #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; irefslotΣ; icacheΣ;

@@ -54,10 +54,28 @@
    parks the unit that accounts for the reference it mints.  Exactly
    filedup's and idup's discipline: it is the caller's job to bring one.
 
-   NO reference, and NO [ireg_inv]: iget never reads a dinode.  The inum's
-   pool bundle moves through the recycle arm as an opaque [ipool_shape]
-   ([IcacheEscrow], §13.3) -- extracted from the pool and parked in the
-   entry's escrow for whoever ilocks it next -- and iget never looks inside.
+   NO reference.  [ireg_inv] IS taken, and the "no [ireg_inv]" clause this
+   paragraph used to carry is AMENDED (iclaim-ledger.md §3.3's contract-set
+   widening, executed in increment IIIe): iget still never READS a dinode
+   -- the region open is GHOST-ONLY, on the ledger's [icnt] and freeze
+   columns and nothing else.  Two sites need it and both are on the recycle
+   arm:
+
+     - the pool peel ([IcacheEscrow.ipool_shape_to_np]) opens the region to
+       refute the AWAIT arm's standing freeze from the caller's LICENCE
+       (§3.1's A-refuter: the old [ipool_await_refuter] wand into [False] is
+       unbuildable out of a fupd, so the refutation moved INSIDE the peel's
+       own fupd, where it needs [ireg_inv] and the [iname] this contract
+       already takes);
+     - the 0 -> 1 count move ([IcacheInv.iref_alloc_store_au]) has to carry
+       the peeled [icnt_half] from 0 to 1, and the region owns the other
+       half of that column.
+
+   The inum's pool bundle still moves through the recycle arm as an opaque
+   [ipool_shape] ([IcacheEscrow], §13.3) -- extracted from the pool and
+   parked in the entry's escrow for whoever ilocks it next -- and iget never
+   looks inside it.  The bundle's payload is untouched here; only its two
+   ghost columns move.
 
    ---- THE ONE PREMISE A READER SHOULD LOOK AT TWICE --------------------
 
@@ -131,7 +149,7 @@
    block, and nothing in the scan can say the inum names a live inode.
    §20.17.5 answered that with a paragraph -- the enumeration of the six
    reasons a caller believes its inum -- and [IgetLic.v] makes it a type:
-   one binder [l : ilic] and one premise [iname γi γfs inum l].  The user's
+   one binder [l : ilic] and one premise [iname γi γfs inodestart inum l].  The user's
    invariant ("the kernel will never invoke iget on inode numbers in
    directories in a disconnected subtree") is not statable about the
    machine's traces; it IS statable here, at DELIVERY, and that is why the
@@ -181,6 +199,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import DinodeEnc. (* [IBLOCK]: the mint premise's block tie, item 7a-wire *)
 Require Import IgetLic.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
@@ -196,7 +215,7 @@ Definition wp_iget_sconf_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (nib : nat)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (dev inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -227,6 +246,11 @@ Definition wp_iget_sconf_body
   itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
   ic_escrows cn γfs γi cov logstart -∗
+  (* THE INODE REGION, and GHOST-ONLY (header, §3.3): the recycle arm's peel
+     refutes a standing freeze from [l] inside it, and its 0 -> 1 count move
+     carries the ledger's [icnt] half.  Persistent, so it costs a caller a
+     frame and nothing else. *)
+  ireg_inv γi γfs inodestart nib -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
   (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
      is the console bundle printk needs.  Note the arm fires while iget
@@ -234,8 +258,12 @@ Definition wp_iget_sconf_body
   panic_env -∗
   (* THE precondition that makes the mint safe, on both arms *)
   iref_slot -∗
-  (* THE LICENCE: borrowed here, returned below at the SAME [l] *)
-  iname γi γfs inum l -∗
+  (* THE LICENCE: borrowed here, returned below at the SAME [l].  It is
+     indexed by the region's start because the [BufL] arm carries its own
+     block tie (SIMP-1) -- the standalone block equation this contract used
+     to state, and the [discriminate] it forced on every non-[BufL] caller,
+     are both gone. *)
+  iname γi γfs inodestart inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
     sie_cap_gpr KT1 mr K b p -∗
@@ -244,9 +272,18 @@ Definition wp_iget_sconf_body
     ⌜ callee_saved m mr
       /\ (k < NINODE)%nat
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref k q dev inum -∗
+    (* ONE ROW (SIMP-2): the reference AND its provenance unit, packaged.
+       The unit is minted here and FLAVOURED by the licence presented --
+       ialloc's own [ClaimL] iget mints [runit_claim] into its own claim
+       box, every other iget mints [runit_plain] -- and it rides with the
+       reference for the reference's whole life, to be surrendered at the
+       iput that closes it.  Since it never travels alone, it is no longer
+       spelled alone: [inode_refb] is the pair, and it is the shape
+       [inode_held] and both rest homes already wanted (ghost-simplification
+       §5.1).  A caller that needs the halves gets them in one destruct. *)
+    inode_refb (is_claim l) k q dev inum -∗
     (* ...and BACK, unspent and at the SAME [l] *)
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -256,11 +293,11 @@ Module Type IGET.
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
+      wp_iget_sconf_body γl cn γfs γi cov logstart inodestart nib dev inum l
                          m n eb p K b lks.
 End IGET.

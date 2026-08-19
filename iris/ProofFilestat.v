@@ -377,7 +377,7 @@ Section ProofFilestat.
        +0x10 jal ra,myproc
        ================================================================= *)
     iApply (wp_jal_s_sconf (mword_of_int (FST + 0x10)) Rra
-              (mword_of_int 2086710 : mword 21) R4 (K - 10)%nat b
+              (mword_of_int 2086638 : mword 21) R4 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi10").
     iIntros (CID9 Hs9) "Hcg Hpc".
@@ -386,7 +386,7 @@ Section ProofFilestat.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (FST + 0x10) : mword 64) 4)]> R4) with R5.
     assert (Htgtmp : add_vec (mword_of_int (FST + 0x10) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2086710 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2086638 : mword 21))
                      = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtmp) in "Hpc".
@@ -551,7 +551,8 @@ Section ProofFilestat.
          inode.  The per-slot escrow and sleeplock then come out of the two
          families by the slot the payload named. ---- *)
       iDestruct (filestat_pay_carve γf k q Cf Hin with "Hrpay")
-        as (ikk inm ssh gsh) "(%Hipk & %Hik & %Hinlt & Hshr0 & Hpayback)".
+        as (ikk inm ssh gsh tysh)
+           "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
       assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsn_cov fn)
         by (apply Hgeo; exact Hinlt).
       iDestruct (ic_escrows_acc2 (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn)
@@ -642,14 +643,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp26) in "Hpc".
       (* +0x26 jal ra,ilock *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x26)) Rra
-                (mword_of_int 2093116 : mword 21) Q2 (K - 10)%nat b
+                (mword_of_int 2093044 : mword 21) Q2 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi26").
       iIntros (CID19 Hs19) "Hcg Hpc".
       set (Q3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x26) : mword 64) 4)]> Q2).
       assert (Htgtil : add_vec (mword_of_int (FST + 0x26) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2093116 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2093044 : mword 21))
                        = mword_of_int KernelSyms.ilock)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtil) in "Hpc".
@@ -692,7 +693,7 @@ Section ProofFilestat.
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
-                icfg_nib ikk (ssh/2)%Qp gsh
+                icfg_nib ikk (ssh/2)%Qp gsh (ShotK tysh)
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
@@ -700,14 +701,14 @@ Section ProofFilestat.
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                      Hslk Hshr Hsb Hppid Hprocs
+                      Hslk Hshr Hshot0 Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
         "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-         Hidev Hinum Hvalid Hlk #Hshot %Hfr_".
+         Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).
       { rewrite HQ3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -929,14 +930,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp38) in "Hpc".
       (* +0x38 jal ra,iunlock *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x38)) Rra
-                (mword_of_int 2093272 : mword 21) J1 (K - 10)%nat b
+                (mword_of_int 2093200 : mword 21) J1 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi38").
       iIntros (CID26 Hs26) "Hcg Hpc".
       set (J2 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x38) : mword 64) 4)]> J1).
       assert (Htgtiu : add_vec (mword_of_int (FST + 0x38) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2093272 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2093200 : mword 21))
                        = mword_of_int KernelSyms.iunlock)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtiu) in "Hpc".
@@ -984,7 +985,7 @@ Section ProofFilestat.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                       Hheld Hslpid Hppid Hprocs
-                      Hdep Hidev Hinum Hvalid Hlk Hshot").
+                      Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
       iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
@@ -1111,14 +1112,14 @@ Section ProofFilestat.
       iEval (rewrite Hpp4a) in "Hpc".
       (* +0x4a jal ra,copyout *)
       iApply (wp_jal_s_sconf (mword_of_int (FST + 0x4a)) Rra
-                (mword_of_int 2085686 : mword 21) U5 (K - 10)%nat b
+                (mword_of_int 2085614 : mword 21) U5 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4a").
       iIntros (CID31 Hs31) "Hcg Hpc".
       set (U6 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FST + 0x4a) : mword 64) 4)]> U5).
       assert (Htgtco : add_vec (mword_of_int (FST + 0x4a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2085686 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2085614 : mword 21))
                        = mword_of_int KernelSyms.copyout)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtco) in "Hpc".

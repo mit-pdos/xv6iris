@@ -360,8 +360,32 @@ Ltac dtp_pin :=
 
 Ltac dtp_spine :=
   lazymatch goal with
-  | |- goodbP _ _ (Defs.bind _ _) _ = true =>
-      first [ apply goodbP_spine | apply goodbP_spine_pure ]
+  | |- goodbP _ _ (Defs.bind _ ?f) _ = true =>
+      (* The decoder's clause spine is either syntactically immediate or one
+         bind-association below a boolean feature gate.  Dispatch on those
+         shapes before asking unification to convert the polymorphic spine
+         lemmas; trying both lemmas at every generic bind dominates this
+         thousand-goal traversal. *)
+      lazymatch f with
+      | (fun o => match o with
+                  | Some r => returnM r
+                  | None => _
+                  end) => apply goodbP_spine
+      | (fun _ => Defs.bind _
+                    (fun o => match o with
+                              | Some r => returnM r
+                              | None => _
+                              end)) => apply goodbP_spine
+      | (fun o => returnM (match o with
+                           | Some r => r
+                           | None => _
+                           end)) => apply goodbP_spine_pure
+      | (fun _ => Defs.bind _
+                    (fun o => returnM (match o with
+                                       | Some r => r
+                                       | None => _
+                                       end))) => apply goodbP_spine_pure
+      end
   end.
 
 Ltac dtp_readreg :=

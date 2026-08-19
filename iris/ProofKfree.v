@@ -169,12 +169,12 @@ Section ProofKfree.
     iEval (rewrite Hpp10) in "Hpc".
     iPoseProof (kfi_10 with "Htext") as "Hi10".
     (* +0x10 addi a5,a5,-1086  (a5 := <end> = KernelSyms.end_ = 0x800235e0) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kfree + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xbc4 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kfree + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xbd4 : mword 12)
               R3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iClear "Hi10".
-    set (R4 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 3012 : mword 12)))]> R3).
+    set (R4 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 3028 : mword 12)))]> R3).
     iEval (rgne) in "Hcg".
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.kfree + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.kfree + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
@@ -436,12 +436,12 @@ Section ProofKfree.
     iEval (rewrite Hpp3a) in "Hpc".
     iPoseProof (kfi_3a with "Htext") as "Hi3a".
     (* +0x3a addi s2,s2,-1688  (s2 := &kmem) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kfree + 0x3a)) (mword_of_int 18 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0x96a : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kfree + 0x3a)) (mword_of_int 18 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0x97a : mword 12)
               S1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a").
     iIntros (CID23 Hs23) "Hcg Hpc".
     iClear "Hi3a".
-    set (S2 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (add_vec (S1 !!! Regidx (mword_of_int 18 : mword 5)) (sign_extend' 64 (mword_of_int 2410 : mword 12)))]> S1).
+    set (S2 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (add_vec (S1 !!! Regidx (mword_of_int 18 : mword 5)) (sign_extend' 64 (mword_of_int 2426 : mword 12)))]> S1).
     iEval (rgne) in "Hcg".
     assert (Hs2kmem : S2 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int KernelSyms.kmem).
     { rewrite /S2 upd_eq. rewrite /S1 upd_eq. apply bv_eq; vm_compute; reflexivity. }

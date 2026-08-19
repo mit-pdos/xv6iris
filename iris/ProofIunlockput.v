@@ -118,9 +118,13 @@ Section ProofIunlockputMain.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
+              Hropen #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
+    (* SIMP-2: the short parent arrives PACKAGED with its provenance unit
+       ([IcacheRef.inode_refp_short]); split once, and the gather below is
+       unchanged. *)
+    iDestruct "Hparp" as "[Hpar Hru]".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iulpi_00 with "Htext") as "Hi00".
@@ -244,14 +248,14 @@ Section ProofIunlockputMain.
     iEval (rewrite Hpp0c) in "Hpc".
     (* ===== +0x0c jal ra,iunlock ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x0c)) Rra
-              (mword_of_int 2096790 : mword 21) R3 (K - 4)%nat b
+              (mword_of_int 2096718 : mword 21) R3 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0c").
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (R4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x0c) : mword 64) 4)]> R3).
     assert (Htgtiu : add_vec (mword_of_int (KernelSyms.iunlockput + 0x0c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096790 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096718 : mword 21))
                      = mword_of_int KernelSyms.iunlock) by pcw.
     iEval (rewrite Htgtiu) in "Hpc".
     assert (HR4a0 : R4 !!! Regidx Ra0 = ip)
@@ -278,7 +282,7 @@ Section ProofIunlockputMain.
               ltac:(lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hpid Hppid
-                    Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot").
+                    Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
@@ -319,14 +323,14 @@ Section ProofIunlockputMain.
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== +0x12 jal ra,iput ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x12)) Rra
-              (mword_of_int 2096996 : mword 21) R5 (K - 4)%nat b
+              (mword_of_int 2096924 : mword 21) R5 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi12").
     iIntros (CID10 Hq10) "Hcg Hpc".
     set (R6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) 4)]> R5).
     assert (Htgtip : add_vec (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096996 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096924 : mword 21))
                      = mword_of_int KernelSyms.iput) by pcw.
     iEval (rewrite Htgtip) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx Ra0 = ip)
@@ -351,20 +355,24 @@ Section ProofIunlockputMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID10) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
+    (* SIMP-1: iunlockput has no boot caller at all, so its own contracts
+       state the regime at the persistent [ireg_open]; iput's gen form keeps
+       the index, and this is it at [rg := true]. *)
+    iEval (rewrite -ireg_regime_true) in "Hropen".
     iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks
+              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks true
               ltac:(lia) Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
               Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
+                    Hropen Hslk [$Href $Hru] Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hnlz Hlogop").
     all: try lkbelow.
     iIntros (CID11 Hq11 mP n' used' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots
-             %Hssub %Hwbm %Hwc %Hbud Hlogop Hslot".
+             %Hssub %Hwbm %Hwc %Hbud Hlogop Hslot _".
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))
       by (rewrite HR6ra; pcw).
@@ -597,7 +605,7 @@ Section ProofIunlockputMain.
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
+              Hropen #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     iDestruct "Hlogop" as (Sb0) "Hlogop".
@@ -610,7 +618,8 @@ Section ProofIunlockputMain.
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hpar
+                    Hropen Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
+                    Hparp
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").
     all: try lkbelow.

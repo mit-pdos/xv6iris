@@ -231,14 +231,16 @@ UserMem.v
 UserFetch.v
 UserCompute.v
 UserStepFull.v
-# --- BEGIN descoped tier: verified Umode WP (sync/echo/sh) ---
+# --- BEGIN descoped tier: verified Umode WP (sync/echo/sh/init) ---
 # Ruling (project owner, 2026-08-19): the proofs of the specific user-mode
-# binaries sync/echo/sh, and the Umode WP infrastructure that exists only to
-# support them, are descoped from the hart-node-port build. This is NOT the
+# binaries sync/echo/sh/init, and the Umode WP infrastructure that exists only
+# to support them, are descoped from the hart-node-port build. This is NOT the
 # ProofUser/UserExec "run arbitrary user-mode code" tier, which is kept and is
-# being finished separately. The .v files below remain on disk untouched;
-# reviving this tier means uncommenting these rows and porting them per
-# claude-notes/projects/user-tier-port.md's P8 entry ("the same bricks").
+# being finished separately. Nor is it LinkUserinit/SpecUserinit, which concern
+# the KERNEL's userinit path and stay in the build. The .v files below remain on
+# disk untouched; reviving this tier means uncommenting these rows and porting
+# them per claude-notes/projects/user-tier-port.md's P8 entry ("the same
+# bricks").
 # UmodeMem.v
 # UmodeCap.v
 # UmodeFetch.v
@@ -260,8 +262,24 @@ UserStepFull.v
 # USpecSh.v
 # USpecShParse.v
 # UmodeFrame.v
+# UmodeStub.v
 # UProofShLib.v
 # UProofShMem.v
+# UProofShHeap.v
+# UProofShLex.v
+# UProofShIo.v
+# UProofShInput.v
+# UProofShParse.v
+# UProofShCmd.v
+# UProofShTop.v
+# UProofShMain.v
+# UProofShEcho.v
+# UCodeInit.v
+# UmodeInitIo.v
+# USpecInit.v
+# UProofInitLib.v
+# UProofInitPrintf.v
+# UProofInit.v
 # UProofEchoA.v
 # UProofEcho.v
 # --- END descoped tier ---
@@ -461,6 +479,7 @@ WpLock.v
 ArrCursor.v
 FdSlots.v
 IcacheRef.v
+EscrowDefs.v
 FileInvDefs.v
 FileInv.v
 FileOff.v
@@ -1040,6 +1059,8 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 InodeRegion.v
+EscrowInode.v
+EscrowDeposit.v
 FsRep.v
 IregLinkNz.v
 IgetLic.v
@@ -1226,7 +1247,6 @@ SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
 SpecCreate.v
-SpecCreateFreshTy.v
 CreateBudget.v
 ProofCreateParts.v
 ProofCreate.v
@@ -1242,6 +1262,10 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
+# SIMP-2: the runtime file system as ONE persistent assertion, with the seal
+# that produces it.  A leaf BELOW the syscall layer, so anything can import
+# the predicate without importing the syscall bodies.
+FsReady.v
 FsSyscalls.v
 LinkFsSyscalls.v
 SpecSysMknod.v

@@ -200,11 +200,16 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   hart-node-port build — see the ruling in
   [`user-tier-port.md`](projects/user-tier-port.md).)
 - **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
-  `sh`, on ONE input (`echo Hello world!`): the syscall protocol at I/O
-  depth, which is what lets a theorem say what a process DOES rather than
-  only that it steps. Read it for the observing `exec` arm, the ghost stdin
-  stream, and why fixing the input removes the two things the tier cannot
-  express. (DESCOPED from the hart-node-port build — see the ruling in
+  `sh` on one fixed input: the design of record for scoping a program by its
+  input, the `xv6_io_protocol` at I/O depth, and the code-catalog generator.
+  (DESCOPED from the hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
+- **[`user-init.md`](projects/user-init.md)** — the Umode tier's FOURTH
+  program, `init`: the first that NEVER TERMINATES (two nested `iLöb` loops
+  and the `▷`-exposing branch leaves that close them), the first whose
+  theorem assumes nothing about what the kernel returns (every branch of
+  every syscall test is proved), and the first verified xv6 `printf`.
+  (DESCOPED from the hart-node-port build — see the ruling in
   [`user-tier-port.md`](projects/user-tier-port.md).)
 
 ## `completed/` — finished projects, archived for reference

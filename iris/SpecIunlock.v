@@ -157,6 +157,15 @@ Definition wp_iunlock_sconf_body
      copy unchanged: none of the five (fileread, filestat, namex, ireclaim,
      iunlockput) alters [di_type], so [dn'] is ilock's [dn]. *)
   ity_shot g (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, back with the payload it rode out on
+     (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- the predicate [ic_swap_park] rebuilds --
+     now carries [ifreeze_off], so the parker owes it exactly as it owes the
+     type witness above.  It costs no caller anything new: this IS the token
+     [SpecIlock]'s post handed out, unspent (the one mover that touches it,
+     [SpecIupdate.wp_iupdate_link]'s freeze-pin arm, borrows and returns it),
+     so every ilock/iunlock pair threads one hypothesis through untouched. *)
+  ifreeze_off (bv_unsigned inum) -∗
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗

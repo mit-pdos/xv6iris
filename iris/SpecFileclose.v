@@ -314,6 +314,12 @@ Section SpecFileclose.
      ic_escrows (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn)
                 (fcn_logstart fn) ∗
      ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) (fcn_nib fn) ∗
+     (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING
+        G).  fileclose reaches iput, whose free path FREEZES, and §2.3's
+        boot-shelter clause makes a freezer exhibit the regime it freezes
+        under.  Persistent, so it belongs in exactly this bundle and costs a
+        caller nothing but having it. *)
+     ireg_open ∗
      ic_sleeplocks (fcn_ic fn))%I.
 
   Global Instance fileclose_ic_env_persistent fn :

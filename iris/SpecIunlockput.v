@@ -104,8 +104,13 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
-   its deepest callee is iput (60).  iunlock wants 26. *)
-Notation K_iunlockput := (76%nat) (only parsing).
+   its deepest callee is iput (60).  iunlock wants 26.
+
+   76 -> 78, forced by [K_iput]'s 72 -> 74 (SpecIput.v's note): the walk calls
+   iput at [K - 4], so [K_iput <= K - 4] needs K >= 78.  All eleven
+   iunlockput call sites were re-checked and every one has slack (the
+   tightest is ProofCreate/ProofSysUnlink at K - 10 / K - 30, i.e. 114). *)
+Notation K_iunlockput := (78%nat) (only parsing).
 Definition wp_iunlockput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
@@ -173,6 +178,13 @@ Definition wp_iunlockput_sconf_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
+     runtime premise verbatim, because iunlockput's whole obligation here is
+     iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
+     no boot thread calls iunlockput at all, so the indexed form had no
+     [rg := false] consumer on either of this file's two contracts.  The
+     premise is persistent, so nothing comes back. *)
+  ireg_open -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -185,11 +197,23 @@ Definition wp_iunlockput_sconf_body
   (* the parked record's type witness -- SpecIunlock's new premise, threaded
      verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
   ity_shot gy (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, relayed straight to [SpecIunlock]'s
+     park (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- what the parked arm holds -- now carries
+     [ifreeze_off], so the parker owes it exactly as it owes the type
+     witness above.  Every caller has it: it is the token its own
+     [ilock] handed over, unspent. *)
+  ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
-  (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
-     iunlock hands the share back and [inode_ref_gather] re-forms the
-     canonical [inode_ref k (qi + s)] that iput then spends. *)
-  inode_ref_short k (qi + s)%Qp qi dev inum -∗
+  (* ONE ROW (SIMP-2): the short parent AND its provenance unit.  The
+     share [s] above was carved off THIS reference ([inode_refp_carve]);
+     iunlock hands the share back and [inode_refp_gather] re-forms the
+     canonical [inode_refp k (qi + s)] that iput then spends -- unit still
+     attached, because the unit rode with the short parent and never with
+     the travelling share (item 7a-wire).  Every caller already holds the
+     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     leaves behind, and [inode_held_short] is now stated over it. *)
+  inode_refp_short k (qi + s)%Qp qi dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -303,6 +327,13 @@ Definition wp_iunlockput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
+     runtime premise verbatim, because iunlockput's whole obligation here is
+     iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
+     no boot thread calls iunlockput at all, so the indexed form had no
+     [rg := false] consumer on either of this file's two contracts.  The
+     premise is persistent, so nothing comes back. *)
+  ireg_open -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -315,11 +346,23 @@ Definition wp_iunlockput_gen_body
   (* the parked record's type witness -- SpecIunlock's new premise, threaded
      verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
   ity_shot gy (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, relayed straight to [SpecIunlock]'s
+     park (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- what the parked arm holds -- now carries
+     [ifreeze_off], so the parker owes it exactly as it owes the type
+     witness above.  Every caller has it: it is the token its own
+     [ilock] handed over, unspent. *)
+  ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
-  (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
-     iunlock hands the share back and [inode_ref_gather] re-forms the
-     canonical [inode_ref k (qi + s)] that iput then spends. *)
-  inode_ref_short k (qi + s)%Qp qi dev inum -∗
+  (* ONE ROW (SIMP-2): the short parent AND its provenance unit.  The
+     share [s] above was carved off THIS reference ([inode_refp_carve]);
+     iunlock hands the share back and [inode_refp_gather] re-forms the
+     canonical [inode_refp k (qi + s)] that iput then spends -- unit still
+     attached, because the unit rode with the short parent and never with
+     the travelling share (item 7a-wire).  Every caller already holds the
+     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     leaves behind, and [inode_held_short] is now stated over it. *)
+  inode_refp_short k (qi + s)%Qp qi dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

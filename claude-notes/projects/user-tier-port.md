@@ -808,8 +808,13 @@ Write I1–I6 as **statements with `Admitted` bodies in one commit**, then fan o
   `⌜exec …⌝` conjuncts.
 * **P8 — CANCELLED by user ruling (2026-08-19):** the verified Umode tier is
   descoped from the hart-node-port build; the tier's rows (`WpUmodeStep.v`
-  and friends, 25 files) are commented out of `iris/_CoqProject`, with the
-  `.v` files left on disk. Reviving it is still "the same bricks" — the port
+  and friends) are commented out of `iris/_CoqProject`, with the
+  `.v` files left on disk. The ruling covers every Umode-tier BINARY proof,
+  so the `init` files main landed later (`UCodeInit.v`, `UmodeInitIo.v`,
+  `USpecInit.v`, `UProofInit*.v`) and the rest of the `sh` walk went into
+  the same commented block on the merge — 41 rows in all. It does NOT cover
+  `LinkUserinit`/`SpecUserinit`, which are about the KERNEL's `userinit`
+  path and stay in the build. Reviving it is still "the same bricks" — the port
   this section described — plus the standalone premise-removal commit
   (`minstret_inv`, `wire_inv`) it was scheduled alongside.
 

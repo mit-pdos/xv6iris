@@ -155,6 +155,7 @@ Require Import ProofKforkB6.
 Require Import ProofKforkB7.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -202,7 +203,7 @@ Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
 
 Section KforkArms.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -422,7 +423,8 @@ Section KforkArms.
   (* =================================================================== *)
   Lemma kfork_arm3
       (γa γf γil γic γw γl : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (inodestart : Z) (nib : nat)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64)
@@ -484,6 +486,9 @@ Section KforkArms.
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
+    (* the region handle, straight through to [B4.kfk_b4]'s [idup]
+       (iclaim-ledger.md §3.19); persistent, and this arm reads no dinode *)
+    ireg_inv γic γfs inodestart nib -∗
     iref_slots (1 + IREFSPARE) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
@@ -500,7 +505,7 @@ Section KforkArms.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
-             Hitb Hitinv Hirs Hcont".
+             Hitb Hitinv #Hireg Hirs Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
     rewrite /kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
@@ -590,11 +595,12 @@ Section KforkArms.
     - iApply wp_next_off_intro. iIntros (Mx2) "%Hregs2 Hsc Hown Hpcx Hpvx Hpvcx".
       destruct Hregs2 as (Hd1 & Hd2 & Hd3 & Hd4 & Hd5).
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
-      iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
+      iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart inodestart nib
+                pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
-                with "Hsc Hown Htext Hpcx Hitb Hitinv Hirs Hpvx Hpvcx").
+                with "Hsc Hown Htext Hpcx Hitb Hitinv Hireg Hirs Hpvx Hpvcx").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
@@ -683,7 +689,7 @@ End KforkArms.
 (* =================================================================== *)
 Section KforkMain.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -694,17 +700,18 @@ Section KforkMain.
 
   Lemma wp_kfork_sconf
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
-    wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-      m lvl K eb pme b pid_p Vp lks.
+    wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart
+      inodestart nib m lvl K eb pme b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv Henv #Hpav Hpv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
@@ -769,7 +776,7 @@ Section KforkMain.
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γa γf γil γic γw γl γs
-                cn γfs cov logstart nib m K lvl eb b pme
+                cn γfs cov logstart inodestart nib m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst lks
@@ -778,7 +785,7 @@ Section KforkMain.
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
-                      Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hirs [HR]").
+                      Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is
          durable-notes' diverging-ltac trap. *)

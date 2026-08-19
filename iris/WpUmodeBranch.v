@@ -22,14 +22,30 @@
    (claude-notes/durable-notes.md, "one general lemma over N special
    cases").
 
-   THE CONTINUATION IS LATER-FREE.  No [|>] guards the continuation of any
-   leaf here, so a caller may not use these lemmas to justify an unbounded
-   spin.  It does not need to: echo's two loops ([strlen], and [main]'s
-   walk over argv) are BOUNDED, and are proved by ordinary Rocq induction
-   on a nat measure rather than by [iLoeb] -- a bounded loop consumes no
-   step credit, and a [|>] here would only force every caller to strip it.
-   The kernel tier's [wp_cbnez_taken_s] is the shape for UNBOUNDED spin
-   loops (design/kernel-proofs.md); this is the other one.
+   BOTH INTERFACES ARE HERE, and which one a caller wants is decided by
+   whether its loop is bounded.
+
+     [wp_uv_btype_later] / [wp_uv_btype_gen_later] hand the step's own
+     [|>] OUT, which is the only thing that lets a caller close an
+     UNBOUNDED loop: an [iLoeb] IH is [|>]-guarded, and a later-free leaf
+     can never strip it.  A branch-TAKEN edge is the back edge of a loop,
+     so this is exactly the leaf that needs the general form -- the same
+     role [wp_cbnez_taken_s] plays in the kernel tier
+     (design/kernel-proofs.md).  Note that the later is exposed in BOTH
+     arms, not only the taken one: [taken] is a parameter of one lemma
+     here, not a case split into two, and a caller's [iNext] is harmless
+     on the fall-through arm.
+
+     [wp_uv_btype] / [wp_uv_btype_gen] / [wp_uv_cbeqz] / [wp_uv_cbnez] are
+     the later-FREE restatements, which absorb it with their own [iNext].
+     echo's two loops ([strlen], and [main]'s walk over argv) and every
+     loop in sh are BOUNDED -- ordinary Rocq induction on a nat measure,
+     no [iLoeb], no [|>] anywhere -- and those callers want this shape.
+
+   init (claude-notes/projects/user-init.md) is the first program with a
+   genuinely unbounded loop, and both of its back edges are base BTYPEs
+   ([beq s1,a0] closing the restart loop, [bgez a0] closing the wait loop),
+   which is why the later-exposing form is stated for the base leaf.
 
    The compressed instances are [wp_uv_cbeqz] / [wp_uv_cbnez] (echo's
    0xcf91 = c.beqz a5,+0x1c and 0xff65 = c.bnez a4,-0x8).  They are
@@ -49,10 +65,9 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Require Import InstrBytes WpGpr RegFile.
 Require Import ExecCommon WpMmodeLeafBase.
-Require Import UserBits.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep.
@@ -167,6 +182,52 @@ Section WpUmodeBranch.
   (* x0, are instances rather than re-proofs.  Everything else (the        *)
   (* comparison, the target, the two arms) is shared verbatim.             *)
   (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_btype_gen_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile)
+      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
+      (taken : bool) (tgt : mword 64) :
+    uinstr pt M pc is_rvc i ->
+    uv_redirect i o ->
+    is_lpad_instruction i = false ->
+    uv_exp i o = BTYPE (imm, Regidx rs2, Regidx rs1, op) ->
+    taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
+    tgt = add_vec pc (sign_extend' 64 imm) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    ▷ (∀ CID0 : CpuId,
+         uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+         pc_is (CID := CID0)
+           (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hred Hlpad Hexp Htaken Htgt Halign.
+    iIntros "Hcg Hpc Hcont".
+    (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
+    iAssert (▷ (∀ CID0 : CpuId,
+                  uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m None) -∗
+                  pc_is (CID := CID0)
+                    (uv_next (if taken then Some tgt else None)
+                       (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+                  WP (Loop : expr riscv_lang)))%I with "[Hcont]" as "Hcont".
+    { iNext. rewrite uv_next_bool. iExact "Hcont". }
+    iApply (wp_uv_retire_later C pt Ψ M m pc is_rvc i o
+              (if taken then Some tgt else None) None
+              Hui Hred Hlpad I with "Hcg Hpc Hcont").
+    intros s_pc Lpc _ _ Hag Hvals.
+    rewrite Hexp.
+    rewrite (exec_execute_BTYPE_gpr_zca imm rs2 rs1 op
+               (m !!! Regidx rs1) (m !!! Regidx rs2) taken s_pc
+               (Hvals rs1) (Hvals rs2) Htaken
+               ltac:(intro Ht; rewrite Lpc; rewrite <- Htgt; exact (Halign Ht))
+               (agree_u_zca s_pc Hag)).
+    rewrite Lpc. rewrite <- Htgt. reflexivity.
+  Qed.
+
+  (* the later-FREE restatement, which is what the compressed instances and
+     every bounded-loop caller take *)
   Lemma wp_uv_btype_gen (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
       (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
@@ -189,25 +250,9 @@ Section WpUmodeBranch.
   Proof.
     intros Hui Hred Hlpad Hexp Htaken Htgt Halign.
     iIntros "Hcg Hpc Hcont".
-    (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
-    iAssert (∀ CID0 : CpuId,
-               uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m None) -∗
-               pc_is (CID := CID0)
-                 (uv_next (if taken then Some tgt else None)
-                    (add_vec_int pc (if is_rvc then 2 else 4))) -∗
-               WP (Loop : expr riscv_lang))%I with "[Hcont]" as "Hcont".
-    { rewrite uv_next_bool. iExact "Hcont". }
-    iApply (wp_uv_retire C pt Ψ M m pc is_rvc i o
-              (if taken then Some tgt else None) None
-              Hui Hred Hlpad I with "Hcg Hpc Hcont").
-    intros s_pc Lpc _ _ Hag Hvals.
-    rewrite Hexp.
-    rewrite (exec_execute_BTYPE_gpr_zca imm rs2 rs1 op
-               (m !!! Regidx rs1) (m !!! Regidx rs2) taken s_pc
-               (Hvals rs1) (Hvals rs2) Htaken
-               ltac:(intro Ht; rewrite Lpc; rewrite <- Htgt; exact (Halign Ht))
-               (agree_u_zca s_pc Hag)).
-    rewrite Lpc. rewrite <- Htgt. reflexivity.
+    iApply (wp_uv_btype_gen_later Ψ M m pc is_rvc i o imm rs2 rs1 op taken tgt
+              Hui Hred Hlpad Hexp Htaken Htgt Halign with "Hcg Hpc [Hcont]").
+    iNext. iExact "Hcont".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -238,6 +283,95 @@ Section WpUmodeBranch.
              (BTYPE (imm, Regidx rs2, Regidx rs1, op)) None
              imm rs2 rs1 op taken tgt
              Hui (fun _ => I) eq_refl eq_refl Htaken Htgt Halign).
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ... and the same leaf handing the step's later OUT, which is what a   *)
+  (* caller closing an UNBOUNDED loop across this branch needs.  init's    *)
+  (* restart loop ([beq s1,a0] back to main+0x32) and its wait loop        *)
+  (* ([bgez a0] back to main+0x44) are both closed with this.              *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_btype_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
+      (taken : bool) (tgt : mword 64) :
+    uinstr pt M pc false (BTYPE (imm, Regidx rs2, Regidx rs1, op)) ->
+    taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
+    tgt = add_vec pc (sign_extend' 64 imm) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    ▷ (∀ CID0 : CpuId,
+         uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+         pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Htaken Htgt Halign.
+    exact (wp_uv_btype_gen_later Ψ M m pc false
+             (BTYPE (imm, Regidx rs2, Regidx rs1, op)) None
+             imm rs2 rs1 op taken tgt
+             Hui (fun _ => I) eq_refl eq_refl Htaken Htgt Halign).
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* The BASE branch against x0 -- [beqz]/[bnez]/[bltz]/[bgez], which the  *)
+  (* assembler emits as [BTYPE (imm, x0, rs1, op)].  The x0 read is the    *)
+  (* one thing a pure premise cannot supply, so it is taken off            *)
+  (* [gpr_file] here ([WpGpr.gpr_file_x0]) exactly as the compressed       *)
+  (* [wp_uv_cbeqz] does, and the leaf's own premise talks about            *)
+  (* [zero_reg].  init has four of these (two closing its unbounded        *)
+  (* loops), which is why they get a leaf rather than a per-site           *)
+  (* [gpr_file_x0] dance.                                                  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_btype0_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 13) (rs1 : mword 5) (op : bop)
+      (taken : bool) (tgt : mword 64) :
+    uinstr pt M pc false
+      (BTYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, op)) ->
+    taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
+    tgt = add_vec pc (sign_extend' 64 imm) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    ▷ (∀ CID0 : CpuId,
+         uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+         pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Htaken Htgt Halign.
+    iIntros "Hcg Hpc Hcont".
+    iDestruct "Hcg" as "(Hcap & Hlin & Hgpr)".
+    iDestruct (gpr_file_x0 m (mword_of_int 0 : mword 5)
+                 ltac:(vm_compute; reflexivity) with "Hgpr") as "[%Hz Hgpr]".
+    iAssert (uv_cap_gpr C pt Ψ M m) with "[Hcap Hlin Hgpr]" as "Hcg".
+    { rewrite /uv_cap_gpr. iFrame "Hcap Hlin Hgpr". }
+    iApply (wp_uv_btype_later Ψ M m pc imm (mword_of_int 0 : mword 5) rs1 op
+              taken tgt Hui ltac:(rewrite Hz; exact Htaken) Htgt Halign
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  Lemma wp_uv_btype0 (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 13) (rs1 : mword 5) (op : bop)
+      (taken : bool) (tgt : mword 64) :
+    uinstr pt M pc false
+      (BTYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, op)) ->
+    taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
+    tgt = add_vec pc (sign_extend' 64 imm) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+       pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Htaken Htgt Halign.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_btype0_later Ψ M m pc imm rs1 op taken tgt
+              Hui Htaken Htgt Halign with "Hcg Hpc [Hcont]").
+    iNext. iExact "Hcont".
   Qed.
 
   (* ------------------------------------------------------------------- *)

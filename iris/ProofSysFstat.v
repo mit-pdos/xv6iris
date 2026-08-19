@@ -474,7 +474,7 @@ Section ProofSysFstat.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ---- +0x0e: jal ra,argaddr ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_fstat + 0x0e))
-              Rra (mword_of_int 2087508 : mword 21) M4 (av - 4)%nat b
+              Rra (mword_of_int 2087436 : mword 21) M4 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0e").
     iIntros (CID7 Hs7) "Hcg Hpc".
@@ -483,7 +483,7 @@ Section ProofSysFstat.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_fstat + 0x0e) : mword 64) 4)]> M4) with M5.
     assert (Hjaa : add_vec (mword_of_int (KernelSyms.sys_fstat + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087508 : mword 21)) = mword_of_int KernelSyms.argaddr)
+                     (sign_extend' 64 (mword_of_int 2087436 : mword 21)) = mword_of_int KernelSyms.argaddr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjaa) in "Hpc".
     assert (HM5a0 : M5 !!! Regidx Ra0 = mword_of_int (Z.of_nat 1)).

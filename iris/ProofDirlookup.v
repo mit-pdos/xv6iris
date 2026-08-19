@@ -342,6 +342,10 @@ Section ProofDirlookupMain.
               /\ mf !!! Regidx Ra0 = ientry kslot⌝ ∗
              inode_ref kslot q dev
                (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32) ∗
+             (* the minted provenance unit (item 7a-wire) *)
+             runit_any
+               (bv_unsigned
+                  (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)) ∗
              (if hasp
               then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * kk)) : mword 32)
               else emp)
@@ -441,7 +445,7 @@ Section ProofDirlookupMain.
       (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname)
       (ga : gname) (gf : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -451,12 +455,12 @@ Section ProofDirlookupMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
-                              ga gf cov logstart nib dev ip dinum bm data dn dr
+                              ga gf cov logstart inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
-           Hinums Hdisj Horph Hdrnz Hj Hgs Ha0 Hposs Heb Hbelow.
+           Hinums Hdisj Horph Hdrnz Hdrnl Hj Hgs Ha0 Hposs Heb Hbelow.
     (* the reading of the type premise the LICENCE work needs, taken
        once here (increment C'-lite, fs-fragments.md §7.1) *)
     assert (Htyz : bv_unsigned (di_type dn) = T_DIR_z)
@@ -469,7 +473,7 @@ Section ProofDirlookupMain.
     assert (Hpjd : proc_addr j = pj) by reflexivity.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
               Hnm Hpoff Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbslot #Hitb2 #Hitbl
-              #Hesc Hislot Hlinks Hdi Hcont".
+              #Hesc #Hireg Hislot Hlinks Hdi Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
        [true] here.  Making that explicit is what keeps every hart-chain in
@@ -1671,23 +1675,23 @@ Section ProofDirlookupMain.
           iEval (rewrite Hpp4a) in "Hpc".
           (* +0x4a addi a0,a0,3290 : ...and its low part *)
           iApply (wp_addi4_s_sconf (mword_of_int (DL + 0x4a)) Ra0 Ra0
-                    (mword_of_int 3324 : mword 12) PA1 (K - 12)%nat b
+                    (mword_of_int 3252 : mword 12) PA1 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a").
           iIntros (CIDpa3 Hqpa3) "Hcg Hpc".
           set (PA2 := <[Regidx Ra0 := regval_into_reg
                          (add_vec (rget PA1 Ra0)
-                            (sign_extend' 64 (mword_of_int 3324 : mword 12)))]> PA1).
+                            (sign_extend' 64 (mword_of_int 3252 : mword 12)))]> PA1).
           assert (Hpp4e : add_vec_int (mword_of_int (DL + 0x4a) : mword 64) 4
                           = mword_of_int (DL + 0x4e)) by pcw.
           iEval (rewrite Hpp4e) in "Hpc".
           (* +0x4e jal ra,panic -- and panic() never returns *)
           iApply (wp_jal_s_sconf (mword_of_int (DL + 0x4e)) Rra
-                    (mword_of_int 2084912 : mword 21) PA2 (K - 12)%nat b
+                    (mword_of_int 2084840 : mword 21) PA2 (K - 12)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi4e").
           iIntros (CIDpa4 Hqpa4) "Hcg Hpc".
           assert (Htgtpn : add_vec (mword_of_int (DL + 0x4e) : mword 64)
-                             (sign_extend' 64 (mword_of_int 2084912 : mword 21))
+                             (sign_extend' 64 (mword_of_int 2084840 : mword 21))
                            = mword_of_int KernelSyms.panic) by pcw.
           iEval (rewrite Htgtpn) in "Hpc".
           (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
@@ -1991,10 +1995,10 @@ Section ProofDirlookupMain.
             iEval (rewrite Hbb8e) in "Hpc".
             (* +0x8e jal ra,iget *)
             assert (Htgtig : add_vec (mword_of_int (DL + 0x8e) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094644 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2094572 : mword 21))
                       = mword_of_int KernelSyms.iget) by pcw.
             iApply (wp_jal_s_sconf (mword_of_int (DL + 0x8e)) Rra
-                      (mword_of_int 2094644 : mword 21) N6 (K - 12)%nat b
+                      (mword_of_int 2094572 : mword 21) N6 (K - 12)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hi8e").
             iIntros (CIDB17 HqB17) "Hcg Hpc".
@@ -2056,15 +2060,24 @@ Section ProofDirlookupMain.
                       = bv_unsigned (dir_inum data i))
               by exact (dlk_zext32_unsigned (dir_inum data i)).
             iAssert (∃ lic : ilic,
-                       iname gi gfs
+                       (* THE FLAVOUR (RULING C', iclaim-ledger.md §5''''').
+                          Neither arm below is [ClaimL] -- dirlookup never
+                          claims -- so the unit its iget mints is the PLAIN
+                          one, which is what [runit_any] now IS and what this
+                          contract's rest home promises.  Chosen here, so the
+                          fact has to travel with the licence.  (The [BufL]
+                          block tie that used to ride beside it is gone: the
+                          licence carries its own, SIMP-1.) *)
+                       ⌜is_claim lic = false⌝
+                       ∗ iname gi gfs inodestart
                          (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                          lic
-                       ∗ (iname gi gfs
+                       ∗ (iname gi gfs inodestart
                             (zero_extend' 32 (dir_inum data i : mword 16)
                              : mword 32) lic
                           -∗ dir_links (bv_unsigned dinum) dn data
                              ∗ dinode_at gi dinum dr))%I
-              with "[Hlinks Hdi]" as (lic) "[Hlic Hlicback]".
+              with "[Hlinks Hdi]" as (lic) "(%Hlicfl & Hlic & Hlicback)".
             { destruct (decide (bv_unsigned (dir_inum data i)
                                 = bv_unsigned dinum)) as [Hself | Hnself].
               - (* the SELF record: licence (c) *)
@@ -2072,19 +2085,28 @@ Section ProofDirlookupMain.
                                : mword 32) = dinum)
                   by (apply bv_eq; rewrite Hzu; exact Hself).
                 iExists (HeldL dr). rewrite Hii.
+                iSplitR; [iPureIntro; reflexivity |].
                 iSplitL "Hdi".
-                { iApply (iname_held_intro gi gfs dinum dr Hdrnz with "Hdi"). }
+                (* §3.3 (RULING D): licence (c) now costs BOTH pure halves of
+                   the borrowed region record.  [Hdrnz] is premise (6); the
+                   count comes from the IN-CORE one ([Hnl0], already in hand
+                   on this arm out of [dl_lic_live]) transported across
+                   premise (6')'s equation [Hdrnl]. *)
+                { iApply (iname_held_intro gi gfs inodestart dinum dr Hdrnz
+                            ltac:(rewrite Hdrnl; exact Hnl0) with "Hdi"). }
                 iIntros "Hl".
-                iDestruct (iname_held_alloc with "Hl") as "[_ Hdi]".
+                iDestruct (iname_held_alloc with "Hl") as "(_ & _ & Hdi)".
                 iFrame "Hlinks Hdi".
               - (* any other record: licence (a), the payload's own ticket *)
                 iDestruct (dir_links_borrow (bv_unsigned dinum) dn data i
                              Htyz Hnl0 Hilt Hlive Hnself with "Hlinks")
                   as (fl) "[Hp Hback]".
-                iExists (LinkedL fl). rewrite /iname Hzu.
+                iExists (LinkedL fl).
+                iSplitR; [iPureIntro; reflexivity |].
+                rewrite /iname Hzu.
                 iSplitL "Hp"; [iExact "Hp" |].
                 iIntros "Hp". iFrame "Hdi". iApply ("Hback" with "Hp"). }
-            iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
+            iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks
@@ -2092,10 +2114,10 @@ Section ProofDirlookupMain.
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
-                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hislot
+                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hislot
                             Hlic").
             all: try lkbelow.
-            iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href Hlic".
+            iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hlic".
             iDestruct ("Hlicback" with "Hlic") as "[Hlinks Hdi]".
             destruct Higp as (Hcsig & Hkslot & Higa0).
             assert (Higregs : dlk_regs m sp0 ip nb pf (16 * i) mig)
@@ -2134,12 +2156,16 @@ Section ProofDirlookupMain.
             iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
             iApply ("Hqc" $! mf true i kslot q with
                       "[%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid
-                       Hbslot Hlinks Hdi [Href Hpoff]").
+                       Hbslot Hlinks Hdi [Href Hru Hpoff]").
             { exact Hcsf. }
             iSplitR.
             { iPureIntro. split; [exact Hsome |]. split; [exact Hkslot |].
               rewrite Ha0f. exact Higa0. }
-            iSplitL "Href"; [iExact "Href" | iExact "Hpoff"].
+            iSplitL "Href"; [iExact "Href" |].
+            (* the minted unit, at whichever flavour the licence chose *)
+            iSplitL "Hru";
+              [rewrite Hlicfl; iApply (runit_any_intro with "Hru")
+              | iExact "Hpoff"].
           * (* ======== THE NAME DIFFERS: [c.bnez] taken, to the latch ==== *)
             assert (Hnm : ~ dir_match data i s).
             { intros [_ Hbn]. apply Hmiss. apply Hiff. symmetry. exact Hbn. }

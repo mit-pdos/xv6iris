@@ -51,11 +51,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes RegFile.
-Require Import AlignBits UserBits.
+Require Import AlignBits.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeFetch.
-Require Import WpUmodeStep WpUmodeLeaf WpUmodeStore WpUmodeLoad.
+Require Import UmodeMem UmodeCap UmodeAbi UmodeArith.
+Require Import WpUmodeLeaf WpUmodeStore WpUmodeLoad.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -384,5 +384,89 @@ Section UmodeFrame.
     - iPureIntro. exact HC.
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* THE FRAME SLOT, store and load.                                      *)
+  (*                                                                      *)
+  (* [c.sdsp rs2,d(sp)] / [c.ldsp rd,d(sp)] with sp at the BOTTOM of a     *)
+  (* budget: the address is [sp0 - n + d], every side condition comes off  *)
+  (* [uv_stack_slot_moi], and the image effect is one [uM_store8].  These  *)
+  (* two are what a prologue and an epilogue are made of at ANY frame      *)
+  (* size, so they generalize [wp_uv_prologue16] / [wp_uv_epilogue16]      *)
+  (* below the point where the 16-byte layout is fixed.                    *)
+  (*                                                                      *)
+  (* (UProofEcho.v's [echo_pro_store] is the same lemma pinned to one      *)
+  (* protocol; init needs it at frame sizes 16, 32 and 96, which is what   *)
+  (* made hoisting it worthwhile.)                                        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_frame_store (CIDp : CpuId) (Ps : usys_protocol Σ)
+      (M : gmap Z (bv 8)) (m : regfile) (sp0 pc : mword 64)
+      (uimm : mword 6) (rs2 : mword 5) (n d : Z) :
+    uinstr pt M pc true (C_SDSP (uimm, Regidx rs2)) ->
+    uv_stack pt M sp0 n ->
+    0 <= d -> d + 8 <= n -> Z.rem d 8 = 0 ->
+    m !!! Regidx csp_rs1 = (mword_of_int (uint sp0 - n) : mword 64) ->
+    (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64)
+      = mword_of_int d ->
+    uv_cap_gpr (CID := CIDp) C pt Ps M m -∗
+    pc_is (CID := CIDp) pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ps
+         (uM_store8 M (uint sp0 - n + d) (m !!! Regidx rs2)) m -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui HS Hd0 Hdn Hd8 Hsp Himm.
+    destruct (uv_stack_slot_moi pt M sp0 n d (mword_of_int (uint sp0 - n + d))
+                HS Hd0 Hdn Hd8 eq_refl)
+      as (Hu & (w & Hl & Hok & _) & Hcanon & Hpg & Hal & Hb).
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_csdsp C pt Ps M m pc uimm rs2 w
+              (mword_of_int (uint sp0 - n + d)) (m !!! Regidx rs2)
+              Hui
+              ltac:(rewrite Hsp; rewrite Himm; rewrite moi_add; reflexivity)
+              eq_refl Hl Hok Hcanon Hpg Hal Hb
+              with "Hcg Hpc [Hcont]").
+    iIntros (CID0) "Hcg Hpc".
+    iEval (rewrite Hu) in "Hcg".
+    iApply ("Hcont" with "Hcg Hpc").
+  Qed.
+
+  Lemma wp_uv_frame_load (CIDp : CpuId) (Ps : usys_protocol Σ)
+      (M : gmap Z (bv 8)) (m : regfile) (sp0 pc : mword 64)
+      (uimm : mword 6) (rd : mword 5) (n d : Z) (wval : mword 64) :
+    uinstr pt M pc true (C_LDSP (uimm, Regidx rd)) ->
+    uint rd <> 0 ->
+    uv_stack pt M sp0 n ->
+    0 <= d -> d + 8 <= n -> Z.rem d 8 = 0 ->
+    m !!! Regidx csp_rs1 = (mword_of_int (uint sp0 - n) : mword 64) ->
+    (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64)
+      = mword_of_int d ->
+    wval = uM_word M (uint sp0 - n + d) 8 ->
+    uv_cap_gpr (CID := CIDp) C pt Ps M m -∗
+    pc_is (CID := CIDp) pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ps M
+         (<[Regidx rd := regval_into_reg wval]> m) -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hrd HS Hd0 Hdn Hd8 Hsp Himm Hwv.
+    destruct (uv_stack_slot_moi pt M sp0 n d (mword_of_int (uint sp0 - n + d))
+                HS Hd0 Hdn Hd8 eq_refl)
+      as (Hu & (w & Hl & _ & Hok) & Hcanon & Hpg & Hal & Hb).
+    iIntros "Hcg Hpc Hcont".
+    assert (Hva : (mword_of_int (uint sp0 - n + d) : mword 64)
+                  = add_vec (m !!! Regidx csp_rs1)
+                      (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))))
+      by (rewrite Hsp; rewrite Himm; rewrite moi_add; reflexivity).
+    iApply (wp_uv_cldsp C pt Ps M m pc uimm rd w
+              (mword_of_int (uint sp0 - n + d)) wval
+              Hui Hrd Hva Hl Hok Hcanon Hpg Hal Hb
+              ltac:(rewrite Hu; exact Hwv)
+              with "Hcg Hpc Hcont").
+  Qed.
 
 End UmodeFrame.
