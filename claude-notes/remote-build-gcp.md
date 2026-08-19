@@ -347,6 +347,37 @@ md5sum kernel-rocq/Kernel*.v user-rocq/Sync*.v
 Six equal digests is the toolchain-match proof the playbook asks for, obtained
 on a machine that shares nothing with yours but the pin.
 
+**AND THE VM'S CLONE IS PINNED ONLY AT CREATION, SO IT GOES STALE ACROSS A
+BUMP AND THEN SILENTLY CLOBBERS THE IMAGE YOU JUST SYNCED.** The VM clones
+`xv6-riscv/` at `$(XV6_REV)` the first time a tree is built and never revisits
+it, so a later bump leaves the remote clone on the OLD revision while the
+remote `Makefile` (which IS synced) names the new one. That is dormant —
+`make proofs`' dump rules stay quiet while the synced `kernel-rocq/*.v` are
+newer than the stale ELF — until **anything makes the dump targets out of
+date, and a change to `tools/dump_elf.py` does exactly that**: the rules fire,
+re-dump from the OLD ELF, and overwrite the correct files the sync just
+delivered. The build then fails hundreds of files deep with
+`Unable to unify "<addr>" with "<addr>"` in `ProcGeom.v` / `ColdBoot.v` —
+`durable-notes.md`'s standard bogus-address symptom, except that every LOCAL
+check passes: `make xv6-rev-check`, a byte-identical local `make dump-force`,
+and `make check-decode` are all green, because they all read the LOCAL tree.
+
+The tell is one command, and it is worth running after any pull that touches
+the dump tooling or the pin:
+
+```sh
+run-on-gcp --no-sync bash -c 'git -C xv6-riscv rev-parse HEAD; grep -oP "XV6_REV \?= \K\w+" Makefile'
+```
+
+Two lines that disagree is the bug. The fix is the same three steps as
+locally, run remotely — `git -C xv6-riscv fetch && checkout --detach $REV`,
+rebuild `kernel/kernel` **and** the user ELFs, `make dump-force` — after which
+the digest comparison above is not merely a reproducibility check but the
+proof that the remote image is the tracked one. **The remote build log is the
+other tell**: `grep dump_elf.py` on it. A `make proofs` that prints dump lines
+at all has rewritten your image, and on a correctly-pinned tree it prints
+none.
+
 **`git status` is not available to check this.** `SYNC_GIT=0`, so the remote
 tree is not a git repository at all — `git status kernel-rocq/` there dies with
 *"not a git repository (or any parent up to mount point /mnt)"*, which reads
