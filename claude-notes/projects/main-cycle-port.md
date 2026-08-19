@@ -1924,13 +1924,16 @@ consumer outside their own file (`wp_gpr_write_s_sconf(_base)`,
 `wp_rvc_gpr_write_s_r`: exec fact -> swp obligation) were reviewed and
 accepted; everything else is byte-identical, checked mechanically per file.
 
-**FLAGGED, NOT YET APPROVED: `UserretPt.wp_ualu_pt` takes a `swp`
-obligation where it took two whole-`execute` `exec` premises.**  Same
-forced change as `wp_gpr_write_s_config_regime`'s, but this one HAS a
-consumer outside its file (`ProofUserret`, three sites), so it is flagged
-rather than filed under the engine-level exemption.  It cannot be avoided:
-an `exec` equation about a whole `execute` carries no footprint, and every
-swp lifter needs one, so the conversion cannot be pushed to the call site.
+**APPROVED (user, 2026-08-19): `UserretPt.wp_ualu_pt` takes a `swp`
+obligation where it took two whole-`execute` `exec` premises** (and drops
+the `vf` / `a0v` / `Ha0` parameters those premises carried).  Same forced
+change as `wp_gpr_write_s_config_regime`'s, but this one HAS a consumer
+outside its file (`ProofUserret`, three sites), which is why it needed the
+ruling rather than the engine-level exemption.  It cannot be avoided: an
+`exec` equation about a whole `execute` carries no footprint, and every swp
+lifter (`WpMmodeSwpBase.swp_execute_rw` & co.) needs one, so the conversion
+cannot be pushed to the call site.  The three call sites take the `swp`
+form when `ProofUserret` is unblocked.
 
 **APPROVED (user, 2026-08-18): `wp_load_s_sconf_au` / `wp_store_s_sconf_au`
 take one extra premise `wordw_claim (KTR := ktd) width ea` before the AU.**
@@ -2009,7 +2012,9 @@ platform ones + `functional_extensionality_dep` where inherited)
 - APPROVED: `wordw_claim` premise on `wp_load/store_s_sconf_au` (and the
   thin WpAu4 width-4 wrappers -- flagged, not yet explicitly approved);
   (A) three `↦ᵣ□` counter premises on `userret_to_user_inv` (not handed
-  back); (B) `pc_is` on `user_trap_frame_open/_intro`.
+  back); (B) `pc_is` on `user_trap_frame_open/_intro`;
+  (C) `UserretPt.wp_ualu_pt`'s whole-`execute` `exec` premises become a
+  `swp` obligation (ProofUserret's three sites follow).
 - RULE: every address claim (`wordw_claim`) is derived ONLY from the
   accessed bytes' `mem_pointsto` (`mem_pointsto_claim`/`wordw_claim_of`),
   never from static bundles / ambient tier defaults.  The tail lane was
@@ -2233,12 +2238,12 @@ through `HartSCsr`'s privilege-parametric CSR engines at Supervisor.
   `WpDecodeBridge.dstateS` (misa = MISA_C, menvcfg = MENVCFG_S, every other
   config CSR zero) is the reference state both `goodb` and the concrete
   `exec` compute against.  `hw_config` pins senvcfg at 0, so no caller pays.
-- **FORCED, SPEC-VISIBLE: `wp_ualu_pt`'s two whole-`execute` `exec`
-  premises are now the `swp` obligation the node shapes conclude.**  An
-  `exec` equation about a whole `execute` carries no footprint, and every
-  swp lifter (`WpMmodeSwpBase.swp_execute_rw` & co.) needs one, so it cannot
-  be converted at the call site.  ProofUserret's three `wp_ualu_pt` sites
-  need the `swp` form; that file is blocked behind `UserretEntryPt` anyway.
+- **APPROVED (user, 2026-08-19): `wp_ualu_pt`'s two whole-`execute` `exec`
+  premises are the `swp` obligation the node shapes conclude.**  An `exec`
+  equation about a whole `execute` carries no footprint, and every swp
+  lifter (`WpMmodeSwpBase.swp_execute_rw` & co.) needs one, so it cannot be
+  converted at the call site.  ProofUserret's three `wp_ualu_pt` sites take
+  the `swp` form; that file is blocked behind `UserretEntryPt` anyway.
   Every other leaf statement is byte-identical, including the three
   `is_aligned_paddr` fetch premises the per-node engine no longer reads.
 
