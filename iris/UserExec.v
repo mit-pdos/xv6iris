@@ -37,18 +37,23 @@
    INTERRUPTS CAN PREEMPT ANY STEP: at User privilege the effective SIE is
    architecturally true (unmaskable), and the wire thread (PlicLoop's wire
    step) may raise the external-interrupt wire [sig_seip] concurrently at
-   any time.  So the user frame does NOT own the wire cells; they will be
-   owned by an invariant SHARED with the device-execution WP, from which a
-   step engine borrows the CURRENT wire value across each step (that shared
-   invariant is not plumbed yet -- the kernel-side S-mode proofs equally
-   still pin the wires and need the same device-model rework; the step
-   lemmas here therefore take the wire values as borrowed dfrac-generic
-   cells, agnostic to where they come from).  Each step case-splits on the
-   dispatch decision ([u_dispatch], UserStep.v): pending-and-enabled
-   delegated interrupt -> the interrupt trap to stvec (Supervisor), which is
-   just another producer of [user_trap_frame]; none -> fetch/execute.
-   [uc_mm] (mie & ~mideleg = 0, a boot constant) only rules out M-DESTINED
-   interrupts, so every dispatched interrupt goes to Supervisor.            *)
+   any time.  So the user frame does NOT own the wire cells -- and under
+   per-node semantics it does not have to BORROW them either: the dispatch
+   reads [sig_meip]/[sig_seip] as forall-BOUND reads
+   ([WpMmodeCsrSwp.swp_read_reg_any], which needs no ownership at all), so
+   the wire value simply lives in the payload of the dispatch's answer.
+   THE TWO PLIC WIRES ARE THE ONLY REGISTERS A USER CYCLE READS THAT THE
+   HART DOES NOT OWN (the enumeration is section 1.4 of the port plan);
+   everything else -- mip, mcycle, mtime and minstret included -- is owned
+   outright by [user_regs] through [MinstretInv.clock_res]/[minstret_res].
+   Consequently the user tier needs NEITHER [WireInv.wire_inv] NOR
+   [MinstretInv.clock_inv], and every invariant borrow this file used to
+   carry is gone.  Each step case-splits on the dispatch decision
+   ([u_dispatch], UserStep.v): pending-and-enabled delegated interrupt ->
+   the interrupt trap to stvec (Supervisor), which is just another producer
+   of [user_trap_frame]; none -> fetch/execute.  [uc_mm] (mie & ~mideleg =
+   0, a boot constant) only rules out M-DESTINED interrupts, so every
+   dispatched interrupt goes to Supervisor.                                *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -62,6 +67,7 @@ Require Import InstrBytes WpGpr.
 Require Import RegFile.
 Require Import WpIntrCore.
 Require Import MinstretInv.
+Require Import UserFrame.
 Require Import UserPtTree.
 Local Open Scope Z_scope.
 Import Defs.
@@ -91,20 +97,19 @@ Record ucfg := UCfg {
   uc_mie     : mword 64;
   uc_mideleg : mword 64;
   uc_medeleg : mword 64;
-  (* THERE IS NO [uc_mip] FIELD, AND THERE CANNOT BE ONE.  [mip] is written
-     by the CLOCK TICK ([tick_clock] sets MTIP/STIP from mtimecmp/stimecmp --
-     the Sstc branch is live), so it lives in [MinstretInv.clock_inv], owned
-     there at [DfracOwn 1].  A [ucfg] field would have to be backed by a
-     [mip ↦ᵣ{dqc}] conjunct of [user_cfg], and [DfracOwn 1] is Exclusive, so
-     ANY second fraction -- owned or discarded -- makes [user_inv] beside
-     [minstret_inv] UNSATISFIABLE, i.e. every user-tier theorem vacuous.
-     (That is exactly what this file's earlier "no timer device is modeled;
-     if a timer ever gets modeled, mip moves into a shared invariant like
-     the wires" note anticipated, and the timer IS modeled.)  So mip is
-     BORROWED across each step from [clock_inv] by [clock_mip_acc] below --
-     the same treatment the sig_* wires get from [wire_inv], and for the
-     same reason -- and its value is existential per step rather than a
-     loop constant. *)
+  (* THERE IS STILL NO [uc_mip] FIELD, BUT NO LONGER FOR THE OLD REASON.
+     [mip] is written by the CLOCK TICK ([tick_clock] sets MTIP/STIP from
+     mtimecmp/stimecmp -- the Sstc branch is live), so a hart cannot pin a
+     VALUE for it across a cycle.  Under per-node semantics the hart OWNS
+     the cell (it rides inside [user_regs] via [MinstretInv.clock_res],
+     together with mcycle and mtime), so the old exclusivity clash with
+     [clock_inv] -- which is what used to make a [mip ↦ᵣ{dqc}] conjunct of
+     [user_cfg] contradict [minstret_inv] and render every user-tier
+     theorem vacuous -- is simply gone, and with it the [clock_mip_acc]
+     borrow this file used to carry.  What survives is the WEAKER reason
+     for the same conclusion: the value is EXISTENTIAL per step, which is
+     exactly what [clock_res] already says, so there is nothing for a
+     loop-CONSTANT record to hold. *)
   uc_dqc     : dfrac;       (* config-cell fraction *)
   (* stvec is DIRECT-mode: traps land exactly at its base *)
   uc_tvd : trapVectorMode_forwards (_get_Mtvec_Mode uc_stvec) = TV_Direct;
@@ -225,46 +230,32 @@ Definition post_fetch_cfg (σf : mstate) (va : mword 64) (miσ : bool) : Prop :=
   is_aligned_vaddr (Virtaddr va) 2 = true /\
   register_lookup (R_bool minstret_increment) σf.(sregs) = miσ.
 
-(* ===================================================================== *)
-(* §3' THE mip BORROW.                                                     *)
-(*                                                                         *)
-(* [mip] is written by the clock tick, so [MinstretInv.clock_inv] owns it   *)
-(* (at [DfracOwn 1], with mcycle/mtime) and NOTHING may hold a fraction of  *)
-(* it across a step -- see the note in [ucfg].  A step that needs mip's     *)
-(* VALUE (the interrupt dispatch does, and only that) borrows the cell for  *)
-(* the duration of its own σ-callback and hands it straight back, exactly   *)
-(* as [UserStepFull.wp_user_step_active] borrows the wires from            *)
-(* [wire_inv].  This is an ORDINARY invariant accessor; it is stated here   *)
-(* only so the four borrow sites (two tiers x interrupt-dispatch/WRS-wake)  *)
-(* share one spelling.                                                     *)
-(*                                                                         *)
-(* SAFE BESIDE [wp_exec_step_clock], which opens [clockN] itself: it does   *)
-(* so ONLY in the tick branch and STRICTLY AFTER the caller's continuation  *)
-(* has closed its own invariants (MinstretInv.v's header), so the borrow    *)
-(* and the tick's write never hold the invariant open at once.  The step    *)
-(* only READS mip, so the close returns the same witness.                   *)
-(* ===================================================================== *)
-Section MipBorrow.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-
-  Lemma clock_mip_acc (E : coPset) :
-    ↑clockN ⊆ E ->
-    clock_inv -∗ |={E, E ∖ ↑clockN}=>
-      ∃ p : mword 64, mip ↦ᵣ p ∗ (mip ↦ᵣ p ={E ∖ ↑clockN, E}=∗ True).
-  Proof.
-    iIntros (HE) "#Hc".
-    iMod (inv_acc with "Hc") as "[>Hb Hclose]"; [ exact HE |].
-    iDestruct "Hb" as (c t p) "(Hcy & Hti & Hp)".
-    iModIntro. iExists p. iFrame "Hp".
-    iIntros "Hp". iApply "Hclose". iNext. iExists c, t, p. iFrame "Hcy Hti Hp".
-  Qed.
-
-End MipBorrow.
 
 (* ===================================================================== *)
 (* §4 The frames and the capstone.                                         *)
 (* ===================================================================== *)
+(* ---------------------------------------------------------------------- *)
+(* THE TWO FROZEN COUNTER CELLS, OUT OF [hw_config].                        *)
+(*                                                                          *)
+(* [RiscvFetchExec] defines [counter_caps] and appends it to [hw_config] but *)
+(* has no proofmode import, so the accessor lives here -- the U tier is its  *)
+(* only consumer.  [mcounteren] is NOT among them: timerinit writes it after *)
+(* [hw_config] is frozen, so its persistent form is [TimerCap.sstc_enabled], *)
+(* which the trap loop takes out of the residue instead.                     *)
+(* ---------------------------------------------------------------------- *)
+Section HwCounters.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma hw_config_counters : hw_config -∗ counter_caps.
+  Proof.
+    iIntros "H". rewrite /hw_config.
+    iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & _ & $)".
+  Qed.
+End HwCounters.
+
 Section UserExec.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -284,13 +275,13 @@ Section UserExec.
   (* the loop-constant config cells (fraction [dqc]: never written during
      user execution; the complementary fraction stays with the kernel).
      satp / tlb / pmp cells live inside [user_pt_inv] (UserPtTree.v).  The
-     external-interrupt WIRES sig_meip / sig_seip are deliberately ABSENT:
-     the device loop writes them concurrently, so they cannot be pinned
-     here -- they live in the invariant shared with the device WP
-     ([WireInv.wire_inv]), and each step borrows their current values across
-     the step.  [mip] IS ABSENT FOR THE SAME REASON: the clock tick writes
-     it, so it lives in [MinstretInv.clock_inv] and is borrowed per step by
-     [clock_mip_acc] -- see the note in [ucfg] where its field used to be. *)
+     external-interrupt WIRES sig_meip / sig_seip are deliberately ABSENT
+     and no bundle in this file holds them: the device loop writes them
+     concurrently, and the dispatch reads them forall-bound, off-frame.
+     [mip] IS ABSENT FOR A DIFFERENT REASON: the clock tick writes it every
+     cycle, so it has no loop-constant value -- but the hart does OWN the
+     cell, inside [user_regs]'s [clock_res] rider.  See the note in [ucfg]
+     where its field used to be. *)
   Definition user_cfg : iProp Σ :=
     (stvec ↦ᵣ{ dqc } uc_stvec C ∗
      mie ↦ᵣ{ dqc } uc_mie C ∗
@@ -311,7 +302,22 @@ Section UserExec.
         other read of it (e.g. [hw_config]'s own copy, RiscvFetchExec.v). *)
      senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
      mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
-     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32))%I.
+     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
+     (* THE COUNTER-PERMISSION CELLS, and they are not optional.  A U-mode
+        [csrr] of cycle / time / instret / hpmcounterN runs [counter_enabled],
+        which reads mcounteren and scounteren UNCONDITIONALLY (UserCsr's
+        [exec_counter_enabled_U_total]), and the hpm path reads mhpmcounter.
+        Under whole-cycle stepping the interpreter answered those reads off
+        [gen_heap_interp] and no bundle had to hold them; under per-node
+        stepping every read the cycle makes must be ANSWERABLE, so the hart
+        owns them.  Their VALUES are existential -- the U-mode CSR arm is
+        total whatever the permission bits say (denied reads are
+        Illegal_Instruction, which is a [u_result_ok] outcome) -- so they are
+        [box] like [medeleg] and cost the kernel nothing to hand over. *)
+     (∃ mcenv scenv : mword 32,
+        (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv ∗
+        (R_bitvector_32 scounteren) ↦ᵣ□ scenv) ∗
+     (∃ hpm : type_of_register mhpmcounter, mhpmcounter ↦ᵣ□ hpm))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The loop invariant: A VALID USER-MODE EXECUTION STATE.  Everything an *)
@@ -331,19 +337,23 @@ Section UserExec.
   (* step retires and ticks, restoring lock-step at [va'].                 *)
   (* ------------------------------------------------------------------- *)
   (* the per-step mutable register cells, as one bundle (shared between
-     [user_inv] and the unpacked step obligations) *)
+     [user_inv] and the unpacked step obligations).  IT IS [UserFrame.u_regs]
+     -- the same eight cells as before plus THREE RIDERS, [minstret_res],
+     [clock_res] and [resv_any cpu_id].  They are here because the user hart
+     now owns minstret/minstret_increment/mcycle/mtime/mip outright: there is
+     no clock invariant left to borrow mip from, and the reservation frag is
+     what [HartMemRun.swp_hmrun_of_exec] consumes and hands back at every
+     model call.  Their values are existential per step, which is exactly
+     what [clock_res]/[minstret_res] say, so nothing in this file's
+     statements has to name them.
+     WHY NOT [pc_is]: [InstrBytes.pc_is x] bundles the same three riders but
+     FORCES PC = nextPC, and the WAITING hart decouples them (the enter-wait
+     step skips the tick).  [UserFrame.u_regs_pc_is] is the bridge back for
+     the two boundaries that still speak [pc_is]. *)
   Definition user_regs (hs : HartState)
       (ms_v sc_v stval_v sepc_v va va' : mword 64)
       (g : regfile) : iProp Σ :=
-    (hart_state ↦ᵣ hs ∗
-     cur_privilege ↦ᵣ User ∗
-     mstatus ↦ᵣ ms_v ∗
-     scause ↦ᵣ sc_v ∗
-     stval ↦ᵣ stval_v ∗
-     sepc ↦ᵣ sepc_v ∗
-     PC ↦ᵣ va ∗
-     nextPC ↦ᵣ va' ∗
-     gpr_file g)%I.
+    u_regs hs ms_v sc_v stval_v sepc_v va va' g.
 
   Definition user_inv : iProp Σ :=
     (∃ (hs : HartState) (ms_v sc_v stval_v sepc_v va va' : mword 64)
@@ -382,21 +392,27 @@ Section UserExec.
 
   (* assemble the trapped frame from the delivered cells (shared by every
      trap arm -- the values differ, the shape never does) *)
+  (* IT TAKES [pc_is], NOT THE TWO CELLS.  Post-port every producer of a trap
+     frame stands on a [u_regs]-shaped bundle whose PC/nextPC come back
+     together with the three riders [user_trap_frame] needs, and [pc_is] is
+     exactly that package ([UserFrame.u_regs_pc_is] is the one-line bridge).
+     Handing the cells separately would owe the caller three more arguments
+     for resources it already holds bundled. *)
   Lemma user_trap_frame_intro (ms' sc' stv' sep' : mword 64)
       (g : regfile) :
     trap_mstatus_ok ms' ->
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
-    PC ↦ᵣ stvec_base (uc_stvec C) -∗ nextPC ↦ᵣ stvec_base (uc_stvec C) -∗
+    pc_is (stvec_base (uc_stvec C)) -∗
     gpr_file g -∗ user_pt_inv pt -∗ user_cfg -∗ Rut pt -∗
     user_trap_frame.
   Proof.
-    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut".
+    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
     iExists ms', sc', stv', sep', g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg Hrut".
     iSplitR; [ iPureIntro; exact Hok | ].
-    iFrame "Hpc Hnpc".
+    iFrame "Hpc".
   Qed.
 
   (* the assumed kernel re-entry contract: the handler at stvec (uservec)

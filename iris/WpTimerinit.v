@@ -53,6 +53,7 @@ Require Import WpMmodeJalr.
 Require Import WpMmodeLoad.
 Require Import WpMmodeStore.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
+Require Import WpGprCsrwStimecmp.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import StackOwn.

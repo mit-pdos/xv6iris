@@ -13,6 +13,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras ExecCommon WpGpr RegFile.
 Require Import InstrBytes.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
+Require Import HartSwp HartMFrame WpMmodeSwpBase WpMmodeJump AlignBits.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
@@ -72,63 +74,43 @@ Section WpJalGpr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrd Halign) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
-    destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr pc false (JAL (imm, Regidx rd)) pmpcfg0
-              Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    (* tick nextPC to [pc+4]: this ticked value is the link JAL writes to rd,
-       and JAL then overwrites nextPC with the jump target. *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    (* PC unchanged by the nextPC tick; still [pc] *)
-    assert (Hpcv : register_lookup PC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    (* the link value: [register_lookup nextPC (set_reg σ nextPC (pc+4)) = pc+4] *)
-    assert (Hlink : register_lookup nextPC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
-    (* nextPC := target [add_vec pc (sign_extend' 64 imm)] (the JUMP) *)
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
-            with "Hreg Hnpc") as "[Hreg Hnpc]".
-    (* write rd := link = pc+4 (rd <> 0, so its entry is the real points-to) *)
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (add_vec_int pc 4))
-                 with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 4))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                        nextPC (add_vec pc (sign_extend' 64 imm)))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 4))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
-      rewrite (exec_execute_JAL_gpr imm rd (set_reg σ nextPC (add_vec_int pc 4))
-                 Hrd).
-      - rewrite Hpcv. rewrite Hlink. reflexivity.
-      - rewrite Hpcv. exact Hal0.
-      - rewrite Hpcv. exact Hal1. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    (* continuation: PC (from wp_instr) is [register_lookup nextPC s_exec] = the
-       target; own nextPC ↦ target too, giving [pc_is target]. *)
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                         nextPC (add_vec pc (sign_extend' 64 imm)))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 4))).(sregs)
-             = add_vec pc (sign_extend' 64 imm)).
-    { rewrite ?sregs_set_reg.
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfmap").
+    iIntros (Hpmp Hstat Hrd Halign) "Hmm Hpmpc Hpc Hf Hinstr Hcont".
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    (* the jump's own alignment side condition: bit 0 of a 4-aligned target *)
+    assert (Hb0 : eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0)
+                    ('b"0") = true).
+    { destruct (align4_low_bits (add_vec pc (sign_extend' 64 imm)) Halign)
+        as [H0 _].
+      unfold neq_vec in H0. by apply negb_false_iff in H0. }
+    iApply (wp_instr pc (add_vec pc (sign_extend' 64 imm)) false
+              (JAL (imm, Regidx rd)) m
+              (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0)%I
+              Hpmp Hstat
+              with "Hmm_wp Hpmpc_wp Hpc Hf Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iApply (swp_mono with "[Hhs_k Hmst_k Hpmpc_k] [Hf HPC HnPC Hpriv_k]");
+        [| iApply (swp_execute_JAL (DfracOwn (q/2)) imm rd m pc
+                     (add_vec_int pc 4) Hrd Hb0
+                     with "Hcert Hf HPC HnPC Hpriv_k Hmseccfg Hmisa") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & Hpriv_k & _ & _)".
+      iSplitR; [done|]. iFrame "Hf HPC HnPC".
+      iSplitL "Hhs_k Hpriv_k Hmst_k".
+      { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+      iFrame "Hpmpc_k".
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' [Hmm_k' Hpmpc_k']".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf'").
   Qed.
 End WpJalGpr.

@@ -1936,8 +1936,12 @@ Section ProofScheduler.
         (* +0x82 wfi -- the ONE leaf with no [wp_next] wrapper (it never
            migrates the hart) *)
         iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & Hhcs)".
+        (* the wfi leaf PINS the translation arm at the kernel table, and the
+           receipt for that is already a member of [trap_csrs] -- the
+           scheduler runs long after kvminithart's switch. *)
+        iDestruct (trap_csrs_kpt_on with "Hcsrs") as "(Hcsrs & #Hkptw)".
         iApply (wp_wfi_s_sconf (mword_of_int (KernelSyms.scheduler + 0x82)) Me n2 false
-                  with "Hcg Hcnt Hpc Hi82").
+                  with "Hkptw Hcg Hcnt Hpc Hi82").
         iNext. iIntros "Hcg Hcnt Hpc".
         assert (Hb86b : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x82) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x86))
           by (apply bv_eq; vm_compute; reflexivity).

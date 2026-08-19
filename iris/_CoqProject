@@ -12,12 +12,40 @@ SetShrink.v
 FastSetSolver.v
 FastSetSolverTests.v
 BvShift.v
+ResvAxioms.v
 ArchReset.v
 RiscvModelBytes.v
 VirtioModel.v
 DiskImg.v
 DevModel.v
 RiscvLang.v
+HartBlock.v
+HartSwp.v
+HartLift.v
+HartEvents.v
+HartRegNode.v
+HartSpan.v
+HartSpanChar.v
+HartMemRun.v
+HartMemAsm.v
+HartRunGen.v
+HartSFrame.v
+WpSFrames.v
+HartMCycle.v
+HartStepAny.v
+HartStepFull.v
+HartMPmp.v
+HartMFetch.v
+HartMDecode.v
+HartMStore.v
+HartMLoad.v
+HartLift2.v
+HartMRun.v
+HartGoodb.v
+HartMFrame.v
+HartMLeaf.v
+HartMDispatch.v
+HartPilot.v
 RegFile.v
 HartTp.v
 WpNext.v
@@ -58,11 +86,16 @@ WpMmodeShiftiop.v
 WpGprCsrwCommon.v
 WpGprCsrwA.v
 WpGprCsrwB.v
+WpGprCsrwStimecmp.v
 WpGprCsrwC.v
 WpGprMret.v
 WpGprMretWp.v
 ZicondGpr.v
 WpMmodeLeafBase.v
+WpMmodeSwpBase.v
+WpMmodeJump.v
+WpMmodeCsrSwp.v
+HartSCsr.v
 MbootVocab.v
 MemAccessGen.v
 WpMmodeItype.v
@@ -74,6 +107,7 @@ WpMmodeUtype.v
 WpMmodeJalr.v
 WpMmodeMret.v
 WpSmodeLeafBase.v
+WpSmodePtEngine.v
 WpSmodePtLeaves.v
 WpSmodePtAlu.v
 WpSmodePtBtype.v
@@ -84,6 +118,8 @@ WpSmodePtLock.v
 WpSmodePtUart.v
 UptTree.v
 UserPtTree.v
+HartSTrans.v
+HartSKpt.v
 UserFetchPt.v
 MemAmo4.v
 UserMemPt.v
@@ -91,7 +127,10 @@ UserMemAccess.v
 UserMemMis.v
 PtFetchGen.v
 TrampStepPt.v
+UptWalkPt.v
+Pt2Walk.v
 TransPt.v
+Pt2WalkPt.v
 UserretDefs.v
 UserretPt.v
 UserretEntryPt.v
@@ -121,6 +160,10 @@ CodeKvminit.v
 CodeKvminithart.v
 CodeKvmmap.v
 InstrBytes.v
+WpInstrRun.v
+WpInstr.v
+WpInstrMip.v
+WpInstrConfig.v
 KernelText.v
 StackOwn.v
 CalleeSaved.v
@@ -131,6 +174,13 @@ SpecSpin.v
 ProofSpin.v
 LinkSpin.v
 SmodePte.v
+UserFrame.v
+PtBytes.v
+UserBytes.v
+PtWalkCert.v
+UserFetchCert.v
+UserFaultCert.v
+UserMemCert.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
@@ -144,8 +194,11 @@ UserBits.v
 SmodeCore.v
 PtTreeAdue.v
 KptTree.v
+KptGoodb.v
 KptShare.v
+HartSMem.v
 SmodeCorePt.v
+WpSmodePtFetch.v
 WpSmodeGpr.v
 WpSmodeMemGen.v
 WpMemsetS.v
@@ -163,6 +216,7 @@ CodeKernelvec.v
 CodeMemset.v
 MstatusBits.v
 WpIntrCore.v
+HartRunFull.v
 PlicPlan.v
 WpUart.v
 RiscvAdequacy.v
@@ -177,57 +231,72 @@ UserMem.v
 UserFetch.v
 UserCompute.v
 UserStepFull.v
-UmodeMem.v
-UmodeCap.v
-UmodeFetch.v
-UmodeAbi.v
-UmodeArith.v
-UmodeSyscall.v
-UmodeIo.v
-WpUmodeStep.v
-WpUmodeLeaf.v
-WpUmodeBranch.v
-WpUmodeStore.v
-WpUmodeLoad.v
-USpecSync.v
-UCodeSync.v
-UProofSync.v
-UCodeEcho.v
-USpecEcho.v
-UCodeSh.v
-USpecSh.v
-USpecShParse.v
-UmodeFrame.v
-UmodeStub.v
-UProofShLib.v
-UProofShMem.v
-UProofShHeap.v
-UProofShLex.v
-UProofShIo.v
-UProofShInput.v
-UProofShParse.v
-UProofShCmd.v
-UProofShTop.v
-UProofShMain.v
-UProofShEcho.v
-UCodeInit.v
-UmodeInitIo.v
-USpecInit.v
-UProofInitLib.v
-UProofInitPrintf.v
-UProofInit.v
-UProofEchoA.v
-UProofEcho.v
+# --- BEGIN descoped tier: verified Umode WP (sync/echo/sh/init) ---
+# Ruling (project owner, 2026-08-19): the proofs of the specific user-mode
+# binaries sync/echo/sh/init, and the Umode WP infrastructure that exists only
+# to support them, are descoped from the hart-node-port build. This is NOT the
+# ProofUser/UserExec "run arbitrary user-mode code" tier, which is kept and is
+# being finished separately. Nor is it LinkUserinit/SpecUserinit, which concern
+# the KERNEL's userinit path and stay in the build. The .v files below remain on
+# disk untouched; reviving this tier means uncommenting these rows and porting
+# them per claude-notes/projects/user-tier-port.md's P8 entry ("the same
+# bricks").
+# UmodeMem.v
+# UmodeCap.v
+# UmodeFetch.v
+# UmodeAbi.v
+# UmodeArith.v
+# UmodeSyscall.v
+# UmodeIo.v
+# WpUmodeStep.v
+# WpUmodeLeaf.v
+# WpUmodeBranch.v
+# WpUmodeStore.v
+# WpUmodeLoad.v
+# USpecSync.v
+# UCodeSync.v
+# UProofSync.v
+# UCodeEcho.v
+# USpecEcho.v
+# UCodeSh.v
+# USpecSh.v
+# USpecShParse.v
+# UmodeFrame.v
+# UmodeStub.v
+# UProofShLib.v
+# UProofShMem.v
+# UProofShHeap.v
+# UProofShLex.v
+# UProofShIo.v
+# UProofShInput.v
+# UProofShParse.v
+# UProofShCmd.v
+# UProofShTop.v
+# UProofShMain.v
+# UProofShEcho.v
+# UCodeInit.v
+# UmodeInitIo.v
+# USpecInit.v
+# UProofInitLib.v
+# UProofInitPrintf.v
+# UProofInit.v
+# UProofEchoA.v
+# UProofEcho.v
+# --- END descoped tier ---
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
 UserExecFacts.v
 UserCsr.v
 UserTotalU.v
-UserActiveClass.v
+UserMemTotal.v
 UserMemClassify.v
+UserMemArmsBase.v
+UserMemArmsC.v
+UserMemArmsA.v
 UserMemClassifyAmo.v
 SpecUser.v
+UserActiveClass.v
 ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
@@ -239,6 +308,7 @@ SpecKernelvec.v
 ProofKernelvec.v
 LinkKernelvec.v
 WpSmodeIntr.v
+WpSconfEngine.v
 WpSconfAlu.v
 WpSconfMem.v
 WpSmodeHalf.v
@@ -331,6 +401,7 @@ WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
 WpSconfSret.v
+WpSconfSfence.v
 WpPushOffCsr.v
 CodeMycpu.v
 ProcGeom.v
@@ -553,7 +624,6 @@ DinodeEnc.v
 DirentEnc.v
 ElfEnc.v
 PathElems.v
-WpSconfSrliw.v
 CodeWriteHead.v
 CodeInstallTrans.v
 CodeInitlog.v

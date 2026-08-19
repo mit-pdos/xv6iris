@@ -92,6 +92,7 @@ Module ForkretNF : FORKRET_NF.
     Definition usertrap_res_pt_open := UserretClosedD.usertrap_res_pt_open.
     Definition usertrap_res_bare_norm := UserretClosedD.usertrap_res_bare_norm.
     Definition usertrap_res_csrs_open := UserretClosedD.usertrap_res_csrs_open.
+  Definition usertrap_res_sstc := UserretClosedD.usertrap_res_sstc.
     Definition usertrap_res_tf_csrs_open := UserretClosedD.usertrap_res_tf_csrs_open.
     Definition usertrap_res_tf_open := UserretClosedD.usertrap_res_tf_open.
   End Res.

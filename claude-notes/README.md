@@ -52,6 +52,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   keystones, the interrupt invariant + absorbing step engine, the SIE-agnostic
   bundle, the interrupt-stack file layout.
 - **[`multi-cpu.md`](design/multi-cpu.md)** — the ambient-hart multi-CPU model.
+- **[`main-cycle-port.md`](design/main-cycle-port.md)** — the expression-resident
+  Sail monad: `HartE gen cpu m` steps one monad NODE per language step, so a
+  page walk, a TLB write-back, a fetch and a data access of one instruction can
+  interleave with other harts. The placement rule, the fused-AMO window, the
+  proof interface that keeps step granularity out of proof granularity, and the
+  phasing (the tree is red across the port — read §6 before starting).
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy.
 - **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
   power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
@@ -110,6 +116,17 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   resource argument rather than by licensing the lock order. Read it for the
   sleeplock DEPOSIT and why a purely pure held arm can never be refuted.
   **The tree now has no admitted statements.**
+- **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
+  monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
+- **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto
+  per-node semantics (sub-plan of the above: `swp_hmrun_of_exec` + `goodmb` twins).
+  **Done on branch `hart-node-port`**: `ProofUser.wp_user_exec_closed` is proven
+  per-node, so the temporary user-exec axiom is discharged and
+  `iris/UserExecAxiom.v` is gone. Read it for the §14.4 fetch-geometry package
+  (width-generic read certificates, the six va geometries, the split-fetch
+  shells) and the `goodmb` discipline. The one scope decision it still records
+  is §P8: the specific-binary Umode tier (`sync`/`echo`/`sh`/`init`) is
+  descoped from the build.
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
@@ -172,26 +189,28 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
-- **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
-  `sh`, on ONE input (`echo Hello world!`): the syscall protocol at I/O
-  depth, which is what lets a theorem say what a process DOES rather than
-  only that it steps. Read it for the observing `exec` arm, the ghost stdin
-  stream, and why fixing the input removes the two things the tier cannot
-  express.
+  (DESCOPED from the hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
 - **[`user-echo.md`](projects/user-echo.md)** — the Umode tier's SECOND
   program, `echo`: the first with loops, memory reads, an argv area and a
   syscall with a real precondition. Read it for the pieces that grew to carry
   it — the stack as a splittable BUDGET, `uM_only` as the image
   postcondition of a call, the `mword_of_int` calculus, and the one generic
-  branch leaf that replaces an op cross-product.
+  branch leaf that replaces an op cross-product. (DESCOPED from the
+  hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
 - **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
   `sh` on one fixed input: the design of record for scoping a program by its
   input, the `xv6_io_protocol` at I/O depth, and the code-catalog generator.
+  (DESCOPED from the hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
 - **[`user-init.md`](projects/user-init.md)** — the Umode tier's FOURTH
   program, `init`: the first that NEVER TERMINATES (two nested `iLöb` loops
   and the `▷`-exposing branch leaves that close them), the first whose
   theorem assumes nothing about what the kernel returns (every branch of
   every syscall test is proved), and the first verified xv6 `printf`.
+  (DESCOPED from the hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
 
 ## `completed/` — finished projects, archived for reference
 

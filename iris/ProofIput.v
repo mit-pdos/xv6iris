@@ -145,7 +145,7 @@ Require Import KernelDataInv.
 Require Import RiscvModelBytes.
 Require Import SchedCtx.
 Require Import SleepLock.
-Require Import WpSconfSrliw.
+(* [wp_srliw_s_sconf] lives in WpSconfAlu.v since the per-node fold-in. *)
 Require Import EscrowDefs.
 Require Import EscrowInode.
 Require Import EscrowDeposit.
@@ -1053,6 +1053,20 @@ Section IputTail.
     assert (Hqthalf : (qt ≤ 1/2)%Qp) by (rewrite Hsum; apply Qp.le_add_l).
     assert (Hiw : iref_word Mt k = (mword_of_int (Z.pos cnt) : mword 32))
       by (rewrite /iref_word HMk; reflexivity).
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
+       rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       window's mapping, alignment, canonicality and RAM-ness have to arrive
+       UP FRONT.  It is persistent and says nothing about the VALUE, so a
+       RESTORING peek of the same cell delivers it. *)
+    iApply fupd_wp.
+    iMod (iref_load_locked_au ⊤ Mt k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+      as "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) (iref_word Mt k) ltac:(lia) with "Hcellp")
+      as "#Hclaim0".
+    iMod ("Hbackp" with "Hcellp") as "Hhalf".
+    iModIntro.
     (* ===== +0x22 c.addiw a5,a5,-1 ===== *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.iput + 0x20)) Ra5
               (mword_of_int 63 : mword 6) M (trap_res eb + (K - 6))%nat false
@@ -1144,7 +1158,8 @@ Section IputTail.
                  ifreeze_off (bv_unsigned inum) ∗
                  icnt_half (bv_unsigned inum) 0%nat)%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [Hhalf Hrtok Hlvh Hself Hisl Hru Hoff Hcnt1]").
+                with "Hcg Hpc Hi24 [] [Hhalf Hrtok Hlvh Hself Hisl Hru Hoff Hcnt1]").
+      { rewrite Hpa2. iExact "Hclaim0". }
       { rewrite Hpa2 Hstv.
         replace (Z.pos 1 - 1)%Z with 0%Z by lia.
         (* THE RETIREMENT, under the restated ledger (design 17.3 (A) / R-e):
@@ -1229,7 +1244,8 @@ Section IputTail.
                  isl_slot (<[k := (qrest, npred)]> Mt) k ∗
                  icnt_half (bv_unsigned inum) (Pos.to_nat npred))%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [Hhalf Hrtok Hisl Hru Hcnt1]").
+                with "Hcg Hpc Hi24 [] [Hhalf Hrtok Hisl Hru Hcnt1]").
+      { rewrite Hpa2. iExact "Hclaim0". }
       { rewrite Hpa2 Hstv Hzs.
         (* the count goes down from [Pos.succ npred >= 2], where BOTH phases
            of §2.3's pin are refuted by arithmetic -- so this mover needs no
@@ -2722,11 +2738,18 @@ Section IputFreePath.
     { rewrite (rget_ne mfi Rs1 ltac:(nz)) Hmfis1. reflexivity. }
     assert (Hsv70 : trunc32 (rget mfi Rz) = valid_word false).
     { rewrite (rget_ne mfi Rz ltac:(nz)) Hx0u. exact ip_trunc32_zero. }
+    (* THE ADDRESS CLAIM: no peek at all here -- since IVd the whole valid
+       word has been in this thread's hand across [itrunc], so the claim
+       comes straight off [Hvld] (persistent, so [Hvld] stays). *)
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry k))
+                 (DfracOwn 1) (valid_word true) ltac:(lia) with "Hvld")
+      as "#Hclaim70".
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iput + 0x70)) Rz Rs1
               (mword_of_int 64 : mword 12) mfi (K - 6)%nat
               (i_valid (ientry k) ↦₄ valid_word false)%I
               (⊤ ∖ ↑minstretN) eb ltac:(solve_ndisj)
-              with "Hcg Hpc Hi70 [Hvld]").
+              with "Hcg Hpc Hi70 [] [Hvld]").
+    { rewrite Hpa70. iExact "Hclaim70". }
     { rewrite Hpa70 Hsv70.
       iModIntro. iExists (valid_word true). iFrame "Hvld". iIntros "Hvld".
       iModIntro. iExact "Hvld". }
@@ -2889,11 +2912,28 @@ Section IputFreePath.
     assert (Hpa86 : add_vec (rget macq2 Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                     = i_ref (ientry k)).
     { rewrite (rget_ne macq2 Rs1 ltac:(nz)) Hma2s1. reflexivity. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
+       rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       window's mapping, alignment, canonicality and RAM-ness have to arrive
+       UP FRONT.  It is persistent and says nothing about the VALUE, so a
+       RESTORING peek of the same cell delivers it. *)
+    (* ONE peek serves both halves of the eviction: +0x86's read and
+       +0x8a's store name the same cell, and the claim is persistent. *)
+    iApply fupd_wp.
+    iMod (iref_load_locked_au ⊤ Mt2 k ltac:(solve_ndisj) Hk with "Hitinv Hhalf")
+      as "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) (iref_word Mt2 k) ltac:(lia) with "Hcellp")
+      as "#Hclaim86".
+    iMod ("Hbackp" with "Hcellp") as "Hhalf".
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x86)) Ra5 Rs1
               (mword_of_int 8 : mword 12) macq2 (trap_res eb + (K - 6))%nat
               (fun v => (⌜v = iref_word Mt2 k⌝ ∗ itable_half Mt2)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi86 [Hhalf]").
+              with "Hcg Hpc Hi86 [] [Hhalf]").
+    { rewrite Hpa86. iExact "Hclaim86". }
     { rewrite Hpa86.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt2 k ltac:(solve_ndisj) Hk
               with "Hitinv Hhalf") as "[Hcell Hback2]".
@@ -3050,7 +3090,8 @@ Section IputFreePath.
                icnt_half (bv_unsigned inum) 0%nat ∗
                frzm_h (bv_unsigned inum) false)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi8a [Hhalf Hfrg Hrslh Hselp Hsele Hisl Hru Hpre Hicnt Hrcpt Hmirt]").
+              with "Hcg Hpc Hi8a [] [Hhalf Hfrg Hrslh Hselp Hsele Hisl Hru Hpre Hicnt Hrcpt Hmirt]").
+    { rewrite Hpa8a. iExact "Hclaim86". }
     { rewrite Hpa8a Hstv2.
       replace (Z.pos 1 - 1)%Z with 0%Z by lia.
       (* THE LAST CLOSE IS THE PHASE STEP (A⁗): [FrzPre -> FrzPost], the
@@ -3841,6 +3882,31 @@ Section IputFreePath.
     assert (Hpa3a : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                     = i_valid (ientry k)).
     { rewrite (rget_ne M Rs1 ltac:(nz)) HMs1. reflexivity. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
+       rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       window's mapping, alignment, canonicality and RAM-ness have to arrive
+       UP FRONT.  It is persistent and says nothing about the VALUE, so a
+       RESTORING peek of the same cell delivers it. *)
+    (* Here the peek is one open of the PARKED arm and its own re-park wand:
+       the arm comes back exactly as it went in -- [ic_mk_parked_arm] is
+       generic in [v] and in the tail's alternative, so this peek does not
+       have to decide either the way the read below does. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iMod (ic_open_auth_ref cn γfs γi cov logstart k
+            (⊤ ∖ ↑icEscN) Mt q q dev inum
+            ltac:(solve_ndisj) HMk1 with "Hitinv Hbodyp Hhalf Hrtok Hrident")
+      as "(Hhalf & Hrtok & Hrident & Harmp & Hparkp)".
+    iDestruct "Harmp" as (vp gap) "(Hidvp & Hinhp & Hvldp & Hpaylp & Hmtp & Hgidap)".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry k))
+                 (DfracOwn 1) (valid_word vp) ltac:(lia) with "Hvldp")
+      as "#Hclaim3a".
+    iMod ("Hclosep" with "[Hparkp Hidvp Hinhp Hvldp Hpaylp Hmtp Hgidap]") as "_".
+    { iApply bi.later_intro. iApply "Hparkp".
+      iApply (ic_mk_parked_arm cn γfs γi cov logstart k dev inum vp gap
+                with "Hidvp Hinhp Hvldp Hpaylp Hmtp Hgidap"). }
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x3a)) Ra4 Rs1
               (mword_of_int 64 : mword 12) M (trap_res eb + (K - 6))%nat
               (fun w => (∃ v : bool, ⌜w = valid_word v⌝ ∗
@@ -3868,7 +3934,8 @@ Section IputFreePath.
                   frzm_h (bv_unsigned inum) false)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi3a [Hhalf Hrtok Hrident Hrest Hmirf]").
+              with "Hcg Hpc Hi3a [] [Hhalf Hrtok Hrident Hrest Hmirf]").
+    { rewrite Hpa3a. iExact "Hclaim3a". }
     { rewrite Hpa3a.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_auth_ref cn γfs γi cov logstart k
@@ -4083,6 +4150,29 @@ Section IputFreePath.
                     = i_inum (ientry k)).
     { rewrite (rget_ne F2 Rs1 ltac:(nz)) HF2s1. reflexivity. }
     iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
+       rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       window's mapping, alignment, canonicality and RAM-ness have to arrive
+       UP FRONT.  It is persistent and says nothing about the VALUE, so a
+       RESTORING peek of the same cell delivers it. *)
+    (* Here the peek is [ic_open_held] / [ic_close_held] -- the same pair the
+       update below uses, run with nothing moved: the HELD arm owns [i_inum]
+       WHOLE, which is exactly why this load is an AU at all. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑icEscN)
+            Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk1
+            with "Hitinv Hbodyp Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
+      as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidvp & Hnfullp
+           & Hvldxp & Hmtp & Hgidap)".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_inum (ientry k))
+                 (DfracOwn 1) inum ltac:(lia) with "Hnfullp") as "#Hclaim46".
+    iDestruct "Hvldxp" as (w0p) "Hvap".
+    iMod ("Hclosep" with "[Hidvp Hnfullp Hvap Hmtp Hgidap]") as "_".
+    { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
+      iExists dev, inum, w0p. iFrame. }
+    iModIntro.
     iApply (wp_lw_au_s_sconf false (mword_of_int (KernelSyms.iput + 0x46)) Rs2 Rs1
               (mword_of_int 4 : mword 12) F2 (trap_res eb + (K - 6))%nat
               (fun w => (⌜w = inum⌝ ∗ itable_half Mt ∗ iref_frag k q ∗ live_frac k q ∗
@@ -4091,7 +4181,8 @@ Section IputFreePath.
                          ic_payload_at γfs γi cov logstart k inum ga dn bm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi46 [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
+              with "Hcg Hpc Hi46 [] [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
+    { rewrite Hpa46. iExact "Hclaim46". }
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
       iMod (ic_open_held cn γfs γi cov logstart k (⊤ ∖ ↑minstretN ∖ ↑icEscN)
@@ -4777,6 +4868,20 @@ Section ProofIput.
     iPoseProof (ipi_1c with "Htext") as "Hi1c".
     assert (Hiw : iref_word Mt k = (mword_of_int (Z.pos cnt) : mword 32))
       by (rewrite /iref_word HMk; reflexivity).
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
+       rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       window's mapping, alignment, canonicality and RAM-ness have to arrive
+       UP FRONT.  It is persistent and says nothing about the VALUE, so a
+       RESTORING peek of the same cell delivers it. *)
+    iApply fupd_wp.
+    iMod (iref_load_locked_au ⊤ Mt k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+      as "[Hcellp Hbackp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                 (DfracOwn 1) (iref_word Mt k) ltac:(lia) with "Hcellp")
+      as "#Hclaim18".
+    iMod ("Hbackp" with "Hcellp") as "Hhalf".
+    iModIntro.
     (* ===== +0x18 c.lw a4,8(s1) ===== *)
     assert (Hpa18 : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                     = i_ref (ientry k)).
@@ -4786,7 +4891,8 @@ Section ProofIput.
               (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi18 [Hhalf]").
+              with "Hcg Hpc Hi18 [] [Hhalf]").
+    { rewrite Hpa18. iExact "Hclaim18". }
     { rewrite Hpa18.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt k
               ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback2]".

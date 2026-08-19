@@ -461,7 +461,7 @@ Section UmodeStoreMemK.
               (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sig2.(sregs)) 0)) 4)
               (uint pa) (uint (to_bits 64 k)) = PMP_Match).
     { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-      exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+      exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                ltac:(clear -Hk; lia) Hram0' Hramk Hcovp). }
     (* the byte-window bridge: the model writes [dat], the image records [v] *)
     assert (Hwb : forall mm : gmap Arch.pa (bv 8),

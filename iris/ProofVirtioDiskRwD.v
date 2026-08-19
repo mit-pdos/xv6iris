@@ -659,6 +659,34 @@ Section VdrwdLeaves.
     assert (Hcan2 : forall j, (j < 2)%nat ->
               (uint (pa_add (pa_add pav 2%nat) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add. exact (Hcana (2 + j)%nat (vdrwd_two_add_lt j Hj)). }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; one peek-open of the device invariant runs the
+       READ-ONLY avail-index accessor, takes the claim off the window's own
+       points-to ([wordw_claim_of]) and hands the cell straight back.  The
+       claim is persistent, so it survives the close. *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv0".
+    iInv "Hvinv0" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_avail_idx_acc γd vstp np with "Hprotop Hpub")
+      as "(_ & #Hcfgvp & _ & Hw2p & Hbackp)".
+    iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
+    assert (Haddrp : avail_idx_pa (v_cfg vstp) = pa_add pav 2%nat)
+      by (rewrite Hceqp; reflexivity).
+    iEval (rewrite Haddrp) in "Hw2p".
+    iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
+                 with "Hkm Hw2p") as "Hcellp".
+    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pav 2%nat) (DfracOwn 1)
+                 (wrap16 np : SailStdpp.Values.mword 16) ltac:(lia)
+                 with "Hcellp") as "#Hcl".
+    iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2
+                 with "Hkm Hcellp") as "Hw2p".
+    iEval (rewrite -Haddrp) in "Hw2p".
+    iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
     iApply (wp_load_s_sconf_au (kt := KT1) (ktd := KT0) 2 false true pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
               (fun w => (⌜w = wrap16 np⌝ ∗ ⌜(nr <= np)%nat⌝ ∗ disk_pub γd np)%I)
@@ -666,7 +694,8 @@ Section VdrwdLeaves.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub] [Hcont]").
+    { rewrite Hea. iExact "Hcl". }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
@@ -747,6 +776,34 @@ Section VdrwdLeaves.
     assert (Hcan2 : forall j, (j < 2)%nat ->
               (uint (pa_add (pa_add pav 2%nat) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add. exact (Hcana (2 + j)%nat (vdrwd_two_add_lt j Hj)). }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; one peek-open of the device invariant runs the
+       READ-ONLY avail-index accessor, takes the claim off the window's own
+       points-to ([wordw_claim_of]) and hands the cell straight back.  The
+       claim is persistent, so it survives the close. *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv0".
+    iInv "Hvinv0" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_avail_idx_acc γd vstp np with "Hprotop Hpub")
+      as "(_ & #Hcfgvp & _ & Hw2p & Hbackp)".
+    iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
+    assert (Haddrp : avail_idx_pa (v_cfg vstp) = pa_add pav 2%nat)
+      by (rewrite Hceqp; reflexivity).
+    iEval (rewrite Haddrp) in "Hw2p".
+    iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
+                 with "Hkm Hw2p") as "Hcellp".
+    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pav 2%nat) (DfracOwn 1)
+                 (wrap16 np : SailStdpp.Values.mword 16) ltac:(lia)
+                 with "Hcellp") as "#Hcl".
+    iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2
+                 with "Hkm Hcellp") as "Hw2p".
+    iEval (rewrite -Haddrp) in "Hw2p".
+    iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
               (disk_pub γd (S np) ∗ disk_receipt γd np sl pin)%I
@@ -755,7 +812,8 @@ Section VdrwdLeaves.
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hpin Hwrb Hpend] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hpin Hwrb Hpend] [Hcont]").
+    { rewrite Hea. iExact "Hcl". }
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".

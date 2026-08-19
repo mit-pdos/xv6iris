@@ -768,6 +768,33 @@ reading the proof:
 grep -rn "5368956[0-9][0-9]" iris/        # then recompute (addr + off) / divisor
 ```
 
+### 4c-ter. A RAW ADDRESS LITERAL IN A FILE THE SWEEP NEVER VISITED
+
+`fix_proof_imms.py` is keyed on `mword_of_int (<sym> + <off>)`, so a proof
+that spells an address as a BARE `Z` — `assert (H : uint hp_flag =
+2147525284)`, the shape every `addr_is_ram` obligation uses — is invisible to
+it and to `relayout_batch`. That is harmless while the bump and the proof are
+in the same tree, because the bump's own build catches it. **It is NOT
+harmless across a MERGE**: the bump swept the branch it landed on, and a
+long-running side branch's own files were never in that sweep, so they arrive
+carrying the pre-bump literal and every audit reports zero. The first symptom
+is `The term "eq_refl" has type "<old> = <old>" while it is expected to have
+type "uint x = <old>"` in a file the merge's diff never touched.
+
+The sweep that finds them is one pass over the OLD symbol table: collect every
+`0x8...` / `21…` literal in the merged tree and flag the ones equal to a MOVED
+symbol's OLD address. Do it against the old table, not the new one — matching
+literals against the NEW table attributes a correct address to whatever symbol
+happens to precede it and buries the real hit in false positives. Restrict to
+the files ONLY the side branch touched (`comm -23` the two `git diff
+--name-only` lists) and it is a handful of lines.
+
+The durable fix is §4b's: derive rather than transcribe. Where the file cannot
+import `KernelSyms` (a boot/model-tier file often cannot), record the symbol
+the literal came from in a comment at the assertion, so the next bump can find
+it by name instead of by a failing `vm_cast_no_check`.
+(`HartMLeaf.t_ram_flag`'s `KernelSyms.started` is the worked instance.)
+
 ### 4d. Stack budgets — the cascade
 
 If a changed function's **frame** grew, every caller's budget constant rises,

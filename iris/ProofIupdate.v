@@ -68,7 +68,6 @@ Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeHalf.
-Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.

@@ -8,6 +8,8 @@ From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr RegFile InstrBytes RiscvExtras SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
+Require Import HartSwp HartMFrame WpMmodeSwpBase WpMmodeJump.
 Import Defs.
 Import Defs.
 
@@ -50,72 +52,42 @@ Section RvcRet.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hra) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
-    pose proof (ret_pc_aligned (m !!! Regidx ra)) as Hal0.
+    iIntros (Hpmp Hstat Hra) "Hmm Hpmpc Hpc Hf Hinstr Hcont".
+    (* keep HALF the config bundle: the jump's [update_elp_state] and
+       [jump_to] read cur_privilege / mseccfg / misa, and wp_instr is about to
+       take the bundle.  misa and mseccfg are PERSISTENT so they survive on
+       their own; only cur_privilege needs the fraction split. *)
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
-    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iApply (wp_instr pc true (JALR (zeros' 12, Regidx ra, zreg)) pmpcfg0
-              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv_k")  as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hmseccfg") as %Lsec.
-    iDestruct (reg_valid_dq with "Hreg Hmisa")    as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc m (Regidx ra) with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value ra (m (Regidx ra)) s_pc with "Hreg Hr1c") as %Hrv.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    assert (Lrav : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs)
-                   = m !!! Regidx ra).
-    { rewrite rf_lookup -Hrv. replace (Z.eqb (uint ra) 0) with false
-        by (symmetry; apply Z.eqb_neq; exact Hra). reflexivity. }
-    assert (Hzic : exec (currentlyEnabled Ext_Zicfilp) s_pc = Some (false, s_pc)).
-    { apply exec_cE_zicfilp_false.
-      - unfold s_pc; tmig; exact Lpriv.
-      - unfold s_pc; tmig; rewrite Lsec; exact Hmlpe. }
-    assert (Hzca : exec (currentlyEnabled Ext_Zca) s_pc = Some (true, s_pc)).
-    { apply exec_currentlyEnabled_Zca. unfold s_pc; tmig; rewrite Lmisa; exact HmisaC. }
-    assert (Htgt : update_vec_dec (add_vec
-                     (register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs))
-                     (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0")
-                   = ret_pc (m !!! Regidx ra)).
-    { rewrite Lrav. apply ret_pc_jalr. }
-    assert (Hexec_spc :
-      exec (execute (JALR (zeros' 12, Regidx ra, zreg))) s_pc
-      = Some (RETIRE_SUCCESS, set_reg s_pc nextPC (ret_pc (m !!! Regidx ra)))).
-    { change (execute (JALR (zeros' 12, Regidx ra, zreg)))
-        with (execute_JALR (zeros' 12) (Regidx ra) zreg).
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr pc (ret_pc (m !!! Regidx ra)) true
+              (JALR (zeros' 12, Regidx ra, zreg)) m m pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0)%I
+              Hpmp Hstat
+              with "Hmm_wp Hpmpc_wp Hpc Hf Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k] [Hcont]").
+    - iIntros "Hf HPC HnPC".
       change zreg with (Regidx cli_rs1).
-      rewrite (exec_execute_JALR_ret_zca (zeros' 12) ra cli_rs1 s_pc Hra
-                 ltac:(vm_compute; reflexivity) Hzic Hzca
-                 ltac:(rewrite Htgt; exact Hal0)).
-      rewrite Htgt. reflexivity. }
-    iMod (reg_update _ nextPC _ (ret_pc (m !!! Regidx ra)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro.
-    iExists (set_reg s_pc nextPC (ret_pc (m !!! Regidx ra))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc nextPC (ret_pc (m !!! Regidx ra))).(sregs)
-             = ret_pc (m !!! Regidx ra)).
-    { rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (q/2)))%I
-      with "[Hhs_k Hpriv_k Hmst_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k Hmst_k". }
-    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
-    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap").
+      iApply (swp_mono with "[HPC Hhs_k Hmst_k Hpmpc_k] [Hf HnPC Hpriv_k]");
+        [| iApply (swp_execute_JALR_ret (DfracOwn (q/2)) ra cli_rs1 m
+                     (add_vec_int pc 2) ltac:(vm_compute; reflexivity)
+                     with "Hcert Hf HnPC Hpriv_k Hmseccfg Hmisa") ].
+      iIntros (e) "(-> & Hf & HnPC & Hpriv_k & _ & _)".
+      iSplitR; [done|]. iFrame "Hf HPC HnPC".
+      iSplitL "Hhs_k Hpriv_k Hmst_k".
+      { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+      iFrame "Hpmpc_k".
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' [Hmm_k' Hpmpc_k']".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf'").
   Qed.
 
 End RvcRet.

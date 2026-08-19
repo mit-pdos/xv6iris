@@ -535,7 +535,7 @@ Section ProofUvmunmap.
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
     (* ---- the iteration's numeric facts ---- *)
     pose proof (bv_unsigned_in_range 64 va) as [Hva0 _].
     assert (Hdnp : (Z.of_nat done + 1 <= Z.of_nat npages)%Z) by lia.

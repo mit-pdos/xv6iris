@@ -244,18 +244,29 @@ Definition MIE_S : mword 64 := mword_of_int 0x220.
    Supervisor state with menvcfg = MENVCFG_S (the constant post-boot value).
    Supplied to the [instr] decode obligation by the M-/S-mode step engines from
    [hw_config] / [smode_config]; consumed by the per-word bridge lemmas. *)
-Definition cfg_ok (s : mstate) : Prop :=
-  (register_lookup cur_privilege s.(sregs) = Machine /\
-   register_lookup mseccfg s.(sregs) = mword_of_int 0)
-  \/ (register_lookup cur_privilege s.(sregs) = Supervisor /\
-      register_lookup menvcfg s.(sregs) = MENVCFG_S).
+(* the config disjunction, over the REGISTER FILE.  The [mstate] form below
+   is definitionally this one at [s.(sregs)] -- which is what lets the
+   footprinted decode characterization ([instr]'s [decode_hval]) drop σ
+   entirely: it needs the register VALUES, never the machine. *)
+Definition cfg_ok_rs (rs : regstate) : Prop :=
+  (register_lookup cur_privilege rs = Machine /\
+   register_lookup mseccfg rs = mword_of_int 0)
+  \/ (register_lookup cur_privilege rs = Supervisor /\
+      register_lookup menvcfg rs = MENVCFG_S).
+
+Definition cfg_ok (s : mstate) : Prop := cfg_ok_rs s.(sregs).
 
 Section HwConfig.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* mcountinhibit / minstretcfg are no longer bundled here (the minstret step
-     no longer needs their values -- [should_inc] is total).  [elp] IS bundled,
+  (* mcountinhibit / minstretcfg are bundled here AGAIN.  They were removed
+     when the exec-shaped [should_inc] turned out to be total and not to need
+     their values; the [swp] wrapper's [swp_should_inc_minstret] DOES read
+     them, and it reads them in S-mode as much as in M-mode -- so they belong
+     in the bundle both modes already carry, not in [mmode_config].  Nothing
+     in the tree or in the kernel ever writes either, so [↦ᵣ□] is sound and
+     they cost no threading at all.  [elp] IS bundled,
      persistently and existentially, pinned to NOT [LP_EXPECTED] so it discharges
      the landing-pad side condition [eq_vec elp (landing_pad_bits_backwards
      LP_EXPECTED) = false] that the run_hart_active / fetch WPs require.
@@ -263,6 +274,17 @@ Section HwConfig.
      mseccfg/elp): like mseccfg it is a board obligation ([RiscvLang.reset_regs]),
      never written again -- xv6 has no line that touches senvcfg -- so it is the
      sixth frozen cell, held the same way [htif_tohost_base] is. *)
+  (* the two frozen counter-permission cells, as one named conjunct so that
+     appending them to [hw_config] adds no top-level existential binder --
+     every existing [iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0) "..."]
+     keeps its four. *)
+  Definition counter_caps : iProp Σ :=
+    (∃ (scen : mword 32) (hpm : type_of_register mhpmcounter),
+       (R_bitvector_32 scounteren) ↦ᵣ□ scen ∗ mhpmcounter ↦ᵣ□ hpm)%I.
+
+  Global Instance counter_caps_persistent : Persistent counter_caps.
+  Proof. apply _. Qed.
+
   Definition hw_config : iProp Σ :=
     (∃ (misa0 mseccfg0 : mword 64) (pmar0 : list PMA_Region) (elp0 : mword 1),
      misa ↦ᵣ□ misa0 ∗ mseccfg ↦ᵣ□ mseccfg0 ∗
@@ -287,10 +309,34 @@ Section HwConfig.
      (* the static kernel-mapping claims bundle (KMap, uniform-claims):
         persistent, minted at adequacy init -- the ambient source of
         identity-mapping fragments (device vas, boot-time image) *)
-     kmap_static_claims)%I.
+     kmap_static_claims ∗
+     (* the generation certificate rides here: persistent, and common to
+        [mmode_config] and the S-mode bundles alike, so neither has to carry
+        its own copy (it used to arrive bundled inside [minstret_inv], which
+        is gone). *)
+     gen_cert ∗
+     (* THE TWO COUNTER-PERMISSION CELLS.  A U-mode [csrr] of a counter CSR
+        reads scounteren unconditionally and the hpm path reads mhpmcounter;
+        under per-node stepping every read the cycle makes must be answerable
+        from an OWNED cell, so both are in the U tier's read footprint
+        ([UserTotalU.Du_r_scen] / [Du_r_hpm]).  Nothing in the tree or in the
+        kernel writes either -- there is no [csrw scounteren] anywhere -- so
+        [↦ᵣ□] is sound and they ride the bundle both modes already carry
+        rather than being threaded (ruled 2026-08-18; the alternative,
+        parking them in [IntrDefs.hart_csrs], would have made every caller
+        between boot and userret carry them).  Their VALUES are existential:
+        the U-mode CSR arm is total whatever the permission bits say, since a
+        denied counter read is Illegal_Instruction, a [u_result_ok] outcome.
+        [mcounteren] is deliberately NOT here -- timerinit WRITES it, so it
+        cannot be frozen at [hw_config_intro] time; its persistent form is
+        [TimerCap.sstc_enabled], minted after timerinit. *)
+     counter_caps)%I.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.
+
+  (* the accessor lives in [UserExec] ([hw_config_counters]): this file has no
+     proofmode import, and the only consumer is the U tier. *)
 End HwConfig.
 
 

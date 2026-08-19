@@ -697,7 +697,7 @@ Section ProofUvmcopy.
     { iExists γk. iSplitR; [iExact "Hlock" |]. iExact "Havail". }
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
     (* ---- the iteration's arithmetic, all up front ---- *)
     assert (Hjn : (j < n)%nat) by (clear -Hsum Hrem; lia).
     pose proof (proj2 (Hnchar j) Hjn) as Hjlt.

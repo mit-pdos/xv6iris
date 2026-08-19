@@ -24,7 +24,18 @@
    There is deliberately NO instance over the EXCLUSIVE [tlb_inv_pt]: the
    userret/uservec island that still owns the kernel tree outright
    (TrampStepPt / UserretEntryPt / UservecExitPt) drives KptTree's
-   absorption theorems directly and never goes through this record.    *)
+   absorption theorems directly and never goes through this record.
+
+   THE RECORD CARRIES THE SWP FACE TOO (§5).  [sr_absorb] opens the
+   regime's invariant ONCE around a whole [translateAddr], which is
+   unavailable at the per-node layer; the eight [sr_swp_*] fields are the
+   same interface re-cut so a translation may span many nodes.  They were
+   a SEPARATE record [s_regime_swp R] for as long as [IntrDefs] could not
+   move; the cost was that a leaf generic in [R : s_regime] could not
+   reach them without a second binder, and the leaves' statements are
+   what this project is not willing to churn.  So each arm's swp material
+   now sits immediately before that arm's [SRegime ...] construction --
+   which is the only reason this file is ordered the way it is.       *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -40,6 +51,9 @@ Require Import RiscvExtras.
 Require Import SmodePte.
 Require Import KptGhost.   (* kptN: the shared kernel table's namespace, named in [sr_absorb]'s mask premise *)
 Require Import KptShare.   (* the SHARED-table regime instance (§3) *)
+Require Import WpDecodeBridge CommonWalk PtTree PtTreeAdue PtAdBits Pt4kWalk.
+Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb HartEvents.
+Require Import HartSTrans HartSKpt KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -187,9 +201,155 @@ Definition pmp_grant_facts (σ : mstate) : Prop :=
 Definition kadm_ident (va : mword 64) (ppn : mword 44) : Prop :=
   pa_of ppn va = va.
 
+(* [SmodePte.pmp_config]'s pure half, named so the OPEN/CLOSE fields below
+   can hand it across without unfolding the bundle. *)
+Definition pmp_ent0_ok (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n) : Prop :=
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR
+  /\ zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false
+  /\ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true
+  /\ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pcfg 0)) ('b"1") = true
+  /\ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pcfg 0)) ('b"1") = true
+  /\ (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z.
+
+Local Ltac str_cbn :=
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.liftR Defs.try_catch
+     Defs.catch_early_return Defs.returnm returnM returnR Defs.returnR
+     Defs.read_reg Defs.early_return Defs.throw Defs.and_boolM Defs.or_boolM
+     andb orb negb not].
+
+Local Ltac str_read :=
+  rewrite hfrun_read;
+  match goal with
+  | |- context [ bool_decide ?P ] =>
+      rewrite (bool_decide_eq_true_2 P ltac:(assumption))
+  end.
+
+(* THE BARE TRANSLATION AS A COMPUTED RUN.  [HartMFetch.hfrun_translateAddr_M]
+   one privilege over: at Supervisor the mode is not the syntactic [Bare] of
+   the Machine arm, so [translationMode] really runs -- [architecture] off
+   mstatus's SXL and then the satp read -- which is the whole difference (two
+   extra register nodes, both in the frame). *)
+Lemma hfrun_translateAddr_S_bare (D Drw : gset register) (rs : regstate)
+    (va : SailStdpp.Values.mword 64) (acc : MemoryAccessType mem_payload) :
+  (mstatus : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  (satp : register) ∈ D ->
+  register_lookup cur_privilege rs = Supervisor ->
+  effectivePrivilege acc (register_lookup mstatus rs) Supervisor
+    = returnM Supervisor ->
+  is_shadow_stack_access acc = returnM false ->
+  _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+  _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)) = ('b"0000" : mword 4) ->
+  hfrun 12 D Drw rs (translateAddr (Virtaddr va) acc)
+  = Some (Values.Ok (Physaddr va, PBMT_PMA, init_ext_ptw), rs).
+Proof.
+  intros HD1 HD2 HD3 Hpriv Hep Hss HSXL Hmode.
+  unfold translateAddr. str_cbn.
+  str_read. str_cbn.
+  str_read. rewrite Hpriv. str_cbn.
+  rewrite Hep. str_cbn.
+  unfold translationMode.
+  replace (Instances.generic_eq Supervisor Machine) with false
+    by (vm_compute; reflexivity).
+  str_cbn.
+  unfold architecture. cbn match. str_cbn.
+  str_read. str_cbn.
+  unfold architecture_bits_backwards. rewrite HSXL.
+  replace (eq_vec ('b"10") ('b"01")) with false by (vm_compute; reflexivity).
+  cbn match.
+  replace (eq_vec ('b"10") ('b"10")) with true by (vm_compute; reflexivity).
+  cbn match. str_cbn.
+  change (xlen >=? 64) with true.
+  unfold Defs.assert_exp'. cbn match. str_cbn.
+  str_read. str_cbn.
+  rewrite Hmode.
+  replace (satpMode_of_bits RV64 ('b"0000" : mword 4)) with (Some Bare)
+    by (vm_compute; reflexivity).
+  cbn match. str_cbn.
+  rewrite Hss. str_cbn.
+  change (Instances.generic_eq Bare Bare) with true. str_cbn.
+  cbn [bits_of_virtaddr]. rewrite zero_extend'_id.
+  apply hfrun_ret.
+Qed.
+
+
+(* ---------------------------------------------------------------------- *)
+(* THE FOUR PROBE PREMISES EVERY [sr_swp_translate] CALL TAKES, discharged  *)
+(* once for the whole S-mode tier.  Both probes are TERM equations at an     *)
+(* S-mode access -- [is_shadow_stack_access] because [s_acc_ok] names only   *)
+(* Data / fetch payloads (the other payloads are [internal_error] arms, not  *)
+(* [Ret]s), and [effectivePrivilege] because MPRV is clear, which the kernel *)
+(* never changes.  A term equation settles the [exec] half and the [goodb]   *)
+(* half at once, which is why none of the four needs a footprint argument.   *)
+(* ---------------------------------------------------------------------- *)
+Lemma s_acc_ssa_ret (acc : MemoryAccessType mem_payload) :
+  s_acc_ok acc -> is_shadow_stack_access acc = returnM false.
+Proof. intros [-> | [-> | [-> | (aq & rl & ->)]]]; reflexivity. Qed.
+
+Lemma s_acc_ssa_exec (acc : MemoryAccessType mem_payload) (dst : mstate) :
+  s_acc_ok acc -> exec (is_shadow_stack_access acc) dst = Some (false, dst).
+Proof. intros H. rewrite (s_acc_ssa_ret acc H). apply exec_returnM. Qed.
+
+Lemma s_acc_ssa_goodb (acc : MemoryAccessType mem_payload)
+    (Db : register -> bool) (dst : mstate) :
+  s_acc_ok acc -> goodb Db (is_shadow_stack_access acc) dst = true.
+Proof. intros H. rewrite (s_acc_ssa_ret acc H). reflexivity. Qed.
+
+Lemma s_eff_exec (acc : MemoryAccessType mem_payload) (m : mword 64)
+    (p : Privilege) (dst : mstate) :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1") = false ->
+  exec (effectivePrivilege acc m p) dst = Some (p, dst).
+Proof. intros H. rewrite (effectivePrivilege_mprv0 acc m p H). apply exec_returnM. Qed.
+
+Lemma s_eff_goodb (acc : MemoryAccessType mem_payload) (m : mword 64)
+    (p : Privilege) (Db : register -> bool) (dst : mstate) :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1") = false ->
+  goodb Db (effectivePrivilege acc m p) dst = true.
+Proof. intros H. rewrite (effectivePrivilege_mprv0 acc m p H). reflexivity. Qed.
+
+(* ===================================================================== *)
+(* §5 THE SWP-LAYER FACE OF A REGIME (claude-notes/projects/               *)
+(*    main-cycle-port.md item 2b / 4).  [sr_absorb] opens the regime's     *)
+(*    invariant ONCE around a whole [translateAddr]; at the [swp] layer a  *)
+(*    translation spans many nodes and no fupd survives a node boundary,   *)
+(*    so the shared-table instance must open [kptN] PER READ NODE.  The    *)
+(*    obligation the engine hands a regime is therefore a [swp] fact, not  *)
+(*    a state-transformer fupd -- and it needs the regime's NON-CELL       *)
+(*    RESIDUE at the file, which [sr_absorb] never did (its invariant      *)
+(*    carried the cells).                                                  *)
+(*                                                                        *)
+(* THE EIGHT SWP FIELDS ARE FIELDS OF [s_regime] ITSELF.  They lived in a  *)
+(* separate [s_regime_swp R] record while [IntrDefs.strans_regime] could   *)
+(* not move; the price was that a leaf generic in [R : s_regime] could not *)
+(* reach the swp face without a second binder, and every such leaf         *)
+(* statement would have had to grow one.  The fold removes that: the face  *)
+(* is reachable from [R] alone, so the regime-generic leaves keep their    *)
+(* statements byte for byte.  What the fold cost is the ORDER of this      *)
+(* file -- each arm's swp material now sits beside the rest of that arm,   *)
+(* immediately before its [SRegime ...] construction.                      *)
+(* ===================================================================== *)
+
+(* THE EMPTY TLB, as a VALUE.  Post-flip the Bare arm owns no tlb cell, but
+   [sr_slot_acc] still binds a [tlbv] existentially (the walking disjunct and
+   [sr_swp_res_at] are stated over it), so a cell-free arm has to answer that
+   binder with something.  This is the model's own reset value
+   ([rv64d.v]'s [write_reg tlb (vector_init (pow2 6) None)]); nothing reads
+   it, because every Bare residue ignores its index. *)
+Definition tlb_none : type_of_register tlb := vector_init (pow2 6) None.
+
 Section SRegimeDef.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* THE BARE ARM'S SATP FACT, stated before the record because
+     [sr_slot_acc]'s Bare disjunct hands it out: it is what
+     [strans_swp_side_bare] and [WpIntrInv.swp_run_hart_active_instr_S_res_b]
+     consume in place of a tlb cell. *)
+  Definition bare_satp_ok (satp0 : mword 64) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4).
 
   Record s_regime := SRegime {
     sr_inv : iProp Σ;
@@ -321,7 +481,282 @@ Section SRegimeDef.
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv;
+
+  (* THE SWP TRANSLATION FIELD, and the two things [sr_absorb] did not need.
+
+     [sr_swp_res] -- the regime's NON-CELL RESIDUE at a file.  [sr_absorb]'s
+     invariant carried the satp/tlb/pmp CELLS; at the swp layer those cells
+     ride in the caller's FRAME, and what is left over is exactly what
+     [WpSFrames.s_frames_intro] hands back untouched ([tlb_snap_ok tlbv] and
+     [kpt_inv]).  It is taken at the pre-file and RETURNED AT THE LANDING
+     FILE, because a TLB fill moves [tlbv] and only the walk can
+     re-establish the snapshot there ([PtTree.tlb_ok_pt_fill]).  [True] for
+     Bare.
+
+     [sr_swp_side] -- the regime's own PURE side condition.  A regime-generic
+     premise list cannot mention the translation mode (Sv39's walk needs
+     [translationMode = Sv39], Bare's needs [= Bare]) nor the page table's
+     leaf-test footprint certificates, so each regime names what it needs and
+     the caller discharges it knowing which arm it is on.  This is the
+     honest home for the facts [sr_absorb] hid inside its invariant. *)
+    sr_swp_res : regstate -> iProp Σ;
+    sr_swp_side : MemoryAccessType mem_payload -> mword 64 -> mword 44 ->
+                  kperm -> (register -> bool) -> gset register ->
+                  gset register -> regstate -> mstate -> Prop;
+    sr_swp_translate : forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      sr_adm va ppn ->
+      sr_swp_side acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        sr_swp_res rs -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      sr_swp_res rsf ∗ resv_any cpu_id);
+    (* ---- THE WITNESSED TRANSLATE, [sr_absorb_wit]'s swp twin -----------
+       A claim that is NOT the identity (a KSTACK or trampoline va) has no
+       [ktier_pin] to feed [sr_adm], and admissibility cannot be DERIVED
+       from the regime's witness either: [strans_regime]'s [sr_kwit] is
+       [kpt_on cpu_id] while its [sr_adm] is [kadm_ident], and knowing the
+       hart's slot is at KPT says nothing about a claim's ppn.  So the
+       witness route drops [sr_adm] rather than proving it -- exactly as
+       [sr_absorb_wit] does one layer down -- and unsoundness surfaces as an
+       unpayable WITNESS: Bare's [sr_kwit] is [False]. *)
+    sr_swp_translate_wit : forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      sr_swp_side acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ sr_kwit -∗ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        sr_swp_res rs -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      sr_swp_res rsf ∗ resv_any cpu_id);
+
+    (* ---------------- THE BUNDLE FACE (added with the swp layer) --------
+       [sr_inv R] is what every S-mode LEAF carries and what the wrappers
+       must keep taking, but the swp engine needs the four cells the regime
+       hides inside it -- satp, tlb, pmpcfg_n, pmpaddr_n -- IN THE FRAME
+       ([HartSFrame.s_Drw] / [s_Dro]), because the walk reads and writes
+       them.  So the record gains an OPEN and a CLOSE, plus the residue as
+       a function of the two cell values it can depend on.
+
+       WHY THE RESIDUE IS INDEXED BY (satp, tlb) AND NOT BY THE FILE.  A
+       wrapper's file is a TOWER whose other components come out of
+       [pc_is] / [hw_config] existentially, so "the residue at the tower"
+       is not statable as a premise.  Every instance's residue reads the
+       file only through those two cells ([sr_swp_res_agree] is the law
+       that says so), and both are cells the bundle hands over, so the
+       indexed form is exactly as strong and can be named.
+
+       The two PURE side conditions travel the same way: [sr_swp_satp_ok]
+       is the regime's own constraint on the satp VALUE (Bare's mode, the
+       kernel table's mode/asid/root) and [pmp_ent0_ok] is entry 0's grant,
+       which is [SmodePte.pmp_config]'s pure half. *)
+    sr_swp_res_at : mword 64 -> type_of_register tlb -> iProp Σ;
+    sr_swp_satp_ok : mword 64 -> Prop;
+    sr_swp_res_agree : forall rs : regstate,
+      sr_swp_res_at (register_lookup satp rs) (register_lookup tlb rs)
+      ⊣⊢ sr_swp_res rs;
+    (* ---- THE WALKING ARM'S RECEIPT, AND THE RE-OPEN IT LICENSES --------
+       An engine hands the slot to its leaf FOLDED and must take it back at
+       the SAME write set -- the cycle fixed that set before the leaf ran.
+       A leaf may MOVE the slot (a satp switch does exactly that), so the
+       walking branch needs to know its arm survived.  It does, in both
+       instances that have one: the arm flip is one-way (Bare -> KPT), so a
+       holder of this persistent receipt re-opens on the walking arm again.
+       [WpIntrInv.s_kpt_wit] / [sie_cap_cells_at] are the same pattern one
+       layer up.  [bare_regime] takes [False] here -- its accessor never
+       produces the walking disjunct, so it never has to produce this. *)
+    sr_walk_wit : iProp Σ;
+    sr_walk_wit_pers : Persistent sr_walk_wit;
+    sr_slot_reopen :
+      sr_walk_wit -∗ sr_inv -∗
+      ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+        (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+        ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+        satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+        tlb ↦ᵣ tlbv ∗ sr_swp_res_at satp0 tlbv ∗
+        (∀ tv' : type_of_register tlb,
+           satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+           tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv);
+
+    (* ---- THE SLOT, AS AN ARM-HONEST ACCESSOR ---------------------------
+       There used to be an [sr_swp_open] / [sr_swp_close] pair here that
+       handed the tlb CELL out unconditionally, and that was the port's own
+       artifact: pre-port the slot went to the leaves FOLDED and the walk's
+       TLB write was absorbed BELOW them.  Handing the cell up forced the
+       Bare arm to fund one, which is what put it in [bare_inv] (6b5d1eb2)
+       and buried kvminithart's flush.  Both fields are GONE with the flip.
+
+       This field is the pre-port boundary at the record.  It is an
+       ACCESSOR because the closing direction has to be a wand the body
+       carries, and it is DISJUNCTIVE because that is the honest shape:
+
+         - the WALKING arm hands the cell over, because a Sv39 walk fills
+           the TLB and the frame must own it;
+         - the BARE arm hands over [bare_satp_ok satp0] INSTEAD -- which is
+           exactly what the Bare translation consumes, [translateAddr]'s
+           [Bare] case being a bare [returnR] that touches no TLB.
+
+       No guard, no boolean, no class: all three instances inhabit this. *)
+    sr_slot_acc :
+      sr_inv -∗
+      ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+        (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+        ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+        satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+        sr_swp_res_at satp0 tlbv ∗
+        ( (tlb ↦ᵣ tlbv ∗ sr_walk_wit ∗
+           (∀ tv' : type_of_register tlb,
+              satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+              tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv))
+        ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+           ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                    (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                    (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+               s_acc_ok acc ->
+               bare_satp_ok (register_lookup satp rs) ->
+               eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+                 ('b"1") = false ->
+               sr_swp_side acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+           (∀ tv' : type_of_register tlb,
+              satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+              sr_swp_res_at satp0 tv' -∗ sr_inv)) );
+
+    (* ---- THE TWO INTRODUCTIONS THE REGIME-GENERIC LEAVES NEED ---------
+       A leaf quantified over [R] can produce the CONFIG facts (the arm's
+       satp constraint, the PMP TOR grant, pma, MPRV, the [Db] read set,
+       SXL) but cannot produce [sr_swp_side] or [sr_adm], which are the
+       two things only the regime knows.  These fields close that gap, so
+       [SmodeCorePt.spt_tr_obl_of_regime] and the data leaves take PURE
+       premises only.
+
+       [sr_adm_of_pin] is at the AMBIENT [CurKtier] instance, which at the
+       record's definition site is the KT0 default -- i.e. it is the
+       IDENTITY pin, exactly what [sr_adm_id] admits, and exactly the pin
+       [SmodeCorePt.spt_tr_obl] bakes.  A KT1 claim does NOT go through
+       here: it goes through [sr_kwit] ([sr_absorb_wit] / the tier witness
+       [sr_ktier_wit]), which is the whole point of that second route. *)
+    sr_adm_of_pin : forall (va : mword 64) (ppn : mword 44),
+      ktier_pin cur_ktier ppn va -> sr_adm va ppn;
+    sr_swp_side_ok : forall (acc : MemoryAccessType mem_payload)
+        (va : mword 64) (ppn : mword 44) (kp : kperm)
+        (Db : register -> bool) (Drw Dro : gset register)
+        (rs : regstate) (dst : mstate),
+      s_acc_ok acc ->
+      sr_swp_satp_ok (register_lookup satp rs) ->
+      pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+      pma_allows_ram (register_lookup pma_regions rs) ->
+      eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+      Db mstatus = true -> Db satp = true ->
+      _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+      register_lookup satp dst.(sregs) = register_lookup satp rs ->
+      (* the WALKING regimes need the TLB cell writable; a regime that never
+         walks ignores this.  It sits here, on the introduction the LEAF
+         calls (a leaf knows its own [Drw]), rather than on
+         [sr_swp_translate], so that the Bare arm is not made to fund a cell
+         the model never touches at Bare. *)
+      (tlb : register) ∈ Drw ->
+      sr_swp_side acc va ppn kp Db Drw Dro rs dst;
+    (* ---- THE ARM'S TRANSLATION MODE, AS DATA ---------------------------
+       [sr_swp_satp_ok] is a Prop, and the regime-generic MEMORY leaves
+       need the mode as a VALUE: [translationMode Supervisor] returns it,
+       and [transform_effective_address] dispatches on it.  Bare's arm is
+       [Bare] and the shared table's is [Sv39]; the combined slot's is a
+       FUNCTION of the satp mode bits, because the arm is exactly what
+       those bits say.  Stated at [satpMode_of_bits] rather than at
+       [translationMode] so it stays a pure fact about the satp VALUE --
+       the register read and its footprint certificate are the leaf's
+       ([SmodePte.exec_translationMode_S_sv39],
+       [KptGoodb.goodb_translationMode_S_sv39]). *)
+    sr_swp_mode : mword 64 -> SATPMode;
+    sr_swp_mode_ok : forall satp0 : mword 64,
+      sr_swp_satp_ok satp0 ->
+      satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0))
+      = Some (sr_swp_mode satp0);
   }.
+
+  (* the record's persistence field, as an INSTANCE -- [#Hwit] on the
+     walking arm's receipt needs resolution to find it. *)
+  Global Existing Instance sr_walk_wit_pers.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
   Lemma pmp_config_grant_facts (r : mword 44) (σ : mstate) :
@@ -347,6 +782,15 @@ Section SRegimeDef.
      supplies that.  Hence EVERY hart can be in its Bare arm at once, and
      the arm survives the kernel map's growth (a secondary hart spins on
      [started] in Bare long after the boot hart's satp switch). *)
+  (* THERE IS NO tlb CELL HERE, AND THAT IS THE WHOLE KVMINITHART LANE.
+     [6b5d1eb2] put one in, on the reading that the swp-layer S-mode frame
+     [HartSFrame.s_Drw] must own it at every arm.  It must not: at Bare
+     [translateAddr] is a bare [returnR] that never consults the TLB, so the
+     Bare frame runs at [s_Drwb] and funds nothing.  Owning it here resealed
+     kvminithart's [sfence.vma] flush into an existential -- and the pre-port
+     proof worked for an ARBITRARY [tlbvec0] precisely because the cell stays
+     in kvminithart's own hand.  See claude-notes/projects/
+     kvminithart-tlb-lane.md §1; do not put it back. *)
   Definition bare_inv : iProp Σ :=
     (∃ satp0 : mword 64,
        satp ↦ᵣ satp0 ∗
@@ -474,9 +918,284 @@ Section SRegimeDef.
     iIntros "H". iDestruct "H" as %[].
   Qed.
 
+  (* ---------------- the BARE instance ---------------- *)
+
+  (* Bare's residue is nothing: satp is in the frame, and the ONE fact about
+     it -- Mode = Bare -- is pure, so it rides in the side condition with the
+     access's two monadic reductions. *)
+  Definition bare_swp_side (acc : MemoryAccessType mem_payload)
+      (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+      (Drw Dro : gset register) (rs : regstate) (dst : mstate) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)) = ('b"0000" : mword 4)
+    /\ effectivePrivilege acc (register_lookup mstatus rs) Supervisor
+       = returnM Supervisor
+    /\ is_shadow_stack_access acc = returnM false.
+
+  Lemma bare_swp_translate :
+    forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      kadm_ident va ppn ->
+      bare_swp_side acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        (True : iProp Σ) -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      (True : iProp Σ) ∗ resv_any cpu_id).
+  Proof.
+    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
+      Hadm (Hsatpmode & Hep & Hssr).
+    assert (Hpa : pa = va) by (rewrite <- Hconcat; exact Hadm).
+    clear Hconcat. subst pa.
+    iIntros "_ #Hcert Hfrag _ Hrw Hro".
+    iDestruct (resv_any_intro with "Hfrag") as "Hany".
+    iApply (swp_mono with "[] [Hrw Hro Hany]").
+    2:{ iApply (swp_frame_l _ _ (resv_any cpu_id) with "Hany [Hrw Hro]").
+        iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
+                  (hfrun_translateAddr_S_bare (Drw ∪ Dro) Drw rs va acc
+                     HDmst HDpriv HDsatp Hcp Hep Hssr HSXL Hsatpmode)
+                  with "Hcert Hrw Hro"). }
+    iIntros (v) "(Hany & -> & Hrw & Hro)".
+    iSplit.
+    { iPureIntro. reflexivity. }
+    iExists rs. iFrame "Hrw Hro Hany".
+    iPureIntro. left. reflexivity.
+  Qed.
+
+  (* the BARE residue is nothing.  ([bare_satp_ok] is stated ABOVE the
+     record -- [sr_slot_acc]'s Bare disjunct names it.)  There is no
+     [bare_swp_open] / [bare_swp_close] pair any more: the record's bundle
+     face went with the flip, since neither could hand out a tlb cell. *)
+
+  Lemma bare_swp_res_agree (rs : regstate) :
+    (True : iProp Σ) ⊣⊢ (True : iProp Σ).
+  Proof. reflexivity. Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (* THE SIDE CONDITIONS, INTRODUCED FROM THE PURE CONFIG FACTS A LEAF HAS. *)
+  (*                                                                       *)
+  (* [sr_swp_side] is where each regime names what its own arm needs, and   *)
+  (* every leaf that drives a translation -- the fetch through              *)
+  (* [SmodeCorePt.spt_tr_obl_of_regime], the loads/stores/AMOs directly --   *)
+  (* has to discharge it.  What it actually has is the bundle's own pure     *)
+  (* facts, and these two lemmas are exactly that conversion, so no leaf     *)
+  (* ever unfolds a side condition.  Both are ACCESS-GENERIC: nothing below  *)
+  (* mentions [acc] except Bare's shadow-stack conjunct, which [s_acc_ok]    *)
+  (* settles for the fetch and for all three data accesses at once.          *)
+  (*                                                                       *)
+  (* The reference state [dst] enters only through the two facts             *)
+  (* [translationMode] reads (mstatus.SXL and satp); at the swp layer the    *)
+  (* caller takes [dst] to be THIS HART'S OWN FILE, and both are then         *)
+  (* [reflexivity] against the tower.                                        *)
+  (* -------------------------------------------------------------------- *)
+  Lemma bare_swp_side_intro (acc : MemoryAccessType mem_payload)
+      (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+      (Drw Dro : gset register) (rs : regstate) (dst : mstate) :
+    s_acc_ok acc ->
+    bare_satp_ok (register_lookup satp rs) ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    bare_swp_side acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros Hacc Hmode HMPRV. rewrite /bare_swp_side. split_and!.
+    - exact Hmode.
+    - exact (effectivePrivilege_mprv0 acc _ Supervisor HMPRV).
+    - exact (s_acc_ssa_ret acc Hacc).
+  Qed.
+
+  (* the record's two introduction fields, at the BARE arm *)
+  Lemma bare_swp_side_ok (acc : MemoryAccessType mem_payload)
+      (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+      (Drw Dro : gset register) (rs : regstate) (dst : mstate) :
+    s_acc_ok acc ->
+    bare_satp_ok (register_lookup satp rs) ->
+    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+    pma_allows_ram (register_lookup pma_regions rs) ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    Db mstatus = true -> Db satp = true ->
+    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+    register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (* the Bare arm IGNORES this: [translateAddr] returns before the TLB is
+       consulted at all when [mode = Bare] *)
+    (tlb : register) ∈ Drw ->
+    bare_swp_side acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros Hacc Hsatp _ _ HMPRV _ _ _ _ _.
+    exact (bare_swp_side_intro acc va ppn kp Db Drw Dro rs dst Hacc Hsatp HMPRV).
+  Qed.
+
+  Lemma bare_swp_mode_ok (satp0 : mword 64) :
+    bare_satp_ok satp0 ->
+    satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0)) = Some Bare.
+  Proof. intros Hmode. rewrite Hmode. vm_compute. reflexivity. Qed.
+
+  Lemma bare_swp_translate_wit :
+    forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      bare_swp_side acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ (False%I : iProp Σ) -∗ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        (True : iProp Σ) -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      (True : iProp Σ) ∗ resv_any cpu_id).
+  Proof.
+    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
+      Hside.
+    iIntros "H". iDestruct "H" as %[].
+  Qed.
+
+  (* THE BARE ARM's accessor: always the right disjunct, and post-flip it
+     does not mention a tlb cell at all -- there is none to park.  The
+     [tlbv] the field existentially binds is still an OBLIGATION (the
+     walking disjunct and [sr_swp_res_at] are stated over it), so the Bare
+     arm answers it with [tlb_none]: its residue is [True] and ignores the
+     index entirely. *)
+  Lemma bare_slot_acc :
+    bare_inv -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      (True : iProp Σ) ∗
+      ( (tlb ↦ᵣ tlbv ∗ (False : iProp Σ) ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv))
+      ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+         ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+             s_acc_ok acc ->
+             bare_satp_ok (register_lookup satp rs) ->
+             eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+               ('b"1") = false ->
+             bare_swp_side acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            (True : iProp Σ) -∗ bare_inv)) ).
+  Proof.
+    iIntros "H". iDestruct "H" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    assert (Hpok : pmp_ent0_ok pcfg paddr)
+      by (unfold pmp_ent0_ok; split_and!; assumption).
+    iExists satp0, pcfg, paddr, tlb_none.
+    iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr".
+    iSplitR; [done |].
+    iRight. iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR; [iPureIntro; exact bare_swp_side_intro |].
+    iIntros (tv') "Hsatp Hpcfg Hpaddr _".
+    rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
+    iSplitR; [iPureIntro; exact Hmode |].
+    iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
+              with "Hpcfg Hpaddr").
+  Qed.
+
+  Lemma bare_slot_reopen :
+    (False : iProp Σ) -∗ bare_inv -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      tlb ↦ᵣ tlbv ∗ (True : iProp Σ) ∗
+      (∀ tv' : type_of_register tlb,
+         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv).
+  Proof. iIntros "[] _". Qed.
+
   Definition bare_regime : s_regime :=
     SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
-            bare_tmode (False%I) _ bare_absorb_wit.
+            bare_tmode (False%I) _ bare_absorb_wit
+            (fun _ => True%I) bare_swp_side bare_swp_translate
+            bare_swp_translate_wit
+            (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
+            (False%I) _ bare_slot_reopen bare_slot_acc
+            (fun _ _ H => H) bare_swp_side_ok
+            (fun _ => Bare) bare_swp_mode_ok.
 
 End SRegimeDef.
 
@@ -608,10 +1327,392 @@ Section SRegimeShared.
               with "Hat Hri Hgh Hres").
   Qed.
 
+  (* ---------------- the SHARED-KERNEL-TABLE instance ---------------- *)
+
+  (* the residue: the hart's TLB coherence at THIS file's vector, and the
+     shared table's invariant (persistent, so it rides along for free) *)
+  Definition kpt_swp_res (root_ppn : mword 44) (rs : regstate) : iProp Σ :=
+    (tlb_snap_ok (register_lookup tlb rs) ∗ kpt_inv root_ppn)%I.
+
+  (* the side condition: the satp facts that make this hart's frame an Sv39
+     file rooted at [root_ppn], the mode reduction and its footprint
+     certificate, and the PMP/PMA grant facts off the frame's own pmp cells.
+     The two PTE tests' [goodb] certificates used to ride here as three more
+     conjuncts; they are PROVED now ([KptGoodb]) and discharged inside
+     [HartSKpt.swp_translate_kpt] itself. *)
+  Definition kpt_swp_side (root_ppn : mword 44)
+      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
+      (kp : kperm) (Db : register -> bool) (Drw Dro : gset register)
+      (rs : regstate) (dst : mstate) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 (register_lookup satp rs)) = ('b"1000" : mword 4)
+    /\ zero_extend' 16 (satp_to_asid
+         (autocast (T := mword) (register_lookup satp rs) : mword 64))
+       = (mword_of_int 0 : mword 16)
+    /\ autocast (T := mword) (satp_to_ppn
+         (autocast (T := mword) (register_lookup satp rs) : mword 64)) = root_ppn
+    /\ exec (translationMode Supervisor) dst = Some (Sv39, dst)
+    /\ goodb Db (translationMode Supervisor) dst = true
+    /\ pmpAddrMatchType_encdec_backwards
+         (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rs) 0)) = TOR
+    /\ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n rs) 0) = false
+    /\ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n rs) 0))
+         ('b"1") = true
+    /\ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n rs) 0))
+         ('b"1") = true
+    /\ (ram_base + ram_size
+        <= uint (vec_access_dec (register_lookup pmpaddr_n rs) 0) * 4)%Z
+    /\ pma_allows_ram (register_lookup pma_regions rs)
+    (* THE WALK'S OWN FRAME REQUIREMENT, and it belongs HERE rather than in
+       [sr_swp_translate]'s type: only a regime that actually WALKS fills the
+       TLB, and a blanket premise on the field forces every OTHER regime to
+       fund a cell it never touches.  At Bare the model's [translateAddr]
+       returns before the TLB is consulted at all (rv64d.v: the [Bare] arm is
+       a bare [returnR]), which is why [bare_swp_side] has no such conjunct
+       and why [bare_swp_translate] never used the premise it was given. *)
+    /\ (tlb : register) ∈ Drw.
+
+  Lemma kpt_swp_translate (root_ppn : mword 44) :
+    forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      True ->
+      kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        kpt_swp_res root_ppn rs -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      kpt_swp_res root_ppn rsf ∗ resv_any cpu_id).
+  Proof.
+    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat _
+      (Hmode & Hasid & Hppn & Htm & Htmg & HA & Hord & HR & HW & Hcov &
+       Hpallow & HWtlb).
+    assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE (register_lookup menvcfg dst.(sregs)))
+                       ('b"0") = true)
+      by (rewrite Hmenv; vm_compute; reflexivity).
+    assert (HADUE : eq_vec (_get_MEnvcfg_ADUE (register_lookup menvcfg dst.(sregs)))
+                      ('b"1") = true)
+      by (rewrite Hmenv; vm_compute; reflexivity).
+    iIntros "#Hat #Hcert Hfrag [Hsnap #Hkinv] Hrw Hro".
+    iApply (swp_mono with "[] [-]").
+    2:{ iApply (swp_translate_kpt acc Drw Dro Df rs dst Db root_ppn va pa
+                  (register_lookup satp rs)
+                  (register_lookup menvcfg dst.(sregs)) ppn kp
+                  (register_lookup tlb rs) (register_lookup pma_regions rs)
+                  (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) rr
+                  Hdisj HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif
+                  HDb Hag HDlc Haglc Hcp eq_refl eq_refl Hhtif eq_refl eq_refl
+                  eq_refl Hmstag Hmisa eq_refl HPBMTE HADUE
+                  Heff Heffg Hss Hssg Htm Htmg Hppn Hasid Hcanon Hconcat
+                  HA Hord HR HW Hcov Hpallow
+                  (fun a d mxr do_sum =>
+                     kperm_variant_check ppn kp acc a d mxr do_sum Hacc Hallow)
+                  with "Hat Hkinv Hsnap Hcert Hfrag Hrw Hro"). }
+    iIntros (v) "(-> & %rsf & %Hshape & Hrw & Hro & Hsnap & Hany)".
+    iSplitR; [done |]. iExists rsf. iFrame "Hrw Hro Hany Hsnap Hkinv".
+    iPureIntro. exact Hshape.
+  Qed.
+
+  (* the SHARED-KERNEL-TABLE bundle face.  [tlb_res_pt]'s destructor and
+     constructor, with the satp facts moved into [sr_swp_satp_ok] (they are
+     about the satp VALUE, not the residue) and the TLB coherence plus the
+     table invariant left as the residue. *)
+  Definition kpt_res_at (root_ppn : mword 44) (satp0 : mword 64)
+      (tv : type_of_register tlb) : iProp Σ :=
+    (tlb_snap_ok tv ∗ kpt_inv root_ppn)%I.
+
+  Definition kpt_satp_ok (root_ppn : mword 44) (satp0 : mword 64) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4)
+    /\ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64))
+       = (mword_of_int 0 : mword 16)
+    /\ autocast (T := mword)
+         (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn.
+
+  Lemma kpt_swp_res_agree (root_ppn : mword 44) (rs : regstate) :
+    kpt_res_at root_ppn (register_lookup satp rs) (register_lookup tlb rs)
+    ⊣⊢ kpt_swp_res root_ppn rs.
+  Proof. reflexivity. Qed.
+
+  Lemma kpt_swp_open (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      kpt_res_at root_ppn satp0 tlbv.
+  Proof.
+    iIntros "H". iDestruct "H" as (satp0 tlbv)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkpt)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iExists satp0, tlbv, pcfg, paddr.
+    iSplitR;
+      [ iPureIntro; unfold kpt_satp_ok; split_and!; assumption |].
+    iSplitR;
+      [ iPureIntro; unfold pmp_ent0_ok; split_and!; assumption |].
+    rewrite /kpt_res_at. iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkpt".
+  Qed.
+
+  Lemma kpt_swp_close (root_ppn : mword 44) (satp0 : mword 64)
+      (tlbv : type_of_register tlb) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    kpt_satp_ok root_ppn satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    ⊢ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
+      pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+      kpt_res_at root_ppn satp0 tlbv -∗ tlb_res_pt root_ppn.
+  Proof.
+    intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "Hsatp Htlb Hpcfg Hpaddr [Hsnap #Hkpt]".
+    rewrite /tlb_res_pt. iExists satp0, tlbv.
+    iFrame "Hsatp Htlb Hsnap Hkpt".
+    iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR; [iPureIntro; exact Hasid |].
+    iSplitR; [iPureIntro; exact Hppn |].
+    iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+              with "Hpcfg Hpaddr").
+  Qed.
+
+  Lemma kpt_swp_side_intro (root_ppn : mword 44)
+      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
+      (kp : kperm) (Db : register -> bool) (Drw Dro : gset register)
+      (rs : regstate) (dst : mstate) :
+    kpt_satp_ok root_ppn (register_lookup satp rs) ->
+    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+    pma_allows_ram (register_lookup pma_regions rs) ->
+    Db mstatus = true -> Db satp = true ->
+    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+    register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (* the walk fills the TLB, so THIS regime needs the cell writable; it is
+       a premise here rather than on [sr_swp_translate] so that a regime
+       which never walks is not made to fund it *)
+    (tlb : register) ∈ Drw ->
+    kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov) Hpma
+      HDm HDs HSXL Hsatp HWtlb.
+    rewrite /kpt_swp_side. split_and!.
+    - exact Hmode.
+    - exact Hasid.
+    - exact Hppn.
+    - exact (exec_translationMode_S_sv39 (register_lookup satp rs) dst
+               HSXL Hsatp Hmode).
+    - exact (goodb_translationMode_S_sv39 Db (register_lookup satp rs) dst
+               HDm HDs HSXL Hsatp Hmode).
+    - exact HA.
+    - exact Hord.
+    - exact HR.
+    - exact HW.
+    - exact Hcov.
+    - exact Hpma.
+    - exact HWtlb.
+  Qed.
+
+  (* the record's two introduction fields, at the SHARED-TABLE arm *)
+  Lemma kpt_swp_side_ok (root_ppn : mword 44)
+      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
+      (kp : kperm) (Db : register -> bool) (Drw Dro : gset register)
+      (rs : regstate) (dst : mstate) :
+    s_acc_ok acc ->
+    kpt_satp_ok root_ppn (register_lookup satp rs) ->
+    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+    pma_allows_ram (register_lookup pma_regions rs) ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    Db mstatus = true -> Db satp = true ->
+    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+    register_lookup satp dst.(sregs) = register_lookup satp rs ->
+    (tlb : register) ∈ Drw ->
+    kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros _ Hsatp Hpmp Hpma _ HDm HDs HSXL Hag HWtlb.
+    exact (kpt_swp_side_intro root_ppn acc va ppn kp Db Drw Dro rs dst
+             Hsatp Hpmp Hpma HDm HDs HSXL Hag HWtlb).
+  Qed.
+
+  Lemma kpt_swp_mode_ok (root_ppn : mword 44) (satp0 : mword 64) :
+    kpt_satp_ok root_ppn satp0 ->
+    satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0)) = Some Sv39.
+  Proof. intros (Hmode & _ & _). rewrite Hmode. vm_compute. reflexivity. Qed.
+
+  Lemma kpt_swp_translate_wit (root_ppn : mword 44) :
+    forall (acc : MemoryAccessType mem_payload)
+        (Drw Dro : gset register) (Df : register -> dfrac)
+        (rs : regstate) (dst : mstate) (Db : register -> bool)
+        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
+      Drw ## Dro ->
+      s_acc_ok acc ->
+      kperm_allows kp acc ->
+      (mstatus : register) ∈ Drw ∪ Dro ->
+      (cur_privilege : register) ∈ Drw ∪ Dro ->
+      (satp : register) ∈ Drw ∪ Dro ->
+      (pma_regions : register) ∈ Drw ∪ Dro ->
+      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, Db r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
+      (forall r : register, D_leafchk r = true ->
+         register_lookup r rs = register_lookup r dst.(sregs)) ->
+      register_lookup cur_privilege rs = Supervisor ->
+      register_lookup htif_tohost_base rs = None ->
+      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
+      register_lookup misa dst.(sregs) = MISA_C ->
+      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
+      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
+        = Some (Supervisor, dst) ->
+      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
+        dst = true ->
+      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
+      goodb Db (is_shadow_stack_access acc) dst = true ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                            (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+           (Z.sub pagesize_bits 1) 0)) = pa ->
+      kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst ->
+      ⊢ (emp%I : iProp Σ) -∗ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+        kpt_swp_res root_ppn rs -∗
+        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+        swp (translateAddr (Virtaddr va) acc)
+          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                    ∃ rsf : regstate,
+                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
+                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
+                      kpt_swp_res root_ppn rsf ∗ resv_any cpu_id).
+  Proof.
+    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
+      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
+      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
+      Hside.
+    iIntros "_".
+    iApply (kpt_swp_translate root_ppn acc Drw Dro Df rs dst Db va pa ppn kp rr
+              Hdisj Hacc Hallow HDmst HDpriv HDsatp HDpma HDcfg HDaddr
+              HDhtif HDb Hag HDlc Haglc Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff
+              Heffg Hss Hssg Hcanon Hconcat I Hside).
+  Qed.
+
+  (* THE WALKING ARM's accessor: always the left disjunct, since a Sv39
+     fetch fills the TLB and [tlb_res_pt] funds the cell.  Open and close
+     are the existing pair; the closer is just [kpt_swp_close] curried. *)
+  Lemma kpt_slot_acc (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      kpt_res_at root_ppn satp0 tlbv ∗
+      ( (tlb ↦ᵣ tlbv ∗ (True : iProp Σ) ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗
+            tlb_res_pt root_ppn))
+      ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+         ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+             s_acc_ok acc ->
+             bare_satp_ok (register_lookup satp rs) ->
+             eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+               ('b"1") = false ->
+             kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            kpt_res_at root_ppn satp0 tv' -∗ tlb_res_pt root_ppn)) ).
+  Proof.
+    iIntros "H".
+    iDestruct (kpt_swp_open root_ppn with "H") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+    iExists satp0, pcfg, paddr, tlbv.
+    iSplitR; [iPureIntro; exact Hsok |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr Hres".
+    iLeft. iFrame "Htlb". iSplitR; [done|].
+    iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
+    iApply (kpt_swp_close root_ppn satp0 tv' pcfg paddr Hsok Hpok
+              with "Hsatp Htlb Hpcfg Hpaddr Hres").
+  Qed.
+
+  (* the kernel table never leaves the walking arm, so its receipt is
+     trivial and the re-open is just the open again. *)
+  Lemma kpt_slot_reopen (root_ppn : mword 44) :
+    (True : iProp Σ) -∗ tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      tlb ↦ᵣ tlbv ∗ kpt_res_at root_ppn satp0 tlbv ∗
+      (∀ tv' : type_of_register tlb,
+         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗ tlb_res_pt root_ppn).
+  Proof.
+    iIntros "_ H".
+    iDestruct (kpt_swp_open root_ppn with "H") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+    iExists satp0, pcfg, paddr, tlbv.
+    iSplitR; [iPureIntro; exact Hsok |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr Htlb Hres".
+    iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
+    iApply (kpt_swp_close root_ppn satp0 tv' pcfg paddr Hsok Hpok
+              with "Hsatp Htlb Hpcfg Hpaddr Hres").
+  Qed.
+
   Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
     SRegime (tlb_res_pt root_ppn) (fun _ _ => True) (fun _ _ _ => I)
             (res_absorb root_ppn) (res_transform root_ppn) (res_tmode root_ppn)
-            (emp%I) _ (res_absorb_wit root_ppn).
+            (emp%I) _ (res_absorb_wit root_ppn)
+            (kpt_swp_res root_ppn) (kpt_swp_side root_ppn)
+            (kpt_swp_translate root_ppn) (kpt_swp_translate_wit root_ppn)
+            (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
+            (kpt_swp_res_agree root_ppn)
+            (True%I) _ (kpt_slot_reopen root_ppn) (kpt_slot_acc root_ppn)
+            (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
+            (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).
 
   Lemma kpt_share_regime_inv (root_ppn : mword 44) :
     sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.
@@ -739,3 +1840,5 @@ Section SRegimeKtier.
   Qed.
 
 End SRegimeKtier.
+
+

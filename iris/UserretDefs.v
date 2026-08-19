@@ -17,6 +17,10 @@ Require Import WpDecodeBridge WpRvcBridge.
 Require Import WpGprCsrwCommon WpGprCsrwB.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
+(* the footprint certificate rides the SAME induction as the exec fact --
+   [goodmb] recurses on the continuation applied to what the STATE holds, so
+   the two walks cannot be separated (see [flush_TLB_all_cert]). *)
+Require Import HartMemRun HartMemAsm.
 Require Import KernelText.
 Require Import SmodePte.
 Require Import TrampPt.
@@ -37,11 +41,27 @@ Definition upa (off : Z) : mword 64 := mword_of_int (KernelSyms.trampoline + off
 (*    execute reduction (S-mode, TVM=0).                                  *)
 (* ===================================================================== *)
 
-Lemma exec_flush_TLB_all (s : mstate) :
+(* THE FLUSH, WITH ITS FOOTPRINT CERTIFICATE.  [exec_flush_TLB_all] below is
+   this at a trivial footprint; they are one lemma because they are one
+   induction.  [goodmb] recurses on the continuation applied to what the
+   state holds, so every case of the certificate's walk needs that case's
+   [exec] fact -- proving them apart would mean discovering the fuel
+   bookkeeping, the [unroll_foreach_ZM_up'] step and the resident/empty slot
+   split a second time. *)
+Lemma flush_TLB_all_cert (Dr Dw : register -> bool) (s : mstate) :
+  Dr (tlb : register) = true -> Dw (tlb : register) = true ->
   exists tlbvec' : vec (option TLB_Entry) (2 ^ 6),
     exec (flush_TLB None None) s = Some (tt, set_reg s tlb tlbvec') /\
-    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec' i = None).
+    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec' i = None) /\
+    (forall mm, goodmb Dr Dw (flush_TLB None None) s mm = true).
 Proof.
+  intros HDr HDw.
+  assert (Hgr : forall (s0 : mstate) mm,
+            goodmb Dr Dw (Defs.read_reg tlb : M _) s0 mm = true)
+    by (intros s0 mm; rewrite goodmb_read_reg; exact HDr).
+  assert (Hgw : forall (s0 : mstate) (v : type_of_register tlb) mm,
+            goodmb Dr Dw (Defs.write_reg tlb v : M _) s0 mm = true)
+    by (intros s0 v mm; rewrite goodmb_write_reg; exact HDw).
   unfold flush_TLB.
   cbv zeta iota.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
@@ -52,6 +72,7 @@ Proof.
      [from..63] are cleared and lower slots keep the START state's values. *)
   assert (Hloop : forall (n : nat) (from : Z) (s0 : mstate),
     0 <= from -> from + Z.of_nat n = 64 ->
+    (forall mm, goodmb Dr Dw (Defs.foreach_ZM_up' from 63 1 n tt B) s0 mm = true) /\
     exists tv : vec (option TLB_Entry) (2 ^ 6),
       exec (Defs.foreach_ZM_up' from 63 1 n tt B) s0 = Some (tt, set_reg s0 tlb tv) /\
       (forall i, 0 <= i < 64 ->
@@ -59,6 +80,9 @@ Proof.
                                 else vec_access_dec (register_lookup tlb s0.(sregs)) i))).
   { induction n as [| n IHn]; intros from s0 Hfrom Hcover.
     - (* fuel exhausted exactly at from = 64 *)
+      split.
+      { intro mm. cbn [Defs.foreach_ZM_up'].
+        destruct (from <=? 63); apply goodmb_returnm. }
       exists (register_lookup tlb s0.(sregs)).
       split.
       + cbn [Defs.foreach_ZM_up'].
@@ -81,10 +105,22 @@ Proof.
           rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s0)).
           rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg tlb _ s0)).
           apply exec_returnM. }
-        rewrite (exec_bind_Some _ _ _ _ _ HB).
         destruct (IHn (from + 1) (set_reg s0 tlb
                     (vec_update_dec (register_lookup tlb s0.(sregs)) from None))
-                    ltac:(lia) ltac:(lia)) as (tv & Hex & Hprop).
+                    ltac:(lia) ltac:(lia)) as (Hgn & tv & Hex & Hprop).
+        assert (HgB : forall mm, goodmb Dr Dw (B from tt) s0 mm = true).
+        { intro mm. unfold B. cbv beta.
+          rewrite (gm_bind Dr Dw _ _ s0 s0 mm _ (Hgr s0 mm) (exec_read_reg tlb s0)).
+          rewrite Hslot. change (flush_TLB_Entry e None None) with true.
+          cbv iota.
+          rewrite (gm_bind Dr Dw _ _ s0 s0 mm _ (Hgr s0 mm) (exec_read_reg tlb s0)).
+          rewrite (gm_bind0 Dr Dw _ _ s0 _ mm (Hgw s0 _ mm)
+                     (exec_write_reg tlb _ s0)).
+          apply goodmb_returnm. }
+        split.
+        { intro mm. rewrite (gm_bind Dr Dw _ _ s0 _ mm _ (HgB mm) HB).
+          exact (Hgn mm). }
+        rewrite (exec_bind_Some _ _ _ _ _ HB).
         exists tv. split.
         * rewrite Hex. rewrite set_reg_tlb_overwrite. reflexivity.
         * intros i Hi.
@@ -100,8 +136,15 @@ Proof.
         { unfold B. cbv beta.
           rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s0)).
           rewrite Hslot. apply exec_returnM. }
+        destruct (IHn (from + 1) s0 ltac:(lia) ltac:(lia)) as (Hgn & tv & Hex & Hprop).
+        assert (HgB : forall mm, goodmb Dr Dw (B from tt) s0 mm = true).
+        { intro mm. unfold B. cbv beta.
+          rewrite (gm_bind Dr Dw _ _ s0 s0 mm _ (Hgr s0 mm) (exec_read_reg tlb s0)).
+          rewrite Hslot. apply goodmb_returnm. }
+        split.
+        { intro mm. rewrite (gm_bind Dr Dw _ _ s0 s0 mm _ (HgB mm) HB).
+          exact (Hgn mm). }
         rewrite (exec_bind_Some _ _ _ _ _ HB).
-        destruct (IHn (from + 1) s0 ltac:(lia) ltac:(lia)) as (tv & Hex & Hprop).
         exists tv. split; [exact Hex |].
         intros i Hi.
         rewrite (Hprop i Hi).
@@ -111,34 +154,74 @@ Proof.
         (* i = from: the slot is already None *)
         assert (i = from) by lia. subst i. rewrite Hslot. reflexivity. }
   destruct (Hloop (S (Z.abs_nat (0 - 63))) 0 s ltac:(lia)
-              ltac:(vm_compute (Z.of_nat _); reflexivity)) as (tv & Hex & Hprop).
+              ltac:(vm_compute (Z.of_nat _); reflexivity)) as (Hgl & tv & Hex & Hprop).
+  match goal with |- context[Defs.bind (Defs.bind0 ?L ?r) ?k] =>
+    assert (HLr : exec (Defs.bind0 L r) s = Some (tv, set_reg s tlb tv)) end.
+  { rewrite (exec_bind0_Some _ _ _ _ _ Hex).
+    rewrite (exec_read_reg tlb _).
+    rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity. }
   exists tv.
-  split.
-  - match goal with |- context[Defs.bind (Defs.bind0 ?L ?r) ?k] =>
-      assert (HLr : exec (Defs.bind0 L r) s = Some (tv, set_reg s tlb tv)) end.
-    { rewrite (exec_bind0_Some _ _ _ _ _ Hex).
-      rewrite (exec_read_reg tlb _).
-      rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity. }
-    rewrite (exec_bind_Some _ _ _ _ _ HLr).
+  split; [| split ].
+  - rewrite (exec_bind_Some _ _ _ _ _ HLr).
     cbv beta. apply exec_returnM.
   - intros i Hi. rewrite (Hprop i Hi).
     replace (0 <=? i) with true by (symmetry; apply Z.leb_le; lia).
     reflexivity.
+  - (* THE CERTIFICATE.  The [exec] rewrites above touched only the [exec]
+       conjunct, so this goal still carries the OUTER [read_reg tlb] bind
+       that [unfold flush_TLB] exposed; peel it first, then the loop's own
+       [bind0] and the tail read. *)
+    intro mm.
+    rewrite (gm_bind Dr Dw _ _ s s mm _ (Hgr s mm) (exec_read_reg tlb s)).
+    assert (HgLr : goodmb Dr Dw
+                     (Defs.bind0 (Defs.foreach_ZM_up' 0 63 1
+                                    (S (Z.abs_nat (0 - 63))) tt B)
+                        (Defs.read_reg tlb)) s mm = true).
+    { rewrite (gm_bind0 Dr Dw _ _ s _ mm (Hgl mm) Hex).
+      exact (Hgr _ mm). }
+    rewrite (gm_bind Dr Dw _ _ s _ mm _ HgLr HLr).
+    apply goodmb_returnm.
 Qed.
 
-(* the SFENCE.VMA x0,x0 execute reduction: S-mode, TVM=0 => full flush. *)
-Lemma exec_execute_SFENCE_VMA_S (s : mstate) :
+(* the original shape, at a trivial footprint: every caller that only wants
+   the exec fact keeps its call unchanged. *)
+Lemma exec_flush_TLB_all (s : mstate) :
+  exists tlbvec' : vec (option TLB_Entry) (2 ^ 6),
+    exec (flush_TLB None None) s = Some (tt, set_reg s tlb tlbvec') /\
+    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec' i = None).
+Proof.
+  destruct (flush_TLB_all_cert (fun _ => true) (fun _ => true) s eq_refl eq_refl)
+    as (tv & Hex & Hprop & _).
+  exists tv. split; [exact Hex | exact Hprop].
+Qed.
+
+(* the SFENCE.VMA x0,x0 execute reduction: S-mode, TVM=0 => full flush --
+   WITH its footprint certificate, on the SAME peels.  Reads cur_privilege
+   and mstatus, reads and writes tlb, and nothing else. *)
+Lemma execute_SFENCE_VMA_S_cert (Dr Dw : register -> bool) (s : mstate) :
+  Dr (cur_privilege : register) = true ->
+  Dr (mstatus : register) = true ->
+  Dr (tlb : register) = true -> Dw (tlb : register) = true ->
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   eq_vec (_get_Mstatus_TVM (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   exists tlbvec' : vec (option TLB_Entry) (2 ^ 6),
     exec (execute (SFENCE_VMA (zreg, zreg))) s
       = Some (RETIRE_SUCCESS, set_reg s tlb tlbvec') /\
-    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec' i = None).
+    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec' i = None) /\
+    (forall mm, goodmb Dr Dw (execute (SFENCE_VMA (zreg, zreg))) s mm = true).
 Proof.
-  intros Hpriv HTVM.
-  destruct (exec_flush_TLB_all s) as (tv & Hfl & Hprop).
-  exists tv. split; [| exact Hprop].
-  change (execute (SFENCE_VMA (zreg, zreg))) with (execute_SFENCE_VMA zreg zreg).
+  intros HDcp HDms HDr HDw Hpriv HTVM.
+  (* the two reads' certificates, named: inside a [gm_bind] whose [m] is an
+     evar there is nothing for [rewrite goodmb_read_reg] to match *)
+  assert (Hgcp : forall mm,
+            goodmb Dr Dw (Defs.read_reg cur_privilege : M _) s mm = true)
+    by (intro mm; rewrite goodmb_read_reg; exact HDcp).
+  assert (Hgms : forall mm,
+            goodmb Dr Dw (Defs.read_reg mstatus : M _) s mm = true)
+    by (intro mm; rewrite goodmb_read_reg; exact HDms).
+  destruct (flush_TLB_all_cert Dr Dw s HDr HDw) as (tv & Hfl & Hprop & Hgfl).
+  exists tv. split; [| split; [exact Hprop |]].
+  - change (execute (SFENCE_VMA (zreg, zreg))) with (execute_SFENCE_VMA zreg zreg).
   unfold execute_SFENCE_VMA.
   replace (generic_neq zreg zreg) with false by (vm_compute; reflexivity).
   cbv iota.
@@ -153,6 +236,45 @@ Proof.
     change a with (@None (mword 16)) end.
   rewrite (exec_bind0_Some _ _ _ _ _ Hfl).
   apply exec_returnM.
+  - (* THE CERTIFICATE, on the same peels: two [returnM]s, cur_privilege,
+       mstatus, then the flush's own certificate. *)
+    intro mm.
+    change (execute (SFENCE_VMA (zreg, zreg))) with (execute_SFENCE_VMA zreg zreg).
+    unfold execute_SFENCE_VMA.
+    replace (generic_neq zreg zreg) with false by (vm_compute; reflexivity).
+    cbv iota.
+    rewrite (gm_bind Dr Dw _ _ s s mm _ (goodmb_returnm Dr Dw None s mm)
+               (exec_returnM None s)).
+    rewrite (gm_bind Dr Dw _ _ s s mm _ (goodmb_returnm Dr Dw None s mm)
+               (exec_returnM None s)).
+    rewrite (gm_bind Dr Dw _ _ s s mm _
+               (Hgcp mm) (exec_read_reg cur_privilege s)).
+    rewrite Hpriv. cbv iota beta.
+    rewrite (gm_bind Dr Dw _ _ s s mm _
+               (Hgms mm) (exec_read_reg mstatus s)).
+    cbv zeta.
+    rewrite HTVM. cbv iota.
+    match goal with |- context[flush_TLB ?a ?b] =>
+      change a with (@None (mword 16)) end.
+    rewrite (gm_bind0 Dr Dw _ _ s _ mm (Hgfl mm) Hfl).
+    apply goodmb_returnm.
+Qed.
+
+(* the original shape: every caller that only wants the exec fact is
+   unchanged. *)
+Lemma exec_execute_SFENCE_VMA_S (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  eq_vec (_get_Mstatus_TVM (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  exists tlbvec' : vec (option TLB_Entry) (2 ^ 6),
+    exec (execute (SFENCE_VMA (zreg, zreg))) s
+      = Some (RETIRE_SUCCESS, set_reg s tlb tlbvec') /\
+    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec' i = None).
+Proof.
+  intros Hpriv HTVM.
+  destruct (execute_SFENCE_VMA_S_cert (fun _ => true) (fun _ => true) s
+              eq_refl eq_refl eq_refl eq_refl Hpriv HTVM)
+    as (tv & Hex & Hprop & _).
+  exists tv. split; [exact Hex | exact Hprop].
 Qed.
 
 (* ===================================================================== *)

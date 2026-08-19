@@ -224,6 +224,17 @@ of them):
 for p in $(pgrep -x make); do echo "$p $(readlink /proc/$p/cwd)"; done
 ```
 
+**TWO `make`s IN THE *SAME* REMOTE TREE RACE, AND THE ERROR LOOKS LIKE A
+BROKEN SWITCH.** A parent agent and its subagent share one work tree (the
+remote path is derived from `$PWD`, so it is the same tree), and two
+concurrent `make`s there can catch each other mid-write: the loser dies with
+*"Cannot find a physical path bound to logical path `<SomeModule>`"*, which
+is character-for-character the failure `durable-notes.md` attributes to a
+missing `eval $(opam env …)`. It is neither — the switch is fine and a plain
+rerun is green. **Before chasing that message, check whether anything else
+you launched is building in the same tree**; the `/proc/*/cwd` loop below
+answers it. Serialise the builds, or give the subagent its own checkout.
+
 **AND NEVER PATTERN-KILL ON THE VM.** `pkill -f "rocqworker --kind=compile"` to
 stop your own build kills every *other* tree's workers in the same breath —
 their `make` reports `Error 143` on whatever was in flight and their agent sees

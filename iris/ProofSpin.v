@@ -14,6 +14,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpGpr ExecCommon.
 Require Import InstrBytes KernelText.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
+Require Import HartSwp HartMFrame WpMmodeLeafBase WpMmodeJump.
 Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
@@ -132,69 +134,51 @@ Qed.
     assert (Htgt : add_vec pc_spin (sign_extend' 64 jimm_spin) = pc_spin)
       by (apply bv_eq; vm_compute; reflexivity).
     iIntros (Hpmp) "Hmm Hpmpc Hpc Hfile #Htext".
-    (* pull the (persistent, constant) misa.C fact out once, so it survives Löb *)
-    iDestruct "Hmm" as "(#Hhw & Hmmrest)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
-    iAssert (mmode_config (DfracOwn q)) with "[Hmmrest]" as "Hmm".
-    { rewrite /mmode_config. iFrame "Hhw". iExact "Hmmrest". }
-    (* Löb: assume the loop already runs from any resource snapshot at pc_spin *)
-    iRevert "Hmm Hpmpc Hpc Hfile".
-    iLöb as "IH".
-    iIntros "Hmm Hpmpc Hpc Hfile".
-    iPoseProof (spin_instr with "Htext") as "Hinstr".
-    iDestruct "Hpc" as "[Hpc Hnpc]".
-    (* the fetch window at the concrete [pc_spin] is kernel text: discharge
-       [wp_instr]'s per-byte static premise by [instr_window_static] +
-       [vm_compute] on the text range (M-mode fetch, guard-permitted). *)
     assert (Hspin_static : forall j, (j < 4)%nat ->
               KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc_spin j)) KP_rx).
     { apply KptPt.instr_window_static. intros j Hj. unfold addr_is_text.
       destruct j as [|[|[|[|k]]]]; try lia;
         (split; [vm_compute; discriminate | vm_compute; reflexivity]). }
-    (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
-    iApply (wp_instr pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 Hpmp Hspin_static
-              with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc_spin 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc_spin 2)).
-    assert (Hpcv : register_lookup PC s_pc.(sregs) = pc_spin).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Hpceq | vm_compute; reflexivity]. }
-    assert (HzcaC : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [rewrite Lmisa; exact HmisaC | vm_compute; reflexivity]. }
-    assert (Halign_spc : eq_vec (access_vec_dec
-              (add_vec (register_lookup PC s_pc.(sregs)) (sign_extend' 64 jimm_spin)) 0)
-              ('b"0") = true).
-    { rewrite Hpcv. rewrite Htgt. exact Hbit0. }
-    assert (Hexec_spc :
-      exec (execute (JAL (jimm_spin, zreg))) s_pc
-      = Some (RETIRE_SUCCESS, set_reg s_pc nextPC pc_spin)).
-    { change (execute (JAL (jimm_spin, zreg))) with (execute_JAL jimm_spin zreg).
-      rewrite (exec_execute_JAL_zreg_zca jimm_spin s_pc Halign_spc
-                 (exec_currentlyEnabled_Zca s_pc HzcaC)).
-      rewrite Hpcv. rewrite Htgt. reflexivity. }
-    iMod (reg_update _ nextPC _ pc_spin with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro.
-    iExists (set_reg s_pc nextPC pc_spin).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    (* continuation: PC (from wp_instr) = nextPC of s_exec = pc_spin; close the
-       loop with the Löb hypothesis (its later is stripped by [wp_instr]'s). *)
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC pc_spin).(sregs) = pc_spin).
-    { rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    (* strip [wp_instr]'s exposed later: it discharges [IH]'s. *)
-    iNext.
-    iApply ("IH" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
+    (* Löb: assume the loop already runs from any resource snapshot at pc_spin *)
+    iRevert "Hmm Hpmpc Hpc Hfile".
+    iLöb as "IH".
+    iIntros "Hmm Hpmpc Hpc Hfile".
+    iPoseProof (spin_instr with "Htext") as "Hinstr".
+    (* keep half the bundle: [jump_to] reads misa (persistent) and the leaf
+       needs cur_privilege for [swp_execute_JAL_zreg]'s footprint *)
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr pc_spin pc_spin true (JAL (jimm_spin, zreg)) m m pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0)%I
+              Hpmp Hspin_static
+              with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k] [IH]").
+    - iIntros "Hf HPC HnPC".
+      change zreg with (Regidx cli_rs1).
+      iApply (swp_mono with "[Hhs_k Hmst_k Hpmpc_k] [Hf HPC HnPC Hpriv_k]");
+        [| iApply (swp_execute_JAL_zreg (DfracOwn (q/2)) jimm_spin cli_rs1 m
+                     pc_spin (add_vec_int pc_spin 2)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(rewrite Htgt; exact Hbit0)
+                     with "Hcert Hf HPC HnPC Hpriv_k Hmseccfg Hmisa") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & Hpriv_k & _ & _)".
+      rewrite Htgt.
+      iSplitR; [done|]. iFrame "Hf HPC HnPC".
+      iSplitL "Hhs_k Hpriv_k Hmst_k".
+      { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+      iFrame "Hpmpc_k".
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' [Hmm_k' Hpmpc_k']".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("IH" with "Hmm'' Hpmpc'' Hpc' Hf'").
   Qed.
 
 End ProofSpin.

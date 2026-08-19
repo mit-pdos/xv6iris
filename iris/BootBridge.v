@@ -262,10 +262,12 @@ Section BootBridge.
   Lemma mmode_config_persist (dq : dfrac) :
     mmode_config dq -∗ (hw_config ∗ minstret_inv) ∗ mmode_config dq.
   Proof.
-    rewrite /mmode_config. iIntros "(#Hhw & #Hmin & Hrest)".
+    (* [minstret_inv] is [emp] now (MinstretInv.v): the counter facts moved
+       into [pc_is]'s [minstret_res], and the bundle no longer carries it *)
+    rewrite /mmode_config /minstret_inv. iIntros "(#Hhw & Hrest)".
     iSplitR "Hrest".
-    - iFrame "Hhw Hmin".
-    - iFrame "Hhw Hmin Hrest".
+    - iFrame "Hhw".
+    - iFrame "Hhw Hrest".
   Qed.
 
   (* [sconf] from raw cells + the tied ghost half (the [smode_config_rebuild]

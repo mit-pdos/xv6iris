@@ -66,7 +66,14 @@ Section UserretUser.
       (sc_v stval_v : mword 64)
       (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
        vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-      (dqm : dfrac) :
+      (dqm : dfrac)
+      (* THE COUNTER-PERMISSION CELLS.  Persistent, never handed back, and
+         forced by the port: [user_cfg] now carries them because a U-mode
+         [csrr] of a counter CSR must be answerable from what the hart owns
+         (worklist section 12).  They are threaded IN from the caller rather
+         than taken out of [hw_config] -- ruled 2026-08-18. *)
+      (mcounteren_v scounteren_v : mword 32)
+      (mhpmcounter_v : type_of_register mhpmcounter) :
     (* ---- userret's own premises ---- *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -144,6 +151,9 @@ Section UserretUser.
     medeleg ↦ᵣ□ uc_medeleg C -∗
     mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
+    mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
     udata_own (ud_data pt) -∗
     (* ---- THE RESIDUE, COMPLETED BY THE WORDS userret READS ----------------
        The 31 save slots are OWNED BY the kernel-side bundle that parks
@@ -202,7 +212,8 @@ Section UserretUser.
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
-             Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrutw Hhandler".
+             Hsc Hstval Hstvec Hmedl Hmse Hsse #Hmcen #Hscen #Hhpm
+             Hdata Hrutw Hhandler".
     iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -233,6 +244,7 @@ Section UserretUser.
                  (uc_stvec C) (uc_medeleg C)
                  (ud_root pt) (ud_tfp pt) (ud_um pt)
                  (mword_of_int 0) (mword_of_int 0)
+                 mcounteren_v scounteren_v mhpmcounter_v
                  (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                     va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                     vs11 vt3 vt4 vt5 vt6 va0f)
@@ -242,7 +254,8 @@ Section UserretUser.
                  eq_refl eq_refl eq_refl eq_refl
                  Hcov Hacc
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
-                       Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrut")
+                       Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse
+                       Hmcen Hscen Hhpm Hdata Hrut")
       as "Hinv".
     iApply (U.wp_user_exec_closed C pt Rut with "Hhw Hmi Hwi Hinv Hhandler").
   Qed.

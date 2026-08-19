@@ -1453,6 +1453,19 @@ Section ProofMain.
     assert (Hsvst : trunc32 (rget S3 (mword_of_int 14 : mword 5)) = started_set).
     { rewrite HS3a4 /trunc32 /started_set. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0xb0 sw a4,0(a5) : started = 1, paying [P] into the escrow ---- *)
+    (* THE ADDRESS CLAIM the per-node store asks for (WpSconfMem.wordw_claim):
+       per node the access TRANSLATES before it writes, so the window's
+       mapping is needed BEFORE the atomic update is opened.  The claim is
+       persistent and says nothing about the VALUE, so one peek-open of the
+       started invariant delivers it and puts the body straight back. *)
+    iApply fupd_wp.
+    iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
+    iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
+                 ltac:(lia) with "Hword") as "#Hstcl".
+    iMod ("Hclose" with "[Hword Hrest]") as "_".
+    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
               (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0 : mword 12) S3 n
@@ -1461,7 +1474,8 @@ Section ProofMain.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
-              ltac:(solve_ndisj) with "Hcg Hpc Hib0 [HP]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hib0 [] [HP]").
+    { rewrite Hsa. iExact "Hstcl". }
     { rewrite Hsa Hsvst.
       iApply (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
                 with "Hsinv HP"). }

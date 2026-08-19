@@ -8,7 +8,7 @@
 (*      which ssreflect -- pulled in by iris -- forbids).           *)
 (* ============================================================== *)
 
-From stdpp Require Import gmap finite bitvector.definitions.
+From stdpp Require Import gmap finite relations bitvector.definitions.
 From iris.program_logic Require Import language.
 (* NOTE: SailStdpp.Base/Values/TypeCasts are imported LATER (before the         *)
 (* ExecClose section), NOT here: they make the model's [mword] Countable        *)
@@ -256,21 +256,68 @@ Definition riscv_step (tick : bool) : M unit :=
 Definition NCPU : nat := 8.
 Definition CPU : Type := fin NCPU.
 
+(* ---------------------------------------------------------------------- *)
+(* A RESERVATION (claude-notes/design/main-cycle-port.md §3a): what a hart's *)
+(* exclusive RAM read leaves behind -- the bytes it read, keyed by address.  *)
+(* [dom r] is the reserved FOOTPRINT; the values are the SNAPSHOT.  While a  *)
+(* hart holds one, no OTHER thread may write those bytes (it self-loops),   *)
+(* so the language keeps [r ⊆ gmem] as a step invariant ([resv_ok]) -- the  *)
+(* fact the conditional-write rule needs to know its RMW is atomic.  Every   *)
+(* [MemWrite] event of the hart and the cycle boundary clear it; a new       *)
+(* exclusive read overwrites it, so a dangling one never outlives its cycle. *)
+(* ---------------------------------------------------------------------- *)
+Definition resv : Type := gmap Arch.pa (bv 8).
+
+(* the byte footprint of an [n]-byte access at [pa] *)
+Definition footprint (pa : Arch.pa) (n : N) : gset Arch.pa :=
+  list_to_set (pa_add pa <$> seq 0 (N.to_nat n)).
+
+(* the snapshot an exclusive read of value [w] records: [dom] = [footprint] *)
+Definition snap_of {w : N} (pa : Arch.pa) (n : N) (v : bv w) : resv :=
+  write_bytes ∅ pa n v.
+
 Record gstate := GState {
   gregs : CPU -> regstate;
   gmem  : gmap Arch.pa (bv 8);
   gdev  : dev_state;
   (* the power/crash layer (claude-notes/design/crash.md): the current
-     GENERATION and the POWER bit.  INERT until the power thread lands:
-     every arm below PRESERVES both fields and none reads them, so the
-     semantics is still generation- and power-blind. *)
+     GENERATION and the POWER bit.  LIVE: every hart and device arm below is
+     gated on [thread_live g gen] ([gpow] set and [ggen] equal to the
+     thread's own generation), with a pure self-loop on the COMPLEMENT, and
+     the power thread's own arms clear [gpow] while bumping [ggen].  The
+     gating partitions, so the relation stays total without a stutter arm --
+     and [ggen > gen] is the one stable death certificate. *)
   ggen : nat;
   gpow : bool;
+  (* each hart's outstanding reservation, if any (§3a) *)
+  gresv : CPU -> option resv;
 }.
 
 (* pointwise update of a single hart's register file *)
 Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
   fun cpu rs gr c => if decide (c = cpu) then rs else gr c.
+
+(* ... and of a single hart's reservation slot *)
+Global Instance gresv_insert : Insert CPU (option resv) (CPU -> option resv) :=
+  fun cpu r gr c => if decide (c = cpu) then r else gr c.
+
+(* the bytes reserved by every hart OTHER than [cpu] -- what blocks [cpu]'s
+   stores and exclusive reads -- and by every hart at all -- what blocks the
+   disk's DMA. *)
+Definition resv_dom (gr : CPU -> option resv) (c : CPU) : gset Arch.pa :=
+  match gr c with Some r => dom r | None => ∅ end.
+
+Definition others_resv (gr : CPU -> option resv) (cpu : CPU) : gset Arch.pa :=
+  ⋃ ((fun c => if decide (c = cpu) then ∅ else resv_dom gr c) <$> enum CPU).
+
+Definition all_resv (gr : CPU -> option resv) : gset Arch.pa :=
+  ⋃ (resv_dom gr <$> enum CPU).
+
+(* THE STEP INVARIANT the reservation guards buy: every outstanding snapshot
+   still agrees with memory.  Held as a pure conjunct of the state
+   interpretation; re-established by every memory-writing arm below. *)
+Definition resv_ok (g : gstate) : Prop :=
+  forall c r, g.(gresv) c = Some r -> r ⊆ g.(gmem).
 
 (* ---------------------------------------------------------------------- *)
 (* 3c. The device execution contexts -- THREE of them, one per device.      *)
@@ -420,18 +467,246 @@ Class CpuId := cpu_id : CPU.
    [wp_next] contracts quantify their continuations over the RESUMING
    CpuId, and that quantifier must range over harts of the SAME
    generation -- a parked proc's payload is era resources and dies with
-   its generation.  Until the power thread lands, the semantics is
-   GENERATION-BLIND: no [prim_step] arm reads or constrains the index
-   (every arm preserves it), so a WP is provable at any fixed ambient
-   generation and the tree is exactly as strong as before. *)
+   its generation.  The semantics READS this index: a thread's real arms
+   are gated on [thread_live], so a WP at a fixed ambient generation is
+   provable only while that generation is current -- a dead one can take
+   only the corpse self-loop. *)
 Class GenId := gen_id : nat.
 
+(* ---------------------------------------------------------------------- *)
+(* THE HART EXPRESSION CARRIES THE IN-FLIGHT SAIL MONAD                     *)
+(* (claude-notes/design/main-cycle-port.md).                                *)
+(*                                                                          *)
+(* THE PLACEMENT RULE.  Control state lives in the EXPRESSION exactly where  *)
+(* control flow is MODEL-defined, and in [gstate] where it is MEMORY-        *)
+(* defined.  INTER-instruction control flow is memory-defined -- the next    *)
+(* instruction is fetched through a page table out of mutable memory, which  *)
+(* has to be PROVEN -- so the instruction boundary is a boring token and the *)
+(* registers/PC stay in σ.  INTRA-instruction control flow is model-defined: *)
+(* the continuation IS the Sail monad value, syntactically known and         *)
+(* consumed monotonically.  So [HartE gen cpu m] is: hart [cpu] of           *)
+(* generation [gen], with [m] left to run of the current cycle -- and        *)
+(* WP-of-an-instruction becomes proof by syntactic descent on [m].           *)
+(*                                                                          *)
+(* [LoopE] is a DEFINITION, not a constructor: the boundary is the unique    *)
+(* end-of-cycle value [Ret tt] (the cycle's result type is [unit]).  Every   *)
+(* statement in the tree that mentions [LoopE gen cpu] therefore keeps       *)
+(* elaborating unchanged; only proofs that unfold the hart step break.       *)
+(*                                                                          *)
+(* THE LOOP LIVES IN THE STEP RELATION, and that is the only place it can:   *)
+(* [M] is an inductive type, so there is no in-monad loop value (the         *)
+(* immediate-subterm relation on [M] is well-founded).  [hart_node_step]     *)
+(* unfolds it at the boundary, choosing the tick nondeterministically        *)
+(* exactly as the old whole-instruction arm did.                             *)
+(* ---------------------------------------------------------------------- *)
+
 Inductive mexpr :=
-  | LoopE (gen : nat) (cpu : CPU)
+  | HartE (gen : nat) (cpu : CPU) (m : M unit)
   | UartLoopE (gen : nat)
   | DiskLoopE (gen : nat)
   | PlicLoopE (gen : nat)
   | PowerLoopE.
+
+(* THE INSTRUCTION BOUNDARY.  [Ret tt] is the unique value of [M unit], so
+   this is exactly "hart [cpu] has nothing left to run of its cycle". *)
+Definition LoopE (gen : nat) (cpu : CPU) : mexpr :=
+  HartE gen cpu (Interface.Ret tt).
+
+(* ---------------------------------------------------------------------- *)
+(* IS THIS ACCESS EXCLUSIVE (the read/write halves of an atomic RMW)?       *)
+(*                                                                          *)
+(* Read off the ACCESS KIND alone.  [AK_ifetch]/[AK_ttw] are never emitted  *)
+(* by this model (fetch goes through [mem_read (InstructionFetch tt) …] and  *)
+(* the walker through [mem_read_priv (Load PageTableEntry) …], both landing  *)
+(* in [Read_plain]), so those arms are faithful but dead; they are spelled   *)
+(* out anyway so a model regeneration that starts emitting them is a         *)
+(* semantics change rather than a silent reclassification.                   *)
+(* [AV_atomic_rmw] is never emitted either -- AMOs use the CONDITIONAL       *)
+(* (exclusive) kinds -- and both are treated the same here, so nothing is    *)
+(* lost by the merge.                                                        *)
+(* ---------------------------------------------------------------------- *)
+(* Spelled with QUALIFIED names: RiscvLang must not [Import]
+   SailStdpp.ConcurrencyInterfaceTypes -- see the header note on
+   [Countable_mword] and the type of [mstate.mem]. *)
+Definition av_excl (v : SailStdpp.ConcurrencyInterfaceTypes.Access_variety)
+    : bool :=
+  match v with
+  | SailStdpp.ConcurrencyInterfaceTypes.AV_plain => false
+  | SailStdpp.ConcurrencyInterfaceTypes.AV_exclusive => true
+  | SailStdpp.ConcurrencyInterfaceTypes.AV_atomic_rmw => true
+  end.
+
+Definition ak_excl (ak : Interface.accessKind) : bool :=
+  match ak with
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_explicit eak =>
+      av_excl (SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_variety eak)
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_ifetch _ => false
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_ttw _ => false
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_arch a =>
+      av_excl (RISCV_strong_access_variety a)
+  end.
+
+(* ---------------------------------------------------------------------- *)
+(* THE HART'S PER-NODE STEP.                                                *)
+(*                                                                          *)
+(* One arm per [Interface.outcome] node, transcribing what [run]'s          *)
+(* interpreter does at that node -- registers against [gregs cpu], RAM       *)
+(* against [gmem], MMIO against [gdev] through [dev_read]/[dev_write].       *)
+(* Alignment/PMA/permission logic stays INSIDE the monad, where the model    *)
+(* put it.  Fences are semantically inert at SC, so [Barrier] is silent.     *)
+(*                                                                          *)
+(* EXCLUSIVE ACCESSES (design §3a) are NOT fused: an exclusive RAM read is   *)
+(* an ordinary read that also RECORDS its snapshot as this hart's            *)
+(* reservation; the window that follows it is ordinary nodes; the paired     *)
+(* conditional write is an ordinary RAM write.  Atomicity is mutual          *)
+(* exclusion on the reserved bytes: while ANOTHER hart's reservation         *)
+(* overlaps, a RAM write or an exclusive read SELF-LOOPS ([m' = m], state    *)
+(* unchanged) -- a step, not a stuck state, so nobody's reducibility          *)
+(* depends on it.  Every [MemWrite] event clears the hart's own reservation  *)
+(* (so it never outlives the silent stretch it protects) and so does the     *)
+(* boundary; a fresh exclusive read overwrites it, blocked or not (the       *)
+(* region begins at the LAST exclusive read).  A BLOCKED WRITE KEEPS its     *)
+(* reservation: releasing there would let the write's own arm run            *)
+(* unguarded, and then [resv_ok] is inductive only together with pairwise    *)
+(* disjointness of all reservations -- a second invariant nobody wants to    *)
+(* carry.  Plain reads are never blocked and never reserve.                  *)
+(*                                                                          *)
+(* STUCK IS FINE.  [GenericFail]/[Discard]/[ExtraOutcome] have no arm, and   *)
+(* there is deliberately NO shape or liveness predicate about the monad --   *)
+(* a shape predicate is a promise about an instruction's FUTURE, and no rule *)
+(* here mentions the future.                                                 *)
+(*                                                                          *)
+(* SEMANTIC DELTA, stated honestly: mid-instruction interleaving is now      *)
+(* REAL.  Another hart's or a device's step can land between two events of   *)
+(* one instruction.  At SC this admits strictly more runs than the old       *)
+(* whole-instruction machine, whose runs embed as the contiguous-block       *)
+(* special case (see the solo-block bracket in RiscvExec.v).                 *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE HART-LOCAL NODE STEP, on ONE HART'S VIEW [mstate] -- the same
+   currency [run] works in, and the same currency the lifting layer's
+   σ-callback hands the caller ([mstate_interp]) -- PLUS the reservation
+   context: [oth] is the byte set reserved by every OTHER hart (read-only
+   here), [r]/[r'] this hart's own reservation before and after.
+   [hart_node_step] below is then literally "focus this hart, take one local
+   node, write back", exactly the shape the old whole-instruction arm had
+   with [run] in place of [mnode_step]. *)
+Definition mnode_step (oth : gset Arch.pa) (s : mstate) (r : option resv)
+    (m : M unit) (m' : M unit) (s' : mstate) (r' : option resv) : Prop :=
+  match m with
+  (* THE BOUNDARY / RESTART RULE.  The cycle is over; begin the next one.
+     [tick] is chosen nondeterministically here exactly as the old
+     whole-instruction arm chose it -- the sound weakening of the model
+     [loop]'s deterministic every-[plat_insns_per_tick] tick.  A dangling
+     reservation is dropped here: it never crosses an instruction. *)
+  | Interface.Ret _ =>
+      exists tick : bool, m' = riscv_step tick /\ s' = s /\ r' = None
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+       (* registers *)
+       | Interface.RegRead rg _ => fun k =>
+           m' = k (register_lookup rg s.(sregs)) /\ s' = s /\ r' = r
+       | Interface.RegWrite rg _ v => fun k =>
+           m' = k tt /\ s' = set_reg s rg v /\ r' = r
+       | Interface.MemRead n req => fun k =>
+           if dev_addr (Interface.ReadReq.pa req) then
+             (* MMIO: the device answers, and its state may move (an RHR read
+                pops the receive FIFO).  The accessor is the PARTIAL one -- a
+                bad width or an undecoded offset inside a device window is
+                stuck, which costs nothing: nothing in this tower ever has to
+                know that an instruction COMPLETES. *)
+             exists (w : bv (8 * n)) (d' : dev_state),
+               dev_read s.(mdev) (Interface.ReadReq.pa req) n = Some (w, d') /\
+               m' = k (inl (w, None)) /\ s' = MState s.(sregs) s.(mem) d' /\
+               r' = r
+           else
+             (* THE PLAIN RAM READ: never blocked, never reserves. *)
+             (ak_excl (Interface.ReadReq.access_kind req) = false /\
+              exists w : bv (8 * n),
+                (forall j : nat, (N.of_nat j < n)%N ->
+                   s.(mem) !! (pa_add (Interface.ReadReq.pa req) j)
+                   = Some (nth_byte w j)) /\
+                m' = k (inl (w, None)) /\ s' = s /\ r' = r)
+             \/
+             (* THE EXCLUSIVE RAM READ: blocked (self-loop) while another
+                hart reserves any of its bytes -- and a hart that has reached
+                a NEW exclusive read has abandoned whatever it reserved before,
+                so the wait releases it (a waiting hart holds nothing, hence
+                no wait-for cycle through exclusive reads); otherwise the same
+                read, and its snapshot becomes this hart's reservation,
+                replacing any stale one. *)
+             (ak_excl (Interface.ReadReq.access_kind req) = true /\
+              ((~ (footprint (Interface.ReadReq.pa req) n ## oth) /\
+                m' = Interface.Next (Interface.MemRead n req) k /\
+                s' = s /\ r' = None)
+               \/
+               (footprint (Interface.ReadReq.pa req) n ## oth /\
+                exists w : bv (8 * n),
+                  (forall j : nat, (N.of_nat j < n)%N ->
+                     s.(mem) !! (pa_add (Interface.ReadReq.pa req) j)
+                     = Some (nth_byte w j)) /\
+                  m' = k (inl (w, None)) /\ s' = s /\
+                  r' = Some (snap_of (Interface.ReadReq.pa req) n w))))
+       | Interface.MemWrite n req => fun k =>
+           if dev_addr (Interface.WriteReq.pa req) then
+             (* MMIO write: a [MemWrite] event, so it clears the reservation *)
+             exists d' : dev_state,
+               dev_write s.(mdev) (Interface.WriteReq.pa req) n
+                 (Interface.WriteReq.value req) = Some d' /\
+               m' = k (inl None) /\ s' = MState s.(sregs) s.(mem) d' /\
+               r' = None
+           else
+             (* THE RAM WRITE, conditional or plain alike (the access kind
+                plays no role): blocked (self-loop) while another hart
+                reserves any of its bytes; otherwise written, and this hart's
+                own reservation is cleared.  A conditional write on the
+                hart's own reservation is never blocked -- no other hart can
+                hold an overlapping one -- but the arm does not need to know
+                that: the rule absorbs the self-loop by Löb either way. *)
+             (~ (footprint (Interface.WriteReq.pa req) n ## oth) /\
+              m' = Interface.Next (Interface.MemWrite n req) k /\
+              s' = s /\ r' = r)
+             \/
+             (footprint (Interface.WriteReq.pa req) n ## oth /\
+              m' = k (inl None) /\
+              s' = MState s.(sregs)
+                     (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                        (Interface.WriteReq.value req)) s.(mdev) /\
+              r' = None)
+       (* trace / announce / fence outcomes: state no-ops, exactly as [run].
+          At SC a fence is semantically inert, so [Barrier] is silent and
+          nothing is parked. *)
+       | Interface.InstrAnnounce _    => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.BranchAnnounce _ _ => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.Barrier _          => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.CacheOp _          => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.TlbOp _            => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.TakeException _    => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.ReturnException _  => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.TranslationStart _ => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.TranslationEnd _   => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.CycleCount         => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.Message _          => fun k => m' = k tt /\ s' = s /\ r' = r
+       | Interface.GetCycleCount      => fun k => m' = k 0%Z /\ s' = s /\ r' = r
+       (* nondeterminism: branch over every choice *)
+       | Interface.Choose _           => fun k => exists ch, m' = k ch /\ s' = s /\ r' = r
+       (* failure / discard / injected exception: stuck *)
+       | _ => fun _ => False
+       end) k
+  end.
+
+(* ... and the global arm: focus the hart, take one local node, write back.
+   Compare the OLD hart arm, which was this with [run (riscv_step tick)] in
+   place of [mnode_step] -- the write-back is character-for-character the
+   same, which is why the lifting rule's proof structure survives. *)
+Definition hart_node_step (gen : nat) (g : gstate) (cpu : CPU) (m : M unit)
+    (e' : mexpr) (g' : gstate) : Prop :=
+  exists (m' : M unit) (s' : mstate) (r' : option resv),
+    mnode_step (others_resv g.(gresv) cpu)
+      (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) (g.(gresv) cpu) m m' s' r' /\
+    e' = HartE gen cpu m' /\
+    g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev)
+           g.(ggen) g.(gpow) (<[cpu := r']> g.(gresv)).
 
 (* ---------------------------------------------------------------------- *)
 (* THE RESET MACHINE (claude-notes/design/crash.md): what the loader and    *)
@@ -826,7 +1101,9 @@ Definition boot_facts (g' : gstate) : Prop :=
      the disk's queue not live (its IMAGE survives -- see [boot_shape]) *)
   /\ g'.(gdev).(duart) = uart0_state
   /\ g'.(gdev).(dplic) = plic0_state
-  /\ (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0).
+  /\ (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0)
+  (* no reservation survives a power cycle *)
+  /\ (forall c : CPU, g'.(gresv) c = None).
 
 (* the machine state a PowerOn hands over (claude-notes/design/crash.md):
    same generation (PowerOff already bumped it), the reset machine above,
@@ -862,39 +1139,41 @@ Notation PowerLoop := PowerLoopE.
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
-  (exists gen cpu, e = LoopE gen cpu /\ e' = LoopE gen cpu /\ κ = [] /\ efs = [] /\
-    ((thread_live g gen /\
-      exists (tick : bool) (u : unit) (s' : mstate),
-        run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
-        g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev) g.(ggen) g.(gpow))
-     \/ (~ thread_live g gen /\ g' = g)))
+  (* THE HART ARM, one Sail-monad NODE at a time.  [LoopE] is a [HartE], so
+     the corpse arm covers the instruction boundary uniformly -- one arm. *)
+  (exists gen cpu m, e = HartE gen cpu m /\ κ = [] /\ efs = [] /\
+    ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
+     \/ (~ thread_live g gen /\ e' = e /\ g' = g)))
   \/
   (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
     ((thread_live g gen /\
       exists d',
         uart_step g.(gdev) d' /\
-        g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow))
+        g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv))
      \/ (~ thread_live g gen /\ g' = g)))
   \/
   (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
     ((thread_live g gen /\
       exists d' m',
         disk_step g.(gdev) g.(gmem) d' m' /\
-        g' = GState g.(gregs) m' d' g.(ggen) g.(gpow))
+        (* the DMA may not touch a byte any hart has reserved (§3a); the
+           device's own [Idle] arm is what it does instead *)
+        (forall a, a ∈ all_resv g.(gresv) -> m' !! a = g.(gmem) !! a) /\
+        g' = GState g.(gregs) m' d' g.(ggen) g.(gpow) g.(gresv))
      \/ (~ thread_live g gen /\ g' = g)))
   \/
   (exists gen, e = PlicLoopE gen /\ e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
     ((thread_live g gen /\
       exists gr',
         plic_step g.(gdev) g.(gregs) gr' /\
-        g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow))
+        g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv))
      \/ (~ thread_live g gen /\ g' = g)))
   \/
   (e = PowerLoopE /\ e' = PowerLoopE /\ κ = [] /\
     ((g.(gpow) = true /\ efs = [] /\
        (* PowerOff: kill the running generation INSTANTLY -- the bump is
           what makes [ggen > gen] the one stable death certificate *)
-       g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false)
+       g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv))
      \/
      (g.(gpow) = false /\ efs = power_fork g.(ggen) /\
        boot_shape g g'))).
@@ -904,10 +1183,377 @@ Proof.
   split.
   - intros [].
   - intros e v Hv. discriminate Hv.
-  - intros e s κ e' s' efs
-      [(gen & cpu & -> & _) | [(gen & -> & _) | [(gen & -> & _)
-       | [(gen & -> & _) | (-> & _)]]]];
-      reflexivity.
+  - intros e s κ e' s' efs _. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* PER-ARM INVERSION.  Every consumer of [prim_step] destructs the five-way *)
+(* disjunction; doing it by name here keeps the ~200-character destruct     *)
+(* patterns out of the lifting rules and makes an added arm one edit.       *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma prim_step_hart_inv gen cpu m g κ e' g' efs :
+  prim_step (HartE gen cpu m) g κ e' g' efs ->
+  κ = [] /\ efs = [] /\
+  ((thread_live g gen /\ hart_node_step gen g cpu m e' g')
+   \/ (~ thread_live g gen /\ e' = HartE gen cpu m /\ g' = g)).
+Proof.
+  intros [(gen0 & cpu0 & m0 & Heq & ? & ? & Harm)
+         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as -> -> ->. by split_and!.
+Qed.
+
+Lemma prim_step_uart_inv gen g κ e' g' efs :
+  prim_step (UartLoopE gen) g κ e' g' efs ->
+  e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
+  ((thread_live g gen /\
+    exists d', uart_step g.(gdev) d' /\
+      g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv))
+   \/ (~ thread_live g gen /\ g' = g)).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(gen0 & Heq & ? & ? & ? & Harm) | [(? & Heq & _)
+         | [(? & Heq & _) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as ->. by split_and!.
+Qed.
+
+Lemma prim_step_disk_inv gen g κ e' g' efs :
+  prim_step (DiskLoopE gen) g κ e' g' efs ->
+  e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
+  ((thread_live g gen /\
+    exists d' m', disk_step g.(gdev) g.(gmem) d' m' /\
+      (forall a, a ∈ all_resv g.(gresv) -> m' !! a = g.(gmem) !! a) /\
+      g' = GState g.(gregs) m' d' g.(ggen) g.(gpow) g.(gresv))
+   \/ (~ thread_live g gen /\ g' = g)).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | [(gen0 & Heq & ? & ? & ? & Harm)
+         | [(? & Heq & _) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as ->. by split_and!.
+Qed.
+
+Lemma prim_step_plic_inv gen g κ e' g' efs :
+  prim_step (PlicLoopE gen) g κ e' g' efs ->
+  e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
+  ((thread_live g gen /\
+    exists gr', plic_step g.(gdev) g.(gregs) gr' /\
+      g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv))
+   \/ (~ thread_live g gen /\ g' = g)).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | [(? & Heq & _)
+         | [(gen0 & Heq & ? & ? & ? & Harm) | (Heq & _)]]]];
+    try discriminate Heq.
+  injection Heq as ->. by split_and!.
+Qed.
+
+Lemma prim_step_power_inv g κ e' g' efs :
+  prim_step PowerLoopE g κ e' g' efs ->
+  e' = PowerLoopE /\ κ = [] /\
+  ((g.(gpow) = true /\ efs = [] /\
+     g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv))
+   \/ (g.(gpow) = false /\ efs = power_fork g.(ggen) /\ boot_shape g g')).
+Proof.
+  intros [(? & ? & ? & Heq & _)
+         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & ? & ? & Harm)]]]];
+    try discriminate Heq.
+  by split_and!.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* SHAPE FACTS a hart step preserves: the successor is the SAME hart of the *)
+(* SAME generation, and the era fields never move.  Both are needed by      *)
+(* every lifting rule, and both are one [destruct] away -- but that         *)
+(* [destruct] is over ~20 outcome arms, so it is done ONCE here.            *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma hart_node_step_shape gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' -> exists m', e' = HartE gen cpu m'.
+Proof. intros (m' & s' & r' & _ & -> & _). by eexists. Qed.
+
+Lemma hart_node_step_era gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' ->
+  g'.(ggen) = g.(ggen) /\ g'.(gpow) = g.(gpow).
+Proof. by intros (m' & s' & r' & _ & _ & ->). Qed.
+
+(* A hart node never moves the disk IMAGE (crash.md): register effects and
+   RAM accesses do not touch the device fabric at all, and an MMIO
+   transaction goes through [dev_read]/[dev_write], which preserve [v_disk].
+   The per-NODE twin of [run_v_disk], and what lets the hart lifting rule
+   FRAME [state_interp]'s durable disk conjunct. *)
+Lemma mnode_step_v_disk oth s r m m' s' r' :
+  mnode_step oth s r m m' s' r' ->
+  v_disk (dvirtio (mdev s')) = v_disk (dvirtio (mdev s)).
+Proof.
+  rewrite /mnode_step. destruct m as [y|T oc k].
+  { by intros (tick & _ & -> & _). }
+  destruct oc; simpl;
+    try (by intros (_ & -> & _)); try (by intros []).
+  - (* MemRead *)
+    destruct (dev_addr _).
+    + intros (w & d' & Hdr & _ & -> & _). cbn.
+      exact (dev_read_v_disk _ _ _ _ _ Hdr).
+    + by intros [(_ & w & _ & _ & -> & _)
+                |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])].
+  - (* MemWrite *)
+    destruct (dev_addr _).
+    + intros (d' & Hdw & _ & -> & _). cbn.
+      exact (dev_write_v_disk _ _ _ _ _ Hdw).
+    + by intros [(_ & _ & -> & _) | (_ & _ & -> & _)].
+  - (* Choose *) by intros (ch & _ & -> & _).
+Qed.
+
+Lemma hart_node_step_v_disk gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' ->
+  v_disk (dvirtio g'.(gdev)) = v_disk (dvirtio g.(gdev)).
+Proof.
+  intros (m' & s' & r' & Hn & _ & ->). cbn.
+  exact (mnode_step_v_disk _ _ _ _ _ _ _ Hn).
+Qed.
+
+(* THE BATCHING LICENCE (claude-notes/design/main-cycle-port.md §5): apart
+   from hart [c]'s own steps and a PowerOn's whole-machine reset, the ONLY
+   thing any step of any other thread can do to hart [c]'s register file is
+   [plic_step]'s [sig_seip] wire write.  This is the meta-level soundness of
+   every batched register rule: a stretch of nodes whose registers the
+   caller owns (and [sig_seip] is not ownable -- it lives in [WireInv])
+   cannot be invalidated by interference. *)
+Lemma prim_step_hart_regs_frame e g κ e' g' efs (c : CPU) :
+  prim_step e g κ e' g' efs ->
+  (forall gen m, e <> HartE gen c m) ->
+  e <> PowerLoopE ->
+  g'.(gregs) c = g.(gregs) c \/
+  g'.(gregs) c = register_set sig_seip
+      (bool_to_bit (dev_seip g.(gdev) (fin_to_nat c))) (g.(gregs) c).
+Proof.
+  intros Hstep Hnot Hnp.
+  destruct Hstep as
+    [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & r' & _ & _ & ->)) | (_ & _ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & m' & _ & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
+    | (-> & _) ] ] ] ];
+    try (by left).
+  - (* another hart's node: [c] is not [cpu], so the insert misses [c] *)
+    left. cbn. rewrite /insert /greg_insert.
+    case_decide as Hc; [exfalso; subst c; exact (Hnot gen m eq_refl)|done].
+  - (* the wire: [sig_seip] on whichever hart the PLIC chose *)
+    destruct Hp as [c0]. cbn. rewrite /insert /greg_insert.
+    case_decide as Hc; [subst c0; by right|by left].
+Qed.
+
+(* THE CORPSE STEP is always available, at every expression that carries a
+   generation -- which is what makes [wp_dead] provable uniformly. *)
+Lemma prim_step_hart_dead gen cpu m g :
+  ~ thread_live g gen -> prim_step (HartE gen cpu m) g [] (HartE gen cpu m) g [].
+Proof.
+  intros Hd. left. exists gen, cpu, m. split_and!; try reflexivity. by right.
+Qed.
+
+(* THE BOUNDARY always steps when live: the restart arm needs no resources
+   and no facts about memory -- the fetch is a LATER node.  The successor
+   state is written with the arm's own (identity) register write-back rather
+   than as [g]: the two are only EXTENSIONALLY equal, and collapsing them
+   would cost this file [functional_extensionality] for a reducibility
+   witness that does not need it. *)
+Lemma prim_step_hart_restart gen cpu g (tick : bool) :
+  thread_live g gen ->
+  prim_step (LoopE gen cpu) g [] (HartE gen cpu (riscv_step tick))
+    (GState (<[cpu := g.(gregs) cpu]> g.(gregs)) g.(gmem) g.(gdev)
+       g.(ggen) g.(gpow) (<[cpu := None]> g.(gresv))) [].
+Proof.
+  intros Hl. left. exists gen, cpu, (Interface.Ret tt).
+  split_and!; try reflexivity. left. split; [exact Hl|].
+  exists (riscv_step tick), (MState (g.(gregs) cpu) g.(gmem) g.(gdev)), None.
+  split_and!; [by exists tick|reflexivity|reflexivity].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE RESERVATION INVARIANT [resv_ok] IS PRESERVED BY EVERY STEP           *)
+(* (design §3a).  This is the meta-level fact the state interpretation's     *)
+(* pure [resv_ok] conjunct rests on; the per-arm lemmas are what the node    *)
+(* rules discharge it with.                                                  *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma elem_of_footprint (pa : Arch.pa) (n : N) (a : Arch.pa) :
+  a ∈ footprint pa n <-> exists j : nat, (N.of_nat j < n)%N /\ a = pa_add pa j.
+Proof.
+  unfold footprint. rewrite elem_of_list_to_set elem_of_list_fmap.
+  split.
+  - intros (j & -> & Hj). apply elem_of_seq in Hj. exists j. split; [lia|done].
+  - intros (j & Hj & ->). exists j. split; [done|]. apply elem_of_seq. lia.
+Qed.
+
+(* the generic foldr-insert facts the byte primitives reduce to *)
+Local Lemma foldr_ins_lookup_out (l : list nat) (pa : Arch.pa)
+    (f : nat -> bv 8) (mm : gmap Arch.pa (bv 8)) (a : Arch.pa) :
+  (forall j, j ∈ l -> pa_add pa j ≠ a) ->
+  foldr (fun j acc => <[pa_add pa j := f j]> acc) mm l !! a = mm !! a.
+Proof.
+  induction l as [|j l IH]; intros Hne; [reflexivity|].
+  cbn [foldr]. rewrite lookup_insert_ne.
+  - apply IH. intros i Hi. apply Hne, elem_of_list_further, Hi.
+  - apply Hne, elem_of_list_here.
+Qed.
+
+Local Lemma foldr_ins_lookup_Some (l : list nat) (pa : Arch.pa)
+    (f : nat -> bv 8) (a : Arch.pa) (b : bv 8) :
+  foldr (fun j acc => <[pa_add pa j := f j]> acc) (∅ : gmap Arch.pa (bv 8)) l
+    !! a = Some b ->
+  exists j, j ∈ l /\ a = pa_add pa j /\ b = f j.
+Proof.
+  induction l as [|j l IH]; intros H.
+  { rewrite lookup_empty in H. discriminate H. }
+  cbn [foldr] in H. destruct (decide (pa_add pa j = a)) as [<-|Hne].
+  - rewrite lookup_insert in H. injection H as <-.
+    exists j. split_and!; [apply elem_of_list_here|done|done].
+  - rewrite lookup_insert_ne in H; [|exact Hne].
+    destruct (IH H) as (i & Hi & -> & ->).
+    exists i. split_and!; [apply elem_of_list_further, Hi|done|done].
+Qed.
+
+Local Lemma foldr_ins_dom (l : list nat) (pa : Arch.pa) (f : nat -> bv 8)
+    (mm : gmap Arch.pa (bv 8)) :
+  dom (foldr (fun j acc => <[pa_add pa j := f j]> acc) mm l)
+  = list_to_set (pa_add pa <$> l) ∪ dom mm.
+Proof.
+  induction l as [|j l IH].
+  - cbn [foldr fmap list_fmap list_to_set]. set_solver.
+  - cbn [foldr fmap list_fmap list_to_set]. rewrite dom_insert_L IH. set_solver.
+Qed.
+
+(* a store leaves every byte OUTSIDE its footprint alone *)
+Lemma write_bytes_lookup_notin {w : N} (mm : gmap Arch.pa (bv 8))
+    (pa : Arch.pa) (n : N) (v : bv w) (a : Arch.pa) :
+  a ∉ footprint pa n -> write_bytes mm pa n v !! a = mm !! a.
+Proof.
+  intros Ha. unfold write_bytes. apply foldr_ins_lookup_out.
+  intros j Hj Heq. apply Ha, elem_of_footprint. exists j.
+  apply elem_of_seq in Hj. split; [lia|done].
+Qed.
+
+Lemma dom_snap_of {w : N} (pa : Arch.pa) (n : N) (v : bv w) :
+  dom (snap_of pa n v) = footprint pa n.
+Proof.
+  unfold snap_of, write_bytes, footprint. rewrite foldr_ins_dom dom_empty_L.
+  set_solver.
+Qed.
+
+Lemma snap_of_lookup_Some {w : N} (pa : Arch.pa) (n : N) (v : bv w)
+    (a : Arch.pa) (b : bv 8) :
+  snap_of pa n v !! a = Some b ->
+  exists j : nat, (N.of_nat j < n)%N /\ a = pa_add pa j /\ b = nth_byte v j.
+Proof.
+  unfold snap_of, write_bytes. intros H.
+  destruct (foldr_ins_lookup_Some _ _ _ _ _ H) as (j & Hj & -> & ->).
+  apply elem_of_seq in Hj. exists j. split_and!; [lia|done|done].
+Qed.
+
+(* the snapshot an exclusive read records agrees with the memory it read *)
+Lemma snap_of_sub (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N)
+    (w : bv (8 * n)) :
+  (forall j : nat, (N.of_nat j < n)%N -> mm !! pa_add pa j = Some (nth_byte w j)) ->
+  snap_of pa n w ⊆ mm.
+Proof.
+  intros Hrd. apply map_subseteq_spec. intros a b Hab.
+  destruct (snap_of_lookup_Some _ _ _ _ _ Hab) as (j & Hj & -> & ->). exact (Hrd j Hj).
+Qed.
+
+Lemma elem_of_others_resv (gr : CPU -> option resv) (cpu c : CPU)
+    (rr : resv) (a : Arch.pa) :
+  c <> cpu -> gr c = Some rr -> a ∈ dom rr -> a ∈ others_resv gr cpu.
+Proof.
+  intros Hne Hc Ha. unfold others_resv. apply elem_of_union_list.
+  exists (resv_dom gr c). split.
+  - apply elem_of_list_fmap. exists c. split; [|apply elem_of_enum].
+    by case_decide.
+  - unfold resv_dom. by rewrite Hc.
+Qed.
+
+Lemma elem_of_all_resv (gr : CPU -> option resv) (c : CPU) (rr : resv)
+    (a : Arch.pa) :
+  gr c = Some rr -> a ∈ dom rr -> a ∈ all_resv gr.
+Proof.
+  intros Hc Ha. unfold all_resv. apply elem_of_union_list.
+  exists (resv_dom gr c). split.
+  - apply elem_of_list_fmap. exists c. split; [done|apply elem_of_enum].
+  - unfold resv_dom. by rewrite Hc.
+Qed.
+
+(* one hart node: its own reservation (if any) still agrees with memory
+   afterwards, and no byte another hart has reserved moved *)
+Lemma mnode_step_resv oth s r m m' s' r' :
+  mnode_step oth s r m m' s' r' ->
+  (forall rr, r = Some rr -> rr ⊆ s.(mem)) ->
+  (forall rr, r' = Some rr -> rr ⊆ s'.(mem)) /\
+  (forall a, a ∈ oth -> s'.(mem) !! a = s.(mem) !! a).
+Proof.
+  rewrite /mnode_step. destruct m as [y|T oc k].
+  { intros (tick & _ & -> & ->) _. split; [discriminate|done]. }
+  destruct oc; simpl;
+    try (by intros (_ & -> & ->) Hr; split; [exact Hr|done]);
+    try (by intros []).
+  - (* MemRead *)
+    destruct (dev_addr _).
+    + intros (w & d' & _ & _ & -> & ->) Hr. split; [exact Hr|done].
+    + intros [(_ & w & _ & _ & -> & ->)
+             |(_ & [(_ & _ & -> & ->) | (Hdisj & w & Hrd & _ & -> & ->)])] Hr;
+        try (by split; [exact Hr|done]); [by split; [discriminate|done]|].
+      split; [|done]. intros rr [= <-]. exact (snap_of_sub _ _ _ _ Hrd).
+  - (* MemWrite *)
+    destruct (dev_addr _).
+    + intros (d' & _ & _ & -> & ->) Hr. split; [discriminate|done].
+    + intros [(_ & _ & -> & ->) | (Hdisj & _ & -> & ->)] Hr;
+        [by split; [exact Hr|done]|].
+      split; [discriminate|]. intros a Ha. cbn.
+      apply write_bytes_lookup_notin. intros Hfp.
+      exact (Hdisj a Hfp Ha).
+  - (* Choose *) intros (ch & _ & -> & ->) Hr. split; [exact Hr|done].
+Qed.
+
+Lemma hart_node_step_resv_ok gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' -> resv_ok g -> resv_ok g'.
+Proof.
+  intros (m' & s' & r' & Hn & _ & ->) Hok c rr. cbn.
+  rewrite /insert /gresv_insert. case_decide as Hc.
+  - (* the stepping hart: its new reservation *)
+    subst c. intros Hr'.
+    destruct (mnode_step_resv _ _ _ _ _ _ _ Hn (Hok cpu)) as (Hown & _).
+    exact (Hown rr Hr').
+  - (* another hart: its bytes did not move *)
+    intros Hc'. pose proof (Hok c rr Hc') as Hsub.
+    destruct (mnode_step_resv _ _ _ _ _ _ _ Hn (Hok cpu)) as (_ & Hoth).
+    apply map_subseteq_spec. intros a b Hab.
+    rewrite Hoth; [by eapply map_subseteq_spec in Hsub|].
+    eapply elem_of_others_resv; [exact Hc|exact Hc'|].
+    apply elem_of_dom. by eexists.
+Qed.
+
+Lemma prim_step_resv_ok e g κ e' g' efs :
+  prim_step e g κ e' g' efs -> resv_ok g -> resv_ok g'.
+Proof.
+  intros Hstep Hok.
+  destruct Hstep as
+    [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & m' & _ & Hkeep & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
+    | (-> & _ & _ & [ (_ & _ & ->) | (_ & _ & Hboot) ]) ] ] ] ];
+    try exact Hok;
+    try (by intros c rr Hc; exact (Hok c rr Hc)).
+  - exact (hart_node_step_resv_ok _ _ _ _ _ _ Hn Hok).
+  - (* the disk: it left every reserved byte alone *)
+    intros c rr Hc. cbn. pose proof (Hok c rr Hc) as Hsub.
+    apply map_subseteq_spec. intros a b Hab.
+    rewrite Hkeep; [by eapply map_subseteq_spec in Hsub|].
+    eapply elem_of_all_resv; [exact Hc|]. apply elem_of_dom. by eexists.
+  - (* PowerOn: no reservation survives *)
+    intros c rr Hc. destruct Hboot as (_ & _ & Hbf).
+    destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
+    rewrite Hnone in Hc. discriminate Hc.
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

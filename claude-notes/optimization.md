@@ -196,6 +196,17 @@ worth 20× on individual files.
       If the override ever looks like it is doing nothing, check that
       `set_shrink` is in scope and that it is actually clearing, before
       believing anything about the goal.
+  - **A SINGLE MEMBERSHIP IN A UNION OF TWO `gset register` VARIABLES STILL
+    COSTS 24 s, override or not.** `assert ((tlb : register) ∈ Drw ∪ Dro) by
+    set_solver` inside a `swp` translation proof measures **24 s per call**
+    (`coqc -time`) — and adding `Require Import FastSetSolver` to the file
+    changes nothing, so this is not a "the override is not in scope" case.
+    Two of them made `Pt2WalkPt.v` a 62 s file; `by (apply elem_of_union_l;
+    exact HWtlb)` makes it 13 s. The rule the durable notes give for
+    tower-carrying proofs (name the union lemma) is therefore still the rule
+    whenever the sets are VARIABLES rather than literals — which is exactly
+    the `Drw`/`Dro` frame idiom. `HartSKpt.swp_translate_kpt` still carries
+    the `set_solver` form.
   - **Two things the override does NOT fix**, both goal-side rather than
     context-side, so the old workarounds stand: `gset (mword n)` still fails
     (instance divergence — see the durable notes), and `set_unfold` still
@@ -360,6 +371,71 @@ worth 20× on individual files.
   to omit whenever the omitted premise is the last one, which for a
   `wp_next`-continuation leaf it always is. (Mid-pattern `[-]` is a different
   shape and stays.)
+
+## Register-file towers (`mm_rs` and friends)
+
+A canonical register file spelled as a tower of `register_set`s — `HartMFrame`'s
+`mm_rs`, 16 deep — is a **delta bomb**, and all three of the following bit
+during one afternoon of writing `wp_instr`. The common cause: `register_set` is
+a record update, so *any* conversion that unfolds the tower compares record
+updates pairwise, and the cost is exponential in the depth.
+
+- **Make the tower `Opaque` the moment its lookup lemmas are proved.**
+  `Global Opaque mm_rs.` right after the section that establishes the nineteen
+  `mm_rs_*` lookup equations. Left transparent, every `apply`/`iApply` whose
+  unifier meets a concrete tower may delta-expand it. Measured: an `InstrBytes`
+  with four `wp_instr` arms did **not finish in 15 minutes** transparent, and
+  the same arms' setup ran in **3 s** opaque. The lookup lemmas are the only
+  interface any consumer needs, so nothing is lost.
+
+- **Never leave a goal with a tower on BOTH sides to `reflexivity`.** A
+  `reg_agree_on D (mm_rs .. x ..) (mm_rs .. y ..)` goal looks like two rewrites,
+  but `rewrite mm_rs_priv` fires on the FIRST occurrence only, and then `by`'s
+  `reflexivity` is asked to convert `Machine` against a 16-deep tower. That
+  hangs. Fixes, in preference order: (1) restate so one side is a **variable** —
+  prove `<12 lookup hypotheses> -> reg_agree_on Dro rs (mm_rs ..)` once, then
+  instantiate `rs` with the other tower and discharge the hypotheses
+  **positionally** (`apply mm_rs_ro_agree; [apply mm_rs_priv | .. ]`); (2) failing
+  that, `etransitivity; [apply L | symmetry; apply L]`, which unifies one side at
+  a time and never converts. A `first [apply .. | .. ]` over 19 alternatives is
+  NOT a fix — the failing branches are exactly where the unifier deltas.
+
+- **`ltac:(tac)` in argument position runs BEFORE the surrounding evars are
+  solved.** `rewrite (Hag _ ltac:(set_solver))` and
+  `rewrite (irrelevant_register_set _ r _ _ ltac:(vm_compute; reflexivity))`
+  both hand the tactic a goal whose register is still `?r`, and `set_solver` /
+  `vm_compute` on an evar does not terminate usefully. Use
+  `etransitivity; [apply L; <tac> | ]` so `apply` fixes the register from the
+  goal first. (Same trap as §"Inline `ltac:` in argument position", reached from
+  a different direction.)
+
+## Directed entailments, not `⊣⊢` rewrites, for frame bridges
+
+`hreg_frame_ext`, `hreg_frame_ro_ext`, `mm_rw_split`, `mm_ro_split` are `↔`/`⊣⊢`,
+so using them means `rewrite` — and **a `rewrite` inside a proofmode goal fires
+on the whole `envs_entails Δ Q`, context included** (this is RULE ONE again, in
+a shape that is easy to miss because the lemma looks tiny). Measured inside one
+`wp_instr` arm: `rewrite mm_rw_split mm_rs_PC .. mm_rs_ip` — a seven-cell split
+plus its seven lookup rewrites — cost **~110 s**; nothing else in the arm cost
+more than a second.
+
+The fix is not to tune the rewrite, it is to **not rewrite at the call site**.
+Export the same steps as one-directional lemmas, proved once where the goal is
+two lines long, and let callers use `iDestruct` / `iApply`:
+
+```coq
+Lemma mm_rw_ext rs rs' : reg_agree_on (mm_Drw ∪ mm_Dro) rs rs' ->
+  hreg_frame rs mm_Drw -∗ hreg_frame rs' mm_Drw.
+Lemma mm_rw_open <tower params> :
+  hreg_frame (mm_rs ..) mm_Drw -∗ (PC ↦ᵣ pc ∗ .. ∗ mip ↦ᵣ ip).
+Lemma mm_rw_close <tower params> :
+  (PC ↦ᵣ pc ∗ .. ∗ mip ↦ᵣ ip) -∗ hreg_frame (mm_rs ..) mm_Drw.
+```
+
+Note `mm_rw_open`/`_close` are stated **at the tower**, so the lookup rewrites
+are absorbed too and the caller neither splits nor rewrites. Rule of thumb: if a
+frame lemma appears under `rewrite` anywhere downstream of the file that proves
+it, that is a directed lemma waiting to be written.
 
 ## Register maps
 
@@ -635,3 +711,32 @@ and runs in CI on every checkin.
   `rewrite` then fails with "does not match any subterm" while the printed goal
   shows the very term, character-identical. State register facts CID-generically
   up front (`assert (∀ CID', rget (CID := CID') M2 r = v)`) and rewrite with that.
+
+## A HINT-DATABASE DISPATCH IS A DEPTH PROBLEM, NOT A BREADTH ONE (measured 2026-08-18, UserTotalU)
+
+`UserTotalU`'s two dispatch tables discharge ~98 per-family `goodmb`
+obligations through one tactic that ends in `eauto … with u_gm`, where
+`u_gm` holds the ~80 twins of P5's catalogue plus the gpr-index side
+conditions.  Breadth is cheap — a twin whose head instruction does not match
+fails its `apply` immediately — but DEPTH is not: at `eauto 6` each call
+site cost **~15 s** and the file took **half an hour**; at `eauto 3` it is a
+few seconds each.  The obligation is only ever "apply the family's twin,
+then its side conditions, then at most one step inside one", so 3 is the
+real bound and everything above it is backtracking through side conditions
+that were already going to fail.
+
+Two companion rules from the same measurement:
+
+* **Put the SYMBOLIC-INDEX side conditions at `Hint Extern 0`.**  A
+  `Hint Extern 2 (Du_w _ = true) => vm_compute; reflexivity` is right for a
+  named cell and a DISASTER at `Du_w (R_bitvector_64 (gpr_of_Z (uint i)))`,
+  where `bool_decide (r ∈ u_rw_list)` is stuck on a symbolic index and
+  `vm_compute` grinds.  Give the gpr shape its own cost-0 extern so the
+  computing one is never reached.
+* **A premise the database cannot possibly discharge is what actually
+  hangs.**  Before the gate certificates existed (§11 of the user-tier
+  plan), `goodmb_execute_JAL_total`'s
+  `goodmb … (currentlyEnabled Ext_Zca) s ∅ = true` premise had no producer,
+  and `eauto` did not fail on it — it searched for minutes. If a hint-driven
+  discharge is mysteriously slow, look first for an obligation nothing in
+  the database proves.

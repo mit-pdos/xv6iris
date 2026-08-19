@@ -1723,31 +1723,20 @@ Lemma upt_pt2_base (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
   forall t, upt_tree_spec uroot tfp um t -> pt_base t = uroot.
 Proof. intros t Hspec. exact (proj1 Hspec). Qed.
 
-(* the instantiated switch-window trampoline fetch + step engine *)
-Section Pt2TrampEngines.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+(* THE PER-NODE SWITCH-WINDOW STEP ENGINES LIVE IN [Pt2WalkPt.v].
 
+   [wp_instr_pt2_tramp_kcur] / [_kprev] there are
+   [TrampStepPt.wp_instr_tramp_pt] at [Res :=] the window's residue
+   ([Pt2WalkPt.pt2_res_kcur] / [_kprev] -- these invariants with the satp /
+   tlb / pmpcfg_n / pmpaddr_n cells taken out into the engine's frame, since
+   the walk reads and writes them), with the fetch obligation
+   [TrampStepPt.tramp_fetch_tr] in place of the whole-cycle [Habs] a
+   [translateAddr] fupd over a whole sigma used to be (per-node stepping
+   makes that unsound: other harts run between the walk's nodes).
 
-  Definition wp_instr_pt2_tramp (rc : mword 44) (Sp Sc : ptree -> Prop)
-      (HSp : pt2_tramp_spec Sp) (HSc : pt2_tramp_spec Sc)
-      (Hbc : forall t, Sc t -> pt_base t = rc) :=
-    wp_instr_tramp_pt (tlb_inv_pt2 rc Sp Sc) (pt2_tramp_fetch_habs rc Sp Sc HSp HSc Hbc).
-
-  (* the SHARED-KERNEL mirror: the kernel side needs only its persistent
-     [kmap_at] claim + [tlb_inv_pt2_kcur], no [pt2_tramp_spec]/[pt_base]
-     obligation of its own (both fold out of [kpt_inv]'s own invariant). *)
-  Definition wp_instr_pt2_tramp_kcur (rc : mword 44) (Sp : ptree -> Prop)
-      (HSp : pt2_tramp_spec Sp) :=
-    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp)
-      (pt2_tramp_fetch_habs_kcur rc Sp HSp).
-
-  (* userret's mirror: the shared side is now [Sp] (the KERNEL table, the
-     PREVIOUS slot); [Sc] (the USER table, CURRENT) keeps its own
-     [pt2_tramp_spec]/[pt_base] obligations, exactly as [Sp] does above. *)
-  Definition wp_instr_pt2_tramp_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
-      (HSc : pt2_tramp_spec Sc) (Hbc : forall t, Sc t -> pt_base t = rc) :=
-    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc)
-      (pt2_tramp_fetch_habs_kprev rc kroot Sc HSc Hbc).
-
-End Pt2TrampEngines.
+   The exec-level [pt2_tramp_fetch_habs_kcur] / [_kprev] above are what the
+   per-node walk had to reproduce, and their geometry plumbing carried over
+   verbatim; only the interpreter changed.  What did NOT carry is the
+   INTERPRETER's uniformity: these two invariants hold one OWNED table and
+   one SHARED one, so neither of the two existing routes serves the whole
+   walk -- see [Pt2WalkPt.v]'s header for how the arms split. *)

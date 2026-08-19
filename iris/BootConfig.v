@@ -302,8 +302,8 @@ Definition boot_gprs : gset register := list_to_set boot_gpr_list.
      AND nextPC, and [reset_regs] deliberately does not pin the latter;
    - what [SpecEntry.wp_entry_boot] quantifies over and then WRITES
      (pmpaddr_n, mepc, satp, medeleg, mideleg, mie, mcounteren, stimecmp);
-   - the [MinstretInv] cells the per-era invariants are allocated over, and
-     the wire pins the device client already asks for;
+   - the [MinstretInv] cells [InstrBytes.pc_is] carries ([minstret_res] /
+     [clock_res]), and the wire pins the device client already asks for;
    - the FOUR S-mode trap registers past the M-mode contract: [tlb]
      ([SpecMain.main_hart_raw], [KptShare.tlb_res_pt]) and [IntrDefs.
      trap_csrs]' [sepc] / [scause] / [stval], all of them [boot_bridge]
@@ -342,7 +342,32 @@ Definition boot_D_named : list register :=
        -- a register outside this set has NO CELL in the era, so a spec that
        asks for one is unsatisfiable.  All three park in
        [IntrDefs.hart_csrs], inside [cpu_own]. *)
-    (sscratch : register); (mstateen0 : register); (sstateen0 : register) ].
+    (sscratch : register); (mstateen0 : register); (sstateen0 : register);
+    (* THE TWO COUNTER-PERMISSION CELLS THE U TIER READS AND NOBODY WRITES.
+       A U-mode [csrr] of a counter CSR runs [counter_enabled], which reads
+       scounteren, and the hpm path reads mhpmcounter; under per-node
+       stepping every read the cycle makes must be answerable from an OWNED
+       cell, so both are in the U footprint ([UserTotalU.Du_r_scen] /
+       [Du_r_hpm]).  Like the three above they are in the domain even though
+       no boot code writes them -- a register outside this set has no cell in
+       the era.  They are frozen into [RiscvFetchExec.hw_config] at
+       [hw_config_intro] and never threaded again (ruled 2026-08-18).
+       [mcounteren] is NOT one of them: timerinit WRITES it, so its
+       persistent form is minted later, by [TimerCap.sstc_enabled]. *)
+    ((R_bitvector_32 scounteren) : register); (mhpmcounter : register);
+    (* THE TWO COUNTER-INHIBIT CELLS THE CYCLE WRAPPER READS.  [swp]'s
+       [swp_should_inc_minstret] reads both on every instruction, in both
+       modes, so they are in every step engine's read footprint
+       ([WpMmodeSwpBase.mm_in_mc] / [WpSmodeWfi.wfi_in_mc]); they are owned
+       persistently inside [MinstretInv.minstret_res], which rides in
+       [InstrBytes.pc_is].  Like the two above they are in the domain even
+       though no boot code writes them -- a register outside this set has no
+       cell in the era, and [pc_is] could not be formed at all without them.
+       Frozen ([↦ᵣ□]) by [BootChain.boot_entry_pre] on the way into the first
+       [pc_is]; their VALUES are existential, since nothing reasons about
+       them beyond the counter's own arithmetic. *)
+    ((R_bitvector_32 mcountinhibit) : register);
+    ((R_bitvector_64 minstretcfg) : register) ].
 
 Definition boot_D_list : list register := boot_D_named ++ boot_gpr_list.
 
@@ -379,23 +404,28 @@ Section BootBundles.
      bundle persistent and hence free to thread); every pure conjunct is
      [vm_compute] on a value [reset_regs] pinned.  [kmap_static_claims] comes
      from the client (adequacy mints it). *)
-  Lemma hw_config_intro :
+  Lemma hw_config_intro (scen0 : mword 32) (hpm0 : type_of_register mhpmcounter) :
     misa ↦ᵣ boot_w64 0x800000000014112D -∗
     mseccfg ↦ᵣ boot_w64 0 -∗
     pma_regions ↦ᵣ pma_boot -∗
     htif_tohost_base ↦ᵣ None -∗
     elp ↦ᵣ landing_pad_bits_backwards NO_LP_EXPECTED -∗
     senvcfg ↦ᵣ boot_w64 0 -∗
-    kmap_static_claims ==∗
+    (R_bitvector_32 scounteren) ↦ᵣ scen0 -∗
+    mhpmcounter ↦ᵣ hpm0 -∗
+    kmap_static_claims -∗
+    gen_cert ==∗
     hw_config.
   Proof.
-    iIntros "Hmisa Hsec Hpma Hhtif Help Hsenv #Hb".
+    iIntros "Hmisa Hsec Hpma Hhtif Help Hsenv Hscen Hhpm #Hb #Hcert".
     iMod (reg_pointsto_persist with "Hmisa") as "#Hmisa'".
     iMod (reg_pointsto_persist with "Hsec")  as "#Hsec'".
     iMod (reg_pointsto_persist with "Hpma")  as "#Hpma'".
     iMod (reg_pointsto_persist with "Hhtif") as "#Hhtif'".
     iMod (reg_pointsto_persist with "Help")  as "#Help'".
     iMod (reg_pointsto_persist with "Hsenv") as "#Hsenv'".
+    iMod (reg_pointsto_persist with "Hscen") as "#Hscen'".
+    iMod (reg_pointsto_persist with "Hhpm")  as "#Hhpm'".
     iModIntro. rewrite /hw_config.
     iExists (boot_w64 0x800000000014112D), (boot_w64 0), pma_boot,
             (landing_pad_bits_backwards NO_LP_EXPECTED).
@@ -415,7 +445,9 @@ Section BootBundles.
                                | apply bv_eq; vm_compute; reflexivity]|].
     iSplit; [iPureIntro; first [reflexivity
                                | apply bv_eq; vm_compute; reflexivity]|].
-    iExact "Hb".
+    iSplit; [iExact "Hb"|]. iSplit; [iExact "Hcert"|].
+    rewrite /counter_caps. iExists scen0, hpm0.
+    iSplit; [iExact "Hscen'" | iExact "Hhpm'"].
   Qed.
 
   (* [mmode_config] at the reset mstatus (0xA00000000: SXL = UXL = 2,
@@ -424,19 +456,18 @@ Section BootBundles.
      [InstrBytes.mmode_config_rebuild]. *)
   Lemma mmode_config_intro (dq : dfrac) :
     hw_config -∗
-    minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Machine -∗
     mstatus ↦ᵣ{ dq } boot_w64 0xA00000000 -∗
     mmode_config dq.
   Proof.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms".
+    iIntros "#Hhw Hhs Hpriv Hms".
     iApply (mmode_config_rebuild dq (boot_w64 0xA00000000)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               mstatus_reset_kernel_facts
-              with "Hhw Hinv Hhs Hpriv Hms").
+              with "Hhw Hhs Hpriv Hms").
   Qed.
 
 End BootBundles.
@@ -548,6 +579,12 @@ Section BootRegs.
       sscratch ↦ᵣ register_lookup sscratch rs ∗
       mstateen0 ↦ᵣ register_lookup mstateen0 rs ∗
       sstateen0 ↦ᵣ register_lookup sstateen0 rs ∗
+      (R_bitvector_32 scounteren) ↦ᵣ register_lookup (R_bitvector_32 scounteren) rs ∗
+      mhpmcounter ↦ᵣ register_lookup mhpmcounter rs ∗
+      (R_bitvector_32 mcountinhibit)
+        ↦ᵣ register_lookup (R_bitvector_32 mcountinhibit) rs ∗
+      (R_bitvector_64 minstretcfg)
+        ↦ᵣ register_lookup (R_bitvector_64 minstretcfg) rs ∗
       ([∗ list] r ∈ boot_gpr_list, r ↦ᵣ register_lookup r rs).
   Proof.
     rewrite boot_reg_list /boot_D_list big_sepL_app.
@@ -555,10 +592,11 @@ Section BootRegs.
     iDestruct "Hn" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                         H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                         H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
-                        H29 & H30 & H31 & H32 & H33 & H34 & H35 & H36 & H37 & _)".
+                        H29 & H30 & H31 & H32 & H33 & H34 & H35 & H36 & H37 &
+                        H38 & H39 & H40 & H41 & _)".
     iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
             H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33 H34
-            H35 H36 H37".
+            H35 H36 H37 H38 H39 H40 H41".
   Qed.
 
   (* the register FILE a reset hart's GPRs form: x0 reads zero (the [gpr_pt]

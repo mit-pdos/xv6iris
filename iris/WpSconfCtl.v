@@ -2,7 +2,10 @@
    (interrupt-sweep stage 5): [sconf]+[sie_cap] twins of
    WpSmodePtCtl.v's fence / c.j / jal / c.ret leaves over the agnostic
    funnel [wp_instr_s_sconf], plus the compressed indirect call c.jalr
-   (the c.ret leaf with rd = ra, i.e. with the link write).
+   (the c.ret leaf with rd = ra, i.e. with the link write).  Since the
+   per-node port they go through that funnel's GENERAL engine,
+   [WpSconfEngine.wp_instr_s_gen], which hands the obligation [sconf]
+   whole -- a fence reads cur_privilege + menvcfg, a jump reads misa.
 
    Spec cleanups made in this pass:
      - the config premises are gone as everywhere in the sweep;
@@ -27,64 +30,21 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpDecode ExecCommon WpGpr RegFile HartTp WpNext.
 Require Import SmodeCore.
-Require Import WpSmodePtCtl.
 Require Import WpMmodeLeafBase.
-Require Import IntrDefs WpSmodeIntr.
+Require Import HartSwp HartMFrame WpMmodeSwpBase.
+Require Import IntrDefs WpSmodeIntr WpSconfEngine.
 Require Import IntrDefs.
 Import Defs.
 
-(* ---- Local helpers (copies: the originals are Local in WpSmodePtCtl.v /
-   ProofSpin.v; [exec_execute_FENCE_S] is exported and imported). ---- *)
-
-Local Lemma exec_execute_JAL_zreg_zca (imm : mword 21) s :
-    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-    exec (execute_JAL imm zreg) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-  Proof.
-    intros Halign Hzca.
-    unfold execute_JAL, get_next_pc.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)).
-    cbn match.
-    unfold zreg.
-    rewrite (exec_bind0_Some _ _ _ _ _
-      (exec_wX_bits_gpr (zero_extend' 5 ('b"00")) (register_lookup nextPC s.(sregs))
-         (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))))).
-    apply exec_returnm.
-  Qed.
-
-Local Lemma exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :
-  uint rd <> 0 ->
-  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  exec (execute_JAL imm (Regidx rd)) s
-  = Some (RETIRE_SUCCESS,
-          set_reg (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                  (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (register_lookup nextPC s.(sregs)))).
-Proof.
-  intros Hrd Halign Hzca.
-  unfold execute_JAL, get_next_pc.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)).
-  cbn match.
-  match goal with |- context[Defs.bind0 ?wx _] =>
-    assert (Hwx : exec wx (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                  = Some (tt, set_reg (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                                (regval_into_reg (register_lookup nextPC s.(sregs)))))
-  end.
-  { rewrite (exec_wX_bits_gpr rd (register_lookup nextPC s.(sregs)) _).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    reflexivity. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
-  apply exec_returnm.
-Qed.
-
+(* THE EXEC-SIDE BRIDGES ARE GONE, and with them the [WpSmodePtCtl] import.
+   This file used to carry local copies of [exec_execute_JAL_{zreg,gpr}_zca]
+   and to import [exec_execute_FENCE_S] / [exec_execute_FENCEI_S], because a
+   leaf's obligation was an [exec] fact about the whole instruction.  Under
+   per-node stepping the obligation is an [swp] one, discharged by
+   [WpSconfEngine]'s general step engine [wp_instr_s_gen] over the S-mode
+   node rules there ([swp_execute_FENCE_S], [swp_execute_FENCEI_s],
+   [swp_execute_JAL_s] / [_zreg_s], [swp_execute_JALR_s] / [_ret_s]) -- so
+   nothing consumed them and they are deleted rather than carried. *)
 
 Section WpSconfCtl.
   Context `{!riscvGS Σ}.
@@ -117,46 +77,20 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc false
-              (FENCE (fm, pred, succ, rs, rd))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0)
-      by (unfold s_pc; tmig; exact Lmenv).
-    iModIntro. iExists s_pc.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_FENCE_S menvcfg0 fm pred succ rs rd s_pc
-               Lpriv_pc Lmenv_pc Hfiom). }
-    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
-      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf (CID := CID)) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    (* STAGE 1: the funnel resumes on the SAME hart (fence is not a trap
-       boundary), so the step's [wp_next] obligation is discharged here. *)
-    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. exact Hs.
+    iApply (wp_instr_s_gen pc (add_vec_int pc 4) false
+              (FENCE (fm, pred, succ, rs, rd)) m m n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iApply (swp_mono (CID := CIDn) with "[Hf HPC HnPC Hback] [Hpriv Hmenv]");
+        [| iApply (swp_execute_FENCE_S (CID := CIDn) fm pred succ rs rd MENVCFG_S
+                     with "Hcert Hpriv Hmenv") ].
+      iIntros (e) "(-> & Hpriv & Hmenv)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc". iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
+    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
   Lemma wp_fencei_s_sconf
@@ -172,36 +106,19 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc false (FENCEI (imm, rs, rd))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iModIntro. iExists s_pc.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_FENCEI_S imm rs rd s_pc). }
-    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
-      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf (CID := CID)) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. exact Hs.
+    iApply (wp_instr_s_gen pc (add_vec_int pc 4) false
+              (FENCEI (imm, rs, rd)) m m n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      iApply (swp_mono (CID := CIDn) with "[Hsc Hf HPC HnPC] []");
+        [| iApply (swp_execute_FENCEI_s (CID := CIDn) imm rs rd with "Hcert") ].
+      iIntros (e) "->". iSplitR; [done|]. iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
+    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
@@ -253,49 +170,23 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc false
-              (FENCE (fm, pred, succ, rs, rd))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0)
-      by (unfold s_pc; tmig; exact Lmenv).
-    iModIntro. iExists s_pc.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_FENCE_S menvcfg0 fm pred succ rs rd s_pc
-               Lpriv_pc Lmenv_pc Hfiom). }
-    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
-      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf (CID := CID)) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    (* STAGE 1: same-hart resume -- pin [wp_next] at [cpu_id] first (the
-       pure obligation is [eq_refl], closed by [//]), THEN [iNext] so it
-       strips the later from the now-concrete continuation AND the goal
-       together. *)
-    iSpecialize ("Hcont" $! CID with "[//]").
-    iNext.
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply (wp_instr_s_gen pc (add_vec_int pc 4) false
+              (FENCE (fm, pred, succ, rs, rd)) m m n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iApply (swp_mono (CID := CIDn) with "[Hf HPC HnPC Hback] [Hpriv Hmenv]");
+        [| iApply (swp_execute_FENCE_S (CID := CIDn) fm pred succ rs rd MENVCFG_S
+                     with "Hcert Hpriv Hmenv") ].
+      iIntros (e) "(-> & Hpriv & Hmenv)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc". iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
+    - (* the later this leaf HANDS OUT is the step's own, and the funnel
+         offers it outermost -- [wp_next_later] is the commutation. *)
+      iApply wp_next_later. iIntros (CIDx Hs).
+      iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hs|].
+      iNext. iIntros "Hcg' _ Hpc'". iApply ("Hcont" with "Hcg' Hpc'").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -317,56 +208,25 @@ Section WpSconfCtl.
   Proof.
     intros tgt Hal0.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc true (JAL (jimm, zreg))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "[#Hhw Hsc2]".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    assert (HzcaC : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ rewrite Lmisa; exact HmisaC | vm_compute; reflexivity ]. }
-    assert (Halign_spc : eq_vec (access_vec_dec
-              (add_vec (register_lookup PC s_pc.(sregs)) (sign_extend' 64 jimm)) 0) ('b"0") = true).
-    { rewrite Hpcv. exact Hal0. }
-    iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro.
-    iExists (set_reg s_pc nextPC tgt).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc.
-      change (execute (JAL (jimm, zreg))) with (execute_JAL jimm zreg).
-      rewrite (exec_execute_JAL_zreg_zca jimm s_pc Halign_spc
-                 (exec_currentlyEnabled_Zca s_pc HzcaC)).
-      rewrite Hpcv. reflexivity. }
-    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
-      by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf (CID := CID)) with "[$Hhw $Hsc2]" as "Hsc".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    (* STAGE 1: c.j resumes on the SAME hart (the absorbing engine already
-       took/handled any pending traps before this callback runs). *)
-    iSpecialize ("Hcont" $! CID with "[//]").
-    iNext.
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    assert (Hz : uint (zero_extend' 5 ('b"00") : mword 5) = 0)
+      by (vm_compute; reflexivity).
+    iApply (wp_instr_s_gen pc tgt true (JAL (jimm, zreg)) m m n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
+      iApply (swp_mono (CID := CIDn) with "[Hsc] [Hf HPC HnPC]");
+        [| iApply (swp_execute_JAL_zreg_s (CID := CIDn) jimm
+                     (zero_extend' 5 ('b"00")) (tp_pin (CID := CIDn) m) pc
+                     (add_vec_int pc 2) Hz Hal0
+                     with "Hcert Hf HPC HnPC Hmisa") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & _)". iSplitR; [done|]. iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
+    - iApply wp_next_later. iIntros (CIDx Hs).
+      iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hs|].
+      iNext. iIntros "Hcg' _ Hpc'". iApply ("Hcont" with "Hcg' Hpc'").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -389,82 +249,33 @@ Section WpSconfCtl.
     iIntros (Hrd Hrdok Hal0) "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b pc false (JAL (imm, Regidx rd))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "[#Hhw Hsc2]".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (Hpcv : register_lookup PC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    assert (Hlink : register_lookup nextPC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
-    assert (Lmisa1 : register_lookup misa (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = misa0).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
-            with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (add_vec_int pc 4))
-                 with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 4))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                        nextPC (add_vec pc (sign_extend' 64 imm)))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 4))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (if false then 2%Z else 4%Z) with 4%Z.
-      change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
-      rewrite (exec_execute_JAL_gpr_zca imm rd (set_reg σ nextPC (add_vec_int pc 4))
-                 Hrd ltac:(rewrite Hpcv; exact Hal0)
-                 (exec_currentlyEnabled_Zca (set_reg σ nextPC (add_vec_int pc 4)) ltac:(rewrite Lmisa1; exact HmisaC))).
-      rewrite Hpcv. rewrite Hlink. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                         nextPC (add_vec pc (sign_extend' 64 imm)))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 4))).(sregs)
-             = add_vec pc (sign_extend' 64 imm)).
-    { rewrite ?sregs_set_reg.
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m !!! Regidx csp_rs1)
+                  = <[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m
+                      !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    (* the leaf's own write commutes with the tp pin *)
-    tp_refold Hrdtp "Hfile".
-    iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b Hsp with "Hcap") as "Hcap".
-    iAssert (sconf (CID := CID)) with "[$Hhw $Hsc2]" as "Hsc".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    (* STAGE 1: jal resumes on the SAME hart. *)
-    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. exact Hs.
+    iApply (wp_instr_s_gen pc (add_vec pc (sign_extend' 64 imm)) false
+              (JAL (imm, Regidx rd)) m
+              (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m)
+              n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      iApply (swp_mono (CID := CIDn) with "[Hsc] [Hf HPC HnPC]");
+        [| iApply (swp_execute_JAL_s (CID := CIDn) imm rd
+                     (tp_pin (CID := CIDn) m) pc (add_vec_int pc 4) Hrd Hal0
+                     with "Hcert Hf HPC HnPC Hmisa") ].
+      iIntros (e) "(-> & Hf & HPC & HnPC & _)". iSplitR; [done|].
+      iEval (rewrite (tp_pin_upd m rd (regval_into_reg (add_vec_int pc 4)) Hrdtp))
+        in "Hf".
+      iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [| done ].
+      iApply (sie_cap_retarget (CID := CIDx) m
+                (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b Hsp
+                with "Hcap").
+    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -523,79 +334,26 @@ Section WpSconfCtl.
     assert (Htgt_all : forall hh : CpuId, ret_pc (rget (CID := hh) m ra) = tgt)
       by (intros hh; unfold tgt; by rewrite (src_ok_rget_indep m ra hh CID)).
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc true (JALR (zeros' 12, Regidx ra, zreg))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx ra) with "Hfile") as "[Hrac Hfb]".
-    iDestruct (gpr_pt_value ra (tp_pin m (Regidx ra)) s_pc with "Hreg Hrac") as %Lra.
-    iDestruct ("Hfb" with "Hrac") as "Hfile".
-    assert (Lra' : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs) = rget m ra).
-    { (* the read crosses the rebinding: [tp_pin m] at the REBOUND hart vs
-         the statement's [rget m ra] at the ENTRY hart, reconciled by this
-         leaf's [SrcOk ra] class. *)
-      rewrite (src_ok_rget_indep m ra CID0 CID).
-      pose proof Lra as H.
-      replace (Z.eqb (uint ra) 0) with false in H by (symmetry; apply Z.eqb_neq; exact Hra).
-      cbn match in H. exact H. }
-    assert (Hpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (Hmenv_spc : register_lookup menvcfg s_pc.(sregs) = menvcfg0).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lmenv | vm_compute; reflexivity ]. }
-    assert (Hzic : exec (currentlyEnabled Ext_Zicfilp) s_pc = Some (false, s_pc)).
-    { apply exec_cE_zicfilp_false_S; [ exact Hpriv_spc | rewrite Hmenv_spc; exact Hlpe ]. }
-    assert (Hmisa_spc : register_lookup misa s_pc.(sregs) = misa0).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
-    assert (Hzca : exec (currentlyEnabled Ext_Zca) s_pc = Some (true, s_pc)).
-    { apply exec_currentlyEnabled_Zca. rewrite Hmisa_spc. exact HmisaC. }
-    iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro.
-    iExists (set_reg s_pc nextPC tgt).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      change (execute (JALR (zeros' 12, Regidx ra, zreg)))
-        with (execute_JALR (zeros' 12) (Regidx ra) zreg).
+    assert (Hz : uint (zero_extend' 5 ('b"00") : mword 5) = 0)
+      by (vm_compute; reflexivity).
+    iApply (wp_instr_s_gen pc tgt true (JALR (zeros' 12, Regidx ra, zreg))
+              m m n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
       change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-      assert (Htgt : update_vec_dec (add_vec
-                (register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs))
-                (sign_extend' 64 (zeros' 12))) 0 ('b"0") = tgt)
-        by (rewrite Lra'; apply ret_pc_jalr).
-      rewrite <- Htgt.
-      apply (exec_execute_JALR_ret_zca (zeros' 12) ra (zero_extend' 5 ('b"00") : mword 5) s_pc
-               Hra ltac:(vm_compute; reflexivity) Hzic Hzca).
-      rewrite Htgt. apply ret_pc_aligned. }
-    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
-      by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf (CID := CID)) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    (* STAGE 1: c.ret resumes on the SAME hart. *)
-    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. exact Hs.
+      iApply (swp_mono (CID := CIDn) with "[Hback HPC] [Hf HnPC Hpriv Hmenv]");
+        [| iApply (swp_execute_JALR_ret_s (CID := CIDn) ra
+                     (zero_extend' 5 ('b"00")) (tp_pin (CID := CIDn) m)
+                     (add_vec_int pc 2) Hz
+                     with "Hcert Hf HnPC Hpriv Hmenv Hmisa") ].
+      iIntros (e) "(-> & Hf & HnPC & Hpriv & Hmenv & _)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      rewrite (Htgt_all CIDn). iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
+    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -639,99 +397,44 @@ Section WpSconfCtl.
     iIntros "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b pc true (JALR (zeros' 12, Regidx rs1, Regidx rd))
-              with "Hcg Hpc Hinstr").
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside a proof, so [rename] moves it aside --
-       and the STATEMENT never sees that, so the 184 call sites that name this
-       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
-       under a different name instead would force a [(CID := ...)] annotation on
-       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
-       with the rename the body below is UNCHANGED. *)
-    rename CID into CID0.
-    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    (* the base register is read BEFORE the link is written, so the target
-       is computed at the ENTRY map [m] even when rd = rs1. *)
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrsc Hfb]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrsc") as %Lrs.
-    iDestruct ("Hfb" with "Hrsc") as "Hfile".
-    assert (Lrs' : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs) = rget m rs1).
-    { (* the read crosses the rebinding: [tp_pin m] at the REBOUND hart vs
-         the statement's [rget m rs1] at the ENTRY hart, reconciled by this
-         leaf's [SrcOk rs1] class. *)
-      rewrite (src_ok_rget_indep m rs1 CID0 CID).
-      pose proof Lrs as H.
-      replace (Z.eqb (uint rs1) 0) with false in H by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      cbn match in H. exact H. }
-    assert (Hlink : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
-      by (unfold s_pc; rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
-    assert (Hpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (Hmenv_spc : register_lookup menvcfg s_pc.(sregs) = menvcfg0).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lmenv | vm_compute; reflexivity ]. }
-    assert (Hzic : exec (currentlyEnabled Ext_Zicfilp) s_pc = Some (false, s_pc)).
-    { apply exec_cE_zicfilp_false_S; [ exact Hpriv_spc | rewrite Hmenv_spc; exact Hlpe ]. }
-    assert (Hmisa_spc : register_lookup misa s_pc.(sregs) = misa0).
-    { unfold s_pc; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
-    assert (Hzca : exec (currentlyEnabled Ext_Zca) s_pc = Some (true, s_pc)).
-    { apply exec_currentlyEnabled_Zca. rewrite Hmisa_spc. exact HmisaC. }
-    iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (add_vec_int pc 2))
-                 with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 2))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg s_pc nextPC tgt)
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 2))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      change (execute (JALR (zeros' 12, Regidx rs1, Regidx rd)))
-        with (execute_JALR (zeros' 12) (Regidx rs1) (Regidx rd)).
-      rewrite (exec_execute_JALR_link_zca (zeros' 12) rs1 rd s_pc Hrs1 Hrd Hzic Hzca
-                 ltac:(rewrite Lrs' ret_pc_jalr; apply ret_pc_aligned)).
-      rewrite Lrs' ret_pc_jalr Hlink. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg s_pc nextPC tgt)
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 2))).(sregs) = tgt).
-    { rewrite ?sregs_set_reg. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m !!! Regidx csp_rs1)
+                  = <[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m
+                      !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    (* the leaf's own write commutes with the tp pin *)
-    tp_refold Hrdtp "Hfile".
-    iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m) n b Hsp with "Hcap") as "Hcap".
-    iAssert (sconf (CID := CID)) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    (* STAGE 1: c.jalr resumes on the SAME hart. *)
-    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. exact Hs.
+    iApply (wp_instr_s_gen pc tgt true (JALR (zeros' 12, Regidx rs1, Regidx rd))
+              m (<[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m)
+              n n b emp%I
+              with "[] [] Hcg Hpc Hinstr [Hcont]").
+    - iIntros (CIDn) "Hsc Hf HPC HnPC".
+      iDestruct (sconf_ctl_acc (CID := CIDn) with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      assert (Halign : eq_vec (access_vec_dec
+                (update_vec_dec
+                   (add_vec (tp_pin (CID := CIDn) m !!! Regidx rs1)
+                      (sign_extend' 64 (zeros' 12))) 0
+                   (MachineWord.MachineWord.N_to_word
+                      (MachineWord.MachineWord.Z_idx 1)
+                      (BinaryString.Raw.to_N "0" 0%N))) 0)
+                (MachineWord.MachineWord.N_to_word
+                   (MachineWord.MachineWord.Z_idx 1)
+                   (BinaryString.Raw.to_N "0" 0%N)) = true)
+        by (rewrite ret_pc_jalr; apply ret_pc_aligned).
+      iApply (swp_mono (CID := CIDn) with "[Hback HPC] [Hf HnPC Hpriv Hmenv]");
+        [| iApply (swp_execute_JALR_s (CID := CIDn) (zeros' 12) rs1 rd
+                     (tp_pin (CID := CIDn) m) (add_vec_int pc 2) Hrd Halign
+                     with "Hcert Hf HnPC Hpriv Hmenv Hmisa") ].
+      iIntros (e) "(-> & Hf & HnPC & Hpriv & Hmenv & _)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      rewrite ret_pc_jalr (Htgt_all CIDn).
+      iEval (rewrite (tp_pin_upd m rd (regval_into_reg (add_vec_int pc 2)) Hrdtp))
+        in "Hf".
+      iFrame.
+    - iIntros (CIDx) "Hcap". iSplitL; [| done ].
+      iApply (sie_cap_retarget (CID := CIDx) m
+                (<[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m) n b Hsp
+                with "Hcap").
+    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)

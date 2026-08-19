@@ -7,6 +7,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras ExecCommon.
 Require Import InstrBytes.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 
@@ -113,6 +114,22 @@ Ltac drive_csr :=
           end
       end; cbn match ].
 
+(* [WpGprCsrrCommon.drive_csr] walks the [read_CSR] cascade inside an [exec]
+   goal.  The guards are in the TERM, not in the interpreter, so the same walk
+   serves a pure term equation -- which is the form both [exec] and [hfrun]
+   want.  Collapse each closed guard and let iota drop the branch. *)
+Ltac drive_csr_term :=
+  unfold read_CSR;
+  repeat (match goal with
+          | |- context [ if ?g then _ else _ ] =>
+              assert_fails (is_var g);
+              let v := eval vm_compute in g in
+              lazymatch v with
+              | true  => replace g with true by (vm_compute; reflexivity)
+              | false => replace g with false by (vm_compute; reflexivity)
+              end
+          end; cbn match).
+
 (* Gated check_CSR_result engine for CSRRead. *)
 (* privilege-generic, for the same reason as [csrr_read_step_p]. *)
 Lemma exec_check_CSR_read_p (p : Privilege) (csr : mword 12) s :
@@ -160,56 +177,9 @@ Lemma misa_set_nextPC (s : mstate) (v : mword 64) :
 Proof. rewrite ?sregs_set_reg.
   rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ]. Qed.
 
-(* Shared Iris-level machinery for the csrr WPs (fractional reg points-to,
-   mmode_config half-split/combine), moved out of Section WpCsrrMhartidGpr. *)
-Section WpCsrrGprShared.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-
-  Global Instance reg_pointsto_fractional_csrr (r : register) (v : type_of_register r) :
-    Fractional (fun q => reg_pointsto r (DfracOwn q) v).
-  Proof. rewrite /reg_pointsto. apply _. Qed.
-  Global Instance reg_pointsto_as_fractional_csrr (r : register) (q : Qp) (v : type_of_register r) :
-    AsFractional (reg_pointsto r (DfracOwn q) v) (fun q => reg_pointsto r (DfracOwn q) v) q.
-  Proof. rewrite /reg_pointsto. split; [done | apply _]. Qed.
-
-  Lemma reg_pointsto_agree_csrr (r : register) (dq1 dq2 : dfrac) (v1 v2 : type_of_register r) :
-    reg_pointsto r dq1 v1 -∗ reg_pointsto r dq2 v2 -∗ ⌜ v1 = v2 ⌝.
-  Proof.
-    rewrite /reg_pointsto. iIntros "H1 H2".
-    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
-    iPureIntro. exact (Eqdep_dec.inj_pair2_eq_dec _ Decidable_eq_register _ r v1 v2 Heq).
-  Qed.
-
-  (* Split [mmode_config (DfracOwn q)] into two halves: one to hand to
-     [wp_instr], the other kept to read [cur_privilege = Machine] at the
-     execute state (the CSR read needs M-privilege).  Fraction-generic
-     ([q := 1] recovers the original full-ownership version). *)
-  Lemma mmode_config_split_half_csrr (q : Qp) :
-    mmode_config (DfracOwn q) ⊢
-      mmode_config (DfracOwn (q/2)) ∗ mmode_config (DfracOwn (q/2)).
-  Proof.
-    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL & %HKF)".
-    iDestruct "Hhs" as "[Hhs1 Hhs2]".
-    iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
-    iDestruct "Hms" as "[Hms1 Hms2]".
-    iSplitL "Hhs1 Hpriv1 Hms1".
-    - iFrame "Hhw Hinv Hhs1 Hpriv1". iExists ms0. iFrame "Hms1 %".
-    - iFrame "Hhw Hinv Hhs2 Hpriv2". iExists ms0. iFrame "Hms2 %".
-  Qed.
-
-  Lemma mmode_config_combine_half_csrr (q : Qp) :
-    mmode_config (DfracOwn (q/2)) -∗ mmode_config (DfracOwn (q/2)) -∗
-    mmode_config (DfracOwn q).
-  Proof.
-    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
-    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL & %HKF)".
-    iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
-    iDestruct (reg_pointsto_agree_csrr with "Hms1 Hms2") as %<-.
-    iCombine "Hhs1 Hhs2" as "Hhs".
-    iCombine "Hpriv1 Hpriv2" as "Hpriv".
-    iCombine "Hms1 Hms2" as "Hms".
-    iFrame "Hhw Hinv Hhs Hpriv". iExists ms0. iFrame "Hms %".
-  Qed.
-End WpCsrrGprShared.
+(* The fractional-points-to instances and the [mmode_config] half
+   split/combine used to be cloned here for the csrr family.  They are
+   [InstrBytes.reg_pointsto_fractional] / [reg_pointsto_agree] /
+   [mmode_config_split] / [mmode_config_combine], with the SAME statements --
+   a per-family clone of a bundle lemma is not a specialization of anything.
+   Callers use those directly. *)

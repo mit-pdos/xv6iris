@@ -338,6 +338,19 @@ Record riscvEraGS := RiscvEraGS {
      all ~312 files that name [cpu_own].  The [inG Σ lockSetR] instance is
      [riscvF_lockSetGS] below, not a separate class, for the same reason. *)
   era_lockset_name : CPU -> gname;
+  (* THE PER-HART RESERVATION MIRROR (design/main-cycle-port.md §3a): a ghost
+     map [CPU -> option resv] whose fragment [resv_frag c r] is the logic's
+     view of [gstate.gresv c].  ONE name with per-hart fragments, rather than
+     the [era_reg_name]-style function of names, because the auth is a single
+     map and every rule that touches it touches exactly one key.
+
+     Why the logic needs it: at its conditional write an RMW hart opens its
+     invariant, sees [x |-> v'], and must know [v'] is the value it READ -- an
+     acquire cannot take [R] without knowing the write is 0->1.  Physically
+     true (every competing writer was blocked) but no invariant carries it
+     across interference, so the reservation's SNAPSHOT plus [resv_ok] in
+     [era_interp] is what supplies it. *)
+  era_resv_name : gname;
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -392,6 +405,10 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      ambient era to the one [state_interp]'s existential holds. *)
   riscvF_registryGS :: ghost_mapG Σ nat riscvEraGS;
   riscv_registry_name : gname;
+  (* the reservation mirror's class (§3a); the NAME is per-era
+     ([riscvEraGS.era_resv_name] above), since reservations do not survive a
+     power cycle -- [boot_shape] mints them all at [None]. *)
+  riscvF_resvGS :: ghost_mapG Σ CPU (option resv);
   (* THE DISK IMAGE's TYPING (claude-notes/design/crash.md): the class alone
      -- the NAME is per-era ([riscvEraGS.era_disk_name] above), because a
      fixed image map could not be re-minted after a crash.  This field is
@@ -1688,6 +1705,97 @@ Definition mstate_interp `{!riscvGS Σ} `{CpuId} (σ : mstate) : iProp Σ :=
 Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
   ([∗ set] cpu ∈ (fin_to_set CPU : gset CPU), reg_interp_at (cpu_reg_name cpu) (gr cpu))%I.
 
+
+(* ---------------------------------------------------------------------- *)
+(* THE RESERVATION MIRROR (design §3a).  [gresv] is a total function and     *)
+(* [ghost_map_auth] wants a map, so this is the one conversion -- via         *)
+(* [map_imap] over [fin_to_set CPU], which makes the lookup lemma three       *)
+(* rewrites with no [NoDup] obligation (the [list_to_map] spelling costs one).*)
+(* ---------------------------------------------------------------------- *)
+Definition resv_map (f : CPU -> option resv) : gmap CPU (option resv) :=
+  map_imap (fun c _ => Some (f c)) (gset_to_gmap () (fin_to_set CPU : gset CPU)).
+
+Lemma resv_map_lookup (f : CPU -> option resv) (c : CPU) :
+  resv_map f !! c = Some (f c).
+Proof.
+  rewrite /resv_map map_lookup_imap lookup_gset_to_gmap.
+  rewrite option_guard_True; [ reflexivity | apply elem_of_fin_to_set ].
+Qed.
+
+Lemma resv_map_insert (f : CPU -> option resv) (c : CPU) (r : option resv) :
+  resv_map (<[c := r]> f) = <[c := r]> (resv_map f).
+Proof.
+  apply map_eq. intros c'. rewrite resv_map_lookup.
+  destruct (decide (c' = c)) as [->|Hne].
+  - rewrite lookup_insert /insert /gresv_insert. by rewrite decide_True.
+  - rewrite lookup_insert_ne // resv_map_lookup /insert /gresv_insert.
+    by rewrite decide_False.
+Qed.
+
+(* the all-[None] map (every era begins there): what the boot allocation
+   hands out, one [None] fragment per hart *)
+Lemma resv_map_none (f : CPU -> option resv) :
+  (forall c, f c = None) ->
+  resv_map f = gset_to_gmap None (fin_to_set CPU : gset CPU).
+Proof.
+  intros Hf. apply map_eq. intros c.
+  rewrite resv_map_lookup lookup_gset_to_gmap option_guard_True;
+    [ by rewrite Hf | apply elem_of_fin_to_set ].
+Qed.
+
+(* THE PRESERVING CASE, which is what lets the rules whose arms never touch
+   the reservation (register nodes, announces, plain and MMIO READS) keep
+   [wp_hart_step]'s reservation-agnostic form: writing back the value that is
+   already there leaves the auth's map alone, so no fragment is needed.  Only
+   the arms that CHANGE it -- every RAM/MMIO write, the exclusive read, and the
+   [Ret] boundary -- have to carry [resv_frag]. *)
+Lemma resv_map_insert_id (f : CPU -> option resv) (c : CPU) (r : option resv) :
+  f c = r -> resv_map (<[c := r]> f) = resv_map f.
+Proof.
+  intros Hfc. apply map_eq. intros c'.
+  rewrite !resv_map_lookup /insert /gresv_insert.
+  case_decide as Hc; [ by rewrite Hc Hfc | reflexivity ].
+Qed.
+
+(* the authoritative half, held by [era_interp]; and the per-hart fragment,
+   which [pc_is] carries at [None] on every instruction boundary *)
+Definition resv_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (f : CPU -> option resv) : iProp Σ :=
+  ghost_map_auth (era_resv_name E) 1 (resv_map f).
+
+Definition resv_frag `{!riscvGS Σ} (c : CPU) (r : option resv) : iProp Σ :=
+  (c ↪[era_resv_name riscv_eraGS] r)%I.
+
+(* the frag at SOME value: what a hart owns between instructions.  A leaf
+   that leaves a dangling reservation (an AMOCAS mismatch, an A/D re-read
+   that found the bits set) ends at [Some]; the boundary drops it.  This is
+   the shape [pc_is] carries and every cycle wrapper threads. *)
+Definition resv_any `{!riscvGS Σ} (c : CPU) : iProp Σ :=
+  (∃ r : option resv, resv_frag c r)%I.
+
+Lemma resv_any_intro `{!riscvGS Σ} (c : CPU) (r : option resv) :
+  resv_frag c r -∗ resv_any c.
+Proof. iIntros "H". by iExists r. Qed.
+
+Lemma resv_frag_agree `{!riscvGS Σ} (f : CPU -> option resv) (c : CPU)
+    (r : option resv) :
+  resv_auth_at riscv_eraGS f -∗ resv_frag c r -∗ ⌜f c = r⌝.
+Proof.
+  iIntros "Ha Hf".
+  iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
+  rewrite resv_map_lookup in Hl. by injection Hl.
+Qed.
+
+Lemma resv_frag_update `{!riscvGS Σ} (f : CPU -> option resv) (c : CPU)
+    (r r' : option resv) :
+  resv_auth_at riscv_eraGS f -∗ resv_frag c r ==∗
+  resv_auth_at riscv_eraGS (<[c := r']> f) ∗ resv_frag c r'.
+Proof.
+  iIntros "Ha Hf".
+  iMod (ghost_map_update r' with "Ha Hf") as "[Ha Hf]".
+  iModIntro. rewrite /resv_auth_at resv_map_insert. iFrame.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 3. irisGS instance (claude-notes/design/crash.md).  [state_interp] is    *)
 (*    defined over the FIXED layer ALONE and holds the CURRENT era          *)
@@ -1718,7 +1826,11 @@ Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp 
   (gregs_interp_at E g.(gregs) ∗
    gen_heap_interp (hG := era_memGS_of E) g.(gmem) ∗
    dev_interp_at E g.(gdev) ∗
-   disk_dur_interp E g)%I.
+   disk_dur_interp E g ∗
+   (* the reservation mirror and its snapshot invariant (design §3a).  The
+      pure conjunct is a STEP invariant of the language, so every arm
+      re-establishes it and no rule has to carry it. *)
+   resv_auth_at E g.(gresv) ∗ ⌜resv_ok g⌝)%I.
 
 (* THE FS TIE's MACHINE SIDE: [state_interp]'s half, always at the machine's
    own disk image.  A FIXED conjunct, NOT part of [era_interp]: the disk (and
@@ -1900,6 +2012,27 @@ Section Bridge.
     - rewrite lookup_insert_ne in Hk; [|done].
       rewrite (Hag k dv Hk).
       by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
+  Qed.
+
+  (* A WRITE THAT CHANGES NOTHING needs no cell to update: the interpretation
+     absorbs it, because [register_set r (its own value) rs] has the same
+     lookups as [rs] and the agreement map is untouched.  This is what lets a
+     stretch write a PERSISTENTLY PINNED register with the value it already
+     holds -- MRET's elp reset and the trap handler's [reset_elp] both do
+     exactly that, and no full-ownership cell for elp exists to update. *)
+  Lemma reg_interp_set_same (rs : regstate) (r : register)
+      (v : type_of_register r) :
+    register_lookup r rs = v ->
+    reg_interp rs -∗ (reg_interp (register_set r v rs) : iProp Σ).
+  Proof.
+    iIntros (Hlk) "Hi". iDestruct "Hi" as (mp) "[Hm %Hag]".
+    iExists mp. iFrame "Hm". iPureIntro.
+    intros k dv Hk.
+    destruct (decide (k = r)) as [->|Hne].
+    - rewrite (Hag r dv Hk) register_lookup_set Hlk. reflexivity.
+    - rewrite (Hag k dv Hk)
+        (irrelevant_register_set k r rs v (register_beq_false k r Hne)).
+      reflexivity.
   Qed.
 
   (* reading a register cell at ANY fraction -- in particular a persistent

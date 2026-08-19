@@ -641,7 +641,7 @@ Section ProofCopyin.
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
     (* the exit continuation, named so the two joins below can take it -- kept
        [wp_next]-shaped (matching ["Hcont"]'s own type verbatim), since it is
        specialised at whichever hart each exit finally reaches. *)

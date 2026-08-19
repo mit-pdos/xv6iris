@@ -1180,7 +1180,7 @@ Section KexecDCommit.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the COMMIT's own three writes ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
@@ -1933,7 +1933,7 @@ Section KexecDMain.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the FIRST trapframe write ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")

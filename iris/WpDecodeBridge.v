@@ -36,11 +36,17 @@ Local Open Scope Z_scope.
 (*    (state-resolved) execution path -- fully [vm_compute]-able over a    *)
 (*    concrete state.                                                      *)
 (* ===================================================================== *)
-Fixpoint goodb (D : register -> bool) {X} (m : M X) (s : mstate) {struct m} : bool :=
+(* Generic in the ERROR type, not just [M X = monad exception X]: the walk's
+   early-return regions ([check_leaf_pte], [translateAddr]) are
+   [catch_early_return] blocks whose BODY lives in [monadR], and a footprint
+   certificate has to be able to see through the wrapper.  Nothing in the
+   body of [goodb] ever mentions the error type. *)
+Fixpoint goodb (D : register -> bool) {E X} (m : Defs.monad E X) (s : mstate) {struct m} : bool :=
   match m with
   | Interface.Ret _ => true
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M X) -> bool with
+      (match oc in Interface.outcome _ T
+             return (T -> Interface.iMon (fun _ => E) X) -> bool with
        | Interface.RegRead r _ => fun k => andb (D r) (goodb D (k (register_lookup r s.(sregs))) s)
        | Interface.InstrAnnounce _   => fun k => goodb D (k tt) s
        | Interface.BranchAnnounce _ _=> fun k => goodb D (k tt) s
@@ -57,6 +63,49 @@ Fixpoint goodb (D : register -> bool) {X} (m : M X) (s : mstate) {struct m} : bo
        | _ => fun _ => false
        end) k
   end.
+
+(* ===================================================================== *)
+(* [goodb] COMPOSES ALONG A BIND -- and this is what makes a certificate     *)
+(* affordable for a stretch that carries SYMBOLIC DATA.                      *)
+(*                                                                          *)
+(* [goodb] is normally discharged by [vm_compute] at the concrete reference   *)
+(* state.  That works only when the whole term is data-free: measured,        *)
+(* [goodb D_m (legalize_menvcfg o v) dstateM] with [o]/[v] FREE finishes      *)
+(* under none of vm_compute / cbv / lazy, because the evaluators normalise    *)
+(* the symbolic bitvector expressions even though goodb's ANSWER cannot       *)
+(* depend on them.                                                           *)
+(*                                                                          *)
+(* With this lemma the certificate is assembled instead of computed: each     *)
+(* sub-stretch of such a chain ([currentlyEnabled X], [hartSupports X]) takes *)
+(* no argument and IS data-free, so each piece is one cheap [vm_compute], and *)
+(* the symbolic data only ever sits in [Ret] positions, where [goodb] returns *)
+(* [true] without looking.                                                   *)
+(*                                                                          *)
+(* [exec m s = Some (x, s)] is not an extra burden: [goodb] already forbids   *)
+(* writes, so any [goodb]-certified stretch preserves the state, and that     *)
+(* fact is exactly what [exec_goodb_congr] hands back.                        *)
+(* ===================================================================== *)
+Lemma goodb_bind (D : register -> bool) {X Y} (m : M X) (f : X -> M Y)
+    (s : mstate) (x : X) :
+  goodb D m s = true -> exec m s = Some (x, s) ->
+  goodb D (Defs.bind m f) s = goodb D (f x) s.
+Proof.
+  revert x. induction m as [y | T oc k IH]; intros x Hg He.
+  - cbn [exec] in He. assert (Hx : x = y) by congruence. subst x. reflexivity.
+  - destruct oc; cbn [goodb exec Defs.bind Interface.iMon_bind] in Hg, He |- *;
+      try discriminate Hg.
+    all: first
+      [ (apply andb_prop in Hg as [HDr Hg']; rewrite HDr;
+         by apply (IH _ x Hg' He))
+      | by apply (IH tt x Hg He)
+      | by apply (IH 0%Z x Hg He) ].
+Qed.
+
+Lemma goodb_bind0 (D : register -> bool) {Y} (m : M unit) (n : M Y)
+    (s : mstate) :
+  goodb D m s = true -> exec m s = Some (tt, s) ->
+  goodb D (Defs.bind0 m n) s = goodb D n s.
+Proof. intros Hg He. exact (goodb_bind D m (fun _ => n) s tt Hg He). Qed.
 
 (* ===================================================================== *)
 (* 2. The generic read-frame congruence (proved ONCE, by induction on the *)

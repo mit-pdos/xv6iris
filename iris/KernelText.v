@@ -18,7 +18,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvPtsto RiscvExtras.
 Require Import RiscvLang RiscvExec.
-Require Import InstrBytes.
+Require Import WpDecodeBridge HartSpan HartGoodb InstrBytes.
 (* for [MISA_C], which [close_dec] reads misa bits out of *)
 Require Import RiscvFetchExec.
 From Kernel Require KernelInstrs.
@@ -168,27 +168,82 @@ Section KernelText.
      only pure side conditions, so a generated lemma's proof term carries no
      proofmode trace at all (measured: the per-lemma proofmode plumbing was
      ~76% of the Code band's tactic time). *)
-  Lemma instr_intro_rvc (A : Z) (h : mword 16) (pc : mword 64) (i : instruction) :
+
+  (* From the [decode_hval] arm's own data to [hval_of_goodb]'s two side
+     conditions.  [D_m]/[D_s] are three-register boolean predicates, so both
+     are a case split on the [orb]. *)
+  Local Lemma Dm_sub (D : gset register) :
+    (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    forall r : register, D_m r = true -> r ∈ D.
+  Proof.
+    intros H1 H2 H3 r Hr. unfold D_m in Hr.
+    apply orb_prop in Hr as [Hr|Hr];
+      [apply orb_prop in Hr as [Hr|Hr]|];
+      apply register_beq_eq in Hr; subst r; assumption.
+  Qed.
+
+  Local Lemma Ds_sub (D : gset register) :
+    (cur_privilege : register) ∈ D -> (R_bitvector_64 menvcfg : register) ∈ D ->
+    (misa : register) ∈ D ->
+    forall r : register, D_s r = true -> r ∈ D.
+  Proof.
+    intros H1 H2 H3 r Hr. unfold D_s in Hr.
+    apply orb_prop in Hr as [Hr|Hr];
+      [apply orb_prop in Hr as [Hr|Hr]|];
+      apply register_beq_eq in Hr; subst r; assumption.
+  Qed.
+
+  Local Lemma Dm_agree (rs : regstate) :
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup mseccfg rs = mword_of_int 0 ->
+    register_lookup misa rs = MISA_C ->
+    forall r : register, D_m r = true ->
+      register_lookup r rs = register_lookup r dstateM.(sregs).
+  Proof.
+    intros Hp Hs Hm.
+    exact (agree_m (MState rs ∅ dev0_state) Hp Hs Hm).
+  Qed.
+
+  Local Lemma Ds_agree (rs : regstate) :
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup menvcfg rs = MENVCFG_S ->
+    register_lookup misa rs = MISA_C ->
+    forall r : register, D_s r = true ->
+      register_lookup r rs = register_lookup r dstateS.(sregs).
+  Proof.
+    intros Hp Hs Hm.
+    exact (agree_s (MState rs ∅ dev0_state) Hp Hs Hm).
+  Qed.
+
+
+  Lemma instr_intro_rvc (A : Z) (h : mword 16) (pc : mword 64)
+      (i i0 : instruction) :
     is_lpad_instruction i = false ->
     pc = mword_of_int A ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     isRVC h = true ->
     subrange_vec_dec (kb_word_at A) 15 0 = h ->
     (forall j, (j < 4)%nat ->
-       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte (kb_word_at A) j)) ->
-    (forall s : mstate,
-       priv_mSU (register_lookup cur_privilege s.(sregs)) = true ->
-       eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-       eq_vec (_get_Misa_A (register_lookup misa s.(sregs))) ('b"1") = true ->
-       register_lookup misa s.(sregs) = MISA_C ->
-       cfg_ok s ->
-       exists i0 : instruction,
-         exec (decode_fetch (F_RVC h)) s = Some (i0, s) /\
-         is_lpad_instruction i0 = false /\
-         (forall s0 : mstate, exec (execute i0) s0 = Some (ExecuteAs i, s0))) ->
+       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z
+       = Some (nth_byte (kb_word_at A) j)) ->
+    (* the decode at the two REFERENCE states, with its [goodb] certificate.
+       [hval_of_goodb] does the transfer to the caller's file, so no
+       state-generic obligation is needed any more.  The [exec] at [dstateM]
+       comes FIRST because it is what determines [i0]: a tactic discharging
+       these in order must not meet [i0] as an evar. *)
+    exec (ext_decode_compressed h) dstateM = Some (i0, dstateM) ->
+    goodb D_m (ext_decode_compressed h) dstateM = true ->
+    exec (ext_decode_compressed h) dstateS = Some (i0, dstateS) ->
+    goodb D_s (ext_decode_compressed h) dstateS = true ->
+    is_lpad_instruction i0 = false ->
+    (forall s0 : mstate, exec (execute i0) s0 = Some (ExecuteAs i, s0)) ->
+    (* the compressed expansion reads NOTHING (it is a [Ret]), so its
+       certificate is at the empty read set *)
+    goodb (fun _ => false) (execute i0) dstateM = true ->
     kernel_text -∗ instr pc true i.
   Proof.
-    intros Hlpad Hpc H2al Hrvc Hsub Hbytes Hob.
+    intros Hlpad Hpc H2al Hrvc Hsub Hbytes Hem Hgm Hes Hgs Hlp0 Hex Hgex.
     iIntros "#Ht". rewrite /instr.
     iSplitR; [iPureIntro; exact Hlpad|].
     iExists (F_RVC h).
@@ -196,28 +251,39 @@ Section KernelText.
     iSplitL "".
     { iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub).
       iApply (kernel_window_pc A (kb_word_at A) 4 pc Hpc Hbytes with "Ht"). }
-    iIntros (s CID) "_". iPureIntro.
-    intros Hpriv HmC HmA Hmisa Hcfg. cbn [fetch_is_rvc].
-    exact (Hob s Hpriv HmC HmA Hmisa Hcfg).
+    iPureIntro.
+    cbn [fetch_is_rvc decode_fetch].
+    exists i0. split; [exact Hlp0|].
+    intros D Drw rs (HDpriv & HDmisa & Hpriv & HmC & HmA & Hmisa & Harm).
+    split.
+    - destruct Harm as [(HDsec & Hp & Hs)|(HDenv & Hp & He)].
+      + exact (hval_of_goodb D_m D Drw _ dstateM rs i0
+                 (Dm_sub D HDpriv HDsec HDmisa)
+                 (Dm_agree rs Hp Hs Hmisa) Hgm Hem).
+      + exact (hval_of_goodb D_s D Drw _ dstateS rs i0
+                 (Ds_sub D HDpriv HDenv HDmisa)
+                 (Ds_agree rs Hp He Hmisa) Hgs Hes).
+    - exact (hval_of_goodb (fun _ => false) D Drw _ dstateM rs (ExecuteAs i)
+               ltac:(intros r Hr; discriminate Hr)
+               ltac:(intros r Hr; discriminate Hr)
+               Hgex (Hex dstateM)).
   Qed.
 
-  Lemma instr_intro_base (A : Z) (w : mword 32) (pc : mword 64) (i : instruction) :
+  Lemma instr_intro_base (A : Z) (w : mword 32) (pc : mword 64)
+      (i : instruction) :
     is_lpad_instruction i = false ->
     pc = mword_of_int A ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall j, (j < 4)%nat ->
        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j)) ->
-    (forall s : mstate,
-       priv_mSU (register_lookup cur_privilege s.(sregs)) = true ->
-       eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-       eq_vec (_get_Misa_A (register_lookup misa s.(sregs))) ('b"1") = true ->
-       register_lookup misa s.(sregs) = MISA_C ->
-       cfg_ok s ->
-       exec (decode_fetch (F_Base w)) s = Some (i, s)) ->
+    exec (ext_decode w) dstateM = Some (i, dstateM) ->
+    goodb D_m (ext_decode w) dstateM = true ->
+    exec (ext_decode w) dstateS = Some (i, dstateS) ->
+    goodb D_s (ext_decode w) dstateS = true ->
     kernel_text -∗ instr pc false i.
   Proof.
-    intros Hlpad Hpc H2al Hnrvc Hbytes Hob.
+    intros Hlpad Hpc H2al Hnrvc Hbytes Hem Hgm Hes Hgs.
     iIntros "#Ht". rewrite /instr.
     iSplitR; [iPureIntro; exact Hlpad|].
     iExists (F_Base w).
@@ -225,9 +291,16 @@ Section KernelText.
     iSplitL "".
     { iApply (instr_bytes_base pc w H2al Hnrvc).
       iApply (kernel_window_pc A w 4 pc Hpc Hbytes with "Ht"). }
-    iIntros (s CID) "_". iPureIntro.
-    intros Hpriv HmC HmA Hmisa Hcfg. cbn [fetch_is_rvc].
-    exact (Hob s Hpriv HmC HmA Hmisa Hcfg).
+    iPureIntro.
+    intros D Drw rs (HDpriv & HDmisa & Hpriv & HmC & HmA & Hmisa & Harm).
+    cbn [fetch_is_rvc decode_fetch].
+    destruct Harm as [(HDsec & Hp & Hs)|(HDenv & Hp & He)].
+    - exact (hval_of_goodb D_m D Drw _ dstateM rs i
+               (Dm_sub D HDpriv HDsec HDmisa)
+               (Dm_agree rs Hp Hs Hmisa) Hgm Hem).
+    - exact (hval_of_goodb D_s D Drw _ dstateS rs i
+               (Ds_sub D HDpriv HDenv HDmisa)
+               (Ds_agree rs Hp He Hmisa) Hgs Hes).
   Qed.
 
 End KernelText.
@@ -264,8 +337,20 @@ Ltac close_dec decname :=
           | H : _ = MISA_C |- _ => rewrite H; vm_compute; reflexivity
           end ].
 
+(* the [kd_] lemma at a REFERENCE state: its two hypotheses are closed *)
+(* the [kd_] lemma at a REFERENCE state.  The base and RVC catalogues have
+   DIFFERENT hypothesis counts -- base takes [misa = MISA_C] and [cfg_ok],
+   RVC takes only the misa.C bit -- so this dispatches per goal rather than
+   assuming a shape. *)
+Ltac close_dec_at decname arm :=
+  apply decname;
+  solve [ vm_compute; reflexivity
+        | unfold cfg_ok, cfg_ok_rs; arm; split; vm_compute; reflexivity ].
+
 Ltac mk_rvc A h pc ast decname expname :=
-  apply (instr_intro_rvc A h pc ast);
+  (* [eapply]: [i0] is left an evar and resolved by the first [exec]
+     obligation, where the [kd_] lemma names it *)
+  eapply (instr_intro_rvc A h pc ast);
   [ vm_compute; reflexivity
   | first [ reflexivity | apply bv_eq; vm_compute; reflexivity ]
   | vm_compute; reflexivity
@@ -274,12 +359,13 @@ Ltac mk_rvc A h pc ast decname expname :=
   | let j := fresh "j" in let Hj := fresh "Hj" in
     intros j Hj;
     do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia
-  | let s := fresh "s" in let Hpriv := fresh "Hpriv" in let HmC := fresh "HmC" in
-    let HmA := fresh "HmA" in let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
-    intros s Hpriv HmC HmA Hmisa Hcfg;
-    eexists; (split; [ close_dec decname
-                     | split; [ vm_compute; reflexivity
-                              | intro; apply expname ] ]) ].
+  | close_dec_at decname ltac:(left)
+  | vm_compute; reflexivity
+  | close_dec_at decname ltac:(right)
+  | vm_compute; reflexivity
+  | vm_compute; reflexivity
+  | intro; apply expname
+  | vm_compute; reflexivity ].
 
 Ltac mk_base A w pc ast decname :=
   apply (instr_intro_base A w pc ast);
@@ -290,7 +376,7 @@ Ltac mk_base A w pc ast decname :=
   | let j := fresh "j" in let Hj := fresh "Hj" in
     intros j Hj;
     do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia
-  | let s := fresh "s" in let Hpriv := fresh "Hpriv" in let HmC := fresh "HmC" in
-    let HmA := fresh "HmA" in let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
-    intros s Hpriv HmC HmA Hmisa Hcfg;
-    close_dec decname ].
+  | close_dec_at decname ltac:(left)
+  | vm_compute; reflexivity
+  | close_dec_at decname ltac:(right)
+  | vm_compute; reflexivity ].

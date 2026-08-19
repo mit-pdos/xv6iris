@@ -33,13 +33,12 @@
    +0x0e contributes zero and the [(b << 51) >> 54] at +0x2a/+0x2c is just
    [b / 8].
 
-   THE ONE MISSING LEAF.  [sllw rd,rs1,rs2] (the mask [1 << (bi % 8)] at
-   +0x26) has no WP leaf in the S-mode ALU layer -- [slliw] is there, the
-   register-register W shift is not -- so it is proved here, exactly the way
-   [WpSconfSrliw.v] proves [srliw]: an exec bridge at the SLLW branch of
-   [execute_RTYPEW] plus one [wp_gpr_write_s_sconf_base] instance.  It
-   belongs in [WpMmodeShiftiop.v] + [WpSconfAlu.v] beside its ADDW/SUBW
-   twins, and balloc needs the same leaf; homing it there is owed. *)
+   THE [sllw] LEAF (the mask [1 << (bi % 8)] at +0x26) LIVES IN
+   [WpSconfAlu.v] NOW, with its exec bridge, beside its ADDW/SUBW twins --
+   as [wp_sllw_wval_s_sconf] (the explicit-[wval] reading this file uses)
+   and [wp_sllw_s_sconf] (balloc's inline-value reading, its [eq_refl]
+   instance).  It was parked here only because editing that file used to
+   invalidate the whole downstream .vo tree. *)
 From Stdlib Require Import Eqdep_dec ZArith Bool Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -66,7 +65,6 @@ Require Import DiskPtsto.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import FdSlots.
@@ -422,71 +420,6 @@ Proof.
   rewrite (bf_add_comm (mword_of_int (Z.of_nat q)) X). apply bf_data_off.
 Qed.
 
-(* ===================================================================== *)
-(*  THE MISSING LEAF: [sllw rd,rs1,rs2].                                  *)
-(*  Exec bridge + WP leaf, exactly as WpSconfSrliw.v does for [srliw].    *)
-(* ===================================================================== *)
-
-Lemma exec_execute_RTYPEW_SLLW_gpr (rs2 rs1 rd : mword 5) s :
-  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW))) s
-  = Some (RETIRE_SUCCESS,
-          if Z.eqb (uint rd) 0 then s
-          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg
-                    (sign_extend' 64
-                       (shift_bits_left
-                          (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32)
-                          (subrange_vec_dec
-                             (subrange_vec_dec (gpr_src rs2 s) 31 0 : mword 32)
-                             4 0))))).
-Proof.
-  unfold gpr_src.
-  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)))
-    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) SLLW).
-  unfold execute_RTYPEW. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
-  apply exec_returnm.
-Qed.
-
-Section WpBfreeSllw.
-  Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_sllw_s_sconf
-      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 ->
-    ops_ok b rd rs1 rs2 ->
-    sign_extend' 64
-      (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
-         (subrange_vec_dec
-            (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) = wval ->
-    sie_cap_gpr KT1 m n b p -∗
-    pc_is pc -∗
-    instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
-              (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) wval m n b
-              Hrd Hops _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva Hvb.
-      rewrite (exec_execute_RTYPEW_SLLW_gpr rs2 rs1 rd s_pc).
-      replace (Z.eqb (uint rd) 0) with false
-        by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_src. rewrite Hva Hvb Hwval. reflexivity.
-  Qed.
-
-End WpBfreeSllw.
 
 (* ===================================================================== *)
 
@@ -1491,7 +1424,7 @@ Section ProofBfreeMain.
                     = mword_of_int (KernelSyms.bfree + 0x26)) by pcw.
     iEval (rewrite Hpp26) in "Hpc".
     (* ===== +0x26 sllw a5,a5,a4 : a5 := m = 1 << (b % 8) ===== *)
-    iApply (wp_sllw_s_sconf (mword_of_int (KernelSyms.bfree + 0x26)) Ra5 Ra5 Ra4
+    iApply (wp_sllw_wval_s_sconf (mword_of_int (KernelSyms.bfree + 0x26)) Ra5 Ra5 Ra4
               (mword_of_int (2 ^ r) : mword 64) B1 (K - 4)%nat b
               ltac:(nz) ltac:(rdok)
               ltac:(rgne; rgne; rewrite HB1a5 HB1a4; apply bf_sllw1; exact Hrmod)

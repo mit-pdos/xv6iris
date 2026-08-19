@@ -842,7 +842,7 @@ Section ProofFreeproc.
       iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
           %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
       iDestruct (tf_page_to_page_own tfp ws Htfval with "Hkmapb Htfp") as "Hpage".
       (* kfree is stated over the RAW kmem lock and count, not the bundle:
          open [kalloc_env] once here.  It is at [None], hence persistent, so

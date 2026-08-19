@@ -11,4 +11,5 @@ Require Import ProofUserretClosed.
    application in argument position, so it is named first) *)
 Module UservecI := Uservec Usertrap Userret.
 
-Module UserretClosedD := UserretClosedProof Userret UserProof UservecI.
+Module UserretClosedD :=
+  UserretClosedProof Userret UserProof UservecI.

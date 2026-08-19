@@ -133,6 +133,8 @@ Section SystemBoot.
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
+    (* the harts' reservation mirrors (design §3a) are gone from this
+       interface: [boot_shared_alloc] threads each into its hart's [pc_is]. *)
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".

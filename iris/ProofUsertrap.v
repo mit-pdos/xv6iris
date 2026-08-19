@@ -103,6 +103,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -516,7 +517,7 @@ Section UtEntry.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & #Hgcert & #Hctrs)".
     iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx uepc ltac:(vm_compute; lia) Hepc
                  with "Hptc Htfp")
@@ -1200,6 +1201,14 @@ Lemma usertrap_res_csrs_open
   usertrap_res_bare pt ksp -∗
   hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
 Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp). Qed.
+
+Lemma usertrap_res_sstc
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
+Proof. exact (ut_res_bare_sstc SY.syscall_env pt ksp). Qed.
 
 Lemma usertrap_res_tf_csrs_open
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,

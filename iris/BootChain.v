@@ -241,8 +241,10 @@ Proof. vm_compute. reflexivity. Qed.
 (* [boot_D] cells (at the values [reset_regs] pins them to) plus the        *)
 (* persisted static claims plus the generation certificate become EXACTLY   *)
 (* what [SpecEntry.wp_entry_boot] asks for -- [mmode_config] included,      *)
-(* which means allocating this hart's [minstret_inv] and freezing its       *)
-(* [hw_config] cells on the way -- together with the five S-mode registers  *)
+(* which means freezing this hart's [hw_config] cells on the way, and       *)
+(* [pc_is], which means forming its [minstret_res] / [clock_res] out of the *)
+(* counter and clock cells and taking in its reservation mirror             *)
+(* -- together with the five S-mode registers                               *)
 (* the M-mode contract never touches and [BootBridge.boot_bridge] wants,    *)
 (* and the two PLIC wire pins the device client asks for.                   *)
 (*                                                                        *)
@@ -258,6 +260,11 @@ Section BootChain.
     reset_regs cpu_id rs ->
     kmap_static_claims -∗
     gen_cert -∗
+    (* this hart's RESERVATION MIRROR, at [None] -- adequacy mints one per
+       hart and the boot chain is what threads it into [pc_is]
+       (claude-notes/projects/main-cycle-port.md §3a).  A hart that has
+       executed nothing holds no reservation. *)
+    resv_frag cpu_id None -∗
     boot_reg_res rs
     ={E}=∗
       (* --- [wp_entry_boot]'s own inputs --- *)
@@ -297,12 +304,13 @@ Section BootChain.
   Proof.
     intros (Hpc0 & Hnpc0 & Hpv0 & Hhs0 & Hmh0 & Hms0 & Hmisa0 & Hsec0 & Hmenv0 &
             Hhtif0 & Help0 & Hpma0 & _ & _ & _ & Hsenv0 & Hmse0 & Hsse0).
-    iIntros "#Hcl #Hcert Hregs".
+    iIntros "#Hcl #Hcert Hresv Hregs".
     iDestruct (boot_reg_split rs with "Hregs") as
       "(HPC & HnPC & Hpriv & Hhs & Hmh & Hms & Hmisa & Hsec & Hmenv & Hhtif & Help &
         Hpma & Hpmpc & Hpmpa & Hmepc & Hsatp & Hmede & Hmdl & Hmie & Hmcen & Hstc &
         Hmst & Hminc & Hmcy & Hmt & Hmip & Hseip & Hmeip & Htlb & Hstvec &
-        Hsepc & Hscause & Hstval & Hsenv & Hssc & Hmse & Hsse & Hgprs)".
+        Hsepc & Hscause & Hstval & Hsenv & Hssc & Hmse & Hsse & Hscen & Hhpm &
+        Hmci & Hmicfg & Hgprs)".
     (* the pinned cells, at their pinned values *)
     iEval (rewrite Hpc0 boot_pc_entry) in "HPC".
     iEval (rewrite Hnpc0 boot_pc_entry) in "HnPC".
@@ -317,15 +325,28 @@ Section BootChain.
     iEval (rewrite Help0) in "Help".
     iEval (rewrite Hpma0) in "Hpma".
     iEval (rewrite Hsenv0) in "Hsenv".
-    (* this hart's two register invariants, and the frozen config bundle *)
-    iMod (minstret_inv_alloc E _ _ _ _ _
-            with "Hcert Hmst Hminc Hmcy Hmt Hmip") as "#Hmin".
-    iMod (hw_config_intro with "Hmisa Hsec Hpma Hhtif Help Hsenv Hcl") as "#Hhw".
+    (* the two counter-inhibit cells, FROZEN: nothing in the kernel or the
+       tree writes either, and [MinstretInv.minstret_res] holds them
+       persistently.  [minstret_inv] itself is [emp] now (see MinstretInv.v's
+       header): the counter facts are OWNED resources riding in [pc_is], so
+       there is no invariant left to allocate here. *)
+    iMod (reg_pointsto_persist with "Hmci") as "#Hmci'".
+    iMod (reg_pointsto_persist with "Hmicfg") as "#Hmicfg'".
+    iMod (hw_config_intro _ _ with "Hmisa Hsec Hpma Hhtif Help Hsenv Hscen Hhpm
+                                    Hcl Hcert") as "#Hhw".
     iModIntro.
     iSplitL "Hhs Hpriv Hms".
-    { iApply (mmode_config_intro (DfracOwn 1) with "Hhw Hmin Hhs Hpriv Hms"). }
+    { iApply (mmode_config_intro (DfracOwn 1) with "Hhw Hhs Hpriv Hms"). }
     iFrame "Hpmpc Hpmpa".
-    iSplitL "HPC HnPC". { rewrite /pc_is. iFrame "HPC HnPC". }
+    (* [pc_is] is the per-cycle bundle: PC/nextPC, the counter and clock
+       cells, and this hart's reservation mirror. *)
+    iSplitL "HPC HnPC Hmst Hminc Hmcy Hmt Hmip Hresv".
+    { rewrite /pc_is. iFrame "HPC HnPC".
+      iSplitL "Hmst Hminc".
+      { iApply (minstret_res_intro with "Hmst Hminc Hmci' Hmicfg'"). }
+      iSplitL "Hmcy Hmt Hmip".
+      { iApply (clock_res_intro with "Hmcy Hmt Hmip"). }
+      iApply (resv_any_intro with "Hresv"). }
     iSplitL "Hgprs". { iApply (boot_gpr_file rs with "Hgprs"). }
     iFrame "Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Htlb".
     iSplitL "Hstvec". { iExists (register_lookup stvec rs). iExact "Hstvec". }

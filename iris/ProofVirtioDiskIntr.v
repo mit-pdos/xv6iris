@@ -33,7 +33,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import WpGpr RegFile.
-Require Import KptPt.
+Require Import KptPt KMap.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
@@ -1142,6 +1142,34 @@ Section VtDevRam.
     assert (Hcan2 : forall j, (j < 2)%nat ->
               (uint (pa_add (pa_add pu 2%nat) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add. exact (Hcanu (2 + j)%nat (vt_two_add_lt j Hj)). }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; one peek-open of the device invariant runs the
+       READ-ONLY used-index accessor, takes the claim off the window's own
+       [phys_to_word2] cell ([wordw_claim_of]) and hands the cell straight
+       back.  The claim is persistent, so it survives the close. *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv0".
+    iInv "Hvinv0" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_used_idx_acc γd vstp np nr with "Hprotop Hpub Hlb0")
+      as (ncp) "(_ & _ & #Hcfgvp & _ & _ & Hw2p & Hbackp)".
+    iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
+    assert (Haddrp : used_idx_pa (v_cfg vstp) = pa_add pu 2%nat)
+      by (rewrite Hceqp; reflexivity).
+    iEval (rewrite Haddrp) in "Hw2p".
+    iDestruct (phys_to_word2 (pa_add pu 2%nat) (wrap16 ncp) Halign Hst2 Hcan2
+                 with "Hkm Hw2p") as "Hcellp".
+    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pu 2%nat) (DfracOwn 1)
+                 (wrap16 ncp : SailStdpp.Values.mword 16) ltac:(lia)
+                 with "Hcellp") as "#Hcl".
+    iDestruct (word2_to_phys (pa_add pu 2%nat) (wrap16 ncp) Hst2
+                 with "Hkm Hcellp") as "Hw2p".
+    iEval (rewrite -Haddrp) in "Hw2p".
+    iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
     iApply (wp_load_s_sconf_au (CID:=CID) (kt := KT1) (ktd := KT0) 2 false true pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
               (fun w => (∃ nc : nat, ⌜w = wrap16 nc⌝ ∗
@@ -1150,7 +1178,8 @@ Section VtDevRam.
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdok
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub] [Hcont]").
+    { rewrite Hea. iExact "Hcl". }
     { (* ---- the atomic update: open dev_inv, run the accessor ---- *)
       iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
@@ -1249,6 +1278,47 @@ Section VtDevRam.
               (uint (pa_add (pa_add pu (vt_uoff p)) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add.
       exact (Hcanu (vt_uoff p + j)%nat (vt_uoff_add_lt p j Hj)). }
+    (* THE ADDRESS CLAIM, off the used ELEMENT's own points-to.  The leaf
+       wants it BESIDE the atomic update (per node the access translates
+       several nodes before the memory node where the update is opened), and
+       [virtio_proto_reclaim_acc]'s closer is one-shot -- it spends the
+       receipt -- so the peek goes through the read-only
+       [VirtioProto.virtio_proto_used_peek], which hands everything back. *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+    iInv "Hvinv" as ">Hdbodyp" "Hdclosep".
+    iDestruct "Hdbodyp" as (vstp) "(Hvfp & Hprotop & %Hvokp)".
+    iDestruct (virtio_proto_used_peek γd vstp np c p sl pin Hpc0
+                 with "Hprotop Hpub Hrcpt Hlbc") as "(#Hcfgvp & Hw4p & Hbackp)".
+    iDestruct (disk_cfg_agree with "Hcfgvp Hcfg0") as %Hceqp.
+    assert (Haddrp : (pa_add pu (vt_uoff p) : Arch.pa) = used_elem_pa (v_cfg vstp) p)
+      by (rewrite Hceqp; reflexivity).
+    (* COPIES, not [rewrite ... in]: the body below re-opens the invariant at
+       its OWN [vst], and rewriting the three shared facts to THIS peek's
+       [vstp] would leave them unusable there. *)
+    assert (Halignp : is_aligned_paddr
+                        (Physaddr (used_elem_pa (v_cfg vstp) p)) 4 = true)
+      by (rewrite -Haddrp; exact Halign).
+    assert (Hst4p : forall j, (j < 4)%nat ->
+              kmap_static (svpn_of (pa_add (used_elem_pa (v_cfg vstp) p) j)) KP_rw)
+      by (rewrite -Haddrp; exact Hst4).
+    assert (Hcan4p : forall j, (j < 4)%nat ->
+              (uint (pa_add (used_elem_pa (v_cfg vstp) p) j
+                     : SailStdpp.Values.mword 64) < 274877906944)%Z)
+      by (rewrite -Haddrp; exact Hcan4).
+    iDestruct (phys_to_word4 (used_elem_pa (v_cfg vstp) p)
+                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+                 Halignp Hst4p Hcan4p with "Hkm Hw4p") as "Hcellp".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (used_elem_pa (v_cfg vstp) p)
+                 (DfracOwn 1) (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))
+                 ltac:(lia) with "Hcellp") as "#Hclaim0".
+    iDestruct (word4_to_phys (used_elem_pa (v_cfg vstp) p)
+                 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) Hst4p
+                 with "Hkm Hcellp") as "Hw4p".
+    iDestruct ("Hbackp" with "Hw4p") as "(Hprotop & Hpub & Hrcpt & _)".
+    iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
+    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    iModIntro.
     iApply (wp_load_s_sconf_au (CID:=CID) (kt := KT1) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
               (fun w => (⌜w = (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))
@@ -1267,9 +1337,9 @@ Section VtDevRam.
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
-              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hrcpt] [Hcont]").
-    { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
-      iInv "Hvinv" as ">Hdbody" "Hdclose".
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Hpub Hrcpt] [Hcont]").
+    { rewrite Hea Haddrp. iExact "Hclaim0". }
+    { iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       iDestruct (virtio_proto_reclaim_acc γd vst np c p sl pin Hpc0
                    with "Hproto Hpub Hrcpt Hlbc")

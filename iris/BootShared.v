@@ -732,6 +732,16 @@ End BootBssChain.
 (* pre-class) are capacity only and are in [Σ] from the start.              *)
 (* ====================================================================== *)
 
+(* the reverse of [RiscvAdequacy.big_sepL_enum_to_set]: [power_boot_res]
+   hands the reservation mirrors out over the SET (that is the spelling the
+   era interpretation uses), while every per-hart family here is over the
+   LIST, so the zip needs them in list form. *)
+Local Lemma big_sepS_enum_to_list {PROP : bi} (Φ : CPU -> PROP) :
+  ([∗ set] c ∈ (fin_to_set CPU : gset CPU), Φ c) ⊢ [∗ list] c ∈ enum CPU, Φ c.
+Proof.
+  rewrite /fin_to_set big_sepS_list_to_set; [done | apply NoDup_enum].
+Qed.
+
 Section BootAlloc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
   (* NO [icacheG] BINDER: [fileG] already carries it, and [IcacheRef.icfg]
@@ -774,6 +784,14 @@ Section BootAlloc.
   Definition hart_locks (c : CPU) : iProp Σ :=
     lk_auth c ∅.
 
+  (* this hart's RESERVATION MIRROR at [None], as adequacy mints it: a hart
+     that has executed nothing holds no reservation.  It goes into that
+     hart's [InstrBytes.pc_is] via [BootChain.boot_entry_pre]
+     (claude-notes/projects/main-cycle-port.md §3a), which is why it is a
+     per-hart family here rather than an output of this file. *)
+  Definition hart_resv (c : CPU) : iProp Σ :=
+    resv_frag c None.
+
   (* [power_boot_res] is stated in ERA-EXPLICIT ghost forms; every ambient
      form ([reg_pointsto_at], [kmap_auth], [uart_frag], [hart_full], ...) IS
      that form at [riscv_eraGS] BY DELTA (RiscvPtsto §"the era's names"), so
@@ -793,6 +811,8 @@ Section BootAlloc.
       ([∗ list] c ∈ enum CPU, hart_locks c) ∗
       ([∗ list] j ∈ seq 0 NPROC, hart_full j (0%fin : CPU)) ∗
       ([∗ list] j ∈ seq 0 NPROC, pstate_full j UNUSED) ∗
+      (* every hart's reservation mirror at [None] (design §3a) *)
+      ([∗ set] c ∈ (fin_to_set CPU : gset CPU), resv_frag c None) ∗
       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
       virtio_frag (g.(gdev).(dvirtio)) ∗
       (* the BOOT MINT: this era's whole disk image, in fragments
@@ -829,10 +849,12 @@ Section BootAlloc.
     ([∗ list] c ∈ enum CPU, hart_spp c) -∗
     ([∗ list] c ∈ enum CPU, hart_spie c) -∗
     ([∗ list] c ∈ enum CPU, hart_locks c) -∗
+    ([∗ list] c ∈ enum CPU, hart_resv c) -∗
     ([∗ list] c ∈ enum CPU, boot_hart_bss c) -∗
     [∗ list] c ∈ enum CPU,
       (boot_reg_res (CID := c) (g.(gregs) c) ∗ hart_strans c ∗ hart_sie c ∗
-       hart_spp c ∗ hart_spie c ∗ hart_locks c ∗ boot_hart_bss c).
+       hart_spp c ∗ hart_spie c ∗ hart_locks c ∗ hart_resv c ∗
+       boot_hart_bss c).
   Proof.
     (* THREE [iApply]s OF THE WAND FORM, NOT [rewrite !big_sepL_sep].
        [big_sepL_sep] is a [⊣⊢], so rewriting with it is SETOID rewriting, and
@@ -844,13 +866,14 @@ Section BootAlloc.
        the predicates, not the goal around them.  [big_sepL_sep_2] is the wand
        form of the same fact; [iApply] matches it by head and never enters the
        setoid machinery. *)
-    iIntros "H1 H2 H3 H4 H5 H6 H7".
-    iApply (big_sepL_sep_2 with "H1 [H2 H3 H4 H5 H6 H7]").
-    iApply (big_sepL_sep_2 with "H2 [H3 H4 H5 H6 H7]").
-    iApply (big_sepL_sep_2 with "H3 [H4 H5 H6 H7]").
-    iApply (big_sepL_sep_2 with "H4 [H5 H6 H7]").
-    iApply (big_sepL_sep_2 with "H5 [H6 H7]").
-    iApply (big_sepL_sep_2 with "H6 H7").
+    iIntros "H1 H2 H3 H4 H5 H6 H7 H8".
+    iApply (big_sepL_sep_2 with "H1 [H2 H3 H4 H5 H6 H7 H8]").
+    iApply (big_sepL_sep_2 with "H2 [H3 H4 H5 H6 H7 H8]").
+    iApply (big_sepL_sep_2 with "H3 [H4 H5 H6 H7 H8]").
+    iApply (big_sepL_sep_2 with "H4 [H5 H6 H7 H8]").
+    iApply (big_sepL_sep_2 with "H5 [H6 H7 H8]").
+    iApply (big_sepL_sep_2 with "H6 [H7 H8]").
+    iApply (big_sepL_sep_2 with "H7 H8").
   Qed.
 
   (* ONE hart's register side, run inside the shared fupd so the two PLIC wire
@@ -864,6 +887,7 @@ Section BootAlloc.
     hart_spp h -∗
     hart_spie h -∗
     hart_locks h -∗
+    hart_resv h -∗
     boot_hart_bss h
     ={E}=∗
       (∃ iv : mword 32,
@@ -875,12 +899,12 @@ Section BootAlloc.
   Proof.
     intro Hbf.
     rewrite /hart_strans /hart_sie /hart_spp /hart_spie /hart_locks
-            /boot_hart_bss.
+            /hart_resv /boot_hart_bss.
     iIntros "#Hcl #Hcert #Hword Hregs [Hs1 Hs2] (Hg2 & Hg4a & Hg4b)
-             [Hspp1 Hspp2] [Hspie1 Hspie2] Hlks
+             [Hspp1 Hspp2] [Hspie1 Hspie2] Hlks Hresv
              (Hstk & Hnoff & Hint & Hproc & Hctx)".
     iMod (boot_entry_pre (CID := h) E (g.(gregs) h)
-            (boot_regs_of_facts g Hbf h) with "Hcl Hcert Hregs") as
+            (boot_regs_of_facts g Hbf h) with "Hcl Hcert Hresv Hregs") as
       "(Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp & Hmede & Hmdl &
         Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec & Hsepc & Hscause & Hstval &
         Hssc & Hmse & Hsse & Hseip & Hmeip)".
@@ -918,6 +942,9 @@ Section BootAlloc.
       main_locks_raw ∗ main_globals_raw ∗
       ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) ∗
       ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) ∗
+      (* NO RESERVATION MIRRORS COME OUT: every hart's is threaded into that
+         hart's [InstrBytes.pc_is] here, inside [boot_hart_pre] (design
+         §3a), so the boot client never names one. *)
       (∃ l0 : list (bv 8),
          uart_tx_own γd l0 ∗ uart_sent γd l0 ∗ uart_out_lb γd l0) ∗
       (∃ b0 : bool, uart_dlab_is γd (DfracOwn (1/2)) b0) ∗
@@ -943,12 +970,12 @@ Section BootAlloc.
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.
-    destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0').
+    destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
     iIntros "H".
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
-        Hlkauth & Hpark & Hpst & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
+        Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
@@ -1019,13 +1046,14 @@ Section BootAlloc.
       iSplit; [iPureIntro; rewrite Hp0; exact plic_ok_plic0
               | iPureIntro; rewrite Hv0; exact (virtio_isr_ok_reset v0)]. }
     (* ---- the eight harts' register sides, and the sixteen wire pins ---- *)
+    iDestruct (big_sepS_enum_to_list hart_resv with "Hresv") as "Hresv".
     iAssert ([∗ list] c ∈ enum CPU,
                (boot_reg_res (CID := c) (g.(gregs) c) ∗
                 hart_strans c ∗ hart_sie c ∗ hart_spp c ∗ hart_spie c ∗
-                hart_locks c ∗ boot_hart_bss c))%I
-      with "[Hregs Hstrans Hsie Hspp Hspie Hlkauth Hharts]" as "Hpre".
+                hart_locks c ∗ hart_resv c ∗ boot_hart_bss c))%I
+      with "[Hregs Hstrans Hsie Hspp Hspie Hlkauth Hresv Hharts]" as "Hpre".
     { iApply (boot_hart_pre_combine with
-                "Hregs Hstrans Hsie Hspp Hspie Hlkauth Hharts"). }
+                "Hregs Hstrans Hsie Hspp Hspie Hlkauth Hresv Hharts"). }
     iAssert ([∗ list] c ∈ enum CPU, |={⊤}=>
                ((∃ iv : mword 32,
                    boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗
@@ -1038,9 +1066,9 @@ Section BootAlloc.
        the intuitionistic context (the claims bundle, [gen_cert] and the image
        word are all shared), and [_mono]'s goal is a fresh entailment. *)
     { iApply (big_sepL_impl with "Hpre").
-      iIntros "!>" (k c _) "(Hr & Hs & Hg & Hsp & Hspe & Hlk & Hb)".
+      iIntros "!>" (k c _) "(Hr & Hs & Hg & Hsp & Hspe & Hlk & Hrv & Hb)".
       iApply (boot_hart_pre c g ⊤ Hbf with
-                "Hcl Hcert Hword Hr Hs Hg Hsp Hspe Hlk Hb"). }
+                "Hcl Hcert Hword Hr Hs Hg Hsp Hspe Hlk Hrv Hb"). }
     iMod (big_sepL_fupd with "Hpre") as "Hpre".
     iEval (rewrite big_sepL_sep) in "Hpre".
     iDestruct "Hpre" as "[Hres Hpins]".

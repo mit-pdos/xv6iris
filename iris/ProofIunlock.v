@@ -428,6 +428,27 @@ Section ProofIunlockMain.
     assert (Hrefadr : add_vec (rget mH Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first.  Both accessors this read uses RESTORE, so one peek
+       -- the escrow's checked-out arm, then the itable's liveness read --
+       hands out the ref word's own points-to; [wordw_claim_of] reads the
+       claim off it and the peek closes with everything put back.  The claim
+       is persistent, so it survives the close. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
+                 eq_refl with "Hbodyp Hvalid Hdep")
+      as "(Hvalid & Hdep & Hborp)".
+    iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
+    iMod (iref_live_load_au (⊤ ∖ ↑icEscN) k sbp
+            ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
+                 ltac:(lia) with "Hcellp") as "#Hclaim0".
+    iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
+    iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".
+    { iNext. iApply ("Hbbackp" with "Hlvp"). }
+    iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
@@ -435,7 +456,8 @@ Section ProofIunlockMain.
                          ic_deposit cn k (DepShr s dev inum g))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hvalid Hdep]").
+              with "Hcg Hpc Hi1c [] [Hvalid Hdep]").
+    { rewrite Hrefadr Hipe. iExact "Hclaim0". }
     { rewrite Hrefadr Hipe.
       iInv "Hesc" as ">Hbody" "Hclose".
       (* IVd: the borrow names this holder's OWN descriptor half, which is

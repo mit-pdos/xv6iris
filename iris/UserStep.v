@@ -32,9 +32,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv.
+Require Import MinstretInv WpGpr RegFile.
 Require Import SmodeCore WpIntrCore.
-Require Import UserPtTree UserExec.
+Require Import HartLift HartSpan HartMCycle HartStepFull HartRunFull.
+Require Import UserFrame.
+Require Import PtreeType PtTree SmodePte UptTree UserPtTree UserExec.
+Require Import HartMemRun PtBytes UserBytes.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -144,460 +147,40 @@ Proof.
   - cbn match. apply exec_returnm.
 Qed.
 
-(* the no-pending corollary: with the S-destined set empty AT THIS STEP,
-   the dispatcher is a no-op and the step proceeds to fetch/execute *)
+(* THE BRIDGE TO THE SHARED DECISION.  [HartRunFull.dispatch_of_pending] is
+   the decision ONCE THE PENDING SET IS KNOWN -- the common core of
+   [WpIntrCore.s_dispatch] (Supervisor, SIE-gated) and [u_dispatch] (User,
+   ungated).  The two coincide by CONVERSION, so this is [reflexivity] and
+   the U rule of [HartRunFull] speaks the tier's own spelling. *)
+Lemma u_dispatch_of_pending (mip_v : mword 64) (meip seip : mword 1)
+    (mie_v mdv : mword 64) :
+  u_dispatch mip_v meip seip mie_v mdv
+  = dispatch_of_pending (s_pending mip_v meip seip mie_v mdv).
+Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
-(* §1b The WAITING-hart step (a user WRS.STO/NTO suspended the core).      *)
-(* [run_hart_waiting] at exit_wait = false (riscv_step's fixed argument)   *)
-(* either WAKES -- an interrupt bit is pending in the raw mip & mie        *)
-(* ([shouldWakeForInterrupt]), or the reservation is invalid -- and        *)
-(* retires (hart_state := ACTIVE, PC ticks, minstret bumps), or STAYS      *)
-(* waiting (the ONLY state change is the wrapper's minstret_increment      *)
-(* write; no PC tick).  [valid_reservation] is an OPAQUE platform axiom,   *)
-(* so the step proof case-splits on it -- BOTH branches step.              *)
+(* §1b .. §3 -- THE WAITING-HART STEP AND THE STEP OBLIGATION -- MOVED.    *)
+(*                                                                        *)
+(* The four pure [run_hart_waiting] facts ([exec_shouldWakeForInterrupt],  *)
+(* [exec_run_hart_waiting_wake] / [_wake_resv] / [_stay]) and the two      *)
+(* [riscv_step] wrappers around them are now in [HartStepFull.v], where    *)
+(* they belong: they are facts about the MODEL with no user-tier content,  *)
+(* and the rules that consume them ([swp_try_step_waiting] /               *)
+(* [swp_exec_step_waiting]) sit below this file.  ONE of them changed on   *)
+(* the way: [exec_run_hart_waiting_stay]'s premise was                     *)
+(* [valid_reservation tt = true], which is STRONGER than the model needs   *)
+(* -- at [exit_wait = false] the match's only reachable wake patterns are  *)
+(* [(WAIT_WRS_STO|WAIT_WRS_NTO, false, _)], so a [WAIT_WFI] hart stays     *)
+(* waiting whatever the axiom answers.  [HartStepFull]'s version takes     *)
+(* [valid_reservation tt = true \/ wr = WAIT_WFI], which is what makes the *)
+(* case split in [swp_try_step_waiting] EXHAUSTIVE.                        *)
+(*                                                                        *)
+(* The Iris halves ([wp_user_step_waiting], [user_step_obligation_holds],  *)
+(* [wp_user_exec_active]) are being rebuilt on [swp_exec_step_waiting] --  *)
+(* they no longer borrow [mip] from a clock invariant (the hart owns it),  *)
+(* so they are frame-shaped rather than sigma-shaped.                      *)
 (* ===================================================================== *)
 
-Lemma exec_shouldWakeForInterrupt (s : mstate) :
-  exec (shouldWakeForInterrupt tt) s
-    = Some (neq_vec (and_vec (register_lookup mip s.(sregs))
-                             (register_lookup mie s.(sregs))) (zeros' 64), s).
-Proof.
-  unfold shouldWakeForInterrupt.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mip s)). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)). cbn beta.
-  apply exec_returnm.
-Qed.
-
-(* wake because an interrupt bit is pending (any wait reason) *)
-Lemma exec_run_hart_waiting_wake (wr : WaitReason) (ib : mword 32) (s : mstate) :
-  neq_vec (and_vec (register_lookup mip s.(sregs))
-                   (register_lookup mie s.(sregs))) (zeros' 64) = true ->
-  exec (run_hart_waiting 0 wr ib false) s
-    = Some (Step_Execute (Retire_Success tt, ib),
-            set_reg s hart_state (HART_ACTIVE tt)).
-Proof.
-  intros Hw.
-  unfold run_hart_waiting.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
-  rewrite Hw. cbn match.
-  change (get_config_print_instr tt) with false. cbn match.
-  (* the print-skip [returnM tt] and the hart_state write both compute away
-     inside the peeled prefix (exec evaluates the RegWrite outcome) *)
-  erewrite exec_bind0_Some. 2: apply exec_returnm.
-  apply exec_returnm.
-Qed.
-
-(* wake because the reservation is invalid (WRS waits only) *)
-Lemma exec_run_hart_waiting_wake_resv (wr : WaitReason) (ib : mword 32) (s : mstate) :
-  neq_vec (and_vec (register_lookup mip s.(sregs))
-                   (register_lookup mie s.(sregs))) (zeros' 64) = false ->
-  valid_reservation tt = false ->
-  wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
-  exec (run_hart_waiting 0 wr ib false) s
-    = Some (Step_Execute (Retire_Success tt, ib),
-            set_reg s hart_state (HART_ACTIVE tt)).
-Proof.
-  intros Hw Hvr Hwr.
-  unfold run_hart_waiting.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
-  rewrite Hw. cbn match.
-  rewrite Hvr.
-  destruct Hwr as [-> | ->]; cbn match;
-    (change (get_config_print_instr tt) with false; cbn match;
-     erewrite exec_bind0_Some; [| apply exec_returnm];
-     apply exec_returnm).
-Qed.
-
-(* stay waiting: no interrupt pending and the reservation is (still) valid *)
-Lemma exec_run_hart_waiting_stay (wr : WaitReason) (ib : mword 32) (s : mstate) :
-  neq_vec (and_vec (register_lookup mip s.(sregs))
-                   (register_lookup mie s.(sregs))) (zeros' 64) = false ->
-  valid_reservation tt = true ->
-  exec (run_hart_waiting 0 wr ib false) s = Some (Step_Waiting wr, s).
-Proof.
-  intros Hw Hvr.
-  unfold run_hart_waiting.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
-  rewrite Hw. cbn match.
-  rewrite Hvr.
-  destruct wr; cbn match;
-    (change (get_config_print_instr tt) with false; cbn match;
-     erewrite exec_bind0_Some; [| apply exec_returnm];
-     apply exec_returnm).
-Qed.
-
-(* --------------------------------------------------------------------- *)
-(* The try_step wrappers.  STAY: the whole step is the wrapper's           *)
-(* minstret_increment write (the epilogue sees a WAITING hart and skips    *)
-(* the PC tick and the bump).  WAKE: the Retire_Success tail is exactly    *)
-(* the retiring-instruction epilogue (tick + conditional bump).            *)
-(* --------------------------------------------------------------------- *)
-
-Section StepWaitStay.
-  Context (s : mstate) (wr : WaitReason) (ib : mword 32) (b : bool).
-  Hypothesis Hsi :
-    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
-      = Some (b, s).
-  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
-  Hypothesis Hhart : register_lookup hart_state s_a.(sregs) = HART_WAITING (wr, ib).
-  Hypothesis Hrhw :
-    exec (run_hart_waiting 0 wr ib false) s_a = Some (Step_Waiting wr, s_a).
-
-  Lemma exec_riscv_step_wait_stay : exec (riscv_step false) s = Some (tt, s_a).
-  Proof using All.
-    unfold riscv_step.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (try_step 0 false) s = Some (true, s_a))).
-    { reflexivity. }
-    unfold try_step.
-    cbn [ext_pre_step_hook].
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
-    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
-    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)). cbn beta.
-    rewrite Hhart. cbn beta iota.
-    rewrite (exec_bind_Some _ _ _ _ _ Hrhw). cbn beta.
-    cbn match.
-    (* Step_Waiting arm: read hart_state >>= assert hart_is_waiting *)
-    erewrite exec_bind_Some.
-    2:{ erewrite exec_bind0_Some.
-        2:{ erewrite exec_bind_Some.
-            2:{ apply exec_read_reg. }
-            rewrite Hhart. unfold Defs.assert_exp. cbn [hart_is_waiting].
-            reflexivity. }
-        apply exec_read_reg. }
-    rewrite Hhart. cbn beta iota.
-    apply exec_returnm.
-  Qed.
-End StepWaitStay.
-
-Section StepWaitWake.
-  Context (s : mstate) (wr : WaitReason) (ib : mword 32) (b : bool).
-  Hypothesis Hsi :
-    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
-      = Some (b, s).
-  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
-  Let s_w : mstate := set_reg s_a hart_state (HART_ACTIVE tt).
-  Hypothesis Hhart : register_lookup hart_state s_a.(sregs) = HART_WAITING (wr, ib).
-  (* stated via the FOLDED [s_w] so every derived term downstream stays
-     folded and the epilogue rewrites match syntactically *)
-  Hypothesis Hrhw :
-    exec (run_hart_waiting 0 wr ib false) s_a
-      = Some (Step_Execute (Retire_Success tt, ib), s_w).
-
-  Let s_tick : mstate := set_reg s_w PC (register_lookup nextPC s_w.(sregs)).
-  Let s_final : mstate :=
-    if b then set_reg s_tick minstret
-                      (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
-         else s_tick.
-
-  Lemma exec_riscv_step_wait_wake : exec (riscv_step false) s = Some (tt, s_final).
-  Proof using All.
-    assert (Hhart_w : register_lookup hart_state s_w.(sregs) = HART_ACTIVE tt).
-    { unfold s_w; rewrite ?sregs_set_reg. apply register_lookup_set. }
-    unfold riscv_step.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (try_step 0 false) s = Some (false, s_final))).
-    { reflexivity. }
-    unfold try_step.
-    cbn [ext_pre_step_hook].
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
-    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
-    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)). cbn beta.
-    rewrite Hhart. cbn beta iota.
-    rewrite (exec_bind_Some _ _ _ _ _ Hrhw). cbn beta.
-    cbn match.
-    (* Retire_Success arm: read hart_state >>= assert hart_is_active *)
-    erewrite exec_bind_Some.
-    2:{ erewrite exec_bind0_Some.
-        2:{ erewrite exec_bind_Some.
-            2:{ apply exec_read_reg. }
-            rewrite Hhart_w. unfold Defs.assert_exp. cbn [hart_is_active].
-            reflexivity. }
-        apply exec_read_reg. }
-    rewrite Hhart_w. cbn beta iota.
-    erewrite exec_bind0_Some.
-    2:{ apply exec_tick_pc. }
-    erewrite exec_bind_Some.
-    2:{ unfold Defs.and_boolM.
-        erewrite exec_bind_Some.
-        2:{ reflexivity. }
-        cbn beta iota. apply (exec_read_reg minstret_increment). }
-    change (get_config_rvfi tt) with false.
-    replace (register_lookup minstret_increment
-               (set_reg s_w PC (register_lookup nextPC s_w.(sregs))).(sregs))
-      with b.
-    2:{ unfold s_w, s_a; rewrite ?sregs_set_reg.
-        repeat (first [ rewrite register_lookup_set
-                      | rewrite irrelevant_register_set; [ | vm_compute; reflexivity ] ]).
-        reflexivity. }
-    unfold s_final, s_tick.
-    destruct b.
-    - erewrite exec_bind0_Some.
-      2:{ erewrite exec_bind0_Some.
-          2:{ erewrite exec_bind_Some.
-              2:{ apply (exec_read_reg minstret). }
-              apply exec_write_reg. }
-          cbn beta iota. reflexivity. }
-      reflexivity.
-    - erewrite exec_bind0_Some.
-      2:{ erewrite exec_bind0_Some.
-          2:{ cbn beta iota. reflexivity. }
-          cbn beta iota. reflexivity. }
-      reflexivity.
-  Qed.
-End StepWaitWake.
-
-(* ===================================================================== *)
-(* §2 The frame-level form: the dispatch decision from BORROWED cells.     *)
-(* All cells are dfrac-generic, so the wire cells (sig_meip / sig_seip)    *)
-(* can come from the future invariant shared with the device WP -- the     *)
-(* engine opens it, applies this with the current wire values, and closes  *)
-(* it before the step commits.                                             *)
-(* ===================================================================== *)
-Section UserStepIris.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-
-
-  (* ------------------------------------------------------------------- *)
-  (* The WAITING-hart step arm: one machine step from a WRS-suspended      *)
-  (* hart either STAYS waiting (nothing observable changes) or WAKES and   *)
-  (* retires (hart_state := ACTIVE, PC ticks to nextPC).  The proof        *)
-  (* case-splits on the wake condition (raw mip & mie over the given cell  *)
-  (* values) and, when that is clear, on the OPAQUE [valid_reservation]    *)
-  (* axiom -- both branches step, so the arm is total.  The continuation   *)
-  (* is an ADDITIVE conjunction: stay / wake.                              *)
-  (* ------------------------------------------------------------------- *)
-  (* [mip] IS NOT A PARAMETER: it is borrowed from [clock_inv] (which
-     [minstret_inv] bundles) for the duration of this step's own
-     σ-callback -- the cell cannot be held by a caller, see [UserExec.ucfg].
-     Its value is therefore discovered here rather than supplied, and the
-     wake/stay split is made on THAT value; the continuation is the same
-     additive conjunction as before, minus the mip cell. *)
-  Lemma wp_user_step_waiting (wr : WaitReason) (ib : mword 32)
-      (mie_v : mword 64) (va va' : mword 64) {dqi : dfrac} :
-    wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
-    minstret_inv -∗
-    hart_state ↦ᵣ HART_WAITING (wr, ib) -∗
-    PC ↦ᵣ va -∗
-    nextPC ↦ᵣ va' -∗
-    mie ↦ᵣ{ dqi } mie_v -∗
-    ▷ ((hart_state ↦ᵣ HART_WAITING (wr, ib) -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
-        mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang))
-     ∧ (hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ va' -∗ nextPC ↦ᵣ va' -∗
-        mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmie Hcont".
-    iPoseProof "Hinv" as "#Hinv'".
-    iDestruct "Hinv'" as "#(_ & Hclock & _)".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑clockN) with "Hinv").
-    iIntros (σ) "[Hreg Hmd] Hbody".
-    (* borrow mip across this step and give it straight back *)
-    iMod (clock_mip_acc (⊤ ∖ ↑minstretN) ltac:(solve_ndisj) with "Hclock")
-      as (mip_v) "[Hmip Hclosec]".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    iDestruct (reg_valid_dq with "Hreg Hnpc") as %Lnpc.
-    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip.
-    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmst") as %Lmst.
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (Lhs_a : register_lookup hart_state s_a.(sregs) = HART_WAITING (wr, ib)).
-    { unfold s_a; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-    assert (Lmip_a : register_lookup mip s_a.(sregs) = mip_v).
-    { unfold s_a; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lmip | reflexivity]. }
-    assert (Lmie_a : register_lookup mie s_a.(sregs) = mie_v).
-    { unfold s_a; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lmie | reflexivity]. }
-    destruct (neq_vec (and_vec mip_v mie_v) (zeros' 64)) eqn:Hwake;
-      [ | destruct (valid_reservation tt) eqn:Hvr ].
-    - (* WAKE: an interrupt bit is pending in raw mip & mie *)
-      assert (Hrhw : exec (run_hart_waiting 0 wr ib false) s_a
-                     = Some (Step_Execute (Retire_Success tt, ib),
-                             set_reg s_a hart_state (HART_ACTIVE tt))).
-      { apply exec_run_hart_waiting_wake. rewrite Lmip_a Lmie_a. exact Hwake. }
-      pose proof (exec_riscv_step_wait_wake σ wr ib b Hsi Lhs_a Hrhw) as Hstep.
-      set (T0 := set_reg s_a hart_state (HART_ACTIVE tt)) in Hstep.
-      assert (Hnpc0 : register_lookup nextPC T0.(sregs) = va').
-      { unfold T0, s_a; rewrite ?sregs_set_reg.
-        repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
-        exact Lnpc. }
-      rewrite Hnpc0 in Hstep.
-      set (T1 := set_reg T0 PC va') in Hstep.
-      assert (Hmst1 : register_lookup minstret T1.(sregs) = mst).
-      { unfold T1, T0, s_a; rewrite ?sregs_set_reg.
-        repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
-        exact Lmst. }
-      rewrite Hmst1 in Hstep.
-      destruct b.
-      + iModIntro. iExists (set_reg T1 minstret (add_vec_int mst 1)).
-        iSplitR. { iPureIntro. exact Hstep. }
-        iNext.
-        iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
-        iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
-        iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
-        iMod ("Hclosec" with "Hmip") as "_".
-        iModIntro.
-        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
-        iFrame "Hreg Hmd".
-        iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
-        iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
-      + iModIntro. iExists T1.
-        iSplitR. { iPureIntro. exact Hstep. }
-        iNext.
-        iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
-        iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
-        iMod ("Hclosec" with "Hmip") as "_".
-        iModIntro.
-        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
-        iFrame "Hreg Hmd".
-        iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-        iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
-    - (* STAY: no interrupt pending, reservation (still) valid *)
-      assert (Hrhw : exec (run_hart_waiting 0 wr ib false) s_a
-                     = Some (Step_Waiting wr, s_a)).
-      { apply exec_run_hart_waiting_stay; [ | exact Hvr ].
-        rewrite Lmip_a Lmie_a. exact Hwake. }
-      pose proof (exec_riscv_step_wait_stay σ wr ib b Hsi Lhs_a Hrhw) as Hstep.
-      iModIntro. iExists s_a.
-      iSplitR. { iPureIntro. exact Hstep. }
-      iNext. iMod ("Hclosec" with "Hmip") as "_". iModIntro.
-      unfold s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
-      iFrame "Hreg Hmd".
-      iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
-      iDestruct "Hcont" as "[Hstay _]".
-      iApply ("Hstay" with "Hhs Hpc Hnpc Hmie").
-    - (* WAKE: the reservation is invalid *)
-      assert (Hrhw : exec (run_hart_waiting 0 wr ib false) s_a
-                     = Some (Step_Execute (Retire_Success tt, ib),
-                             set_reg s_a hart_state (HART_ACTIVE tt))).
-      { apply exec_run_hart_waiting_wake_resv; [ | exact Hvr | exact Hwr ].
-        rewrite Lmip_a Lmie_a. exact Hwake. }
-      pose proof (exec_riscv_step_wait_wake σ wr ib b Hsi Lhs_a Hrhw) as Hstep.
-      set (T0 := set_reg s_a hart_state (HART_ACTIVE tt)) in Hstep.
-      assert (Hnpc0 : register_lookup nextPC T0.(sregs) = va').
-      { unfold T0, s_a; rewrite ?sregs_set_reg.
-        repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
-        exact Lnpc. }
-      rewrite Hnpc0 in Hstep.
-      set (T1 := set_reg T0 PC va') in Hstep.
-      assert (Hmst1 : register_lookup minstret T1.(sregs) = mst).
-      { unfold T1, T0, s_a; rewrite ?sregs_set_reg.
-        repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
-        exact Lmst. }
-      rewrite Hmst1 in Hstep.
-      destruct b.
-      + iModIntro. iExists (set_reg T1 minstret (add_vec_int mst 1)).
-        iSplitR. { iPureIntro. exact Hstep. }
-        iNext.
-        iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
-        iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
-        iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
-        iMod ("Hclosec" with "Hmip") as "_".
-        iModIntro.
-        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
-        iFrame "Hreg Hmd".
-        iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
-        iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
-      + iModIntro. iExists T1.
-        iSplitR. { iPureIntro. exact Hstep. }
-        iNext.
-        iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
-        iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
-        iMod ("Hclosec" with "Hmip") as "_".
-        iModIntro.
-        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
-        iFrame "Hreg Hmd".
-        iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-        iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
-  Qed.
-
-End UserStepIris.
-
-(* ===================================================================== *)
-(* §3 The step obligation, reduced to its ACTIVE-hart residue: the        *)
-(* WAITING case (a user WRS suspended the core) is discharged here via    *)
-(* [wp_user_step_waiting] -- both the stay and the wake outcome re-enter  *)
-(* [user_inv].                                                            *)
-(* ===================================================================== *)
-Section UserStepObligation.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context (C : ucfg) (pt : uptd).
-  Context (Rut : uptd -> iProp Σ).
-
-  Theorem user_step_obligation_holds :
-    minstret_inv -∗
-    user_step_obligation_active C pt Rut -∗
-    user_step_obligation C pt Rut.
-  Proof.
-    iIntros "#Hminstret #Hactive".
-    iIntros "!> Hinv Hk".
-    iDestruct "Hinv" as (hs ms_v sc_v stval_v sepc_v va va' g)
-      "(%Hhs & %Hms & %Hlock & Hregs & Hupt & Hcfg & Hrut)".
-    destruct hs as [u | [wr ib]].
-    - (* ACTIVE: hand off to the residue obligation *)
-      destruct u.
-      rewrite (Hlock tt eq_refl).
-      iApply ("Hactive" with "[//] Hregs Hupt Hcfg Hrut Hk").
-    - (* WAITING: the WRS stay/wake step *)
-      simpl in Hhs.
-      iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
-                             Hpc & Hnpc & Hgpr)".
-      iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hcfgrest)".
-      iApply (wp_user_step_waiting wr ib (uc_mie C) va va' Hhs
-                with "Hminstret Hhs Hpc Hnpc Hmie [-]").
-      iNext. iSplit.
-      + (* STAY: re-enter [user_inv] with the same waiting machine *)
-        iIntros "Hhs Hpc Hnpc Hmie".
-        iDestruct "Hk" as "[Hk _]".
-        iApply "Hk".
-        iExists (HART_WAITING (wr, ib)), ms_v, sc_v, stval_v, sepc_v, va, va', g.
-        iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt".
-        iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest".
-        iFrame "Hrut".
-        iPureIntro. split; [exact Hhs | split; [exact Hms | intros u Hu; discriminate Hu]].
-      + (* WAKE: re-enter [user_inv] ACTIVE, pc in lock-step at [va'] *)
-        iIntros "Hhs Hpc Hnpc Hmie".
-        iDestruct "Hk" as "[Hk _]".
-        iApply "Hk".
-        iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g.
-        iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt".
-        iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest".
-        iFrame "Hrut".
-        iPureIntro. split; [exact Hms | intros u _; reflexivity].
-  Qed.
-
-  (* the capstone, over the ACTIVE residue only: what remains of the whole
-     user-execution theorem is [user_step_obligation_active] *)
-  Corollary wp_user_exec_active :
-    minstret_inv -∗
-    user_step_obligation_active C pt Rut -∗
-    user_inv C pt Rut -∗
-    ▷ stvec_handler_wp C pt Rut -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#Hminstret #Hactive Hinv Htrap".
-    iApply (wp_user_exec with "[] Hinv Htrap").
-    iApply (user_step_obligation_holds with "Hminstret Hactive").
-  Qed.
-
-End UserStepObligation.
 
 (* (The old §4 full-WP RETIRING step engine [wp_user_step_retire] is gone:
    the payload-form [retire_branch] (UserArms.v) supersedes it -- the
@@ -772,3 +355,430 @@ Section StepEnterWait.
     apply exec_returnm.
   Qed.
 End StepEnterWait.
+
+(* ===================================================================== *)
+(* §2 THE WAITING-HART STEP, at the FRAME layer.                          *)
+(*                                                                       *)
+(* One machine step from a WRS-suspended hart either STAYS waiting        *)
+(* (nothing observable changes but the wrapper's minstret_increment       *)
+(* write) or WAKES and retires (hart_state := ACTIVE, PC ticks to         *)
+(* nextPC).  The machine picks, on a value nobody can pin -- the wake     *)
+(* test reads mip, which the tick writes, and [valid_reservation] is an   *)
+(* opaque platform axiom -- so the rule's conclusion is a DISJUNCTION and *)
+(* the tier absorbs both arms into the same [user_inv].                   *)
+(*                                                                       *)
+(* WHAT CHANGED AGAINST THE PRE-PORT PROOF: everything sigma-shaped.      *)
+(* There is no [wp_exec_step_minstret] callback, no [mstate_interp], and  *)
+(* above all NO [clock_mip_acc] borrow -- the hart OWNS mip (it rides in  *)
+(* [user_regs]'s [clock_res]), so the step is a plain frame-in/frame-out  *)
+(* application of [HartStepFull.swp_exec_step_waiting] and the WHOLE of   *)
+(* the old sigma bookkeeping (three [reg_update]s, six [reg_valid_dq]s,   *)
+(* the invariant open/close) is gone.                                     *)
+(*                                                                       *)
+(* THE PRICE, and it is the port's one genuinely new obligation: the      *)
+(* frame layer speaks a [regstate], so the entry file has to be BUILT     *)
+(* ([UserFrame.u_rs]) and the exit file has to be READ BACK.  The exit is *)
+(* the two [wpin_*] lemmas below: [wait_post] describes the landing file  *)
+(* only up to agreement off the three clock cells, which is exactly       *)
+(* enough because [clock_res] holds their values existentially anyway.    *)
+(* ===================================================================== *)
+(* [tk_clock3] is the three cells the tick may move; nothing the tier names
+   is one of them, and the check computes. *)
+Local Ltac u_notin_clock := apply (bool_decide_unpack _); vm_compute; reflexivity.
+
+Section UserStepWaiting.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* ---- reading the landing file back, cell by cell ---- *)
+
+
+  Lemma wpin_stay (rs rsP rs3 : regstate) (r : register) :
+    reg_agree_on (u_Drw ∪ u_Dro) rsP (wrap_pre rs) ->
+    reg_agree_on ((u_Drw ∪ u_Dro) ∖ tk_clock3) rs3 rsP ->
+    r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+    register_beq r (R_bool minstret_increment) = false ->
+    register_lookup r rs3 = register_lookup r rs.
+  Proof.
+    intros Hp Hag Hin Hnc Hne.
+    rewrite (Hag r ltac:(apply elem_of_difference; split; assumption)).
+    rewrite (Hp r Hin). exact (wrap_pre_other r rs Hne).
+  Qed.
+
+  Lemma wpin_wake (rs rs' rs3 : regstate) (mi2 : mword 64) (r : register) :
+    reg_agree_on (u_Drw ∪ u_Dro) rs'
+      (register_set hart_state (HART_ACTIVE tt) (wrap_pre rs)) ->
+    reg_agree_on ((u_Drw ∪ u_Dro) ∖ tk_clock3) rs3 (wrap_post rs' mi2) ->
+    r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+    register_beq r (R_bitvector_64 minstret) = false ->
+    register_beq r (R_bitvector_64 PC) = false ->
+    register_beq r hart_state = false ->
+    register_beq r (R_bool minstret_increment) = false ->
+    register_lookup r rs3 = register_lookup r rs.
+  Proof.
+    intros Hp Hag Hin Hnc Hms Hpc Hhs Hmi.
+    rewrite (Hag r ltac:(apply elem_of_difference; split; assumption)).
+    rewrite (wrap_post_other r rs' mi2 Hms Hpc).
+    rewrite (Hp r Hin) (irrelevant_register_set r hart_state _ _ Hhs).
+    exact (wrap_pre_other r rs Hmi).
+  Qed.
+
+  (* the two cells the WAKE arm genuinely moves *)
+  Lemma wpin_wake_hart (rs rs' rs3 : regstate) (mi2 : mword 64) :
+    reg_agree_on (u_Drw ∪ u_Dro) rs'
+      (register_set hart_state (HART_ACTIVE tt) (wrap_pre rs)) ->
+    reg_agree_on ((u_Drw ∪ u_Dro) ∖ tk_clock3) rs3 (wrap_post rs' mi2) ->
+    register_lookup hart_state rs3 = HART_ACTIVE tt.
+  Proof.
+    intros Hp Hag.
+    rewrite (Hag hart_state ltac:(apply elem_of_difference; split;
+              [ exact u_in_hart | u_notin_clock ])).
+    rewrite (wrap_post_other hart_state rs' mi2 eq_refl eq_refl).
+    rewrite (Hp hart_state u_in_hart). apply register_lookup_set.
+  Qed.
+
+  Lemma wpin_wake_pc (rs rs' rs3 : regstate) (mi2 : mword 64) :
+    reg_agree_on (u_Drw ∪ u_Dro) rs'
+      (register_set hart_state (HART_ACTIVE tt) (wrap_pre rs)) ->
+    reg_agree_on ((u_Drw ∪ u_Dro) ∖ tk_clock3) rs3 (wrap_post rs' mi2) ->
+    register_lookup (R_bitvector_64 PC) rs3
+      = register_lookup (R_bitvector_64 nextPC) rs.
+  Proof.
+    intros Hp Hag.
+    rewrite (Hag (R_bitvector_64 PC) ltac:(apply elem_of_difference; split;
+              [ exact u_in_PC | u_notin_clock ])).
+    rewrite wrap_post_PC.
+    rewrite (Hp (R_bitvector_64 nextPC) u_in_nPC).
+    rewrite (irrelevant_register_set (R_bitvector_64 nextPC) hart_state _ _
+               eq_refl).
+    (* [exact] with the index GIVEN: ssreflect's [apply] picks the wrong
+       instantiation here and reports it as a PC/nextPC mismatch *)
+    exact (wrap_pre_other (R_bitvector_64 nextPC) rs eq_refl).
+  Qed.
+
+End UserStepWaiting.
+
+(* ===================================================================== *)
+(* §2b THE CLOSE: from a landing file and its pins, back to [user_inv].    *)
+(*                                                                       *)
+(* Both arms of the WAITING step -- and, when it lands, the ACTIVE cycle  *)
+(* -- exit here.  What it needs is exactly the cells whose VALUE          *)
+(* [user_inv] pins; everything else ([scause]/[stval]/[sepc], the GPRs,   *)
+(* the four counter cells) is existential in the invariant, so its pin at *)
+(* [rs3] is [reflexivity] and no transport is owed.  The persistent       *)
+(* [box] cells are not transported either: the caller still holds its own *)
+(* copies, and the frame's are dropped.                                   *)
+(*                                                                       *)
+(* [Hpmp] is a WAND rather than six more pure premises: the pmp facts are *)
+(* about the VALUES [pmp_config] existentially quantified, and the caller *)
+(* has them in hand at the point it took that bundle apart.               *)
+(* ===================================================================== *)
+Section UserWaitClose.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
+
+  Lemma u_close_inv (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (tlbvec : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs3 : regstate) (hs3 : HartState) (ms3 va3 va3' : mword 64) :
+    user_hart_ok hs3 ->
+    user_mstatus_ok ms3 ->
+    (forall u, hs3 = HART_ACTIVE u -> va3' = va3) ->
+    register_lookup hart_state rs3 = hs3 ->
+    register_lookup cur_privilege rs3 = User ->
+    register_lookup (R_bitvector_64 mstatus) rs3 = ms3 ->
+    register_lookup (R_bitvector_64 PC) rs3 = va3 ->
+    register_lookup (R_bitvector_64 nextPC) rs3 = va3' ->
+    register_lookup (R_bitvector_64 stvec) rs3 = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rs3 = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rs3 = uc_mideleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rs3 = MENVCFG_S ->
+    register_lookup (R_bitvector_64 satp) rs3 = usatp ->
+    register_lookup pmpcfg_n rs3 = pcfg ->
+    register_lookup pmpaddr_n rs3 = paddr ->
+    register_lookup tlb rs3 = tlbvec ->
+    tlb_ok_pt (mword_of_int 0) t tlbvec ->
+    u_mem_wf pt t mm ->
+    (pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗ pmp_config (ud_root pt)) -∗
+    medeleg ↦ᵣ□ uc_medeleg C -∗
+    senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
+    mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
+    (R_bitvector_32 sstateen0) ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcenv -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scenv -∗ mhpmcounter ↦ᵣ□ hpm -∗
+    hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
+    resv_any cpu_id -∗ pt_claims 2 t -∗ bytes_own mm -∗
+    (∀ (t' : ptree) (mm' : PtBytes.pamap) (tlbvec' : type_of_register tlb),
+       ⌜u_mem_step pt t t' mm mm'⌝ -∗
+       ⌜tlb_ok_pt (mword_of_int 0) t' tlbvec'⌝ -∗
+       upt_regs pt usatp tlbvec' -∗ bytes_own mm' -∗ user_pt_inv pt) -∗
+    Rut pt -∗
+    user_inv C pt Rut.
+  Proof.
+    intros Hhok Hmsok Hlock Lhs Lpriv Lms Lpc Lnpc Lstvec Lmie Lmdl Lmenv
+      Lsatp Lpcfg Lpaddr Ltlb Htlbok Hwf.
+    iIntros "Hpmp #Hmedl #Hsenv #Hmste #Hsste #Hmcen #Hscen #Hhpm
+             Hrw Hro Hresv Hclaims Hbytes Hclose Hrut".
+    iDestruct (u_frames_elim rs3 (uc_dqc C) hs3 ms3
+                 (register_lookup (R_bitvector_64 scause) rs3)
+                 (register_lookup (R_bitvector_64 stval) rs3)
+                 (register_lookup (R_bitvector_64 sepc) rs3) va3 va3'
+                 (register_lookup (R_bitvector_64 minstret) rs3)
+                 (register_lookup (R_bool minstret_increment) rs3)
+                 (register_lookup (R_bitvector_32 mcountinhibit) rs3)
+                 (register_lookup (R_bitvector_64 minstretcfg) rs3)
+                 (register_lookup (R_bitvector_64 mcycle) rs3)
+                 (register_lookup (R_bitvector_64 mtime) rs3)
+                 (register_lookup (R_bitvector_64 mip) rs3)
+                 (uc_stvec C) (uc_mie C) (uc_mideleg C)
+                 (register_lookup (R_bitvector_64 medeleg) rs3) MENVCFG_S
+                 (register_lookup (R_bitvector_64 mstateen0) rs3)
+                 (register_lookup (R_bitvector_32 sstateen0) rs3)
+                 (register_lookup (R_bitvector_32 mcounteren) rs3)
+                 (register_lookup (R_bitvector_32 scounteren) rs3)
+                 (register_lookup mhpmcounter rs3)
+                 (register_lookup (R_bitvector_64 misa) rs3)
+                 (register_lookup (R_bitvector_64 mseccfg) rs3)
+                 (register_lookup (R_bitvector_64 senvcfg) rs3)
+                 (register_lookup pma_regions rs3)
+                 (register_lookup htif_tohost_base rs3)
+                 (register_lookup (R_bitvector_1 elp) rs3)
+                 usatp pcfg paddr tlbvec
+                 ltac:(rewrite /u_pins_regs; split_and!;
+                       [ exact Lhs | exact Lpriv | exact Lms
+                       | reflexivity | reflexivity | reflexivity
+                       | exact Lpc | exact Lnpc | exact (u_regfile_agree rs3) ])
+                 ltac:(rewrite /u_pins_tick; split_and!; reflexivity)
+                 ltac:(rewrite /u_pins_cfg; split_and!;
+                       [ exact Lstvec | exact Lmie | exact Lmdl
+                       | reflexivity | exact Lmenv | reflexivity | reflexivity
+                       | reflexivity | reflexivity | reflexivity ])
+                 ltac:(rewrite /u_pins_hw; split_and!; reflexivity)
+                 ltac:(rewrite /u_pins_pt; split_and!;
+                       [ exact Lsatp | exact Lpcfg | exact Lpaddr | exact Ltlb ])
+                 with "Hrw Hro")
+      as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & HPC & HnPC & Hgpr &
+           Hminstret & Hmincr & #Hmcnt & #Hmicfg & Hmcycle & Hmtime & Hmip &
+           Hstvec & Hmie & Hmdl & _ & Hmenv & _ & _ & _ & _ & _ &
+           _ & _ & _ & _ & _ & _ &
+           Hsatp & Htlb & Hpcfg & Hpaddr)".
+    iExists hs3, ms3, (register_lookup (R_bitvector_64 scause) rs3),
+            (register_lookup (R_bitvector_64 stval) rs3),
+            (register_lookup (R_bitvector_64 sepc) rs3), va3, va3',
+            (u_regfile rs3).
+    iSplitR; [ iPureIntro; exact Hhok |].
+    iSplitR; [ iPureIntro; exact Hmsok |].
+    iSplitR; [ iPureIntro; exact Hlock |].
+    iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr Hminstret Hmincr
+             Hmcycle Hmtime Hmip Hresv".
+    { rewrite /user_regs /u_regs /minstret_res /clock_res.
+      iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr Hresv".
+      iSplitL "Hminstret Hmincr".
+      - iExists _, _, _, _. iFrame "Hminstret Hmincr Hmcnt Hmicfg".
+      - iExists _, _, _. iFrame "Hmcycle Hmtime Hmip". }
+    iSplitL "Hclaims Hbytes Hclose Hsatp Htlb Hpcfg Hpaddr Hpmp".
+    { iApply ("Hclose" $! t mm tlbvec
+                (u_mem_step_refl pt t mm Hwf) Htlbok with "[-Hbytes] Hbytes").
+      rewrite /upt_regs. iFrame "Hsatp Htlb".
+      iApply ("Hpmp" with "Hpcfg Hpaddr"). }
+    iFrame "Hrut".
+    rewrite /user_cfg. iFrame "Hstvec Hmie Hmdl Hmenv".
+    iFrame "Hmedl Hsenv Hmste Hsste".
+    iSplitR; [ iExists mcenv, scenv; iFrame "Hmcen Hscen"
+             | iExists hpm; iFrame "Hhpm" ].
+  Qed.
+
+End UserWaitClose.
+
+(* ===================================================================== *)
+(* §2c THE WAITING ARM ITSELF.                                            *)
+(* ===================================================================== *)
+Section UserStepWaitArm.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
+
+  Lemma wp_user_step_waiting (wr : WaitReason) (ib : mword 32)
+      (ms_v sc_v stval_v sepc_v va va' : mword 64) (g : regfile) :
+    (wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO) ->
+    user_mstatus_ok ms_v ->
+    hw_config -∗
+    user_regs (HART_WAITING (wr, ib)) ms_v sc_v stval_v sepc_v va va' g -∗
+    user_pt_inv pt -∗ user_cfg C -∗ Rut pt -∗
+    ▷ (user_inv C pt Rut -∗ WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hwr Hmsok.
+    iIntros "#Hhw Hregs Hupt Hcfg Hrut Hcont".
+    (* ---- take the three bundles apart ---- *)
+    rewrite /user_regs u_regs_open.
+    iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & HPC & HnPC
+                           & Hgpr & Hmr & Hcr & Hresv)".
+    iDestruct "Hmr" as (mst mi mc micfg) "(Hminstret & Hmincr & #Hmcnt & #Hmicfg)".
+    iDestruct "Hcr" as (cy ti ip) "(Hmcycle & Hmtime & Hmip)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hsenv &
+                          #Hmste & #Hsste & Hctr & Hhpmb)".
+    iDestruct "Hctr" as (mcenv scenv) "[#Hmcen #Hscen]".
+    iDestruct "Hhpmb" as (hpm) "#Hhpm".
+    iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & _ &
+        _ & _ & _ & _ & %Hmisaeq & %Hseceq & _ & #Hcert & _)".
+    iDestruct (user_pt_inv_bytes pt with "Hupt") as (t mm usatp tlbvec)
+      "(%Hwf & %Hsatpok & %Htlbok & (Hsatp & Htlb & Hpmp) & #Hclaims & Hbytes
+        & Hclose)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HpA & %Hpord & %HpX & %HpW & %HpR & %Hpcov)".
+    iAssert (pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗ pmp_config (ud_root pt))%I
+      as "Hpmpi".
+    { iApply (pmp_config_intro (ud_root pt) pcfg paddr
+                HpA Hpord HpX HpW HpR Hpcov). }
+    (* ---- the entry file ---- *)
+    set (RS := u_rs g (HART_WAITING (wr, ib)) mi mc (mword_of_int 0 : mword 32)
+                 mcenv scenv hpm elp0 pmar0 None pcfg paddr tlbvec
+                 va va' ms_v sc_v stval_v sepc_v mst cy ti ip micfg
+                 misa0 mseccfg0 (mword_of_int 0 : mword 64)
+                 (uc_stvec C) (uc_mie C) (uc_mideleg C) (uc_medeleg C)
+                 MENVCFG_S (mword_of_int 0 : mword 64) usatp).
+    iDestruct (u_frames_intro RS (uc_dqc C) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 (u_rs_pins_regs _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_tick _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_cfg _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_hw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_pt _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 with "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr
+                       Hminstret Hmincr Hmcnt Hmicfg Hmcycle Hmtime Hmip
+                       Hstvec Hmie Hmdl Hmedl Hmenv Hmste Hsste
+                       Hmcen Hscen Hhpm
+                       Hmisa Hmseccfg Hpma Hhtif Help Hsenv
+                       Hsatp Htlb Hpcfg Hpaddr")
+      as "[Hrw Hro]".
+    (* ---- the step ---- *)
+    iApply (swp_exec_step_waiting Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C)) RS
+              wr ib emp%I
+              u_disj Du_r_sub Du_w_sub
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              u_w_cy u_w_ti u_w_ip u_in_priv u_in_hart u_in_mc u_in_micfg
+              u_w_mi u_in_mi u_w_ms u_in_ms u_w_PC u_in_PC u_in_nPC
+              (eq_refl : register_lookup hart_state RS = HART_WAITING (wr, ib))
+              with "Hcert Hresv Hrw Hro [//] [-]").
+    iNext. iIntros (rs3) "(%rsP & %Hwp & %Hag) Hrw Hro Hresv _".
+    iApply "Hcont".
+    destruct Hwp as [Hstay | (rs' & mi2 & Hwk & ->)].
+    - (* ---- STAY: the hart is still waiting, PC and nextPC untouched ---- *)
+      assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+                register_beq r (R_bool minstret_increment) = false ->
+                register_lookup r rs3 = register_lookup r RS)
+        by (intros r H1 H2 H3; exact (wpin_stay RS rsP rs3 r Hstay Hag H1 H2 H3)).
+      iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr
+                mcenv scenv hpm rs3
+                (HART_WAITING (wr, ib)) ms_v va va'
+                ltac:(exact Hwr)
+                Hmsok
+                ltac:(intros u Hu; discriminate Hu)
+                ltac:(rewrite (T _ u_in_hart ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_priv ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_mst ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_PC ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_nPC ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_stvec ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_mie ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_mdl ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_menv ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_satp ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_pcfg ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_paddr ltac:(u_notin_clock) eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl); reflexivity)
+                Htlbok Hwf
+                with "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
+                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
+    - (* ---- WAKE: hart_state := ACTIVE, PC ticks to nextPC ---- *)
+      assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+                register_beq r (R_bitvector_64 minstret) = false ->
+                register_beq r (R_bitvector_64 PC) = false ->
+                register_beq r hart_state = false ->
+                register_beq r (R_bool minstret_increment) = false ->
+                register_lookup r rs3 = register_lookup r RS)
+        by (intros r H1 H2 H3 H4 H5 H6;
+            exact (wpin_wake RS rs' rs3 mi2 r Hwk Hag H1 H2 H3 H4 H5 H6)).
+      iApply (u_close_inv C pt Rut t mm usatp tlbvec pcfg paddr
+                mcenv scenv hpm rs3
+                (HART_ACTIVE tt) ms_v va' va'
+                ltac:(exact I)
+                Hmsok
+                ltac:(intros u _; reflexivity)
+                ltac:(exact (wpin_wake_hart RS rs' rs3 mi2 Hwk Hag))
+                ltac:(rewrite (T _ u_in_priv ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_mst ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (wpin_wake_pc RS rs' rs3 mi2 Hwk Hag); reflexivity)
+                ltac:(rewrite (T _ u_in_nPC ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_stvec ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_mie ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_mdl ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_menv ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_satp ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_pcfg ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_paddr ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl eq_refl); reflexivity)
+                Htlbok Hwf
+                with "Hpmpi Hmedl Hsenv Hmste Hsste Hmcen Hscen Hhpm
+                      Hrw Hro Hresv Hclaims Hbytes Hclose Hrut").
+  Qed.
+
+End UserStepWaitArm.
+
+(* ===================================================================== *)
+(* §3 The step obligation, reduced to its ACTIVE-hart residue.            *)
+(*                                                                       *)
+(* The premise is [hw_config], not [minstret_inv]: there is no invariant  *)
+(* left to open, and what the WAITING arm needs of the ambient machine is *)
+(* the persistent misa / mseccfg / pma / htif / elp / senvcfg cells and   *)
+(* the generation certificate -- all of which [hw_config] carries and     *)
+(* every caller already holds.                                           *)
+(* ===================================================================== *)
+Section UserStepObligation.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
+
+  Theorem user_step_obligation_holds :
+    hw_config -∗
+    user_step_obligation_active C pt Rut -∗
+    user_step_obligation C pt Rut.
+  Proof.
+    iIntros "#Hhw #Hactive".
+    iIntros "!> Hinv Hk".
+    iDestruct "Hinv" as (hs ms_v sc_v stval_v sepc_v va va' g)
+      "(%Hhs & %Hms & %Hlock & Hregs & Hupt & Hcfg & Hrut)".
+    destruct hs as [u | [wr ib]].
+    - (* ACTIVE: hand off to the residue obligation *)
+      destruct u. rewrite (Hlock tt eq_refl).
+      iApply ("Hactive" with "[//] Hregs Hupt Hcfg Hrut Hk").
+    - (* WAITING: the WRS stay/wake step, which re-enters [user_inv] on
+         BOTH arms -- so the caller's additive conjunction is projected to
+         its retire half once, here. *)
+      simpl in Hhs.
+      iApply (wp_user_step_waiting C pt Rut wr ib ms_v sc_v stval_v sepc_v
+                va va' g Hhs Hms with "Hhw Hregs Hupt Hcfg Hrut [Hk]").
+      iNext. iDestruct "Hk" as "[Hk _]". iExact "Hk".
+  Qed.
+
+  (* the capstone, over the ACTIVE residue only *)
+  Corollary wp_user_exec_active :
+    hw_config -∗
+    user_step_obligation_active C pt Rut -∗
+    user_inv C pt Rut -∗
+    ▷ stvec_handler_wp C pt Rut -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hhw #Hactive Hinv Htrap".
+    iApply (wp_user_exec with "[] Hinv Htrap").
+    iApply (user_step_obligation_holds with "Hhw Hactive").
+  Qed.
+
+End UserStepObligation.

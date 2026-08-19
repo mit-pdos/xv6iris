@@ -63,6 +63,9 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep Riscv
 Require Export PtreeType.
 Require Export PageGeom.   (* [page_valid] / [page_base]: a node page is a kalloc page *)
 Require Import SmodePte.
+(* the [swp] layer's footprint vocabulary: [hval] and the [goodb] bridge.
+   Both sit BELOW this file, so the splice below adds no cycle. *)
+Require Import HartSpan HartSpanChar WpDecodeBridge HartGoodb.
 Require Import PtAdBits.
 Require Import Pt4kWalk.
 Require Import WpDecodeBridge.
@@ -1929,6 +1932,97 @@ Section PtHit.
     rewrite (exec_bind_Some _ _ _ _ _ (uwe_pbmt vpn p2 p1 q0 asid s Hpb)).
     rewrite uwe_ppn.
     apply exec_returnm.
+  Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SWP SPLICE for this hit (main-cycle-port).  Under per-node       *)
+  (* stepping a rule may not compute a successor from the whole state it  *)
+  (* saw -- another hart steps between this walk's nodes -- so the [swp]  *)
+  (* layer wants the same fact as a FOOTPRINTED characterization: reads   *)
+  (* inside a declared set, no writes, and the file it lands on named.    *)
+  (*                                                                     *)
+  (* No page-table reasoning is restated to get it.  [WpDecodeBridge.     *)
+  (* goodb] certifies the footprint discipline along the SAME chain the   *)
+  (* exec proof above walks (one [goodb_bind] per step, fed by the very   *)
+  (* same sub-facts), and [HartGoodb.hval_of_goodb] pairs that with the   *)
+  (* exec lemma to produce [hval].  The hit path makes no events at all,  *)
+  (* which is why the certificate is this cheap -- the MISS path writes    *)
+  (* the TLB and reads PTEs from memory, and needs the [swp] event rules   *)
+  (* rather than a bridge.                                                *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [pte_check_ok]'s EVENT-FREENESS twin.  The check reads no register on
+     the paths this kernel takes (an R|X or R|W leaf), so wherever
+     [pte_check_ok] is discharged -- at a CONCRETE flag byte -- this one
+     falls to [vm_compute] as well. *)
+  Definition pte_check_pure (Db : register -> bool) (w : mword 64) : Prop :=
+    forall s, goodb Db (check_PTE_permission acc p mxr do_sum
+                          (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                          (ext_bits_of_PTE w) tt) s = true.
+
+  Lemma goodb_translate_TLB_hit_pt (Db : register -> bool) (vpn : mword 27)
+      (p2 p1 q0 : mword 64) (asid : mword 16) (idx : Z) s :
+    pte_check_ok acc p mxr do_sum q0 ->
+    pte_check_pure Db q0 ->
+    update_PTE_Bits (autocast (T := mword) q0 : mword 64) acc = None ->
+    pte_pbmt0 q0 ->
+    goodb Db (translate_TLB_hit 39 asid vpn acc p mxr do_sum tt idx
+                (u_walk_entry vpn p2 p1 q0 asid)) s = true.
+  Proof.
+    intros Hchk Hpure Hupd Hpb.
+    unfold translate_TLB_hit. cbn zeta.
+    match goal with |- context[tlb_get_pte ?sz ?e] => change sz with 8 end.
+    rewrite uwe_pte.
+    rewrite autocast_id.
+    rewrite (goodb_bind Db _ _ s _ (Hpure s) (Hchk s)). cbn match.
+    match goal with |- context[update_and_write_pte ?w ?vp ?a ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hue : exec (update_and_write_pte w vp a pv lv ac pr mx ds e) s
+                    = Some (Ok (None, tt), s));
+      [| assert (Hug : goodb Db (update_and_write_pte w vp a pv lv ac pr mx ds e) s
+                       = true) ] end.
+    { unfold update_and_write_pte.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        change w with 64 end.
+      rewrite autocast_id in Hupd. rewrite Hupd.
+      cbn match. apply exec_returnm. }
+    { unfold update_and_write_pte.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        change w with 64 end.
+      rewrite autocast_id in Hupd. rewrite Hupd.
+      reflexivity. }
+    rewrite (goodb_bind Db _ _ s _ Hug Hue). cbn match.
+    rewrite (goodb_bind Db _ _ s _ _ (uwe_pbmt vpn p2 p1 q0 asid s Hpb)).
+    - reflexivity.
+    - unfold tlb_get_pbmt, u_walk_entry. cbn [TLB_Entry_pte]. cbn zeta.
+      rewrite zero_extend64_id. rewrite autocast_id.
+      unfold pte_pbmt0 in Hpb. rewrite Hpb.
+      vm_compute (page_based_mem_type_forwards _). reflexivity.
+  Qed.
+
+  Lemma hval_translate_TLB_hit_pt (Db : register -> bool) (D Drw : gset register)
+      (rs : regstate) (dst : mstate) (vpn : mword 27) (p2 p1 q0 : mword 64)
+      (asid : mword 16) (idx : Z) :
+    (forall r : register, Db r = true -> r ∈ D) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    pte_check_ok acc p mxr do_sum q0 ->
+    pte_check_pure Db q0 ->
+    update_PTE_Bits (autocast (T := mword) q0 : mword 64) acc = None ->
+    pte_pbmt0 q0 ->
+    hval D Drw rs
+      (translate_TLB_hit 39 asid vpn acc p mxr do_sum tt idx
+         (u_walk_entry vpn p2 p1 q0 asid))
+      (Ok (autocast (T := mword)
+             ((autocast (T := mword) (PPN_of_PTE q0)) : mword 44),
+           PBMT_PMA, tt)) rs.
+  Proof.
+    intros HD Hag Hchk Hpure Hupd Hpb.
+    eapply (hval_of_goodb Db D Drw _ dst rs _ HD Hag).
+    - exact (goodb_translate_TLB_hit_pt Db vpn p2 p1 q0 asid idx dst
+               Hchk Hpure Hupd Hpb).
+    - exact (exec_translate_TLB_hit_pt vpn p2 p1 q0 asid idx dst
+               Hchk Hupd Hpb).
   Qed.
 
   (* the hit whose cached leaf word FAILS the check: the fault surfaces

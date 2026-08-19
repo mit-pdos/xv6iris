@@ -1271,11 +1271,28 @@ Section ProofIget.
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
             assert (Hsv6e : trunc32 (rget N1 Rs2) = dev).
             { rewrite (rget_ne N1 Rs2 ltac:(nz)) HN1s2. apply trunc32_sext. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; the claim is persistent and says nothing about the
+       VALUE, so a RESTORING peek of the same cell delivers it. *)
+    (* Here the peek is [ic_open_empty_dev] run at [devN := devT]: it hands
+       the empty arm's dev cell out and its wand takes it back unchanged, so
+       the ghost re-tag is the identity. *)
+            iApply fupd_wp.
+            iInv "Hesc" as ">Hbodyp" "Hclosep".
+            iMod (ic_open_empty_dev cn γfs γi cov logstart e devT inumT devT
+                    with "Hbodyp Hgid") as "(Hcellp & Hgid & Hcbp)".
+            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_dev (ientry e))
+                         (DfracOwn 1) devT ltac:(lia) with "Hcellp") as "#Hclaim1".
+            iMod ("Hclosep" with "[Hcbp Hcellp]") as "_";
+              [ iNext; iApply ("Hcbp" with "Hcellp") |].
+            iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (ic_id cn e (1/2) false dev inumT)
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi6e [Hgid]").
+                      with "Hcg Hpc Hi6e [] [Hgid]").
+            { rewrite Hpa6e. iExact "Hclaim1". }
             { rewrite Hpa6e Hsv6e.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_dev cn γfs γi cov logstart e devT inumT dev
@@ -1303,6 +1320,14 @@ Section ProofIget.
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
             assert (Hsv72 : trunc32 (rget N1 Rs4) = inum).
             { rewrite (rget_ne N1 Rs4 ltac:(nz)) HN1s4. apply trunc32_sext. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; the claim is persistent and says nothing about the
+       VALUE, so a RESTORING peek of the same cell delivers it. *)
+    (* Here no peek is needed at all: the caller already OWNS half of the
+       inum cell ([HinT]), which is what it is about to put in the update. *)
+            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_inum (ientry e))
+                         (DfracOwn (1/2)) inumT ltac:(lia) with "HinT") as "#Hclaim2".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
                       (mword_of_int 4 : mword 12) N1 (trap_res b + (K - 6))%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
@@ -1315,7 +1340,8 @@ Section ProofIget.
                        ifreeze_off (bv_unsigned inum) ∗
                        iname γi γfs inodestart inum l)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi72 [Hgid HinT Hbundle Hlic]").
+                      with "Hcg Hpc Hi72 [] [Hgid HinT Hbundle Hlic]").
+            { rewrite Hpa72. iExact "Hclaim2". }
             { rewrite Hpa72 Hsv72.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iMod (ic_open_empty_free cn γfs γi cov logstart e dev inumT dev inum
@@ -1381,6 +1407,18 @@ Section ProofIget.
             assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
             (* the slot's share authority, out of the LOCK's resource *)
             iDestruct (isl_pool_acc_upd M e He with "Hipool") as "[Hisl Hislback]".
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; the claim is persistent and says nothing about the
+       VALUE, so a RESTORING peek of the same cell delivers it. *)
+            iApply fupd_wp.
+            iMod (iref_load_locked_au ⊤ M e ltac:(solve_ndisj) He with "Hinv Hhalf")
+              as "[Hcellp Hbackp]".
+            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry e))
+                         (DfracOwn 1) (iref_word M e) ltac:(lia) with "Hcellp")
+              as "#Hclaim3".
+            iMod ("Hbackp" with "Hcellp") as "Hhalf".
+            iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
                       (mword_of_int 8 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
@@ -1393,7 +1431,8 @@ Section ProofIget.
                        icnt_half (bv_unsigned inum) 1%nat ∗
                        runit (is_claim l) (bv_unsigned inum))%I
                       (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi78 [Hhalf Hisl Hlic Hfoff Hicnt0]").
+                      with "Hcg Hpc Hi78 [] [Hhalf Hisl Hlic Hfoff Hicnt0]").
+            { rewrite Hpa78. iExact "Hclaim3". }
             { rewrite Hpa78 Hsv78.
               (* THE SIXTH COUNT MOVE (iclaim-ledger.md §3.1, A-AUs' last
                  bullet): [iref_alloc_store_au], the region-aware 0 -> 1
@@ -1436,13 +1475,32 @@ Section ProofIget.
                          ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
             assert (Hsv7c : trunc32 (rget V1 Rz) = valid_word false).
             { rewrite (rget_ne V1 Rz ltac:(nz)) Hx0. exact ig_trunc32_zero. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; the claim is persistent and says nothing about the
+       VALUE, so a RESTORING peek of the same cell delivers it. *)
+    (* [ic_open_mid] / [ic_close_mid] are an open/close pair with no ghost
+       move, so the mid arm's valid cell can be looked at and put back. *)
+            iApply fupd_wp.
+            iInv "Hesc" as ">Hbodyp" "Hclosep".
+            iDestruct (ic_open_mid cn γfs γi cov logstart e with "Hmt Hbodyp")
+              as "[Hmt Harmp]".
+            iDestruct "Harmp" as (devp inump wvp)
+              "(Hd1p & Hincellp & Hvldp & Hpayp & Hgid1p)".
+            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry e))
+                         (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
+            iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p]") as "_".
+            { iNext. iApply (ic_close_mid cn γfs γi cov logstart e).
+              rewrite /ic_mid_arm. iExists devp, inump, wvp. iFrame. }
+            iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
                       (mword_of_int 64 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
                        ic_id cn e (1/2) true dev inum)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi7c [Hmt Hgid2 Hd2 Hlvh Hpend Hfoff]").
+                      with "Hcg Hpc Hi7c [] [Hmt Hgid2 Hd2 Hlvh Hpend Hfoff]").
+            { rewrite Hpa7c. iExact "Hclaim4". }
             { rewrite Hpa7c Hsv7c.
               iInv "Hesc" as ">Hbody" "Hclose2".
               iDestruct (ic_open_mid cn γfs γi cov logstart e with "Hmt Hbody")
@@ -1645,12 +1703,25 @@ Section ProofIget.
       assert (Hpa44 : add_vec (rget Mr Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref (ientry j)).
       { rewrite (rget_ne Mr Rs1 ltac:(nz)) HMs1. reflexivity. }
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; the claim is persistent and says nothing about the
+       VALUE, so a RESTORING peek of the same cell delivers it. *)
+      iApply fupd_wp.
+      iMod (iref_load_locked_au ⊤ M j ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+        as "[Hcellp Hbackp]".
+      iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry j))
+                   (DfracOwn 1) (iref_word M j) ltac:(lia) with "Hcellp")
+        as "#Hclaim0".
+      iMod ("Hbackp" with "Hcellp") as "Hhalf".
+      iModIntro.
       iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x44)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) Mr (trap_res b + (K - 6))%nat
                 (fun v => (⌜v = iref_word M j⌝ ∗ itable_half M)%I)
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
                 ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-                with "Hcg Hpc Hi44 [Hhalf]").
+                with "Hcg Hpc Hi44 [] [Hhalf]").
+      { rewrite Hpa44. iExact "Hclaim0". }
       { rewrite Hpa44.
         iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) M j
                 ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback]".
@@ -1921,6 +1992,18 @@ Section ProofIget.
         assert (Hqv : (qj + qj'/2 < 1/2)%Qp) by (apply ig_frac_lt1; by apply Qp.sub_Some).
         (* the slot's share authority, out of the LOCK's resource *)
         iDestruct (isl_pool_acc_upd M j ltac:(lia) with "Hipool") as "[Hisl Hislback]".
+    (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
+       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       to arrive first; the claim is persistent and says nothing about the
+       VALUE, so a RESTORING peek of the same cell delivers it. *)
+        iApply fupd_wp.
+        iMod (iref_load_locked_au ⊤ M j ltac:(solve_ndisj) Hk with "Hinv Hhalf")
+          as "[Hcellp Hbackp]".
+        iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry j))
+                     (DfracOwn 1) (iref_word M j) ltac:(lia) with "Hcellp")
+          as "#Hclaim5".
+        iMod ("Hbackp" with "Hcellp") as "Hhalf".
+        iModIntro.
         iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (trap_res b + (K - 6))%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
@@ -1931,7 +2014,8 @@ Section ProofIget.
                    icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
                    runit (is_claim l) (bv_unsigned inum))%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                  with "Hcg Hpc Hi58 [Hhalf Hisl Hselj Hlic Hicnt]").
+                  with "Hcg Hpc Hi58 [] [Hhalf Hisl Hselj Hlic Hicnt]").
+        { rewrite Hpa58. iExact "Hclaim5". }
         { rewrite Hpa58 Hstv.
           (* THE BORROWED LICENCE (iclaim-ledger.md §3.1, RULING A): the
              incrementer holds no freeze token -- A-custody put it on the

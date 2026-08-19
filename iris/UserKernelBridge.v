@@ -16,9 +16,11 @@
    CSRs [scause]/[stval] (stale until the next trap writes them), the four
    config CSRs userret does not thread ([stvec]/[medeleg] and the
    [mstateen0]/[sstateen0] state-enable pins; [mip] is NOT among them --
-   it lives in [MinstretInv.clock_inv] and is borrowed per step, see
-   [UserExec.ucfg]), and the user data pages'
-   bytes [udata_own] with their coverage / access-classification facts.
+   it has no loop-constant value, and the hart owns it inside
+   [user_regs]'s [clock_res] rider, which arrives here as part of the
+   [pc_is] userret hands back, see [UserExec.ucfg]), and the user data
+   pages' bytes [udata_own] with their coverage / access-classification
+   facts.
 
    THE ONE PURE OBLIGATION is [user_mstatus_ok (sret_ms5 mstatus0)] -- the
    SXL=64 / MPRV=0 / MXR=0 pins survive the sret transform.  This is
@@ -43,6 +45,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes WpGpr RegFile.
 Require Import MstatusBits WpIntrCore.
+Require Import MinstretInv UserFrame.
 Require Import UptTree UserPtTree UserExec.
 Local Open Scope Z_scope.
 Import Defs.
@@ -90,6 +93,8 @@ Section UserKernelBridge.
       (stv medeleg_v : mword 64)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (mstateen0v : mword 64) (sstateen0v : mword 32)
+      (mcounteren_v scounteren_v : mword 32)
+      (mhpmcounter_v : type_of_register mhpmcounter)
       (g : regfile) :
     (* mstatus pins on the pre-sret value (FS/VS = Off: FP/vector disabled --
        the user machine runs with the FP and vector units off, an invariant
@@ -140,6 +145,16 @@ Section UserKernelBridge.
     medeleg ↦ᵣ□ medeleg_v -∗
     mstateen0 ↦ᵣ□ mstateen0v -∗
     sstateen0 ↦ᵣ□ sstateen0v -∗
+    (* THE COUNTER-PERMISSION CELLS.  New with the port, and forced by it:
+       a U-mode [csrr] of a counter CSR reads mcounteren / scounteren /
+       mhpmcounter, and under per-node stepping every read the cycle makes
+       must be answerable from what the hart OWNS.  All three are [box] --
+       nothing writes them after M-mode boot -- so handing them over costs
+       the kernel nothing, and their VALUES are unconstrained (a denied
+       counter read is Illegal_Instruction, which the user tier classifies). *)
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
+    mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
     (* ---- the user data pages ---- *)
     udata_own pt.(ud_data) -∗
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
@@ -150,8 +165,7 @@ Section UserKernelBridge.
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hcov Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
-             Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrut".
-    iDestruct "Hpc" as "[Hpcc Hnpc]".
+             Hsc Hstval Hstvec Hmedl Hmse Hsse Hmcen Hscen Hhpm Hdata Hrut".
     unfold user_inv.
     iExists (HART_ACTIVE tt), (sret_ms5 mstatus0), sc_v, stval_v, sepc0,
             (ret_pc sepc0), (ret_pc sepc0), g.
@@ -161,9 +175,14 @@ Section UserKernelBridge.
     iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS HTVM HTSR) |].
     (* lock-step va' = va *)
     iSplitR; [iPureIntro; intros u _; reflexivity |].
-    iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr".
-    { (* user_regs *)
-      unfold user_regs. iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr". }
+    iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr".
+    { (* [user_regs] IS [UserFrame.u_regs], and the three riders it now
+         carries -- [minstret_res], [clock_res], [resv_any] -- are exactly
+         the three [pc_is] bundles beside PC/nextPC.  So the bridge does NOT
+         take [pc_is] APART any more: [u_regs_pc_is] is the whole step, and
+         it is what makes the entry boundary free. *)
+      unfold user_regs. rewrite u_regs_pc_is.
+      iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr". }
     iSplitL "Hutlb Hdata".
     { (* user_pt_inv *)
       unfold user_pt_inv.
@@ -171,11 +190,14 @@ Section UserKernelBridge.
       iFrame "Hutlb Hdata".
       rewrite Hum in Hcov Hacc.
       iPureIntro. split; [exact Hcov | exact Hacc]. }
-    iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse".
+    iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hmcen Hscen Hhpm".
     { (* user_cfg *)
       unfold user_cfg.
       rewrite Hdqc Hstvec Hmie Hmdl Hmedl.
-      iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
+      iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse".
+      iSplitL "Hmcen Hscen".
+      - iExists mcounteren_v, scounteren_v. iFrame "Hmcen Hscen".
+      - iExists mhpmcounter_v. iFrame "Hhpm". }
     (* Rut pt *)
     iFrame "Hrut".
   Qed.
@@ -204,8 +226,11 @@ Section UserKernelBridge.
       scause ↦ᵣ sc_v ∗
       stval ↦ᵣ stval_v ∗
       sepc ↦ᵣ sepc_v ∗
-      PC ↦ᵣ stvec_base (uc_stvec C) ∗
-      nextPC ↦ᵣ stvec_base (uc_stvec C) ∗
+      (* [pc_is], NOT the two cells: post-port it also carries
+         [minstret_res], [clock_res] and [resv_any cpu_id], and splitting
+         PC/nextPC off would DROP them on the floor -- the kernel phase
+         needs all five. *)
+      pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
       (* user_pt_inv pt, fully unpacked *)
       utlb_inv_pt pt.(ud_root) pt.(ud_tfp) pt.(ud_um) ∗
@@ -221,21 +246,28 @@ Section UserKernelBridge.
       senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
+      (* THE THREE COUNTER-PERMISSION CELLS ARE NOT HANDED BACK.  They are
+         [box], so [user_cfg] holding them costs the kernel nothing to
+         RE-establish: whoever built this frame still has its own copies.
+         Returning them would only widen this opener's output -- and every
+         ipattern that eliminates it -- for resources the caller already
+         has.  (They are still inside [user_cfg], and [user_trap_frame_intro]
+         still asks for them there; this is the OPENER's output only.) *)
       Rut pt.
   Proof.
     iIntros "H".
     unfold user_trap_frame.
     iDestruct "H" as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hupt & Hcfg & Hrut)".
-    iDestruct "Hpc" as "[Hpcc Hnpc]".
     unfold user_pt_inv.
     iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
     unfold user_cfg.
     iDestruct "Hcfg" as
-      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
+      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse & #Hctr & #Hhpm)".
     iExists ms_v, sc_v, stval_v, sepc_v, g.
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr
-            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hrut".
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
+            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse
+            Hrut".
     iPureIntro. split; [exact Hok | split; [exact Hcov | exact Hacc]].
   Qed.
 

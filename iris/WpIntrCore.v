@@ -40,6 +40,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv.
 Require Import WpDecode ExecCommon.
+(* the swp layer, for the footprinted twins of the dispatch chain below *)
+Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
+        HartMFrame WpDecodeBridge WpMmodeCsrSwp HartRunGen.
 Require Import WpGprMret.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
@@ -103,6 +106,413 @@ Proof.
             (exec_external_interrupts_pending_reduce s meip seip HES Hmeip Hseip)).
   rewrite Hmip. apply exec_returnm.
 Qed.
+
+
+(* ===================================================================== *)
+(* THE SAME CHAIN AT THE SWP LAYER.                                       *)
+(*                                                                       *)
+(* THE PLIC WIRES ARE ∀-BOUND, and that is the point rather than a        *)
+(* concession.  [sig_meip] / [sig_seip] are ordinary registers whose      *)
+(* points-to's live in [WireInv.wire_inv], owned exclusively per CPU.  An *)
+(* invariant opens around ONE atomic step and this dispatch is many nodes, *)
+(* so no caller can hold them across it -- and none should want to: under  *)
+(* per-node stepping another hart may move a wire BETWEEN these nodes,     *)
+(* which is exactly why the cycle rule offers both arms.  So the wire      *)
+(* reads are OFF-FRAME reads ([swp_read_reg_any], which needs no ownership *)
+(* at all), they peel to a ∀-binder, and the answer is EXISTENTIAL in      *)
+(* their values.                                                          *)
+(*                                                                       *)
+(* This is also the one stretch of the S-mode path the [goodb] bridge      *)
+(* cannot carry: [getPendingSet] is event-free, but [hval_of_goodb]        *)
+(* requires every certified read to be IN THE FOOTPRINT, and the wires are *)
+(* precisely the registers that cannot be.  Hence a hand walk, mirroring   *)
+(* the exec proofs above node for node.                                    *)
+(* ===================================================================== *)
+Section SwpDispatch.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* [goodb] on a [returnm] is [true], but only once the [returnm] is
+     unfolded -- name it rather than fighting [cbn] at each use. *)
+  Lemma goodb_returnm (Db : register -> bool) {E X : Type} (x : X) (s : mstate) :
+    goodb Db (Defs.returnm (E := E) x) s = true.
+  Proof. reflexivity. Qed.
+
+  Lemma swp_external_interrupts_pending_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (dst : mstate)
+      (Db : register -> bool) :
+    Drw ## Dro ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (external_interrupts_pending tt)
+      (fun v => ∃ meip seip : mword 1, ⌜v = s_ext_ip meip seip⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDb Hag HES HESg.
+    iIntros "#Hcert Hrw Hro".
+    unfold external_interrupts_pending.
+    (* the FIRST wire: nobody owns it, so it peels to a binder *)
+    iApply (swp_bind_use (Defs.read_reg sig_meip) _ _ _ with "[] [-]").
+    { iApply (swp_read_reg_any sig_meip (fun _ => True%I) with "Hcert").
+      by iIntros (v). }
+    iIntros (meip) "_".
+    iApply (swp_bind_use (currentlyEnabled Ext_S) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw _ dst rs _ HDb Hag HESg HES)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    (* ...and the second *)
+    iApply (swp_bind_use (Defs.read_reg sig_seip) _ _ _ with "[] [-]").
+    { iApply (swp_read_reg_any sig_seip (fun _ => True%I) with "Hcert").
+      by iIntros (v). }
+    iIntros (seip) "_".
+    iApply swp_ret. iExists meip, seip. unfold s_ext_ip. by iFrame.
+  Qed.
+
+
+  Lemma swp_read_mip_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (Db : register -> bool)
+      (mip_v : mword 64) :
+    Drw ## Dro ->
+    (mip : register) ∈ Drw ∪ Dro ->
+    register_lookup mip rs = mip_v ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (read_mip IncludePlatformInterrupts)
+      (fun v => ∃ meip seip : mword 1, ⌜v = s_mip_bits mip_v meip seip⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmip Hmip HDb Hag HES HESg.
+    iIntros "#Hcert Hrw Hro".
+    unfold read_mip. cbn match.
+    iApply (swp_bind_use (Defs.read_reg mip) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmip
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hmip.
+    iApply (swp_bind_use (external_interrupts_pending tt) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_external_interrupts_pending_S Drw Dro Df rs dst Db Hdisj
+                HDb Hag HES HESg with "Hcert Hrw Hro"). }
+    iIntros (v). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+    iApply swp_ret. iExists meip, seip. unfold s_mip_bits. by iFrame.
+  Qed.
+
+  (* [getPendingSet Supervisor], SIE left symbolic and the M-destined set
+     dead ([mie & ~mideleg = 0]) -- the statement
+     [exec_getPendingSet_S_reduce] proves, with the wires existential.
+
+     THE TWO BOOLEAN BLOCKS ARE BRIDGED, NOT PEELED: their operands are
+     [returnM] applications, so [mbind_ret]'s [Interface.Ret] LHS does not
+     match them, and widening the [cbn] to fix that would unfold [Defs.bind]
+     across the goal.  Each reads only mstatus, which is framed, so each goes
+     across as its exec fact (copied from the exec proof) plus a certificate.
+     Both are NESTED two deep, so the inner bind's facts come first. *)
+  Lemma swp_getPendingSet_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (Db : register -> bool)
+      (mip_v mie_v mdv_v ms_v : mword 64) :
+    Drw ## Dro ->
+    (mip : register) ∈ Drw ∪ Dro ->
+    (mie : register) ∈ Drw ∪ Dro ->
+    (mideleg : register) ∈ Drw ∪ Dro ->
+    Db mstatus = true ->
+    register_lookup mip rs = mip_v ->
+    register_lookup mie rs = mie_v ->
+    register_lookup mideleg rs = mdv_v ->
+    register_lookup mstatus dst.(sregs) = ms_v ->
+    and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (getPendingSet Supervisor)
+      (fun v => ∃ meip seip : mword 1,
+                ⌜v = (if andb (eq_vec (_get_Mstatus_SIE ms_v) ('b"1"))
+                              (neq_vec (s_pending mip_v meip seip mie_v mdv_v)
+                                 (zeros' 64))
+                      then Some (s_pending mip_v meip seip mie_v mdv_v, Supervisor)
+                      else None)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmip HDmie HDmdl HDbmst Hmip Hmie Hmdl Hms Hmm HDb Hag
+      HES HESg.
+    iIntros "#Hcert Hrw Hro".
+    unfold getPendingSet.
+    iApply (swp_bind_use (currentlyEnabled Ext_S) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw _ dst rs _ HDb Hag HESg HES)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    iApply (swp_bind_use (Defs.read_reg mideleg) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmdl
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (read_mip IncludePlatformInterrupts) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_mip_S Drw Dro Df rs dst Db mip_v Hdisj HDmip Hmip
+                HDb Hag HES HESg with "Hcert Hrw Hro"). }
+    iIntros (v). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (Defs.read_reg mie) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmie
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (Defs.read_reg mie) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmie
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    (* ---- the mIE block.  At Supervisor the and_boolM short-circuits on
+       [generic_eq Supervisor Machine = false], so mstatus is never read. ---- *)
+    match goal with |- context[Defs.or_boolM ?A ?B] =>
+      set (Amie := Defs.or_boolM A B) end.
+    assert (HmieAE : forall K : bool -> M bool,
+              exec (Defs.bind (Defs.returnm (generic_eq Supervisor Machine)) K)
+                dst = exec (K false) dst).
+    { intro K.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_returnM (generic_eq Supervisor Machine) dst)).
+      reflexivity. }
+    assert (HmieE : exec Amie dst = Some (true, dst)).
+    { subst Amie. unfold Defs.or_boolM, Defs.and_boolM.
+      match goal with |- exec (Defs.bind ?A ?B) _ = _ =>
+        assert (HinE : exec A dst = Some (false, dst));
+        [ rewrite (HmieAE _); reflexivity
+        | rewrite (exec_bind_Some _ _ _ _ _ HinE) ] end.
+      cbn match.
+      change (orb (generic_eq Supervisor Supervisor) (generic_eq Supervisor User))
+        with true.
+      apply exec_returnm. }
+    assert (HmieG : goodb Db Amie dst = true).
+    { subst Amie. unfold Defs.or_boolM, Defs.and_boolM.
+      match goal with |- goodb _ (Defs.bind ?A ?B) _ = true =>
+        assert (HinE : exec A dst = Some (false, dst));
+        [ rewrite (HmieAE _); reflexivity | ];
+        assert (HinG : goodb Db A dst = true);
+        [ rewrite (goodb_bind Db _ _ dst (generic_eq Supervisor Machine)
+                     (goodb_returnm Db _ dst) ltac:(apply exec_returnm));
+          apply (goodb_returnm Db _ dst)
+        | rewrite (goodb_bind Db A B dst false HinG HinE) ] end.
+      apply (goodb_returnm Db _ dst). }
+    iApply (swp_bind_use Amie _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Amie true Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw Amie dst rs true
+                   HDb Hag HmieG HmieE)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    (* ---- the sIE block.  This one DOES read mstatus. ---- *)
+    match goal with |- context[Defs.or_boolM ?A ?B] =>
+      set (Asie := Defs.or_boolM A B) end.
+    assert (HsieInE : forall K : bool -> M bool,
+              exec (Defs.bind (Defs.returnm (generic_eq Supervisor Supervisor)) K)
+                dst = exec (K true) dst).
+    { intro K.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_returnM (generic_eq Supervisor Supervisor) dst)).
+      reflexivity. }
+    assert (HsieE : exec Asie dst
+                    = Some (eq_vec (_get_Mstatus_SIE ms_v) ('b"1"), dst)).
+    { subst Asie. unfold Defs.or_boolM, Defs.and_boolM.
+      match goal with |- exec (Defs.bind ?A ?B) _ = _ =>
+        assert (HinE : exec A dst
+                       = Some (eq_vec (_get_Mstatus_SIE ms_v) ('b"1"), dst));
+        [ rewrite (HsieInE _);
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus dst));
+          rewrite Hms; apply exec_returnm
+        | rewrite (exec_bind_Some _ _ _ _ _ HinE) ] end.
+      destruct (eq_vec (_get_Mstatus_SIE ms_v) ('b"1")).
+      - reflexivity.
+      - change (generic_eq Supervisor User) with false. apply exec_returnm. }
+    assert (HsieG : goodb Db Asie dst = true).
+    { subst Asie. unfold Defs.or_boolM, Defs.and_boolM.
+      match goal with |- goodb _ (Defs.bind ?A ?B) _ = true =>
+        assert (HinE : exec A dst
+                       = Some (eq_vec (_get_Mstatus_SIE ms_v) ('b"1"), dst));
+        [ rewrite (HsieInE _);
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus dst));
+          rewrite Hms; apply exec_returnm | ];
+        assert (HinG : goodb Db A dst = true);
+        [ rewrite (goodb_bind Db _ _ dst (generic_eq Supervisor Supervisor)
+                     (goodb_returnm Db _ dst) ltac:(apply exec_returnm));
+          change (generic_eq Supervisor Supervisor) with true; cbn match;
+          rewrite (goodb_bind Db (Defs.read_reg mstatus) _ dst
+                     (register_lookup mstatus dst.(sregs))
+                     ltac:(cbn [goodb Defs.read_reg read_reg];
+                           by rewrite HDbmst)
+                     ltac:(apply exec_read_reg));
+          apply (goodb_returnm Db _ dst)
+        | rewrite (goodb_bind Db A B dst
+                     (eq_vec (_get_Mstatus_SIE ms_v) ('b"1")) HinG HinE) ] end.
+      destruct (eq_vec (_get_Mstatus_SIE ms_v) ('b"1"));
+        apply (goodb_returnm Db _ dst). }
+    iApply (swp_bind_use Asie _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs Asie _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw Asie dst rs _
+                   HDb Hag HsieG HsieE)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hmie Hmdl Hmm.
+    rewrite and_vec_zeros64_r.
+    replace (neq_vec (zeros' 64 : mword 64) (zeros' 64)) with false
+      by (vm_compute; reflexivity).
+    rewrite andb_false_r.
+    iApply swp_ret. iExists meip, seip.
+    unfold s_pending, s_mip_bits. by iFrame.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* THE S-MODE DISPATCH.  This is [HartRunGen]'s other obligation, and the *)
+  (* wires make its answer genuinely the machine's choice: existential in    *)
+  (* [meip] / [seip], which is exactly the shape                            *)
+  (* [swp_run_hart_active_gen]'s match-shaped premise consumes.             *)
+  (* ==================================================================== *)
+  Lemma swp_dispatchInterrupt_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (dst : mstate)
+      (Db : register -> bool) (mip_v mie_v mdv_v ms_v : mword 64) :
+    Drw ## Dro ->
+    (mip : register) ∈ Drw ∪ Dro ->
+    (mie : register) ∈ Drw ∪ Dro ->
+    (mideleg : register) ∈ Drw ∪ Dro ->
+    Db mstatus = true ->
+    register_lookup mip rs = mip_v ->
+    register_lookup mie rs = mie_v ->
+    register_lookup mideleg rs = mdv_v ->
+    register_lookup mstatus dst.(sregs) = ms_v ->
+    and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (dispatchInterrupt Supervisor)
+      (fun r => ∃ meip seip : mword 1,
+                ⌜r = s_dispatch mip_v meip seip mie_v mdv_v ms_v⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmip HDmie HDmdl HDbmst Hmip Hmie Hmdl Hms Hmm HDb Hag
+      HES HESg.
+    iIntros "#Hcert Hrw Hro".
+    unfold dispatchInterrupt.
+    iApply (swp_bind_use (getPendingSet Supervisor) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_getPendingSet_S Drw Dro Df rs dst Db mip_v mie_v mdv_v ms_v
+                Hdisj HDmip HDmie HDmdl HDbmst Hmip Hmie Hmdl Hms Hmm HDb Hag
+                HES HESg with "Hcert Hrw Hro"). }
+    iIntros (v). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+    iApply swp_ret. iExists meip, seip. unfold s_dispatch.
+    destruct (andb (eq_vec (_get_Mstatus_SIE ms_v) ('b"1"))
+                   (neq_vec (s_pending mip_v meip seip mie_v mdv_v)
+                      (zeros' 64))).
+    - cbn match.
+      destruct (findPendingInterrupt (s_pending mip_v meip seip mie_v mdv_v));
+        by iFrame.
+    - cbn match. by iFrame.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* [run_hart_active] AT SUPERVISOR, both arms.  This is                  *)
+  (* [HartRunGen.swp_run_hart_active_gen] with its DISPATCH obligation      *)
+  (* discharged by the rule above; the FETCH stays an obligation, since     *)
+  (* what the fetch needs (a translation and the text bytes) is the         *)
+  (* caller's to supply -- [HartSTrans.swp_fetch_S] is what discharges it.  *)
+  (*                                                                      *)
+  (* [Qi] carries the wires INSIDE it.  The gen rule fixes [Qi] before the  *)
+  (* dispatch runs, and the wire values are not known until it does, so the *)
+  (* existential lives in the payload rather than around the rule -- which  *)
+  (* is the honest statement: the trap this cycle takes is whichever one    *)
+  (* the wires made pending while it was running.                          *)
+  (* ==================================================================== *)
+  Lemma swp_run_hart_active_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf rs2 : regstate) (dst : mstate) (Db : register -> bool)
+      (pc : mword 64) (w : mword 32) (i : instruction) (nl : nat)
+      (R : iProp Σ) (mip_v mie_v mdv_v ms_v : mword 64) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mip : register) ∈ Drw ∪ Dro ->
+    (mie : register) ∈ Drw ∪ Dro ->
+    (mideleg : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    Db mstatus = true ->
+    register_lookup cur_privilege rs = Supervisor ->
+    register_lookup mip rs = mip_v ->
+    register_lookup mie rs = mie_v ->
+    register_lookup mideleg rs = mdv_v ->
+    register_lookup mstatus dst.(sregs) = ms_v ->
+    and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    register_lookup (R_bitvector_64 PC) rsf = pc ->
+    hval (Drw ∪ Dro) Drw rsf (ext_decode w) i rsf ->
+    hfrun nl (Drw ∪ Dro) Drw rsf (is_landing_pad_expected tt)
+      = Some (false, rsf) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch tt)
+         (fun r => ⌜r = F_Base w⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 4) rsf) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                   (add_vec_int pc 4) rsf) Dro -∗
+     swp (execute i)
+       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗
+                    ∃ meip seip : mword 1,
+                      ⌜s_dispatch mip_v meip seip mie_v mdv_v ms_v
+                       = Some (ii, pr)⌝ ∗
+                      hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)
+                 ∨ (⌜st = Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w)⌝ ∗
+                    hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)).
+  Proof.
+    intros Hdisj HDpriv HDmip HDmie HDmdl HDpc HDnpc HDbmst Hpriv Hmip Hmie
+      Hmdl Hms Hmm HDb Hag HES HESg Hpcf Hdec Hlpad.
+    iIntros "#Hcert Hrw Hro Hfet Hex".
+    iApply (swp_run_hart_active_gen Drw Dro Df rs rsf rs2 Supervisor pc w i nl R
+              (fun ii pr => (∃ meip seip : mword 1,
+                   ⌜s_dispatch mip_v meip seip mie_v mdv_v ms_v = Some (ii, pr)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+              Hdisj HDpriv HDpc HDnpc Hpriv Hpcf Hdec Hlpad
+              with "Hcert Hrw Hro [] Hfet Hex").
+    (* the dispatch, from the rule above, re-shaped into the match the gen
+       rule expects *)
+    iIntros "Hrw Hro".
+    iApply (swp_mono with "[] [Hrw Hro]");
+      [| iApply (swp_dispatchInterrupt_S Drw Dro Df rs dst Db mip_v mie_v mdv_v
+                   ms_v Hdisj HDmip HDmie HDmdl HDbmst Hmip Hmie Hmdl Hms Hmm
+                   HDb Hag HES HESg with "Hcert Hrw Hro") ].
+    iIntros (o). iDestruct 1 as (meip seip) "(%Hd & Hrw & Hro)".
+    destruct o as [[ii pr] |].
+    - iExists meip, seip. iFrame. iPureIntro. by rewrite Hd.
+    - iFrame.
+  Qed.
+
+End SwpDispatch.
 
 (* getPendingSet Supervisor, SIE left SYMBOLIC: the M-destined set is dead
    (mie & ~mideleg = 0), and the outcome is the [s_dispatch]-shaped test. *)
@@ -580,64 +990,32 @@ Section WpIntrEngine.
 
   (* mstate_interp absorbs a same-value register write (the trap's
      [reset_elp], whose cell is pinned ↦ᵣ□ by hw_config). *)
-  Lemma reg_interp_set_same (rs : regstate) (r : register) (v : type_of_register r) :
-    register_lookup r rs = v ->
-    reg_interp rs -∗ reg_interp (register_set r v rs).
-  Proof.
-    iIntros (Hv) "H". iDestruct "H" as (m) "[Hh %Hag]".
-    iExists m. iFrame "Hh". iPureIntro.
-    intros r0 dv Hm. rewrite (Hag r0 dv Hm).
-    destruct (register_beq r0 r) eqn:Hb.
-    - pose proof (register_beq_true _ _ Hb) as ->.
-      rewrite register_lookup_set. rewrite Hv. reflexivity.
-    - rewrite irrelevant_register_set; [reflexivity | exact Hb].
-  Qed.
+  (* [reg_interp_set_same] lives in RiscvPtsto, where [reg_interp] does. *)
 
 
-  Lemma wp_exec_step_interrupt_inv {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ,
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (i : InterruptType) (p : Privilege) (s_trap : mstate),
-         ⌜ exec (run_hart_active 0) σ = Some (Step_Pending_Interrupt (i, p), σ) ⌝ ∗
-         ⌜ exec (handle_interrupt i p) σ = Some (tt, s_trap) ⌝ ∗
-         PC ↦ᵣ (register_lookup PC s_trap.(sregs)) ∗
-         mstate_interp s_trap ∗
-         ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-            PC ↦ᵣ (register_lookup nextPC s_trap.(sregs)) -∗
-            WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
-    iIntros (σ) "[Hreg Hmem] Hbody".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
-      as (i p s_trap) "(%Hha & %Hhi & Hpc & [Hreg Hmem] & Hcont)".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_trap.
-    assert (Hhart_a :
-      register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
-        = HART_ACTIVE tt).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-    iModIntro. iExists _. iSplitR.
-    { iPureIntro.
-      exact (exec_riscv_step_interrupt σ s_trap i p b
-               Hsi Hhart_a Hha Hhi Hhart_trap). }
-    iNext.
-    iMod (reg_update _ PC _ (register_lookup nextPC s_trap.(sregs)) with "Hreg Hpc")
-      as "[Hreg Hpc]".
-    iModIntro. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
-    iSplitL "Hmst Hmi".
-    { iExists mst, b. iFrame. }
-    iApply ("Hcont" with "Hhs Hpc").
-  Qed.
+  (* [wp_exec_step_interrupt_inv] WAS HERE, and is deleted rather than
+     ported: its shape is the one this port exists to remove.  It handed the
+     caller the whole machine state and asked for a successor in one fupd
+     ([exec (run_hart_active 0) σ = Some (Step_Pending_Interrupt (i,p), σ)]
+     plus [exec (handle_interrupt i p) σ = Some (tt, s_trap)]), which is
+     unsound per node: other harts step between an instruction's nodes, so a
+     successor computed from the σ you saw is stale unless you can name what
+     you depend on -- which is a footprint.
+
+     ITS REPLACEMENT IS THE CHAIN THIS FILE NOW ENDS WITH:
+
+       HartStepAny.swp_exec_step_any        -- the cycle, BOTH arms, with the
+                                               body's postcondition matching
+                                               on the step it reached
+        |- swp_run_hart_active_S (above)    -- the S-mode body
+           |- swp_dispatchInterrupt_S       -- wires ∀-bound
+           |- fetch obligation <- HartSTrans.swp_fetch_S
+
+     The trap arm's [handle_interrupt] rides in the dispatch's POSTCONDITION
+     (see [HartStepAny]'s header) rather than beside it, which is what
+     threads the frames without a second binder. *)
+
+
 
 End WpIntrEngine.
 

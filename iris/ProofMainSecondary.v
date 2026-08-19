@@ -331,6 +331,19 @@ Section ProofMainSecondary.
     iPoseProof (mni_1c with "Htext") as "Hi1c".
     iPoseProof (mni_1e with "Htext") as "Hi1e".
     (* ---- +0x16 c.lw a5,0(a4) : the spin load, under the invariant ---- *)
+    (* THE ADDRESS CLAIM the per-node load asks for (WpSconfMem.wordw_claim):
+       the access TRANSLATES several nodes before the atomic update is opened,
+       so the window's mapping has to arrive up front.  It is persistent and
+       says nothing about the VALUE, so one peek-open of the started
+       invariant delivers it and puts the body straight back. *)
+    iApply fupd_wp.
+    iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
+    iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
+                 ltac:(lia) with "Hword") as "#Hstcl".
+    iMod ("Hclose" with "[Hword Hrest]") as "_".
+    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    iModIntro.
     iApply (wp_load_s_sconf_au (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (mword_of_int 0 : mword 12) m n
@@ -340,7 +353,8 @@ Section ProofMainSecondary.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 data2_ext_4
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(solve_ndisj) with "Hcg Hpc Hi16 []").
+              ltac:(solve_ndisj) with "Hcg Hpc Hi16 [] []").
+    { rewrite Ha4. iExact "Hstcl". }
     { rewrite Ha4.
       iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv)
                 ltac:(solve_ndisj) with "Hsinv"). }

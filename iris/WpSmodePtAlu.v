@@ -16,6 +16,7 @@ Require Import SRegime.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
 Require Import WpSmodePtLeaves.
+Require Import HartSwp WpMmodeSwpBase.
 Require Import RegFile.
 Import Defs.
 
@@ -60,17 +61,22 @@ Section WpSmodePtAlu.
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_regime R pc rd csp_rs1 csp_rs1
+    iApply (wp_gpr_write_s_config_regime R pc rd
               (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
-              m mstatus0 mie_v mdv0 menvcfg0
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
-    - intros s_pc Hnpc Hva _.
-      change sp with (Regidx csp_rs1).
-      rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 rd (caddi4spn_imm nzimm) s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_addi_val. rewrite Hva. reflexivity.
+              (add_vec (m !!! Regidx csp_rs1)
+                 (sign_extend' 64 (caddi4spn_imm nzimm)))
+              m mstatus0 mie_v mdv0 menvcfg0 (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
+                    Hfile Hinstr Hcont").
+    iIntros "#Hcert Hf".
+    change sp with (Regidx csp_rs1).
+    iApply (swp_execute_rw csp_rs1 rd m
+              (execute (ITYPE (caddi4spn_imm nzimm, Regidx csp_rs1,
+                               Regidx rd, ADDI)))
+              RETIRE_SUCCESS
+              (fun a => add_vec a (sign_extend' 64 (caddi4spn_imm nzimm)))
+              eq_refl Hrd with "Hcert Hf").
   Qed.
 
 
@@ -106,17 +112,20 @@ Section WpSmodePtAlu.
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_regime R pc rd rd rd
+    iApply (wp_gpr_write_s_config_regime R pc rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI))
               (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))
-              m mstatus0 mie_v mdv0 menvcfg0
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
-              _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ITYPE_ADDI_gpr rd rd (sign_extend' 12 imm) s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addi_val. rewrite Hva. reflexivity.
+              m mstatus0 mie_v mdv0 menvcfg0 (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
+                    Hfile Hinstr Hcont").
+    iIntros "#Hcert Hf".
+    iApply (swp_execute_rw rd rd m
+              (execute (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd,
+                               ADDI)))
+              RETIRE_SUCCESS
+              (fun a => add_vec a (sign_extend' 64 (sign_extend' 12 imm)))
+              eq_refl Hrd with "Hcert Hf").
   Qed.
 
 
@@ -153,18 +162,22 @@ Section WpSmodePtAlu.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_gpr_write_s_config_regime R pc csp_rs1 csp_rs1 csp_rs1
+    iApply (wp_gpr_write_s_config_regime R pc csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
-              m mstatus0 mie_v mdv0 menvcfg0
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsp
-              _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
+              (add_vec (m !!! Regidx csp_rs1)
+                 (sign_extend' 64 (caddi16sp_imm imm6)))
+              m mstatus0 mie_v mdv0 menvcfg0 (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
+                    Hfile Hinstr Hcont").
+    iIntros "#Hcert Hf".
     change sp with (Regidx csp_rs1).
-    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (caddi16sp_imm imm6) s_pc).
-    replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
-    unfold gpr_addi_val. rewrite Hva. reflexivity.
+    iApply (swp_execute_rw csp_rs1 csp_rs1 m
+              (execute (ITYPE (caddi16sp_imm imm6, Regidx csp_rs1,
+                               Regidx csp_rs1, ADDI)))
+              RETIRE_SUCCESS
+              (fun a => add_vec a (sign_extend' 64 (caddi16sp_imm imm6)))
+              eq_refl Hsp with "Hcert Hf").
   Qed.
 
 
@@ -245,18 +258,23 @@ Section WpSmodePtAlu.
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_regime R pc rd rd rd
+    iApply (wp_gpr_write_s_config_regime R pc rd
               (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd))
               (sign_extend' 64 (subrange_vec_dec
-                 (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm))) 31 0))
-              m mstatus0 mie_v mdv0 menvcfg0
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
-              _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ADDIW_gpr rd rd (sign_extend' 12 imm) s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addiw_val. rewrite Hva. reflexivity.
+                 (add_vec (m !!! Regidx rd)
+                    (sign_extend' 64 (sign_extend' 12 imm))) 31 0))
+              m mstatus0 mie_v mdv0 menvcfg0 (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
+                    Hfile Hinstr Hcont").
+    iIntros "#Hcert Hf".
+    iApply (swp_execute_rw2 rd rd m
+              (execute (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd)))
+              RETIRE_SUCCESS
+              (fun a => sign_extend' 64 (subrange_vec_dec
+                          (add_vec a (sign_extend' 64 (sign_extend' 12 imm)))
+                          31 0))
+              eq_refl Hrd with "Hcert Hf").
   Qed.
 
 

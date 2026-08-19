@@ -1624,7 +1624,7 @@ Section SyscallRet.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iDestruct (proc_priv_tf_upd with "Hpriv") as "(Htfc & Htfp & Hpvback)".
     iDestruct (tf_page_length with "Htfp") as "%Htflen".
@@ -2761,7 +2761,7 @@ Section SyscallArms.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iDestruct (proc_priv_tf_upd with "Hpriv") as "(Htfc & Htfp & Hpvback)".
     iDestruct (tf_page_length with "Htfp") as "%Htflen".
@@ -3028,7 +3028,7 @@ Section SyscallMain.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
     iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv with "Hkmapb") as "#Hptc".
     iDestruct (tf_page_word_mem (ud_tfp (pv_upt V)) (pv_tf V) 21%nat RAWNUM ltac:(lia) Htf21 with "Hptc Htfp") as "[Htfw Htfwback]".
     iPoseProof (syci_16 with "Htext") as "Hi16".

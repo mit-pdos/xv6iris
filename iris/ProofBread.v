@@ -677,6 +677,23 @@ Section BreadBlocks.
                   = b_valid (bpa k)).
     { rgne. rewrite HMs1 bd_s0. rewrite /b_valid /bpa. apply kv_addv_zero. }
     (* ---- +0xb4 c.lw a5,0(s1): the CHECKOUT, at this one instruction ---- *)
+    (* THE CHECKOUT RUNS HERE, one fupd BEFORE the load: [escrow_swap_checkout]
+       hands the new escrow body straight back, so nothing stays open across
+       the step, and the load's atomic update is then over a cell this thread
+       already holds -- which is also where its ADDRESS CLAIM comes from
+       ([wordw_claim_of], off the very points-to it puts in the update). *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    iDestruct (escrow_swap_checkout bn V k q dev bno
+                 with "Hbodyp Hbown Hrtok Hrdev Hrbno") as "[Hbodyp Hpark2]".
+    iDestruct "Hpark2" as (vb0 bs0) "(Hvld & Hbdev & Hbuf & Hpay)".
+    iMod ("Hclosep" with "[Hbodyp]") as "_".
+    { iApply bi.later_intro. iExact "Hbodyp". }
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_valid (bpa k)) (DfracOwn 1)
+                 (if vb0 then (mword_of_int 1 : mword 32)
+                  else (mword_of_int 0 : mword 32)) ltac:(lia)
+                 with "Hvld") as "#HclaimA".
+    iModIntro.
     iApply (wp_lw_au_s_sconf (dqm := DfracOwn 1) true
               (mword_of_int (KernelSyms.bread + 0xb4)) Ra5 Rs1 (mword_of_int 0 : mword 12)
               M (K - 6)%nat
@@ -688,20 +705,16 @@ Section BreadBlocks.
                     b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
                     buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
                     buf_pay bn V k vb dev bno bs)%I)
-              (⊤ ∖ ↑minstretN ∖ ↑bioN) eb
+              (⊤ ∖ ↑minstretN) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hib4 [Hbown Hrtok Hrdev Hrbno]").
-    { iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (escrow_swap_checkout bn V k q dev bno
-                   with "Hbody Hbown Hrtok Hrdev Hrbno") as "[Hbody Hpark2]".
-      iDestruct "Hpark2" as (vb bs) "(Hvld & Hbdev & Hbuf & Hpay)".
-      iModIntro.
-      iExists (if vb then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)).
+              with "Hcg Hpc Hib4 [] [Hvld Hbdev Hbuf Hpay]").
+    { rewrite Hva. iExact "HclaimA". }
+    { iModIntro.
+      iExists (if vb0 then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)).
       iEval (rewrite -Hva) in "Hvld". iFrame "Hvld".
-      iIntros "Hvld". iEval (rewrite Hva) in "Hvld".
-      iMod ("Hclose" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
-      iModIntro. iExists vb, bs. iSplitR; [by iPureIntro|].
+      iIntros "Hvld". iEval (rewrite Hva) in "Hvld". iModIntro.
+      iExists vb0, bs0. iSplitR; [by iPureIntro|].
       iFrame "Hvld Hbdev Hbuf Hpay". }
     iIntros (vld CIDt1 Hst1) "Hcg Hpc H".
     iDestruct "H" as (vb bs) "(%Hpin & Hvld & Hbdev & Hbuf & Hpay)".
@@ -1362,11 +1375,17 @@ Section BreadBlocks.
       as "(%Hpure & Hauth & Hcell & Hdevs & Hbnos & Hpool & Hclose)".
     destruct Hpure as [Hmiss Huniq].
     (* ---- +0x90 sw s2,8(s1) : b->dev = dev ---- *)
+    (* the ADDRESS CLAIM, straight off the half of the dev cell the caller
+       already holds -- [wordw_claim_of]'s conclusion is persistent, so
+       [Hdevs] is still here for the update. *)
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_dev (bpa k)) (DfracOwn (1/2))
+                 (devs k) ltac:(lia) with "Hdevs") as "#HclaimB".
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.bread + 0x90)) Rs2 Rs1
               (mword_of_int 8 : mword 12) M (trap_res eb + (K - 6))%nat
               (own (bn_auth bn) (● Mg) ∗ b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev)%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi90 [Hauth Hdevs]").
+              with "Hcg Hpc Hi90 [] [Hauth Hdevs]").
+    { rewrite Hadev. iExact "HclaimB". }
     { iInv "Hesc" as ">Hbody" "Hclose2".
       iDestruct (escrow_recyc_dev bn V k Mg (devs k) dev HMk Hdv
                    with "Hauth Hbody Hdevs") as "(Hauth & Hfull & Hback)".
@@ -1385,13 +1404,16 @@ Section BreadBlocks.
        THE CACHE MEMBERSHIP MOVES HERE, so this is where the pool exchange
        happens and where the escrow enters its mid-recycle window (cells
        only, dev cell FULL, the recycle token out in our hand). *)
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_blockno (bpa k)) (DfracOwn (1/2))
+                 (bnos k) ltac:(lia) with "Hbnos") as "#HclaimC".
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.bread + 0x94)) Rs3 Rs1
               (mword_of_int 12 : mword 12) M (trap_res eb + (K - 6))%nat
               (own (bn_auth bn) (● Mg) ∗ bmid bn k ∗ pool_blk V (uint bno) ∗
                b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno ∗
                bio_pool V (bfun_upd bnos k bno))%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi94 [Hauth Hdevs Hbnos Hpool]").
+              with "Hcg Hpc Hi94 [] [Hauth Hdevs Hbnos Hpool]").
+    { rewrite Habno. iExact "HclaimC". }
     { iInv "Hesc" as ">Hbody" "Hclose2".
       iDestruct (escrow_recyc_bno bn V k Mg bnos dev bno
                    HMk Hk Hcov Hmiss Huniq Hdv
@@ -1413,13 +1435,28 @@ Section BreadBlocks.
        the recycle token refutes both normal arms, so what we reopen is the
        window we parked; the stored 0 makes the arm INVALID and deposits the
        new block's pool bundle for whoever wins the sleeplock race. *)
+    (* the valid word is nobody's here, so its claim comes off one PEEK of the
+       mid arm: [escrow_open_mid] / [escrow_close_mid] are an open/close pair
+       with no ghost move, so the cell is looked at and put straight back. *)
+    iApply fupd_wp.
+    iInv "Hesc" as ">Hbodyq" "Hcloseq".
+    iDestruct (escrow_open_mid bn V k with "Hbmid Hbodyq") as "(Hbmid & Hmidq & _)".
+    iDestruct "Hmidq" as (vldq bnoq bsq) "(%Hpinq & Hvldq & Hdevfullq & Hbufq)".
+    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_valid (bpa k)) (DfracOwn 1)
+                 vldq ltac:(lia) with "Hvldq") as "#HclaimD".
+    iMod ("Hcloseq" with "[Hvldq Hdevfullq Hbufq]") as "_".
+    { iNext. iApply (escrow_close_mid bn V k).
+      rewrite /buf_mid. iExists vldq, bnoq, bsq. iFrame.
+      iPureIntro. exact Hpinq. }
+    iModIntro.
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.bread + 0x98)) Rz Rs1
               (mword_of_int 0 : mword 12) M (trap_res eb + (K - 6))%nat
               (own (bn_auth bn) (● Mg) ∗
                b_dev (bpa k) ↦₄{DfracOwn (1/2)} (bv_dev V) ∗
                b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno)%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi98 [Hauth Hbmid HpoolB Hbnos]").
+              with "Hcg Hpc Hi98 [] [Hauth Hbmid HpoolB Hbnos]").
+    { rewrite Hava. iExact "HclaimD". }
     { iInv "Hesc" as ">Hbody" "Hclose2".
       iDestruct (escrow_recyc_valid bn V k bno Hcov
                    with "Hbmid Hbody Hbnos HpoolB") as "(Hvld & Hbnos & Hback)".

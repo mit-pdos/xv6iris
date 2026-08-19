@@ -127,6 +127,7 @@ Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked re
 Require Import UserPtTree UserExec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -498,6 +499,18 @@ Module Type USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
       usertrap_res_bare pt ksp -∗
       hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
+
+  (* THE TIMER CAPABILITY'S mcounteren PIN.  The U tier needs
+     [mcounteren ↦ᵣ□] and it cannot come from [hw_config] (timerinit writes
+     mcounteren after that bundle is frozen); the residue carries it inside
+     [devintr_caps_any]'s [timer_cap], at every hart.  Persistent, so it is
+     handed straight back.  Concrete: [UsertrapRes.ut_res_bare_sstc]. *)
+  Parameter usertrap_res_sstc :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
 
   (* ... AND BOTH AT ONCE, which is what uservec needs: its save walk holds
      the trapframe page open across the same stretch its [csrw sscratch,a0] /

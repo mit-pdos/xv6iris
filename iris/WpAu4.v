@@ -90,6 +90,16 @@ Section Au4Leaves.
     sie_cap_gpr kt m av b p -∗
     pc_is pc -∗
     instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
+    (* THE ADDRESS CLAIM the per-node forms ask for
+       ([WpSconfMem.wordw_claim]): per node the access TRANSLATES several
+       nodes before the memory node where the one-shot atomic update is
+       opened, so the window's mapping, alignment, canonicality and RAM-ness
+       have to arrive UP FRONT, beside the (linear) update rather than
+       inside it.  It is persistent and says nothing about the VALUE.  This
+       is the wrapped leaf's premise, passed straight through: an owner of
+       the window reads it off its own points-to ([wordw_claim_of]), an
+       invariant-backed caller off one peek-open of its accessor. *)
+    wordw_claim (KTR := KT0) 4 (add_vec (rget m rs1) (sign_extend' 64 imm)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
        add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
        (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
@@ -111,13 +121,13 @@ Section Au4Leaves.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
               = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
+    iIntros "Hcg Hpc Hinstr #Hclaim HAU Hcont".
     iApply (wp_load_s_sconf_au (kt := kt) (ktd := KT0) 4 cmp false pc rd rs1 imm m av
               (fun w => sign_extend' 64 w) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
+              with "Hcg Hpc Hinstr Hclaim HAU Hcont").
   Qed.
 
   (* [sw rs2, imm(rs1)], same discipline. *)
@@ -128,6 +138,16 @@ Section Au4Leaves.
     sie_cap_gpr kt m av b p -∗
     pc_is pc -∗
     instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
+    (* THE ADDRESS CLAIM the per-node forms ask for
+       ([WpSconfMem.wordw_claim]): per node the access TRANSLATES several
+       nodes before the memory node where the one-shot atomic update is
+       opened, so the window's mapping, alignment, canonicality and RAM-ness
+       have to arrive UP FRONT, beside the (linear) update rather than
+       inside it.  It is persistent and says nothing about the VALUE.  This
+       is the wrapped leaf's premise, passed straight through: an owner of
+       the window reads it off its own points-to ([wordw_claim_of]), an
+       invariant-backed caller off one peek-open of its accessor. *)
+    wordw_claim (KTR := KT0) 4 (add_vec (rget m rs1) (sign_extend' 64 imm)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
        add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
        (add_vec (rget m rs1) (sign_extend' 64 imm)
@@ -148,13 +168,13 @@ Section Au4Leaves.
       by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
+    iIntros "Hcg Hpc Hinstr #Hclaim HAU Hcont".
     iApply (wp_store_s_sconf_au (kt := kt) (ktd := KT0) 4 cmp pc rs2 rs1 imm m av
               (trunc32 (rget m rs2)) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
+              with "Hcg Hpc Hinstr Hclaim HAU Hcont").
   Qed.
 
 End Au4Leaves.

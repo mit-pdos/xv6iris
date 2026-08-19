@@ -79,6 +79,7 @@ Require Import SpecUsertrap.   (* USERTRAP_RES -- the fit is checked at the foot
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -898,6 +899,30 @@ Section UsertrapRes.
        ut_trap_parked (un_pj N) ksp av ∅ ∗
        ut_env_nopt Rsys N V)%I.
 
+  (* THE TIMER CAPABILITY'S mcounteren PIN, READ OUT OF THE BARE RESIDUE.
+     The U tier needs [mcounteren ↦ᵣ□] -- a U-mode [csrr] of a counter CSR
+     runs [counter_enabled], which reads it unconditionally -- and unlike
+     scounteren / mhpmcounter it cannot ride [RiscvFetchExec.hw_config]:
+     timerinit WRITES mcounteren, so it is not frozen when that bundle is
+     built.  Its persistent form is [TimerCap.sstc_enabled], minted right
+     after timerinit and carried at every hart by [ut_caps]' own
+     [devintr_caps_any].  So the trap loop takes it from the residue it
+     already holds rather than from a new premise.  Persistent, hence handed
+     straight back. *)
+  Lemma ut_res_bare_sstc (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) :
+    ut_res_bare Rsys pt ksp -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Hcaps & Hown)".
+    iDestruct "Hcaps" as "(Hpi & Hkd & Hks & #Hdev & Hrest)".
+    iDestruct (devintr_caps_any_at CID with "Hdev") as "(_ & _ & _ & _ & [#Hsstc _] & _)".
+    iFrame "Hsstc".
+    iExists N, V, av. rewrite /ut_env_nopt /ut_caps.
+    iFrame "Htrap Hpi Hkd Hks Hdev Hrest Hown".
+    iPureIntro. split; [| split; [| split]]; assumption.
+  Qed.
+
   Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ proc_pt pt -∗ ut_res_parked Rsys pt ksp.
@@ -1390,6 +1415,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
     usertrap_res_bare pt ksp -∗
     hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
   Proof. exact (ut_res_bare_csrs_open (SY.syscall_env) pt ksp). Qed.
+
+  Lemma usertrap_res_sstc
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
+  Proof. exact (ut_res_bare_sstc (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
