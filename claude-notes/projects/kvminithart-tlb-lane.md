@@ -261,10 +261,55 @@ and the diff cannot be confined to `SRegime.v` + those files:
 Neither is churn — no call site, no explicit instance, no import ripple, no
 `Proof*`/`Spec*` file, no declare-twice — but the containment rule is
 mechanical and both are outside it, so the whole SrWalks edit was reverted
-before any commit.  **Do not re-try it without a fresh ruling**; the standing
-direction is instead to re-route the consumers of `sr_swp_open`/`sr_swp_close`
-so that NO regime-generic statement changes at all, and to reprove the wfi
-leaf regime-independently (which would also revert 4a′'s `kpt_on` premise).
+before any commit.  **Do not re-try it without a fresh ruling.**
+
+(The wfi half of the old fallback is RETIRED by user ruling: `ProofScheduler`
+is completely closed — no `Admitted`, no `Axiom`, green, spec untouched, and
+the `kpt_on` premise discharged at its one call site — so **the wfi leaf keeps
+its `kpt_on` premise as landed in `1cd04ce5`**, conditional only on that
+scheduler proof staying closed.)
+
+### THE DISJUNCTIVE RECORD (user design, 2026-08-19): BLOCKED, and not by an
+### encoding — the tlb cell is in the LEAF's obligation, not just the engine's
+
+The design was: `sr_swp_open` returns EITHER the satp/tlb/pmp cells OR the
+satp/pmp cells plus `⌜bare_satp_ok satp0⌝`; `sr_swp_close` takes the tlb back
+only on the walking arm; the three instances each produce their own arm; and
+`SmodeCorePt`'s two engines case-split INTERNALLY into two concrete branches,
+with the 44 downstream leaf statements byte-identical.
+
+**It cannot be contained, and the reason is one line of
+`wp_instr_s_config_sr`'s own statement** (`SmodeCorePt.v:3926`):
+
+```coq
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ sr_swp_res_at R satp0 tv' -∗          (* THE LEAF'S *)
+```
+
+That is the LEAF'S OBLIGATION — the premise each of the 44 regime-generic
+leaves *discharges* — and it hands the leaf the tlb CELL unconditionally (its
+post gives it back as `∃ tv2, tlb ↦ᵣ tv2 ∗ sr_swp_res_at R satp0 tv2`).  At a
+Bare arm there is no cell to hand over, so serving both arms forces that
+obligation disjunctive, and then all 44 leaf PROOFS move — `git diff` on the
+six downstream files cannot be empty.
+
+**And the leaves genuinely CONSUME it**, so this is not a threading artefact
+that could be optimised away: `WpSmodePtMem.wp_clw_s_r_t` feeds the cell
+straight into `sda_frames_in … with "Htlbc …"`, i.e. into its OWN data-access
+frame at `WpSmodePtEngine.sda_Drw`, which IS `{[tlb]}`.  These are MEMORY
+leaves at the kernel page table: their own load/store walks.  A Bare-arm
+instantiation would have to run its data access through the Bare path too, so
+the disjunction is load-bearing all the way down to each leaf's memory access
+and there is nowhere above them to absorb it.
+
+**Consequence, and it is a general one.**  Any design that makes
+`wp_instr_s_config_sr` serve BOTH arms reaches the leaves, because the arm is
+visible in what the leaf is handed.  The only designs that keep the leaves
+untouched are the ones that keep them WALKING-ONLY — i.e. a constraint on `R`
+(the rejected `SrWalks`), or de-generalizing `R` to `kpt_share_regime` in
+those statements.  Both change the 44 statements; they differ only in how
+much churn the change causes (`SrWalks`: an implicit binder, zero call-site
+churn, measured).  There is no third option that leaves them byte-identical.
 
 The rest of 4b is unblocked once this lands: restrict `sie_cap_to_cells` /
 `sie_cap_of_cells` to `b = true` (4a and 4a′ removed their last generic-`b`
