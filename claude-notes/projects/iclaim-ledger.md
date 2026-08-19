@@ -2643,3 +2643,33 @@ walk files, ProofIdup, ProofIlock. 7d executes: PROBE FIRST (the
 satisfiability witness from IputFreeLockedDev:844's real resources + the
 kill + the movers' re-establishment skeleton), then the increment, then
 7b″'s full payout gate.
+
+### §6′ INTEGRATION RE-BRIEF (2026-08-19, coordinator — accepting the
+### integration executor's corrected findings verbatim; §6's scope was stale)
+
+RULING G (the shelter round-trip): ADOPTED as the executor proposed, per
+§2.3's own text. `SpecIput`/`wp_iput_gen`/`wp_iput_sconf` (and
+`SpecIunlockput`) take the borrowed REGIME disjunction
+`(ireg_open ∨ ireg_boot)` and RETURN it; the return leg is implemented at
+`EscrowDeposit.ireg_free_deposit_au`'s second fupd (extract the right
+disjunct from the shelter — with FrzPost in hand ⌜f = FrzOff⌝ is refuted —
+instead of dropping it), riding offlock → locked → gen/sconf posts.
+Runtime callers lend the persistent left arm (supply threaded down RULING
+B's §3.2 channel: ≈12 Spec files, ≈25–30 proof files, one persistent
+premise each — the priced list in the executor's report); ireclaim lends
+its ireg_boot and takes it back from the post. ip_free_entry's premise
+becomes the disjunction (the mint ireg_freeze_au already accepts it).
+
+Also adopted, in the executor's order: (2) ip_tail's ledger re-splice (the
+third walk-splice; all lemmas exist); (3) the ip_epilogue factoring; (4)
+the fold-in with the four seam repairs (Exit-B frzsel hand-over; the
+budget clause with the cru:=true trick at the off-lock flush; the crz
+binder on ip_free_locked with the upgrade before itrunc; the vacuous
+u+2<2^31 premise deleted from all three) + the checked-out mechanics list
+(module sig, imports, OFF. strip, ip_rest_sum dedup, the six dead decode
+witnesses). K bumps landed at b26c956469 (K_iput 74, K_iunlockput 78 —
+eleven call sites re-checked).
+
+GATE unchanged: task 18's final gate (zero failures tree-wide, three tops
+at the standing six, admits = the one pre-existing placeholder, coverage +
+lemma_diff justified).

@@ -512,8 +512,10 @@ Section FreeLockedDev.
       (k : nat) (q : Qp) (inum : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
-      (u : nat) (Sb : gset Z) (crb cru : bool) (bfl : bool) (e0 v : nat)
-      (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
+      (u : nat) (Sb : gset Z) (crb cru crz : bool) (bfl : bool) (e0 v : nat)
+      (* [dqd]/[dqn] were dead binders and are gone: nothing in this
+         statement mentions them. *)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (sp0 vra vs0 vs1 vs2 vs3 vs4 : mword 64)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) :
     let ip := ientry k in
@@ -528,7 +530,8 @@ Section FreeLockedDev.
        [3] (not [2]) is what makes itrunc's post leave [1 <= u'], i.e. an
        [S _] for [OFF.ip_free_offlock]'s [log_opSe γ (S u) Sb e0]. *)
     (3 <= u)%nat ->
-    (Z.of_nat u + 2 < 2 ^ 31)%Z ->
+    (* the vacuous [Z.of_nat u + 2 < 2^31] is GONE: log_write's bound is on
+       the CPU NESTING LEVEL and the off-lock tail calls it at level 0. *)
     (crb = true -> bmapstart ∈ Sb) ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -698,6 +701,19 @@ Section FreeLockedDev.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 3 -∗
+    (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
+       [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
+       and every landed caller passes nothing.  At [crz = true] it is the
+       walker's persistent, inum-keyed observation -- "at epoch [e0], inside MY
+       still-open op, this inum's record had a NONZERO nlink" -- and this body
+       cashes it with [InodeRegion.ireg_obs_use] at the record its caller's
+       +0x44 test found ZERO, buying the unit ITRUNC's tail flush would
+       otherwise spend.  It is that unit and not the off-lock flush's: the
+       off-lock flush is credited unconditionally, off the membership itrunc's
+       own post hands out ([Hibin'] below). *)
+    (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜γ = icfg_log⌝ ∗
+                 ⌜inodestart = icfg_ist⌝
+     else emp) -∗
     log_epoch_lb γ v -∗
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
     log_opSe γ u Sb e0 -∗
@@ -740,8 +756,18 @@ Section FreeLockedDev.
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
         ⌜crb = true -> w = false⌝ -∗
+        (* THE BUDGET CLAUSE, which this post used to be missing outright and
+           without which [wp_iput_gen]'s own post cannot be stated.  The figure
+           is [SpecIput.ip_spend_w]'s: the bitmap unit if this run logged it,
+           plus ITRUNC's tail flush unless one of the two credits paid for it.
+           The off-lock flush is NOT in it -- see the [true] handed to
+           [OFF.ip_free_offlock] below. *)
+        ⌜((u - ip_spend_w w cru crz)%nat <= n'')%nat /\ (n'' <= u)%nat⌝ -∗
         log_opS γ n'' Sb'' -∗
         iref_slot -∗
+        (* RULING G's RETURN LEG (iclaim-ledger.md §6′): the regime the caller
+           lent at the +0x50 mint, handed back by the +0xba deposit. *)
+        (ireg_open ∨ ireg_boot) -∗
         (* frame ra/s0/s1 slots, still saved, for the epilogue *)
         add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
         add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
@@ -752,13 +778,13 @@ Section FreeLockedDev.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros ip pj HK HKit Hk Hu2 Hubnd Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog Histpos Hicov Hilog
+    intros ip pj HK HKit Hk Hu2 Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog Histpos Hicov Hilog
            Hnib Hdtnz Hnl0 Hdnwf Hbmwf Hbelow Hdlen Hadr HMwf Hciwf HMk1 Hj Hgl
            Hsp0 Ha0 Hs1v Hs2v Hs3v Hs4v Hlkbelow Hitnotin.
     iIntros "Hcg Hcnt Hpay Hextc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx
              #Hitlk #Hitinv #Hesc Htok Hhalf Hiauth Hipool Hpool %Hcik Hrtok Hgid Hwand
              #Hslk Hpayl Hlvh Hvb #Hireg Hpre Hrcpt Hmirt Hselo Hru Hbms Hins Hbm Hppid
-             #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots #Hvlb Hcrd Hop
+             #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hnlz #Hvlb Hcrd Hop
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     (* ===== +0x5a jal acquiresleep -- the ref-1 NON-BLOCKING lock ===== *)
     iPoseProof (ipi_5a with "Htext") as "Hi5a".
@@ -1020,10 +1046,39 @@ Section FreeLockedDev.
                  ltac:(wp_next_chain) with "Hclm") as "Hclm".
     pose (uit := (u - (if crb then 1 else 2))%nat).
     assert (Hun : it_entry crb uit = u) by (unfold it_entry, uit; destruct crb; lia).
+    (* ---- THE GROUP CREDIT, CASHED (fs-log.md §G.18/§G.20) ----
+       itrunc's tail-flush credit is a RESOURCE at a NAMED birth epoch, and
+       iput is one link of the thread that carries it.  iput's OWN claim is the
+       pure own-set one; a [crz] caller one tier up presents a GROUP witness
+       instead, which is the point of the tier -- and cashing it HERE, at the
+       record the caller's +0x44 test found with [nlink = 0], is what makes
+       [ip_spend_w]'s [if cru || crz then 0 else 1] the truth. *)
+    iDestruct (log_opSe_pos with "Hop") as %He0pos.
+    iApply fupd_wp.
+    iAssert (|={⊤}=> dinode_at γi inum dn ∗
+                     log_credit γ (cru || crz) Sb e0 (IBLOCK inum inodestart))%I
+      with "[Hdat Hnlz Hcrd]" as ">[Hdat #Hcrui]".
+    { destruct crz.
+      - (* THE GROUP ARM: the observation was taken at [e0] inside THIS op, the
+           record has [nlink = 0], and genesis-positivity comes off the
+           reservation itself -- so the region returns a witness at an epoch no
+           earlier than the op's birth, i.e. [log_credit]'s right disjunct. *)
+        iEval (cbn beta iota) in "Hnlz".
+        iDestruct "Hnlz" as "(#Hobs & %Hgeq & %Histeq)".
+        iMod (InodeRegion.ireg_obs_use ⊤ γi γfs inodestart nib inum dn γ e0
+                ltac:(solve_ndisj) Hnib Hgeq Hnl0 He0pos
+                with "Hireg Hdat Hobs") as "[Hdat #Hwit]".
+        iDestruct "Hwit" as (e) "[%Hle #Hlog]".
+        iModIntro. iFrame "Hdat". rewrite Histeq.
+        iApply (log_credit_group γ (cru || true) Sb e0 e (IBLOCK inum icfg_ist)
+                  Hle with "Hlog").
+      - (* the OWN-SET arm: the caller's own credit, unchanged *)
+        iModIntro. iFrame "Hdat". rewrite orb_false_r. iExact "Hcrd". }
+    iModIntro.
     (* ===== itrunc ===== *)
     iApply (IT.wp_itrunc_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart bmapstart inodestart nib size dev used
-              (ip : mword 64) inum dn dn bm data2 uit Sb crb cru e0
+              (ip : mword 64) inum dn dn bm data2 uit Sb crb (cru || crz)%bool e0
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 6)%nat
               eb eb lks
               HKit Hcrb
@@ -1035,7 +1090,7 @@ Section FreeLockedDev.
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
-                    Hdevi Hdgeom Hdlock Hbslots Hcrd [Hop]").
+                    Hdevi Hdgeom Hdlock Hbslots Hcrui [Hop]").
     all: try lkbelow.
     { rewrite /inode_map. iFrame. }
     { rewrite Hun. iExact "Hop". }
@@ -1743,15 +1798,28 @@ Section FreeLockedDev.
       "(%Hsub' & %Hibin' & %Hwbm' & %Hcrbw' & %Hbud & Hop)".
     assert (Hu'1 : (1 <= u')%nat).
     { destruct Hbud as [Hlo _]. rewrite Hun in Hlo.
-      unfold it_bm, it_iu in Hlo. destruct wbm, cru; lia. }
+      unfold it_bm, it_iu in Hlo. destruct wbm, cru, crz; cbn in Hlo |- *; lia. }
     assert (Hu'le : (u' <= u)%nat).
     { destruct Hbud as [_ Hhi]. rewrite Hun in Hhi.
-      unfold it_iu in Hhi. destruct cru; lia. }
+      unfold it_iu in Hhi. destruct cru, crz; cbn in Hhi |- *; lia. }
+    (* THE BUDGET, AS THIS LEMMA'S POST STATES IT.  itrunc's lower bound is
+       exactly [ip_spend_w]'s figure once the group credit has bought its tail
+       flush, and the off-lock flush below adds nothing -- it runs credited. *)
+    assert (Hbudlo : (u - ip_spend_w wbm cru crz <= u')%nat).
+    { destruct Hbud as [Hlo _]. rewrite Hun in Hlo.
+      unfold it_bm, it_iu in Hlo. unfold ip_spend_w, ip_bm.
+      destruct wbm, cru, crz; cbn in Hlo |- *; lia. }
     (* the op count, in the [S _] form the off-lock flush's contract wants *)
     destruct u' as [| uoff]; [exfalso; lia |].
     iDestruct (log_opS_named with "Hop") as (e0') "Hop".
     iPoseProof (log_opSe_lb with "Hop") as "#Hvlb2".
-    iAssert (log_credit γ cru Sb' e0' (IBLOCK inum inodestart)) as "#Hcrd2".
+    (* THE OFF-LOCK FLUSH IS CREDITED, UNCONDITIONALLY (fs-log.md §G.22, and
+       [SpecIput]'s own note: "itrunc's post hands out [IBLOCK inum inodestart
+       ∈ Sb'] determinately, so iput's [ip->type = 0] flush runs credited for
+       free").  That is what makes [ip_spend_w] -- which counts the bitmap unit
+       and itrunc's tail flush and NOT this one -- the honest figure, and
+       without it this lemma's budget clause could not close. *)
+    iAssert (log_credit γ true Sb' e0' (IBLOCK inum inodestart)) as "#Hcrd2".
     { iApply log_credit_own. intros _. exact Hibin'. }
     (* the off-lock tail runs on two of our three bio slots *)
     iEval (rewrite (_ : 3%nat = (1 + 2)%nat); [| reflexivity]) in "Hbslots".
@@ -1766,10 +1834,9 @@ Section FreeLockedDev.
     (* ===== +0xa8 .. j 0x30 : OFF.ip_free_offlock ===== *)
     iApply (OFF.ip_free_offlock γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev inum dn2 ge gr gd
-              uoff Sb' cru e0' e0' pidv dq dqs
+              uoff Sb' true e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks
               ltac:(lia) ltac:(lia) ltac:(lia)
-              ltac:(change (2 ^ 31)%Z with 2147483648%Z in Hubnd |- *; lia)
               Hgeom Histpos Hicov Hilog Hnib Hdn2wf Hdn2nl Hj Hgl
               ltac:(exact (eq_sym HP5sp)) HP5a0 HP5a1 HP5s2 Hlkbelow
               with "Hcg Hcnt Hextc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hireg
@@ -1777,7 +1844,7 @@ Section FreeLockedDev.
                     Hvlb2 Hcrd2 Hop Hra Hs0f Hs1f Hs2f Hs3f Hs4f [-]").
     (* ---- the continuation: offlock's post at 0x30, re-shaped into ours ---- *)
     iIntros (CIDf Hstf).
-    iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hbs2 Hop2 Hwit
+    iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hbs2 Hop2 Hwit Hgreg
                   Hra Hs0f Hs1f Hs2f Hs3f Hs4f".
     (* the whole walk never touched a callee-saved register, so [P5] agrees
        with [m] on all of them and offlock's threading composes to ours *)
@@ -1799,15 +1866,16 @@ Section FreeLockedDev.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDf)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iSpecialize ("Hcont" $! CIDf with "[]"); [iPureIntro; wp_next_chain |].
-    iApply ("Hcont" $! mf (if cru then S uoff else uoff)
+    iApply ("Hcont" $! mf (S uoff)
                        (used ∖ bm_blocks bm) (Sb' ∪ {[IBLOCK inum inodestart]}) wbm
               with "[%] Hcg Hcnt Hextc Hclm Hpc Hppid Hbms Hins [%] Hbm Hbslots
-                    [%] [%] [%] Hop2 Hiu Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
+                    [%] [%] [%] [%] Hop2 Hiu Hgreg Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
     { split_and!; [exact Hthrm | exact Hmfsp | exact Hmfs2 | exact Hmfs3 | exact Hmfs4]. }
     { exact (fl_diff_sub used (bm_blocks bm)). }
     { exact (union_subseteq_l' _ _ _ Hsub'). }
     { intros Hw. apply elem_of_union_l. exact (Hwbm' Hw). }
     { exact Hcrbw'. }
+    { split; [exact Hbudlo | exact Hu'le]. }
   Qed.
 
 End FreeLockedDev.

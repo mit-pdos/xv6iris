@@ -161,7 +161,11 @@ Section OfflockDev.
     let bno := (mword_of_int (IBLOCK inum inodestart) : mword 32) in
     let dn' := set_ditype0 dn in
     (K_bread <= K)%nat -> (K_log_write <= K)%nat -> (K_brelse <= K)%nat ->
-    (Z.of_nat u + 2 < 2 ^ 31)%Z ->
+    (* [SpecLogWrite]'s [Z.of_nat n + 2 < 2^31] is a bound on the CPU NESTING
+       LEVEL, not on the log's unit count, and this tail calls log_write at
+       the literal level 0 -- so the premise this lemma used to carry for it
+       was vacuous and is gone.  (It read as a bound on [u] purely because
+       the two arguments happen to share a name at the call site.) *)
     log_geom_ok cov logstart ->
     0 <= inodestart ->
     IBLOCK inum inodestart ∈ cov ->
@@ -246,6 +250,13 @@ Section OfflockDev.
         bslots bn 2 -∗
         log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
         (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
+        (* RULING G's RETURN LEG (iclaim-ledger.md §6′).  The +0xba deposit
+           runs the region open that retires the freeze, and the slot's
+           boot-shelter clause is on its SEALED arm there ([FrzPost] refutes
+           ⌜f = FrzOff⌝) -- so the regime the caller lent at the mint comes
+           back out with the [committedA] marker
+           ([EscrowDeposit.ireg_free_deposit_au]'s second fupd). *)
+        (ireg_open ∨ ireg_boot) -∗
         (* the frame ra/s0/s1 slots, still saved, for the epilogue *)
         add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
         add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
@@ -256,7 +267,7 @@ Section OfflockDev.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj bno dn' HKbr HKlw HKbl Hu2 Hgeom Hst Hcov Hlog Hnib Hdnwf Hnl0
+    intros pj bno dn' HKbr HKlw HKbl Hgeom Hst Hcov Hlog Hnib Hdnwf Hnl0
            Hj Hgl Hsp0 Ha0 Ha1 Hs2v Hbelow.
     (* ---- pure prelude (mirrors iu_main_gen) ---- *)
     destruct Hgeom as [Hcovok Hlogsub].
@@ -513,7 +524,7 @@ Section OfflockDev.
     iEval (rewrite -Hbno) in "Hau0".
     iDestruct (lw_au_lb0 γ γfs (uint bno) (⊤ ∖ ↑iregN)
                  (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds)
-                 (committedA ge)%I e0 with "Hau0") as "Hau".
+                 (committedA ge ∗ (ireg_open ∨ ireg_boot))%I e0 with "Hau0") as "Hau".
     (* ---- transports around the log_write park ---- *)
     iDestruct (cpu_own_transport CID15 CID21 0 eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -524,7 +535,7 @@ Section OfflockDev.
       [rewrite Hbno; iExact "Hcrd0" |].
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
-              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge)%I
+              cru Sb e0 v (⊤ ∖ ↑iregN) (committedA ge ∗ (ireg_open ∨ ireg_boot))%I
               R5 0%nat eb pj K b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HR5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -532,7 +543,7 @@ Section OfflockDev.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.
-    iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS #Hcom Hlk Hsl".
+    iIntros (CID22 Hq22 mL) "Hcg Hcnt Hpc %Hcs2 HopS [#Hcom Hgreg] Hlk Hsl".
     (* NO POOL ENTRY IS ASSEMBLED HERE (IVd).  The bundle was parked at the
        +0x94 release on the AWAIT arm, which is the arm's own stated purpose;
        the [committedA] the deposit just produced is not needed to state it
@@ -696,7 +707,7 @@ Section OfflockDev.
                  with "Hcont") as "Hcont".
     iSpecialize ("Hcont" $! CID29 with "[]"); [iPureIntro; wp_next_chain |].
     iApply ("Hcont" $! P3 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hsb Hsl Hop Hwit
-                                Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
+                                Hgreg Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
     { split_and!; [exact Hthr | exact HP3sp | exact HP3s2 | exact HP3s3 | exact HP3s4]. }
   Qed.
 

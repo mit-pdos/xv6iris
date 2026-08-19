@@ -118,7 +118,7 @@ Section ProofIunlockputMain.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hpar Hru
+              Hropen #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hpar Hru
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
@@ -359,12 +359,12 @@ Section ProofIunlockputMain.
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
               Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hslk Href Hru Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
+                    Hropen Hslk Href Hru Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hnlz Hlogop").
     all: try lkbelow.
     iIntros (CID11 Hq11 mP n' used' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots
-             %Hssub %Hwbm %Hwc %Hbud Hlogop Hslot".
+             %Hssub %Hwbm %Hwc %Hbud Hlogop Hslot Hgreg".
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))
       by (rewrite HR6ra; pcw).
@@ -558,7 +558,7 @@ Section ProofIunlockputMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P4 n' used' Sb' wp with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins [%]
-                                             Hbitmap Hbslots [%] [%] [%] [%] Hlogop Hslot").
+                                             Hbitmap Hbslots [%] [%] [%] [%] Hlogop Hslot Hgreg").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }
     { exact Hssub. }
@@ -597,7 +597,7 @@ Section ProofIunlockputMain.
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hpar Hru
+              Hropen #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hpar Hru
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     iDestruct "Hlogop" as (Sb0) "Hlogop".
@@ -610,7 +610,7 @@ Section ProofIunlockputMain.
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
+                    Hropen Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
                     Hpar Hru
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").
@@ -619,10 +619,10 @@ Section ProofIunlockputMain.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' used' Sb' wf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                               %Husub Hbitmap Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot".
+                               %Husub Hbitmap Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot Hgreg".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' used' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
-                     [%] Hbitmap Hbslots [%] [Hlogop] Hslot").
+                     [%] Hbitmap Hbslots [%] [Hlogop] Hslot Hgreg").
     { exact Hcs. }
     { exact Husub. }
     { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.

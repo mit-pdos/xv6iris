@@ -104,8 +104,13 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
-   its deepest callee is iput (60).  iunlock wants 26. *)
-Notation K_iunlockput := (76%nat) (only parsing).
+   its deepest callee is iput (60).  iunlock wants 26.
+
+   76 -> 78, forced by [K_iput]'s 72 -> 74 (SpecIput.v's note): the walk calls
+   iput at [K - 4], so [K_iput <= K - 4] needs K >= 78.  All eleven
+   iunlockput call sites were re-checked and every one has slack (the
+   tightest is ProofCreate/ProofSysUnlink at K - 10 / K - 30, i.e. 114). *)
+Notation K_iunlockput := (78%nat) (only parsing).
 Definition wp_iunlockput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
@@ -173,6 +178,11 @@ Definition wp_iunlockput_sconf_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING
+     G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
+     obligation here is iput's.  A runtime caller passes [iLeft] on its
+     persistent copy and may discard what comes back. *)
+  (ireg_open ∨ ireg_boot) -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -234,6 +244,8 @@ Definition wp_iunlockput_sconf_body
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
       iref_slot -∗
+      (* RULING G: the regime comes back, on every arm. *)
+      (ireg_open ∨ ireg_boot) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -316,6 +328,11 @@ Definition wp_iunlockput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING
+     G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
+     obligation here is iput's.  A runtime caller passes [iLeft] on its
+     persistent copy and may discard what comes back. *)
+  (ireg_open ∨ ireg_boot) -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -393,6 +410,8 @@ Definition wp_iunlockput_gen_body
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
+      (* RULING G: the regime comes back, on every arm. *)
+      (ireg_open ∨ ireg_boot) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -88,7 +88,17 @@ Section EscrowDeposit.
       (⌜bsl' = diblk_bytes ds⌝ -∗
        fsblock γfs (IBLOCK inum inodestart)
                (diblk_bytes (<[islot inum := dn']> ds))
-       ={E ∖ ↑iregN, E}=∗ committedA ge).
+       (* RULING G, THE RETURN LEG (iclaim-ledger.md §6′).  iput BORROWS the
+          regime -- the sealed [ireg_open] a runtime freezer must exhibit, or
+          the exclusive [ireg_boot] ireclaim's boot thread carries instead --
+          and this is where it gives it back.  It is not invented here: the
+          slot's own boot-shelter clause (§2.3) is on its SEALED arm at this
+          open, because the column stands at [FrzPost] and ⌜f = FrzOff⌝ is
+          therefore refuted, so the disjunction is simply lifted out of the
+          record the freeze window opened.  Without it a boot-thread iput
+          could lend [ireg_boot] and never get it back, and ireclaim's loop
+          -- which needs it on every iteration -- would not close. *)
+       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ (ireg_open ∨ ireg_boot)).
   Proof.
     iIntros (HE Hesc_mask Hin Hwf Hdn' Hz Hnl) "#Hinv #Hesc Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
@@ -161,6 +171,13 @@ Section EscrowDeposit.
     iMod (escA_deposit_acc (E ∖ ↑iregN) ge gr gd γi (bv_unsigned inum)
             Hesc_mask with "Hesc Hdep") as "[Hfz Hescl]".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
+    (* RULING G's EXTRACTION.  With the column pinned at [FrzPost] the
+       boot-shelter clause's left arm is a refutable equation, so what the
+       slot is holding is the REGIME the freezer lent at the mint.  The
+       re-park below owes nothing in its place: it lands on [FrzOff], where
+       the clause's left arm holds outright. *)
+    iAssert (ireg_open ∨ ireg_boot)%I with "[Hfdisj]" as "Hgreg".
+    { iDestruct "Hfdisj" as "[%Hc | Hr]"; [discriminate Hc | iExact "Hr"]. }
     (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
        the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
        [FrzPre], so the slot's receipt clause is on its [frzown] arm both
@@ -243,7 +260,7 @@ Section EscrowDeposit.
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].
       iExists ge, gr. iFrame "Hrh2 Hcom". }
-    iModIntro. iExact "Hcom".
+    iModIntro. iSplitR; [iExact "Hcom" | iExact "Hgreg"].
   Qed.
 
 End EscrowDeposit.

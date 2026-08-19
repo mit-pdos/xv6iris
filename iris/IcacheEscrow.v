@@ -2325,6 +2325,50 @@ Section IcacheEscrow.
     iLeft. iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
   Qed.
 
+  (* FLAVOUR 1', THE SAME EVICTION WITH ITS LEDGER TRIPLE ARRIVING LATE.
+
+     [ic_close_to_empty] above asks for the count at zero -- and the ORDINARY
+     last close cannot have it when it must run.  The eviction has to happen
+     BEFORE the [sw] that zeroes [ip->ref] ([ic_open_auth_ref] wants the
+     table authority still showing the slot at REF-1, and the store deletes
+     it), while [icnt_half _ 0] does not exist until AFTER it: the count is
+     moved by [IcacheInv.iref_close_last_store_au], which fires with the
+     instruction.  That is the same ordering observation §3.16 records for
+     the FROZEN eviction, and it has the same answer -- run the eviction on
+     what the caller does hold and hand the pool bundle back as a WAND, to
+     be fed the three ledger outputs the store produces.
+
+     Not a second proof: [ic_close_to_empty] is this one applied
+     immediately. *)
+  Lemma ic_close_to_empty_late cn γfs γi cov logstart k (v : bool) (g : gname)
+      (dev inum : mword 32) :
+    ic_id cn k (1/2) true dev inum -∗
+    ic_id cn k (1/2) true dev inum -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_payload_np γfs γi cov logstart k inum g v -∗
+    ic_mid cn k -∗
+    |==> ic_escrow_body cn γfs γi cov logstart k ∗
+         ic_id cn k (1/2) false dev inum ∗
+         (icnt_half (bv_unsigned inum) 0%nat -∗
+          frzm_h (bv_unsigned inum) false -∗
+          ifreeze_off (bv_unsigned inum) -∗
+          ipool_shape γfs γi cov logstart inum).
+  Proof.
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt".
+    iMod (ic_close_to_empty_core cn γfs γi cov logstart k v g dev inum
+            with "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt") as "(Hbody & Hgf2 & Hnp)".
+    iModIntro.
+    iSplitL "Hbody"; [iExact "Hbody" |].
+    iSplitL "Hgf2"; [iExact "Hgf2" |].
+    iIntros "Hcnt Hmir Hoff".
+    rewrite /ipool_shape. iSplitL "Hcnt"; [iExact "Hcnt" |].
+    iSplitL "Hmir"; [iExact "Hmir" |].
+    iLeft. iSplitL "Hnp"; [iExact "Hnp" | iExact "Hoff"].
+  Qed.
+
   (* FLAVOUR 2: the FREE path's eviction (§1.3).  Same eviction, but the
      freeze is standing at [FrzPost], so the pool takes the AWAIT arm and the
      bundle the loaded/unloaded payload was carrying goes back to the FREER

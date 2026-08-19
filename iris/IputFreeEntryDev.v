@@ -295,7 +295,7 @@ Section FreeEntryDev.
        [2]) is what makes itrunc's post leave [1 <= u'], i.e. an [S _] for the
        off-lock flush's [log_opSe γ (S u) Sb e0]; the bound is its companion. *)
     (3 <= u)%nat ->
-    (Z.of_nat u + 2 < 2 ^ 31)%Z ->
+    (* the vacuous [Z.of_nat u + 2 < 2^31] is GONE (see [ip_free_locked]) *)
     (crb = true -> bmapstart ∈ Sb) ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -345,8 +345,17 @@ Section FreeEntryDev.
        that ireclaim's boot freeze exhibits with its exclusive token instead.
        Persistent, so it costs the caller nothing but having it; RULING B
        fires the seal once, after fsinit and before [kexec("/init")], so every
-       runtime iput has it. *)
-    ireg_open -∗
+       runtime iput has it.
+
+       RULING G (iclaim-ledger.md §6′): BORROWED, not persistent.  ireclaim
+       freezes at BOOT, where the seal has not been fired and what it carries
+       instead is the exclusive [ireg_boot] -- so a contract that demanded the
+       left arm outright would shut the boot thread out of iput entirely.  The
+       disjunction goes in, the mint spends it, and the off-lock deposit hands
+       it back out of the slot's own boot-shelter clause
+       ([EscrowDeposit.ireg_free_deposit_au]'s second fupd); on the two Exit-A
+       arms, which never reach the mint, it comes straight back below. *)
+    (ireg_open ∨ ireg_boot) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res γfs bmapstart cov logstart size used -∗
@@ -367,9 +376,17 @@ Section FreeEntryDev.
     pa_stk sp0 4 ↦₈[KT1] vg4 -∗
     pa_stk sp0 5 ↦₈[KT1] vg5 -∗
     pa_stk sp0 6 ↦₈[KT1] vg6 -∗
-    (* ===== EXIT A: pc +0x20, the ip_tail seam (valid==0 OR nlink!=0);
+    (* ===== THE TWO EXITS, JOINED BY [∧] AND NOT BY [∗] ==================
+       They are ALTERNATIVES -- the walk reaches exactly one of them -- and
+       the caller's own post (and the reference's provenance unit) is a single
+       spatial resource that BOTH have to end in.  Under [∗] the caller would
+       have to split it in two and could not; under [∧] it proves each arm
+       from the whole context, which is exactly the truth of the matter.  The
+       body eliminates whichever side its branch reached and drops the other.
+       ==================================================================== *)
+    ((* ===== EXIT A: pc +0x20, the ip_tail seam (valid==0 OR nlink!=0);
        the bundle goes back UNTOUCHED, the payload is re-parked ===== *)
-    (∀ (M' : regfile) (vg4' vg5' vg6' : mword 64),
+     (∀ (M' : regfile) (vg4' vg5' vg6' : mword 64),
        ⌜ipe_regs m M' spd k⌝ -∗
        ⌜M' !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)⌝ -∗
        sie_cap_gpr KT1 M' (trap_res eb + (K - 6))%nat false pj -∗
@@ -385,6 +402,9 @@ Section FreeEntryDev.
        ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
        IcacheRef.inode_ref k q dev inum -∗
+       (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
+          regime the caller lent has not been spent and comes straight back. *)
+       (ireg_open ∨ ireg_boot) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used -∗
@@ -399,8 +419,9 @@ Section FreeEntryDev.
        pa_stk sp0 4 ↦₈[KT1] vg4' -∗
        pa_stk sp0 5 ↦₈[KT1] vg5' -∗
        pa_stk sp0 6 ↦₈[KT1] vg6' -∗
-       WP (Loop : expr riscv_lang)) -∗
-    (* ===== EXIT B: pc +0x5a, byte-compatible with ip_free_locked's ENTRY
+       WP (Loop : expr riscv_lang))
+     ∧
+     (* ===== EXIT B: pc +0x5a, byte-compatible with ip_free_locked's ENTRY
        (IputFreeLockedDev.v:247).  dn/bm/data/g1 are the body's discoveries
        from opening the payload; the pure block is FreeLocked's dn-dependent
        premise list verbatim ===== *)
@@ -498,6 +519,13 @@ Section FreeEntryDev.
        ifreeze_pre (bv_unsigned inum) -∗
        frzown (bv_unsigned inum) -∗
        frzm_h (bv_unsigned inum) true -∗
+       (* ...AND THE SELECTOR's OFF HALF (RULING R-e, iclaim-ledger.md §5⁗⁗).
+          [frz_park_ref1_off] peeled it out of [islot2]'s live arm at the
+          +0x3a window-entering read; the two Exit-A arms put it straight back
+          ([frz_park_intro_off]), and on THIS arm the mint has already flipped
+          the bit, so it must ride out to [ip_free_locked]'s +0x62 re-park,
+          which is the one thing that can spend it. *)
+       IcacheRef.frzsel k (1/2)%Qp false -∗
        i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -513,16 +541,16 @@ Section FreeEntryDev.
        pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx Rs2) -∗
        pa_stk sp0 5 ↦₈[KT1] (m !!! Regidx Rs3) -∗
        pa_stk sp0 6 ↦₈[KT1] (m !!! Regidx Rs4) -∗
-       WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros ip pj sp0 spd HK HKit Hk Hu3 Hubnd Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog
+    intros ip pj sp0 spd HK HKit Hk Hu3 Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog
            Histpos Hicov Hilog Hnib Hbelow HMwf Hciwf HMk1 Hj Hgl Hregs Ha5
            Hlkbelow Hitnotin.
     iIntros "Hcg Hcnt Hpay Hextc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx
              #Hitlk #Hitinv #Hesc Htok Hhalf Hiauth Hipool Hslots Hpool Href
-             #Hslk #Hireg #Hropen Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock
-             Hbslots #Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6 HcA HcB".
+             #Hslk #Hireg Hropen Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock
+             Hbslots #Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6 Hex".
     pose proof Hregs as Hregs'.
     destruct Hregs' as (HMs1 & HMsp & _).
     iPoseProof (ipi_3a with "Htext") as "Hi3a".
@@ -676,9 +704,10 @@ Section FreeEntryDev.
       { rewrite /islot2 HMk1 Hcik. iFrame "Hiu Hgid Hcnt1".
         iSplitL "Hrest"; [iExact "Hrest" |].
         iApply (frz_park_intro_off with "Hmirf Hself"). }
+      iDestruct "Hex" as "[HcA _]".
       iApply ("HcA" $! F1 vg4 vg5 vg6
                 with "[%] [%] Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool
-                      Hslots Hpool [Hrtok Hrident] Hbms Hins Hbm Hppid Hbslots Hvlb
+                      Hslots Hpool [Hrtok Hrident] Hropen Hbms Hins Hbm Hppid Hbslots Hvlb
                       Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
       { exact HF1regs. }
       { exact HF1a5. }
@@ -1027,9 +1056,10 @@ Section FreeEntryDev.
         - rewrite /G2 upd_ne; [| nz]. rewrite /G1 upd_ne; [| nz]. exact P27. }
       assert (HG2a5 : G2 !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)).
       { rewrite /G2 upd_ne; [| nz]. rewrite /G1 upd_ne; [| nz]. exact HF4a5. }
+      iDestruct "Hex" as "[HcA _]".
       iApply ("HcA" $! G2 (m !!! Regidx Rs2) vg5 (m !!! Regidx Rs4)
                 with "[%] [%] Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool
-                      Hslots Hpool [Hrtok Hrd Hrn] Hbms Hins Hbm Hppid Hbslots Hvlb
+                      Hslots Hpool [Hrtok Hrd Hrn] Hropen Hbms Hins Hbm Hppid Hbslots Hvlb
                       Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
       { exact HG2regs. }
       { exact HG2a5. }
@@ -1069,9 +1099,8 @@ Section FreeEntryDev.
     iApply fupd_wp.
     iMod (ireg_freeze_au ⊤ γi γfs inodestart nib inum dn
             ltac:(solve_ndisj) Hnib (fe_nlink_zero (di_nlink dn) Hnl0) Htyne
-            with "Hireg [] Hdat Hoff Hcnt1 Hmirf")
-      as "(Hdat & Hpre & Hcnt1 & Hrcpt & Hmirt)";
-      [ iLeft; iExact "Hropen" |].
+            with "Hireg Hropen Hdat Hoff Hcnt1 Hmirf")
+      as "(Hdat & Hpre & Hcnt1 & Hrcpt & Hmirt)".
     iModIntro.
     iEval (rewrite -Hp1nat) in "Hcnt1".
     iPoseProof (ipi_50 with "Htext") as "Hi50".
@@ -1193,10 +1222,11 @@ Section FreeEntryDev.
         rewrite /islot_rest_at Ert /IcacheRef.inode_ident. iFrame. }
       iSplitL "Hslots"; [iExact "Hslots" |].
       rewrite /IcacheRef.inode_ident. iFrame. }
+    iDestruct "Hex" as "[_ HcB]".
     iApply ("HcB" $! F7 ga dn bm data
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool Hpool
-                    [%] Hrtok Hgid Hwand Hpayl Hlvh Hpre Hrcpt Hmirt Hvb Hbms Hins Hbm
+                    [%] Hrtok Hgid Hwand Hpayl Hlvh Hpre Hrcpt Hmirt Hself Hvb Hbms Hins Hbm
                     Hppid Hbslots Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
     { exact Htyne. }
     { exact (fe_nlink_zero (di_nlink dn) Hnl0). }
