@@ -35,25 +35,30 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   (`pdev_ev_ok`, `pstep_ev_lat_free`, `_ts_load/_ts_rmw`, `_ldepfree`,
   `pcls_ev_obl`, `efulfil_acct`, WeakRetag) need per-arm additions in
   R2/R3.  Full ledger in the A0 report (session transcript).
-- **A1 — the sRVWMO definition** (design doc S1; orchestrator spec, then
-  a subagent mechanizes).  The settled shape, from the refutations:
-  sRVWMO's ppo = RVWMO rules **1–5, 7, 9–11, 13, 14**, with **rule 6
-  OMITTED** (machine is weaker: `.rl` feeds only `w_vRel`; omission is
-  SAFE — it widens the model, and the final theorem quantifies over all
-  sRVWMO executions), **rule 12 WEAKENED per D-7** (forwarded reads bank
-  0), **rule 8 replaced** by an `rmw : ev → ev → Prop` relation + the
-  RVWMO atomicity axiom `rmw ∩ (fre;coe) = ∅` (split-ready; a DANGLING
-  exclusive read is a plain read).  The rel→acq arm = the machine's
-  `w_vRel` version, noting it coincides with RVWMO rule 7 under RISC-V's
-  all-RCsc annotations — NOT a strengthening beyond RVWMO.  Rule 14 =
-  `ppo_op` arm 1, already landed.  Deps: the alphabet gains
-  `asrc`/`vsrc` on `LStore`/`LRmw` (per D-8, not on loads) + reg-write/
-  ctrl events or a per-event dep relation; `mstep` moves to the `_d`
-  step functions.  Fabric: a SCOPE CLAUSE — sRVWMO covers RAM accesses
-  of harts + the disk agent; MMIO/UART/PLIC are outside, under the
-  retained MMIO-ordering assumption.  Presentation: consistency is
-  defined over `cand` (trace presentations), the landed shape; the
-  partial-order form is later sugar.
+- **A1a — the dep-vacuity probe: DONE (2026-08-19).**  The orchestrator's
+  claim FAILED in mechanism, HOLDS in conclusion for the D-8 alphabet:
+  the pf machine's fulfil side is fully vacuous at the top timestamp
+  (BOTH `fulfil_ok_d` conjuncts — `fulfil_ok_d_top`), but `read_ok_d`'s
+  `vaddr` floor IS a live load-side binding site (machine-checked MP+addr
+  witness: with `asrc = [DReg 1]` the stale read is NOT a step) —
+  unreachable at the instance only because D-8 pins loads to
+  `asrc = []` (`pstep_ev_ldepfree`).  The rmw read half is vacuous via
+  `pf_rmw_latest` + `latest_readable`; the forward bank via the NEW
+  `dep_dom` invariant (every dep view ≤ `w_vrOld` at pf-reachable
+  states, ~90 ln, must land).  Probe files preserved at
+  scratchpad/a1a-depvacuity-keep/ (18 lemmas, closed).  Projection
+  route chosen: the ERASURE SIMULATION (see the design doc's settled
+  block); fallback `mstep_d` prototyped (~1 line/arm, blast radius = 9
+  files of exhaustive `lbl` matches).
+- **A1 — the sRVWMO definition (settled — the design doc §1's "SETTLED
+  AXIOMATIZATION" block is normative)**: ppo = RVWMO rules **1–5, 7, 14**
+  ONLY; 6/8/10/11/13/9-store redundant under 14; 9-LOAD omitted BECAUSE
+  OF D-8 (returns if D-8 drops); 12 omitted via `dep_dom`.  Exclusives
+  stay FUSED axiomatically (projection re-fuses; dangling read = plain
+  load) — the earlier `rmw`-relation idea is RETIRED.  Mechanization
+  (A1c): the rel→acq `ppo_op` arm + view-domination extension; land
+  `dep_dom`; a named top-level `srvwmo_ok`; the residue notes as
+  comments.  BLOCKED ON R1's commit (shared tree in flux).
 - **A2 — T2 completion**: extend the soundness theorems for the new
   arms; the projection unblocks once the alphabet carries deps
   (`proj_lbl` keeps operand lists; `cfg_match` equality then holds with

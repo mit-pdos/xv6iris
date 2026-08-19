@@ -69,6 +69,49 @@ successor ordering — the machine is WEAKER there; vacuous for this image,
 but the axiom set must say so honestly), ppo 12/13 details, own-store
 forwarding's placement of loads in gmo, and the fabric agent's accesses.
 
+**SETTLED AXIOMATIZATION (2026-08-19, from the machine-checked evidence —
+the A0/A1a ledger in
+[`../projects/weak-memory-srvwmo.md`](../projects/weak-memory-srvwmo.md)).**
+sRVWMO's ppo = RVWMO rules **1–5, 7, 14** (7 in the machine's `w_vRel`
+form, stated on the `aq`/`rl` label bits unconditionally — coincides with
+RVWMO 7 under RISC-V's all-RCsc annotations; forced by the T1 refutation
+`promise_free_complete_false`), plus the load-value, atomicity and progress
+axioms.  Exclusive pairs stay FUSED in the axiomatic presentation (the
+projection re-fuses a split machine pair — sound because `excl_ok`'s window
+makes re-fusion value-exact; a DANGLING exclusive read projects as a plain
+load with no atomicity obligation).  Rules absent relative to RVWMO, each
+with its reason of record:
+
+- **6, 8, 10, 11, 13, and 9's store half — REDUNDANT under rule 14** (their
+  right end is a store; rule 14 already orders it after everything).
+  Machine side proved: the pf fulfil check is vacuous at the top timestamp
+  in BOTH conjuncts (`fulfil_ok_d_top`, A1a).  Rule 6's only non-redundant
+  corner is a release-annotated LOAD (`lr.rl`) — omitted; the machine does
+  not enforce it and no ISA-sane code emits it.
+- **9's LOAD half (address-dependent loads) — OMITTED BECAUSE OF D-8, not
+  vacuity.**  The pf machine DOES enforce it for dep-carrying loads
+  (`read_ok_d`'s `vaddr` floor is a live binding site — A1a's
+  machine-checked MP+addr witness), but the xv6 instance's loads carry
+  `asrc = []` (D-8: a PTE read and a data load are the same node), so the
+  site is unreachable and T1's realization (empty operand lists) never
+  trips it.  **If D-8 is ever dropped — loads gaining a real `asrc` —
+  rule 9 comes straight back into the definition.**
+- **12 (forwarding pipeline) — OMITTED via the `dep_dom` domination
+  argument** (every dependency view is dominated by `w_vrOld` at every
+  pf-reachable state; the D-7 bank's residues are then absorbed), NOT via
+  top-timestamp vacuity.  The ~90-line `dep_dom` invariant must LAND
+  before the definition relies on it (A1a scratch, `A1aDom.v`).
+
+Scope clause: sRVWMO covers RAM accesses of harts and the disk agent;
+MMIO, the UART thread and the PLIC wire are outside it, under the retained
+device-ordering assumption.  Projection route for T2's carrier: the
+ERASURE SIMULATION (on the `lb_ldepfree` alphabet, blank every operand
+list; project the erased run with the existing `wp_pf_step_mstep`, whose
+`lb_depfree` premise is then discharged by construction) — zero changes to
+`mstep`/`lbl`/the `WeakAxiomatic` tower; the one real work item is the
+`w_fwd` component of the erasure invariant, where `dep_dom` does the work;
+fallback is the prototyped `mstep_d` re-land.
+
 **Relation to RC11 (for the paper).**  Same genre of move — strengthen the
 model by an ordering axiom to make it interleaving-representable — but NOT
 the same axiom: RC11 adds exactly `acyclic(po ∪ rf)` and deliberately
