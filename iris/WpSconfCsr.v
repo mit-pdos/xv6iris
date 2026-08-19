@@ -1974,6 +1974,150 @@ Section WpSconfCsr.
       iApply ("Hcont" $! cpu_id with "[%] Hcg' Hstv Hpc'"). done.
   Qed.
 
+  (* ---- csrw satp,rs1 -- THE Bare -> Sv39 SWITCH (kvminithart's +0x1c).
+
+     THE WRITE FLIPS THE TRANSLATION SLOT'S ARM INSIDE ITS OWN [execute]:
+     the word it installs is an Sv39 satp, so [SRegime.bare_inv] -- which
+     asserts the mode field is Bare -- cannot hold afterwards, and the
+     capability has to come back re-sealed at the kernel-table arm.  (The
+     SIE=0 funnel is built to absorb exactly this; see
+     [WpIntrInv.sie_cap_cells_at].)
+
+     THE LEAF DOES NOT DECIDE HOW, AND ITS OWN INTERFACE IS CELLS.  It takes
+     the Bare arm apart with [IntrDefs.strans_inv_acc_bare] (hence the
+     [strans_pending] premise), writes the satp cell through the ordinary
+     [pw2_*] two-cell frame, and hands the caller back precisely what that
+     accessor produced with [satp] REWRITTEN.  The re-seal is the CALLER's
+     step, supplied as the [Hslot] premise: kvminithart funds it from the
+     [tlb] cell it has been holding IN HAND since the +0x08 sfence
+     ([KptShare.tlb_res_pt_intro] / [IntrDefs.strans_flip] /
+     [strans_inv_intro]), which is the only place that flush is remembered
+     -- re-sealing the cell into the slot would discard it, see
+     WpSconfSfence.v's closing note.  [Rout] is whatever the caller carries
+     out of the step ([kpt_on cpu_id] and the recovered [stvec] cell there);
+     it is an [iProp] parameter, never a register set, so nothing
+     write-set-parameterised reaches the cycle's WP goal.
+
+     THE LANDING satp CARRIES ITS LEGALIZER, and the entry value is
+     ∀-BOUND in the caller's step: the Bare arm is existential in satp, so
+     the caller cannot name what was in the cell either.  Collapsing
+     [satp_legalized satp0 wval] to [wval] is one rewrite at an Sv39 mode
+     field ([UserretDefs.satp_legalized_sv39]) and belongs at the site that
+     knows the word.
+
+     THE INDEX IS THE LITERAL [false] -- see [THE PINNED INDEX] above; and
+     here it is doubly forced, since [strans_pending] and the slot are this
+     hart's. ---- *)
+  Lemma wp_csrw_satp_s_sconf
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (wval : mword 64) (Rout : iProp Σ) :
+    uint rs1 <> 0 ->
+    rget m rs1 = wval ->
+    sie_cap_gpr kt m n false p -∗
+    strans_pending -∗
+    (* THE CALLER'S SLOT MOVE, Bare -> KPT. *)
+    (∀ satp0 : mword 64,
+       satp ↦ᵣ (satp_legalized satp0 wval) -∗
+       SmodePte.pmp_config (mword_of_int 0 : mword 44) -∗
+       (∃ v : mword 64, stvec ↦ᵣ v) -∗
+       strans_pending -∗ strans_pending -∗
+       |={⊤}=> strans_inv ∗ Rout) -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n false p -∗
+      Rout -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrs1 Hwval) "Hcg Hbit Hslot Hpc Hinstr Hcont".
+    assert (Hok : cw2_ok satp mstatus).
+    { rewrite /cw2_ok /cw_fresh. split_and!;
+        first [ vm_compute; reflexivity | intros HX; discriminate HX ]. }
+    iApply (wp_instr_s_sconf m n false false pc false
+              (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW))
+              (fun (_ : CpuId) npc ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Rout)%I
+              with "Hcg Hpc Hinstr [Hbit Hslot Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitL "Hbit Hslot".
+    - (* ---- the instruction ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      (* the still-Bare receipt pins the arm and opens it *)
+      iDestruct (strans_inv_acc_bare with "Hbit Htr")
+        as "(Hbit & Hbit2 & Hbare & Hstv)".
+      iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
+      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      pose proof Hmsf as (_ & HSXL & _ & _ & _ & _ & _ & _ & _ & HTVM).
+      iDestruct (pw2_frames_in Supervisor (DfracOwn 1) (DfracOwn 1)
+                   satp satp0 mstatus ms0 Hok
+                   with "Hsatpc Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)))
+        with (execute_CSRReg csr_satp (Regidx rs1) zreg CSRRW).
+      (* the slot move is a [bupd] under the caller's wand, and
+         [HartSwp.swp_fupd_post] is what lets it run in the swp's POST. *)
+      iApply swp_fupd_post.
+      iApply (swp_mono with
+                "[Hstk Harm Hhalf Hspp Hmie Hmdl Hmenv Hpmp Hstv Hbit Hbit2
+                  Hslot HPC HnPC Hresv] [Hrw Hro Hfile]");
+        [| iApply (swp_execute_CSRReg_w_p (cw_Drw satp) (cw2_Dro mstatus)
+                     (cw2_Df (DfracOwn 1) (DfracOwn 1) mstatus)
+                     (pw2_rs Supervisor satp satp0 mstatus ms0)
+                     (pw2_rs Supervisor satp (satp_legalized satp0 wval)
+                        mstatus ms0)
+                     (tp_pin m) csr_satp Supervisor rs1
+                     (satp_legalized satp0 wval)
+                     (cw2_disj satp mstatus Hok) (cw2_in_priv satp mstatus)
+                     (pw2_rs_priv Supervisor satp satp0 mstatus ms0 Hok)
+                     ltac:(by vm_compute)
+                     (hval_check_CSR_result_satp_S_w
+                        (cw_Drw satp ∪ cw2_Dro mstatus) (cw_Drw satp)
+                        (pw2_rs Supervisor satp satp0 mstatus ms0)
+                        (cw2_in_priv satp mstatus) (cw2_in_sec satp mstatus)
+                        (cw2_in_misa satp mstatus) (cw2_in_r2 satp mstatus)
+                        ltac:(rewrite (pw2_rs_r2 Supervisor satp satp0
+                                         mstatus ms0); exact HTVM))
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     ltac:(by vm_compute)
+                     with "Hcert Hfile Hrw Hro [Hcert]") ].
+      + iIntros (e) "(-> & Hf & Hrw & Hro)".
+        iDestruct (pw2_frames_out Supervisor (DfracOwn 1) (DfracOwn 1)
+                     satp (satp_legalized satp0 wval) mstatus ms0 Hok
+                     with "[$Hrw $Hro]") as "(Hsatpc & Hms & Hpriv & _ & _)".
+        iMod ("Hslot" $! satp0 with "Hsatpc Hpmp Hstv Hbit Hbit2")
+          as "[Htr Hout]".
+        iModIntro.
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4), ms0, m, n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        { rewrite /sconf_at_priv. iExists mdv0.
+          iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          iPureIntro. split; [exact Hmsf | exact Hmm]. }
+        iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Hwit". }
+        iFrame "Hf".
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hout".
+      + (* the write itself *)
+        iIntros "Hrw Hro".
+        change (tp_pin m !!! Regidx rs1) with (rget m rs1). rewrite Hwval.
+        iApply (swp_write_CSR_satp_S (DfracOwn 1) (DfracOwn 1) satp0 ms0 wval
+                  Hok HSXL with "Hcert Hrw Hro").
+    - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hout)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hout Hpc'"). done.
+  Qed.
+
   (* ---- csrw sstatus,rs1 -- THE S-STATUS RESTORE, and the one leaf whose
      postcondition EXPOSES mstatus.
 

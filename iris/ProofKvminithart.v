@@ -17,6 +17,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore RegFile WpGpr WpMmodeLeafBase.
 Require Import HartTp WpNext IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl.
+(* the two converted leaves this function's three raw blocks became *)
+Require Import WpSconfCsr WpSconfSfence.
 Require Import RiscvExtras.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes.
@@ -59,8 +61,6 @@ Section KvminithartBody.
     assert (Hc6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14 : mword 5))
       by (vm_compute; reflexivity).
     assert (Hc7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5))
-      by (vm_compute; reflexivity).
-    assert (Hzreg : Regidx (mword_of_int 0 : mword 5) = zreg)
       by (vm_compute; reflexivity).
     (* frame-cell address facts (2-slot frame: ra @ slot 1, s0 @ slot 2) *)
     assert (Hpush : add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) = pa_stk (mm !!! Regidx csp_rs1) 2).
@@ -120,52 +120,21 @@ Section KvminithartBody.
     assert (Hp08 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.kvminithart + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp08) in "Hpc".
     iPoseProof (kvi_08 with "Htext") as "Hi08".
-    (* ============ +0x08 sfence.vma zero,zero (under Bare) ============= *)
-    iApply (wp_instr_s_sconf W2 (K - 2)%nat false false (mword_of_int (KernelSyms.kvminithart + 0x08)) false
-              (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
-              with "Hcg Hpc Hi08").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
-       obligation is discharged by [wp_next]'s OWN introduction rule at the
-       ambient hart -- the same [wp_next_off_intro] every b = false leaf
-       already uses for its own conclusion.  Nothing is renamed and nothing
-       is substituted: the body below is the pre-move proof VERBATIM. *)
+    (* ============ +0x08 sfence.vma zero,zero (under Bare) =============
+       THE FLUSHED CELL STAYS IN THE FUNCTION'S OWN HAND from here to
+       +0x1c.  That is what the leaf's CELL interface is for
+       (WpSconfSfence.v's closing note): the six instructions in between run
+       on [Hcg] alone, [Htlb] sits beside the bundle owned by nobody else,
+       and the switch consumes it with [Hnone1] still attached.  Re-sealing
+       it into the translation slot would discard exactly that fact. *)
+    iApply (wp_sfence_vma_s_sconf KT0 pcur
+              (mword_of_int (KernelSyms.kvminithart + 0x08))
+              W2 (K - 2)%nat tlbvec0 with "Hcg Htlb Hpc Hi08").
     iApply wp_next_off_intro.
-    iIntros (σ1 Hpceq1) "Hsc Hcap Hfile Hnpc Hsi".
-    iClear "Hi08".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms1) "(Hms & Hhalf & Hspp & %Hmsf)".
-    pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv1.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms1.
-    iMod (reg_update _ nextPC _ (add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x08)) 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc1 := set_reg σ1 nextPC (add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x08)) 4)).
-    assert (Lpriv1p : register_lookup cur_privilege s_pc1.(sregs) = Supervisor)
-      by (unfold s_pc1; tmig; exact Lpriv1).
-    assert (Lms1p : register_lookup mstatus s_pc1.(sregs) = ms1)
-      by (unfold s_pc1; tmig; exact Lms1).
-    destruct (exec_execute_SFENCE_VMA_S s_pc1 Lpriv1p ltac:(rewrite Lms1p; exact HTVM))
-      as (tlbz1 & Hex1 & Hnone1).
-    iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb") as "[Hreg Htlb]".
-    iModIntro. iExists (set_reg s_pc1 tlb tlbz1).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq1. fold s_pc1. rewrite Hzreg. exact Hex1. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs Hpc". iNext.
-    assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs)
-                    = mword_of_int (KernelSyms.kvminithart + 0x0c)).
-    { unfold s_pc1; cbn [sregs]. tmig. rewrite register_lookup_set.
-      apply bv_eq; vm_compute; reflexivity. }
-    iEval (rewrite Lnpc1) in "Hpc".
+    iIntros "Hcg Htlbz Hpc".
+    iDestruct "Htlbz" as (tlbz1) "(%Hnone1 & Htlb)".
     assert (Hpnpc1 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpnpc1) in "Hnpc".
-    (* reassemble the ambient bundle at pc = 0x0c *)
-    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx". iExists ms1. iFrame "Hms Hhalf Hspp". done. }
-    iAssert (pc_is (mword_of_int (KernelSyms.kvminithart + 0x0c))) with "[Hpc Hnpc]" as "Hpc".
-    { iFrame "Hpc Hnpc". }
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    iEval (rewrite Hpnpc1) in "Hpc".
     iPoseProof (kvi_0c with "Htext") as "Hi0c".
     (* ============ +0x0c auipc a5,0x9 ============ *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 20)
@@ -253,149 +222,53 @@ Section KvminithartBody.
     assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.kvminithart + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
     iPoseProof (kvi_1c with "Htext") as "Hi1c".
-    (* ============ +0x1c csrw satp,a5 : THE SWITCH ============ *)
-    iApply (wp_instr_s_sconf S4 (K - 2)%nat false false (mword_of_int (KernelSyms.kvminithart + 0x1c)) false
-              (CSRReg (mword_of_int 384 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 0), CSRRW))
-              with "Hcg Hpc Hi1c").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
-       obligation is discharged by [wp_next]'s OWN introduction rule at the
-       ambient hart -- the same [wp_next_off_intro] every b = false leaf
-       already uses for its own conclusion.  Nothing is renamed and nothing
-       is substituted: the body below is the pre-move proof VERBATIM. *)
+    (* ============ +0x1c csrw satp,a5 : THE SWITCH ============
+       The leaf owns the instruction; THE SLOT MOVE IS THIS FUNCTION'S, and
+       it is the pre-move block's own script -- the leaf hands the Bare
+       arm's cells over with satp already rewritten, and takes back a slot
+       re-sealed at the kernel-table arm. *)
+    assert (Hrs15 : uint (mword_of_int 15 : mword 5) <> 0) by (vm_compute; lia).
+    assert (Ha5r : rget S4 (mword_of_int 15 : mword 5) = kvi_satp_word root)
+      by (rgne; exact Ha5).
+    iApply (wp_csrw_satp_s_sconf (mword_of_int (KernelSyms.kvminithart + 0x1c))
+              (mword_of_int 15 : mword 5) S4 (K - 2)%nat (kvi_satp_word root)
+              (kpt_on cpu_id ∗ (∃ v : mword 64, stvec ↦ᵣ v))%I
+              Hrs15 Ha5r
+              with "Hcg Hbit [Htlb] Hpc Hi1c").
+    { (* The table is ALREADY published (main's boot arm did it, once): all
+         this hart does is re-seal its own slot at the KPT arm, out of its
+         own satp/tlb/pmp cells plus the up-front snapshot [kpt_lb t0] and
+         the persistent [kpt_inv root] riding along.  [tlbz1] / [Hnone1] are
+         the +0x08 flush, still in hand and never re-sealed. *)
+      iIntros (satp0) "Hsatpc Hpmp Hstv Hbit Hbit2".
+      iEval (rewrite (satp_legalized_sv39 satp0 (kvi_satp_word root)
+                        (kvi_satp_mode root))) in "Hsatpc".
+      iDestruct (tlb_res_pt_intro root (kvi_satp_word root) tlbz1 t0
+                   (kvi_satp_mode root) (kvi_satp_asid root) (kvi_satp_ppn root)
+                   (tlb_ok_pt_empty (mword_of_int 0) t0 tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
+                   with "Hsatpc Htlb Hlbt [Hpmp] Hkinv") as "Htlbinv".
+      { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
+      iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
+      iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
+      iModIntro. iFrame "Htr Hbitkpt Hstv". }
     iApply wp_next_off_intro.
-    iIntros (σ2 Hpceq2) "Hsc Hcap Hfile Hnpc Hsi".
-    iClear "Hi1c".
-    iDestruct "Hsc" as "(#Hhw2 & #Hminv2 & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms2) "(Hms & Hhalf & Hspp & %Hmsf2)".
-    pose proof Hmsf2 as (HMPRV2 & HSXL2 & HMXR2 & HTSR2 & HXS2 & HFS2 & HVS2 & HSD2 & HMPP2 & HTVM2).
-    iPoseProof "Hhw2" as "#Hhwc2".
-    iDestruct "Hhwc2" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & _)".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv2.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms2.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa2.
-    iMod (reg_update _ nextPC _ (add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x1c)) 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc2 := set_reg σ2 nextPC (add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x1c)) 4)).
-    assert (Lpriv2p : register_lookup cur_privilege s_pc2.(sregs) = Supervisor)
-      by (unfold s_pc2; tmig; exact Lpriv2).
-    assert (Lms2p : register_lookup mstatus s_pc2.(sregs) = ms2)
-      by (unfold s_pc2; tmig; exact Lms2).
-    assert (Lmisa2p : register_lookup misa s_pc2.(sregs) = misa0)
-      by (unfold s_pc2; tmig; exact Lmisa2).
-    (* a5's value at the executing state *)
-    iDestruct (gpr_file_lookup_acc (tp_pin S4) (Regidx (mword_of_int 15 : mword 5)) with "Hfile") as "[Hspc Hfb]".
-    iDestruct (gpr_pt_value (mword_of_int 15) (S4 (Regidx (mword_of_int 15 : mword 5))) s_pc2 with "Hreg Hspc") as %Lva2.
-    iDestruct ("Hfb" with "Hspc") as "Hfile".
-    replace (Z.eqb (uint (mword_of_int 15 : mword 5)) 0) with false in Lva2 by (vm_compute; reflexivity).
-    rewrite -rf_lookup Ha5 in Lva2.
-    pose proof (exec_execute_csrw_satp_S (mword_of_int 15) s_pc2
-                  ltac:(vm_compute; lia) Lpriv2p
-                  ltac:(rewrite Lms2p; exact HTVM2)
-                  ltac:(rewrite Lmisa2p; exact HmisaS)
-                  ltac:(rewrite Lms2p; exact HSXL2)) as Hex2.
-    rewrite Lva2 in Hex2.
-    rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) (kvi_satp_word root) (kvi_satp_mode root)) in Hex2.
-    (* open the Bare arm of the translation slot; do the switch *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
-    iDestruct (strans_inv_acc_bare with "Hbit Htr") as "(Hbit & Hbit2 & Hbare & Hstv)".
-    iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
-    iMod (reg_update _ satp _ (kvi_satp_word root) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
-    (* The table is ALREADY published (main's boot arm did it, once): all this
-       hart does is re-seal its own slot at the KPT arm, out of its own
-       satp/tlb/pmp cells plus the up-front snapshot [kpt_lb t0] and the
-       persistent [kpt_inv root] riding along. *)
-    iDestruct (tlb_res_pt_intro root (kvi_satp_word root) tlbz1 t0
-                 (kvi_satp_mode root) (kvi_satp_asid root) (kvi_satp_ppn root)
-                 (tlb_ok_pt_empty (mword_of_int 0) t0 tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
-                 with "Hsatpc Htlb Hlbt [Hpmp] Hkinv") as "Htlbinv".
-    { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
-    iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
-    iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
-    iAssert (sie_cap KT0 S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
-    iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word root)).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq2. fold s_pc2.
-      rewrite Hzreg. exact Hex2. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc2; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs Hpc". iNext.
-    assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp (kvi_satp_word root)).(sregs)
-                    = mword_of_int (KernelSyms.kvminithart + 0x20)).
-    { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set.
-      apply bv_eq; vm_compute; reflexivity. }
-    iEval (rewrite Lnpc2) in "Hpc".
+    iIntros "Hcg [#Hbitkpt Hstv] Hpc".
     assert (Hpnpc2 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpnpc2) in "Hnpc".
-    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw2 Hminv2 Hpriv Hmiex Hmenvx". iExists ms2. iFrame "Hms Hhalf Hspp". done. }
-    iAssert (pc_is (mword_of_int (KernelSyms.kvminithart + 0x20))) with "[Hpc Hnpc]" as "Hpc".
-    { iFrame "Hpc Hnpc". }
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    iEval (rewrite Hpnpc2) in "Hpc".
     iPoseProof (kvi_20 with "Htext") as "Hi20".
-    (* ============ +0x20 sfence.vma zero,zero (under the kernel PT) ===== *)
-    iApply (wp_instr_s_sconf S4 (K - 2)%nat false false (mword_of_int (KernelSyms.kvminithart + 0x20)) false
-              (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
-              with "Hcg Hpc Hi20").
-    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
-       obligation is discharged by [wp_next]'s OWN introduction rule at the
-       ambient hart -- the same [wp_next_off_intro] every b = false leaf
-       already uses for its own conclusion.  Nothing is renamed and nothing
-       is substituted: the body below is the pre-move proof VERBATIM. *)
+    (* ============ +0x20 sfence.vma zero,zero (under the kernel PT) =====
+       THE OTHER SFENCE LEAF.  By here the cell is back inside the
+       translation slot, at the arm the switch just installed, and nothing
+       downstream reads this flush -- so the KPT-arm variant borrows the
+       cell out of [tlb_res_pt], re-seals it at the flushed vector, and the
+       receipt the switch produced is the whole price. *)
+    iApply (wp_sfence_vma_kpt_s_sconf KT0 pcur
+              (mword_of_int (KernelSyms.kvminithart + 0x20))
+              S4 (K - 2)%nat with "Hcg Hbitkpt Hpc Hi20").
     iApply wp_next_off_intro.
-    iIntros (σ3 Hpceq3) "Hsc Hcap Hfile Hnpc Hsi".
-    iClear "Hi20".
-    iDestruct "Hsc" as "(#Hhw3 & #Hminv3 & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms3) "(Hms & Hhalf & Hspp & %Hmsf3)".
-    pose proof Hmsf3 as (HMPRV3 & HSXL3 & HMXR3 & HTSR3 & HXS3 & HFS3 & HVS3 & HSD3 & HMPP3 & HTVM3).
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv3.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms3.
-    iMod (reg_update _ nextPC _ (add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x20)) 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc3 := set_reg σ3 nextPC (add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x20)) 4)).
-    assert (Lpriv3p : register_lookup cur_privilege s_pc3.(sregs) = Supervisor)
-      by (unfold s_pc3; tmig; exact Lpriv3).
-    assert (Lms3p : register_lookup mstatus s_pc3.(sregs) = ms3)
-      by (unfold s_pc3; tmig; exact Lms3).
-    destruct (exec_execute_SFENCE_VMA_S s_pc3 Lpriv3p ltac:(rewrite Lms3p; exact HTVM3))
-      as (tlbz3 & Hex3 & Hnone3).
-    (* open the KPT arm to reach the tlb cell; flush; re-seal *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & _)".
-    iDestruct "Htr" as "[(Hbit0 & _ & _) | (Hbit1 & Hk)]".
-    { iDestruct (kpt_on_pending_False with "Hbitkpt Hbit0") as %[]. }
-    iDestruct "Hk" as (root_ppn) "Htlbinv".
-    (* the flush touches only THIS hart's tlb cell: the tree stays inside
-       [kpt_inv], and the post-flush coherence is [tlb_ok_pt_empty] at the
-       residue's OWN snapshot, so no invariant is opened in this step. *)
-    iDestruct (tlb_res_pt_open with "Htlbinv") as (ksatp3 tlbvec3)
-      "(Hsatp & %HkMode3 & %Hkasid3 & %Hkppn3 & Htlbc & Hsnap3 & Hpmp & #Hkinv3)".
-    iDestruct "Hsnap3" as (kt3) "(_ & #Hlb3)".
-    iMod (reg_update _ tlb _ tlbz3 with "Hreg Htlbc") as "[Hreg Htlbc]".
-    iDestruct (tlb_res_pt_intro root_ppn ksatp3 tlbz3 kt3 HkMode3 Hkasid3 Hkppn3
-                 (tlb_ok_pt_empty (mword_of_int 0) kt3 tlbz3 (fun vpn' => Hnone3 _ (tlb_hash_range vpn')))
-                 with "Hsatp Htlbc Hlb3 Hpmp Hkinv3") as "Htlbinv".
-    iDestruct (strans_inv_intro root_ppn with "Hbit1 Htlbinv") as "Htr".
-    iAssert (sie_cap KT0 S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
-    iModIntro. iExists (set_reg s_pc3 tlb tlbz3).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq3. fold s_pc3. rewrite Hzreg. exact Hex3. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc3; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs Hpc". iNext.
-    assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs)
-                    = mword_of_int (KernelSyms.kvminithart + 0x24)).
-    { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set.
-      apply bv_eq; vm_compute; reflexivity. }
-    iEval (rewrite Lnpc3) in "Hpc".
+    iIntros "Hcg _ Hpc".
     assert (Hpnpc3 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpnpc3) in "Hnpc".
-    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw3 Hminv3 Hpriv Hmiex Hmenvx". iExists ms3. iFrame "Hms Hhalf Hspp". done. }
-    iAssert (pc_is (mword_of_int (KernelSyms.kvminithart + 0x24))) with "[Hpc Hnpc]" as "Hpc".
-    { iFrame "Hpc Hnpc". }
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    iEval (rewrite Hpnpc3) in "Hpc".
     (* ============ epilogue: +0x24 ld ra ; +0x26 ld s0 ; +0x28 addi sp ; +0x2a ret ==== *)
     assert (HS4sp : S4 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     { rewrite /S4 upd_ne; [| reg_neq]. rewrite /S3 upd_ne; [| reg_neq].

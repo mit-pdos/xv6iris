@@ -42,6 +42,10 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode HartMemRun
 Require Import UserretDefs.
 Require Import SmodeCore HartTp WpNext KernelText.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
+(* the KPT arm's residue, for the second leaf below: [tlb_res_pt_open] /
+   [_intro] (KptShare), [tlb_ok_pt_empty] (PtTree), [tlb_hash_range]
+   (SmodePte).  [WpIntrInv] already requires all three, so no edge moves. *)
+Require Import KptShare PtTree SmodePte.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -296,5 +300,96 @@ Section SfenceLeaf.
      consumes exactly that flush six instructions later
      ([tlb_res_pt_intro ... (tlb_ok_pt_empty ... Hnone1)]).  The cell stays
      in the caller's hand across the window for that reason. *)
+
+  (* ==================================================================== *)
+  (* 4. THE SAME INSTRUCTION AT THE KERNEL TABLE.                          *)
+  (*                                                                      *)
+  (* The leaf above threads the cell because kvminithart's FIRST sfence     *)
+  (* has to remember its flush six instructions later.  Its SECOND does     *)
+  (* not: by then the switch has re-sealed the translation slot at the KPT  *)
+  (* arm, [KptShare.tlb_res_pt] owns the cell, and nothing downstream reads *)
+  (* the flush -- so this variant BORROWS the cell out of the arm the       *)
+  (* receipt pins, re-seals it at the flushed vector, and exposes nothing.  *)
+  (* It is not the deleted Bare variant in disguise: the objection there    *)
+  (* was that [bare_inv] is existential in the tlb value, and the KPT arm   *)
+  (* is not -- [tlb_res_pt] carries the coherence, and [tlb_ok_pt_empty]    *)
+  (* re-establishes it at the residue's OWN snapshot, so no invariant is    *)
+  (* opened in the step.  Same borrow shape as                              *)
+  (* [WpSconfCsr.wp_csrr_satp_kpt_s_sconf]; the receipt is free at the one  *)
+  (* call site, being exactly what the switch produced.                     *)
+  (* ==================================================================== *)
+  Lemma wp_sfence_vma_kpt_s_sconf (pc : mword 64) (m : regfile) (n : nat) :
+    sie_cap_gpr kt m n false p -∗
+    kpt_on cpu_id -∗
+    pc_is pc -∗
+    instr pc false (SFENCE_VMA (zreg, zreg)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n false p -∗
+      kpt_on cpu_id -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "Hcg #Hkptr Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf m n false false pc false
+              (SFENCE_VMA (zreg, zreg))
+              (fun (_ : CpuId) npc ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
+              with "Hcg Hpc Hinstr [Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
+        as (root) "(Hres & Htrback)".
+      iDestruct (tlb_res_pt_open with "Hres") as (ksatp tlbv)
+        "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlbc & Hsnap & Hpmp & #Hkinv)".
+      iDestruct "Hsnap" as (kt3) "(_ & #Hlb3)".
+      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
+                          HMPP & HTVM).
+      iDestruct (sf_frames_in ms0 tlbv with "Htlbc Hpriv Hms") as "[Hrw Hro]".
+      iApply (swp_mono with
+                "[Hstk Harm Hfile HPC HnPC Hhalf Hspp Hmie Hmdl Hmenv
+                  Hsatp Hpmp Htrback] [Hrw Hro Hresv]");
+        last first.
+      { iApply (swp_execute_SFENCE_VMA_S (sf_rs ms0 tlbv)
+                  (sf_rs_priv ms0 tlbv)
+                  ltac:(rewrite sf_rs_ms; exact HTVM)
+                  with "Hcert Hresv Hrw Hro"). }
+      iIntros (e) "(-> & Hpost)".
+      iDestruct "Hpost" as (rs' tv) "(%Hag & %Hflush & Hrw & Hro & Hresv)".
+      iDestruct (hreg_frame_ext rs' (sf_rs ms0 tv) sf_Drw with "Hrw") as "Hrw";
+        [ intros r Hr; rewrite (Hag r ltac:(set_solver));
+          exact (sf_rs_after ms0 tlbv tv r ltac:(set_solver)) |].
+      iDestruct (hreg_frame_ro_ext sf_Df rs' (sf_rs ms0 tv) sf_Dro with "Hro")
+        as "Hro";
+        [ intros r Hr; rewrite (Hag r ltac:(set_solver));
+          exact (sf_rs_after ms0 tlbv tv r ltac:(set_solver)) |].
+      iDestruct (sf_frames_out ms0 tv with "[$Hrw $Hro]")
+        as "(Htlbc & Hpriv & Hms)".
+      (* re-seal the arm at the flushed vector, at the residue's OWN
+         snapshot -- an empty TLB is coherent with any tree. *)
+      iDestruct (tlb_res_pt_intro root ksatp tv kt3 HkMode Hkasid Hkppn
+                   (tlb_ok_pt_empty (mword_of_int 0) kt3 tv
+                      (fun vpn' => Hflush _ (tlb_hash_range vpn')))
+                   with "Hsatp Htlbc Hlb3 Hpmp Hkinv") as "Hres".
+      iDestruct ("Htrback" with "Hres") as "Htr".
+      iSplitR; [done|].
+      iExists (add_vec_int pc 4), ms0, m, n.
+      iFrame "HPC HnPC Hresv".
+      iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+      { rewrite /sconf_at_priv. iExists mdv0.
+        iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        iPureIntro. split; [exact Hmsf | exact Hmm]. }
+      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Hwit". }
+      iFrame "Hfile". iSplitR; [done|]. iSplitR; [done|]. done.
+    - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hkptr Hpc'"). done.
+  Qed.
 
 End SfenceLeaf.
