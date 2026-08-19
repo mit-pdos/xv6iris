@@ -1,29 +1,27 @@
 (*  FsReady.v -- THE RUNTIME FILE SYSTEM, AS ONE PERSISTENT ASSERTION,
     AND THE SEAL THAT MAKES IT EXIST.  (SIMP-2, second half;
-    claude-notes/design/ghost-simplification.md §5.2.)
+    claude-notes/design/ghost-simplification.md §5.2 and §5.3a;
+    claude-notes/design/fs-ghost-state.md §7.)
 
-    ---- WHAT IS HERE, AND WHY IT IS HERE RATHER THAN IN FsSyscalls.v ----
+    ---- WHAT IS HERE ----------------------------------------------------
 
-    [fs_ready] is [FsSyscalls.fs_world] REHOMED, conjunct for conjunct.
-    Nothing about the assertion changed; what changed is three things
-    around it:
+    [fs_ready] began as [FsSyscalls.fs_world] rehomed.  Three things are
+    true of it now that were not true of that assertion:
 
-      1. IT HAS ITS OWN LEAF FILE, below the syscall layer, so that any
-         file that wants the fs environment can import the predicate
-         without importing the syscall bodies that used to own it.
-         [FsSyscalls.fs_world] is now the DERIVED form -- a one-line
-         alias -- and its two friendly seals read unchanged.
+      1. IT HAS ITS OWN LEAF FILE, below the syscall layer -- and, since the
+         [ic_sleeplocks] hoist, below the whole Spec layer.  Any file that
+         wants the fs environment can import the predicate without
+         importing the syscall bodies that used to own it.
 
       2. IT HAS A PRODUCER.  [fs_world] never had one: it was, in its own
          header's words, an assertion "a friendly client pays for once, at
          boot", with satisfiability unchecked (upstream's [syscall_env] is
          in the same position).  [fs_ready_seal] and [fs_ready_establish]
-         below are that producer's two halves, and both are machine-checked
-         (probe ZZSimp2.v P3, satisfiability-first per iclaim-ledger.md
-         §5''''): the boot-shelter token [ireg_boot] that fsinit hands back
-         DIES into the persistent sealed regime [ireg_open], and the
-         remaining eighteen constituents -- every one of which fsinit's own
-         caller already holds -- complete the predicate in one [bupd].
+         below are that producer's two halves: the boot-shelter token
+         [ireg_boot] that fsinit hands back DIES into the persistent sealed
+         regime [ireg_open], and the remaining seventeen constituents --
+         every one of which fsinit's own caller already holds -- complete
+         the predicate in one [bupd].
 
       3. IT IS BOOT-FREE, AND THE TYPE ENFORCES IT.  Not one conjunct
          mentions boot state.  [ireg_boot] is EXCLUSIVE and is consumed by
@@ -34,6 +32,40 @@
          constituent forms and must not take [fs_ready]: they hold
          [ireg_inv] without [ireg_open], and the predicate they cannot form
          is exactly the predicate whose existence says they are done.
+
+    ---- IT TAKES NO PARAMETERS, AND THAT IS THE POINT -------------------
+
+    [fs_ready] is meant to be CARRIED: produced by forkret's not-forked
+    arm, held by a running process, handed to the trap loop, read back by
+    every later syscall.  A twenty-parameter version can be carried only by
+    existentially quantifying the twenty, and a bare existential is useless
+    downstream -- a consumer handed [∃ γ…, fs_ready γ…] cannot feed it to
+    [SpecKexec.fs_fabric] or [UsertrapRes.ut_res_bare], whose own resources
+    are keyed to the CALLER's concrete names, because nothing relates the
+    two.  Ambient names remove the existential instead of hiding it.
+
+    So every name is ambient: the four the inode cache already owned
+    ([icfg_log], [icfg_ist], [icfg_nib], [icfg_dev]) and the fifteen
+    [FsCfg.fscfg] adds.  That is [IcacheRef.icfg]'s own argument one layer
+    out -- there is exactly one file system per boot -- and [fscfg] is
+    per-era exactly as [icfg] is (the disk image ghost is re-minted at
+    PowerOn; design/crash.md), i.e. a Class ASSUMPTION each era's boot
+    instantiates rather than a global constant.
+
+    [procs_inv] IS NOT A CONJUNCT.  It is a PROCESS resource, it is
+    persistent, every consumer holds it beside this predicate anyway
+    ([SpecKexec.fs_fabric] lists it separately), and it was the only
+    conjunct that reached back into the process layer -- which is what made
+    the file system LOOK as though it depended on process abstractions.  A
+    spec that wants it takes [procs_inv γs] as its own premise.
+
+    [FsSyscalls.fs_world] is therefore no longer a one-line alias: it is
+    this predicate AT A CALLER'S OWN NAMES -- the tie equations
+    ([bn = fsc_bio], [glog = icfg_log], …) beside the ambient [fs_ready] --
+    with [fs_world_all] doing the substitution once, so a body that threads
+    its own names still destructs ONE row and gets the constituents spelled
+    the way its callee spells them.  That is [SpecKexec]'s existing
+    [g = icfg_log] idiom at full width.
 
     ---- WHY IT MATTERS: THE FORKRET DELTA ----
 
@@ -50,23 +82,23 @@
 
     ---- THE SECTION, AND THE CLASS-USED-AS-INDEX TRAP ----
 
-    THIS IS LOAD-BEARING, and it is the live finding the design pass
-    recorded.  [FsSyscalls]'s own section names [fileG] but NOT [icfg] or
-    [icacheG]; [fileG] carries both as superclass FIELDS
+    THIS IS LOAD-BEARING.  [FsSyscalls]'s own section names [fileG] but NOT
+    [icfg] or [icacheG]; [fileG] carries both as superclass FIELDS
     ([FileInvDefs.file_icfg], [FileInvDefs.file_icacheG]), so every
-    icache-flavoured conjunct of [fs_world] is elaborated at the BAKED
-    projections rather than at a binder.  A foreign section with its own
-    [ICFG : icfg] therefore cannot frame [fs_world]'s conjuncts against
-    its own re-typed copies -- which is what made the projection family
-    unprobeable outside this file.
+    icache-flavoured conjunct is elaborated at the BAKED projections rather
+    than at a binder.  A foreign section with its own [ICFG : icfg]
+    therefore cannot frame those conjuncts against its own re-typed copies
+    -- which is what made the projection family unprobeable outside this
+    file.
 
-    The fix, and the reason [fs_ready] is stated here at all: this section
-    declares [icacheG] and [icfg] EXPLICITLY, and declares them LAST so
-    that resolution prefers them over [fileG]'s fields.  [fs_ready] is
-    therefore PARAMETRIC in the cache's index, every projection below is
-    stated at that same parameter, and the alias in [FsSyscalls]
-    instantiates it with [file_icfg]/[file_icacheG] -- recovering today's
-    [fs_world] on the nose.  *)
+    So this section declares [icacheG] and [icfg] EXPLICITLY and declares
+    them LAST, so that resolution prefers them over [fileG]'s fields:
+    [fs_ready] is parametric in the cache's INDEX (though not in its
+    names), and every projection below is stated at that same index, so a
+    consumer elaborating at [file_icfg]/[file_icacheG] meets it on the
+    nose.  [FSC : fscfg] is bound here too and is NOT a superclass of
+    anything, so unlike [icfg] it has to be bound by hand wherever this
+    predicate is named.  *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
