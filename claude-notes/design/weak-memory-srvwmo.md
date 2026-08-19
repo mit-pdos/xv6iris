@@ -102,6 +102,35 @@ with its reason of record:
   top-timestamp vacuity.  The ~90-line `dep_dom` invariant must LAND
   before the definition relies on it (A1a scratch, `A1aDom.v`).
 
+**THE T2 CARRIER PIPELINE (A2, designed 2026-08-19).**  From a real xv6
+pf event-language run to an sRVWMO execution, three stages, each its own
+simulation:
+
+1. **ERASURE** (instance run → dep-free run of the same pf machine):
+   relabel `LRegW`/`LCtrl`/`LInstr` to `LSilent` and blank every operand
+   list.  The state relation is a ≤-SIMULATION, not equality: log/`w_fwd`
+   timestamps/`w_res` equal (with "instance `None` → erased anything" at
+   the `LInstr`-clear divergence — an exstore only fires where both are
+   the same `Some`), and the monotone views satisfy erased ≤ instance —
+   every erased side condition is thereby WEAKER, so every instance step
+   erases.  Post-D-7 `w_fwd` banks 0 on both sides, which is what makes
+   the relation this simple; `w_ldv`/`w_regv`/`w_vcap` drift is
+   unobservable (erased consumers read them only through
+   `srcs_view [] = 0`, and `rv_view` is computed from a zeroed bank).
+2. **RE-FUSION** (dep-free split run → dep-free fused run): commute each
+   `LExLoad` right to its `LExStore` (the erased window between them is
+   all `LSilent`; foreign steps don't read the agent's state; the bytes
+   are unchanged across the window by `excl_ok_ts`, so the re-read at
+   the write's position returns the same `tvs`), then replace the
+   adjacent pair by ONE `PFRmw` step (whose premises hold there given
+   the pair's).  A DANGLING `LExLoad` relabels to a plain `LLoad` (same
+   read semantics; its `w_res` is never consumed).  This is why `LRmw`
+   and `PFRmw` survive until A2 is done — R6 waits.
+3. **THE EXISTING PROJECTION** (`wp_pf_step_mstep`): the output of
+   stages 1–2 is `lb_depfree ∧ lb_fused`, discharging the gates by
+   construction.  T1's realization side names the SAME gates
+   (`WeakAxRealize.lbl_realizes`), so both directions relax in lockstep.
+
 Scope clause: sRVWMO covers RAM accesses of harts and the disk agent;
 MMIO, the UART thread and the PLIC wire are outside it, under the retained
 device-ordering assumption.  Projection route for T2's carrier: the
