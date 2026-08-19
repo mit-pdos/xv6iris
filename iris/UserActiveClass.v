@@ -27,6 +27,9 @@ Require Import UserFrame UserClassifyAsm.
 Require Import UserPtTree UserExec UserStep UserStepFull.
 Require Import UserFetchPt UserClassify.
 Require Import UserTrap.
+(* the swp bridge needs [exec] itself, and the five PURE fetch producers *)
+Require Import RiscvExec.
+Require Import UserFetchCert UserFaultCert.
 From iris.base_logic.lib Require Import ghost_map.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1003,6 +1006,142 @@ Section UserActiveClass.
               (rv64d_types.Exception e) (xtval_exception_value e xv) pcx
               Lhs Hmsok Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr Htlbok Hwf
               Hag with "Hrw Hro Hany Hopen Hrut").
+  Qed.
+
+  (* ===================================================================== *)
+  (* §6a  THE [swp] BRIDGE OVER THE PURE FETCH LAYER.                       *)
+  (*                                                                        *)
+  (* ONE lemma serves all FIVE pure fetch producers -- [u_fetch_pure] and    *)
+  (* [u_fetch_fault_pure] for the 4-aligned arm, and [u_fetch_pure_2] /      *)
+  (* [u_fetch_or_fault_pure_2_second] / [u_fetch_fault_pure_2_first] for the *)
+  (* 2-aligned one -- because §14.4 gave all five the SAME five conjuncts.   *)
+  (* That uniformity is exactly what the shape was chosen for.               *)
+  (*                                                                        *)
+  (* [u_landing_map] is what turns [swp_hmrun_of_exec]'s existential post    *)
+  (* map into the composer's [mm']: at the reference state a submap with the *)
+  (* full domain IS the map.                                                 *)
+  (* ===================================================================== *)
+  Lemma swp_fetch_of_pure (dq : dfrac) (t t' : ptree) (mm mm' : PtBytes.pamap)
+      (rsf rsf' : regstate) (fr : FetchResult)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ)
+      (Pf : mword 64 -> ExceptionType -> iProp Σ)
+      (Px : ext_fetch_addr_error -> iProp Σ) :
+    exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') ->
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true ->
+    u_mem_wf pt t mm ->
+    u_mem_step pt t t' mm mm' ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rsf u_Drw -∗ hreg_frame_ro (u_Df dq) rsf u_Dro -∗
+    bytes_own mm -∗
+    (∀ rs2 : regstate,
+       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rsf'⌝ -∗
+       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       bytes_own mm' -∗ resv_any cpu_id -∗
+       run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px fr) -∗
+    swp (fetch tt) (run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px).
+  Proof.
+    intros He Hg Hwf Hstep.
+    iIntros "#Hcert Hany Hrw Hro Hown Hk".
+    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+    2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq) (fetch tt)
+                  (u_state rsf mm) (u_state rsf' mm') fr rsf mm
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(intros r _; reflexivity) ltac:(reflexivity) Hg He
+                  with "Hcert Hany Hrw Hro Hown"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost"
+      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+    assert (Hmm2 : mm2 = mm')
+      by exact (u_landing_map pt t t' mm mm2 (u_state rsf' mm') Hwf Hstep
+                  Hsub Hdom).
+    subst mm2.
+    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+  Qed.
+
+  (* ===================================================================== *)
+  (* §6b  THE [swp] BRIDGE OVER THE EXECUTE HALF of [base_post]/[rvc_post]. *)
+  (*                                                                        *)
+  (* The [ExecuteAs] fork is a SECOND [swp] inside the FIRST execute's post  *)
+  (* ([HartRunFull.run_exec_post]), not a side condition, so the redirect    *)
+  (* arm runs [swp_hmrun_of_exec] twice -- and the redirect lands on the     *)
+  (* state it started from, which is what lets the second run start from the *)
+  (* frame the first handed back.                                            *)
+  (* ===================================================================== *)
+  Lemma swp_execute_of_pure (dq : dfrac) (t t' : ptree) (mm : PtBytes.pamap)
+      (rsx : regstate) (instr : instruction) (r : ExecutionResult)
+      (s_x : mstate) (ib : mword 32)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ) :
+    (exec (execute instr) (u_state rsx mm) = Some (r, s_x)
+       /\ goodmb Du_r Du_w (execute instr) (u_state rsx mm) mm = true
+     \/ (exists other : instruction,
+           exec (execute instr) (u_state rsx mm)
+             = Some (ExecuteAs other, u_state rsx mm)
+           /\ goodmb Du_r Du_w (execute instr) (u_state rsx mm) mm = true
+           /\ exec (execute other) (u_state rsx mm) = Some (r, s_x)
+           /\ goodmb Du_r Du_w (execute other) (u_state rsx mm) mm = true)) ->
+    (match r with ExecuteAs _ => False | _ => True end) ->
+    u_mem_wf pt t mm ->
+    u_mem_step pt t t' mm s_x.(mem) ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
+    bytes_own mm -∗
+    (∀ rs2 : regstate,
+       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 s_x.(sregs)⌝ -∗
+       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       bytes_own s_x.(mem) -∗ resv_any cpu_id -∗
+       Pe r ib) -∗
+    swp (execute instr) (run_exec_post Pe ib).
+  Proof.
+    intros Hexe Hnr Hwf Hstep.
+    iIntros "#Hcert Hany Hrw Hro Hown Hk".
+    destruct Hexe as [(He & Hg) | (other & He1 & Hg1 & He2 & Hg2)].
+    - (* DIRECT: one execute, and the result is not a redirect *)
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+      2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                    (execute instr) (u_state rsx mm) s_x r rsx mm
+                    u_disj Du_r_sub Du_w_sub
+                    ltac:(intros q _; reflexivity) ltac:(reflexivity) Hg He
+                    with "Hcert Hany Hrw Hro Hown"). }
+      iIntros (v) "(-> & Hpost)".
+      iDestruct "Hpost"
+        as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+      assert (Hmm2 : mm2 = s_x.(mem))
+        by exact (u_landing_map pt t t' mm mm2 s_x Hwf Hstep Hsub Hdom).
+      subst mm2.
+      iApply (run_exec_post_direct Pe ib r Hnr).
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+    - (* REDIRECT: the first execute answers [ExecuteAs other] AT THE SAME
+         STATE, so the second starts from the frame the first handed back *)
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+      2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                    (execute instr) (u_state rsx mm) (u_state rsx mm)
+                    (ExecuteAs other) rsx mm
+                    u_disj Du_r_sub Du_w_sub
+                    ltac:(intros q _; reflexivity) ltac:(reflexivity)
+                    Hg1 He1 with "Hcert Hany Hrw Hro Hown"). }
+      iIntros (v) "(-> & Hpost)".
+      iDestruct "Hpost"
+        as (rs1 mm1) "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hown & Hany)".
+      assert (Hmm1 : mm1 = mm)
+        by exact (u_landing_map pt t t mm mm1 (u_state rsx mm) Hwf
+                    (u_mem_step_refl pt t mm Hwf) Hsub1 Hdom1).
+      subst mm1.
+      iApply run_exec_post_redirect.
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+      2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                    (execute other) (u_state rsx mm) s_x r rs1 mm
+                    u_disj Du_r_sub Du_w_sub Hag1 ltac:(reflexivity)
+                    Hg2 He2 with "Hcert Hany Hrw Hro Hown"). }
+      iIntros (v) "(-> & Hpost)".
+      iDestruct "Hpost"
+        as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+      assert (Hmm2 : mm2 = s_x.(mem))
+        by exact (u_landing_map pt t t' mm mm2 s_x Hwf Hstep Hsub Hdom).
+      subst mm2.
+      (* NO [run_exec_post_direct] here: [run_exec_post_redirect] already
+         stripped the wrapper, so the second execute's continuation is
+         [fun e' => Pe e' ib] and the goal IS [Pe r ib]. *)
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
   Qed.
 
 End UserActiveClass.
