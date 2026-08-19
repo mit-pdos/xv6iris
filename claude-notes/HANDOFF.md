@@ -1,4 +1,19 @@
-# SESSION HANDOFF — 2026-08-18 (branch `weak-memory`)
+# SESSION HANDOFF — 2026-08-19 (branch `weak-memory`)
+
+**LATEST (2026-08-19): DECISION — the sRVWMO declared-model plan is the
+plan of record: [`design/weak-memory-srvwmo.md`](design/weak-memory-srvwmo.md).
+Tier 1 = adequacy ∘ characterization (sRVWMO ≡ pf machine; T1
+realizability + T2 containment), NO side conditions of any kind about
+xv6 — the `main_premises`/`robust_main` tower is off the tier-1 path.
+Tier 2 (the RVWMO upgrade) = the certification route D8/E1/L2′ unchanged,
+with the user's criterion now binding: hypotheses are hardware assumptions
++ WP-derived exports (φ, lock-word protocol) ONLY; unverified kernel
+side conditions and ALL syntactic/binary-scan routes are REJECTED.  The
+A-bit assumption is absorbed into sRVWMO's rule 14 (implicit stores
+covered).  Gate before any D8 porting: the two-hart LB-shaped L2′ paper
+exercise (worklist S6).  Frozen/read-only sharing (struct file) recorded
+as fitting both tiers (§5 of the new doc).**
+
 
 **LATEST (2026-08-18, orchestrator session): THE WALKER DECISION IS TAKEN —
 the user chose "follow the Sail model: it does not issue speculative A-bit
