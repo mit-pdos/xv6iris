@@ -1956,3 +1956,585 @@ Section Pt2Window.
   Qed.
 
 End Pt2Window.
+
+(* ===================================================================== *)
+(* 5. THE TRAMPOLINE FETCH, ON THE SWITCH WINDOW.                         *)
+(*                                                                        *)
+(* [TrampStepPt.tramp_tr_obl] at [Res := pt2_res_kcur rc Sp] resp.         *)
+(* [pt2_res_kprev rc kroot Sc].  BESPOKE, exactly as the user table's      *)
+(* [UptWalkPt.utramp_tr_obl] is: the window is not an [SRegime.s_regime]   *)
+(* -- [sr_inv] is keyed on ONE table's claim, and the window's two are     *)
+(* asymmetric (one owned + abstract, one shared + snapshot).               *)
+(*                                                                        *)
+(* The claim side is the caller's own [kmap_at tramp_vpn tramp_ppn KP_rx]  *)
+(* -- the same resource [TransPt.pt2_tramp_fetch_habs_kcur] / [_kprev]     *)
+(* took, and their geometry premises carry over verbatim.  The class-KP_rx *)
+(* leaf [mk_pte tramp_ppn (kperm_flags KP_rx)] IS [pte_tramp] modulo A/D   *)
+(* ([KptTree.kperm_rx_tramp_variant]), which is what lets the OWNED side's *)
+(* [TransPt.pt2_tramp_spec] clauses discharge the walk's premises.         *)
+(* ===================================================================== *)
+
+Section Pt2Tramp.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Local Ltac tlbpeel :=
+    rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
+
+  (* the trampoline leaf's fetch check, in the class-keyed spelling the
+     window's walk takes *)
+  Local Lemma rx_chk (a d : mword 1) (mxr do_sum : bool) :
+    pte_check_ok (InstructionFetch tt) Supervisor mxr do_sum
+      (pte_set_ad (mk_pte tramp_ppn (kperm_flags KP_rx)) a d).
+  Proof. exact (kperm_variant_check_fetch tramp_ppn a d mxr do_sum). Qed.
+
+  Local Lemma rx_gchk (a d : mword 1) (mxr do_sum : bool)
+      (Db : register -> bool) (s0 : mstate) :
+    goodb Db (check_PTE_permission (InstructionFetch tt) Supervisor mxr do_sum
+                (Mk_PTE_Flags (subrange_vec_dec
+                   (pte_set_ad (mk_pte tramp_ppn (kperm_flags KP_rx)) a d) 7 0))
+                (ext_bits_of_PTE
+                   (pte_set_ad (mk_pte tramp_ppn (kperm_flags KP_rx)) a d)) tt)
+           s0 = true.
+  Proof.
+    exact (kperm_variant_goodb_check tramp_ppn KP_rx a d (InstructionFetch tt)
+             mxr do_sum Db s0
+             (s_acc_ssa_goodb (InstructionFetch tt) Db s0 (or_introl eq_refl))
+             Db s0).
+  Qed.
+
+  (* [TransPt.pt2_tramp_spec]'s two clauses, moved onto the class-keyed leaf
+     and onto the fetched va's own vpn *)
+  Local Lemma rx_sel (S : ptree -> Prop) (va : mword 64) :
+    svpn_of va = tramp_vpn -> pt2_tramp_spec S ->
+    forall t, S t -> exists p2 p1 (a d : mword 1),
+      ptree_maps t (svpn_of va) p2 p1
+        (pte_set_ad (mk_pte tramp_ppn (kperm_flags KP_rx)) a d).
+  Proof.
+    intros Hvpn (Hsel & _) t HS. rewrite Hvpn.
+    destruct (Hsel t HS) as (p2 & p1 & a & d & Hm).
+    exists p2, p1, a, d. rewrite kperm_rx_tramp_variant. exact Hm.
+  Qed.
+
+  Local Lemma rx_pres (S : ptree -> Prop) (va : mword 64) :
+    svpn_of va = tramp_vpn -> pt2_tramp_spec S ->
+    forall t (a1 d1 : mword 1), S t ->
+      S (ptree_set_leaf t (svpn_of va)
+           (pte_set_ad (mk_pte tramp_ppn (kperm_flags KP_rx)) a1 d1)).
+  Proof.
+    intros Hvpn (_ & Hpres) t a1 d1 HS.
+    rewrite Hvpn kperm_rx_tramp_variant. exact (Hpres t a1 d1 HS).
+  Qed.
+
+  (* ---- uservec's window ---------------------------------------------- *)
+
+  Lemma pt2_tramp_tr_obl_kcur (rc : mword 44) (Sp : ptree -> Prop)
+      (Df : register -> dfrac)
+      (pc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64) :
+    misa0 = MISA_C ->
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    upt_satp_ok_pt rc satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pma_allows_all pmar0 ->
+    pt2_tramp_spec Sp ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    gen_cert -∗
+    tramp_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0
+      (pt2_res_kcur rc Sp).
+  Proof.
+    intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma HSp.
+    iIntros "#Hat #Hcert". rewrite /tramp_tr_obl. iModIntro.
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hatva".
+    { rewrite Hvpn. iApply "Hat". }
+    iApply (swp_mono with "[] [-]").
+    2:{ iApply (swp_translate_pt2_kcur (InstructionFetch tt) s_Drw s_Dro Df
+                  (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                  rc Sp tramp_ppn KP_rx va pax satp0 mst0 tv pcfg paddr pmar0 rr
+                  s_disj upt_Dr_in_s upt_Dw_in_s (or_introl eq_refl)
+                  ltac:(rewrite s_rs_misa; exact Hmisa)
+                  ltac:(rewrite s_rs_menv; exact Hmenv)
+                  ltac:(apply s_rs_htif) ltac:(apply s_rs_priv)
+                  ltac:(apply s_rs_mst) HSXL HMPRV
+                  ltac:(apply s_rs_satp) ltac:(apply s_rs_tlb)
+                  ltac:(apply s_rs_pcfg) ltac:(apply s_rs_paddr)
+                  ltac:(apply s_rs_pma)
+                  Hsatpok Hpmpok Hpma
+                  (rx_sel Sp va Hvpn HSp) (rx_pres Sp va Hvpn HSp)
+                  rx_chk rx_gchk Hcanon Hident
+                  with "Hatva Hcert Hfrag HRes Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+    iSplitR; [done |].
+    destruct Hshape as [-> | (tvx & ->)].
+    - iExists tv. rewrite s_rs_tlb. iFrame "Hany Hrw Hro HRes".
+    - assert (Ltlbv : register_lookup tlb
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                = tvx)
+        by apply register_lookup_set.
+      assert (Hag : reg_agree_on (s_Drw ∪ s_Dro)
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tvx)).
+      { apply (s_rs_agree pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tvx);
+          [ tlbpeel; apply s_rs_PC
+          | tlbpeel; apply s_rs_nPC
+          | tlbpeel; apply s_rs_ms
+          | tlbpeel; apply s_rs_mi
+          | tlbpeel; apply s_rs_cy
+          | tlbpeel; apply s_rs_ti
+          | tlbpeel; apply s_rs_ip
+          | exact Ltlbv
+          | tlbpeel; apply s_rs_priv
+          | tlbpeel; apply s_rs_mst
+          | tlbpeel; apply s_rs_hart
+          | tlbpeel; apply s_rs_pcfg
+          | tlbpeel; apply s_rs_paddr
+          | tlbpeel; apply s_rs_mc
+          | tlbpeel; apply s_rs_micfg
+          | tlbpeel; apply s_rs_misa
+          | tlbpeel; apply s_rs_sec
+          | tlbpeel; apply s_rs_pma
+          | tlbpeel; apply s_rs_htif
+          | tlbpeel; apply s_rs_elp
+          | tlbpeel; apply s_rs_senv
+          | tlbpeel; apply s_rs_satp
+          | tlbpeel; apply s_rs_mie
+          | tlbpeel; apply s_rs_mdl
+          | tlbpeel; apply s_rs_menv ]. }
+      iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
+      iExists tvx. rewrite Ltlbv. iFrame "Hany Hrw Hro HRes".
+  Qed.
+
+  Lemma pt2_tramp_fetch_tr_kcur (rc : mword 44) (Sp : ptree -> Prop)
+      (dq : dfrac) (pc mst0 satp0 mie0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    upt_satp_ok_pt rc satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pt2_tramp_spec Sp ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    hw_config -∗
+    tramp_fetch_tr (s_Df_mix dq) (pt2_res_kcur rc Sp) pc mst0 satp0 mie0
+      mdv0 menv0 pcfg paddr.
+  Proof.
+    intros Hmenv HSXL HMPRV Hsatpok Hpmpok HSp.
+    iIntros "#Hat #Hhw".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    rewrite /tramp_fetch_tr.
+    iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
+    rewrite /tramp_tr_obl. iModIntro.
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
+    { iEval (rewrite s_ro_split_mix) in "Hro".
+      iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
+      rewrite s_rs_misa s_rs_pma.
+      iDestruct "Hhw" as (misaX secX pmaX elpX)
+        "(#HmisaW & _ & #HpmaW & _ & _ & _ & _ & _ & _ & _ & %HpmaV & _ & _ &
+          _ & _ & %HmisaV & _)".
+      iDestruct (reg_pointsto_agree with "Hmisac HmisaW") as %->.
+      iDestruct (reg_pointsto_agree with "Hpmac HpmaW") as %->.
+      iPureIntro. split; [exact HmisaV | exact HpmaV]. }
+    subst misa0.
+    iDestruct (pt2_tramp_tr_obl_kcur rc Sp (s_Df_mix dq) pc ms bmi cy ti ip mst0
+                 pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
+                 mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
+                 HSp with "Hat Hcert") as "#Hobl".
+    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag HRes Hrw Hro");
+      [ exact Hcanon | exact Hvpn | exact Hident ].
+  Qed.
+
+  (* ---- userret's window ---------------------------------------------- *)
+
+  Lemma pt2_tramp_tr_obl_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
+      (Df : register -> dfrac)
+      (pc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64) :
+    misa0 = MISA_C ->
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    upt_satp_ok_pt rc satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pma_allows_all pmar0 ->
+    pt2_tramp_spec Sc ->
+    (forall t, Sc t -> pt_base t = rc) ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    gen_cert -∗
+    tramp_tr_obl Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0
+      (pt2_res_kprev rc kroot Sc).
+  Proof.
+    intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma HSc Hbc.
+    iIntros "#Hat #Hcert". rewrite /tramp_tr_obl. iModIntro.
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hatva".
+    { rewrite Hvpn. iApply "Hat". }
+    iApply (swp_mono with "[] [-]").
+    2:{ iApply (swp_translate_pt2_kprev (InstructionFetch tt) s_Drw s_Dro Df
+                  (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv)
+                  rc kroot Sc tramp_ppn KP_rx va pax satp0 mst0 tv pcfg paddr
+                  pmar0 rr
+                  s_disj upt_Dr_in_s upt_Dw_in_s (or_introl eq_refl)
+                  ltac:(rewrite s_rs_misa; exact Hmisa)
+                  ltac:(rewrite s_rs_menv; exact Hmenv)
+                  ltac:(apply s_rs_htif) ltac:(apply s_rs_priv)
+                  ltac:(apply s_rs_mst) HSXL HMPRV
+                  ltac:(apply s_rs_satp) ltac:(apply s_rs_tlb)
+                  ltac:(apply s_rs_pcfg) ltac:(apply s_rs_paddr)
+                  ltac:(apply s_rs_pma)
+                  Hsatpok Hpmpok Hpma Hbc
+                  (rx_sel Sc va Hvpn HSc) (rx_pres Sc va Hvpn HSc)
+                  rx_chk rx_gchk Hcanon Hident
+                  with "Hatva Hcert Hfrag HRes Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+    iSplitR; [done |].
+    destruct Hshape as [-> | (tvx & ->)].
+    - iExists tv. rewrite s_rs_tlb. iFrame "Hany Hrw Hro HRes".
+    - assert (Ltlbv : register_lookup tlb
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                = tvx)
+        by apply register_lookup_set.
+      assert (Hag : reg_agree_on (s_Drw ∪ s_Dro)
+                (register_set tlb tvx
+                   (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv))
+                (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                   mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tvx)).
+      { apply (s_rs_agree pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tvx);
+          [ tlbpeel; apply s_rs_PC
+          | tlbpeel; apply s_rs_nPC
+          | tlbpeel; apply s_rs_ms
+          | tlbpeel; apply s_rs_mi
+          | tlbpeel; apply s_rs_cy
+          | tlbpeel; apply s_rs_ti
+          | tlbpeel; apply s_rs_ip
+          | exact Ltlbv
+          | tlbpeel; apply s_rs_priv
+          | tlbpeel; apply s_rs_mst
+          | tlbpeel; apply s_rs_hart
+          | tlbpeel; apply s_rs_pcfg
+          | tlbpeel; apply s_rs_paddr
+          | tlbpeel; apply s_rs_mc
+          | tlbpeel; apply s_rs_micfg
+          | tlbpeel; apply s_rs_misa
+          | tlbpeel; apply s_rs_sec
+          | tlbpeel; apply s_rs_pma
+          | tlbpeel; apply s_rs_htif
+          | tlbpeel; apply s_rs_elp
+          | tlbpeel; apply s_rs_senv
+          | tlbpeel; apply s_rs_satp
+          | tlbpeel; apply s_rs_mie
+          | tlbpeel; apply s_rs_mdl
+          | tlbpeel; apply s_rs_menv ]. }
+      iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
+      iExists tvx. rewrite Ltlbv. iFrame "Hany Hrw Hro HRes".
+  Qed.
+
+  Lemma pt2_tramp_fetch_tr_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
+      (dq : dfrac) (pc mst0 satp0 mie0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    upt_satp_ok_pt rc satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    pt2_tramp_spec Sc ->
+    (forall t, Sc t -> pt_base t = rc) ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    hw_config -∗
+    tramp_fetch_tr (s_Df_mix dq) (pt2_res_kprev rc kroot Sc) pc mst0 satp0 mie0
+      mdv0 menv0 pcfg paddr.
+  Proof.
+    intros Hmenv HSXL HMPRV Hsatpok Hpmpok HSc Hbc.
+    iIntros "#Hat #Hhw".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    rewrite /tramp_fetch_tr.
+    iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
+    rewrite /tramp_tr_obl. iModIntro.
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
+    { iEval (rewrite s_ro_split_mix) in "Hro".
+      iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
+      rewrite s_rs_misa s_rs_pma.
+      iDestruct "Hhw" as (misaX secX pmaX elpX)
+        "(#HmisaW & _ & #HpmaW & _ & _ & _ & _ & _ & _ & _ & %HpmaV & _ & _ &
+          _ & _ & %HmisaV & _)".
+      iDestruct (reg_pointsto_agree with "Hmisac HmisaW") as %->.
+      iDestruct (reg_pointsto_agree with "Hpmac HpmaW") as %->.
+      iPureIntro. split; [exact HmisaV | exact HpmaV]. }
+    subst misa0.
+    iDestruct (pt2_tramp_tr_obl_kprev rc kroot Sc (s_Df_mix dq) pc ms bmi cy ti ip
+                 mst0 pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
+                 mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
+                 HSc Hbc with "Hat Hcert") as "#Hobl".
+    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag HRes Hrw Hro");
+      [ exact Hcanon | exact Hvpn | exact Hident ].
+  Qed.
+
+End Pt2Tramp.
+
+(* ===================================================================== *)
+(* 6. THE SWITCH-WINDOW STEP ENGINES.                                     *)
+(*                                                                        *)
+(* [TrampStepPt.wp_instr_tramp_pt] at [Res :=] the window's residue, with  *)
+(* the window invariant opened on the way in and resealed on the way out   *)
+(* -- [SmodeCorePt.wp_instr_s_config_tlbinv_pt]'s shape for the shared     *)
+(* kernel table, over [pt2_kcur_swp_open] / [_close] instead.              *)
+(*                                                                        *)
+(* The instruction the two call sites step is the window's closing         *)
+(* [sfence.vma], which moves neither satp nor the PMP cells, so the        *)
+(* engine's landing values for those are the ones it went in with; the     *)
+(* execute phase is handed them as a [swp (execute i)] continuation, and   *)
+(* hands the tlb back at whatever value it left.                          *)
+(* ===================================================================== *)
+
+Section Pt2Engine.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma wp_instr_pt2_tramp_kcur (rc : mword 44) (Sp : ptree -> Prop)
+      (pc pa : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    pt2_tramp_spec Sp ->
+    neq_vec (bits_of_virtaddr (Virtaddr pc))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub 39 1) 0)) = false ->
+    svpn_of pc = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub 39 1) 0)) = false ->
+    svpn_of (add_vec_int pc 2) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv_pt2_kcur rc Sp -∗
+    pc_is pc -∗
+    instr pa is_rvc i -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       ⌜ upt_satp_ok_pt rc satp0 ⌝ -∗
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ pt2_res_kcur rc Sp tv' -∗
+       clock_res -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mie ↦ᵣ{ dq } mie_v ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg0 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ pt2_res_kcur rc Sp tv2) ∗
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   resv_any cpu_id)) -∗
+    ▷ (∀ npc ms1 mdv1 : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
+         mie ↦ᵣ{ dq } mie_v -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+         tlb_inv_pt2_kcur rc Sp -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HSp
+           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
+    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv
+             Hpc Hinstr Hex Hcont".
+    iDestruct (pt2_kcur_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
+      "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
+    iApply (wp_instr_tramp_pt (pt2_res_kcur rc Sp) pc pa is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mie_v menvcfg0 satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
+              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc Hres Hpc Hinstr [] [Hex] [Hcont]").
+    - iApply (pt2_tramp_fetch_tr_kcur rc Sp dq pc mstatus0 satp0 mie_v mdv0
+                menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok HSp
+                with "Hat Hhw").
+    - iIntros (tv') "%Hpmp2 Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg
+                     Hpaddr Htlbc HRes Hclk Hpcc Hnpcc Hany".
+      iApply ("Hex" $! satp0 pcfg paddr tv' with
+                "[%] [%] Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr
+                 Htlbc HRes Hclk Hpcc Hnpcc Hany");
+        [ exact Hpmp2 | exact Hsatpok ].
+    - iNext. iIntros (npc ms1 mdv1 tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc ms1 mdv1 with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+      iApply (pt2_kcur_swp_close rc Sp satp0 tv1 pcfg paddr Hsatpok Hpmpok
+                with "Hsatp Htlbc Hpcfg Hpaddr HRes").
+  Qed.
+
+  Lemma wp_instr_pt2_tramp_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
+      (pc pa : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    pt2_tramp_spec Sc ->
+    (forall t, Sc t -> pt_base t = rc) ->
+    neq_vec (bits_of_virtaddr (Virtaddr pc))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub 39 1) 0)) = false ->
+    svpn_of pc = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub 39 1) 0)) = false ->
+    svpn_of (add_vec_int pc 2) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv_pt2_kprev rc kroot Sc -∗
+    pc_is pc -∗
+    instr pa is_rvc i -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       ⌜ upt_satp_ok_pt rc satp0 ⌝ -∗
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ pt2_res_kprev rc kroot Sc tv' -∗
+       clock_res -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mie ↦ᵣ{ dq } mie_v ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg0 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ pt2_res_kprev rc kroot Sc tv2) ∗
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   resv_any cpu_id)) -∗
+    ▷ (∀ npc ms1 mdv1 : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
+         mie ↦ᵣ{ dq } mie_v -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+         tlb_inv_pt2_kprev rc kroot Sc -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HSc Hbc
+           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
+    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv
+             Hpc Hinstr Hex Hcont".
+    iDestruct (pt2_kprev_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
+      "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
+    iApply (wp_instr_tramp_pt (pt2_res_kprev rc kroot Sc) pc pa is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mie_v menvcfg0 satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
+              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc Hres Hpc Hinstr [] [Hex] [Hcont]").
+    - iApply (pt2_tramp_fetch_tr_kprev rc kroot Sc dq pc mstatus0 satp0 mie_v
+                mdv0 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
+                HSc Hbc with "Hat Hhw").
+    - iIntros (tv') "%Hpmp2 Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg
+                     Hpaddr Htlbc HRes Hclk Hpcc Hnpcc Hany".
+      iApply ("Hex" $! satp0 pcfg paddr tv' with
+                "[%] [%] Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr
+                 Htlbc HRes Hclk Hpcc Hnpcc Hany");
+        [ exact Hpmp2 | exact Hsatpok ].
+    - iNext. iIntros (npc ms1 mdv1 tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc ms1 mdv1 with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+      iApply (pt2_kprev_swp_close rc kroot Sc satp0 tv1 pcfg paddr
+                Hsatpok Hpmpok with "Hsatp Htlbc Hpcfg Hpaddr HRes").
+  Qed.
+
+End Pt2Engine.
