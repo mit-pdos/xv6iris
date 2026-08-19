@@ -20,7 +20,6 @@ Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode04.
-Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
@@ -43,6 +42,7 @@ Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode28.
+Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
@@ -199,9 +199,9 @@ Section CodeDirlink.
   Proof. mk_rvc (KernelSyms.dirlink + 0x56) (mword_of_int 0xa829 : mword 16)
     (mword_of_int (KernelSyms.dirlink + 0x56) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")), zreg)) kd_a829 exec_execute_C_J. Qed.
 
-  Lemma dki_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x58) : mword 64) false (JAL (mword_of_int 2095504 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.dirlink + 0x58) (mword_of_int 0x991ff0ef : mword 32)
-    (mword_of_int (KernelSyms.dirlink + 0x58) : mword 64) (JAL (mword_of_int 2095504 : mword 21, Regidx (mword_of_int 1))) kd_991ff0ef. Qed.
+  Lemma dki_58 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x58) : mword 64) false (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.dirlink + 0x58) (mword_of_int 0x949ff0ef : mword 32)
+    (mword_of_int (KernelSyms.dirlink + 0x58) : mword 64) (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1))) kd_949ff0ef. Qed.
 
   Lemma dki_5c : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x5c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.dirlink + 0x5c) (mword_of_int 0x557d : mword 16)
@@ -215,13 +215,13 @@ Section CodeDirlink.
   Proof. mk_base (KernelSyms.dirlink + 0x60) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.dirlink + 0x60) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma dki_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) false (ITYPE (mword_of_int 2808 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.dirlink + 0x64) (mword_of_int 0xaf850513 : mword 32)
-    (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) (ITYPE (mword_of_int 2808 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_af850513. Qed.
+  Lemma dki_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) false (ITYPE (mword_of_int 2736 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.dirlink + 0x64) (mword_of_int 0xab050513 : mword 32)
+    (mword_of_int (KernelSyms.dirlink + 0x64) : mword 64) (ITYPE (mword_of_int 2736 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ab050513. Qed.
 
-  Lemma dki_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) false (JAL (mword_of_int 2084380 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.dirlink + 0x68) (mword_of_int 0xe1dfc0ef : mword 32)
-    (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) (JAL (mword_of_int 2084380 : mword 21, Regidx (mword_of_int 1))) kd_e1dfc0ef. Qed.
+  Lemma dki_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) false (JAL (mword_of_int 2084308 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.dirlink + 0x68) (mword_of_int 0xdd5fc0ef : mword 32)
+    (mword_of_int (KernelSyms.dirlink + 0x68) : mword 64) (JAL (mword_of_int 2084308 : mword 21, Regidx (mword_of_int 1))) kd_dd5fc0ef. Qed.
 
   Lemma dki_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x6c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
   Proof. mk_rvc (KernelSyms.dirlink + 0x6c) (mword_of_int 0x79a2 : mword 16)
@@ -243,9 +243,9 @@ Section CodeDirlink.
   Proof. mk_base (KernelSyms.dirlink + 0x74) (mword_of_int 0xfb240513 : mword 32)
     (mword_of_int (KernelSyms.dirlink + 0x74) : mword 64) (ITYPE (mword_of_int 4018 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)) kd_fb240513. Qed.
 
-  Lemma dki_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x78) : mword 64) false (JAL (mword_of_int 2085760 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.dirlink + 0x78) (mword_of_int 0xb80fd0ef : mword 32)
-    (mword_of_int (KernelSyms.dirlink + 0x78) : mword 64) (JAL (mword_of_int 2085760 : mword 21, Regidx (mword_of_int 1))) kd_b80fd0ef. Qed.
+  Lemma dki_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x78) : mword 64) false (JAL (mword_of_int 2085688 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.dirlink + 0x78) (mword_of_int 0xb38fd0ef : mword 32)
+    (mword_of_int (KernelSyms.dirlink + 0x78) : mword 64) (JAL (mword_of_int 2085688 : mword 21, Regidx (mword_of_int 1))) kd_b38fd0ef. Qed.
 
   Lemma dki_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.dirlink + 0x7c) : mword 64) false (STORE (mword_of_int 4016 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 8), 2)).
   Proof. mk_base (KernelSyms.dirlink + 0x7c) (mword_of_int 0xfb641823 : mword 32)

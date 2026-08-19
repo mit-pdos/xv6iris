@@ -261,7 +261,7 @@ Definition wp_dirlookup_sconf_body
     (γfs : fs_names) (γi : gname)
     (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (dinum : mword 32)                (* the HOME's inum     *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode) (dr : dinode)                       (* in-core / REGION    *)
@@ -296,6 +296,39 @@ Definition wp_dirlookup_sconf_body
   dir_orphan_clean dn data ->
   (* (6) the borrowed region record is allocated -- all licence (c) needs *)
   bv_unsigned (di_type dr) <> 0 ->
+  (* (6') ...AND ITS LINK COUNT IS THE IN-CORE ONE -- iclaim-ledger.md §3.3
+     (RULING D), landed in its EQUATIONAL form; the deviation is recorded
+     below and it is a strict WEAKENING of the ruling's text, not of what
+     the proof needs.
+
+     WHY THE PROOF NEEDS SOMETHING: licence (c) was strengthened by §2.6
+     ([IgetLic.iname]'s [HeldL d] now carries [di_nlink d <> 0], because the
+     freeze pin's [di_nlink = 0] is what the row contradicts), so
+     [iname_held_intro] at the ["."] site (ProofDirlookup.v:2076) asks for
+     the borrowed REGION record's count as well as its type.
+
+     WHY NOT THE RULING'S [bv_unsigned (di_nlink dr) <> 0]: dirlookup has
+     FIVE callers, not the four §3.3 enumerates, and the fifth --
+     [FsLookup.wp_dirlookup_tree] -- provably cannot pay it.  FsLookup's own
+     header says so in as many words ("[node_rep] ... says NOTHING about
+     [di_nlink].  There is no tree-level fact that implies it"), which is
+     why ITS premise (4) is the §7.5.6 DISJUNCTION and nothing stronger.
+     Under the ruling's shape the tree layer would go red with no discharge
+     in sight -- §3.3's TRIPWIRE t3b territory.
+
+     WHY THE EQUATION COSTS NOTHING INSTEAD: the proof site already holds
+     [Hnl0 : bv_unsigned (di_nlink dn) <> 0] about the IN-CORE record -- it
+     is [dl_lic_live]'s output, derived on the hit arm from premises (4) and
+     (5) before the self/non-self split -- so the count it is missing is
+     only the region record's, and this equation transports the one it has.
+     FOUR of the five callers hand the SAME record in twice ([dn dn]:
+     FsLookup, ProofCreate, ProofNamex, ProofSysUnlink) and pay [eq_refl];
+     the fifth (ProofDirlink, the one caller with a genuinely stale region
+     index) pays it out of [di_nlink_stable]'s first conjunct, which its
+     contract already carries for [SpecIupdate]'s sake.  It is the same
+     "parked-means-flushed" fact [ic_loaded] states resource-side, at one
+     field. *)
+  di_nlink dr = di_nlink dn ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dp *)
@@ -338,6 +371,13 @@ Definition wp_dirlookup_sconf_body
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
+  (* ---- THE INODE REGION, and it is iget's premise, not dirlookup's own
+     (iclaim-ledger.md §3.3's contract-set widening, increment IIIe).  The
+     hit arm's [iget] opens it GHOST-ONLY, on the ledger's [icnt] and freeze
+     columns; dirlookup itself still reads dinodes only through [readi] and
+     the borrowed [dinode_at] below.  Persistent, so it is a frame at every
+     one of the five call sites. ---- *)
+  ireg_inv γi γfs inodestart nib -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
   (* ---- THE BORROWED TICKET LIST AND THE HOME'S OWN RECORD ---- *)
@@ -372,6 +412,15 @@ Definition wp_dirlookup_sconf_body
              /\ mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot⌝ ∗
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
+            (* THE MINTED PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
+               §5''.3): dirlookup's iget mints one, flavoured by the licence
+               it presented -- which is [HeldL] on the self record and
+               [LinkedL] on every other, so never the claim flavour.  The
+               flavour is EXISTENTIAL here because the licence is chosen
+               inside the proof; a consumer only ever needs A unit. *)
+            runit_any
+              (bv_unsigned
+                 (zero_extend' 32 (dir_inum data k : mword 16) : mword 32)) ∗
             (if hasp
              then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * k)) : mword 32)
              else emp)
@@ -396,7 +445,7 @@ Module Type DIRLOOKUP.
       (γfs : fs_names) (γi : gname)
       (cn : ic_names) (gtl : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -406,6 +455,6 @@ Module Type DIRLOOKUP.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
-                              γa γf cov logstart nib dev ip dinum bm data dn dr
+                              γa γf cov logstart inodestart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks.
 End DIRLOOKUP.

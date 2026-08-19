@@ -379,6 +379,7 @@ WpLock.v
 ArrCursor.v
 FdSlots.v
 IcacheRef.v
+EscrowDefs.v
 FileInvDefs.v
 FileInv.v
 FileOff.v
@@ -959,11 +960,14 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 InodeRegion.v
+EscrowInode.v
+EscrowDeposit.v
 FsRep.v
 IregLinkNz.v
 IgetLic.v
 IregDirBit.v
 IcacheEscrow.v
+EscrowRegionA.v
 IregBox.v
 IcacheBoot.v
 CodeIget.v
@@ -1145,7 +1149,6 @@ SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
 SpecCreate.v
-SpecCreateFreshTy.v
 CreateBudget.v
 ProofCreateParts.v
 ProofCreate.v

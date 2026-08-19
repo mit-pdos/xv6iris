@@ -51,6 +51,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSysFork.
 Require Import ProcAvail.
+Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -79,7 +80,7 @@ Module SysForkProof (Kfork : KFORK) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-            !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
@@ -87,11 +88,12 @@ Section ProofSysFork.
   (* =================================================================== *)
   Lemma wp_sys_fork_sconf
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string)
-    : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-                             m lvl av eb p b pid V lks.
+    : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart
+                             inodestart nib m lvl av eb p b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
@@ -106,7 +108,7 @@ Section ProofSysFork.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv Henv #Hpav Hpriv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav Hpriv Hcont".
     iPoseProof (sf_00 with "Htext") as "Hi00".
     iPoseProof (sf_02 with "Htext") as "Hi02".
     iPoseProof (sf_04 with "Htext") as "Hi04".
@@ -176,11 +178,12 @@ Section ProofSysFork.
        anchored at the ENTRY hart -- re-anchor it before crossing. *)
     iDestruct (cpu_own_transport CID CID5 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- kfork(): a0 = -1 or the child's pid; the parent's block back ---- *)
-    iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+    iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart
+              inodestart nib
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Henv Hpav Hpriv").
+                    Hitbl Hitinv Hireg Henv Hpav Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henv & %Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))

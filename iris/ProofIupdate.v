@@ -174,10 +174,17 @@ Section IupdateDefs.
     rewrite /dinode_wf Hda /bm_cells length_app Hdirlen. reflexivity.
   Qed.
 
-  (* THE ORDINARY STEP, verbatim what the four landed contracts always did:
-     a type-0 flush is iput's free path and ABSORBS the fragment, paying out
-     the marker; every other flush keeps the fragment out and the marker in.
-     [InodeRegion.ireg_out] is exactly that two-case payout (§16.4). *)
+  (* THE ORDINARY STEP.  It used to be TWO-ARMED -- a type-0 flush was
+     iput's free path, ABSORBING the fragment and paying out the marker --
+     and the payout [InodeRegion.ireg_out] is still written that way (§16.4)
+     so that no landed caller's continuation moves a character.  But the
+     free arm is now DEAD here (iclaim-ledger.md §3.1, RULING A): since
+     [InodeRegion.ireg_free_au] retires the freeze in the same step it takes
+     an [ifreeze_post] token, which no generic caller of iupdate holds, and
+     the only type-0 write left in the reordered kernel goes through the
+     off-lock DEPOSIT.  So the contract narrows to [di_type dn <> 0], the
+     [case_decide]'s zero arm is refuted by that premise, and what is left
+     is the single [ireg_write_au] this step always really was. *)
   Lemma iu_step_out (γ : log_names) (γfs : fs_names) (γi : gname)
       (inodestart : Z) (nib : nat)
       (inum : mword 32) (dn dn0 : dinode) (e0 : nat) :
@@ -185,18 +192,17 @@ Section IupdateDefs.
     dinode_wf dn ->
     di_type_stable dn dn0 ->
     di_nlink_stable dn dn0 ->
+    bv_unsigned (di_type dn) <> 0 ->
     ireg_inv γi γfs inodestart nib -∗
     iu_region_step γ γfs γi inodestart inum dn dn0 e0 (ireg_out γi inum dn).
   Proof.
-    intros Hnib Hdnwf Hstab Hnlk. iIntros "#Hireg" (ds) "%Hdswf Hdn".
+    intros Hnib Hdnwf Hstab Hnlk Hnzty. iIntros "#Hireg" (ds) "%Hdswf Hdn".
     (* the ordinary flush owes no receipt ([InodeRegion.ireg_ep_mono]
        carries it for free), so its anchor is the unit: one adapter line
        and both region lemmas below are unchanged. *)
     rewrite /iu_region_au. iApply lw_au_lb0.
     rewrite /ireg_out. case_decide as Hty.
-    - iApply (ireg_free_au ⊤ γi γfs inodestart nib inum dn0 dn ds
-                ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty Hnlk
-                with "Hireg Hdn").
+    - exfalso. exact (Hnzty Hty).
     - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
                 ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty Hstab Hnlk
                 with "Hireg Hdn").
@@ -212,7 +218,7 @@ Section IupdateDefs.
   Lemma iu_step_link (γ : log_names) (γfs : fs_names) (γi : gname)
       (inodestart : Z) (nib : nat)
       (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
-      (fl : option (option Z)) :
+      (fl : option (option Z)) (pin : bool) :
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     bv_unsigned (di_type dn) <> 0 ->
@@ -231,19 +237,26 @@ Section IupdateDefs.
     (fl = None -> bv_unsigned (di_type dn) <> ireg_dir_ty) ->
     (forall pv : Z, fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
     ireg_inv γi γfs inodestart nib -∗
+    (* THE FREEZE-PIN PREMISE, RULING A-prime's two-armed form
+       (iclaim-ledger.md §3.9), relayed straight to the mover: either the
+       raised record is ALREADY named, or the caller presents the inum's
+       freeze token.  Borrowed and returned -- it comes back inside the
+       anchor below, which is why the anchor grew a third conjunct. *)
+    ireg_link_pin pin (bv_unsigned inum) dn0 -∗
     iu_region_step γ γfs γi inodestart inum dn dn0 e0
-      (dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum)).
+      (dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum) ∗
+       ireg_link_pin pin (bv_unsigned inum) dn0).
   Proof.
     intros Hnib Hdnwf Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp.
-    iIntros "#Hireg" (ds) "%Hdswf Hdn".
+    iIntros "#Hireg Hpin" (ds) "%Hdswf Hdn".
     (* nlink RISES here, so the receipt is vacuous at the written record
        and the anchor is the unit -- the same one adapter line the ordinary
        step takes. *)
     rewrite /iu_region_au. iApply lw_au_lb0.
-    iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn ds fl
+    iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn ds fl pin
               ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hbump Hgrd
               Hfl Hnfl Hflp
-              with "Hireg Hdn").
+              with "Hireg Hdn Hpin").
   Qed.
 
   (* THE UNLINK STEP (design fs-icache.md §20.18, stage C4; fs-log.md
@@ -501,14 +514,14 @@ Section IupdateTail.
     iEval (rewrite Hpp68) in "Hpc".
     (* ===== +0x68 jal ra,log_write ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iupdate + 0x68)) Rra
-              (mword_of_int 3100 : mword 21) T0 (K - 4)%nat b
+              (mword_of_int 3172 : mword 21) T0 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi68").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (T1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) 4)]> T0).
     assert (Htgtlw : add_vec (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64)
-                       (sign_extend' 64 (mword_of_int 3100 : mword 21))
+                       (sign_extend' 64 (mword_of_int 3172 : mword 21))
                      = mword_of_int KernelSyms.log_write) by pcw.
     iEval (rewrite Htgtlw) in "Hpc".
     assert (HT1a0 : T1 !!! Regidx Ra0 = bnode kk)
@@ -1214,12 +1227,12 @@ Section ProofIupdateMain.
     iEval (rewrite Hpp18) in "Hpc".
     (* ===== +0x18 lw a1,1850(a1) : a1 := sb.inodestart ===== *)
     assert (Hsbadr : add_vec (rget R6 Ra1)
-                       (sign_extend' 64 (mword_of_int 1922 : mword 12))
+                       (sign_extend' 64 (mword_of_int 1938 : mword 12))
                      = sb_inodestart).
     { rgne. rewrite HR6a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x18)) Ra1 Ra1
-              (mword_of_int 1922 : mword 12) R6 (K - 4)%nat
+              (mword_of_int 1938 : mword 12) R6 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18 Hsb").
     iIntros (CID11 Hq11) "Hcg Hpc Hsb".
@@ -1964,7 +1977,7 @@ Qed.
                           pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_gen_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hnzty Hda Hdirlen Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
@@ -1985,7 +1998,7 @@ Qed.
        contract always made, now supplied to the core rather than wired
        into it. *)
     iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
@@ -2029,12 +2042,12 @@ Qed.
                               pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hnzty Hda Hdirlen Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd Hop Hcont".
     iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
@@ -2077,7 +2090,7 @@ Qed.
                            pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_cred_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hnzty Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
@@ -2090,7 +2103,7 @@ Qed.
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
     iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
@@ -2139,7 +2152,7 @@ Qed.
                             pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hnzty Hda Hdirlen Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
@@ -2149,7 +2162,7 @@ Qed.
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcrd".
     iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
@@ -2188,12 +2201,13 @@ Qed.
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
+      (pin : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                           pidv dq dqd dqn dqs m K eb b lks.
+                           pin pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hfl Hnfl
@@ -2201,7 +2215,7 @@ Qed.
            Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
-              Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
+              Hsb #Hireg Hdn Hpin Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     (* the trivial anchor and the own-set credit, exactly as the credited
        seal builds them *)
@@ -2210,13 +2224,14 @@ Qed.
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
     (* THE ONE SUBSTITUTION *)
-    iPoseProof (iu_step_link γ γfs γi inodestart nib inum dn dn0 e0 fl Hnib
-                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd Hfl
-                  Hnfl Hflp
-                  with "Hireg") as "Hstep".
+    iPoseProof (iu_step_link γ γfs γi inodestart nib inum dn dn0 e0 fl pin Hnib
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd
+                  Hfl Hnfl Hflp
+                  with "Hireg Hpin") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
-              (dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum))%I
+              (dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum) ∗
+               ireg_link_pin pin (bv_unsigned inum) dn0)%I
               pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
@@ -2230,10 +2245,10 @@ Qed.
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
     (* the payout, taken apart into the contract's two wands *)
-    iDestruct "Hiout" as "[Hdnout Hlink]".
+    iDestruct "Hiout" as "(Hdnout & Hlink & Hpin)".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
-                     Hsb Hdnout Hlink Hsl Hop").
+                     Hsb Hdnout Hlink Hpin Hsl Hop").
     exact Hcs.
   Qed.
 

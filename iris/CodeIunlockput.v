@@ -17,15 +17,16 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode04.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode19.
+Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode29.
-Require Import KernelDecode30.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -60,17 +61,17 @@ Section CodeIunlockput.
   Proof. mk_rvc (KernelSyms.iunlockput + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.iunlockput + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma iulpi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlockput + 0xc) : mword 64) false (JAL (mword_of_int 2096790 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.iunlockput + 0xc) (mword_of_int 0xe97ff0ef : mword 32)
-    (mword_of_int (KernelSyms.iunlockput + 0xc) : mword 64) (JAL (mword_of_int 2096790 : mword 21, Regidx (mword_of_int 1))) kd_e97ff0ef. Qed.
+  Lemma iulpi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlockput + 0xc) : mword 64) false (JAL (mword_of_int 2096718 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.iunlockput + 0xc) (mword_of_int 0xe4fff0ef : mword 32)
+    (mword_of_int (KernelSyms.iunlockput + 0xc) : mword 64) (JAL (mword_of_int 2096718 : mword 21, Regidx (mword_of_int 1))) kd_e4fff0ef. Qed.
 
   Lemma iulpi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlockput + 0x10) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.iunlockput + 0x10) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.iunlockput + 0x10) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma iulpi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) false (JAL (mword_of_int 2096996 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.iunlockput + 0x12) (mword_of_int 0xf65ff0ef : mword 32)
-    (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) (JAL (mword_of_int 2096996 : mword 21, Regidx (mword_of_int 1))) kd_f65ff0ef. Qed.
+  Lemma iulpi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) false (JAL (mword_of_int 2096924 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.iunlockput + 0x12) (mword_of_int 0xf1dff0ef : mword 32)
+    (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) (JAL (mword_of_int 2096924 : mword 21, Regidx (mword_of_int 1))) kd_f1dff0ef. Qed.
 
   Lemma iulpi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.iunlockput + 0x16) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.iunlockput + 0x16) (mword_of_int 0x60e2 : mword 16)

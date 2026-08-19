@@ -21,7 +21,6 @@ Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
-Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
@@ -137,17 +136,17 @@ Section CodeNamex.
   Proof. mk_base (KernelSyms.namex + 0x2a) (mword_of_int 0x00f70f63 : mword 32)
     (mword_of_int (KernelSyms.namex + 0x2a) : mword 64) (BTYPE (mword_of_int 30 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)) kd_00f70f63. Qed.
 
-  Lemma nxi_02e : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x2e) : mword 64) false (JAL (mword_of_int 2089066 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0x2e) (mword_of_int 0x86afe0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0x2e) : mword 64) (JAL (mword_of_int 2089066 : mword 21, Regidx (mword_of_int 1))) kd_86afe0ef. Qed.
+  Lemma nxi_02e : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x2e) : mword 64) false (JAL (mword_of_int 2088994 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0x2e) (mword_of_int 0x822fe0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0x2e) : mword 64) (JAL (mword_of_int 2088994 : mword 21, Regidx (mword_of_int 1))) kd_822fe0ef. Qed.
 
   Lemma nxi_032 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x32) : mword 64) false (LOAD (mword_of_int 336 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)).
   Proof. mk_base (KernelSyms.namex + 0x32) (mword_of_int 0x15053503 : mword 32)
     (mword_of_int (KernelSyms.namex + 0x32) : mword 64) (LOAD (mword_of_int 336 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)) kd_15053503. Qed.
 
-  Lemma nxi_036 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x36) : mword 64) false (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0x36) (mword_of_int 0x949ff0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0x36) : mword 64) (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1))) kd_949ff0ef. Qed.
+  Lemma nxi_036 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x36) : mword 64) false (JAL (mword_of_int 2095360 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0x36) (mword_of_int 0x901ff0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0x36) : mword 64) (JAL (mword_of_int 2095360 : mword 21, Regidx (mword_of_int 1))) kd_901ff0ef. Qed.
 
   Lemma nxi_03a : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x3a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).
   Proof. mk_rvc (KernelSyms.namex + 0x3a) (mword_of_int 0x8a2a : mword 16)
@@ -181,9 +180,9 @@ Section CodeNamex.
   Proof. mk_rvc (KernelSyms.namex + 0x4a) (mword_of_int 0x852e : mword 16)
     (mword_of_int (KernelSyms.namex + 0x4a) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 10), ADD)) kd_852e exec_execute_C_MV. Qed.
 
-  Lemma nxi_04c : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x4c) : mword 64) false (JAL (mword_of_int 2094538 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0x4c) (mword_of_int 0xdcaff0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0x4c) : mword 64) (JAL (mword_of_int 2094538 : mword 21, Regidx (mword_of_int 1))) kd_dcaff0ef. Qed.
+  Lemma nxi_04c : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x4c) : mword 64) false (JAL (mword_of_int 2094466 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0x4c) (mword_of_int 0xd82ff0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0x4c) : mword 64) (JAL (mword_of_int 2094466 : mword 21, Regidx (mword_of_int 1))) kd_d82ff0ef. Qed.
 
   Lemma nxi_050 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x50) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).
   Proof. mk_rvc (KernelSyms.namex + 0x50) (mword_of_int 0x8a2a : mword 16)
@@ -285,9 +284,9 @@ Section CodeNamex.
   Proof. mk_rvc (KernelSyms.namex + 0x84) (mword_of_int 0x8552 : mword 16)
     (mword_of_int (KernelSyms.namex + 0x84) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma nxi_086 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x86) : mword 64) false (JAL (mword_of_int 2095580 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0x86) (mword_of_int 0x9ddff0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0x86) : mword 64) (JAL (mword_of_int 2095580 : mword 21, Regidx (mword_of_int 1))) kd_9ddff0ef. Qed.
+  Lemma nxi_086 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x86) : mword 64) false (JAL (mword_of_int 2095508 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0x86) (mword_of_int 0x995ff0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0x86) : mword 64) (JAL (mword_of_int 2095508 : mword 21, Regidx (mword_of_int 1))) kd_995ff0ef. Qed.
 
   Lemma nxi_08a : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x8a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.namex + 0x8a) (mword_of_int 0xbfc9 : mword 16)
@@ -333,9 +332,9 @@ Section CodeNamex.
   Proof. mk_rvc (KernelSyms.namex + 0xa6) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.namex + 0xa6) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma nxi_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0xa8) : mword 64) false (JAL (mword_of_int 2085872 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0xa8) (mword_of_int 0xbf0fd0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0xa8) : mword 64) (JAL (mword_of_int 2085872 : mword 21, Regidx (mword_of_int 1))) kd_bf0fd0ef. Qed.
+  Lemma nxi_0a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0xa8) : mword 64) false (JAL (mword_of_int 2085800 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0xa8) (mword_of_int 0xba8fd0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0xa8) : mword 64) (JAL (mword_of_int 2085800 : mword 21, Regidx (mword_of_int 1))) kd_ba8fd0ef. Qed.
 
   Lemma nxi_0ac : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0xac) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.namex + 0xac) (mword_of_int 0x84ca : mword 16)
@@ -365,9 +364,9 @@ Section CodeNamex.
   Proof. mk_rvc (KernelSyms.namex + 0xc0) (mword_of_int 0x8552 : mword 16)
     (mword_of_int (KernelSyms.namex + 0xc0) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma nxi_0c2 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0xc2) : mword 64) false (JAL (mword_of_int 2095346 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0xc2) (mword_of_int 0x8f3ff0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0xc2) : mword 64) (JAL (mword_of_int 2095346 : mword 21, Regidx (mword_of_int 1))) kd_8f3ff0ef. Qed.
+  Lemma nxi_0c2 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0xc2) : mword 64) false (JAL (mword_of_int 2095274 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0xc2) (mword_of_int 0x8abff0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0xc2) : mword 64) (JAL (mword_of_int 2095274 : mword 21, Regidx (mword_of_int 1))) kd_8abff0ef. Qed.
 
   Lemma nxi_0c6 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0xc6) : mword 64) false (LOAD (mword_of_int 68 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), false, 2)).
   Proof. mk_base (KernelSyms.namex + 0xc6) (mword_of_int 0x044a1783 : mword 32)
@@ -525,9 +524,9 @@ Section CodeNamex.
   Proof. mk_rvc (KernelSyms.namex + 0x130) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.namex + 0x130) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma nxi_132 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x132) : mword 64) false (JAL (mword_of_int 2085734 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0x132) (mword_of_int 0xb66fd0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0x132) : mword 64) (JAL (mword_of_int 2085734 : mword 21, Regidx (mword_of_int 1))) kd_b66fd0ef. Qed.
+  Lemma nxi_132 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x132) : mword 64) false (JAL (mword_of_int 2085662 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0x132) (mword_of_int 0xb1efd0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0x132) : mword 64) (JAL (mword_of_int 2085662 : mword 21, Regidx (mword_of_int 1))) kd_b1efd0ef. Qed.
 
   Lemma nxi_136 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x136) : mword 64) true (RTYPE (Regidx (mword_of_int 21), Regidx (mword_of_int 26), Regidx (mword_of_int 26), ADD)).
   Proof. mk_rvc (KernelSyms.namex + 0x136) (mword_of_int 0x9d56 : mword 16)
@@ -553,9 +552,9 @@ Section CodeNamex.
   Proof. mk_rvc (KernelSyms.namex + 0x144) (mword_of_int 0x8552 : mword 16)
     (mword_of_int (KernelSyms.namex + 0x144) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma nxi_146 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x146) : mword 64) false (JAL (mword_of_int 2095600 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.namex + 0x146) (mword_of_int 0x9f1ff0ef : mword 32)
-    (mword_of_int (KernelSyms.namex + 0x146) : mword 64) (JAL (mword_of_int 2095600 : mword 21, Regidx (mword_of_int 1))) kd_9f1ff0ef. Qed.
+  Lemma nxi_146 : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x146) : mword 64) false (JAL (mword_of_int 2095528 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.namex + 0x146) (mword_of_int 0x9a9ff0ef : mword 32)
+    (mword_of_int (KernelSyms.namex + 0x146) : mword 64) (JAL (mword_of_int 2095528 : mword 21, Regidx (mword_of_int 1))) kd_9a9ff0ef. Qed.
 
   Lemma nxi_14a : kernel_text -∗ instr (mword_of_int (KernelSyms.namex + 0x14a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).
   Proof. mk_rvc (KernelSyms.namex + 0x14a) (mword_of_int 0x4a01 : mword 16)

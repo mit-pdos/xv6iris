@@ -398,12 +398,24 @@ Section SpecFilestat.
      reference already holds everything the old, content-indexed environment
      asked its caller for: the slot, the device, the inum, the region bound
      and the share.  This hands them out and takes the share back. *)
+  (* WIDENED BY RULING C' (iclaim-ledger.md §5''''', the 16-site table): it
+     now RE-EXPORTS the generation's one-shot, which [FileInvDefs.inode_pay]
+     already holds and this carve used to put straight back untouched.  That
+     is the whole of filestat's share of item 7b'': [wp_ilock_sconf]'s
+     [ShotK] index takes the one-shot in place of a provenance unit, and the
+     fd layer cannot produce a unit (its payload lives behind a cancellable
+     invariant no syscall may hold open across the call).  Persistent, so
+     re-exporting it costs the payback wand nothing -- the wand's argument
+     list is UNCHANGED, which is why [ProofFilestat]'s two other uses of it
+     do not move.  This is [SpecFileread.fileread_pay_carve]'s fifth output,
+     restated at the smaller carve. *)
   Lemma filestat_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent) :
     fstat_has_inode Cf ->
     file_pay γf k q Cf -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+      IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
       (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay γf k q Cf).
   Proof.
@@ -423,8 +435,10 @@ Section SpecFilestat.
        back -- one slot in the pattern and one [iExact]. *)
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
-    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn).
+    iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
+    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
        instance search does not see through the definition. *)
@@ -434,7 +448,7 @@ Section SpecFilestat.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
-    iExact "Hwt".
+    iExists ty. iSplitR; [iExact "Hshot"|]. done.
   Qed.
 
   (* A file that carries no inode costs its stat-er nothing. *)

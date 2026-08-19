@@ -17,10 +17,10 @@
    - dirlink arrives through LinkDirlink.v, whose writei CAN allocate --
      balloc is itself proven (LinkBalloc.v), so nothing new is assumed.
 
-   The eighth is [CreateFreshTy], and it is the one ASSUMPTION in this
-   cone: [LinkCreateFreshTy.v]'s [Axiom create_fresh_ty], the four-instruction
+   The eighth is [CreateFreshTy], and since item 7 it is PROVEN like the
+   other seven: [LinkCreateFreshTy.v]'s [Lemma create_fresh_ty], the four-instruction
    span across create's own [jal ialloc] / [ilock].  Read that file's header
-   and [SpecCreateFreshTy.v]'s before this one.
+   and [SpecCreateFreshTy.v]'s before this one -- both retired at item 7.
 
    panic is NOT a module here.  create's own panics are all inside callees
    (ialloc's no-inodes arm printks rather than panics, which is why the
@@ -29,8 +29,9 @@
    callees, whose own panic arms are discharged against [Panic].
 
    So this cone's assumption count is the five platform axioms plus funext,
-   plus [create_fresh_ty], plus the TRANSIENT [iput_acquiresleep_order_
-   ADMITTED] that iput carries in from upstream. *)
+   plus the TRANSIENT [iput_acquiresleep_order_ADMITTED] that iput carries
+   in from upstream.  ([create_fresh_ty] was a member until item 7 proved
+   the span -- LinkCreateFreshTy.v.) *)
 Require Import LinkNameiparent LinkIlock LinkIunlockput LinkDirlookup
         LinkIalloc LinkIupdate LinkDirlink LinkCreateFreshTy
         ProofCreate.

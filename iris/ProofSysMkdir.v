@@ -780,7 +780,8 @@ Section ProofSysMkdirBody.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpre #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+             #Hireg #Hiopen Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hir
+             Hpriv Hcont".
     iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -991,14 +992,14 @@ Section ProofSysMkdirBody.
     iEval (rewrite Hpp16) in "Hpc".
     (* ================= +0x16 jal ra,argstr ================= *)
     iApply (wp_jal_s_sconf (CID := CID9) (mword_of_int (MD + 0x16)) Rra
-              (mword_of_int 2086452 : mword 21) M6 (K - 18)%nat b
+              (mword_of_int 2086380 : mword 21) M6 (K - 18)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16").
     iIntros (CID10 Hq10) "Hcg Hpc".
     set (M7 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (MD + 0x16) : mword 64) 4)]> M6).
     assert (Hjas : add_vec (mword_of_int (MD + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2086452 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2086380 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM7ra : (M7 !!! Regidx Rra : mword 64)
@@ -1207,7 +1208,8 @@ Section ProofSysMkdirBody.
                 ltac:(unfold create_units; lia) Hnsb Hj Hgl
                 HN4a1 HN4a2 HN4a3 Heb
                 with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv
-                      Hitab Hitinv Hescrows Hslks Hireg Hsbn Hsbi Hsbs Hsbb
+                      Hitab Hitinv Hescrows Hslks Hireg Hiopen Hsbn Hsbi Hsbs
+                      Hsbb
                       Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
       iIntros (CID18 Hq18 mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1 used1)
@@ -1266,7 +1268,7 @@ Section ProofSysMkdirBody.
         (* the ten conjuncts create hands back ARE iunlockput's precondition *)
         iDestruct "Hlocked" as (gil gisl)
           "(Hslk & Hslkd & Hslpid & Hdep & Hidev & Hiinum & Hivalid & Hload &
-            Hshot & Href)".
+            Hshot & Hfrz & Href & Hru)".
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
@@ -1281,21 +1283,25 @@ Section ProofSysMkdirBody.
         iApply (Iunlockput.wp_iunlockput_sconf (CID := CID20) gs j gl gu gd gk
                   pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                   inodestart nib size dev used1 kk qi ss gy inum dn bm un1
-                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
+                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks true
                   ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                        Hload Hshot Href Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                        Hesc Hireg [] Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                        Hload Hshot Hfrz Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
+        (* RULING G: a runtime caller lends iunlockput the SEALED arm of the
+           borrowed regime and discards what comes back -- its own copy is
+           persistent. *)
+        { iExact "Hiopen". }
         { iApply (log_opS_op with "HopS"). }
         iIntros (CID21 Hq21 miu n2 used2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-           Hop Hislot".
+           Hop Hislot _".
         assert (Hpc32 : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (MD + 0x32)) by (rewrite HP0ra; pcw).
         iEval (rewrite Hpc32) in "Hpc".

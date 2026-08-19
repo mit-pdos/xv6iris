@@ -126,17 +126,17 @@ Section ProofNamexRoot.
 
   Lemma wp_namex_root
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
-    : wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
+    : wp_namex_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
                          m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namex_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.
     destruct (nxr_kb K HK) as (Kig & K12 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg #Hropen Hisl Hp0 Hp1 Hcont".
     iPoseProof (nxi_000 with "Htext") as "Hi000".
     iPoseProof (nxi_002 with "Htext") as "Hi002".
     iPoseProof (nxi_004 with "Htext") as "Hi004".
@@ -512,10 +512,10 @@ Section ProofNamexRoot.
     iEval (rewrite Hpp04c) in "Hpc".
     (* ===== +0x04c jal ra,iget ===== *)
     assert (Htgtig : add_vec (mword_of_int (NX + 0x4c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094538 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094466 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (NX + 0x4c)) Rra
-              (mword_of_int 2094538 : mword 21) A2 (K - 12)%nat b
+              (mword_of_int 2094466 : mword 21) A2 (K - 12)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi04c").
     iIntros (CID23 Hq23) "Hcg Hpc".
@@ -551,22 +551,22 @@ Section ProofNamexRoot.
        this walk nothing.  This is the root clause's first consumer. *)
     iAssert (iname gi gfs ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
-              Kig Hn Hrino HA3a0 HA3a1 Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hisl Hlic").
-    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
+              Kig Hn Hrino ltac:(discriminate) HA3a0 HA3a1 Hbelow
+              with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl Hlic").
+    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href Hru _".
     destruct Higp as (Hcsig & Hkig & Higa0).
     assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
     { rewrite HA3ra. pcw. }
     iEval (rewrite Hpc050) in "Hpc".
     (* the answer, in the currency the contract speaks *)
-    iAssert (inode_held (ientry kig)) with "[Href]" as "Hip".
+    iAssert (inode_held (ientry kig)) with "[Href Hru]" as "Hip".
     { rewrite /inode_held. iExists kig, qig, ROOTINO.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
       iSplitR; [iPureIntro; rewrite -Hnib; exact Hrino |].
-      rewrite -Hdev. iExact "Href". }
+      iFrame "Hru". rewrite -Hdev. iExact "Href". }
     (* ===== +0x050 c.mv s4,a0 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x50)) Rs4 Ra0 mig (K - 12)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi050").

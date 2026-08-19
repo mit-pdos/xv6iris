@@ -81,6 +81,7 @@ Require Import SpecKfork.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -88,10 +89,11 @@ Local Open Scope Z_scope.
 Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
-    (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+    (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+    (inodestart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fork in
@@ -110,6 +112,13 @@ Definition wp_sys_fork_sconf_body
   is_ftable γl γf -∗
   is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
+  (* the inode region, and it travels with the fs fabric for the SAME reason
+     the itable does -- kfork's [np->cwd = idup(p->cwd)], whose [ref++] is a
+     ledger move since increment IVe (iclaim-ledger.md §3.19).  Persistent,
+     and every FS syscall's dispatch already holds it inside
+     [ProofSyscall.sysc_fs_env]'s [fileclose_ic_env], so a dispatcher pays
+     nothing extra.  sys_fork does no I/O and touches no log. *)
+  ireg_inv γic γfs inodestart nib -∗
   kalloc_env γa None -∗
   (* the proc table's sealed regime, threaded to kfork's allocproc
      ([ProcAvail.v]); persistent, so it costs nothing to carry *)
@@ -135,12 +144,13 @@ Definition wp_sys_fork_sconf_body
 Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
-      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
+      (inodestart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-                             m lvl av eb p b pid V lks.
+      wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart
+                             inodestart nib m lvl av eb p b pid V lks.
 End SYSFORK.

@@ -156,7 +156,7 @@ Section ProofIunlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hpid Hppid
-              #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
+              #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
@@ -344,14 +344,14 @@ Section ProofIunlockMain.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 jal ra,holdingsleep ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlock + 0x16)) Rra
-              (mword_of_int 3334 : mword 21) R5 (K - 4)%nat b
+              (mword_of_int 3406 : mword 21) R5 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16").
     iIntros (CID11 Hq11) "Hcg Hpc".
     set (R6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlock + 0x16) : mword 64) 4)]> R5).
     assert (Htgths : add_vec (mword_of_int (KernelSyms.iunlock + 0x16) : mword 64)
-                       (sign_extend' 64 (mword_of_int 3334 : mword 21))
+                       (sign_extend' 64 (mword_of_int 3406 : mword 21))
                      = mword_of_int KernelSyms.holdingsleep) by pcw.
     iEval (rewrite Htgths) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx Ra0 = i_lock ip)
@@ -431,14 +431,20 @@ Section ProofIunlockMain.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
-                         i_valid (ientry k) ↦₄ valid_word true)%I)
+                         i_valid (ientry k) ↦₄ valid_word true ∗
+                         ic_deposit cn k (DepShr s dev inum g))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hvalid]").
+              with "Hcg Hpc Hi1c [Hvalid Hdep]").
     { rewrite Hrefadr Hipe.
       iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbody Hvalid")
-        as "[Hvalid Hbor]".
+      (* IVd: the borrow names this holder's OWN descriptor half, which is
+         what rules out [ic_out]'s frozen alternative -- the free path's
+         window, which parks its live mass in [islot2] and deposits
+         a [DepFrz], so there would be no slice to borrow. *)
+      iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
+                   eq_refl with "Hbody Hvalid Hdep")
+        as "(Hvalid & Hdep & Hbor)".
       iDestruct "Hbor" as (sb) "[Hlv Hbback]".
       iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k sb
               ltac:(solve_ndisj) Hk with "Hitbl Hlv") as (v) "[Hcell Hcl]".
@@ -446,8 +452,8 @@ Section ProofIunlockMain.
       iMod ("Hcl" with "Hcell") as "[%Hb Hlv]".
       iMod ("Hclose" with "[Hbback Hlv]") as "_".
       { iNext. iApply ("Hbback" with "Hlv"). }
-      iModIntro. iFrame "Hvalid". iPureIntro. exact Hb. }
-    iIntros (refv CID14 Hq14) "Hcg Hpc [%Href Hvalid]".
+      iModIntro. iFrame "Hvalid Hdep". iPureIntro. exact Hb. }
+    iIntros (refv CID14 Hq14) "Hcg Hpc (%Href & Hvalid & Hdep)".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))
       by (rewrite /R7; apply upd_eq).
@@ -488,14 +494,14 @@ Section ProofIunlockMain.
     iEval (rewrite Hpp24) in "Hpc".
     (* ===== +0x24 jal ra,releasesleep ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlock + 0x24)) Rra
-              (mword_of_int 3264 : mword 21) R8 (K - 4)%nat b
+              (mword_of_int 3336 : mword 21) R8 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi24").
     iIntros (CID17 Hq17) "Hcg Hpc".
     set (R9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlock + 0x24) : mword 64) 4)]> R8).
     assert (Htgtrs : add_vec (mword_of_int (KernelSyms.iunlock + 0x24) : mword 64)
-                       (sign_extend' 64 (mword_of_int 3264 : mword 21))
+                       (sign_extend' 64 (mword_of_int 3336 : mword 21))
                      = mword_of_int KernelSyms.releasesleep) by pcw.
     iEval (rewrite Htgtrs) in "Hpc".
     assert (HR9a0 : R9 !!! Regidx Ra0 = i_lock ip)
@@ -516,9 +522,16 @@ Section ProofIunlockMain.
        checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
        the sleeplock protects now -- and the caller's reference out. *)
     iApply fupd_wp.
+    (* THE PARKED PAYLOAD, AND ITS TOKEN (iclaim-ledger.md §3.9).
+       [IcacheEscrow.ic_payload] is the [_np] bundle plus the inum's
+       [ifreeze_off]; the token is the one [SpecIlock]'s post handed this
+       holder, threaded through its critical section untouched, and putting
+       it back is what re-establishes the parked arm's A-custody conjunct. *)
     iAssert (ic_payload gfs gi cov logstart k inum g true)%I
-      with "[Hlk]" as "Hpay";
-      [iExists dn', bm'; iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"] |].
+      with "[Hlk Hfrz]" as "Hpay".
+    { iApply (ic_payload_join with "[Hlk] Hfrz").
+      rewrite /ic_payload_np. iExists dn', bm'.
+      iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"]. }
     iInv "Hesc" as ">Hbody" "Hclose".
     iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g) g
                  true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")

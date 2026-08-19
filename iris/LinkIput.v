@@ -12,5 +12,11 @@
    stand between them -- [LinkIputCompat.v] -- is deleted.               *)
 Require Import LinkAcquire LinkRelease LinkAcquiresleep LinkReleasesleep
                LinkItrunc LinkIupdate ProofIput.
+(* the off-lock tail's three leaves, new at the task-18 splice: the reordered
+   free path flushes [ip->type = 0] by hand (bread / sh / log_write / brelse
+   at +0xa8) instead of calling iupdate, so iput now instantiates them too.
+   All three are real proofs; the assumption count is still ZERO. *)
+Require Import LinkBread LinkLogWrite LinkBrelse.
 
-Module Iput := IputProof Acquire Release Acquiresleep Releasesleep Itrunc Iupdate.
+Module Iput := IputProof Acquire Release Acquiresleep Releasesleep Itrunc Iupdate
+                         Bread LogWrite Brelse.

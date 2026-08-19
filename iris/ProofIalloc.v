@@ -445,12 +445,18 @@ Section IallocDefs.
      which each arm has ALREADY set (the dry arm at +0x7e, the claim arm as
      iget's return value at +0xaa).
 
-     Note what is NOT here: no region resource of any kind.  The claimed
-     fragment stayed inside [InodeRegion.ireg_inv] at its [fresh_shape] arm
-     (fs-icache.md §16.5) and nothing crosses back to the caller. *)
+     WHAT IS HERE SINCE iclaim-ledger.md §2.4 (IIIb brief step 4): the
+     claim arm carries [IcacheRef.iclaim], the [c] column's exclusive
+     receipt that [InodeRegion.ireg_claim_au] mints in the same ghost step
+     that writes the box.  The record itself still stays inside
+     [InodeRegion.ireg_inv] at its [fresh_shape] arm (fs-icache.md §16.5) --
+     what crosses back is the LEDGER fragment alone, because it is the
+     fresh box's only licence (ClaimL, §2.6's fourth row) and create's fill
+     spends it at [ireg_withdraw].  Before this increment the AU's output
+     was dropped at the claim site's [iIntros]. *)
   Definition ia_arms (γ : log_names) (dev : mword 32)
-      (inodestart ninodes : Z) (nib : nat) (u : nat) (Sb : gset Z)
-      (av : mword 64) : iProp Σ :=
+      (inodestart ninodes : Z) (nib : nat) (ty : mword 16) (u : nat)
+      (Sb : gset Z) (av : mword 64) : iProp Σ :=
     ((* NO INODES: a0 = 0, the iget ledger unit unspent, the reservation
         untouched *)
      (⌜av = (mword_of_int 0 : mword 64)⌝ ∗ iref_slot ∗ log_opS γ (S u) Sb)
@@ -462,6 +468,10 @@ Section IallocDefs.
          /\ 0 < bv_unsigned inum < ninodes
          /\ bv_unsigned inum < 16 * Z.of_nat nib⌝ ∗
         inode_ref kslot q dev inum ∗
+        (* the minted provenance unit, at the CLAIM flavour (item 7a-wire;
+           spelled [runit_claim] since RULING C' -- see SpecIalloc) *)
+        runit_claim (bv_unsigned inum) ∗
+        iclaim (bv_unsigned inum) ty ∗
         log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})))%I.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
@@ -491,6 +501,8 @@ Section IallocDefs.
                /\ di_type dn' = ty
                /\ fresh_shape dn'⌝ ∗
               inode_ref kslot q dev inum ∗
+              runit_claim (bv_unsigned inum) ∗
+              iclaim (bv_unsigned inum) ty ∗
               log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
          else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
               iref_slot ∗
@@ -550,7 +562,7 @@ Section IallocEpilogue.
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots bn 2 -∗
-    ia_arms γ dev inodestart ninodes nib u Sb (M !!! Regidx Ra0 : mword 64) -∗
+    ia_arms γ dev inodestart ninodes nib ty u Sb (M !!! Regidx Ra0 : mword 64) -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
             pidv dq dqs dqn j m K b lks -∗
     WP (Loop : expr riscv_lang).
@@ -721,17 +733,18 @@ Section IallocEpilogue.
         [exact Hcs |].
       iSplitR; [iPureIntro; rewrite HP3a0; exact Hz |].
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hop"].
-    - iDestruct "Hcl" as (kslot q inum) "(%Hp & Href & Hop)".
+    - iDestruct "Hcl" as (kslot q inum) "(%Hp & Href & Hru & Hclaim & Hop)".
       destruct Hp as (Hav & Hks & Hinum & Hnib).
       iApply ("Hcont" $! P3 true kslot q inum (ialloc_fresh ty)
-                with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Href Hop]");
+                with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl
+                      [Href Hru Hclaim Hop]");
         [exact Hcs |].
       iSplitR.
       { iPureIntro. rewrite HP3a0.
         split; [exact Hav |]. split; [exact Hks |]. split; [exact Hinum |].
         split; [exact Hnib |]. split; [reflexivity |].
         split; [exact (ialloc_fresh_type ty) | exact (ialloc_fresh_shape ty Hty)]. }
-      iSplitL "Href"; [iExact "Href" | iExact "Hop"].
+      iFrame "Href Hru Hclaim Hop".
   Qed.
 
 End IallocEpilogue.
@@ -1130,6 +1143,10 @@ Section IallocClaim.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     ireg_inv γi γfs inodestart nib -∗
+    (* RULING B (iclaim-ledger.md §3.2): the sealed regime, which
+       [InodeRegion.ireg_claim_au] now takes.  Persistent -- borrowed, never
+       spent -- and it rides the same channel [ireg_inv] does. *)
+    ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1154,7 +1171,8 @@ Section IallocClaim.
            Hnib Hdswf Ht0 Hty Hinum Halign Hbelow.
     pose proof HK as HK'. 
     pose proof (DinodeEnc.islot_lt inum) as Hsl16.
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanenv #Hbio #Hlctx #Hireg #Hprocs
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanenv #Hbio #Hlctx #Hireg #Hiopen
+              #Hprocs
               #Hdevi #Hdgeom #Hdlock Hitb2 Hitbl Hesc Hiref
               Hframe Hppid Hsbn Hsbi Hsl Hop Hheld Hcont".
     iPoseProof (iali_88 with "Htext") as "Hi88".
@@ -1412,14 +1430,14 @@ Section IallocClaim.
     iEval (rewrite Hpp9a) in "Hpc".
     (* ===== +0x9a jal ra,log_write : THE CLAIM ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ialloc + 0x9a)) Rra
-              (mword_of_int 3238 : mword 21) W4 (K - 8)%nat b
+              (mword_of_int 3310 : mword 21) W4 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi9a").
     iIntros (CID8 Hq8) "Hcg Hpc".
     set (W5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ialloc + 0x9a) : mword 64) 4)]> W4).
     assert (Htgtlw : add_vec (mword_of_int (KernelSyms.ialloc + 0x9a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 3238 : mword 21))
+                       (sign_extend' 64 (mword_of_int 3310 : mword 21))
                      = mword_of_int KernelSyms.log_write) by pcw.
     iEval (rewrite Htgtlw) in "Hpc".
     assert (HW5a0 : W5 !!! Regidx Ra0 = bnode kk)
@@ -1443,12 +1461,13 @@ Section IallocClaim.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 8)%nat) by (lia).
-    (* THE ONE GHOST STEP (fs-icache.md §16.5): no resource in, [True] out.
-       The free inum's fragment is INSIDE the region and stays there, at the
-       [fresh_shape] arm; the buffer is the serialiser. *)
+    (* THE ONE GHOST STEP (fs-icache.md §16.5): no resource in, and since
+       iclaim-ledger.md §2.4 the [c]-column RECEIPT out.  The free inum's
+       record is INSIDE the region and stays there, at the [fresh_shape]
+       arm; the buffer is the serialiser and the ledger fragment is what
+       crosses. *)
     iRename "Hop" into "HopS".
-    (* ialloc wants no receipt, so its anchor is the unit (fs-log.md §G.17)
-       and its credit is [emp]: this is an ordinary uncredited spend
+    (* ialloc's credit is [emp]: this is an ordinary uncredited spend
        ([cr := false]), so log_write's relaxed credited premise (§G.19) costs
        it exactly one [log_credit_own] at the vacuous implication. *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
@@ -1458,7 +1477,10 @@ Section IallocClaim.
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
               (diblk_bytes ds) bsd d0 u
-              false Sb e0 0%nat (⊤ ∖ ↑iregN) True%I
+              (* THE ANCHOR IS NO LONGER THE UNIT (iclaim-ledger.md §2.4 /
+                 IIIb step 4): [ireg_claim_au]'s closing wand delivers the
+                 [c]-column receipt, so log_write carries it out for us. *)
+              false Sb e0 0%nat (⊤ ∖ ↑iregN) (iclaim (bv_unsigned inum) ty)
               W5 0%nat true (proc_addr j) (K - 8)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
@@ -1469,14 +1491,18 @@ Section IallocClaim.
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
-      (* ialloc owes no receipt, so the atomic update's own anchor is the
-         unit and both of its closing inputs are dropped: one adapter line
-         (fs-log.md §G.17), and [ireg_claim_au] is unchanged. *)
+      (* log_write's own two closing inputs (the epoch witness and its
+         bound) are still dropped -- one adapter line, fs-log.md §G.17 --
+         but the ANCHOR is now [iclaim]; see the instantiation above. *)
       iApply lw_au_lb0.
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
                 ltac:(solve_ndisj) Hnib Hdswf Ht0
-                (ialloc_fresh_shape ty Hty) with "Hireg"). }
-    iIntros (CID9 Hq9 mL) "Hcg Hcnt Hpc %Hcsl HopS _ Hlk Hsl".
+                (ialloc_fresh_shape ty Hty) with "Hireg Hiopen"). }
+    (* THE RECEIPT LANDS HERE (iclaim-ledger.md §2.4 / IIIb step 4).  The
+       slot this names used to be [_]: [ireg_claim_au]'s closing wand has
+       delivered [iclaim] since increment I and ialloc dropped it on the
+       floor.  It now travels the claim arm out to [ia_arms]. *)
+    iIntros (CID9 Hq9 mL) "Hcg Hcnt Hpc %Hcsl HopS Hclaim Hlk Hsl".
     (* the block log_write just logged IS [IBLOCK inum inodestart]: that is
        [Hbno], and it is what makes the growth DETERMINATE. *)
     iEval (rewrite Hbno) in "HopS".
@@ -1657,33 +1683,46 @@ Section IallocClaim.
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* ==================================================================== *)
-    (*  R14: THE SPAN LICENCE -- THE ONE PERMITTED [SpanL] SITE IN THE TREE   *)
+    (*  R14 IS DISCHARGED: THE SPAN LICENCE BECOMES [ClaimL]                  *)
     (* ==================================================================== *)
-    (*  ialloc has claimed the inum, written [dip->type = ty], [log_write]d
-        it and BRELSE'd; at this [iget] it holds nothing revocable at all --
-        no buffer half (so licence (e) is unavailable, and §7.2's CURRENCY
-        GAP is why no epoch device recovers it), no reference, no fragment.
-        The licence the record deserves is (d), [ClaimL], and (d) is
-        foreclosed by §7.1.5's theorem until F1.5c mints an [iclaim].
+    (*  THE SWAP THE TOMBSTONE PROMISED (IgetLic.v's R14 header, verbatim:
+        "It deletes when F1.5c lands -- the site becomes [ClaimL], no
+        signature moves"), executed here.  F1.5c HAS landed: since increment
+        I [InodeRegion.ireg_claim_au] mints [IcacheRef.iclaim] in the same
+        ghost step that writes the box, and this walk has been holding that
+        receipt as "Hclaim" since the log_write above.
 
-        So this iget presents [SpanL], whose [iname] is [⌜True⌝]: a licence
-        that licenses nothing.  The span it names is exactly the gap
-        [create_fresh_ty] axiomatizes, and naming it here is what turns the
-        axiom's delivery-side perimeter from a paragraph into a grep line --
-        [grep -n "SpanL" iris/Proof*.v] must name THIS site and no other.
-        It deletes when F1.5c lands (the site becomes [ClaimL], no signature
-        moves) or when the axiom retires.  See IgetLic.v's R14 header. *)
-    iAssert (iname γi γfs inum SpanL) as "Hlic";
-      [rewrite /iname; iPureIntro; exact I |].
-    iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
-              SpanL
+        What the old text said was missing is exactly what is now in hand.
+        ialloc still holds nothing else revocable at this iget -- no buffer
+        half (licence (e) unavailable, §7.2's CURRENCY GAP), no reference,
+        no link fragment -- but it no longer needs any: (d) is the licence
+        the record deserves and (d) is now mintable.  The old span licence,
+        whose [iname] was [⌜True⌝], is deleted from [IgetLic.ilic] outright;
+        the standing grep for its name over [iris/Proof*.v] now comes back
+        empty, and the only remaining mention in the tree is IgetLic.v's own
+        tombstone.
+
+        NOTHING IS SPENT: [SpecIget] returns the licence at the same [l], so
+        the receipt comes straight back below and travels on to [ia_arms].
+        It is create's [ilock(ip)] that finally spends it, at
+        [InodeRegion.ireg_withdraw]. *)
+    iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
+              (ClaimL ty)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
-              Hnib HWAa0 HWAa1
+              Hnib
+              (* the mint's [BufL] block tie: [ClaimL] is not [BufL] *)
+              ltac:(discriminate) HWAa0 HWAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanenv Hiref Hlic").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref
+                    Hclaim").
     all: try lkbelow.
-    iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href _".
+    iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href Hru Hclaim".
+    (* the minted unit, at the CLAIM flavour and KEPT there (RULING C'):
+       [runit (is_claim (ClaimL ty))] IS [runit_claim], which is what
+       [ireg_withdraw]'s ClaimK arm converts at create's fill. *)
+    iEval (change (runit (is_claim (ClaimL ty)) (bv_unsigned inum))
+             with (runit_claim (bv_unsigned inum))) in "Hru".
     destruct Higp as (Hcsi & Hkslot & Higa0).
     assert (Hpcae : ret_pc (WA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0xae)) by (rewrite HWAra; pcw).
@@ -1875,12 +1914,12 @@ Section IallocClaim.
     iApply (ia_epilogue (CID0 := CID23) j bn γ inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m V6 K b lks HK Hty HV6sp HV6thr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
-                    [Href Hop] [Hcont]").
+                    [Href Hru Hclaim Hop] [Hcont]").
     { rewrite /ia_arms. iRight. iExists kslot, q, inum.
       iSplitR.
       { iPureIntro. split; [exact HV6a0 |]. split; [exact Hkslot |].
         split; [exact Hinum | exact Hnib]. }
-      iSplitL "Href"; [iExact "Href" | iExact "Hop"]. }
+      iFrame "Href Hru Hclaim Hop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID23) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -1930,6 +1969,10 @@ Section IallocScan.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     ireg_inv γi γfs inodestart nib -∗
+    (* RULING B (iclaim-ledger.md §3.2): the sealed regime, which
+       [InodeRegion.ireg_claim_au] now takes.  Persistent -- borrowed, never
+       spent -- and it rides the same channel [ireg_inv] does. *)
+    ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1967,7 +2010,7 @@ Section IallocScan.
     intros HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Hbelow.
     pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
-    iIntros "#Htext #Hkdata #Hpenv #Hbio #Hlctx #Hireg #Hprocs
+    iIntros "#Htext #Hkdata #Hpenv #Hbio #Hlctx #Hireg #Hiopen #Hprocs
               #Hdevi #Hdgeom #Hdlock #Hitb2 #Hitbl #Hesc".
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iIntros (fuel).
@@ -2491,7 +2534,8 @@ Section IallocScan.
                   HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Hinum Hslotal
                   Hbelow
-                  with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hlctx Hireg Hprocs
+                  with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hlctx Hireg Hiopen
+                        Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc Hiref Hframe
                         Hppid Hsbn Hsbi Hsl Hop Hheld [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID13)
@@ -2794,7 +2838,7 @@ Section IallocMain.
                  ltac:(change (2^31)%Z with 2147483648%Z in Hn31; lia)).
       apply not_true_is_false. intro Hc. apply Z.geb_le in Hc. lia. }
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
-              Hsbn Hsbi #Hireg Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
+              Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
     iAssert (ia_cont (CID0 := CID) γ bn inodestart ninodes nib dev ty u Sb
                pidv dq dqs dqn j m K b lks)%I with "[Hcont]" as "Hcont";
@@ -2914,12 +2958,12 @@ Section IallocMain.
     iEval (rewrite Hpp0c) in "Hpc".
     (* ===== +0x0c lw a4,2108(a4) : a4 := sb.ninodes ===== *)
     assert (Hnadr : add_vec (rget R3 Ra4)
-                      (sign_extend' 64 (mword_of_int 2110 : mword 12))
+                      (sign_extend' 64 (mword_of_int 2126 : mword 12))
                     = sb_ninodes).
     { rgne. rewrite HR3a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0xc)) Ra4 Ra4
-              (mword_of_int 2110 : mword 12) R3 (K - 8)%nat
+              (mword_of_int 2126 : mword 12) R3 (K - 8)%nat
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c Hsbn").
     iIntros (CID6 Hq6) "Hcg Hpc Hsbn".
@@ -3184,12 +3228,12 @@ Section IallocMain.
     iEval (rewrite Hpp2c) in "Hpc".
     (* ===== +0x2c addi s4,s4,2064 : s4 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ialloc + 0x2c)) Rs4 Rs4
-              (mword_of_int 2066 : mword 12) R9 (K - 8)%nat b
+              (mword_of_int 2082 : mword 12) R9 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c").
     iIntros (CID19 Hq19) "Hcg Hpc".
     set (RA := <[Regidx Rs4 := regval_into_reg
                   (add_vec (rget R9 Rs4)
-                     (sign_extend' 64 (mword_of_int 2066 : mword 12)))]> R9).
+                     (sign_extend' 64 (mword_of_int 2082 : mword 12)))]> R9).
     assert (HRAs4 : RA !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)).
     { rewrite /RA upd_eq. rgne. rewrite HR9s4. pcw. }
     assert (HRAs2 : RA !!! Regidx Rs2
@@ -3219,7 +3263,7 @@ Section IallocMain.
                   cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
                   pidv dq dqs dqn m K b lks
                   HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Hbelow
-                  with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hprocs
+                  with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hiopen Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc") as "Hscan".
     iSpecialize ("Hscan" $! (Z.to_nat (ninodes - 1))).
     iPoseProof ("Hscan" $! CID19 with "[%]") as "Hscan1";
@@ -3265,7 +3309,7 @@ Section IallocMain.
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl
            Ha0 Ha1 Heb Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
-              Hsbn Hsbi #Hireg Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
+              Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
     iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -3273,7 +3317,7 @@ Section IallocMain.
               pidv dq dqs dqn m K eb b lks
               HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx
-                    Hsbn Hsbi Hireg Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
+                    Hsbn Hsbi Hireg Hiopen Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
                     Hitb2 Hitbl Hesc Hiref HopS [Hcont]").
     all: try lkbelow.
     iIntros (CID') "%Hq".
@@ -3284,9 +3328,11 @@ Section IallocMain.
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Harm]");
       [exact Hcs |].
     destruct alloc.
-    - iDestruct "Harm" as "(%Hp & Href & HopS)".
+    - iDestruct "Harm" as "(%Hp & Href & Hru & Hclaim & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
       iSplitL "Href"; [iExact "Href" |].
+      iSplitL "Hru"; [iExact "Hru" |].
+      iSplitL "Hclaim"; [iExact "Hclaim" |].
       iApply (log_opS_op with "HopS").
     - iDestruct "Harm" as "(%Hp & Hiref & HopS)".
       iSplitR; [iPureIntro; exact Hp |].

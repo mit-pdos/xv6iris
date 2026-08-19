@@ -666,6 +666,11 @@ Section ProofSysOpenPublish.
     off_wf voff ->
     (* the parent the walk kept, short by the share it lent ilock ... *)
     inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    (* ... its PROVENANCE UNIT, which travels with the parent into the fd
+       slot's [cinv] and comes back out at fileclose's withdraw (item
+       7a-wire, iclaim-ledger.md §5''.3's step 6: the fd slot is one of the
+       two rest homes, and it is [inode_held_short] that parks there) *)
+    runit_any (bv_unsigned inum) -∗
     (* ... and that share, back from iunlock and generation-erased *)
     inode_shr kk s icfg_dev inum -∗
     ity_shot gy ty -∗
@@ -681,17 +686,17 @@ Section ProofSysOpenPublish.
     |={E}=> file_ref gf kf 1 C.
   Proof.
     intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
-    iIntros "Hkeep Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
+    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
     (* ---- the generation: name the returned share and pin it ---- *)
     rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %<-.
     (* ---- the parked reference: the parent, short by exactly [s] ---- *)
-    iAssert (inode_held_short (ientry kk) s) with "[Hkeep]" as "Hsh".
+    iAssert (inode_held_short (ientry kk) s) with "[Hkeep Hru]" as "Hsh".
     { iExists kk, (qi + s)%Qp, qi, inum.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hkk|].
       iSplitR; [iPureIntro; exact Hinb|].
-      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; reflexivity|]. iFrame "Hru".
       iApply (inode_ref_short_gen_forget with "Hkeep"). }
     iAssert (inode_shr_held_gen (ientry kk) s gy) with "[Hshr]" as "Hs".
     { iExists kk, inum.

@@ -243,6 +243,19 @@ Definition wp_ialloc_sconf_body
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
      nothing; see the header. *)
   ireg_inv γi γfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
+     claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
+     [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
+     that mints a [c] -- takes it, and ialloc is the one function that runs
+     that mover.  It is PERSISTENT (a [ity_shot] at the boot one-shot), so
+     it is borrowed and never spent, and its production is the boot chain's:
+     fsinit returns [ireg_boot], [IcacheRef.ity_shoot] seals it once in
+     forkret's first branch, and every syscall's ambient [sysc_fs_env]
+     carries the result down this channel.  §3.2's termination clause: the
+     chain ends at [LinkForkretNF.wp_forkret_nf_ax], an EXISTING accepted
+     IOU -- no new axiom, and a premise pulls nothing into
+     [Print Assumptions] at the gate targets. *)
+  ireg_open -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle and the disk fabric *)
@@ -292,6 +305,33 @@ Definition wp_ialloc_sconf_body
           /\ di_type dn' = ty
           /\ fresh_shape dn'⌝ ∗
          inode_ref kslot q dev inum ∗
+         (* THE MINTED PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
+            §5''.3), at the CLAIM flavour: ialloc's iget is the one call in
+            the tree that presents [IgetLic.ClaimL], so the reference it
+            returns is the claimant's own reference into its own claim box.
+            The flavour is what keeps (R3) -- "no plainly-licenced reference
+            to a claim box" -- true.
+
+            SPELLED [runit_claim] SINCE RULING C' (iclaim-ledger.md §5''''').
+            It used to leave here as [runit_any], the flavour forgotten;
+            under C' [runit_any] IS the plain unit, and the claimant's is
+            not plain -- it is the second half of what create's fill hands
+            [InodeRegion.ireg_withdraw], whose ClaimK arm CONVERTS the pair
+            [iclaim ∗ runit_claim] into the plain unit the child reference
+            carries from the fill onward.  So this is the currency create
+            spends at [ilock], and the plain one it gets back is what its
+            [iunlockput] finally returns. *)
+         runit_claim (bv_unsigned inum) ∗
+         (* THE RECEIPT (iclaim-ledger.md §2.4 / IIIb brief step 4): the
+            [c] column's exclusive fragment, minted by [ireg_claim_au] in
+            the same ghost step that wrote the box.  It is EXPOSED here
+            rather than dropped because it is the ONLY licence a fresh
+            claim box has -- ClaimL, §2.6's fourth row -- and create's
+            [ilock(ip)] spends it at [InodeRegion.ireg_withdraw], which is
+            what retires [c] so that [ireg_freeze_au] can refute a standing
+            claim at all.  Callers that do not fill the box (there are
+            none today) may frame it affinely. *)
+         iclaim (bv_unsigned inum) ty ∗
          log_op γ u
        else (* NO INODES: a0 = 0, the ledger unit back, nothing spent *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
@@ -386,6 +426,19 @@ Definition wp_ialloc_gen_body
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
      nothing; see the header. *)
   ireg_inv γi γfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
+     claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
+     [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
+     that mints a [c] -- takes it, and ialloc is the one function that runs
+     that mover.  It is PERSISTENT (a [ity_shot] at the boot one-shot), so
+     it is borrowed and never spent, and its production is the boot chain's:
+     fsinit returns [ireg_boot], [IcacheRef.ity_shoot] seals it once in
+     forkret's first branch, and every syscall's ambient [sysc_fs_env]
+     carries the result down this channel.  §3.2's termination clause: the
+     chain ends at [LinkForkretNF.wp_forkret_nf_ax], an EXISTING accepted
+     IOU -- no new axiom, and a premise pulls nothing into
+     [Print Assumptions] at the gate targets. *)
+  ireg_open -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle and the disk fabric *)
@@ -439,6 +492,25 @@ Definition wp_ialloc_gen_body
           /\ di_type dn' = ty
           /\ fresh_shape dn'⌝ ∗
          inode_ref kslot q dev inum ∗
+         (* THE MINTED PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
+            §5''.3), at the CLAIM flavour: ialloc's iget is the one call in
+            the tree that presents [IgetLic.ClaimL], so the reference it
+            returns is the claimant's own reference into its own claim box.
+            The flavour is what keeps (R3) -- "no plainly-licenced reference
+            to a claim box" -- true.
+
+            SPELLED [runit_claim] SINCE RULING C' (iclaim-ledger.md §5''''').
+            It used to leave here as [runit_any], the flavour forgotten;
+            under C' [runit_any] IS the plain unit, and the claimant's is
+            not plain -- it is the second half of what create's fill hands
+            [InodeRegion.ireg_withdraw], whose ClaimK arm CONVERTS the pair
+            [iclaim ∗ runit_claim] into the plain unit the child reference
+            carries from the fill onward.  So this is the currency create
+            spends at [ilock], and the plain one it gets back is what its
+            [iunlockput] finally returns. *)
+         runit_claim (bv_unsigned inum) ∗
+         (* THE RECEIPT -- see the sconf twin above (§2.4 / IIIb step 4). *)
+         iclaim (bv_unsigned inum) ty ∗
          (* THE SET GROWTH IS DETERMINATE, exactly as [wp_iupdate_gen]'s is:
             ialloc logs the claimed inum's HOME BLOCK and nothing else. *)
          log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})

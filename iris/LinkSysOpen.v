@@ -6,8 +6,9 @@
    LinkSysChdir.v; namei and ilock likewise; create by LinkSysMkdir.v;
    iunlock, itrunc, filealloc, fdalloc and fileclose by LinkSysLink.v /
    LinkSysPipe.v / LinkSysClose.v.  So the assumption set is LinkSysMkdir.v's
-   -- the standing platform five plus funext, plus [create_fresh_ty], which
-   comes in through create's ialloc and through nothing else.
+   -- the standing platform five plus funext.  ([create_fresh_ty] came in
+   through create's ialloc and through nothing else, until item 7 proved
+   the span; see LinkCreateFreshTy.v.)
 
    THE THREE THINGS THE COMPOSITION RESTS ON, all recorded at the point of
    use in SpecSysOpen.v's header and machine-checked in SysOpenBudget.v:

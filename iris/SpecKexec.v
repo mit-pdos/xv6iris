@@ -362,6 +362,14 @@ Definition fs_fabric
    ic_escrows cn gfs gi cov logstart ∗
    ic_sleeplocks cn ∗
    ireg_inv gi gfs inodestart nib ∗
+   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2 RULING B, §6'' RULING
+      G').  The kexec cone reaches iput (fileclose on the exec'ing process's
+      table, and kexit's), whose free path FREEZES -- and §2.3's boot-shelter
+      clause makes a freezer exhibit the regime it is freezing under.  It is
+      persistent and RULING B fires it before [kexec("/init")], so the fabric
+      is exactly where it belongs: every consumer of this bundle already has
+      it, and no block lemma's premise list grows. *)
+   ireg_open ∗
    procs_inv gs ∗
    dev_inv gu gd ∗
    disk_geom gd pd pav pu ∗

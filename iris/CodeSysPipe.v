@@ -29,6 +29,7 @@ Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode16.
 Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
@@ -49,7 +50,7 @@ Section CodeSysPipe.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---- sys_pipe @ KernelSyms.sys_pipe, 242 bytes ---- *)
+  (* ---- sys_pipe @ KernelSyms.sys_pipe, 234 bytes ---- *)
 
   Lemma spi_00 : kernel_text -∗ instr (mword_of_int KernelSyms.sys_pipe : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 60 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc KernelSyms.sys_pipe (mword_of_int 0x7139 : mword 16)
@@ -71,9 +72,9 @@ Section CodeSysPipe.
   Proof. mk_rvc (KernelSyms.sys_pipe + 0x8) (mword_of_int 0x0080 : mword 16)
     (mword_of_int (KernelSyms.sys_pipe + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 16 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0080 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma spi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64) false (JAL (mword_of_int 2081938 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_pipe + 0xa) (mword_of_int 0xc92fc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64) (JAL (mword_of_int 2081938 : mword 21, Regidx (mword_of_int 1))) kd_c92fc0ef. Qed.
+  Lemma spi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64) false (JAL (mword_of_int 2081866 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_pipe + 0xa) (mword_of_int 0xc4afc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64) (JAL (mword_of_int 2081866 : mword 21, Regidx (mword_of_int 1))) kd_c4afc0ef. Qed.
 
   Lemma spi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.sys_pipe + 0xe) (mword_of_int 0x84aa : mword 16)
@@ -87,9 +88,9 @@ Section CodeSysPipe.
   Proof. mk_rvc (KernelSyms.sys_pipe + 0x14) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_pipe + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma spi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x16) : mword 64) false (JAL (mword_of_int 2085860 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_pipe + 0x16) (mword_of_int 0xbe4fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_pipe + 0x16) : mword 64) (JAL (mword_of_int 2085860 : mword 21, Regidx (mword_of_int 1))) kd_be4fd0ef. Qed.
+  Lemma spi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x16) : mword 64) false (JAL (mword_of_int 2085788 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_pipe + 0x16) (mword_of_int 0xb9cfd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_pipe + 0x16) : mword 64) (JAL (mword_of_int 2085788 : mword 21, Regidx (mword_of_int 1))) kd_b9cfd0ef. Qed.
 
   Lemma spi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x1a) : mword 64) false (ITYPE (mword_of_int 4040 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (KernelSyms.sys_pipe + 0x1a) (mword_of_int 0xfc840593 : mword 32)
@@ -167,9 +168,9 @@ Section CodeSysPipe.
   Proof. mk_rvc (KernelSyms.sys_pipe + 0x5c) (mword_of_int 0x68a8 : mword 16)
     (mword_of_int (KernelSyms.sys_pipe + 0x5c) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) kd_68a8 ke_68a8. Qed.
 
-  Lemma spi_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x5e) : mword 64) false (JAL (mword_of_int 2080888 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_pipe + 0x5e) (mword_of_int 0x878fc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_pipe + 0x5e) : mword 64) (JAL (mword_of_int 2080888 : mword 21, Regidx (mword_of_int 1))) kd_878fc0ef. Qed.
+  Lemma spi_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x5e) : mword 64) false (JAL (mword_of_int 2080816 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_pipe + 0x5e) (mword_of_int 0x830fc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_pipe + 0x5e) : mword 64) (JAL (mword_of_int 2080816 : mword 21, Regidx (mword_of_int 1))) kd_830fc0ef. Qed.
 
   Lemma spi_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x62) : mword 64) false (BTYPE (mword_of_int 30 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof. mk_base (KernelSyms.sys_pipe + 0x62) (mword_of_int 0x00054f63 : mword 32)
@@ -199,9 +200,9 @@ Section CodeSysPipe.
   Proof. mk_rvc (KernelSyms.sys_pipe + 0x74) (mword_of_int 0x68a8 : mword 16)
     (mword_of_int (KernelSyms.sys_pipe + 0x74) : mword 64) (LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) kd_68a8 ke_68a8. Qed.
 
-  Lemma spi_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x76) : mword 64) false (JAL (mword_of_int 2080864 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_pipe + 0x76) (mword_of_int 0x860fc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_pipe + 0x76) : mword 64) (JAL (mword_of_int 2080864 : mword 21, Regidx (mword_of_int 1))) kd_860fc0ef. Qed.
+  Lemma spi_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x76) : mword 64) false (JAL (mword_of_int 2080792 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_pipe + 0x76) (mword_of_int 0x818fc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_pipe + 0x76) : mword 64) (JAL (mword_of_int 2080792 : mword 21, Regidx (mword_of_int 1))) kd_818fc0ef. Qed.
 
   Lemma spi_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_pipe + 0x7a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_pipe + 0x7a) (mword_of_int 0x4781 : mword 16)

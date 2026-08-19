@@ -141,8 +141,9 @@
    "the append fits" premise, neither of which [InodeLock.inode_ok]'s
    loose size cap can give -- and [fresh_shape] is exactly those two facts.
    That leaves [di_type dn = ty] as the ONLY underivable half of create's
-   fresh-record obligation, which is what [LinkCreateFreshTy.v] assumes and
-   nothing more.  Every other caller ignores the pair.
+   fresh-record obligation, which is what [LinkCreateFreshTy.v] used to
+   ASSUME and now PROVES, off the [ClaimK] index below and nothing more.
+   Every other caller ignores the pair.
 
    ilock SLEEPS (acquiresleep, and bread inside the uncached arm), so it
    threads the full running-process bundle.  It enters and returns at
@@ -207,7 +208,7 @@ Definition wp_ilock_sconf_body
     (cn : ic_names)                                    (* the icache's names  *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -274,6 +275,41 @@ Definition wp_ilock_sconf_body
      Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
      is the existential its [inode_shr] already carries. *)
   inode_shr_gen k s dev inum g -∗
+  (* ---- THE FILL's LICENCE, INDEXED (iclaim-ledger.md §5''''', RULING C')
+
+     §16.4's fill has a sub-arm -- the CLAIM BOX -- that no caller can be
+     left stuck on, and [InodeRegion.ireg_withdraw] is the only thing that
+     can discharge it.  The index says which of the three currencies this
+     caller brought and therefore which discharge runs; see
+     [InodeRegion.ilkc].  In one line each:
+
+       [ClaimK ty]  create's child fill, and the only site that can present
+                    ialloc's typed [iclaim].  It brings the claim TOGETHER
+                    with the claim-flavoured provenance unit its own
+                    reference carries, the withdraw CONVERTS the pair into
+                    the plain unit, and the post below pins BOTH
+                    [filled = true] and [di_type dn = ty] -- which is
+                    exactly [LinkCreateFreshTy]'s span conjunct, now
+                    proven.  The other two shapes the entry could be in
+                    (cached, or a pool bundle) are refuted by
+                    [InodeRegion.ireg_claim_no_out]: a claimed inum's record
+                    is INSIDE the region, so nobody holds its [dinode_at].
+       [PlainK]     the twelve in-file-unit sites.  The unit their own
+                    reference carries collides with the claim pin's (R3),
+                    which DERIVES [c = None] -- the box arm is refuted and
+                    the unit comes straight back out.
+       [ShotK ty]   the three fd sites, which can hold no whole unit across
+                    this call (their inode payload is behind a cancellable
+                    invariant no syscall may keep open here).  What they DO
+                    hold, free and persistent, is this generation's own
+                    one-shot -- and a one-shot in hand means the generation
+                    has already been filled, so it refutes the UNCACHED arm
+                    outright ([IcacheRef.ity_pending_shot_excl]) and the
+                    post reports [filled = false].
+
+     STATED AT THE CALLER'S [g], like [ity_shot] below and for the same
+     reason. *)
+  ireg_wd_lic o g (bv_unsigned inum) -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
@@ -334,10 +370,39 @@ Definition wp_ilock_sconf_body
          vacuous.  A generation sees at most one fill (17.6), which is what
          makes that agreement sound. *)
       ity_shot g (di_type dn) -∗
+      (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.1 A-custody /
+         §3.9 RULING A-prime).  A-custody puts the token on the PAYLOAD's
+         custody path -- pool bundle <-> parked arm <-> holder -- and this is
+         the holder's end of it: [IcacheEscrow.ic_payload], the predicate
+         [ic_swap_checkout] takes out of the parked arm, carries
+         [ifreeze_off], so a checkout hands it over exactly as it hands over
+         [ic_loaded].  [SpecIunlock]'s precondition takes it back.
+
+         WHY THE CONTRACT GREW (§3.9's ruling, and its price): the freeze
+         pin's premise on [InodeRegion.ireg_write_link_fl] is FALSE at
+         create's fresh child ([fresh_shape] pins the pre-count at zero) and
+         unavailable at sys_link's [ip->nlink++] (no guard, no ilink in
+         hand); IIIc refuted every cheaper route.  The honest supply is this
+         token, and a checked-out holder is exactly who has it.
+
+         WHAT A CALLER THAT DOES NOT WRITE DOES WITH IT: nothing -- it
+         threads it to its own iunlock.  iProp is affine, so a caller that
+         parks through some other route may drop it. *)
+      ifreeze_off (bv_unsigned inum) -∗
       (* THE CLAIM-BOX INDICATOR -- see the header.  Proven content, not a
          new obligation: [InodeRegion.ireg_withdraw] pays [fresh_shape] to
          §16.4's fill sub-arm and this clause is where it now leaves. *)
       ⌜filled = true -> fresh_shape dn⌝ -∗
+      (* ...AND THE LICENCE's PAYOUT (RULING C').  [ClaimK]'s pair has
+         CONVERTED into the plain unit the child reference carries from
+         here on; [PlainK]'s unit is the caller's own, borrowed and
+         returned; [ShotK]'s one-shot is persistent and comes back
+         because it never left. *)
+      ireg_wd_back o g (bv_unsigned inum) -∗
+      (* ...and what the index BUYS, which is the whole of item 7: at
+         [ClaimK] the fill is FORCED and the record is the record the claim
+         wrote. *)
+      ⌜ilk_post o filled dn⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -355,11 +420,11 @@ Module Type ILOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g dev inum
+                          cov logstart inodestart nib k s g o dev inum
                           pidv dq dqs m K eb b lks.
 End ILOCK.

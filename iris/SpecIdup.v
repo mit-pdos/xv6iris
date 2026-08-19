@@ -98,7 +98,62 @@
    The SIE/[cpu_own] bookkeeping is [SpecFiledup.v]'s, and for the same
    reason: a fully-nested acquire/release leaves [n], [eb] and the SIE
    index [b] as they came in.  Unlike filedup's, this is now DERIVED from
-   the two lock contracts rather than asserted.                            *)
+   the two lock contracts rather than asserted.
+
+   ---- WHY THIS CONTRACT WIDENED IN INCREMENT IVe -----------------------
+
+   iclaim-ledger.md §3.3 approved widening [SpecIget], [SpecIdup] and
+   [SpecIput] with [ireg_inv] + the index params; IIIe executed that for the
+   other two and idup's was BLOCKED on the doc's own OPEN(2.6b).  §3.19's
+   RULING closes it and this increment executes the widening, so the
+   paragraph that used to stand here (a full account of the block) is
+   superseded.  The short version of what it said, because it is still the
+   reason this contract's shape is what it is:
+
+     [ip->ref++] is a ledger move, and RULING A (§3.1, A-AUs) gave every
+     UP-count the same premise -- a borrowed [IgetLic.iname γi γfs inum l].
+     idup's TWO call sites are both [idup(p->cwd)] (ProofKforkB4:365 and
+     ProofNamex:5660) and NEITHER can produce a licence at ANY of the five
+     constructors: [LinkedL] wants an [ipaid], [HeldL] and the region-side
+     [*_alloc] lemmas want a [dinode_at] (idup reads no dinode and neither
+     does its caller), [ClaimL] wants an [iclaim], [RootL] wants the inum to
+     BE the root, [BufL] is boot-only -- and a cwd is not even [nlink <> 0],
+     since xv6 permits unlinking a process's cwd.  The licence-free
+     ARITHMETIC route ([IcacheInv.ireg_icnt_acc]) does not do it either: it
+     refutes the two frozen phases from [ireg_frz_ok]'s pins ([FrzPost => n
+     = 0], [FrzPre => n = 1]) and so needs [2 <= n], while a cwd held by one
+     process sits at [n = 1] exactly -- the one value [FrzPre] admits.
+
+   WHAT CLOSED IT is §2.6b's own recommendation, landed as RULING A⁗'s
+   frozen park (§3.16): the freeze arm PARKS the dying reference's liveness
+   slice and the escrow arm's half inside [IcacheEscrow.islot2]'s live arm,
+   where a foreign idup taking the itable lock finds them.  So idup's mover
+   is now [IcacheInv.iref_upgrade_mir_store_au] -- the licence-free
+   up-count -- and what it presents in place of a licence is the LOCK's own
+   [false] mirror half, decided by [IcacheInv.frz_park_shr_off] out of the
+   caller's OWN SHARE.  [inode_shr] is enough; no licence, no REF-1, no
+   count restriction.
+
+   THE PRICE, AND IT IS EXACTLY SpecIget's (§3.19(d), the in-campaign
+   precedent): the mover's up-count carries the ledger's [icnt] half, whose
+   other half lives in [InodeRegion.ireg_slot], so this contract takes
+   [ireg_inv γi γfs inodestart nib] and the [inodestart] binder that goes
+   with it -- and, because [ireg_inv]'s own type has [LogInv.logG] as a real
+   instance argument (its [ireg_ep] carries a [log_epoch_lb], §G.13/§G.17),
+   the Context gains [!logG Σ].  The handle is PERSISTENT, so it costs a
+   caller a frame and nothing else, and the region open is GHOST-ONLY: idup
+   reads no dinode, and the only column that moves is [icnt].
+
+   WHAT THIS CONTRACT DELIBERATELY DOES *NOT* TAKE is SpecIget's
+   [bv_unsigned inum < 16 * Z.of_nat nib].  iget needs it as a premise
+   because its recycle arm asks for an inum that is by construction NOT
+   cached, so no table clause can speak about it.  idup's inum IS cached --
+   the caller's share names a live slot -- so the bound comes out of
+   [IcacheEscrow.ic_ci_wf]'s third clause inside the proof, off the very
+   [ci !! k] the mint already reads.  Every caller would have had it (both
+   sites hold [IcacheRef.inode_held]'s), but at [icfg_nib] rather than at
+   this contract's generic [nib], and deriving it costs the proof one
+   [destruct].                                                             *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -124,17 +179,18 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
+Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
 
 (* idup's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
    below that -- filedup's [K] budget exactly, and for the same frame. *)
 Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
-    (cov : gset Z) (logstart : Z) (nib : nat)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (s : Qp) (dev inum : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -155,10 +211,24 @@ Definition wp_idup_sconf_body
   kernel_text -∗ pc_is pcE -∗
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
+  (* THE INODE REGION, and GHOST-ONLY (header, §3.19): the [ref++] carries
+     the ledger's [icnt] half and the region owns the other one, so the
+     mover ([IcacheInv.iref_upgrade_mir_store_au]) opens [↑iregN] around the
+     same instruction.  No dinode is read.  Persistent, so it costs a caller
+     a frame and nothing else. *)
+  ireg_inv γi γfs inodestart nib -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
   (* A SHARE, not a reference -- see the header. *)
   inode_shr k s dev inum -∗
+  (* THE PARENT REFERENCE's PROVENANCE UNIT (item 7a-wire, §5''.3's step 3).
+     idup's mint is SELF-PAYING: this unit is what buys the two side
+     conditions [InodeRegion.ireg_ref_ok_mint] owes (allocatedness at either
+     flavour, and [c = None] at the plain one), so idup needs no licence --
+     which is what §3.11's wall said it could never have.  And the COPY is
+     minted at the PARENT's flavour: a dup of a claim reference is
+     claim-flavoured, which is what keeps (R3) true. *)
+  runit_any (bv_unsigned inum) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗
@@ -172,19 +242,23 @@ Definition wp_idup_sconf_body
     (* ...beside a NEW reference, minted from the table's retained share at
        a fraction only the table knows. *)
     (∃ qn : Qp, inode_ref k qn dev inum) -∗
+    (* TWO units out: the parent's back, unspent, and the copy the new
+       reference carries -- both at the parent's flavour. *)
+    runit_any (bv_unsigned inum) -∗
+    runit_any (bv_unsigned inum) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
+      wp_idup_sconf_body γl cn γfs γi cov logstart inodestart nib k s dev inum
                          m n eb p K b lks.
 End IDUP.

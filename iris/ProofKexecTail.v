@@ -1084,6 +1084,7 @@ Section KexecAExit.
     ic_escrows cn gfs gi cov logstart -∗
     ic_sleeplocks cn -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
@@ -1091,8 +1092,8 @@ Section KexecAExit.
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev.
   Proof.
-    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hprocs
-             Hdevi Hdgeom Hdlock".
+    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
+             Hprocs Hdevi Hdgeom Hdlock".
     rewrite /fs_fabric.
     iSplitL "Hkd"; [iExact "Hkd" |].
     iSplitL "Hpenv"; [iExact "Hpenv" |].
@@ -1105,6 +1106,7 @@ Section KexecAExit.
     iSplitL "Hesc"; [iExact "Hesc" |].
     iSplitL "Hslks"; [iExact "Hslks" |].
     iSplitL "Hireg"; [iExact "Hireg" |].
+    iSplitL "Hropen"; [iExact "Hropen" |].
     iSplitL "Hprocs"; [iExact "Hprocs" |].
     iSplitL "Hdevi"; [iExact "Hdevi" |].
     iSplitL "Hdgeom"; [iExact "Hdgeom" | iExact "Hdlock"].
@@ -1307,7 +1309,13 @@ Section KexecABad.
     (* the parked record's type witness -- SpecIunlockput's new premise
        (SpecIlock v5's postcondition supplies it at the same [gy]) *)
     ity_shot gy (di_type dn) -∗
+    (* ...AND THE INUM'S FREEZE TOKEN, [SpecIunlockput]'s new premise since
+       iclaim-ledger.md §3.9 (RULING A-prime): the payload's A-custody
+       conjunct, relayed from the caller's own ilock. *)
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short k (qi + sq)%Qp qi dev inum -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any (bv_unsigned inum) -∗
     (* ---- and the rest of kexec's state ---- *)
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1349,13 +1357,13 @@ Section KexecABad.
            Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
     iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
-             Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
+             Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
        order premise needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
     iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
@@ -1405,18 +1413,18 @@ Section KexecABad.
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
-              B2 (K - 68)%nat true true lks
+              B2 (K - 68)%nat true true lks true
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                    Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
+                    Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
+                    Hity Hfrz Hkeep Hru Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hbm Hins %Hu3
-             Hbits Hbs %Hn3 Hlog Hirs1".
+             Hbits Hbs %Hn3 Hlog Hirs1 _".
     assert (Hpc6a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KXA + 0x6a))
       by (rewrite HB2ra; pcw).
     iEval (rewrite Hpc6a) in "Hpc".
@@ -1774,10 +1782,10 @@ Section KexecCBad.
     iEval (rewrite Hpp1da) in "Hpc".
     (* ---- +0x1da: jal ra,proc_freepagetable ---- *)
     assert (Htpfp : add_vec (mword_of_int (KXA + 0x1da) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085186 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085114 : mword 21))
                    = mword_of_int KernelSyms.proc_freepagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x1da)) Rra
-              (mword_of_int 2085186 : mword 21) B2 (K - 68)%nat true
+              (mword_of_int 2085114 : mword 21) B2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpfp; vm_compute; reflexivity)
               with "Hcg Hpc Hi1da").

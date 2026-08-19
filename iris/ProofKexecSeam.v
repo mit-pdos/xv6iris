@@ -562,7 +562,12 @@ Section KexecBSeam.
      i_valid (ientry kf) ↦₄ valid_word true ∗
      ic_loaded gfs gi cov logstart kf inumf dnf bmf ∗
      ity_shot gyf (di_type dnf) ∗
-     inode_ref_short kf (qf + sf)%Qp qf dev inumf)%I.
+     (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
+     ifreeze_off (bv_unsigned inumf) ∗
+     inode_ref_short kf (qf + sf)%Qp qf dev inumf ∗
+     (* ...and its PROVENANCE UNIT (item 7a-wire): the iunlockput that
+        consumes this bundle spends it. *)
+     runit_any (bv_unsigned inumf))%I.
 
   (* --------------------------------------------------------------- *)
   (*  +0x1a2 -- [elf.phnum = 0], so the phdr loop is skipped entirely. *)

@@ -372,6 +372,10 @@ Section ItruncTail.
               (* §19.6 Part 1: [di_trunc] keeps the type, so itrunc's own
                  [Hstab] about [dn] vs [dn0] is exactly what iupdate wants. *)
               Hstab Hnlk
+              (* §3.1's TYPE NARROWING: itrunc runs BEFORE iput's free
+                 clears the type, so the record it flushes is live and the
+                 contract's new premise is the walk's own [Hdtnz]. *)
+              Hdtnz
               (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0 Hlkbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap

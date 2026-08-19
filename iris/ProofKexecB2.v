@@ -386,10 +386,10 @@ Section KexecB2Body.
     iEval (rewrite Hpp32a) in "Hpc".
     (* ---- +0x32a: jal ra,proc_freepagetable ---- *)
     assert (Htpf : add_vec (mword_of_int (KXB + 0x32a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2084850 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2084778 : mword 21))
                    = mword_of_int KernelSyms.proc_freepagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x32a)) Rra
-              (mword_of_int 2084850 : mword 21) T2 (K - 68)%nat true
+              (mword_of_int 2084778 : mword 21) T2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpf; vm_compute; reflexivity)
               with "Hcg Hpc Hi32a").
@@ -635,7 +635,7 @@ Section KexecB2Body.
     iDestruct (cpu_own_transport CID4 CID13 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                           Hivalid & Hload & #Hity & Hkeep)".
+                           Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     (* [kxc_bad64] pins its own [CID0] from "Hcg", so kexec's exit -- still
        anchored at the section's [CID0] -- is re-anchored there, and the
        crossing fact goes by NAME (durable-notes.md). *)
@@ -651,7 +651,7 @@ Section KexecB2Body.
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
               with "Hcg Hcnt Htext Hpc Hfab Hslkk Hslkd Hslpid Hdep
-                    Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits
+                    Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                     Hcont").
     iApply (kxc_frameBpin_to_A6 sp0 ra0 s00 s10 s20 pv av
@@ -809,7 +809,7 @@ Section KexecB2Loops.
        hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     rewrite /kxc_res.
     iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins & Hbits & Hbs & Hpt &
@@ -921,10 +921,10 @@ Section KexecB2Loops.
                                            (zeros' 12 : mword 12))).
     { rewrite HN4a0 Hbase. reflexivity. }
     assert (Htwa : add_vec (mword_of_int (KXB + 0x100) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2082642 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2082570 : mword 21))
                    = mword_of_int KernelSyms.walkaddr) by lpcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x100)) Rra
-              (mword_of_int 2082642 : mword 21) N4 (K - 68)%nat true
+              (mword_of_int 2082570 : mword 21) N4 (K - 68)%nat true
               ltac:(lnz) ltac:(rdok)
               ltac:(rewrite Htwa; vm_compute; reflexivity)
               with "Hcg Hpc Hi100").
@@ -1005,21 +1005,21 @@ Section KexecB2Loops.
       iEval (rewrite Hpp0d2) in "Hpc".
       (* +0x0d2 addi a0,a0,3482 *)
       iApply (wp_addi4_s_sconf (mword_of_int (KXB + 0xd2)) Ra0 Ra0
-                (mword_of_int 3482 : mword 12) Np1 (K - 68)%nat true
+                (mword_of_int 3410 : mword 12) Np1 (K - 68)%nat true
                 ltac:(lnz) ltac:(rdok) with "Hcg Hpc Hi0d2").
       iIntros (CIDp2 Hsp2) "Hcg Hpc".
       set (Np2 := <[Regidx Ra0 := regval_into_reg
                      (add_vec (rget Np1 Ra0)
-                        (sign_extend' 64 (mword_of_int 3482 : mword 12)))]> Np1).
+                        (sign_extend' 64 (mword_of_int 3410 : mword 12)))]> Np1).
       assert (Hpp0d6 : add_vec_int (mword_of_int (KXB + 0xd2) : mword 64) 4
                        = mword_of_int (KXB + 0xd6)) by lpcw.
       iEval (rewrite Hpp0d6) in "Hpc".
       (* +0x0d6 jal ra,panic -- and panic() never returns *)
       assert (Htpn : add_vec (mword_of_int (KXB + 0xd6) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2080742 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2080670 : mword 21))
                      = mword_of_int KernelSyms.panic) by lpcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXB + 0xd6)) Rra
-                (mword_of_int 2080742 : mword 21) Np2 (K - 68)%nat true
+                (mword_of_int 2080670 : mword 21) Np2 (K - 68)%nat true
                 ltac:(lnz) ltac:(rdok)
                 ltac:(rewrite Htpn; vm_compute; reflexivity)
                 with "Hcg Hpc Hi0d6").
@@ -1322,7 +1322,7 @@ Section KexecB2Loops.
         exact (HD3get r Hr Hne). }
       (* ---- the resources readi asks for ---- *)
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                             Hivalid & Hload & #Hity & Hkeep)".
+                             Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       iDestruct (kxc_load_peel with "Hload") as
         (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Hmap
                & Hblocks)".
@@ -1376,7 +1376,7 @@ Section KexecB2Loops.
       iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                    inumf dnf bmf gilf gislf
                    with "Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                         Hity Hkeep") as "Hopen".
+                         Hity Hfrz Hkeep Hru") as "Hopen".
       (* ---- the register facts on the far side of readi ---- *)
       assert (HM2s2 : M2 !!! Regidx Rs2
                       = (mword_of_int (Z.of_nat nn) : mword 64)).
@@ -1579,7 +1579,7 @@ Section KexecB2Loops.
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
           { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                         Hesc Hslks Hireg Hprocs Hdevi Hdgeom
+                                         Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
                                          Hdlock"). }
           { rewrite /kxc_res.
             iSplitL "Hopen"; [iExact "Hopen" |].
@@ -1629,7 +1629,7 @@ Section KexecB2Loops.
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
         { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                       Hesc Hslks Hireg Hprocs Hdevi Hdgeom
+                                       Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
                                        Hdlock"). } }
 
     (* ---- +0x10e: bgeu s9,a5,+0x0da ---- *)

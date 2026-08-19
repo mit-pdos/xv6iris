@@ -109,13 +109,13 @@ Set Printing Depth 40.
    [bcache]'s geometry, then [ByteBuf.bb_align_z] ---- *)
 Lemma wh_align_arith (kk qq : Z) :
   0 <= kk -> kk < 30 -> 0 <= qq -> qq <= 255 ->
-  (2147582488 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
-  /\ 0 <= 2147582488 + 1112 * kk + (88 + 4 * qq)
-  /\ 2147582488 + 1112 * kk + (88 + 4 * qq) < 18446744073709551616.
+  (2147582504 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
+  /\ 0 <= 2147582504 + 1112 * kk + (88 + 4 * qq)
+  /\ 2147582504 + 1112 * kk + (88 + 4 * qq) < 18446744073709551616.
 Proof.
   intros H1 H2 H3 H4. split_and!; [| lia | lia].
-  replace (2147582488 + 1112 * kk + (88 + 4 * qq))
-    with ((536895644 + 278 * kk + qq) * 4) by lia.
+  replace (2147582504 + 1112 * kk + (88 + 4 * qq))
+    with ((536895648 + 278 * kk + qq) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -132,8 +132,8 @@ Proof.
   destruct (wh_align_arith (Z.of_nat k) (Z.of_nat q)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia) ltac:(lia) ltac:(lia))
     as (Hm & Hlo & Hhi).
-  replace (0x80018200 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
-    with (2147582488 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
+  replace (0x80018210 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
+    with (2147582504 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
   apply bb_align_z; assumption.
 Qed.
 
@@ -622,14 +622,14 @@ Section WriteHeadBlocks.
     iEval (rewrite Hpp48) in "Hpc".
     (* ===== +0x48 jal ra,bwrite ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.write_head + 0x48)) Rra
-              (mword_of_int 2093440 : mword 21) T1 (K - 4)%nat b
+              (mword_of_int 2093368 : mword 21) T1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi48").
     iIntros (CID2 Hs2) "Hcg Hpc".
     set (T2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.write_head + 0x48) : mword 64) 4)]> T1).
     assert (Htgtbw : add_vec (mword_of_int (KernelSyms.write_head + 0x48) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093440 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2093368 : mword 21))
                      = mword_of_int KernelSyms.bwrite)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbw) in "Hpc".
@@ -738,14 +738,14 @@ Section WriteHeadBlocks.
     iEval (rewrite Hpp4e) in "Hpc".
     (* ===== +0x4e jal ra,brelse ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.write_head + 0x4e)) Rra
-              (mword_of_int 2093484 : mword 21) T3 (K - 4)%nat b
+              (mword_of_int 2093412 : mword 21) T3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4e").
     iIntros (CID5 Hs5) "Hcg Hpc".
     set (T4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.write_head + 0x4e) : mword 64) 4)]> T3).
     assert (Htgtbl : add_vec (mword_of_int (KernelSyms.write_head + 0x4e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093484 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2093412 : mword 21))
                      = mword_of_int KernelSyms.brelse)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbl) in "Hpc".
@@ -1496,13 +1496,13 @@ Section ProofWriteHead.
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 addi s2,s2,-1826 *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x10)) Rs2 Rs2
-              (mword_of_int 2320 : mword 12) R3 (K - 4)%nat b
+              (mword_of_int 2264 : mword 12) R3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (R4 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (rget R3 Rs2)
-                     (sign_extend' 64 (mword_of_int 2320 : mword 12)))]> R3).
+                     (sign_extend' 64 (mword_of_int 2264 : mword 12)))]> R3).
     assert (HR4s2 : R4 !!! Regidx Rs2 = log_addr).
     { rewrite /R4 upd_eq. rgne. rewrite /R3 upd_eq /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1556,14 +1556,14 @@ Section ProofWriteHead.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c jal ra,bread ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.write_head + 0x1c)) Rra
-              (mword_of_int 2093270 : mword 21) R6 (K - 4)%nat b
+              (mword_of_int 2093198 : mword 21) R6 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1c").
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.write_head + 0x1c) : mword 64) 4)]> R6).
     assert (Htgtbr : add_vec (mword_of_int (KernelSyms.write_head + 0x1c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093270 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2093198 : mword 21))
                      = mword_of_int KernelSyms.bread)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbr) in "Hpc".
@@ -1813,13 +1813,13 @@ Section ProofWriteHead.
       iEval (rewrite Hpp30) in "Hpc".
       (* +0x30 addi a4,a4,-1810 : a4 := &log.lh.block[0] *)
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x30)) Ra4 Ra4
-                (mword_of_int 2336 : mword 12) B3 (K - 4)%nat b
+                (mword_of_int 2280 : mword 12) B3 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30").
       iIntros (CID18 Hs18) "Hcg Hpc".
       set (B4 := <[Regidx Ra4 := regval_into_reg
                     (add_vec (rget B3 Ra4)
-                       (sign_extend' 64 (mword_of_int 2336 : mword 12)))]> B3).
+                       (sign_extend' 64 (mword_of_int 2280 : mword 12)))]> B3).
       assert (HB4a4 : B4 !!! Regidx Ra4 = lh_block 0%nat).
       { rewrite /B4 upd_eq. rgne. rewrite /B3 upd_eq.
         rewrite /lh_block /log_pa /log_addr /pa_add /add_vec_int.

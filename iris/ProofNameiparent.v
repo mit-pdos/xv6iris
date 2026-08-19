@@ -185,7 +185,7 @@ Section ProofNameiparentMain.
        resource ONCE, and never write [pjv] again. *)
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
-              #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
+              #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -363,7 +363,7 @@ Section ProofNameiparentMain.
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true) Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
-                    Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
+                    Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog").
     all: try lkbelow.
     iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv w)
@@ -574,7 +574,7 @@ Section ProofNameiparentMain.
            HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
-              #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
+              #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -585,7 +585,7 @@ Section ProofNameiparentMain.
               size dev used cwdv plen pfun nfun n Sb0
               pidv dq dqb dqs dqc m K eb b
               _ HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' used' Sb' ok nf ipv w)

@@ -76,6 +76,7 @@ Require Import SpecIdup.
 Require Import SpecSafestrcpy.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
+Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -177,10 +178,11 @@ Section KforkB4Res.
   Lemma kfk_child_cwd (k : nat) (q : Qp) (inum : mword 32) :
     (k < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    inode_ref k q icfg_dev inum -∗ cwd_ref (ientry k).
+    inode_ref k q icfg_dev inum -∗ runit_any (bv_unsigned inum) -∗
+    cwd_ref (ientry k).
   Proof.
-    iIntros (Hk Hinum) "Href". iApply cwd_ref_of_held.
-    rewrite /inode_held. iExists k, q, inum. iFrame "Href".
+    iIntros (Hk Hinum) "Href Hru". iApply cwd_ref_of_held.
+    rewrite /inode_held. iExists k, q, inum. iFrame "Href Hru".
     iSplitR; [done|]. iSplitR; [iPureIntro; exact Hk|].
     iPureIntro; exact Hinum.
   Qed.
@@ -193,7 +195,7 @@ End KforkB4Res.
 Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -215,7 +217,7 @@ Section KforkB4Proof.
      and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
       (γf γil γic : gname) (cn : ic_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (nib : nat)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
       (m : regfile) (rsv K lvl : nat) (eb : bool) (lks : gset string) :
@@ -243,6 +245,10 @@ Section KforkB4Proof.
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
+    (* THE INODE REGION -- pure pass-through to the [idup] below, whose
+       [ref++] became a ledger move in increment IVe (iclaim-ledger.md
+       §3.19).  Persistent; this block reads no dinode. *)
+    ireg_inv γic γfs inodestart nib -∗
     (* the child's iref units: the [1] is what [idup] spends here, and
        [IREFSPARE] rides through to the park. *)
     iref_slots (1 + IREFSPARE) -∗
@@ -270,7 +276,7 @@ Section KforkB4Proof.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hms5 Hms4 Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv Hir Hparent Hchild Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv #Hireg Hir Hparent Hchild Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".
@@ -295,7 +301,7 @@ Section KforkB4Proof.
        single-device pin), which is what lets the itable this block holds
        the lock for be named without a coherence premise. *)
     iDestruct (cwd_ref_held (pv_cwd Vp) with "Hpcref") as "Hpcref".
-    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref)".
+    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref & Hcru)".
     set (cdev := icfg_dev).
     (* THE PARENT SHEDS A SHARE (B3).  idup no longer takes a reference: it
        takes a count-0 share, hands it straight back and mints the child's
@@ -362,17 +368,17 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
+    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart inodestart nib
               ck (cq/2)%Qp cdev cinum M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
                  its literal, and only the [rsv] slack is left for [lia]. *)
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
               Hfresh
-              with "Hcg Hown Htext Hpc Hitb Hitinv Hirs Hshr").
+              with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hshr Hcru").
     all: try lkbelow.
     iApply wp_next_off_intro.
-    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".
+    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2) Hcru Hcru2".
     (* THE GATHER: the share comes back at the fraction it left at (nothing
        in idup touches it), so it re-pairs with the short parent and the
        parent's block closes at the fraction it came in with -- no halving. *)
@@ -380,7 +386,7 @@ Section KforkB4Proof.
                  with "Hpkeep Hshr") as "Hiref".
     iEval (rewrite Qp.div_2) in "Hiref".
     iDestruct (kfk_child_cwd ck cq cinum Hcklt Hcinumb
-                 with "Hiref") as "Hpcref1".
+                 with "Hiref Hcru") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
     iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
     iEval (rewrite upd_cwd_id) in "Hparent2".
@@ -409,7 +415,7 @@ Section KforkB4Proof.
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
     iDestruct (kfk_child_cwd ck qn cinum Hcklt Hcinumb
-                 with "Href2") as "Hccref2".
+                 with "Href2 Hcru2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
     iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"

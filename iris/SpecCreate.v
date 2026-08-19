@@ -465,7 +465,21 @@ Section CreateSpec.
        i_valid (ientry k) ↦₄ valid_word true ∗
        ic_loaded γfs γi cov logstart k inum dn bm ∗
        ity_shot g (di_type dn) ∗
-       inode_ref_short_gen k (qi + s)%Qp qi dev inum g)%I.
+       (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.9): this bundle
+          is a CHECKED-OUT entry, i.e. exactly [SpecIunlockput]'s
+          precondition, and since A-prime that precondition includes
+          [ifreeze_off].  create holds it (its own [ilock(ip)] handed it
+          over) and hands it on to whichever of sys_open / sys_mkdir /
+          sys_mknod releases the child. *)
+       ifreeze_off (bv_unsigned inum) ∗
+       inode_ref_short_gen k (qi + s)%Qp qi dev inum g ∗
+       (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
+          This bundle IS [SpecIunlockput]'s precondition, and since item
+          7a-wire that precondition includes the unit the closing iput
+          spends.  create holds it -- it came out of its own iget, or out of
+          [SpecIalloc]'s claim -- and hands it on to whichever of sys_open /
+          sys_mkdir / sys_mknod releases the child. *)
+       runit_any (bv_unsigned inum))%I.
 
   (* Assembled structurally, not by [iFrame]: at the syscall altitude this
      is built at (hundreds of accumulated hypotheses), even a NAMED
@@ -484,16 +498,20 @@ Section CreateSpec.
     i_valid (ientry k) ↦₄ valid_word true -∗
     ic_loaded γfs γi cov logstart k inum dn bm -∗
     ity_shot g (di_type dn) -∗
+    ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
+    runit_any (bv_unsigned inum) -∗
     create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
   Proof.
-    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Href".
+    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
     iSplitL "Hpid"; [iExact "Hpid" |]. iSplitL "Hdep"; [iExact "Hdep" |].
     iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
     iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
-    iSplitL "Hshot"; [iExact "Hshot" | iExact "Href"].
+    iSplitL "Hshot"; [iExact "Hshot" |].
+    iSplitL "Hfrz"; [iExact "Hfrz" |].
+    iSplitL "Href"; [iExact "Href" | iExact "Hru"].
   Qed.
 End CreateSpec.
 
@@ -595,6 +613,15 @@ Definition wp_create_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   SpecDirlink.ic_sleeplocks cn -∗
   ireg_inv γi γfs inodestart nib -∗
+  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
+     borrowed, never spent.  create is the only function in the tree that
+     runs [ialloc], and [SpecIalloc] now takes this because
+     [InodeRegion.ireg_claim_au] -- the one mover that mints a [c] column --
+     does.  It rides the SAME channel [ireg_inv] does, from the syscall
+     dispatch's [sysc_fs_env] down; its producer is the boot chain's
+     ([IcacheRef.ity_shoot] on fsinit's [ireg_boot]), terminating at the
+     EXISTING [LinkForkretNF.wp_forkret_nf_ax] IOU. *)
+  ireg_open -∗
   (* ---- the four superblock cells ---- *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

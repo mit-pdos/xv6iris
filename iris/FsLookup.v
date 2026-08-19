@@ -540,7 +540,7 @@ Definition wp_dirlookup_tree_body
     (γfs : fs_names) (γi : gname)
     (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
@@ -606,6 +606,10 @@ Definition wp_dirlookup_tree_body
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
+  (* the inode region: iget's premise since iclaim-ledger.md §3.3, relayed
+     verbatim.  The tree layer neither reads nor names a dinode through it
+     -- the hit arm's iget opens it ghost-only, on the ledger columns. *)
+  ireg_inv γi γfs inodestart nib -∗
   iref_slot -∗
   (* the directory's OUT-EDGES, borrowed for the licence and returned
      verbatim on both arms (§1.3 makes them a client-held fragment) *)
@@ -638,6 +642,10 @@ Definition wp_dirlookup_tree_body
              /\ (mf !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ientry kslot⌝ ∗
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
+            (* the minted provenance unit (item 7a-wire) *)
+            runit_any
+              (bv_unsigned
+                 (zero_extend' 32 (dir_inum data k : mword 16) : mword 32)) ∗
             (if hasp
              then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * k)) : mword 32)
              else emp)
@@ -667,7 +675,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (γfs : fs_names) (γi : gname)
       (cn : ic_names) (gtl : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -678,7 +686,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
-                             γa γf cov logstart nib dev ip bm data dn
+                             γa γf cov logstart inodestart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks.
   Proof.
@@ -686,7 +694,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     intros HK Hlg Hbwf Hbcov Hszb Hdio Hdisj Horph Hdpi Hj Hgs Ha0 Ha2 Heb Hlkb.
     iIntros "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap Hfdir
              Hname Hpoff Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
-             Hitb2 Hitbl Hesc Hisl Hedges Hcont".
+             Hitb2 Hitbl Hesc Hireg Hisl Hedges Hcont".
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
     (* licence (c)'s only demand on the record: an allocated one.  The
        tree layer has it by construction -- a directory node's type is
@@ -698,15 +706,15 @@ Module FsLookupTree (DL : DIRLOOKUP).
       with "[Hedges]" as "Hedges".
     { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
-              γa γf cov logstart nib dev ip (inum_of dpi) bm data dn dn
+              γa γf cov logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
-              Hdio Hdisj Horph Htynz Hj Hgs Ha0 Ha2 Heb Hlkb
+              Hdio Hdisj Horph Htynz eq_refl Hj Hgs Ha0 Ha2 Heb Hlkb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv
                     Hidev Hmeta Hmap Hblocks Hname Hpoff
                     Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
-                    Hitb2 Hitbl Hesc Hisl Hedges Hdiat").
+                    Hitb2 Hitbl Hesc Hireg Hisl Hedges Hdiat").
     iIntros (CIDd Hgd mf found k kslot q)
       "%Hcs Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
        Hedges Hdiat Harm".
@@ -720,7 +728,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     - iPureIntro. exact Hcs.
     - iApply (fdir_intro γi γfs dpi ents dn bm data Hrep with "Hdiat Hblocks").
     - destruct found.
-      + iDestruct "Harm" as "(%Hpure & Href & Hpf)".
+      + iDestruct "Harm" as "(%Hpure & Href & Hru & Hpf)".
         iSplitR.
         { iPureIntro.
           exact (node_lookup_found ents dn data (bname 14 fn) k Hrep

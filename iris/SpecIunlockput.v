@@ -104,8 +104,13 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
-   its deepest callee is iput (60).  iunlock wants 26. *)
-Notation K_iunlockput := (76%nat) (only parsing).
+   its deepest callee is iput (60).  iunlock wants 26.
+
+   76 -> 78, forced by [K_iput]'s 72 -> 74 (SpecIput.v's note): the walk calls
+   iput at [K - 4], so [K_iput <= K - 4] needs K >= 78.  All eleven
+   iunlockput call sites were re-checked and every one has slack (the
+   tightest is ProofCreate/ProofSysUnlink at K - 10 / K - 30, i.e. 114). *)
+Notation K_iunlockput := (78%nat) (only parsing).
 Definition wp_iunlockput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
@@ -127,7 +132,7 @@ Definition wp_iunlockput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -173,6 +178,11 @@ Definition wp_iunlockput_sconf_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING
+     G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
+     obligation here is iput's.  A runtime caller passes [iLeft] on its
+     persistent copy and may discard what comes back. *)
+  ireg_regime rg -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -185,11 +195,24 @@ Definition wp_iunlockput_sconf_body
   (* the parked record's type witness -- SpecIunlock's new premise, threaded
      verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
   ity_shot gy (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, relayed straight to [SpecIunlock]'s
+     park (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- what the parked arm holds -- now carries
+     [ifreeze_off], so the parker owes it exactly as it owes the type
+     witness above.  Every caller has it: it is the token its own
+     [ilock] handed over, unspent. *)
+  ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
   (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
      iunlock hands the share back and [inode_ref_gather] re-forms the
      canonical [inode_ref k (qi + s)] that iput then spends. *)
   inode_ref_short k (qi + s)%Qp qi dev inum -∗
+  (* THE REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
+     iunlockput is "iunlock; iput", and iput's close SPENDS the unit that
+     rode with this reference since the iget that minted it -- so the wrapper
+     relays it exactly as it relays the reference itself.  Every caller has
+     it: it is what [IcacheRef.inode_held_shed] left on the short parent. *)
+  runit_any (bv_unsigned inum) -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -221,6 +244,8 @@ Definition wp_iunlockput_sconf_body
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
       iref_slot -∗
+      (* RULING G: the regime comes back, on every arm. *)
+      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -254,7 +279,7 @@ Definition wp_iunlockput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -303,6 +328,11 @@ Definition wp_iunlockput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
+  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING
+     G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
+     obligation here is iput's.  A runtime caller passes [iLeft] on its
+     persistent copy and may discard what comes back. *)
+  ireg_regime rg -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -315,11 +345,24 @@ Definition wp_iunlockput_gen_body
   (* the parked record's type witness -- SpecIunlock's new premise, threaded
      verbatim (design fs-icache.md 17.6 (5), ratified 17.7) *)
   ity_shot gy (di_type dn') -∗
+  (* ...AND THE INUM'S FREEZE TOKEN, relayed straight to [SpecIunlock]'s
+     park (iclaim-ledger.md §3.1 A-custody / §3.9 RULING A-prime).
+     [IcacheEscrow.ic_payload] -- what the parked arm holds -- now carries
+     [ifreeze_off], so the parker owes it exactly as it owes the type
+     witness above.  Every caller has it: it is the token its own
+     [ilock] handed over, unspent. *)
+  ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
   (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
      iunlock hands the share back and [inode_ref_gather] re-forms the
      canonical [inode_ref k (qi + s)] that iput then spends. *)
   inode_ref_short k (qi + s)%Qp qi dev inum -∗
+  (* THE REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
+     iunlockput is "iunlock; iput", and iput's close SPENDS the unit that
+     rode with this reference since the iget that minted it -- so the wrapper
+     relays it exactly as it relays the reference itself.  Every caller has
+     it: it is what [IcacheRef.inode_held_shed] left on the short parent. *)
+  runit_any (bv_unsigned inum) -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -367,6 +410,8 @@ Definition wp_iunlockput_gen_body
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
+      (* RULING G: the regime comes back, on every arm. *)
+      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -389,11 +434,11 @@ Module Type IUNLOCKPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb b lks.
+                               pidv dq dqb dqs m K eb b lks rg.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness and at the birth epoch [LogInv.log_opS_named] opens. *)
@@ -415,9 +460,9 @@ Module Type IUNLOCKPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb b lks.
+                             crz e0 pidv dq dqb dqs m K eb b lks rg.
 End IUNLOCKPUT.
