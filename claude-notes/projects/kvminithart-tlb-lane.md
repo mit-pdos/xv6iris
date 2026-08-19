@@ -1,6 +1,6 @@
 # CHECKPOINT: the kvminithart TLB lane (handoff, 2026-08-19)
 
-Branch `hart-node-port`, clean at **`9466bad8`**, nothing pushed.
+Branch `hart-node-port`, clean at **`5f1cf2bf`**, nothing pushed.
 Baseline: **8 red roots**, unchanged all session —
 `ProofKvminithart`, `ProofMain`, `ProofMainSecondary`, `ProofUser`,
 `UserretPt`, `UservecExitPt`, `UserretEntryPt`, `WpUmodeStep`.
@@ -56,7 +56,9 @@ written, built green, and REVERTED for this reason. Do not re-introduce it.
 | `11eb3a09` | `Global Opaque s_tlb_at` |
 | `ba32b71e` | revert of the funnel wiring (see §3) |
 | `9466bad8` | **`swp_run_hart_active_instr_S_res_b`** and the `iApply` diagnosis (see §3) |
-| (this session) | **`WpSmodeIntr.wp_instr_s_sconf_off_clock` is off `sie_cap_to_cells`** — two concrete branches on the arm; 14 s, statement unchanged |
+| `ff11e052` | **`WpSmodePtFetch.wp_instr_s_config_folded`** — the folded engine, both arms |
+| `5f1cf2bf` | **the twelve leaf conversions**; `sda_slot_acc_R` gains `⌜SD ⊆ sda_Drw⌝` |
+| (earlier session) | **`WpSmodeIntr.wp_instr_s_sconf_off_clock` is off `sie_cap_to_cells`** — two concrete branches on the arm; 14 s, statement unchanged |
 
 The nine data sites (`WpSconfLock` 1, `WpSconfMem` 2, `WpPlic` 2,
 `WpVirtioDev` 2, `ProofUart` 2) now keep the translation slot FOLDED exactly
@@ -389,7 +391,41 @@ is the entire fix.  **Profile, don't guess**: `coqc -time` streams, the last
 line is the stalling sentence, and `head -c B <f>.v | wc -l` maps it to a
 line.
 
-### THE LEAF CONVERSION RECIPE (for a fresh agent, no context assumed)
+### THE LEAF CONVERSION RECIPE — **DONE (`5f1cf2bf`), and the two places it
+### was WRONG are marked below.**
+
+**LANDED.**  `WpSmodePtFetch.wp_instr_s_config_folded` (`ff11e052`, both arms,
+no admits, 8.8 s) and all twelve leaves on it (`5f1cf2bf`; Mem 11.4 s, Leaves
+7.6 s, Ctl 4.7 s, Btype 4.8 s).  Every leaf statement verified byte-identical
+against the pre-conversion tree, header by header; 282 insertions against 300
+deletions, i.e. shorter, exactly as the sconf-tier precedent was.  Whole tree
+at the 8 pre-existing red roots throughout.  **The engine compiled first try
+from the construction recorded below** — the 4b-section text is accurate and
+worth trusting if any of it has to be redone.
+
+Two corrections, both of which cost a compile:
+
+* **`sda_slot_acc_R` DID NOT HAND OUT `⌜SD ⊆ sda_Drw⌝`, AND THE SIX MEMORY
+  LEAVES NEED IT.**  A data walk may FILL the TLB, so the leaf's landing file
+  is `register_set tlb tvx (sda_rs …)` and has to be normalised back onto the
+  tower with `sda_rw_ext_D`, whose first premise is exactly that subset.
+  `WpIntrInv.sda_slot_acc` (the `strans_regime` twin the sconf tier uses) has
+  the conjunct; the `R`-generic one did not.  Added as its SECOND conjunct, so
+  the ipat is `(%Hdisj & %Hsub & %Hsok & %Hpok & %Hside & Hrw & Hro & HRes &
+  Hclose)` — matching the twin — and both arms pay it outright (`reflexivity`
+  at `sda_Drw`, `empty_subseteq` at `sda_Drwb = ∅`).
+* **THE CLOSER MUST BE FRAMED INTO `swp_mono`'s CONTINUATION BUCKET.**  Every
+  memory leaf runs its access under `iApply (swp_mono with "[…] [-]")`, and
+  `[-]` swallows `Hclose` into the access itself; the re-seal after the access
+  then fails with `iPoseProof: "Hclose" not found`.  Write
+  `with "[Hmie Hmdl Hclk HPC HnPC Hclose] [-]"`.  (`WpSconfMem`'s converted
+  sites already do this — its bucket lists `Hclose` — which is what the recipe
+  should have copied.)
+
+Two smaller things the recipe over-prescribed: `pose proof Hpmpok as (HA &
+Hord & HX & HW & HR & Hcov)` destructures `pmp_ent0_ok` fine and KEEPS the
+whole (the proj1/proj2 chains are unnecessary), and the leaf's `Hpok` is
+still a plain `destruct`.
 
 **It is TWELVE sites, not 44.**  The 44 figure counted every regime-generic
 statement that would have needed the rejected `SrWalks` binder.  Under the
@@ -508,9 +544,11 @@ Precedent worth reading first: the nine sconf-tier sites converted onto
 `sda_slot_acc` in commits `553d1630`, `c694f217`, `25812c05` — every one came
 out SHORTER than before, and these should too.
 
-**THE FOLDED ENGINE: WALKING BRANCH PROVED, BARE BRANCH NOT WRITTEN.**  The
-walking branch compiled end to end in `WpSmodePtFetch.v` before being stripped
-(it cannot land beside an `Admitted` Bare branch).  It is a close
+**THE FOLDED ENGINE — LANDED AS `WpSmodePtFetch.wp_instr_s_config_folded`
+(`ff11e052`), BOTH ARMS, 8.8 s, no admits.**  What follows is the
+construction as built; it went green first try from this text.  (Before the
+landing the walking branch had compiled once and been stripped, since it
+cannot land beside an `Admitted` Bare branch.)  It is a close
 transformation of `SmodeCorePt.wp_instr_s_config_regime`, and these are the
 edits — all of them verified by that compile, so redoing it is mechanical:
 
@@ -558,19 +596,25 @@ FLIPPED the arm, so the re-open after the leaf is `sr_slot_acc` (not
 served: the walking one by PARKING its tlb cell in the closer, the Bare one
 directly.
 
-**STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
-absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
-the layering is already right, `WpSmodePtEngine.v` is `_CoqProject` 110 vs
-`SRegime.v` 150, and `sda_Drwb = ∅`, `sda_frames_b`, `sda_frames_in_b`,
-`sda_rw_ext_D`, the `sda_in_*_D` family and `WpSmodePtFetch.sda_translate_D`
-(already generic in `R` AND in the write set) all exist from the sconf-tier
-lane.  Then re-shape the engine's leaf obligation to pass the slot folded and
-convert the 44 leaf proofs onto it (statements untouched — verified
-byte-identical against `main`), fetch side case-split into two concrete arms.
-Step 3: the flip proper.  Land each green; a strangler (new folded engine
-beside the old one, leaves moved in batches, old engine deleted last) keeps
-every commit green because the old cell-handout fields stay inhabitable until
-the flip.
+**STEPS 1 AND 2 ARE DONE; ONLY STEP 3, THE FLIP, IS LEFT.**  Step 1 was the
+record's `sr_slot_acc` (`87bcf24b`/`699d619f`); step 2 was
+`sda_slot_acc_R` (`ab61dc0f`), the folded engine (`ff11e052`) and the twelve
+leaves (`5f1cf2bf`).  The strangler held: the old cell-handout engines and
+the record's `sr_swp_open` / `sr_swp_close` are still inhabited and still
+carry `SmodeCorePt.wp_instr_s_sr` (consumerless), so every commit stayed
+green.
+
+**Step 3, the flip proper, is NOT started and is dispatched separately.**  It
+is the list under "The rest of 4b is unblocked once this lands" below: drop
+`tlb ↦ᵣ tlbv` from `bare_inv`; restrict `sie_cap_to_cells` / `_of_cells` to
+`b = true`; simplify the Bare branch of `sie_cap_frame_acc` /
+`sie_cap_cells_at` / `sda_slot_acc` / `sda_slot_acc_R` (each currently PARKS
+that cell in its closer — post-flip there is nothing to park, and the same
+goes for `wp_instr_s_config_folded`'s Bare branch, which parks it in
+`sr_close_at_b`); delete `wp_instr_s_config_sr` / `wp_instr_s_sr` and the two
+cell-handout engines with them; revert `52f89133`'s BootBridge / SpecMain
+routing.  kvminithart's / `ProofMain`'s / `ProofMainSecondary`'s
+`tlb ↦ᵣ tlbvec0` premises STAY.
 
 ### (superseded analysis, kept for the record) why the naive reading said
 ### "the tlb cell is in the LEAF's obligation, not just the engine's" 
