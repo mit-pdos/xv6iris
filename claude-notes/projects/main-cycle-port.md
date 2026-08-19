@@ -2713,27 +2713,16 @@ Each line is a ROOT: every file that merely depends on one is skipped by
   the switch needs.  (Two arm-specific variants that did that were
   written and then removed; the comment in the file says why.)
 
-**WHAT IS LEFT IN THE LANE**, in order:
-
-1. **The `csrw satp` leaf at Supervisor — THE SWITCH.**  ProofKvminithart's
-   +0x1c block is raw for the same reason the sfences were.  Unlike them it
-   should be a NODE WALK, not an `swp_hmrun_of_exec`: `HartSCsr.
-   swp_execute_CSRReg_w_p` is already CSR-generic and `wp_csrw_stvec_s_sconf`
-   (WpSconfCsr.v) is the template — what it needs at `csr_satp` is
-   `hval_check_CSR_result_S` fed by
-   `UserretDefs.exec_check_CSR_result_csrw_satp_S` (exists) and an
-   `swp_write_CSR_satp_S` (does not).  Its interface is cells too: the
-   `satp` cell in, rewritten out.  The slot move (Bare arm → KPT arm) is
-   the CALLER's, exactly as in the raw block — `strans_inv_acc_bare`,
-   `tlb_res_pt_intro`, `strans_flip`, `strans_inv_intro`.
-2. Ruling 1 (already recorded above, "RULINGS ON THE TAIL-1 ITEMS" item 1,
-   with the unsatisfiability diagnosis at "BLOCKED (1)").
-3. **ProofKvminithart**: the three raw blocks become three leaf
-   applications; `tlbz1` / `Hnone1` from +0x08 must survive to +0x1c.
-4. **ProofMain / ProofMainSecondary**: `SpecMain.main_hart_raw` is already
-   `strans_pending ∗ trap_csrs_raw`, so `iDestruct "Hhart" as "(Hsbit &
-   Htlb & Htcsr)"` over-destructs into `trap_csrs_raw`; and `mn_grp_kvm`
-   drops its own `tlb ↦ᵣ tlbvec0` premise with the spec.
+**THE LANE IS CLOSED.**  The switch leaf (`WpSconfCsr.wp_csrw_satp_s_sconf`),
+the KPT-arm sfence (`WpSconfSfence.wp_sfence_vma_kpt_s_sconf`) and
+ProofKvminithart itself all landed; the state and the design decisions are in
+[`kvminithart-tlb-lane.md`](kvminithart-tlb-lane.md) §4c.  The one shape rule
+worth carrying to any other slot-moving leaf: **a leaf cannot hand the
+translation slot out and still be a leaf** — `sie_cap` holds `strans_inv`
+folded and `sconf_step_obl` demands it back inside the step, so an
+arm-flipping instruction re-seals in its own step and the POLICY comes in as
+a caller wand (`… -∗ |={⊤}=> strans_inv ∗ Rout`, `swp_fupd_post` in the
+swp's post).
 
 ### THE KVMINITHART LANE: THE SETTLED ANSWER (2026-08-19)
 

@@ -1,14 +1,14 @@
-# CHECKPOINT: the kvminithart TLB lane (handoff, 2026-08-19)
+# CHECKPOINT: the kvminithart TLB lane (handoff)
 
-**4b IS COMPLETE, AND THE THREE SIDE LANES ARE INTEGRATED.**  Branch
-`hart-node-port`, clean at **`c08bfc54`**, nothing pushed.
+**4a, 4a′, 4b AND 4c ARE ALL COMPLETE — THIS LANE'S ROOT IS CLOSED.**
+Branch `hart-node-port`, nothing pushed.
 
-Red roots **8 → 5**.  `ProofMain` and `ProofMainSecondary` went green with
-the flip (the revert of `52f89133` fixed their `iDestruct "Hhart"`
-over-destructure, exactly as predicted); `UserretPt` went green with the
-trampoline merge.  **What is left: `ProofKvminithart` (4c) plus `ProofUser`,
-`UserretEntryPt`, `UservecExitPt`, `WpUmodeStep` (4d)** — none of them this
-lane's.
+**What is left is 4d, and none of it is this lane's:** `ProofUser`,
+`UserretEntryPt`, `UservecExitPt`, `WpUmodeStep`, and `BootChain` — the
+last of which 4c did not break but UNCOVERED (it sits behind
+`LinkMain` → `LinkKvminithart`, so it had never been reached; its failure
+is `minstret_inv_alloc`, the twin of `WpUmodeStep`'s `minstret_inv_body`,
+i.e. one MinstretInv-port gap with two consumers).
 
 **THE INTEGRATION (2026-08-19), three worktree branches all based at
 `08a0c5bc`, merged `--no-ff` in this order, full tree validated after each:**
@@ -756,27 +756,55 @@ BootBridge / SpecMain routing.  kvminithart's / `ProofMain`'s /
 drops the incoming cell), so the only caller that would need a cell-free
 close is one framing at `s_Drwb` — and after 4a there is none.
 
-### 4c. kvminithart itself (closes 1 root) — **THE NEXT THING TO DO**
+### 4c. kvminithart itself — **DONE.**  Three raw blocks, two new leaves.
 
-`ProofMain` / `ProofMainSecondary` are already closed: the flip's revert of
-`52f89133` fixed their `iDestruct "Hhart"` over-destructure, so this step
-now closes ONE root, not three.
+`ProofKvminithart` is green and `SpecKvminithart` never moved.  What landed,
+and the two things the plan for it got wrong:
 
-Port `ProofKvminithart`'s three raw blocks (+0x08, +0x1c, +0x20) onto
-`WpSconfSfence.wp_sfence_vma_s_sconf` (cell-premise, already landed) plus a
-`csrw satp` switch leaf whose composer half is landed
-(`WpSconfCsr.swp_write_CSR_satp_S`). The switch leaf takes the `tlb` cell as a
-caller argument and takes only satp/pmp from `strans_inv_acc_bare` — which
-post-flip hands out satp and the PMP pair and NOTHING else, which is exactly
-what makes kvminithart's own `Htlb` survive from the flush at +0x08 to
-`tlb_res_pt_intro` at +0x1c.  The first error to meet is at
-`ProofKvminithart.v:133` (`iIntro: cannot turn (▷ sconf_step_obl …) into a
-universal quantifier` — the raw-step shape, not a missing lemma).
+* **`WpSconfCsr.wp_csrw_satp_s_sconf`** — the switch, a node walk on the
+  `wp_csrw_stvec_s_sconf` template over the two-cell `pw2_*` frame at
+  satp/mstatus, through `swp_execute_CSRReg_w_p` with `swp_write_CSR_satp_S`
+  for the write.  **Its check is `hval_check_CSR_result_satp_S_w`, NOT
+  `hval_check_CSR_result_S`:** satp's `check_CSR` reads `mstatus.TVM`, which
+  is outside `D_m`, so the generic S-mode transport cannot serve and the
+  file's own `D_ms` twin is what exists for it.
+* **A LEAF CANNOT HAND THE SLOT OUT AND STILL BE A LEAF.**  `sie_cap` holds
+  `strans_inv` FOLDED, so a caller cannot open the Bare arm before the leaf
+  runs, and `sconf_step_obl` demands `sie_cap` back at the end of the step —
+  so a satp write, which makes `bare_inv` unsatisfiable, MUST re-seal inside
+  its own step.  The way to keep the policy out of the leaf is a **caller
+  wand**: the leaf opens with `strans_inv_acc_bare`, writes, and hands the
+  caller `satp` (rewritten), `pmp_config`, the `stvec` cell and both pending
+  halves, taking back `strans_inv ∗ Rout` under a `|={⊤}=>`
+  (`HartSwp.swp_fupd_post` is what lets that run in the swp's post).
+  kvminithart's proof of the wand is the pre-move block's own script —
+  `tlb_res_pt_intro` / `strans_flip` / `strans_inv_intro` — funded by the
+  `tlb` cell it has held since +0x08.  `Rout` is an `iProp` parameter, so
+  nothing write-set-parameterised reaches the cycle's WP goal (§3).
+  The landing satp is stated as `satp_legalized satp0 wval` with `satp0`
+  ∀-bound: the Bare arm is existential in satp, and collapsing it is one
+  `satp_legalized_sv39` rewrite at the site that knows the word.
+* **THE TWO SFENCES NEED TWO LEAVES.**  +0x08 is the cells leaf
+  (`wp_sfence_vma_s_sconf`) and its flush must survive in hand to +0x1c.  By
+  +0x20 the cell is back INSIDE the slot, so the cells leaf cannot serve;
+  the new **`WpSconfSfence.wp_sfence_vma_kpt_s_sconf`** borrows it out of the
+  KPT arm the receipt pins (`strans_inv_acc_kpt` / `tlb_res_pt_open`),
+  flushes, and re-seals at the residue's OWN snapshot.  That is not the
+  deleted Bare variant returning: `bare_inv` is existential in the tlb value
+  and `tlb_res_pt` is not, and nothing downstream reads this flush.  Same
+  borrow shape as `WpSconfCsr.wp_csrr_satp_kpt_s_sconf`.
 
-**NOTE for 4c:** the satp switch FLIPS THE ARM inside its own `execute`. That
-is why `sie_cap_cells_at` exists; do not be surprised by it.
+Costs: `WpSconfCsr` 26 s, `WpSconfSfence` 2.4 s, `ProofKvminithart` 3.6 s;
+the whole port is 296 insertions against 184 deletions, of which
+`ProofKvminithart` itself is 241 lines SHORTER.
 
-### 4d. The other three roots — independent, and none of them small
+One paper cut worth keeping: **`ltac:(rgne; exact H)` in argument position
+fails with `The LHS of rget_ne does not match any subterm of the goal`** when
+the leaf has an `iProp` parameter after the register file — the splice
+happens while that argument is still an evar.  Name the premise in an
+`assert` and pass it.  (Same family as durable-notes' inline-`ltac:` trap.)
+
+### 4d. The other roots — independent, and none of them small
 
 * `UservecExitPt` and `UserretEntryPt`.  **The engines they were waiting on
   now all EXIST** (this is the biggest change from the integration):
@@ -791,9 +819,12 @@ is why `sie_cap_cells_at` exists; do not be surprised by it.
   missing `Require`/instantiation, not a missing lemma) and
   `UserretEntryPt.v:120`.  Recipe: `main-cycle-port.md`'s trampoline
   section, "WHAT IS LEFT".
-* `WpUmodeStep` references `minstret_inv_body`, which no longer exists —
-  `MinstretInv.minstret_inv` is `emp` post-port. Needs porting to the trivial
-  form.
+* `WpUmodeStep` references `minstret_inv_body` and `BootChain` (line ~322)
+  references `minstret_inv_alloc`, neither of which exists any more —
+  `MinstretInv.minstret_inv` is `emp` post-port.  ONE gap, two consumers;
+  both need porting to the trivial form.  `BootChain` only became visible
+  when 4c closed `ProofKvminithart`, since it sits behind
+  `LinkMain` → `LinkKvminithart`.
 * `ProofUser` needs P7 §5 assembly plus the last two memory arms
   (`arm_STORECON_u`, `arm_AMO_u`), blocked on `u_sc_pure` covering only the
   reservation-held outcome. See `user-tier-port.md` §16.
