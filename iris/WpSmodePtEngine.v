@@ -846,6 +846,22 @@ Section SdaFrames.
     iIntros "H". iExact "H".
   Qed.
 
+  (* the write-frame extension at an ARBITRARY data write set below
+     [sda_Drw] -- what a leaf handed an abstract set by
+     [WpIntrInv.sda_slot_acc] normalises its landing file with.  [sda_ro_ext]
+     needs no twin: it never mentions the write set. *)
+  Lemma sda_rw_ext_D (D : gset register) (rs rs' : regstate) :
+    D ⊆ sda_Drw ->
+    reg_agree_on (sda_Drw ∪ sda_Dro) rs rs' ->
+    hreg_frame rs D -∗ (hreg_frame rs' D : iProp Σ).
+  Proof.
+    intros Hsub Hag.
+    rewrite (hreg_frame_ext _ _ D
+      (reg_agree_mono (sda_Drw ∪ sda_Dro) D _ _
+         (transitivity Hsub (union_subseteq_l sda_Drw sda_Dro)) Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
   Lemma sda_ro_ext (Df : register -> dfrac) (rs rs' : regstate) :
     reg_agree_on (sda_Drw ∪ sda_Dro) rs rs' ->
     hreg_frame_ro Df rs sda_Dro -∗ (hreg_frame_ro Df rs' sda_Dro : iProp Σ).

@@ -1848,7 +1848,7 @@ Section IntrEngine.
     reg_pointsto misa DfracDiscarded MISA_C -∗
     ∃ (SD : gset register) (satp0 : mword 64) (tlbv : type_of_register tlb)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
-      ⌜ SD ## sda_Dro ⌝ ∗ ⌜ strans_satp_ok satp0 ⌝ ∗
+      ⌜ SD ## sda_Dro ⌝ ∗ ⌜ SD ⊆ sda_Drw ⌝ ∗ ⌜ strans_satp_ok satp0 ⌝ ∗
       ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
       sda_tr_obl SD kt dq mst0 menv0 satp0 pmar0 pcfg paddr tlbv ∗
       hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) SD ∗
@@ -1881,6 +1881,7 @@ Section IntrEngine.
                          Hmisa") as "[Hrw Hro]".
       iExists sda_Drwb, satp0, tlbv, pcfg, paddr.
       iSplitR; [iPureIntro; exact sda_disj_b |].
+      iSplitR; [iPureIntro; rewrite /sda_Drwb; apply empty_subseteq |].
       iSplitR; [iPureIntro; left; exact Hmode |].
       iSplitR; [iPureIntro; exact Hpok |].
       iSplitR "Hrw Hro Hpend Hstv Htlb".
@@ -1939,6 +1940,7 @@ Section IntrEngine.
                          Hmisa") as "[Hrw Hro]".
       iExists sda_Drw, satp0, tlbvec, pcfg, paddr.
       iSplitR; [iPureIntro; exact sda_disj |].
+      iSplitR; [iPureIntro; reflexivity |].
       iSplitR; [iPureIntro; right; exact Hsokk |].
       iSplitR; [iPureIntro; exact Hpok |].
       iSplitR "Hrw Hro Hkpt Hsnap".

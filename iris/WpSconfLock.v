@@ -941,9 +941,10 @@ Section WpSconfLock.
           Hmdl & Hmenv)".
       pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
                           HMPP & HTVM).
-      iDestruct (sie_cap_to_cells (CID := CID) with "Hcap")
-        as (satp0 tlbv pcfg paddr)
-        "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & HRes & Hstk & Harm & #Hwit)".
+      (* THE SLOT STAYS FOLDED -- the pre-port shape.  The frame comes out of
+         [WpIntrInv.sda_slot_acc] below, which is the one place the two
+         translation arms are told apart. *)
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -978,16 +979,15 @@ Section WpSconfLock.
       pose proof (off_bound_div pa 4 ltac:(lia) ltac:(exists 1024; lia) Halign4)
         as Hoff.
       rewrite (uint_unsigned_n _) in Hoff.
+      (* ---- THE FRAME, OUT OF THE FOLDED SLOT.  The write set [SD] is
+             abstract here: [sda_Drw] under the kernel table, the EMPTY
+             set under Bare.  Nothing below looks inside it. ---- *)
+      iDestruct (sda_slot_acc (CID := CID) kt (DfracOwn 1) mst0 MENVCFG_S
+                   pmar0 eq_refl HSXL HMPRV (pma_all_ram Hpma_all)
+                   with "Htr Hms Hpriv Hmenv Hpma Hhtif Hmisa")
+        as (SD satp0 tlbv pcfg paddr)
+        "(%Hdisj & %Hsub & %Hsok & %Hpok & Htrobl & Hrw & Hro & HRes & Hclose)".
       destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-      (* ---- the cells become the data-access frame ---- *)
-      iAssert (hreg_frame (CID := CID)
-                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) sda_Drw ∗
-               hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
-                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) sda_Dro)%I
-        with "[Htlb Hms Hpriv Hmenv Hsatp Hpcfg Hpaddr]" as "[Hrw Hro]".
-      { rewrite sda_frames.
-        iFrame "Htlb Hms Hpriv Hmenv Hsatp Hpcfg Hpaddr".
-        iFrame "Hpma Hhtif Hmisa". }
       iAssert (sr_swp_res (strans_regime (CID := CID))
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
         with "[HRes]" as "HRes".
@@ -1002,9 +1002,9 @@ Section WpSconfLock.
       assert (Hea : add_vec (tp_pin (CID := CID) m !!! Regidx rs1) (zeros' 64)
                     = pa) by (rewrite Lpin_rs1; reflexivity).
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
       2:{ iApply (swp_execute_AMOSWAP_S_ex_mode (CID := CID)
-                    sda_Drw sda_Dro (sda_Df (DfracOwn 1))
+                    SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                     rs2 rs1 rd (tp_pin (CID := CID) m) (pa_of ppn pa)
                     pmar0 pcfg paddr
@@ -1015,8 +1015,8 @@ Section WpSconfLock.
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
                     (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
-                    sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                    sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                    Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                    (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                     (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_pma _ _ _ _ _ _ _)
                     (sda_rs_pcfg _ _ _ _ _ _ _) (sda_rs_paddr _ _ _ _ _ _ _)
                     (sda_rs_htif _ _ _ _ _ _ _)
@@ -1034,19 +1034,20 @@ Section WpSconfLock.
                     (pa_aligned_div ppn pa 4 ltac:(lia) ltac:(exists 1024; lia)
                        Halign4)
                     Hrd
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [] [HTc] []").
-          - (* the data translation *)
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HTc] []").
+          - (* the data translation, ALREADY DISCHARGED at [SD] by the
+               accessor -- this leaf never learns which arm it is on *)
             iIntros "Hfrag HRes Hrw Hro".
             rewrite Hea.
-            iApply (sda_translate (CID := CID) (strans_regime (CID := CID)) kt KT0
-                      (DfracOwn 1) (Atomic (AMOSWAP, true, false, Data, Data))
-                      KP_rw mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv pa ppn rr
-                      (or_intror (or_intror (or_intror
-                         (ex_intro _ true (ex_intro _ false eq_refl)))))
-                      eq_refl eq_refl HSXL HMPRV Hsok
-                      ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                      (pma_all_ram Hpma_all) Hcan Hid
-                      with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
+            iApply ("Htrobl" $! KT0 (Atomic (AMOSWAP, true, false, Data, Data))
+                      KP_rw pa ppn rr with "[%] [%] [%] [%] [%] Hwit Hk Hcert
+                      Hfrag HRes Hrw Hro").
+            + apply _.
+            + exact (or_intror (or_intror (or_intror
+                       (ex_intro _ true (ex_intro _ false eq_refl))))).
+            + exact eq_refl.
+            + exact Hcan.
+            + exact Hid.
           - (* the exclusive READ node: open the invariant, read, close *)
             iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
@@ -1128,7 +1129,7 @@ Section WpSconfLock.
       iSplitR; [done|].
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (CID := CID)
-                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Drw ∗
+                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) SD ∗
                  hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                  strans_res_at (CID := CID) satp0 tv2)%I
@@ -1139,7 +1140,7 @@ Section WpSconfLock.
                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
           iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hro") as "Hro".
@@ -1150,10 +1151,9 @@ Section WpSconfLock.
                  register_lookup_set) in "HRes".
           rewrite irrelevant_register_set; [| vm_compute; reflexivity].
           rewrite sda_rs_satp. iExact "HRes". }
-      iCombine "Hrw Hro" as "Hrwro".
-      iEval (rewrite sda_frames) in "Hrwro".
-      iDestruct "Hrwro" as "(Htlb & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg &
-                            Hpaddr & _ & _)".
+      (* the slot re-seals itself, at the landing tlb value *)
+      iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes") as
+        "(Htr & Hms & Hpriv & Hmenv)".
       iExists (add_vec_int pc 4), mst0,
               (<[Regidx rd := regval_into_reg (amoswap_loaded bytes)]> m), n.
       iFrame "HPC HnPC".
@@ -1166,13 +1166,8 @@ Section WpSconfLock.
                     = <[Regidx rd := regval_into_reg (amoswap_loaded bytes)]> m
                         !!! Regidx csp_rs1)
         by (symmetry; apply upd_ne; congruence).
-      iSplitL "Hsatp Htlb Hpcfg Hpaddr HRes Hstk Harm".
-      { iApply (sie_cap_of_cells (CID := CID) kt
-                  (<[Regidx rd := regval_into_reg (amoswap_loaded bytes)]> m)
-                  n b p satp0 tv2 pcfg paddr Hsok
-                  ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                  with "Hsatp Htlb Hpcfg Hpaddr HRes [Hstk Harm]").
-        rewrite /sie_cap_rest -Hsp. iFrame "Hstk Harm Hwit". }
+      iSplitL "Htr Hstk Harm".
+      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hwit". }
       iSplitL "Hfile".
       { iEval (rewrite (tp_pin_upd m rd
                           (regval_into_reg (amoswap_loaded bytes))
