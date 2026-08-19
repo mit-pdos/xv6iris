@@ -59,10 +59,23 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   (A1c): the rel→acq `ppo_op` arm + view-domination extension; land
   `dep_dom`; a named top-level `srvwmo_ok`; the residue notes as
   comments.  BLOCKED ON R1's commit (shared tree in flux).
-- **A2 — T2 completion**: extend the soundness theorems for the new
-  arms; the projection unblocks once the alphabet carries deps
-  (`proj_lbl` keeps operand lists; `cfg_match` equality then holds with
-  `_d` step functions).
+- **A1c — mechanization: DONE (2026-08-19, `01e17da1`).**  One
+  presentation refinement worth knowing: rule 7 is stated TWICE — as
+  `ppo_op`'s fifth arm (`rel_acq_po`, the global/ppo form) AND as
+  `ax_rel_ord` (its gmo-consistency rendering in the file's local-axiom
+  style: `rel_ord ; fr ; gmo|W` forbidden), because the counterexample's
+  return leg is TIMESTAMP order on different-byte writes, which is not a
+  `co`/`ob_op` edge — the local form is where the constraint bites.
+  `rel_ord` = rule 7 composed through a non-empty acquire read with
+  rule 5 (the acquire absorbs `w_vRel` into `w_vrNew`, so the release
+  keeps ordering later steps); the empty-acquire exclusion is
+  load-bearing.  `cand_rl_free` is GONE (A3(i) done);
+  `srvwmo_consistent`/`srvwmo_realizable` are the named top level;
+  `promise_free_complete_local` now uses FIVE local axioms,
+  ob-acyclicity still unused.  Remaining premise: `cand_pub_clean`.
+- **A2 — T2 completion**: the erasure simulation (design doc's settled
+  block) + `dep_dom` landed as its invariant + the safety-form adequacy;
+  after R3.
 - **A3 — T1 completion** (much smaller than feared — the induction
   exists): (i) drop `cand_rl_free` by adding the rel→acq `ppo_op` arm
   and extending the view-domination lemma's dominator case; (ii) drop
