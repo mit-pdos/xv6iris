@@ -1321,7 +1321,7 @@ Section IreclaimOrphan.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref Hlic").
     all: try lkbelow.
-    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href Hru Hlic".
+    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts [Href Hru] Hlic".
     (* the minted unit.  [BufL] is not the claim licence, so what iget
        minted is the PLAIN unit, which under RULING C' is exactly what a
        rest home carries. *)
@@ -1887,7 +1887,7 @@ Section IreclaimOrphan.
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
-                    Hireg Hboot Hslk Href Hru Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
+                    Hireg Hboot Hslk [$Href $Hru] Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl [] Hop").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

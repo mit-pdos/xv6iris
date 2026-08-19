@@ -2874,6 +2874,140 @@ Section IcacheRef.
     Timeless (inode_ref_short k qt qi dev inum).
   Proof. apply _. Qed.
 
+  (* ------------------------------------------------------------------
+     THE FLAVOURED REFERENCE PACKAGE (SIMP-2, ghost-simplification.md §5.1)
+
+     NOT a new invention: [inode_held] below has been the package since
+     item 7a-wire (reference ∗ unit, flavour existential), and the walker
+     cone plus both rest homes already speak it.  What SIMP-2 does is push
+     the SAME shape DOWN into the four fs contracts that still spell the
+     unbundled trio -- [SpecIget]'s post, [SpecIput]/[SpecIunlockput]'s
+     pre, [SpecIdup]'s two sides, [SpecIalloc]'s receipt -- so that iget
+     hands back ONE resource and iput demands ONE.  Each restatement is a
+     RENAME (the intro/spend lemmas below are [iFrame]/[reflexivity]);
+     none of them adds content, and that is the satisfiability discipline
+     (iclaim-ledger.md §5''''): every package has an INTRO lemma stated
+     from exactly the producer site's rows.
+
+     The flavour is an INDEX rather than an existential here because the
+     mint site knows it ([is_claim l] at iget) and the two consumers want
+     different ones: ialloc's own [ClaimL] reference carries
+     [runit_claim], everything else carries the plain unit.  [inode_refp]
+     -- the plain form -- is the one and only shape that ever reaches an
+     iput, because ilock's ClaimK arm ([ireg_withdraw]) CONVERTS the claim
+     flavour before any close (RULING C').  So [inode_refb true] needs no
+     spend form, and [inode_held] is [inode_refp] with its indices hidden. *)
+
+  Definition inode_refb (b : bool) (k : nat) (q : Qp)
+      (dev inum : mword 32) : iProp Σ :=
+    (inode_ref k q dev inum ∗ runit b (bv_unsigned inum))%I.
+
+  (* the plain, iput-consumable form.  Under RULING C' [runit false] IS
+     [runit_any], so this is [inode_refb false] on the nose
+     ([inode_refb_false_refp], by [reflexivity]) -- but it is spelled with
+     [runit_any] so that its ONE delta step lands on precisely the pair
+     [SpecIput] states today, with no iota in the way at the ~30 landed
+     positional sites that unpack it. *)
+  Definition inode_refp (k : nat) (q : Qp) (dev inum : mword 32) : iProp Σ :=
+    (inode_ref k q dev inum ∗ runit_any (bv_unsigned inum))%I.
+
+  Lemma inode_refb_false_refp k q dev inum :
+    inode_refb false k q dev inum ⊣⊢ inode_refp k q dev inum.
+  Proof. reflexivity. Qed.
+
+  (* SAT: exactly [SpecIget]'s two post rows, at any flavour.  The
+     producer-side witness -- iget's post packs with zero new content. *)
+  Lemma inode_refb_intro b k q dev inum :
+    inode_ref k q dev inum -∗ runit b (bv_unsigned inum) -∗
+    inode_refb b k q dev inum.
+  Proof. iIntros "H1 H2". iFrame. Qed.
+
+  Lemma inode_refb_elim b k q dev inum :
+    inode_refb b k q dev inum ⊣⊢
+    inode_ref k q dev inum ∗ runit b (bv_unsigned inum).
+  Proof. reflexivity. Qed.
+
+  (* SPEND: exactly [SpecIput]'s two premise rows, so the package-shaped
+     iput contract is a rename and nothing more. *)
+  Lemma inode_refp_spend k q dev inum :
+    inode_refp k q dev inum ⊣⊢
+    inode_ref k q dev inum ∗ runit_any (bv_unsigned inum).
+  Proof. reflexivity. Qed.
+
+  Lemma inode_refp_intro k q dev inum :
+    inode_ref k q dev inum -∗ runit_any (bv_unsigned inum) -∗
+    inode_refp k q dev inum.
+  Proof. iIntros "H1 H2". iFrame. Qed.
+
+  (* THE SHORT-PARENT PACKAGE.  [wp_iunlockput_*] is "iunlock; iput", and
+     what its caller holds across the call is not a whole reference but the
+     PARENT of the carve it made for ilock -- so the row it states is
+     [inode_ref_short] beside the same unit, and its package is this.  The
+     unit rides with the SHORT PARENT and not with the travelling share
+     (item 7a-wire: a share is not a reference and pays for no count move),
+     which is exactly what makes [inode_refp_carve] below an equivalence:
+     carving a share out of a package leaves a short package, and gathering
+     puts the reference back together with its unit still attached. *)
+  Definition inode_refp_short (k : nat) (qt qi : Qp)
+      (dev inum : mword 32) : iProp Σ :=
+    (inode_ref_short k qt qi dev inum ∗ runit_any (bv_unsigned inum))%I.
+
+  Lemma inode_refp_carve k q s dev inum :
+    inode_refp k (q + s)%Qp dev inum ⊣⊢
+    inode_refp_short k (q + s)%Qp q dev inum ∗ inode_shr k s dev inum.
+  Proof.
+    rewrite /inode_refp /inode_refp_short inode_ref_carve.
+    iSplit; [iIntros "[[$ $] $]" | iIntros "[[$ $] $]"].
+  Qed.
+
+  Lemma inode_refp_gather k q s dev inum :
+    inode_refp_short k (q + s)%Qp q dev inum -∗ inode_shr k s dev inum -∗
+    inode_refp k (q + s)%Qp dev inum.
+  Proof. iIntros "Hp Hs". rewrite inode_refp_carve. iFrame. Qed.
+
+  Lemma inode_refp_canon k q dev inum :
+    inode_refp k q dev inum ⊣⊢ inode_refp_short k q q dev inum.
+  Proof.
+    rewrite /inode_refp /inode_refp_short inode_ref_canon. reflexivity.
+  Qed.
+
+  Global Instance inode_refp_short_timeless k qt qi dev inum :
+    Timeless (inode_refp_short k qt qi dev inum).
+  Proof. apply _. Qed.
+
+  (* THE CLAIM PACKAGE -- [SpecIalloc]'s receipt, whole.  Its elim is
+     [InodeRegion.inode_claimed_to_ClaimK]: the pair after the reference IS
+     [ireg_wd_lic (ClaimK ty)], i.e. exactly what create's fill presents to
+     ilock, so the receipt travels as one row and unpacks in one destruct. *)
+  Definition inode_claimed (ty : bv 16) (k : nat) (q : Qp)
+      (dev inum : mword 32) : iProp Σ :=
+    (inode_ref k q dev inum ∗
+     runit_claim (bv_unsigned inum) ∗
+     iclaim (bv_unsigned inum) ty)%I.
+
+  (* SAT: exactly [SpecIalloc]'s three receipt rows. *)
+  Lemma inode_claimed_intro ty k q dev inum :
+    inode_ref k q dev inum -∗ runit_claim (bv_unsigned inum) -∗
+    iclaim (bv_unsigned inum) ty -∗
+    inode_claimed ty k q dev inum.
+  Proof. iIntros "H1 H2 H3". iFrame. Qed.
+
+  Lemma inode_claimed_elim ty k q dev inum :
+    inode_claimed ty k q dev inum ⊣⊢
+    inode_ref k q dev inum ∗ runit_claim (bv_unsigned inum) ∗
+    iclaim (bv_unsigned inum) ty.
+  Proof. reflexivity. Qed.
+
+  Global Instance inode_refb_timeless b k q dev inum :
+    Timeless (inode_refb b k q dev inum).
+  Proof. rewrite /inode_refb /runit. destruct b; apply _. Qed.
+  Global Instance inode_refp_timeless k q dev inum :
+    Timeless (inode_refp k q dev inum).
+  Proof. apply _. Qed.
+  Global Instance inode_claimed_timeless ty k q dev inum :
+    Timeless (inode_claimed ty k q dev inum).
+  Proof. apply _. Qed.
+
 End IcacheRef.
 
 (* ===================================================================== *)
@@ -2904,12 +3038,25 @@ Section IcacheHeld.
      lives HERE, at the package, rather than being spelled beside it at each
      home: one edit, and not one of those contracts changes shape.
      The FLAVOUR is existential -- a holder does not care which licence paid
-     for its reference, only that it has the unit iput will demand. *)
+     for its reference, only that it has the unit iput will demand.
+     RESTATED OVER THE PACKAGE (SIMP-2): the last two conjuncts ARE
+     [inode_refp], on the nose -- [inode_refp]'s single delta step is the
+     pair that used to be spelled here, so every landed positional
+     unpacking of [inode_held] reads exactly as before. *)
   Definition inode_held (v : mword 64) : iProp Σ :=
     (∃ (k : nat) (q : Qp) (inum : mword 32),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
-       inode_ref k q icfg_dev inum ∗ runit_any (bv_unsigned inum))%I.
+       inode_refp k q icfg_dev inum)%I.
+
+  (* the one-unfold view: [inode_held] IS a package with its indices hidden *)
+  Lemma inode_held_refp v :
+    inode_held v ⊣⊢
+    ∃ (k : nat) (q : Qp) (inum : mword 32),
+      ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+      ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+      inode_refp k q icfg_dev inum.
+  Proof. reflexivity. Qed.
 
   Global Instance inode_held_timeless v : Timeless (inode_held v).
   Proof. apply _. Qed.
@@ -2982,8 +3129,7 @@ Section IcacheHeld.
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜qt = (qi + s)%Qp⌝ ∗
-       inode_ref_short k qt qi icfg_dev inum ∗
-       runit_any (bv_unsigned inum))%I.
+       inode_refp_short k qt qi icfg_dev inum)%I.
 
   (* ...and the GENERATION-NAMED form of the travelling share (design §17.3
      piece 4).  [FileInv.inode_pay] records the generation its slice belongs

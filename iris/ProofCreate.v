@@ -3078,7 +3078,7 @@ Section ProofCreateMain.
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                         Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
-                        Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
+                        Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
@@ -3509,7 +3509,7 @@ Section ProofCreateMain.
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                           Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
-                          Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
+                          Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                           Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
@@ -3733,7 +3733,7 @@ Section ProofCreateMain.
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                             Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep
-                            Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz Hckeep2 Hruc Hsbb
+                            Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz [$Hckeep2 $Hruc] Hsbb
                             Hsbi Hbmr Hppid Hprocs Hdevi Hgeom Hdlk Hbsl []
                             Hop").
             all: try lkbelow.
@@ -4257,7 +4257,7 @@ Section ProofCreateMain.
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                         Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
-                        Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
+                        Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
@@ -5556,7 +5556,7 @@ Section ProofCreateMain.
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                              Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev
-                             Hiinum Hivalid Hload Hshotl' Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr
+                             Hiinum Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                              Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
              all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
@@ -5897,7 +5897,7 @@ Section ProofCreateMain.
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                       Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
-                      Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
+                      Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                       Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
@@ -6360,7 +6360,7 @@ Section ProofCreateMain.
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
-                    Hcivalid Hcload Hcshot' Hcfrz Hckp Hruc Hsbb Hsbi Hbmr Hppid Hprocs
+                    Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -6524,7 +6524,7 @@ Section ProofCreateMain.
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
-                    Hivalid Hload Hshotl' Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid Hprocs
+                    Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -7176,7 +7176,7 @@ Section ProofCreateMain.
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
-                    Hcivalid Hcload Hcshot' Hcfrz Hckp Hruc Hsbb Hsbi Hbmr Hppid Hprocs
+                    Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -7273,7 +7273,7 @@ Section ProofCreateMain.
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
-                    Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid Hprocs
+                    Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -9049,7 +9049,7 @@ Section ProofCreateMain.
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                           Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev
-                          Hiinum Hivalid Hload Hshotf Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr
+                          Hiinum Hivalid Hload Hshotf Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                           Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }

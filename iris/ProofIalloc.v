@@ -500,9 +500,11 @@ Section IallocDefs.
                /\ dn' = ialloc_fresh ty
                /\ di_type dn' = ty
                /\ fresh_shape dn'⌝ ∗
-              inode_ref kslot q dev inum ∗
-              runit_claim (bv_unsigned inum) ∗
-              iclaim (bv_unsigned inum) ty ∗
+              (* SIMP-2: the receipt as ONE row, exactly [SpecIalloc]'s
+                 post.  [ia_arms] below still carries the three constituents
+                 separately -- that is the epilogue's internal shape, and the
+                 pack happens once, here, where the contract is met. *)
+              inode_claimed ty kslot q dev inum ∗
               log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
          else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
               iref_slot ∗
@@ -744,7 +746,8 @@ Section IallocEpilogue.
         split; [exact Hav |]. split; [exact Hks |]. split; [exact Hinum |].
         split; [exact Hnib |]. split; [reflexivity |].
         split; [exact (ialloc_fresh_type ty) | exact (ialloc_fresh_shape ty Hty)]. }
-      iFrame "Href Hru Hclaim Hop".
+      iSplitR "Hop"; [| iExact "Hop" ].
+      iApply (inode_claimed_intro with "Href Hru Hclaim").
   Qed.
 
 End IallocEpilogue.
@@ -1715,7 +1718,9 @@ Section IallocClaim.
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref
                     Hclaim").
     all: try lkbelow.
-    iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href Hru Hclaim".
+    (* SIMP-2: iget's post is ONE row ([IcacheRef.inode_refb]); the two
+       halves are what the claim arm carries on, so split at the intro. *)
+    iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hclaim".
     (* the minted unit, at the CLAIM flavour and KEPT there (RULING C'):
        [runit (is_claim (ClaimL ty))] IS [runit_claim], which is what
        [ireg_withdraw]'s ClaimK arm converts at create's fill. *)
@@ -3326,11 +3331,9 @@ Section IallocMain.
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hppid Hsl [Harm]");
       [exact Hcs |].
     destruct alloc.
-    - iDestruct "Harm" as "(%Hp & Href & Hru & Hclaim & HopS)".
+    - iDestruct "Harm" as "(%Hp & Hpkg & HopS)".
       iSplitR; [iPureIntro; exact Hp |].
-      iSplitL "Href"; [iExact "Href" |].
-      iSplitL "Hru"; [iExact "Hru" |].
-      iSplitL "Hclaim"; [iExact "Hclaim" |].
+      iSplitL "Hpkg"; [iExact "Hpkg" |].
       iApply (log_opS_op with "HopS").
     - iDestruct "Harm" as "(%Hp & Hiref & HopS)".
       iSplitR; [iPureIntro; exact Hp |].

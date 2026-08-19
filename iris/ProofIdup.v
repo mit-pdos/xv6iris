@@ -77,6 +77,8 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import InstrBytes.  (* SIMP-2: [pc_is], spelled by the core lemma below *)
+Require Import KernelText.  (* SIMP-2: [kernel_text], likewise *)
 Require Import CodeIdup.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIdup.
@@ -142,16 +144,54 @@ Section ProofIdup.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
-  Lemma wp_idup_sconf
+  (* ---- THE CORE, AT THE SHARE (SIMP-2) -------------------------------
+     This is the contract [wp_idup_sconf] used to BE, and the whole walk
+     below still proves exactly it: [ip->ref++] runs on a SHARE (see the
+     file header for why a share, and only a share, is what the mover
+     needs), hands the share back untouched, and mints the new reference
+     out of the table's retained identity slice.
+
+     What SIMP-2 changed is the PUBLIC face, not this: the carve and the
+     gather that every caller used to perform around the call moved inside,
+     so the contract now speaks [IcacheRef.inode_held] -- the package both
+     callers already hold -- and this core is derived-from, not stated by,
+     [SpecIdup].  The derivation below is the whole of the difference. *)
+  Local Lemma wp_idup_core
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
-      (K : nat) (b : bool) (lks : gset string)
-    : wp_idup_sconf_body γl cn γfs γi cov logstart inodestart nib k s dev inum
-                         m n eb p K b lks.
+      (K : nat) (b : bool) (lks : gset string) :
+    let pcE : mword 64 := mword_of_int KernelSyms.idup in
+    let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+    (K_idup <= K)%nat ->
+    (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+    (k < NINODE)%nat ->
+    m !!! Regidx (mword_of_int 10 : mword 5) = ientry k ->
+    locks_below lks "itable" ->
+    sie_cap_gpr KT1 m K b p -∗
+    cpu_own n eb p b lks -∗
+    kernel_text -∗ pc_is pcE -∗
+    is_itable2 γl cn γfs γi cov logstart nib dev -∗
+    itable_inv -∗
+    ireg_inv γi γfs inodestart nib -∗
+    iref_slot -∗
+    inode_shr k s dev inum -∗
+    runit_any (bv_unsigned inum) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ mr,
+      sie_cap_gpr KT1 mr K b p -∗
+      cpu_own n eb p b lks -∗
+      pc_is ret_tgt -∗
+      ⌜ callee_saved m mr
+        /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
+      inode_shr k s dev inum -∗
+      (∃ qn : Qp, inode_ref k qn dev inum) -∗
+      runit_any (bv_unsigned inum) -∗
+      runit_any (bv_unsigned inum) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
-    cbv beta delta [wp_idup_sconf_body].
     intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
 
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -788,6 +828,60 @@ Section ProofIdup.
     repeat split;
       first [ exact Hc2 | exact Hc8 | exact Hc9
             | apply Hthread; vm_compute; first [reflexivity | discriminate] ].
+  Qed.
+
+  (* ---- THE PUBLIC CONTRACT: ONE PACKAGE IN, TWO OUT (SIMP-2) ----------
+     The whole derivation is the carve and the gather the two callers used
+     to perform themselves.  [inode_held] hides the slot, the fraction and
+     the inum; [ientry_inj] recovers the slot from the pointer, the device
+     is the cache's own, and the fraction the caller came in with is the
+     fraction it leaves with -- the mover runs on HALF of it and the other
+     half stays behind as the short parent, exactly as before, but now
+     inside the contract instead of at every call site. *)
+  Lemma wp_idup_sconf
+      (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (k : nat) (dev : mword 32)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
+      (K : nat) (b : bool) (lks : gset string)
+    : wp_idup_sconf_body γl cn γfs γi cov logstart inodestart nib k dev
+                         m n eb p K b lks.
+  Proof.
+    cbv beta delta [wp_idup_sconf_body].
+    intros pcE ret_tgt HK HnZ Hk Ha0 Hdev Hfresh. subst dev.
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Hheld Hcont".
+    iDestruct "Hheld" as (k0 q inum) "(%Hent & %Hk0 & %Hinb & Href & Hru)".
+    assert (Hkk : k0 = k).
+    { symmetry. apply (ientry_inj k k0); [lia | lia | exact Hent]. }
+    subst k0.
+    (* THE CARVE: half the caller's fraction goes across as the share the
+       mover needs; the count fragment stays with the short parent. *)
+    rewrite inode_ref_shed.
+    iDestruct "Href" as "[Hkeep Hshr]".
+    iApply (wp_idup_core γl cn γfs γi cov logstart inodestart nib
+              k (q/2)%Qp icfg_dev inum m n eb p K b lks
+              HK HnZ Hk Ha0 Hfresh
+              with "Hcg Hcnt Htext Hpc Hlock Hinv Hrinv Hislot Hshr Hru
+                    [Hcont Hkeep]").
+    iEval (rewrite /wp_next).
+    iIntros (CID') "%Hq".
+    iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hq |].
+    iIntros (mr) "Hcg Hcnt Hpc %Hpost Hshr (%qn & Hnew) Hru Hru2".
+    (* THE GATHER: the share comes back at the fraction it left at, so the
+       caller's package closes at the fraction it came in with. *)
+    iDestruct (inode_ref_gather k (q/2)%Qp (q/2)%Qp icfg_dev inum
+                 with "Hkeep Hshr") as "Hold".
+    iEval (rewrite Qp.div_2) in "Hold".
+    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hold Hru] [Hnew Hru2]").
+    { exact Hpost. }
+    - iExists k, q, inum.
+      iSplitR; [done |]. iSplitR; [iPureIntro; exact Hk |].
+      iSplitR; [iPureIntro; exact Hinb |].
+      rewrite /inode_refp. iFrame "Hold Hru".
+    - iExists k, qn, inum.
+      iSplitR; [done |]. iSplitR; [iPureIntro; exact Hk |].
+      iSplitR; [iPureIntro; exact Hinb |].
+      rewrite /inode_refp. iFrame "Hnew Hru2".
   Qed.
 
 End ProofIdup.

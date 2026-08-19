@@ -556,7 +556,7 @@ Section ProofNamexRoot.
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl Hlic").
-    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href Hru _".
+    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp [Href Hru] _".
     destruct Higp as (Hcsig & Hkig & Higa0).
     assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
     { rewrite HA3ra. pcw. }

@@ -1755,7 +1755,7 @@ Section ProofSysMknodBody.
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                         Hesc Hireg [] Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                        Hload Hshot Hfrz Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                        Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }

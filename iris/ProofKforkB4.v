@@ -175,17 +175,9 @@ Section KforkB4Res.
      [cwd_ref] is stated over: both are the same canonical
      [IcacheInv.iref_name] by construction ([InodeRef.v]'s header explains
      why). *)
-  Lemma kfk_child_cwd (k : nat) (q : Qp) (inum : mword 32) :
-    (k < NINODE)%nat ->
-    bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    inode_ref k q icfg_dev inum -∗ runit_any (bv_unsigned inum) -∗
-    cwd_ref (ientry k).
-  Proof.
-    iIntros (Hk Hinum) "Href Hru". iApply cwd_ref_of_held.
-    rewrite /inode_held. iExists k, q, inum. iFrame "Href Hru".
-    iSplitR; [done|]. iSplitR; [iPureIntro; exact Hk|].
-    iPureIntro; exact Hinum.
-  Qed.
+  (* RETIRED BY SIMP-2: [kfk_child_cwd] packed a bare reference and a bare
+     unit into a [cwd_ref].  Both of idup's results are [inode_held] now, so
+     the pack is [ProcInv.cwd_ref_of_held] and nothing else. *)
 
 End KforkB4Res.
 
@@ -301,23 +293,23 @@ Section KforkB4Proof.
        single-device pin), which is what lets the itable this block holds
        the lock for be named without a coherence premise. *)
     iDestruct (cwd_ref_held (pv_cwd Vp) with "Hpcref") as "Hpcref".
-    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref & Hcru)".
+    (* SIMP-2: the three hidden data are still read off the package -- the
+       SLOT is what [a0] is set to and the two pure facts are what the
+       child's [cwd_ref] wants back -- but the package itself now travels
+       WHOLE.  What used to stand here (the shed, and the gather after the
+       call) is idup's own business since [SpecIdup] took [inode_held]. *)
+    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hrefp)".
+    iAssert (inode_held (ientry ck)) with "[Hrefp]" as "Hpheld".
+    { iExists ck, cq, cinum.
+      iSplitR; [done |]. iSplitR; [iPureIntro; exact Hcklt |].
+      iSplitR; [iPureIntro; exact Hcinumb |]. iExact "Hrefp". }
     set (cdev := icfg_dev).
-    (* THE PARENT SHEDS A SHARE (B3).  idup no longer takes a reference: it
-       takes a count-0 share, hands it straight back and mints the child's
-       reference from the table's retained slice (design §14.7(3)).  So the
-       parent's own reference is never handed in and never halves -- it goes
-       SHORT for the length of the call ([IcacheRef.inode_ref_shed], a pure
-       resource split: no fupd, no invariant, no mask) and is made whole again
-       by the gather below.
-       IT CANNOT CLOSE ITS BLOCK ANY EARLIER THAN THAT, and that is what our
-       algebra costs against the natR version this is ported from.  There
-       [cwd_ref] could be re-formed from the reference the parent kept; here
-       [cwd_ref] is [inode_held], which demands a CANONICAL pairing, and a
-       short parent has none by construction -- being unspendable while a
-       share is out is exactly what makes shares unable to outlive it. *)
-    iEval (rewrite inode_ref_shed) in "Hiref".
-    iDestruct "Hiref" as "[Hpkeep Hshr]".
+    (* THE SHED THAT USED TO STAND HERE IS GONE (SIMP-2).  idup still runs
+       on a count-0 share and still mints the child's reference from the
+       table's retained slice (design §14.7(3)) -- but the carve, and the
+       gather that made the parent whole again, are now inside the contract,
+       which is why this block hands over one row and gets two back.  The
+       parent's fraction is still the fraction it came in with. *)
     assert (Hpa0a4 : add_vec (rget m Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
@@ -369,24 +361,19 @@ Section KforkB4Proof.
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
     iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart inodestart nib
-              ck (cq/2)%Qp cdev cinum M1 lvl eb pme (rsv + (K - 8))%nat false lks
+              ck cdev M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
                  its literal, and only the [rsv] slack is left for [lia]. *)
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
-              Hfresh
-              with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hshr Hcru").
+              eq_refl Hfresh
+              with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hpheld").
     all: try lkbelow.
     iApply wp_next_off_intro.
-    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2) Hcru Hcru2".
-    (* THE GATHER: the share comes back at the fraction it left at (nothing
-       in idup touches it), so it re-pairs with the short parent and the
-       parent's block closes at the fraction it came in with -- no halving. *)
-    iDestruct (inode_ref_gather ck (cq/2)%Qp (cq/2)%Qp cdev cinum
-                 with "Hpkeep Hshr") as "Hiref".
-    iEval (rewrite Qp.div_2) in "Hiref".
-    iDestruct (kfk_child_cwd ck cq cinum Hcklt Hcinumb
-                 with "Hiref Hcru") as "Hpcref1".
+    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hpheld1 Hpheld2".
+    (* the parent's own package, whole and at its own fraction: straight
+       back into its block. *)
+    iDestruct (cwd_ref_of_held (ientry ck) with "Hpheld1") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
     iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
     iEval (rewrite upd_cwd_id) in "Hparent2".
@@ -414,8 +401,7 @@ Section KforkB4Proof.
     assert (Hstoreval : rget mr Ra0 = ientry ck).
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
-    iDestruct (kfk_child_cwd ck qn cinum Hcklt Hcinumb
-                 with "Href2 Hcru2") as "Hccref2".
+    iDestruct (cwd_ref_of_held (ientry ck) with "Hpheld2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
     iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"

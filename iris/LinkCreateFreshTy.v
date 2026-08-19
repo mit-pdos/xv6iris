@@ -582,7 +582,8 @@ Proof.
   - (* ============================================================== *)
     (*  ALLOCATED: a0 = ientry kslot, the branch FALLS THROUGH        *)
     (* ============================================================== *)
-    iDestruct "Hres" as "(%Hpure & Href & Hruc & Hclaim & Hop)".
+    (* SIMP-2: ialloc's receipt is ONE row now ([IcacheRef.inode_claimed]). *)
+    iDestruct "Hres" as "(%Hpure & Hpkg & Hop)".
     destruct Hpure as (Hia0 & Hkslt & Hinpos & Hinb & Hdn'eq & Hdn'ty & Hdn'fr).
     destruct (Hiregb inum Hinb) as [Hcblk Hcblog].
     (* +0xae c.beqz a0 : NOT taken -- an entry address is never zero *)
@@ -627,6 +628,15 @@ Proof.
     iDestruct (cft_esc_acc cn γfs γi cov logstart kslot Hkslt with "Hesc")
       as "#Hescc".
     iDestruct (cft_slk_acc cn kslot Hkslt with "Hslks") as (gilc gislc) "#Hslkc".
+    (* THE RECEIPT UNPACKS IN ONE STEP (SIMP-2), and what comes out beside
+       the reference IS the licence ilock's claim arm asks for:
+       [InodeRegion.inode_claimed_to_ClaimK] is exactly
+       [ireg_wd_lic (ClaimK ty)], so the pair that used to be assembled by
+       hand at the call below is handed over as it stands.  ([ireg_wd_lic]'s
+       ClaimK arm does not mention its gname, so the [γi] here is any gname
+       in scope and the [gsh] the call wants is convertible with it.) *)
+    iDestruct (inode_claimed_to_ClaimK ty kslot q dev inum γi with "Hpkg")
+      as "[Href Hlic]".
     (* the claimant's reference SHEDS a share for ilock and keeps the rest *)
     iEval (rewrite inode_ref_shed) in "Href".
     iDestruct "Href" as "[Hkeep Hshr]".
@@ -642,11 +652,10 @@ Proof.
               B1 K eb b lks
               HKil Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc Hireg
-                    Hslkc Hshr [Hclaim Hruc] Hsbi Hppid Hprocs Hdevi Hdgeom
+                    Hslkc Hshr Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
                     Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    { iSplitL "Hclaim"; [iExact "Hclaim" | iExact "Hruc"]. }
     iIntros (CID8 Hq8 Mo dnc bmc filled)
       "%Hcso Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hslpid Hdep
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".

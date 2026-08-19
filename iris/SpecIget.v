@@ -272,13 +272,16 @@ Definition wp_iget_sconf_body
     ⌜ callee_saved m mr
       /\ (k < NINODE)%nat
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref k q dev inum -∗
-    (* THE REFERENCE's PROVENANCE UNIT (item 7a-wire): minted here, FLAVOURED
-       by the licence presented -- ialloc's own [ClaimL] iget mints
-       [runit_claim] into its own claim box, every other iget mints
-       [runit_plain].  It rides with the reference for the reference's whole
-       life and is surrendered at the iput that closes it. *)
-    runit (is_claim l) (bv_unsigned inum) -∗
+    (* ONE ROW (SIMP-2): the reference AND its provenance unit, packaged.
+       The unit is minted here and FLAVOURED by the licence presented --
+       ialloc's own [ClaimL] iget mints [runit_claim] into its own claim
+       box, every other iget mints [runit_plain] -- and it rides with the
+       reference for the reference's whole life, to be surrendered at the
+       iput that closes it.  Since it never travels alone, it is no longer
+       spelled alone: [inode_refb] is the pair, and it is the shape
+       [inode_held] and both rest homes already wanted (ghost-simplification
+       §5.1).  A caller that needs the halves gets them in one destruct. *)
+    inode_refb (is_claim l) k q dev inum -∗
     (* ...and BACK, unspent and at the SAME [l] *)
     iname γi γfs inodestart inum l -∗
     WP (Loop : expr riscv_lang)) -∗

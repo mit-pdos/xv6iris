@@ -3653,6 +3653,25 @@ Section InodeRegion.
     | ShotK ty => IcacheRef.ity_shot g ty
     end.
 
+  (* THE CLAIM PACKAGE's ELIM (SIMP-2, ghost-simplification.md §5.1).
+     [IcacheRef.inode_claimed] -- what [SpecIalloc] now hands back as ONE
+     row -- unpacks in a single destruct into the reference the caller
+     keeps and, beside it, EXACTLY [ireg_wd_lic (ClaimK ty)]: the licence
+     create's fill presents to [wp_ilock_sconf].  So the receipt's three
+     rows travel bundled and arrive already in the shape ilock asks for;
+     nothing is proved here that the ClaimK arm did not already state.
+     (The extra [lockG] binder is [IcacheRef.inode_ref]'s, not this
+     lemma's: the reference's liveness slice is stated over the icache
+     lock's ghost theory, and this section does not carry it.) *)
+  Lemma inode_claimed_to_ClaimK `{!WpLock.lockG Σ} ty k q dev inum g :
+    IcacheRef.inode_claimed ty k q dev inum ⊢
+    IcacheRef.inode_ref k q dev inum ∗
+    ireg_wd_lic (ClaimK ty) g (bv_unsigned inum).
+  Proof.
+    rewrite /IcacheRef.inode_claimed /ireg_wd_lic.
+    iIntros "($ & H2 & H3)". iFrame.
+  Qed.
+
   (* ...and what the claim arm BUYS, which is the whole point of item 7 *)
   Definition ireg_wd_ty (o : ilkc) (d : dinode) : Prop :=
     match o with ClaimK ty => di_type d = ty | _ => True end.

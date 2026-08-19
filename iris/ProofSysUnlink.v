@@ -5059,7 +5059,7 @@ Section ProofSysUnlinkBody.
               ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hropen Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
-                    Hivalidd Hloadd Hshotd2 Hfrz Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq
+                    Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbsl [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -5352,7 +5352,7 @@ Section ProofSysUnlinkBody.
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hropen Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
-                    Hivalidi Hloadi Hshoti2 Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpidq
+                    Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -6887,7 +6887,7 @@ Section ProofSysUnlinkBody.
               Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hropen Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
-                    Hivalidd Hloadd Hshotd2 Hfrz Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq
+                    Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -7248,7 +7248,7 @@ Section ProofSysUnlinkBody.
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hropen Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
-                    Hivalidi Hloadi Hshoti2 Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpidq
+                    Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
