@@ -46,6 +46,9 @@ Import Defs.
 
 Require Import WpDecodeBridge DecodeTotalU PtWalkCert UserFetchCert.
 Require Import UserMemCert UserFaultCert MemAccessGen UserTranslate CommonWalk.
+(* the width-16 (AMOCAS.Q) execute layer: [wpair_state], the pair-register
+   reductions and the two width-16 AMO pairs *)
+Require Import UserMemClassifyAmo.
 Set Printing Depth 40.
 
 (* ---------------------------------------------------------------------- *)
@@ -247,12 +250,79 @@ Lemma u_neq_amo (op : amoop) (aq rl : bool) :
   generic_neq (Atomic (op, aq, rl, Data, Data)) (Store PageTableEntry) = true.
 Proof. destruct op, aq, rl; split_and!; vm_compute; reflexivity. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* 0c. THE TWO-GPR LANDING.                                                *)
+(*                                                                        *)
+(* AMOCAS.Q writes rd AND rd+1 ([UserMemClassifyAmo.wpair_state]).  Every   *)
+(* landing fact the tier had was a ONE-write form -- [u_fix_gpr_state] /    *)
+(* [u_tlb_gpr] / [u_mem_gpr], all over [gpr_write_state] -- and the         *)
+(* one-write form is NOT an instance of the pair form: [wpair_state] is     *)
+(* guarded on the OUTSIDE by [generic_neq (Regidx rd) zreg], which          *)
+(* [gpr_write_state] has no counterpart for.  So these are SIBLINGS, not a  *)
+(* generalization, and no landed arm changes.  The footprint side           *)
+(* conditions need nothing new: [Du_gpr_of_Z] / [_r] are already index-     *)
+(* generic, so they apply at [add_vec_int rd 1] unchanged.                  *)
+(* ---------------------------------------------------------------------- *)
+Lemma u_fix_wpair_state (rd : mword 5) (data : mword (64 * 2)) (s : mstate) :
+  reg_agree_on u_Dfix (wpair_state rd data s).(sregs) s.(sregs).
+Proof.
+  unfold wpair_state.
+  destruct (generic_neq (Regidx rd) zreg); [ | apply u_fix_refl ]. cbv zeta.
+  destruct (Z.eqb (uint rd) 0) eqn:H0;
+    destruct (Z.eqb (uint (add_vec_int rd 1)) 0) eqn:H1.
+  - apply u_fix_refl.
+  - rewrite sregs_set_reg. apply u_fix_gpr, Z.eqb_neq, H1.
+  - rewrite sregs_set_reg. apply u_fix_gpr, Z.eqb_neq, H0.
+  - eapply u_fix_trans.
+    + rewrite sregs_set_reg. apply u_fix_gpr, Z.eqb_neq, H1.
+    + rewrite sregs_set_reg. apply u_fix_gpr, Z.eqb_neq, H0.
+Qed.
+
+Lemma u_tlb_wpair (rd : mword 5) (data : mword (64 * 2)) (s : mstate) :
+  register_lookup tlb (wpair_state rd data s).(sregs)
+    = register_lookup tlb s.(sregs).
+Proof.
+  unfold wpair_state.
+  destruct (generic_neq (Regidx rd) zreg); [ | reflexivity ]. cbv zeta.
+  destruct (Z.eqb (uint rd) 0); destruct (Z.eqb (uint (add_vec_int rd 1)) 0).
+  - reflexivity.
+  - rewrite sregs_set_reg. apply u_tlb_irr. reflexivity.
+  - rewrite sregs_set_reg. apply u_tlb_irr. reflexivity.
+  - rewrite sregs_set_reg.
+    etransitivity; [ apply u_tlb_irr; reflexivity | ].
+    rewrite sregs_set_reg. apply u_tlb_irr. reflexivity.
+Qed.
+
+Lemma u_mem_wpair (rd : mword 5) (data : mword (64 * 2)) (s : mstate) :
+  (wpair_state rd data s).(mem) = s.(mem).
+Proof.
+  unfold wpair_state.
+  destruct (generic_neq (Regidx rd) zreg); [ | reflexivity ]. cbv zeta.
+  destruct (Z.eqb (uint rd) 0); destruct (Z.eqb (uint (add_vec_int rd 1)) 0);
+    repeat rewrite mem_set_reg; reflexivity.
+Qed.
+
+(* [UserMemArms]' AMO post-state IS [gpr_write_state]; the two names differ
+   only in where the [regval_into_reg] coercion is spelled. *)
+Lemma wgpr_is_gpr_write (rd : mword 5) (v : mword 64) (s : mstate) :
+  wgpr_state rd v s = gpr_write_state rd v s.
+Proof. reflexivity. Qed.
+
 Section UserMemArmsA.
   Context (pt : uptd).
 
   Local Notation s0r rsf va := (register_set nextPC (add_vec_int va 4) rsf).
   Local Notation s0 rsf mm va :=
     (u_state (register_set nextPC (add_vec_int va 4) rsf) mm).
+  (* the AMO effective address, spelled EXACTLY as [execute_AMO] builds it
+     (offset [zeros' 64], off the TICKED file) -- a Notation, not a
+     Definition: an intermediate address behind a Definition is a conversion
+     bomb against the execute lemmas' premises *)
+  Local Notation eav rsf mm va ir1 :=
+    (add_vec (if Z.eqb (uint ir1) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint ir1)))
+                     (u_state (register_set nextPC (add_vec_int va 4) rsf) mm).(sregs))
+             (zeros' 64)).
 
   (* ------------------------------------------------------------------- *)
   (* 1. THE TRANSLATION-EXCEPTION FLAVOURS, at the three atomic accesses.  *)
@@ -982,6 +1052,331 @@ Section UserMemArmsA.
         | exact Htlbok | exact Hstep ].
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* 7. THE AMO ARM.                                                      *)
+  (*                                                                     *)
+  (* THE ONLY ARM WITH NO [vmem_*] LEVEL.  [execute_AMO] inlines the       *)
+  (* read-modify-write -- its own alignment check, the translate, the      *)
+  (* effective-address announcement, the read, the per-op result, the      *)
+  (* AMOCAS guard, the write and the [wX] -- so [UserMemArms]' five        *)
+  (* execute pairs take the composer's facts DIRECTLY and the arm's case   *)
+  (* tree runs at [execute].  It is still LR's three-arm tree (misaligned  *)
+  (* / aligned+mapped / aligned+faulting), crossed with two further        *)
+  (* splits inside the mapped arm:                                        *)
+  (*                                                                     *)
+  (*   the AMOCAS GUARD [op = AMOCAS && loaded <> rd] -- a boolean, not a  *)
+  (*     case on the op: a mismatch writes rd and stores NOTHING;          *)
+  (*   the WIDTH -- 16 takes the rs2/rd operands as register PAIRS         *)
+  (*     ([UserMemClassifyAmo]'s width-16 layer) and lands on              *)
+  (*     [wpair_state], hence section 0c's two-gpr landing.                *)
+  (*                                                                     *)
+  (* The mem-level aq/rl are NOT the access type's: the leaf reads at      *)
+  (* [(aq, aq && rl)] and writes at [(aq && rl, rl)].                      *)
+  (* ------------------------------------------------------------------- *)
+  Lemma arm_AMO_u (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (w : mword 32)
+      (op : amoop) (aq rl : bool) (rs2 rs1 rd : regidx) (width : word_width_wide) :
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    (width = 1 \/ width = 2 \/ width = 4 \/ width = 8 \/ width = 16) ->
+    exec (ext_decode w) (u_state rsf mm)
+      = Some (AMO (op, aq, rl, rs2, rs1, width, rd), u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w)
+      (AMO (op, aq, rl, rs2, rs1, width, rd)) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    base_post pt t mm rsf va w.
+  Proof.
+    intros Hpfc Hag Hwid Hdec Hhv Hpins Hwf.
+    destruct rs2 as [ir2]. destruct rs1 as [ir1]. destruct rd as [ird].
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    assert (Hk : 0 < width)
+      by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]]; lia).
+    assert (Hk16 : width <= 16)
+      by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]]; lia).
+    assert (Hw2 : (width <=? Z.mul xlen_bytes 2) = true)
+      by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]]; vm_compute; reflexivity).
+    assert (Hkdvd : (width | 4096))
+      by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]];
+          [exists 4096 | exists 2048 | exists 1024 | exists 512 | exists 256];
+          reflexivity).
+    assert (Huintk : uint (to_bits 64 width) = width)
+      by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]]; vm_compute; reflexivity).
+    pose proof (u_data_cfg_tick rsf va 4
+                  (u_data_cfg_of_post_fetch rsf mm va mi Hpfc)) as Hcfg.
+    pose proof (u_pins_tick pt t rsf va 4 Hpins) as Hpins'.
+    pose proof Hcfg as (Lcp & Lms & Lmenv).
+    destruct Lms as (_ & Lmprv & _).
+    pose proof Hpins' as (_ & _ & _ & Htlb0).
+    assert (Heff : exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data))
+                     (register_lookup mstatus (s0 rsf mm va).(sregs)) User)
+                     (s0 rsf mm va) = Some (User, s0 rsf mm va))
+      by exact (exec_effectivePrivilege_mprv0 (Atomic (op, aq, rl, Data, Data)) _ User
+                  (s0 rsf mm va) Lmprv).
+    assert (Heffg : goodmb Du_r Du_w
+                      (effectivePrivilege (Atomic (op, aq, rl, Data, Data))
+                         (register_lookup mstatus (s0 rsf mm va).(sregs)) User)
+                      (s0 rsf mm va) mm = true)
+      by exact (goodmb_effectivePrivilege_mprv0 Du_r Du_w
+                  (Atomic (op, aq, rl, Data, Data)) _ User (s0 rsf mm va) mm Lmprv).
+    destruct (u_pmlen_pure pt t mm mm (s0r rsf va) (Atomic (op, aq, rl, Data, Data))
+                (proj1 (u_neq_amo op aq rl)) (proj1 (proj2 (u_neq_amo op aq rl)))
+                (proj2 (proj2 (u_neq_amo op aq rl))) Hcfg Hpins') as (Hpml & Hpmlg).
+    pose proof (u_translationMode_pure pt t (s0r rsf va) mm Hcfg Hpins') as Htm.
+    pose proof (u_goodmb_translationMode_pure pt t (s0r rsf va) mm mm Hcfg Hpins')
+      as Htmg.
+    destruct (is_aligned_vaddr (Virtaddr (eav rsf mm va ir1)) width) eqn:Hal;
+      last first.
+    - (* MISALIGNED: refused before any walk, state untouched *)
+      apply (finish_mem_base pt t t mm rsf va
+               (AMO (op, aq, rl, Regidx ir2, Regidx ir1, width, Regidx ird))
+               (rv64d_types.Trap (User,
+                  make_sync_exception (E_SAMO_Access_Fault tt) (eav rsf mm va ir1),
+                  register_lookup PC (s0r rsf va))) w
+               (s0 rsf mm va) Hdec Hhv eq_refl).
+      + exact (exec_execute_AMO_u_misaligned op aq rl ir2 ir1 ird width
+                 (register_lookup PC (s0r rsf va)) Sv39 (s0 rsf mm va)
+                 Hw2 Lcp Heff Hpml Htm eq_refl Hal).
+      + exact (goodmb_execute_AMO_u_misaligned Du_r Du_w op aq rl ir2 ir1 ird width
+                 (register_lookup PC (s0r rsf va)) Sv39 (s0 rsf mm va) mm
+                 (fun H => Du_gpr_of_Z_r ir1 H)
+                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                 ltac:(vm_compute; reflexivity)
+                 Hw2 Lcp Heff Heffg Hpml Hpmlg Htm Htmg eq_refl Hal).
+      + exact (u_ok_trap (E_SAMO_Access_Fault tt) _ _
+                 ltac:(vm_compute; reflexivity)).
+      + exact I.
+      + rewrite u_state_sregs. apply u_fix_refl.
+      + rewrite u_state_sregs. exact Htlb0.
+      + rewrite u_state_mem. exact (u_mem_step_refl pt t mm Hwf).
+    - (* ALIGNED: one page by construction, so one walk *)
+      destruct (data_classify (Atomic (op, aq, rl, Data, Data)) (ud_tfp pt)
+                  (ud_um pt) (eav rsf mm va ir1)
+                  (or_intror (or_intror (or_intror (or_intror (or_intror
+                     (ex_intro _ op (ex_intro _ aq (ex_intro _ rl eq_refl))))))))
+                  Hacc)
+        as [ (wp & Hum & Hok & Hcanon) | Hfault ].
+      + (* MAPPED *)
+        destruct (u_amo_pure pt t mm (s0r rsf va) width wp (eav rsf mm va ir1)
+                    op aq rl Hk Hk16 Hkdvd Huintk Hal Hum Hok Hcanon
+                    Hcfg Hpins' Hwf)
+          as (dv & rs' & mm' & t' & Htr & Htrg & Hea & Heag & Hrdm & Hgrdm
+              & Hwrite & Hfile & Htlbok & Hstep & Hcfg' & Hpins'').
+        (* the post-walk certificates read back at the STARTING map *)
+        rewrite (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep) in Heag.
+        rewrite (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep) in Hgrdm.
+        assert (Hland : reg_agree_on u_Dfix rs' (s0r rsf va))
+          by exact (u_fix_of_tlb_only _ _ (u_tlb_only_land _ _ Hfile)).
+        assert (Hcase : (width <=? xlen_bytes) = true \/ width = 16)
+          by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]];
+              [ left | left | left | left | right ]; reflexivity).
+        destruct Hcase as [Hwle | Hw16].
+        * (* widths 1/2/4/8: rs2 and rd are single registers *)
+          pose proof (exec_rX_bits_gpr ird (u_state rs' mm')) as Hrdv.
+          destruct (andb (generic_eq op AMOCAS)
+                      (neq_vec (autocast (T := mword) dv : bits (width * 8))
+                         (trunc (Z.mul (__id width) 8)
+                            (if Z.eqb (uint ird) 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (gpr_of_Z (uint ird)))
+                                    (u_state rs' mm').(sregs))))) eqn:Hguard.
+          -- (* AMOCAS, COMPARE MISMATCH: rd := the loaded value, no store *)
+             apply (finish_mem_base pt t t' mm rsf va
+                      (AMO (op, aq, rl, Regidx ir2, Regidx ir1, width, Regidx ird))
+                      RETIRE_SUCCESS w
+                      (wgpr_state ird
+                         (sign_extend' 64
+                            (autocast (T := mword) dv : bits (width * 8)))
+                         (u_state rs' mm')) Hdec Hhv eq_refl).
+             ++ exact (exec_execute_AMO_u_cas_ne op aq rl ir2 ir1 ird width
+                         (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         dv _ Sv39 (s0 rsf mm va) (u_state rs' mm')
+                         Hwle Hw2 Hrdv Hguard Lcp Heff Hpml Htm Hal Htr Hea Hrdm).
+             ++ exact (goodmb_execute_AMO_u_cas_ne Du_r Du_w op aq rl ir2 ir1 ird
+                         width (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         dv _ Sv39 (s0 rsf mm va) (u_state rs' mm') mm
+                         (fun H => Du_gpr_of_Z_r ir1 H)
+                         (fun H => Du_gpr_of_Z_r ir2 H)
+                         (fun H => Du_gpr_of_Z_r ird H) (Du_gpr_of_Z ird)
+                         ltac:(vm_compute; reflexivity)
+                         ltac:(vm_compute; reflexivity)
+                         Hwle Hw2 Hrdv Hguard Lcp Heff Heffg Hpml Hpmlg Htm Htmg
+                         Hal Htr Htrg Hea Heag Hrdm Hgrdm).
+             ++ exact u_ok_retire.
+             ++ exact I.
+             ++ eapply u_fix_trans; [ apply u_fix_gpr_state | ].
+                rewrite u_state_sregs. exact Hland.
+             ++ rewrite u_tlb_gpr u_state_sregs. exact Htlbok.
+             ++ rewrite u_mem_gpr u_state_mem. exact Hstep.
+          -- (* the RMW stores (every non-CAS op, and a matching AMOCAS) *)
+             (* [u_amo_pure] offers the write at ANY value, so the value has
+                to be NAMED here -- [destruct (Hwrite _)] will not leave it as
+                an evar.  It is the model's per-op result, transcribed. *)
+             pose (rs2v := trunc (Z.mul (__id width) 8)
+                     (if Z.eqb (uint ir2) 0 then zero_reg
+                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint ir2)))
+                             (u_state rs' mm').(sregs)) : bits (width * 8)).
+             pose (lcv := autocast (T := mword) dv : bits (width * 8)).
+             destruct (Hwrite (sign_extend' (Z.mul 8 (__id width))
+                        (match op with
+                         | AMOSWAP => rs2v | AMOADD => add_vec rs2v lcv
+                         | AMOXOR => xor_vec rs2v lcv | AMOAND => and_vec rs2v lcv
+                         | AMOOR => or_vec rs2v lcv
+                         | AMOMIN => if zopz0zI_s rs2v lcv then rs2v else lcv
+                         | AMOMAX => if zopz0zK_s rs2v lcv then rs2v else lcv
+                         | AMOMINU => if zopz0zI_u rs2v lcv then rs2v else lcv
+                         | AMOMAXU => if zopz0zK_u rs2v lcv then rs2v else lcv
+                         | AMOCAS => rs2v end)))
+               as (mm2 & Hwv & Hwvg & Hstep2).
+             apply (finish_mem_base pt t t' mm rsf va
+                      (AMO (op, aq, rl, Regidx ir2, Regidx ir1, width, Regidx ird))
+                      RETIRE_SUCCESS w
+                      (wgpr_state ird
+                         (sign_extend' 64
+                            (autocast (T := mword) dv : bits (width * 8)))
+                         (u_state rs' mm2)) Hdec Hhv eq_refl).
+             ++ exact (exec_execute_AMO_u_store op aq rl ir2 ir1 ird width
+                         (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         dv _ Sv39 (s0 rsf mm va) (u_state rs' mm') (u_state rs' mm2)
+                         Hwle Hw2 Hrdv Hguard Lcp Heff Hpml Htm Hal Htr Hea Hrdm Hwv).
+             ++ rewrite (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep) in Hwvg.
+                exact (goodmb_execute_AMO_u_store Du_r Du_w op aq rl ir2 ir1 ird
+                         width (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         dv _ Sv39 (s0 rsf mm va) (u_state rs' mm') (u_state rs' mm2)
+                         mm
+                         (fun H => Du_gpr_of_Z_r ir1 H)
+                         (fun H => Du_gpr_of_Z_r ir2 H)
+                         (fun H => Du_gpr_of_Z_r ird H) (Du_gpr_of_Z ird)
+                         ltac:(vm_compute; reflexivity)
+                         ltac:(vm_compute; reflexivity)
+                         Hwle Hw2 Hrdv Hguard Lcp Heff Heffg Hpml Hpmlg Htm Htmg
+                         Hal Htr Htrg Hea Heag Hrdm Hgrdm Hwv Hwvg).
+             ++ exact u_ok_retire.
+             ++ exact I.
+             ++ eapply u_fix_trans; [ apply u_fix_gpr_state | ].
+                rewrite u_state_sregs. exact Hland.
+             ++ rewrite u_tlb_gpr u_state_sregs. exact Htlbok.
+             ++ rewrite u_mem_gpr u_state_mem. exact Hstep2.
+        * (* width 16 (AMOCAS.Q): rs2 and rd are register PAIRS *)
+          subst width.
+          destruct (exec_rX_pair_bits_gpr ir2 (u_state rs' mm')) as (rp & Hrp).
+          destruct (exec_rX_pair_bits_gpr ird (u_state rs' mm')) as (rpd & Hrpd).
+          destruct (andb (generic_eq op AMOCAS)
+                      (neq_vec (autocast (T := mword) dv : bits (16 * 8))
+                         (trunc (Z.mul (__id 16) 8) rpd))) eqn:Hguard.
+          -- (* AMOCAS.Q, COMPARE MISMATCH *)
+             apply (finish_mem_base pt t t' mm rsf va
+                      (AMO (op, aq, rl, Regidx ir2, Regidx ir1, 16, Regidx ird))
+                      RETIRE_SUCCESS w
+                      (wpair_state ird
+                         (sign_extend' (Z.mul 64 2)
+                            (autocast (T := mword) dv : bits (16 * 8)))
+                         (u_state rs' mm')) Hdec Hhv eq_refl).
+             ++ exact (exec_execute_AMO_u_cas_ne_16 op aq rl ir2 ir1 ird
+                         (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         rp rpd dv Sv39 (s0 rsf mm va) (u_state rs' mm')
+                         Lcp Heff Hpml Htm Hal Htr Hrp Hrpd Hguard Hea Hrdm).
+             ++ exact (goodmb_execute_AMO_u_cas_ne_16 Du_r Du_w op aq rl ir2 ir1 ird
+                         (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         rp rpd dv Sv39 (s0 rsf mm va) (u_state rs' mm') mm
+                         (fun H => Du_gpr_of_Z_r ir1 H)
+                         (fun H => Du_gpr_of_Z_r ir2 H)
+                         (fun H => Du_gpr_of_Z_r (add_vec_int ir2 1) H)
+                         (fun H => Du_gpr_of_Z_r ird H)
+                         (fun H => Du_gpr_of_Z_r (add_vec_int ird 1) H)
+                         (Du_gpr_of_Z ird) (Du_gpr_of_Z (add_vec_int ird 1))
+                         ltac:(vm_compute; reflexivity)
+                         ltac:(vm_compute; reflexivity)
+                         Lcp Heff Heffg Hpml Hpmlg Htm Htmg Hal Htr Htrg
+                         Hrp Hrpd Hguard Hea Heag Hrdm Hgrdm).
+             ++ exact u_ok_retire.
+             ++ exact I.
+             ++ eapply u_fix_trans; [ apply u_fix_wpair_state | ].
+                rewrite u_state_sregs. exact Hland.
+             ++ rewrite u_tlb_wpair u_state_sregs. exact Htlbok.
+             ++ rewrite u_mem_wpair u_state_mem. exact Hstep.
+          -- (* AMOCAS.Q that stores *)
+             pose (rs2v := trunc (Z.mul (__id 16) 8) rp : bits (16 * 8)).
+             pose (lcv := autocast (T := mword) dv : bits (16 * 8)).
+             destruct (Hwrite (sign_extend' (Z.mul 8 (__id 16))
+                        (match op with
+                         | AMOSWAP => rs2v | AMOADD => add_vec rs2v lcv
+                         | AMOXOR => xor_vec rs2v lcv | AMOAND => and_vec rs2v lcv
+                         | AMOOR => or_vec rs2v lcv
+                         | AMOMIN => if zopz0zI_s rs2v lcv then rs2v else lcv
+                         | AMOMAX => if zopz0zK_s rs2v lcv then rs2v else lcv
+                         | AMOMINU => if zopz0zI_u rs2v lcv then rs2v else lcv
+                         | AMOMAXU => if zopz0zK_u rs2v lcv then rs2v else lcv
+                         | AMOCAS => rs2v end)))
+               as (mm2 & Hwv & Hwvg & Hstep2).
+             apply (finish_mem_base pt t t' mm rsf va
+                      (AMO (op, aq, rl, Regidx ir2, Regidx ir1, 16, Regidx ird))
+                      RETIRE_SUCCESS w
+                      (wpair_state ird
+                         (sign_extend' (Z.mul 64 2)
+                            (autocast (T := mword) dv : bits (16 * 8)))
+                         (u_state rs' mm2)) Hdec Hhv eq_refl).
+             ++ exact (exec_execute_AMO_u_store_16 op aq rl ir2 ir1 ird
+                         (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         rp rpd dv Sv39 (s0 rsf mm va) (u_state rs' mm')
+                         (u_state rs' mm2)
+                         Lcp Heff Hpml Htm Hal Htr Hrp Hrpd Hguard Hea Hrdm Hwv).
+             ++ rewrite (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep) in Hwvg.
+                exact (goodmb_execute_AMO_u_store_16 Du_r Du_w op aq rl ir2 ir1 ird
+                         (Physaddr (u_walk_pa wp (eav rsf mm va ir1))) PBMT_PMA
+                         rp rpd dv Sv39 (s0 rsf mm va) (u_state rs' mm')
+                         (u_state rs' mm2) mm
+                         (fun H => Du_gpr_of_Z_r ir1 H)
+                         (fun H => Du_gpr_of_Z_r ir2 H)
+                         (fun H => Du_gpr_of_Z_r (add_vec_int ir2 1) H)
+                         (fun H => Du_gpr_of_Z_r ird H)
+                         (fun H => Du_gpr_of_Z_r (add_vec_int ird 1) H)
+                         (Du_gpr_of_Z ird) (Du_gpr_of_Z (add_vec_int ird 1))
+                         ltac:(vm_compute; reflexivity)
+                         ltac:(vm_compute; reflexivity)
+                         Lcp Heff Heffg Hpml Hpmlg Htm Htmg Hal Htr Htrg
+                         Hrp Hrpd Hguard Hea Heag Hrdm Hgrdm Hwv Hwvg).
+             ++ exact u_ok_retire.
+             ++ exact I.
+             ++ eapply u_fix_trans; [ apply u_fix_wpair_state | ].
+                rewrite u_state_sregs. exact Hland.
+             ++ rewrite u_tlb_wpair u_state_sregs. exact Htlbok.
+             ++ rewrite u_mem_wpair u_state_mem. exact Hstep2.
+      + (* UNMAPPED / DENIED: the ordinary translate fault *)
+        destruct (u_fault_pair pt t mm (s0r rsf va)
+                    (Atomic (op, aq, rl, Data, Data)) (E_SAMO_Page_Fault tt)
+                    (eav rsf mm va ir1)
+                    (or_intror (or_intror (or_intror (or_intror (or_intror
+                       (ex_intro _ op (ex_intro _ aq (ex_intro _ rl eq_refl))))))))
+                    (proj1 (u_texc_amo op aq rl (s0 rsf mm va)))
+                    (proj1 (proj2 (u_texc_amo op aq rl (s0 rsf mm va))))
+                    (proj2 (proj2 (u_texc_amo op aq rl (s0 rsf mm va))))
+                    Hfault Hcfg Hpins' Hwf) as (Htr & Htrg & _ & _).
+        apply (finish_mem_base pt t t mm rsf va
+                 (AMO (op, aq, rl, Regidx ir2, Regidx ir1, width, Regidx ird))
+                 (rv64d_types.Trap (User,
+                    make_sync_exception (E_SAMO_Page_Fault tt) (eav rsf mm va ir1),
+                    register_lookup PC (s0r rsf va))) w
+                 (s0 rsf mm va) Hdec Hhv eq_refl).
+        * exact (exec_execute_AMO_u_translate_err op aq rl ir2 ir1 ird width
+                   (E_SAMO_Page_Fault tt) (register_lookup PC (s0r rsf va)) Sv39
+                   (s0 rsf mm va) (s0 rsf mm va)
+                   Hw2 Lcp Heff Hpml Htm Lcp eq_refl Hal Htr).
+        * exact (goodmb_execute_AMO_u_translate_err Du_r Du_w op aq rl ir2 ir1 ird
+                   width (E_SAMO_Page_Fault tt) (register_lookup PC (s0r rsf va))
+                   Sv39 (s0 rsf mm va) (s0 rsf mm va) mm
+                   (fun H => Du_gpr_of_Z_r ir1 H)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity)
+                   Hw2 Lcp Heff Heffg Hpml Hpmlg Htm Htmg Lcp eq_refl Hal
+                   Htr Htrg).
+        * exact (u_ok_trap (E_SAMO_Page_Fault tt) _ _
+                   ltac:(vm_compute; reflexivity)).
+        * exact I.
+        * rewrite u_state_sregs. apply u_fix_refl.
+        * rewrite u_state_sregs. exact Htlb0.
+        * rewrite u_state_mem. exact (u_mem_step_refl pt t mm Hwf).
+  Qed.
+
 End UserMemArmsA.
 
 (* ====================================================================== *)
@@ -1020,3 +1415,16 @@ Definition arm_STORECON_u_contract (pt : uptd) :
     u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
     base_post pt t mm rsf va w
   := arm_STORECON_u pt.
+
+Definition arm_AMO_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (w : mword 32)
+      (op : amoop) (aq rl : bool) (rs2 rs1 rd : regidx) (width : word_width_wide),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    (width = 1 \/ width = 2 \/ width = 4 \/ width = 8 \/ width = 16) ->
+    exec (ext_decode w) (u_state rsf mm) = Some (AMO (op, aq, rl, rs2, rs1, width, rd), u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w) (AMO (op, aq, rl, rs2, rs1, width, rd)) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    base_post pt t mm rsf va w
+  := arm_AMO_u pt.

@@ -1985,7 +1985,7 @@ same gap, and it is a real one:
 
 Neither is a day's work, but neither is a copy of the LR arm either.
 
-## 17. P4b IS 18 / 19 — SC, and where §16 put the composer gap in the wrong place
+## 17. P4b IS 19 / 19 — SC and AMO, the last two memory arms
 
 ### THE SC GAP IS AT `vmem_write_addr`, NOT AT `mem_write_value`
 
@@ -2059,51 +2059,80 @@ aligned+unmapped/denied → translate fault) with the write substituted:
   `vmem_write` at `(aq && rl, rl)`, and `UserMemCert.wr_flags_ok_amo`
   is exactly `wr_flags_ok (aq && rl) rl`.
 
-### WHAT AMO STILL NEEDS — the inventory, checked rather than guessed
+### AMO — P4b IS 19 / 19
 
-`arm_AMO_u` is the last one, and it is NOT a day's work.  Widths 1/2/4/8
-are ready; **width 16 (AMOCAS.Q) is a second engine with a hole in it.**
+`arm_AMO_u`, `UserMemArmsA.v`.  Five things it needed, in the order they
+unblock each other; all five leave a forward-looking rule.
 
-**Widths 1–8 are assembled, not built.**  `UserMemArms` already has all
-five execute-level arms as PAIRS — `exec/goodmb_execute_AMO_u_store`,
-`_cas_ne`, `_read_err`, `_translate_err`, `_misaligned` — and each takes
-the composer facts as premises directly, so **AMO has no `vmem_*` level
-at all**: the arm's case tree runs at `execute`, and is
-misaligned / aligned+mapped / aligned+faulting exactly as LR and SC's.
-`u_amo_pure` supplies the four calls, whose aq/rl pairs are NOT the
-access type's — the leaf reads at `(aq, aq && rl)` (`mem_flags_ok_amo`)
-and writes at `(aq && rl, rl)` (`wr_flags_ok_amo`).  What decides
-retire-vs-`cas_ne` is `execute_AMO`'s CAS guard
-`op = AMOCAS && loaded <> rd`, a boolean PREMISE, not a case on the op.
+**1. `ram_fetch_pmp`'s WIDTH BOUND IS 16, and a premise weakening is not
+free at the call sites.**  `SmodeCore.ram_fetch_pmp` pinned `w <= 8`,
+which is the only thing that capped `u_amo_pure` at `k <= 8`.  Nothing in
+the range match needs a bound (`SmodePte.ram_pmp_match_w` takes none);
+the sole use is `uint_pa_add`'s non-wrap side condition on the access's
+last byte, which any bound far below 2^64 discharges.  16 is
+`word_width_wide`'s top.  **`w <= 8` is not syntactically `w <= 16` and
+Coq does not coerce**, so the twelve call sites passing a NAMED
+`Hk8`/`Hb8` became `ltac:(lia)`; the sites already passing `ltac:(lia)`
+at a literal width were untouched.  It is a bottom-of-tree file: pay the
+600-700 file cone once, before building anything on top.
 
-**Width 16 is blocked on four things, and none is a copy of an existing
-lemma.**  It is not avoidable by making it a fault arm:
-`RiscvFetchExec.pma_class_grants PmaRam` grants `∀ op n, n <=? 16 = true
--> pma_allows_atomic_op … = true`, so an AMOCAS.Q on DRAM is PERMITTED
-and takes the store / cas_ne path.
+**2. A COMPOSER WHOSE LATER CALL TAKES AN EARLIER CALL'S RESULT MUST
+OFFER IT UNDER THE EXISTENTIALS.**  `u_amo_pure` took the written value
+`v` as a PARAMETER while producing `dv` (the loaded value) and `rs'` (the
+landed file) existentially — and an AMO's written value is a function of
+BOTH.  So no call site could ever instantiate it: the lemma was
+unusable, and nothing in the build said so.  The write conjunct is now
 
-1. **`UserMemClassifyAmo`'s width-16 execute layer has NO `goodmb`
-   twins.**  `exec_execute_AMO_u_store_16` / `_cas_ne_16` /
-   `_read_err_16` exist and nothing else does — and `goodmb` is not
-   determined by `exec`.  Their templates are the width-≤8 twins in
-   `UserMemArms` (~165 lines each), plus `goodmb_rX_pair_bits_gpr` /
-   `goodmb_wX_pair_bits_gpr`, which do not exist either.
-2. **`u_amo_pure` is capped at `k <= 8`, and the cap is NOT cosmetic.**
-   `pma_width_le k 8` relaxes to `k 16` for free, but
-   `SmodeCore.ram_fetch_pmp` — the PMP range match — takes `w <= 8` as a
-   hypothesis.  Generalising it edits a bottom-of-the-tree file whose
-   rebuild cone is 600–700 files (`durable-notes.md`, "the rebuild cone
-   is the dev-loop cost"), so budget the cone, or state the 16-byte PMP
-   match as its own leaf lemma.
-3. **The width-16 landing writes TWO GPRs.**  `wpair_state` sets `rd`
-   and `rd+1`, so the `reg_agree_on u_Dfix` obligation is `u_fix_gpr`
-   TWICE (via `u_fix_trans`) at two symbolic indices, and the
-   certificate's footprint obligation needs `Du_gpr_of_Z` at
-   `add_vec_int rd 1` as well as at `rd`.  Every arm so far has had a
-   one-gpr landing; `u_fix_gpr_state` / `u_tlb_gpr` / `u_mem_gpr` are
-   stated for `gpr_write_state` and have no pair form.
-4. the 128-bit RAM leaves `exec_read_ram_resv_kinds_16` /
-   `exec_write_ram_cond_kinds_16` are exec-only for the same reason as 1.
+    (forall v, exists mm2, exec (mem_write_value ... v ...) ... = Some (Ok true, ...)
+                        /\ goodmb ... /\ u_mem_step P t t' mm mm2)
 
-The order that unblocks: (2) then (1) then (3), and the arm last — (3)
-is the only one that is a genuinely new SHAPE rather than a transcription.
+INSIDE the block, with `mm2` moved in beside it.  **The rule: a later
+call whose argument is computed from an earlier call's RESULT goes under
+a `forall` inside the existential, never beside it.**  This is the
+same family as the vacuous-premise trap in `durable-notes.md` — a lemma
+that compiles, is axiom-clean, and no caller can use.  Corollary at the
+use site: `destruct (Hwrite _)` will NOT leave the value as an evar
+(*"Cannot infer this placeholder"*), so the arm names the model's per-op
+result explicitly — ten lines, transcribed.
+
+**3. The width-16 layer needed CERTIFICATES, not just reductions.**
+`UserMemClassifyAmo` had `exec_execute_AMO_u_store_16` / `_cas_ne_16` and
+nothing else; `goodmb` is not determined by `exec`.  Both twins are there
+now, plus `goodmb_rX_pair_bits_gpr` / `goodmb_wX_pair_bits_gpr`.  They
+are transcriptions of `UserMemArms`' width-<=8 twins with the two width
+branches taken the other way (`16 <=? 2*xlen_bytes` true, `16 <=?
+xlen_bytes` FALSE — which is what routes rs2/rd through the PAIR reads).
+`_read_err_16` was NOT needed and stays exec-only: under `u_amo_pure` the
+read cannot fault, because `RiscvFetchExec.pma_class_grants PmaRam`
+grants every op at every `n <= 16`.  That same fact is why width 16
+cannot be dismissed as a fault arm.
+**`goodmb_rX_bits_gpr` lives in `UserExecFacts`, which `UserMemArms` only
+LOADS** — `Require Import` is not transitive for the Import half — so the
+file needed its own `Require Import UserExecFacts`.
+
+**4. THE TWO-GPR LANDING IS A SIBLING, NOT A GENERALIZATION.**  AMOCAS.Q
+lands on `wpair_state` (rd AND rd+1).  `u_fix_wpair_state` /
+`u_tlb_wpair` / `u_mem_wpair` sit BESIDE `u_fix_gpr_state` / `u_tlb_gpr` /
+`u_mem_gpr` rather than subsuming them: `wpair_state` carries an outer
+`generic_neq (Regidx rd) zreg` guard that `gpr_write_state` has no
+counterpart for, so the one-write form is not an instance of the pair
+form and no landed arm changed.  The footprint side conditions needed
+nothing new — `Du_gpr_of_Z` / `_r` are already index-generic, so they
+apply at `add_vec_int rd 1` unchanged.  `UserMemArms.wgpr_state` IS
+`gpr_write_state` (`reflexivity`); the two names differ only in where the
+`regval_into_reg` coercion is spelled.
+
+**5. AMO IS THE ONE ARM WITH NO `vmem_*` LEVEL.**  `execute_AMO` inlines
+the whole read-modify-write, so `UserMemArms`' five execute pairs
+(`_store`, `_cas_ne`, `_read_err`, `_translate_err`, `_misaligned`) take
+the composer's facts DIRECTLY and the case tree runs at `execute`.  It is
+still LR's three-arm tree, crossed with two splits inside the mapped arm:
+the AMOCAS guard `op = AMOCAS && loaded <> rd` (a boolean PREMISE, not a
+case on the op) and the width (16 takes the pair operands).
+`_translate_err` and `_misaligned` are width-GENERIC and cover 16 for
+free — both early-return before the model reaches its `width <=?
+xlen_bytes` branch.  The mem-level aq/rl are not the access type's: the
+leaf reads at `(aq, aq && rl)` (`mem_flags_ok_amo`) and writes at
+`(aq && rl, rl)` (`wr_flags_ok_amo`).
+
+All nineteen arms carry their `arm_X_u_contract` typing check.
