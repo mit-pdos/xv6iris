@@ -930,4 +930,188 @@ Section runfull.
     - iFrame.
   Qed.
 
+  (* ===================================================================== *)
+  (* THE RESIDUE FORM.  [swp_run_hart_active_U] returns only the FRAMES on  *)
+  (* the pending-interrupt arm, which is not enough for any tier that must  *)
+  (* carry linear resources across the branch: the fetch needs them BEFORE  *)
+  (* the dispatch decides, and the interrupt arm needs them AFTER.  Put     *)
+  (* them in the [swp_mono] wand and the fetch starves; put them in the     *)
+  (* fetch obligation and the interrupt arm does.  One [Wd] threaded from   *)
+  (* the dispatch's [None] branch into the fetch fixes it, and the caller   *)
+  (* owns the interrupt arm through [Qi].                                   *)
+  (*                                                                        *)
+  (* [SmodeCorePt.swp_run_hart_active_gen_exf_res] is the S tier's copy of   *)
+  (* the same idea; fold that one in here too when its file is next open.   *)
+  (* ===================================================================== *)
+  (* ===================================================================== *)
+  (* §7  THE CYCLE RULE WITH A RESOURCE THREADED PAST THE DISPATCH.          *)
+  (*                                                                        *)
+  (* [HartRunFull.swp_run_hart_active_full] takes the dispatch and the fetch *)
+  (* obligations as two SEPARATING premises and returns nothing but the      *)
+  (* frames on the None branch, so a resource the tier needs on BOTH arms    *)
+  (* -- and it has three: the reservation fragment, the byte map and the     *)
+  (* [u_open] bundle -- cannot be supplied.  Put it in the fetch obligation  *)
+  (* and the interrupt arm has none; put it in the [swp_mono] wand and the   *)
+  (* fetch cannot run.  This is the same hole [SmodeCorePt.swp_run_hart_     *)
+  (* active_gen_exf_res] fills for the S tier, and it is filled the same     *)
+  (* way: one [Wd] threaded from the dispatch's None branch into the fetch.  *)
+  (* Everything after the fetch is [swp_run_hart_active_full]'s proof node   *)
+  (* for node.                                                              *)
+  (* ===================================================================== *)
+  Local Ltac ru_glue :=
+    cbn beta iota zeta delta
+      [Defs.returnm returnM returnR Defs.returnR andb orb negb not
+       Instances.generic_eq Instances.generic_neq get_config_rvfi
+       get_config_print_instr].
+
+  Lemma swp_run_hart_active_res (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (p : Privilege)
+      (Wd : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ)
+      (Pf : mword 64 -> ExceptionType -> iProp Σ)
+      (Px : ext_fetch_addr_error -> iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    register_lookup cur_privilege rs = p ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    Wd -∗
+    (Wd -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (dispatchInterrupt p)
+         (fun o => match o with
+                   | Some (ii, pr) => Qi ii pr
+                   | None => Wd ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro
+                   end)) -∗
+    (Wd -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch tt) (run_fetch_post Drw Dro Df Pe Pf Px)) -∗
+    swp (run_hart_active 0)
+      (fun st => match st with
+                 | Step_Pending_Interrupt (ii, pr) => Qi ii pr
+                 | Step_Execute (r, ib)            => Pe r ib
+                 | Step_Fetch_Failure (Virtaddr xv, e) => Pf xv e
+                 | Step_Ext_Fetch_Failure x        => Px x
+                 | Step_Waiting _                  => False
+                 end).
+  Proof.
+    intros Hdisj HDpriv HDpc HDnpc Hpriv.
+    iIntros "#Hcert Hrw Hro HWd Hdisp Hfet".
+    unfold run_hart_active.
+    rewrite /swp. iIntros (K) "%HC Hcont".
+    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ K HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
+    iApply (swp_use_cer (dispatchInterrupt p) _ _ K HC
+              with "[Hrw Hro Hdisp HWd] [-]").
+    { iApply ("Hdisp" with "HWd Hrw Hro"). }
+    iIntros (o) "Ho".
+    destruct o as [[ii pr] |].
+    - (* ---- THE TRAP ARM: early return, nothing else runs ---- *)
+      cbn beta iota. rewrite mcer_early_return.
+      iApply ("Hcont" $! (Step_Pending_Interrupt (ii, pr))). iApply "Ho".
+    - (* ---- THE RETIRE ARM: on into the fetch ---- *)
+      iDestruct "Ho" as "(HWd & Hrw & Hro)".
+      cbn beta iota. rewrite mbind0_ret.
+      iApply (swp_use_cer (fetch tt) _ _ K HC with "[Hrw Hro Hfet HWd] [-]").
+      { iApply ("Hfet" with "HWd Hrw Hro"). }
+      iIntros (fr) "Hfr".
+      destruct fr as [ x | w | h | [e xv] ]; rewrite /run_fetch_post.
+      + (* ---- F_Ext_Error ---- *)
+        cbn beta iota zeta delta [ext_fetch_hook]. ru_glue.
+        rewrite mcer_ret.
+        iApply ("Hcont" $! (Step_Ext_Fetch_Failure x)). iApply "Hfr".
+      + (* ---- F_Base ---- *)
+        rewrite /run_fetch_base.
+        iDestruct "Hfr" as (rsf i pc nl)
+          "(%Hpcf & %Hdec & %Hlpad & Hrw & Hro & Hex)".
+        cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
+          fetch_callback get_config_print_instr].
+        iApply (swp_use_cer (ext_decode w) _ _ K HC with "[Hrw Hro] [-]").
+        { iApply (swp_span Drw Dro Df rsf rsf _ _ Hdisj Hdec
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
+        rewrite mbind0_ret.
+        iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ K HC
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_hfrun nl Drw Dro Df rsf rsf _ _ Hdisj Hlpad
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
+        rewrite mbind_ret. ru_glue.
+        iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ K HC
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_read_reg_pinned Drw Dro Df rsf _ Hdisj HDpc
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". rewrite Hpcf.
+        iApply (swp_use_cer2
+                  (Defs.write_reg (R_bitvector_64 nextPC)
+                     (add_vec_int pc 4)) _ _ _ K HC with "[Hrw Hro] [-]").
+        { iApply (swp_write_reg_owned Drw Dro Df rsf _ _ Hdisj HDnpc
+                    with "Hcert Hrw Hro"). }
+        iIntros (u) "[Hrw Hro]".
+        iApply (swp_use_cer (execute i) _ _ K HC with "[Hrw Hro Hex] [-]").
+        { iApply ("Hex" with "Hrw Hro"). }
+        iIntros (er) "He". rewrite /run_exec_post.
+        destruct er; try (ru_glue; rewrite mcer_ret; iApply "Hcont";
+                          iApply "He").
+        ru_glue.
+        iApply (swp_use_cer (execute i0) _ _ K HC with "[He] [-]").
+        { iApply "He". }
+        iIntros (er2) "He2". ru_glue. rewrite mcer_ret.
+        iApply "Hcont". iApply "He2".
+      + (* ---- F_RVC ---- *)
+        rewrite /run_fetch_rvc.
+        iDestruct "Hfr" as (rsf i pc nl nz)
+          "(%Hpcf & %Hdec & %Hlpad & %Hzca & Hrw & Hro & Hex)".
+        cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
+          fetch_callback get_config_print_instr].
+        iApply (swp_use_cer (ext_decode_compressed h) _ _ K HC
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_span Drw Dro Df rsf rsf _ _ Hdisj Hdec
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
+        rewrite mbind0_ret.
+        iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ K HC
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_hfrun nl Drw Dro Df rsf rsf _ _ Hdisj Hlpad
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
+        rewrite mbind_ret. ru_glue.
+        iApply (swp_use_cer (currentlyEnabled Ext_Zca) _ _ K HC
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_hfrun nz Drw Dro Df rsf rsf _ _ Hdisj Hzca
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
+        iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ K HC
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_read_reg_pinned Drw Dro Df rsf _ Hdisj HDpc
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". rewrite Hpcf.
+        iApply (swp_use_cer2
+                  (Defs.write_reg (R_bitvector_64 nextPC)
+                     (add_vec_int pc 2)) _ _ _ K HC with "[Hrw Hro] [-]").
+        { iApply (swp_write_reg_owned Drw Dro Df rsf _ _ Hdisj HDnpc
+                    with "Hcert Hrw Hro"). }
+        iIntros (u) "[Hrw Hro]".
+        iApply (swp_use_cer (execute i) _ _ K HC with "[Hrw Hro Hex] [-]").
+        { iApply ("Hex" with "Hrw Hro"). }
+        iIntros (er) "He". rewrite /run_exec_post.
+        destruct er; try (ru_glue; rewrite mcer_ret; iApply "Hcont";
+                          iApply "He").
+        ru_glue.
+        iApply (swp_use_cer (execute i0) _ _ K HC with "[He] [-]").
+        { iApply "He". }
+        iIntros (er2) "He2". ru_glue. rewrite mcer_ret.
+        iApply "Hcont". iApply "He2".
+      + (* ---- F_Error ---- *)
+        cbn beta iota zeta delta [ext_fetch_hook]. ru_glue.
+        rewrite mcer_ret.
+        iApply ("Hcont" $! (Step_Fetch_Failure (Virtaddr xv, e))).
+        iApply "Hfr".
+  Qed.
+
 End runfull.
