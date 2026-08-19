@@ -13,7 +13,9 @@
      [umem pt M]        ownership of the process image [M] -- a gmap keyed by
                         USER VIRTUAL address (same keying as the dumped
                         [sync_bytes]) -- realized as the same [↦ₚ] bytes the
-                        safety tier's [udata_own] bottoms out in.
+                        safety tier's [UserPtTree.umem_own] holds.  The two
+                        are now the SAME definition up to the domain
+                        constraint the safety tier carries.
      [uinstr pt M pc is_rvc i]
                         the PURE per-instruction fact: the instruction [i]'s
                         bytes sit in [M] at [pc], [pc]'s vpn is mapped
@@ -45,14 +47,9 @@ Import Defs.
 (* §1 The va -> pa view of a fixed user table.                             *)
 (* ===================================================================== *)
 
-(* the pa [va] translates to through [pt]'s abstract map: the recorded
-   level-0 leaf's page, at [va]'s page offset.  Total: off the mapped vpns
-   the value is arbitrary (zeros), and nothing owns bytes there. *)
-Definition uva_pa (pt : uptd) (va : Z) : mword 64 :=
-  match ud_um pt !! svpn_of (mword_of_int va) with
-  | Some w => u_walk_pa w (mword_of_int va)
-  | None => zeros' 64
-  end.
+(* [uva_pa pt va] -- the pa [va] translates to through [pt]'s abstract map
+   -- now lives in UserPtTree.v, where the SAFETY tier's own byte map
+   ([umem_own]) is keyed by it; this file only reads it. *)
 
 Lemma uva_pa_mapped (pt : uptd) (va : Z) (w : mword 64) :
   ud_um pt !! svpn_of (mword_of_int va) = Some w ->

@@ -2779,6 +2779,82 @@ Lemma ud_pas_cov (P : uptd) : udata_cov P.(ud_um) (ud_pas P).
 Proof. apply um_pas_cov. Qed.
 
 (* ===================================================================== *)
+(* §4b THE ADDRESS-SPACE VIEW.                                            *)
+(*                                                                        *)
+(* The derived footprint IS the image of the user address space under the *)
+(* va -> pa map, and (this is what [um_inj] buys at byte granularity)     *)
+(* that map is INJECTIVE.  Those two facts are what let the satp switch   *)
+(* hand the user tier its memory keyed by USER VIRTUAL ADDRESS            *)
+(* ([UserPtTree.umem_own]) instead of by page -- see [user_pt_inv_close]. *)
+(* ===================================================================== *)
+
+(* a translated address, as unsigned arithmetic: the leaf's page, plus the
+   va's page offset *)
+Lemma u_walk_pa_unsigned (w va : mword 64) :
+  bv_unsigned (u_walk_pa w va)
+  = bv_unsigned (pte_ppn w) * 4096 + bv_unsigned va mod 4096.
+Proof.
+  unfold u_walk_pa, pte_ppn. cbn [bits_of_virtaddr].
+  change (Z.sub pagesize_bits 1) with 11.
+  rewrite zext64_concat44_12_unsigned UserBits.bv_subrange11. reflexivity.
+Qed.
+
+(* the page offset of a mapped page's va is the offset it was built from *)
+Local Lemma uva_moi_off (vpn : mword 27) (j : nat) :
+  (j < 4096)%nat -> bv_unsigned vpn < 67108862 ->
+  bv_unsigned (mword_of_int (bv_unsigned vpn * 4096 + Z.of_nat j) : mword 64)
+    mod 4096 = Z.of_nat j.
+Proof.
+  intros Hj Hvpn.
+  rewrite (uva_moi_unsigned vpn j Hj Hvpn).
+  rewrite Z.add_comm Z_mod_plus_full. apply Z.mod_small. lia.
+Qed.
+
+Lemma elem_of_ud_pas_data (P : uptd) (a : Arch.pa) :
+  upt_map_wf P.(ud_um) -> (a ∈ ud_pas P <-> u_data_pa P a).
+Proof.
+  intros Hwf. split.
+  - intros Ha. apply elem_of_um_pas in Ha as (ppn & Hppn & Hpa).
+    apply elem_of_um_ppns in Hppn as (vpn & w & Hl & <-).
+    apply elem_of_page_pas in Hpa as (j & Hj & ->).
+    exists (bv_unsigned vpn * 4096 + Z.of_nat j). split.
+    + exists vpn, w, j. split_and!; [exact Hl | exact Hj | reflexivity].
+    + rewrite (uva_pa_page P vpn w j Hwf Hl Hj).
+      apply bv_eq.
+      rewrite u_walk_pa_unsigned
+        (uva_moi_off vpn j Hj (upt_map_wf_vpn_lt _ _ _ Hwf Hl))
+        (pa_add_page_unsigned (pte_ppn w) j Hj).
+      reflexivity.
+  - intros (va & (vpn & w & j & Hl & Hj & ->) & <-).
+    apply elem_of_um_pas. exists (pte_ppn w). split.
+    + apply elem_of_um_ppns. exists vpn, w. split; [exact Hl | reflexivity].
+    + rewrite (uva_pa_page P vpn w j Hwf Hl Hj). apply u_walk_pa_in_page.
+Qed.
+
+(* NO ALIASING AT BYTE GRANULARITY: [um_inj] says distinct vpns name
+   distinct PAGES, and inside one page the offsets are distinct, so the
+   whole va -> pa map is injective on the address space. *)
+Lemma uva_pa_inj_of_wf (P : uptd) :
+  upt_map_wf P.(ud_um) -> um_inj P.(ud_um) -> uva_pa_inj P.
+Proof.
+  intros Hwf Hinj va1 va2 H1 H2 Heq.
+  destruct H1 as (v1 & w1 & j1 & Hl1 & Hj1 & ->).
+  destruct H2 as (v2 & w2 & j2 & Hl2 & Hj2 & ->).
+  rewrite (uva_pa_page P v1 w1 j1 Hwf Hl1 Hj1) in Heq.
+  rewrite (uva_pa_page P v2 w2 j2 Hwf Hl2 Hj2) in Heq.
+  assert (Hu : bv_unsigned (pte_ppn w1) * 4096 + Z.of_nat j1
+             = bv_unsigned (pte_ppn w2) * 4096 + Z.of_nat j2).
+  { rewrite <- (uva_moi_off v1 j1 Hj1 (upt_map_wf_vpn_lt _ _ _ Hwf Hl1)).
+    rewrite <- (uva_moi_off v2 j2 Hj2 (upt_map_wf_vpn_lt _ _ _ Hwf Hl2)).
+    rewrite <- !u_walk_pa_unsigned. by rewrite Heq. }
+  assert (Hz1 : Z.of_nat j1 < 4096) by lia.
+  assert (Hz2 : Z.of_nat j2 < 4096) by lia.
+  assert (Hppn : pte_ppn w1 = pte_ppn w2) by (apply bv_eq; lia).
+  assert (Hjj : j1 = j2) by lia.
+  rewrite (Hinj v1 v2 w1 w2 Hl1 Hl2 Hppn) Hjj. reflexivity.
+Qed.
+
+(* ===================================================================== *)
 (* §5 THE OWNERSHIP, and THE PREDICATE.                                   *)
 (* ===================================================================== *)
 
@@ -2990,6 +3066,41 @@ Section ProcPt.
   Lemma proc_pt_own_udata (P : uptd) :
     proc_pt_own P ⊣⊢ udata_own (ud_pas P).
   Proof. rewrite /proc_pt_own /ud_pas upt_pages_udata. reflexivity. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE ADDRESS-SPACE BRIDGE.  The same bytes, re-keyed: the kernel's    *)
+  (* page-indexed view of a process's user pages IS the process's memory  *)
+  (* keyed by USER VIRTUAL ADDRESS.  Nothing changes hands and nothing    *)
+  (* is converted -- the two are one big-op over one set of [↦ₚ] cells,  *)
+  (* indexed two ways, and [uva_pa_inj_of_wf] is what says the reindexing *)
+  (* is a bijection.  The CONTENTS are quantified on both sides here; a   *)
+  (* caller that knows them keeps [umem_own P M] instead.                 *)
+  (* ------------------------------------------------------------------ *)
+  Lemma udata_own_umem (P : uptd) :
+    upt_map_wf P.(ud_um) -> um_inj P.(ud_um) ->
+    udata_own (ud_pas P) ⊣⊢ umem_any P.
+  Proof.
+    intros Hwf Hinj.
+    rewrite umem_any_set.
+    rewrite (bigset_gather_reindex (uva_pa P) (uva_dom P) (u_data_pa P)
+               (fun (a : Arch.pa) (b : bv 8) => (a ↦ₚ b)%I)
+               (uva_dom_inj P (uva_pa_inj_of_wf P Hwf Hinj)) (u_data_pa_img P)).
+    rewrite /udata_own. iSplit.
+    - iIntros "H". iDestruct "H" as (dm) "[%Hd Hm]". iExists dm. iFrame "Hm".
+      iPureIntro. intros a.
+      rewrite <- (elem_of_ud_pas_data P a Hwf). rewrite <- Hd.
+      apply elem_of_dom.
+    - iIntros "H". iDestruct "H" as (dm) "[%Hd Hm]". iExists dm. iFrame "Hm".
+      iPureIntro. apply set_eq. intros a.
+      rewrite elem_of_dom. rewrite <- (Hd a). rewrite (elem_of_ud_pas_data P a Hwf). reflexivity.
+  Qed.
+
+  Lemma proc_pt_own_umem (P : uptd) :
+    upt_map_wf P.(ud_um) -> um_inj P.(ud_um) ->
+    proc_pt_own P ⊣⊢ umem_any P.
+  Proof.
+    intros Hwf Hinj. rewrite proc_pt_own_udata. by apply udata_own_umem.
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (* THE KALLOC/KFREE BOUNDARY.  [KallocInv.page_own] -- the [↦ₘ] page    *)
@@ -3470,11 +3581,12 @@ Section ProcPt.
      the descriptor's [ud_data] field, and only at the DERIVED footprint
      are they the pages [proc_pt_own] names. *)
   Lemma user_pt_inv_open (P : uptd) :
-    ud_data P = ud_pas P ->
-    user_pt_inv P -∗
+    upt_map_wf P.(ud_um) -> um_inj P.(ud_um) ->
+    user_pt_any P -∗
     utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗ proc_pt_own P.
   Proof.
-    intros Hnorm. rewrite /user_pt_inv proc_pt_own_udata Hnorm.
+    intros Hwf Hinj.
+    rewrite user_pt_any_unfold (proc_pt_own_umem P Hwf Hinj).
     iIntros "(Htlb & Hdat & _ & _)". iFrame "Htlb Hdat".
   Qed.
 
@@ -3487,14 +3599,14 @@ Section ProcPt.
     proc_pt_wf P ->
     utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) -∗
     proc_pt_own P -∗
-    user_pt_inv (ud_norm P).
+    user_pt_any (ud_norm P).
   Proof.
-    intros (_ & Hacc & _ & _ & _).
-    rewrite /user_pt_inv.
+    intros (Hmwf & Hacc & _ & Hinj & _).
+    rewrite user_pt_any_unfold.
     unfold ud_norm; cbn [ud_root ud_tfp ud_um ud_data].
-    rewrite proc_pt_own_udata.
+    rewrite (proc_pt_own_umem P Hmwf Hinj).
     iIntros "Htlb Hdat". iFrame "Htlb Hdat".
-    iPureIntro. split; [exact (ud_pas_cov P) | exact Hacc].
+    iPureIntro. split; [exact (uva_pa_inj_of_wf P Hmwf Hinj) | exact Hacc].
   Qed.
 
   (* ------------------------------------------------------------------ *)

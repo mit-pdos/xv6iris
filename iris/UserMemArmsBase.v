@@ -652,7 +652,7 @@ Section UserMemArmsBase.
         /\ u_mem_step pt t t' mm mm').
   Proof.
     intros Hk Hk8 Hcfg Hpins Hwf.
-    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & Hacc & _ & _).
     pose proof Hpins as (_ & _ & _ & Htlb0).
     assert (Hpm : plat_misaligned_exception (Load Data) false = None)
       by (apply plat_misaligned_loadstore_none; vm_compute; reflexivity).
@@ -905,7 +905,7 @@ Section UserMemArmsBase.
         /\ u_mem_step pt t t' mm mm').
   Proof.
     intros Hk Hk8 Hcfg Hpins Hwf.
-    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & Hacc & _ & _).
     pose proof Hpins as (_ & _ & _ & Htlb0).
     assert (Hpm : plat_misaligned_exception (Store Data) false = None)
       by (apply plat_misaligned_loadstore_none; vm_compute; reflexivity).

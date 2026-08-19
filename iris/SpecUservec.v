@@ -199,7 +199,7 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
        handed back only [utlb_inv_pt] while the residue below still carried
        [proc_pt], the two together would claim the tree and the pages twice
        over -- the vacuity this whole boundary was restated to avoid. *)
-    user_pt_inv pt' -∗
+    user_pt_any pt' -∗
     pc_is (ret_pc uepc) -∗
     gpr_file mf -∗
     (* the leftover: usertrap's OWN kernel-internal BARE bundle (no address

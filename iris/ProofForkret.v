@@ -873,10 +873,11 @@ Proof.
   iEval (rewrite HuptV') in "Hpt".
   iEval (rewrite proc_pt_split) in "Hpt".
   iDestruct "Hpt" as "[[%Hwf2 Hufr] Hdata]".
-  iEval (rewrite proc_pt_own_udata -Hnorm) in "Hdata".
-  assert (Hcov : udata_cov (ud_um pt) (ud_data pt))
-    by (rewrite Hnorm; exact (ud_pas_cov pt)).
   destruct Hptwf as (Hmapwf & Haccwf & Hpv1 & Hpv2 & Hpv3).
+  (* the pages, RE-KEYED by user virtual address: the same [↦ₚ] cells the
+     kernel held page-indexed, which is what the user tier now takes *)
+  iEval (rewrite (proc_pt_own_umem pt Hmapwf Hpv2)) in "Hdata".
+  assert (Hcov : uva_pa_inj pt) by exact (uva_pa_inj_of_wf pt Hmapwf Hpv2).
   (* ---- and the residue, handed to the caller's wand ---- *)
   iAssert (forkret_yield (CID := CIDf) γf p ksp pid av V')
     with "[Hparked Hpnopt]" as "Hyld".

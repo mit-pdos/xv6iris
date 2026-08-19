@@ -11,10 +11,12 @@
         map entry from its concrete R/W/X/U flag byte ([upt_acc_wf]).
         The S-mode-only trampoline / trapframe leaves are DENIED for
         every user access (U = 0);
-     §3 the user-execution page-table bundle [user_pt_inv]: the tree
-        invariant [utlb_inv_pt] + ownership of the mapped pages' bytes
-        with EXISTENTIAL contents ([udata_own], a flat pa-set -- two
-        vpns may map one page, a gset dedups) + the coverage fact;
+     §3 the user-execution page-table bundle and THE ABSTRACT STATE OF
+        THE USER-MODE PROCESS: [user_pt_inv P M] is the tree invariant
+        [utlb_inv_pt] + ownership of the process's memory [umem_own P M],
+        a [gmap] from USER VIRTUAL ADDRESS to byte, + the no-aliasing and
+        access-classification facts.  [user_pt_any P] quantifies [M] and
+        is what the user-execution engines take;
      §4 the U-mode Ok absorption instance: a user-mapped, check-passing
         va translates to its leaf page and the invariant absorbs
         whatever the walk did (hit / TLB fill / Svadu A/D write-back).
@@ -27,6 +29,8 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvExtras.   (* [svpn_of_unsigned_lo] / [moi64_unsigned] -- the va keying *)
+Require Import UserBits.      (* [bv_subrange11] -- the page-offset arithmetic *)
 Require Import SmodePte.
 Require Import PtAdBits.
 Require Import Pt4kWalk.
@@ -121,7 +125,45 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §3 The user-execution page-table bundle.                                *)
+(* §3 The user-execution page-table bundle, and THE ABSTRACT STATE OF    *)
+(*    THE USER-MODE PROCESS.                                             *)
+(*                                                                       *)
+(* What a user hart owns of memory used to be the mapped pages with      *)
+(* EXISTENTIAL contents ([udata_own], a flat pa-set).  That is enough    *)
+(* for SAFETY -- user execution never depends on what the bytes are --   *)
+(* but it says nothing a kernel-side proof can thread: copyin/copyout,   *)
+(* a syscall argument, an exec image are all statements ABOUT THE BYTES, *)
+(* at USER VIRTUAL addresses.  So the bundle now EXPOSES that state:     *)
+(*                                                                       *)
+(*   [M : gmap Z (bv 8)]  the process's memory, keyed by user virtual    *)
+(*                        address (the keying the descoped verified tier *)
+(*                        already used, [UmodeMem.umem]);                *)
+(*   [umem_own P M]       ownership of exactly those bytes, realized as  *)
+(*                        the [↦ₚ] cells at the translated addresses;   *)
+(*   [user_pt_inv P M]    the tree invariant + [umem_own P M] + the two  *)
+(*                        pure side conditions;                          *)
+(*   [user_pt_any P]      [∃ M, user_pt_inv P M] -- what the USER-       *)
+(*                        EXECUTION engines take, because arbitrary user *)
+(*                        code may write arbitrary bytes into its own    *)
+(*                        pages and so has nothing to say about [M].     *)
+(*                        The DOMAIN is still pinned ([uva_dom P] is a   *)
+(*                        function of the table), so quantifying [M] at  *)
+(*                        the loop invariant loses nothing: only the     *)
+(*                        kernel can change which vas are mapped.        *)
+(*                                                                       *)
+(* WHY A VA-KEYED MAP FORCES NO ALIASING.  Two user vpns mapping ONE     *)
+(* physical page would make [umem_own] own that page's bytes twice, so   *)
+(* the resource itself refutes aliasing.  That is not a new restriction: *)
+(* [ProcPtOwn.um_inj] -- "distinct vpns, distinct pages" -- is already a *)
+(* conjunct of [proc_pt_wf], re-established at every insert from the     *)
+(* OWNERSHIP of the page being added.  The user tier states the same     *)
+(* fact in its own vocabulary ([uva_pa_inj], at byte granularity) and    *)
+(* receives it across the satp switch ([ProcPtOwn.user_pt_inv_close]).   *)
+(*                                                                       *)
+(* [udata_own] / [udata_cov] STAY, and [uptd]'s [ud_data] field with     *)
+(* them: the pre-port [gen_heap_interp] memory layer (UserMemPt /        *)
+(* UserMemAccess / UserMemMis / UserFetchPt) is stated over them and is  *)
+(* independent of this bundle, which no longer reads [ud_data] at all.   *)
 (* ===================================================================== *)
 
 (* the pas a mapped leaf can output: its page, at every offset *)
@@ -131,7 +173,9 @@ Definition udata_cov (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa) : P
 (* ONE pure description of a live user page table, so the whole
    user-execution development closes over a single parameter (the
    [upt]-record successor): the root and trapframe ppns, the abstract
-   user map, and the data-page footprint. *)
+   user map, and the data-page footprint.  [ud_data] is read only by the
+   pre-port layer above ([ProcPtOwn.ud_norm] renormalises it); the
+   bundle of this section derives its footprint from [ud_um]. *)
 Record uptd := UPTD {
   ud_root : mword 44;
   ud_tfp  : mword 44;
@@ -139,25 +183,425 @@ Record uptd := UPTD {
   ud_data : gset Arch.pa
 }.
 
+(* --------------------------------------------------------------------- *)
+(* §3a The va -> pa view of a live table, and the user address space.     *)
+(* --------------------------------------------------------------------- *)
+
+(* the pa a user virtual address translates to through [P]'s map: the
+   recorded level-0 leaf's page, at [va]'s page offset.  TOTAL -- off the
+   mapped vpns the value is arbitrary (zeros), and nothing owns bytes
+   there. *)
+Definition uva_pa (P : uptd) (va : Z) : mword 64 :=
+  match P.(ud_um) !! svpn_of (mword_of_int va) with
+  | Some w => u_walk_pa w (mword_of_int va)
+  | None => zeros' 64
+  end.
+
+(* THE USER ADDRESS SPACE: every offset of every mapped page.  Spelled as
+   PAGE * 4096 + OFFSET and not through [svpn_of], so that the finite set
+   below is a function of [ud_um] with no well-formedness hypothesis and
+   no wrap reasoning in its membership proof; [u_data_pa_cov] below is the
+   bridge to the [svpn_of] form a memory arm holds. *)
+Definition uva_mapped (P : uptd) (va : Z) : Prop :=
+  exists (vpn : mword 27) (w : mword 64) (j : nat),
+    P.(ud_um) !! vpn = Some w /\ (j < 4096)%nat /\
+    va = bv_unsigned vpn * 4096 + Z.of_nat j.
+
+Definition uva_dom (P : uptd) : gset Z :=
+  list_to_set (mjoin
+    ((fun vw : mword 27 * mword 64 =>
+        (fun j : nat => bv_unsigned (fst vw) * 4096 + Z.of_nat j) <$> seq 0 4096)
+     <$> map_to_list P.(ud_um))).
+
+Lemma elem_of_uva_dom (P : uptd) (va : Z) :
+  va ∈ uva_dom P <-> uva_mapped P va.
+Proof.
+  unfold uva_dom, uva_mapped.
+  rewrite elem_of_list_to_set elem_of_list_join.
+  split.
+  - intros (l & Hva & Hl).
+    apply elem_of_list_fmap in Hl as ([vpn w] & -> & Hin).
+    apply elem_of_map_to_list in Hin.
+    apply elem_of_list_fmap in Hva as (j & -> & Hj).
+    apply elem_of_seq in Hj.
+    exists vpn, w, j. split_and!; [exact Hin | lia | reflexivity].
+  - intros (vpn & w & j & Hl & Hj & ->).
+    exists ((fun j0 : nat => bv_unsigned vpn * 4096 + Z.of_nat j0) <$> seq 0 4096).
+    split.
+    + apply elem_of_list_fmap. exists j.
+      split; [reflexivity |]. apply elem_of_seq. lia.
+    + apply elem_of_list_fmap. exists (vpn, w).
+      split; [reflexivity |]. apply elem_of_map_to_list. exact Hl.
+Qed.
+
+(* the physical addresses the user address space covers -- the successor
+   of [udata_cov]'s [data] set.  DERIVED from [ud_um], and stated as a
+   PREDICATE rather than a [gset Arch.pa] so that no [Countable Arch.pa]
+   instance appears in the interface (see UserBytes.v section 3b on why a
+   [gset Arch.pa] does not survive a file boundary here). *)
+Definition u_data_pa (P : uptd) (a : mword 64) : Prop :=
+  exists va, uva_mapped P va /\ uva_pa P va = a.
+
+(* NO ALIASING, at byte granularity: distinct user vas name distinct
+   bytes.  [ProcPtOwn.um_inj] read through [uva_pa]. *)
+Definition uva_pa_inj (P : uptd) : Prop :=
+  forall va1 va2, uva_mapped P va1 -> uva_mapped P va2 ->
+    uva_pa P va1 = uva_pa P va2 -> va1 = va2.
+
+(* the two premises every bridge feeds [bigset_gather_reindex], restated
+   over [uva_dom] (its index set) rather than over [uva_mapped] *)
+Lemma uva_dom_inj (P : uptd) :
+  uva_pa_inj P ->
+  forall x y : Z, x ∈ uva_dom P -> y ∈ uva_dom P ->
+    uva_pa P x = uva_pa P y -> x = y.
+Proof.
+  intros Hinj x y Hx Hy Heq.
+  apply Hinj; [ by apply elem_of_uva_dom | by apply elem_of_uva_dom | exact Heq ].
+Qed.
+
+Lemma u_data_pa_img (P : uptd) (a : mword 64) :
+  u_data_pa P a <-> exists va, va ∈ uva_dom P /\ uva_pa P va = a.
+Proof.
+  unfold u_data_pa. split.
+  - intros (va & Hm & <-). exists va.
+    split; [ by apply elem_of_uva_dom | reflexivity ].
+  - intros (va & Hva & <-). exists va.
+    split; [ by apply elem_of_uva_dom | reflexivity ].
+Qed.
+
+(* --- the one piece of wrap arithmetic the va keying needs -------------- *)
+
+(* a user page's vas sit below 2^38 (every user vpn is below the
+   trapframe's, [upt_map_wf]), so [svpn_of] reads the vpn straight back *)
+Local Lemma svpn_of_moi (va : Z) :
+  0 <= va < 274877906944 ->
+  bv_unsigned (svpn_of (mword_of_int va)) = va / 4096.
+Proof.
+  intros Hva.
+  assert (Hmod : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  assert (Hu : bv_unsigned (mword_of_int va : mword 64) = va).
+  { rewrite moi64_unsigned. apply bv_wrap_small. rewrite Hmod. lia. }
+  assert (Hui : uint (mword_of_int va : mword 64) = va)
+    by (rewrite uint_unsigned; exact Hu).
+  rewrite (svpn_of_unsigned_lo (mword_of_int va) ltac:(rewrite Hui; lia)).
+  rewrite Hui. rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096. reflexivity.
+Qed.
+
+Lemma uva_svpn_of (vpn : mword 27) (j : nat) :
+  (j < 4096)%nat -> bv_unsigned vpn < 67108862 ->
+  svpn_of (mword_of_int (bv_unsigned vpn * 4096 + Z.of_nat j)) = vpn.
+Proof.
+  intros Hj Hvpn.
+  pose proof (bv_unsigned_in_range _ vpn) as [Hv0 _].
+  assert (Hb : 0 <= bv_unsigned vpn * 4096 + Z.of_nat j < 274877906944) by lia.
+  apply bv_eq.
+  rewrite (svpn_of_moi _ Hb).
+  rewrite Z.div_add_l; [| lia].
+  rewrite (Z.div_small (Z.of_nat j) 4096 ltac:(lia)). lia.
+Qed.
+
+(* every user vpn is below the trapframe's, read as a number *)
+Lemma upt_map_wf_vpn_lt (um : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w : mword 64) :
+  upt_map_wf um -> um !! vpn = Some w -> bv_unsigned vpn < 67108862.
+Proof.
+  intros Hwf Hl. destruct (Hwf _ _ Hl) as (Hlt & _).
+  rewrite tf_vpn_unsigned in Hlt. exact Hlt.
+Qed.
+
+(* ...so a user va fits in 64 bits with room to spare and [mword_of_int]
+   does not wrap it *)
+Lemma uva_moi_unsigned (vpn : mword 27) (j : nat) :
+  (j < 4096)%nat -> bv_unsigned vpn < 67108862 ->
+  bv_unsigned (mword_of_int (bv_unsigned vpn * 4096 + Z.of_nat j) : mword 64)
+  = bv_unsigned vpn * 4096 + Z.of_nat j.
+Proof.
+  intros Hj Hvpn.
+  pose proof (bv_unsigned_in_range _ vpn) as [Hv0 _].
+  assert (Hmod : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite moi64_unsigned. apply bv_wrap_small. rewrite Hmod. lia.
+Qed.
+
+(* ...and so the va -> pa view of a mapped page's va is that page's byte *)
+Lemma uva_pa_page (P : uptd) (vpn : mword 27) (w : mword 64) (j : nat) :
+  upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = Some w -> (j < 4096)%nat ->
+  uva_pa P (bv_unsigned vpn * 4096 + Z.of_nat j)
+  = u_walk_pa w (mword_of_int (bv_unsigned vpn * 4096 + Z.of_nat j)).
+Proof.
+  intros Hwf Hl Hj.
+  unfold uva_pa.
+  rewrite (uva_svpn_of vpn j Hj (upt_map_wf_vpn_lt _ _ _ Hwf Hl)) Hl. reflexivity.
+Qed.
+
+(* [u_walk_pa] reads only the leaf's ppn and the va's PAGE OFFSET, so two
+   vas with the same offset translate through one leaf to one pa *)
+Lemma u_walk_pa_off (w va va' : mword 64) :
+  bv_unsigned va mod 4096 = bv_unsigned va' mod 4096 ->
+  u_walk_pa w va = u_walk_pa w va'.
+Proof.
+  intros Hoff. unfold u_walk_pa. cbn [bits_of_virtaddr].
+  change (Z.sub pagesize_bits 1) with 11.
+  assert (Hs : subrange_vec_dec va 11 0 = subrange_vec_dec va' 11 0)
+    by (apply bv_eq; rewrite !bv_subrange11; exact Hoff).
+  rewrite Hs. reflexivity.
+Qed.
+
+(* THE COVERAGE FACT, now a THEOREM rather than a side condition: every
+   address a mapped leaf can output belongs to the user address space.
+   This is [udata_cov] with the [data] set replaced by [u_data_pa], and
+   it is what every memory arm's ownership obligation goes through.
+   Note it does NOT ask [vpn = svpn_of va]: the pa depends only on the
+   leaf and the page offset, so the CANONICAL va of that page and that
+   offset -- which is in [uva_dom P] by construction -- is the witness,
+   whatever the high bits of [va] were. *)
+Lemma u_data_pa_cov (P : uptd) (vpn : mword 27) (w va : mword 64) :
+  upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = Some w ->
+  u_data_pa P (u_walk_pa w va).
+Proof.
+  intros Hwf Hl.
+  pose proof (bv_unsigned_in_range _ va) as [Hva0 _].
+  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
+  assert (Hjlt : (Z.to_nat (bv_unsigned va mod 4096) < 4096)%nat) by lia.
+  assert (Hjz : Z.of_nat (Z.to_nat (bv_unsigned va mod 4096))
+                = bv_unsigned va mod 4096) by lia.
+  exists (bv_unsigned vpn * 4096
+          + Z.of_nat (Z.to_nat (bv_unsigned va mod 4096))).
+  split.
+  - exists vpn, w, (Z.to_nat (bv_unsigned va mod 4096)).
+    split_and!; [exact Hl | exact Hjlt | reflexivity].
+  - rewrite (uva_pa_page P vpn w _ Hwf Hl Hjlt).
+    apply u_walk_pa_off.
+    rewrite (uva_moi_unsigned vpn _ Hjlt (upt_map_wf_vpn_lt _ _ _ Hwf Hl)).
+    rewrite Hjz Z.add_comm Z_mod_plus_full Zmod_mod. reflexivity.
+Qed.
+
 Section UserPtInv.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* the owned bytes of the mapped pages, contents EXISTENTIAL: user-mode
-     safety never depends on what the pages hold.  One aggregated byte
-     map -- accesses look up plain addresses, no per-page decomposition;
-     a flat pa-set dedups pages shared by several vpns. *)
+  (* ------------------------------------------------------------------ *)
+  (* §3b Generic big-op plumbing.                                        *)
+  (*                                                                     *)
+  (* Every bridge into or out of [umem_own] -- UserBytes.v's accessor    *)
+  (* and ProcPtOwn.v's satp-switch dovetail -- gathers existential bytes *)
+  (* out of a big-op over a finite set, and reindexes such a big-op      *)
+  (* along an injection.  Neither of those files imports the other, so   *)
+  (* both live here.  They are POLYMORPHIC in the key type on purpose:   *)
+  (* that is also what lets them be used at BOTH [Countable Arch.pa]     *)
+  (* instances the tree carries (UserBytes.v section 3b).                *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma bigset_gather {A} `{Countable A} (Phi : A -> bv 8 -> iProp Σ) (D : gset A) :
+    ([∗ set] x ∈ D, ∃ b : bv 8, Phi x b) ⊣⊢
+    (∃ m : gmap A (bv 8), ⌜dom m = D⌝ ∗ [∗ map] x ↦ b ∈ m, Phi x b).
+  Proof.
+    iSplit.
+    - iIntros "H".
+      iInduction D as [| x D' Hnin] "IH" using set_ind_L.
+      + iExists ∅. rewrite big_sepM_empty dom_empty_L. iSplit; done.
+      + rewrite big_sepS_insert; [| exact Hnin].
+        iDestruct "H" as "[Hx HD]".
+        iDestruct ("IH" with "HD") as (m) "[%Hdom Hm]".
+        iDestruct "Hx" as (b) "Hx".
+        assert (Hnone : m !! x = None)
+          by (apply not_elem_of_dom; rewrite Hdom; exact Hnin).
+        iExists (<[x := b]> m).
+        rewrite big_sepM_insert; [| exact Hnone].
+        iFrame "Hx Hm". iPureIntro. rewrite dom_insert_L Hdom. reflexivity.
+    - iIntros "H". iDestruct "H" as (m) "[%Hdom Hm]".
+      rewrite <- Hdom.
+      rewrite <- (big_sepM_dom (fun x => (∃ b : bv 8, Phi x b)%I) m).
+      iApply (big_sepM_impl with "Hm").
+      iIntros "!>" (x b _) "Hb". iExists b. iExact "Hb".
+  Qed.
+
+  (* The target set is taken ABSTRACTLY and characterised by its
+     membership, not spelled as [set_map h X]: the two consumers hold a
+     [dom md] and a [ud_pas P] respectively, and (see above) the [gset]
+     of physical addresses each of them means is at its own [Countable]
+     instance, which a [set_map] in this statement would pin to THIS
+     file's. *)
+  Lemma bigset_reindex {A B} `{Countable A} `{Countable B}
+      (h : A -> B) (X : gset A) (S : gset B) (Phi : B -> iProp Σ) :
+    (forall x y, x ∈ X -> y ∈ X -> h x = h y -> x = y) ->
+    (forall a, a ∈ S <-> exists x, x ∈ X /\ h x = a) ->
+    ([∗ set] x ∈ X, Phi (h x)) ⊣⊢ ([∗ set] a ∈ S, Phi a).
+  Proof.
+    (* NO [set_solver] anywhere below, on purpose: on an abstract
+       [Countable] key the hypothesis-discharging goals it would be aimed
+       at include a bare [h y = h z], and there it does not terminate. *)
+    revert S.
+    induction X as [| x X Hnin IH] using set_ind_L; intros S Hinj HS.
+    - assert (S = ∅) as ->.
+      { apply set_eq. intros a. split.
+        - intros Ha. apply HS in Ha as (y & Hy & _).
+          exfalso. exact (not_elem_of_empty y Hy).
+        - intros Ha. exfalso. exact (not_elem_of_empty a Ha). }
+      rewrite !big_sepS_empty. reflexivity.
+    - assert (Hxin : x ∈ ({[x]} ∪ X : gset A)).
+      { apply elem_of_union. left. apply elem_of_singleton. reflexivity. }
+      assert (Hsub : forall y : A, y ∈ X -> y ∈ ({[x]} ∪ X : gset A)).
+      { intros y Hy. apply elem_of_union. right. exact Hy. }
+      assert (Hhx : h x ∈ S).
+      { apply HS. exists x. split; [exact Hxin | reflexivity]. }
+      assert (HS' : forall a, a ∈ S ∖ {[h x]} <-> exists y, y ∈ X /\ h y = a).
+      { intros a. rewrite elem_of_difference elem_of_singleton. split.
+        - intros [Ha Hne]. apply HS in Ha as (y & Hy & <-).
+          apply elem_of_union in Hy as [Hy | Hy].
+          + apply elem_of_singleton in Hy as ->. exfalso. exact (Hne eq_refl).
+          + exists y. split; [exact Hy | reflexivity].
+        - intros (y & Hy & <-). split.
+          + apply HS. exists y. split; [exact (Hsub y Hy) | reflexivity].
+          + intros Heq. apply Hnin.
+            rewrite <- (Hinj y x (Hsub y Hy) Hxin Heq). exact Hy. }
+      assert (Hdisj1 : ({[x]} : gset A) ## X).
+      { apply elem_of_disjoint. intros y Hy1 Hy2.
+        apply elem_of_singleton in Hy1 as ->. exact (Hnin Hy2). }
+      assert (Hdisj2 : ({[h x]} : gset B) ## S ∖ {[h x]}).
+      { apply elem_of_disjoint. intros a Ha1 Ha2.
+        apply elem_of_singleton in Ha1 as ->.
+        apply elem_of_difference in Ha2 as [_ Hne].
+        apply Hne. apply elem_of_singleton. reflexivity. }
+      assert (HSeq : S = {[h x]} ∪ (S ∖ {[h x]})).
+      { apply set_eq. intros a.
+        rewrite elem_of_union elem_of_difference elem_of_singleton.
+        destruct (decide (a = h x)) as [-> | Hne].
+        - split; [intros _; left; reflexivity | intros _; exact Hhx].
+        - split.
+          + intros Ha. right. split; [exact Ha | exact Hne].
+          + intros [Hc | [Ha _]]; [ exfalso; exact (Hne Hc) | exact Ha ]. }
+      rewrite HSeq.
+      rewrite (big_sepS_union _ {[x]} X Hdisj1).
+      rewrite (big_sepS_union _ {[h x]} (S ∖ {[h x]}) Hdisj2).
+      rewrite !big_sepS_singleton.
+      rewrite (IH (S ∖ {[h x]})
+                 (fun y z Hy Hz Heq => Hinj y z (Hsub y Hy) (Hsub z Hz) Heq) HS').
+      reflexivity.
+  Qed.
+
+  (* the two composed: a big-op over a finite INDEX set, whose predicate
+     is a per-index existential byte at an injectively-mapped address,
+     IS one byte map at the image.  This is the only shape the bridges
+     use; the image is again taken abstractly, as a PREDICATE. *)
+  Lemma bigset_gather_reindex {A B} `{Countable A} `{Countable B}
+      (f : A -> B) (D : gset A) (Psi : B -> Prop) (Phi : B -> bv 8 -> iProp Σ) :
+    (forall x y, x ∈ D -> y ∈ D -> f x = f y -> x = y) ->
+    (forall a, Psi a <-> exists x, x ∈ D /\ f x = a) ->
+    ([∗ set] x ∈ D, ∃ b : bv 8, Phi (f x) b) ⊣⊢
+    (∃ m : gmap B (bv 8), ⌜forall a, Psi a <-> is_Some (m !! a)⌝ ∗
+       [∗ map] a ↦ b ∈ m, Phi a b).
+  Proof.
+    intros Hinj HPsi.
+    assert (Hmem : forall a : B, a ∈ set_map (D := gset B) f D <-> Psi a).
+    { intros a. rewrite elem_of_map (HPsi a). split.
+      - intros (x & -> & Hx). exists x. split; [exact Hx | reflexivity].
+      - intros (x & Hx & <-). exists x. split; [reflexivity | exact Hx]. }
+    assert (Himg : forall a : B,
+              a ∈ set_map (D := gset B) f D <-> exists x, x ∈ D /\ f x = a).
+    { intros a. rewrite (Hmem a). exact (HPsi a). }
+    rewrite (bigset_reindex f D (set_map (D := gset B) f D)
+               (fun a => (∃ b : bv 8, Phi a b)%I) Hinj Himg).
+    rewrite (bigset_gather Phi (set_map (D := gset B) f D)).
+    iSplit.
+    - iIntros "H". iDestruct "H" as (m) "[%Hdom Hm]". iExists m. iFrame "Hm".
+      iPureIntro. intros a. rewrite <- Hmem, <- Hdom. apply elem_of_dom.
+    - iIntros "H". iDestruct "H" as (m) "[%Hd Hm]". iExists m. iFrame "Hm".
+      iPureIntro. apply set_eq. intros a.
+      rewrite elem_of_dom. rewrite <- Hd. rewrite Hmem. reflexivity.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §3c The pre-port page ownership, unchanged.                         *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the owned bytes of the mapped pages, contents EXISTENTIAL.  One
+     aggregated byte map -- accesses look up plain addresses, no per-page
+     decomposition; a flat pa-set dedups pages shared by several vpns. *)
   Definition udata_own (data : gset Arch.pa) : iProp Σ :=
     (∃ dm : gmap Arch.pa (bv 8),
        ⌜dom dm = data⌝ ∗ [∗ map] a ↦ b ∈ dm, a ↦ₚ b)%I.
 
-  (* THE USER-EXECUTION PT BUNDLE: the tree invariant + the data pages +
-     the pure coverage and access-classification facts. *)
-  Definition user_pt_inv (P : uptd) : iProp Σ :=
+  (* ------------------------------------------------------------------ *)
+  (* §3d THE ABSTRACT STATE and the bundle.                              *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the process's memory: one byte per mapped user virtual address.  The
+     domain is PINNED to the table's address space, so [umem_own P M]
+     says "this is ALL of the user's memory", not "some of it". *)
+  Definition umem_own (P : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
+    (⌜dom M = uva_dom P⌝ ∗
+     [∗ map] va ↦ b ∈ M, (uva_pa P va : Arch.pa) ↦ₚ b)%I.
+
+  Definition umem_any (P : uptd) : iProp Σ := (∃ M, umem_own P M)%I.
+
+  (* a mapped va is exactly a va the image records *)
+  Lemma umem_own_lookup_is_Some (P : uptd) (M : gmap Z (bv 8)) (va : Z) :
+    dom M = uva_dom P -> (is_Some (M !! va) <-> uva_mapped P va).
+  Proof.
+    intros Hdom. rewrite <- elem_of_dom. rewrite Hdom. apply elem_of_uva_dom.
+  Qed.
+
+  (* READ OR WRITE ONE BYTE, at a user virtual address: the byte comes out
+     at the address it translates to, and handing a cell back at a new
+     value moves the abstract state by exactly that insert.  This is the
+     accessor the proofs that thread [M] will consume. *)
+  Lemma umem_own_acc (P : uptd) (M : gmap Z (bv 8)) (va : Z) (b : bv 8) :
+    M !! va = Some b ->
+    umem_own P M -∗
+    ((uva_pa P va : Arch.pa) ↦ₚ b ∗
+     (∀ b' : bv 8, (uva_pa P va : Arch.pa) ↦ₚ b' -∗ umem_own P (<[va := b']> M))).
+  Proof.
+    iIntros (Hl) "[%Hdom HM]".
+    iDestruct (big_sepM_insert_acc with "HM") as "[Hb Hrest]"; [exact Hl |].
+    iFrame "Hb". iIntros (b') "Hb". iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom.
+      assert (Hva : va ∈ uva_dom P)
+        by (rewrite <- Hdom; apply elem_of_dom; exists b; exact Hl).
+      apply set_eq. intros y. rewrite elem_of_union elem_of_singleton. split.
+      - intros [-> | Hy]; [exact Hva | exact Hy].
+      - intros Hy. right. exact Hy. }
+    iApply ("Hrest" with "Hb").
+  Qed.
+
+  (* THE SET FORM both bridges go through: forgetting the contents turns
+     the map into a big-op over the address space. *)
+  Lemma umem_any_set (P : uptd) :
+    umem_any P ⊣⊢
+    ([∗ set] va ∈ uva_dom P, ∃ b : bv 8, (uva_pa P va : Arch.pa) ↦ₚ b).
+  Proof.
+    rewrite /umem_any /umem_own.
+    symmetry.
+    apply (bigset_gather (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I) (uva_dom P)).
+  Qed.
+
+  (* THE USER-EXECUTION PT BUNDLE: the tree invariant + the process's
+     memory + the no-aliasing and access-classification facts. *)
+  Definition user_pt_inv (P : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
     (utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗
-     udata_own P.(ud_data) ∗
-     ⌜udata_cov P.(ud_um) P.(ud_data)⌝ ∗
+     umem_own P M ∗
+     ⌜uva_pa_inj P⌝ ∗
      ⌜upt_acc_wf P.(ud_um)⌝)%I.
+
+  (* ...with the memory quantified: what user execution preserves *)
+  Definition user_pt_any (P : uptd) : iProp Σ := (∃ M, user_pt_inv P M)%I.
+
+  Lemma user_pt_any_unfold (P : uptd) :
+    user_pt_any P ⊣⊢
+    (utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗ umem_any P ∗
+     ⌜uva_pa_inj P⌝ ∗ ⌜upt_acc_wf P.(ud_um)⌝).
+  Proof.
+    rewrite /user_pt_any /user_pt_inv /umem_any. iSplit.
+    - iIntros "H". iDestruct "H" as (M) "(Htlb & Hm & %Hinj & %Hacc)".
+      iFrame "Htlb". iSplitL "Hm"; [iExists M; iExact "Hm" |].
+      iPureIntro. split; [exact Hinj | exact Hacc].
+    - iIntros "(Htlb & Hm & %Hinj & %Hacc)". iDestruct "Hm" as (M) "Hm".
+      iExists M. iFrame "Htlb Hm". iPureIntro. split; [exact Hinj | exact Hacc].
+  Qed.
+
+  Lemma user_pt_any_intro (P : uptd) (M : gmap Z (bv 8)) :
+    user_pt_inv P M -∗ user_pt_any P.
+  Proof. iIntros "H". iExists M. iExact "H". Qed.
 
 End UserPtInv.
 

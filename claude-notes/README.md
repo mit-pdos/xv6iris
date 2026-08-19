@@ -158,8 +158,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   and lock payloads at explicit tiers.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`proc_pt`): the footprint derived
-  from `um`, the physical-tier decision, the `page_own ⇄ udata_own` bridges.
-  The CONSTRUCTION side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
+  from `um`, the physical-tier decision, the `page_own ⇄ umem_own` bridges,
+  and **the address-space view** — `user_pt_inv P M` now EXPOSES the abstract
+  state of a user-mode process (`M`, its memory keyed by user virtual
+  address), why that forces no aliasing, and what is left to thread it into
+  the kernel-side proofs. The CONSTRUCTION side is
+  [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
 - **[`kexec.md`](projects/kexec.md)** — `kexec()`, the largest function in the
   tree, where the FS, the page-table builder and `struct proc` meet: PROVEN,
   linked, and reaching `syscall()` through `sys_exec` at dispatch index 7.

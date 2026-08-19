@@ -32,10 +32,13 @@ duplicating another:
   **parked**, which is the form `wp_userret_pt` (UserretAllPt.v) consumes.
 - **`UserPtTree.v` — the user-execution bundle.** The descriptor record
   `uptd` and `upt_acc_wf` (each leaf is User-ok or User-denied on every A/D
-  variant — decided once when the map is built), plus `user_pt_inv P` =
-  `utlb_inv_pt` ∗ `udata_own ud_data` ∗ ⌜`udata_cov`⌝ ∗ ⌜`upt_acc_wf`⌝.
-  `UserExec.user_inv` wraps it; `UserKernelBridge.userret_to_user_inv`
-  repackages userret's post into it.
+  variant — decided once when the map is built), plus **`user_pt_inv P M` =
+  `utlb_inv_pt` ∗ `umem_own P M` ∗ ⌜`uva_pa_inj P`⌝ ∗ ⌜`upt_acc_wf`⌝**,
+  where `M : gmap Z (bv 8)` is THE ABSTRACT STATE OF THE USER-MODE PROCESS —
+  its memory, keyed by user virtual address. `user_pt_any P := ∃ M,
+  user_pt_inv P M` is what the user-execution engines take (see
+  "The address-space view" below). `UserExec.user_inv` wraps `user_pt_any`;
+  `UserKernelBridge.userret_to_user_inv` repackages userret's post into it.
 
 So `user_pt_inv` was the closest thing to a "process page table", and three
 things were missing from it:
@@ -53,6 +56,74 @@ things were missing from it:
 Plus one shape defect: `ud_data` + `udata_cov` is a derived quantity carried
 as a second field of the same record and re-coupled by a side condition —
 exactly the "ad-hoc argument coupling" the durable notes warn off.
+
+## The address-space view: `user_pt_inv` exposes the process's memory
+
+**The user-visible memory used to be existentially quantified inside the
+bundle** (`udata_own`, a flat `gset Arch.pa` of pages with existential
+contents). That is enough for SAFETY — user execution never depends on what
+the bytes are — but it says nothing a kernel-side proof can thread:
+copyin/copyout, a syscall argument, an exec image are all statements ABOUT
+THE BYTES, at USER VIRTUAL addresses. So the bundle now exposes that state.
+
+- `uva_pa P va` — the pa a user va translates to through `P`'s map (total;
+  zeros off the mapped vpns). Moved down from the descoped `UmodeMem.v`,
+  which had the same definition for the verified tier.
+- `uva_mapped P va` / `uva_dom P : gset Z` — the user address space, spelled
+  `PAGE * 4096 + OFFSET` so the finite set is a function of `ud_um` and its
+  membership needs no well-formedness hypothesis.
+- `umem_own P M` — `⌜dom M = uva_dom P⌝ ∗ [∗ map] va ↦ b ∈ M, uva_pa P va ↦ₚ b`.
+  The domain is PINNED, so it says "this is ALL of the user's memory".
+  `umem_any P := ∃ M, umem_own P M`.
+- `u_data_pa P a : Prop` — the pas the address space covers; the successor of
+  `udata_cov`'s `data` set, DERIVED and stated as a predicate so that no
+  `gset Arch.pa` (and so no `Countable Arch.pa` instance) appears in the
+  interface. `u_data_pa_cov` is `udata_cov`, now a theorem.
+
+**A va-keyed map forces NO ALIASING**, because two vpns mapping one physical
+page would make `umem_own` own that page's bytes twice. That is not a new
+restriction: `ProcPtOwn.um_inj` ("distinct vpns, distinct pages") was already
+a conjunct of `proc_pt_wf`, re-established at every insert from the OWNERSHIP
+of the page being added. The user tier states the same fact at byte
+granularity as `uva_pa_inj P`, and `ProcPtOwn.uva_pa_inj_of_wf` derives it.
+
+The satp-switch dovetail is unchanged in substance — the SAME `↦ₚ` cells,
+indexed two ways: `ProcPtOwn.proc_pt_own_umem` (`proc_pt_own P ⊣⊢ umem_any P`,
+under `upt_map_wf` + `um_inj`) replaces the old `proc_pt_own_udata` at the
+`user_pt_inv_open` / `user_pt_inv_close` boundary and at ProofUservec's exit
+switch. The reindexing itself is three generic Iris lemmas in `UserPtTree.v`
+(`bigset_gather`, `bigset_reindex`, `bigset_gather_reindex`), kept
+POLYMORPHIC in the key type — which is also what lets them be used at BOTH
+`Countable Arch.pa` instances the tree carries, retiring UserBytes.v's old
+`list_to_map (map_to_list _)` transport.
+
+**What the user-execution engines see.** `UserExec.user_inv` /
+`user_trap_frame` carry `user_pt_any pt`, and `UserBytes.user_pt_inv_bytes`
+opens and re-seals at `user_pt_any`. That loses nothing: arbitrary user code
+may write arbitrary bytes into its own pages, which is exactly what
+`u_mem_step`'s data half already said, and the DOMAIN is pinned by `pt`
+anyway — only the kernel can change which vas are mapped. `u_mem_wf` /
+`u_mem_step` keep their arity; their data-half clause now reads
+`∀ a, u_data_pa P a ↔ is_Some (md !! a)` and the `udata_cov` conjunct is
+gone (it is derivable from the `upt_map_wf` conjunct).
+
+### Still to do (the "thread it into other proofs" half)
+
+1. **Pin `M` across the memory arms.** Today a user store re-seals at a fresh
+   `M`; making the arms say *which* bytes changed means `u_mem_step` gains
+   `M M'` and the width-generic store certificate (`UserMemCert.u_mem_step_store`)
+   states `M' = M` with `k` bytes written at `va`. Everything else that
+   mentions `u_mem_wf`/`u_mem_step` (~370 sites) is a mechanical extra
+   argument.
+2. **Expose `M` on the KERNEL side**, i.e. `proc_pt P M`, and thread it
+   through copyin / copyout / uvmcopy / uvmalloc / uvmunmap / kexec. This is
+   where the abstract state actually pays: `proc_pt_own_umem` is already the
+   bridge, so the work is restating those specs.
+3. **Retire `ud_data`.** `user_pt_inv` no longer reads it, so the
+   `ud_data pt = ud_pas pt` premise threaded through
+   `SpecUserretClosed.loop_ok`, `SpecUservec.uservec_post`, `SpecForkret` and
+   `ProcInv` is now DEAD, as is `ud_norm`. Dropping the field is a
+   mechanical sweep and was already slated (step 3 below).
 
 ## The design (in `iris/ProcPtOwn.v`)
 

@@ -439,7 +439,7 @@ Section UserMemArmsA.
         /\ u_mem_step pt t t' mm mm').
   Proof.
     intros Hk Hk8 Hkdvd Huintk Hcfg Hpins Hwf.
-    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & Hacc & _ & _).
     pose proof Hpins as (_ & _ & _ & Htlb0).
     pose proof Hcfg as (Lcp & Lms & Lmenv).
     destruct Lms as (_ & Lmprv & _).
@@ -745,7 +745,7 @@ Section UserMemArmsA.
         /\ u_mem_step pt t t' mm mm').
   Proof.
     intros Hk Hk8 Hkdvd Huintk Hvwid Hcfg Hpins Hwf.
-    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & Hacc & _ & _).
     pose proof Hpins as (_ & _ & _ & Htlb0).
     pose proof Hcfg as (Lcp & Lms & Lmenv).
     destruct Lms as (_ & Lmprv & _).
@@ -1088,7 +1088,7 @@ Section UserMemArmsA.
   Proof.
     intros Hpfc Hag Hwid Hdec Hhv Hpins Hwf.
     destruct rs2 as [ir2]. destruct rs1 as [ir1]. destruct rd as [ird].
-    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & Hacc & _ & _).
     assert (Hk : 0 < width)
       by (destruct Hwid as [-> | [-> | [-> | [-> | ->]]]]; lia).
     assert (Hk16 : width <= 16)

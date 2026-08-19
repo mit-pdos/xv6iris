@@ -114,7 +114,7 @@ Section UserretClosed.
     iDestruct (user_trap_frame_open C pt (Rut_at h) with "Hframe") as
       (ms_v sc_v stval_v sepc_v g)
       "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr &
-        Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmiec & Hmdlc & #Hmedlc & Hmenvc &
+        Hutlb & Hdata & %Hupinj & %Hacc & Hstvec & Hmiec & Hmdlc & #Hmedlc & Hmenvc &
         #Hsenvc & #Hmsec & #Hssec & Hrut)".
     iDestruct "Hrut" as (ksp) "Hures".
     (* the three counter-permission cells [user_cfg] carries.  The opener
@@ -131,8 +131,8 @@ Section UserretClosed.
                  ms_v sc_v stval_v sepc_v g Hmsok
                  with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
                        [Hutlb Hdata] [Hstvec Hmiec Hmdlc Hmenvc] []") as "Hframe".
-    { rewrite /user_pt_inv. iFrame "Hutlb Hdata".
-      iPureIntro. split; [exact Hcov | exact Hacc]. }
+    { rewrite user_pt_any_unfold. iFrame "Hutlb Hdata".
+      iPureIntro. split; [exact Hupinj | exact Hacc]. }
     { rewrite /user_cfg.
       iFrame "Hstvec Hmiec Hmdlc Hmenvc Hmedlc Hsenvc Hmsec Hssec".
       iSplitR; [iExists mcen, scen; iFrame "Hmcen Hscen" | iExists hpm; iFrame "Hhpm"]. }
@@ -239,7 +239,7 @@ End Res.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hgap Hkw HSIE HMPRV HSXL HTVM HMXR HTSR HFS HVS Hsup Hwf
-           Ha0 Hsatpr Hcov Hacc.
+           Ha0 Hsatpr Hinj Hacc.
     destruct Hok as (Hstv & Hdqc & Hmie & Hmedl & Hnorm & Hptwf).
     destruct Hsatpr as (HuMode & Huasid & Huppn).
     iIntros "#Hkt #Hhw #Hmin #Hwire #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
@@ -275,7 +275,7 @@ End Res.
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
               mcen scen hpm
               HSIE HMPRV HSXL HTVM HMXR (uc_mm C) Hwf HTSR Hsup Ha0
-              HuMode Huasid Huppn HFS HVS Hdqc Hcov Hacc
+              HuMode Huasid Huppn HFS HVS Hdqc Hinj Hacc
               with "Hkt Hhw Hmin Hwire Hhs Hpriv Hms Hmiec Hmdlc Hmenvc Hsenvc
                     Hsepc Hclaim Hktlb Hufr Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112

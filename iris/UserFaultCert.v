@@ -448,7 +448,7 @@ Lemma u_translate_blocked (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
        (u_state rs mm) mm = true.
 Proof.
   intros Hwf Hpins Hblk Hlk.
-  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & _ & Hspec).
+  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & Hspec).
   pose proof Hspec as (Hbase & _).
   set (s := u_state rs mm) in *.
   assert (Hwalk : exec (pt_walk 39 vpn acc User mxr do_sum (ud_root P) 2 false tt) s
@@ -549,7 +549,7 @@ Lemma u_translate_denied (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
           mxr do_sum tt) (u_state rs mm) mm = true.
 Proof.
   intros Hwf Hpins Hleaf Hden Hss.
-  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & Hwfm & Hspec).
+  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   pose proof Hpins as (_ & _ & _ & Htlbok).
   set (s := u_state rs mm) in *.
@@ -690,7 +690,7 @@ Proof.
   pose proof Hpins as (Hhw & _ & Hpt & Htlbok).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & _).
   destruct Hsatpok as (Hmode & Hasid & Hppn & _).
-  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & _ & Hspec).
+  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & Hspec).
   pose proof Hspec as (Hbase & _ & _ & _ & Hblkspec).
   set (s := u_state rs mm) in *.
   (* the probes' certificates, off the exec facts the caller supplies *)

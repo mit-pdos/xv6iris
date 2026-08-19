@@ -9,9 +9,12 @@
 
      [user_inv]        the loop invariant: privilege User, an ARBITRARY pc,
                        ARBITRARY registers, arbitrary trap CSRs, over the
-                       user page table bundle [user_pt_inv] (UserPtTree.v -- owns
-                       the PT slots and every mapped page, contents
-                       existential) and the loop-constant config [user_cfg].
+                       user page table bundle [user_pt_any] (UserPtTree.v --
+                       owns the PT slots and the process's whole memory
+                       [umem_own P M]; [M] -- the abstract state -- is
+                       QUANTIFIED here, since arbitrary user code may write
+                       arbitrary bytes into its own pages, while its DOMAIN
+                       is pinned by the table) and the config [user_cfg].
      [user_trap_frame] the frame handed to the kernel re-entry continuation:
                        privilege Supervisor, pc at stvec's direct base, the
                        trap CSRs written, everything else as in [user_inv].
@@ -28,8 +31,8 @@
    totality [DecodeTotalU/DecodeSetU] x per-family execute outcomes).
    Everything a step can do falls in one of the two continuations:
      - retire: compute/branch/jump (register file changes), loads/stores/AMOs
-       to mapped pages (the page contents are existential in [user_pt_inv], so a
-       store trivially re-establishes it), TLB fills and Svadu A/D write-backs (absorbed by [utlb_inv_pt]);
+       to mapped pages (the memory [M] is quantified in [user_pt_any], so a
+       store re-establishes it at a new [M]), TLB fills and Svadu A/D write-backs (absorbed by [utlb_inv_pt]);
      - trap TO STVEC: a pending delegated INTERRUPT (see below), ecall/ebreak,
        illegal (incl. all privileged instructions), fetch/load/store page
        faults (unmapped or permission-denied or A/D-update-needed pages),
@@ -274,7 +277,7 @@ Section UserExec.
 
   (* the loop-constant config cells (fraction [dqc]: never written during
      user execution; the complementary fraction stays with the kernel).
-     satp / tlb / pmp cells live inside [user_pt_inv] (UserPtTree.v).  The
+     satp / tlb / pmp cells live inside [user_pt_any] (UserPtTree.v).  The
      external-interrupt WIRES sig_meip / sig_seip are deliberately ABSENT
      and no bundle in this file holds them: the device loop writes them
      concurrently, and the dispatch reads them forall-bound, off-frame.
@@ -326,7 +329,7 @@ Section UserExec.
   (* cell, so it is owned at full fraction), the pc (ANY value -- fetching *)
   (* from a non-canonical or unmapped address page-faults safely), the     *)
   (* register file, the trap CSRs (stale until the next trap writes them), *)
-  (* mstatus up to its pins, and -- inside [user_pt_inv] -- the TLB and the    *)
+  (* mstatus up to its pins, and -- inside [user_pt_any] -- the TLB and the    *)
   (* mapped pages' contents.                                               *)
   (*                                                                       *)
   (* PC vs nextPC: while ACTIVE the two are in lock-step ([pc_is]-shaped:  *)
@@ -362,7 +365,7 @@ Section UserExec.
       ⌜user_mstatus_ok ms_v⌝ ∗
       ⌜forall u, hs = HART_ACTIVE u -> va' = va⌝ ∗
       user_regs hs ms_v sc_v stval_v sepc_v va va' g ∗
-      user_pt_inv pt ∗
+      user_pt_any pt ∗
       user_cfg ∗
       Rut pt)%I.
 
@@ -386,7 +389,7 @@ Section UserExec.
       sepc ↦ᵣ sepc_v ∗
       pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
-      user_pt_inv pt ∗
+      user_pt_any pt ∗
       user_cfg ∗
       Rut pt)%I.
 
@@ -405,7 +408,7 @@ Section UserExec.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
     pc_is (stvec_base (uc_stvec C)) -∗
-    gpr_file g -∗ user_pt_inv pt -∗ user_cfg -∗ Rut pt -∗
+    gpr_file g -∗ user_pt_any pt -∗ user_cfg -∗ Rut pt -∗
     user_trap_frame.
   Proof.
     iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
@@ -442,7 +445,7 @@ Section UserExec.
           (g : regfile),
         ⌜user_mstatus_ok ms_v⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-        user_pt_inv pt -∗
+        user_pt_any pt -∗
         user_cfg -∗
         Rut pt -∗
         ▷ ((user_inv -∗ WP (Loop : expr riscv_lang)) ∧

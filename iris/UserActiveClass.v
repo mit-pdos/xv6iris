@@ -1798,7 +1798,7 @@ Section UserActiveClass.
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
         _ & _ & _ & #Hcert & _)".
     pose proof Hpins1 as (_ & _ & _ & Htlbok1).
-    pose proof Hwf as (_ & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hwf as (_ & _ & _ & _ & _ & _ & Hacc & _ & _).
     (* ---- every pin moves from [rs1] to [rsA]: the prelude writes ONE cell *)
     assert (TA : forall q : register, q ∈ u_Dfix ->
               register_beq q (R_bool minstret_increment) = false ->
