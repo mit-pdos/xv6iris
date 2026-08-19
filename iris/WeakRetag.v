@@ -519,7 +519,7 @@ Section machine.
     astep_ok img log i ag l g Dl ↔ astep_ok img (retag_log f log) i ag l g Dl.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - done.
     - split.
@@ -548,6 +548,8 @@ Section machine.
         exists ts, ak. split_and!; [done|done|done| | |done|done|done].
         * by eapply retag_read_ok_1.
         * by eapply retag_excl_ok_1.
+    - done.
+    - done.
     - done.
     - done.
     - done.
@@ -699,7 +701,7 @@ Section machine.
     assert (ag1 = ag) as -> by congruence.
     have Htid : wm_tid m0 = Some i.
     { destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
-                             |aq rl base tvs data asrc vsrc| | | | |];
+                             |aq rl base tvs data asrc vsrc| | | | | | |];
         simpl in Hok.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as (_ & _ & HD). by rewrite HD in Hts.
@@ -715,7 +717,9 @@ Section machine.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
-      - destruct Hok as [_ HD]. by rewrite HD in Hts. }
+      - destruct Hok as [_ HD]. by rewrite HD in Hts.
+      - done.
+      - done. }
     eapply (canon_f_spec clsf TS (ts - 1)%nat m0 i T k ev ag);
       [done|done|done|done|by rewrite Hsp|done|].
     intros k1 k2 ev1 ev2 He1 Ht1 He2 Ht2.

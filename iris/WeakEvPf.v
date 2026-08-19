@@ -292,6 +292,9 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
       wglog σ' = wglog σ /\
       wgws σ' c = ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)
   | LInstr => wglog σ' = wglog σ /\ wgws σ' c = instr_post (wgws σ c)
+  (* THE RMW SPLIT (S1): the event language emits neither label yet
+     (S3 does), and this predicate is a NODE's arm — so [False]. *)
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
 (** The disk agent's version.  Since M5 the disk is an ORDINARY weak-memory
@@ -321,6 +324,9 @@ Definition edlabel_ok (P : epool) (σ : wgstate) (l : wlabel)
   | LDev => wglog σ' = wglog σ /\ dws' = ep_dws P
   | LRmw _ _ _ _ _ _ _ => False
   | LRegW _ _ | LCtrl _ | LInstr => False
+  (* THE RMW SPLIT (S1): no arm yet, and the disk has no exclusives —
+     the [LRmw] precedent two lines up. *)
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
 Lemma wbytes_ne (n : N) {w : N} (v : bv w) : n <> 0%N -> wbytes n v <> [].

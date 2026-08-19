@@ -130,6 +130,11 @@ Section pf_uniform.
           (srcs_view (pa_ws ag) asrc) /\
         excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg)))
     | LRegW _ _ | LCtrl _ | LInstr => True
+    (* THE RMW SPLIT (S1).  [pf_ok] is the side condition of a
+       [wp_pf_step] ARM ([wp_pf_step_intro]), and [wp_pf_step] gains
+       [PFExLoad]/[PFExStore] only in S2 — so in the additive slice the two
+       new labels have no arm. *)
+    | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
     end.
 
   Definition pf_log (cfg : wpcfg P D) (i : agent) (ag : wpagent P)
@@ -144,8 +149,12 @@ Section pf_uniform.
         ++ [WMsg base data (Some i)
               (pcls (pa_st ag) (LRmw aq rl base tvs data asrc vsrc)
                  (pa_ws ag))]
+    | LExStore rl base data asrc vsrc =>
+        pc_log cfg
+        ++ [WMsg base data (Some i)
+              (pcls (pa_st ag) (LExStore rl base data asrc vsrc) (pa_ws ag))]
     | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-    | LCtrl _ | LInstr => pc_log cfg
+    | LCtrl _ | LInstr | LExLoad _ _ _ _ => pc_log cfg
     end.
 
   Definition pf_ws (cfg : wpcfg P D) (ag : wpagent P) (l : wlabel) : wstate :=
@@ -165,6 +174,11 @@ Section pf_uniform.
     | LRegW rd srcs => regw_post (pa_ws ag) rd (srcs_view (pa_ws ag) srcs)
     | LCtrl srcs => ctrl_post (pa_ws ag) (srcs_view (pa_ws ag) srcs)
     | LInstr => instr_post (pa_ws ag)
+    | LExLoad aq base tvs _ => load_post_run (pa_ws ag) aq base tvs.*1
+    | LExStore rl base data asrc vsrc =>
+        store_post_run_d (pa_ws ag) rl (srcs_view (pa_ws ag) asrc)
+          (srcs_view (pa_ws ag) vsrc) base (length data)
+          (S (length (pc_log cfg)))
     | LSilent | LDev => pa_ws ag
     end.
 
@@ -181,7 +195,7 @@ Section pf_uniform.
   Proof.
     intros Hlk Hps Hok. rewrite /pf_cfg.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc].
     - by apply (PFSilent pstep pcls i cfg ag st' d').
     - destruct Hok as (-> & Hrd). rewrite /pf_ws /pf_log.
       rewrite -(load_post_run_d_0 (pa_ws ag) aq base (tvs.*1)).
@@ -196,6 +210,8 @@ Section pf_uniform.
     - by apply (PFRegW pstep pcls i cfg ag rdw wsrc st' d').
     - by apply (PFCtrl pstep pcls i cfg ag csrc st' d').
     - by apply (PFInstr pstep pcls i cfg ag st' d').
+    - done.
+    - done.
   Qed.
 
   (** THE LOAD PIN (D3-2, weakening D2's).  [pf_ok] pins the LOAD's operand
@@ -366,6 +382,8 @@ Proof.
   - destruct Hdf as [Ha Hb]. rewrite Ha Hb.
     rewrite /edlab_ws /pf_ws /=.
     by rewrite load_post_run_d_0 store_post_run_d_0.
+  (* [LExStore]: [LStore]'s case verbatim (RMW split S1) *)
+  - destruct Hdf as [Ha Hb]. rewrite Ha Hb. apply store_post_run_d_0.
 Qed.
 
 (** ... and the four shapes of a projected configuration after one step. *)
@@ -454,7 +472,7 @@ Lemma elab_apply_elabel_ok σ c l k ors oib d' :
 Proof.
   intros Hok Hlat.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     rewrite /elabel_ok /elab_apply /=.
   - by split.
   - destruct Hok as (-> & Hrd).
@@ -470,6 +488,8 @@ Proof.
   - by split; [|rewrite gws_insert_eq].
   - by split; [|rewrite gws_insert_eq].
   - by split; [|rewrite gws_insert_eq].
+  - done.
+  - done.
 Qed.
 
 (** The hart's program half assembles into an [epf_step]: at a boundary
@@ -522,7 +542,7 @@ Proof.
                 (edlab_apply σ l k d').
   { have Hdf : lb_depfree l by eapply pstep_disk_depfree; left; exact Hps.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl in Hdf, Hok.
     - by split.
     - (* the disk's read is lat-free by construction *)
@@ -537,7 +557,9 @@ Proof.
     - by split.
     - by destruct Hdf.
     - by destruct Hdf.
-    - by destruct Hdf. }
+    - by destruct Hdf.
+    - done.
+    - done. }
   by apply (EPFDisk l P σ dp' (edlab_ws σ (ep_dws P) l)).
 Qed.
 

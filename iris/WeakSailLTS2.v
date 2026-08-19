@@ -213,7 +213,7 @@ Proof.
     + intros [_ H].
       destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                     |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                    |csrc|]; try done.
+                    |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try done.
       * destruct lat; [done|]. destruct asrc as [|x asrc']; [|done].
         by destruct H as (_ & _ & _ & w & _ & ->).
       * destruct asrc as [|x asrc']; [|done].
@@ -264,7 +264,7 @@ Proof.
   intros [_ H].
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                |csrc|]; try done.
+                |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try done.
   - destruct lat; [done|]. by destruct asrc as [|x asrc'].
   - destruct asrc as [|x asrc']; [|done]. by destruct vsrc as [|y vsrc'].
 Qed.
@@ -275,7 +275,8 @@ Lemma sail_step_ni_dep_free next p l p' :
   | WeakPromise.LRegW _ _ | WeakPromise.LCtrl _ | WeakPromise.LInstr => False
   | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _
   | WeakPromise.LStore _ _ _ _ _ | WeakPromise.LRmw _ _ _ _ _ _ _
-  | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev => True
+  | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev
+  | WeakPromise.LExLoad _ _ _ _ | WeakPromise.LExStore _ _ _ _ _ => True
   end.
 Proof.
   intros H%sail_step_ni_depfree. by destruct l.
@@ -320,9 +321,14 @@ Definition lbl_class (l : wlabel) (ws : wstate) : wm_class :=
   | WeakPromise.LStore rl _ _ _ _ =>
       if (w_relp ws || rl)%bool then WCrel else WCplain
   | WeakPromise.LRmw _ _ _ _ _ _ _ => WCexcl
+  (* THE RMW SPLIT (S1): the conditional write classifies like a plain
+     store (design §8 / the class-function rule); the exclusive read, like
+     a load, appends nothing and classifies plain. *)
+  | WeakPromise.LExStore rl _ _ _ _ =>
+      if (w_relp ws || rl)%bool then WCrel else WCplain
   | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _ | WeakPromise.LFence _ _ _ _
   | WeakPromise.LDev | WeakPromise.LRegW _ _ | WeakPromise.LCtrl _
-  | WeakPromise.LInstr => WCplain
+  | WeakPromise.LInstr | WeakPromise.LExLoad _ _ _ _ => WCplain
   end.
 
 Lemma lbl_class_store ak ws base data :
@@ -378,7 +384,8 @@ Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail unit) : Prop :=
         read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs
   | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _ | WeakPromise.LStore _ _ _ _ _
   | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev | WeakPromise.LRegW _ _
-  | WeakPromise.LCtrl _ | WeakPromise.LInstr => True
+  | WeakPromise.LCtrl _ | WeakPromise.LInstr
+  | WeakPromise.LExLoad _ _ _ _ | WeakPromise.LExStore _ _ _ _ _ => True
   end.
 
 Definition pf_solo (next : bool → M unit) (i : agent)

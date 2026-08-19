@@ -219,11 +219,11 @@ Section ord.
     match gev_lb TS r with
     | Some l =>
         match l with
-        | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ =>
+        | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExLoad _ _ _ _ =>
             lsrcs_view (pre_lstate TS r) (lb_asrc l)
             ++ lfloor (pre_lstate TS r) (lb_aq l) a
         | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-        | LCtrl _ | LInstr => []
+        | LCtrl _ | LInstr | LExStore _ _ _ _ _ => []
         end
     | None => []
     end.
@@ -1256,9 +1256,9 @@ Section ordwf.
     pt_trs TS !! r.1 = Some T → at_ags T !! r.2 = Some ag →
     gev_lb TS r = Some l →
     match l with
-    | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True
+    | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExLoad _ _ _ _ => True
     | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-    | LCtrl _ | LInstr => False
+    | LCtrl _ | LInstr | LExStore _ _ _ _ _ => False
     end →
     rd_floor TS r a
     = Nat.max (load_vpre_d (pa_ws ag) (lb_aq l)

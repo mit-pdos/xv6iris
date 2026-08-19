@@ -112,8 +112,9 @@ Definition lb_reads (l : wlabel) : list (Z * nat) :=
   match l with
   | LLoad _ _ base tvs _ => tvs_reads base tvs
   | LRmw _ _ base tvs _ _ _ => tvs_reads base tvs
+  | LExLoad _ base tvs _ => tvs_reads base tvs
   | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => []
+  | LCtrl _ | LInstr | LExStore _ _ _ _ _ => []
   end.
 
 (** THE ADDRESS-OPERAND LIST of a label (D2).  [[]] on every label that
@@ -124,6 +125,8 @@ Definition lb_asrc (l : wlabel) : list dsrc :=
   | LLoad _ _ _ _ asrc => asrc
   | LStore _ _ _ asrc _ => asrc
   | LRmw _ _ _ _ _ asrc _ => asrc
+  | LExLoad _ _ _ asrc => asrc
+  | LExStore _ _ _ asrc _ => asrc
   | LSilent | LFence _ _ _ _ | LDev | LRegW _ _ | LCtrl _ | LInstr => []
   end.
 
@@ -162,7 +165,7 @@ Section astep.
     astep_ok img log i ag l f D → ∀ w, ws_le w (f w).
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros [-> _] w. reflexivity.
     - intros (_ & -> & _) w. apply load_post_run_d_le.
@@ -174,6 +177,8 @@ Section astep.
     - intros [-> _] w. apply regw_post_le.
     - intros [-> _] w. apply ctrl_post_le.
     - intros [-> _] w. apply instr_post_le.
+    - done.
+    - done.
   Qed.
 
   (** A fulfilled timestamp is nonzero: [fulfil_ok]'s EXT conjunct
@@ -194,6 +199,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** A read's timestamp names a real write of the byte it reads
@@ -203,7 +210,7 @@ Section astep.
     is_Some (log_byte img log ts a).
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros _ Hin%elem_of_nil. done.
     - intros (Hro & _ & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
@@ -216,6 +223,8 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
+    - done.
+    - done.
   Qed.
 
   (** THE READ RAISES [coh]: after a step whose label reads [(a, ts)],
@@ -227,7 +236,7 @@ Section astep.
     (ts ≤ coh (f (pa_ws ag)) a)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
@@ -245,6 +254,8 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
+    - done.
+    - done.
   Qed.
 
   (** THE FULFIL LOWERS NOTHING BUT DEMANDS [coh < ts] on every byte of
@@ -264,6 +275,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   Lemma astep_ok_fulfil_coh img log i ag l f ts m a :
@@ -272,7 +285,7 @@ Section astep.
     (coh (pa_ws ag) a < ts)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -289,6 +302,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** THE SAME-STEP CASE of the own-read lemma: a step can NEVER read
@@ -300,7 +315,7 @@ Section astep.
     astep_ok img log i ag l f (Some ts) → (a, ts) ∈ lb_reads l → False.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -319,6 +334,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
 End astep.

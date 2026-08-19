@@ -299,7 +299,7 @@ Section stepout.
     have Hokc := Hok.
     destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
                             |aq rl base tvs data asrc vsrc
-                            |pr pw sr sw| |rdw wsrc|csrc|] eqn:Hlbe.
+                            |pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc] eqn:Hlbe.
     - (* ---- LSilent ---- *)
       destruct Hok as (Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -502,6 +502,8 @@ Section stepout.
         apply (PFInstr pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
+    - done.
+    - done.
   Qed.
 
 End stepout.
@@ -1637,12 +1639,14 @@ Section coneblocks.
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
       destruct l2 as [|aq lat base tvs asrc|rl base data asrc vsrc
                      |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                     |csrc|];
+                     |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
         simpl in Hinrd;
         [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
         | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
         |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
-        |by apply elem_of_nil in Hinrd].
+        |by apply elem_of_nil in Hinrd
+        (* THE RMW SPLIT (S1): no machine arm, so [astep_ok] is [False] *)
+        |by destruct Hok2|by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
         split_and!; [done|done|left; by exists aq, lat, asrc].

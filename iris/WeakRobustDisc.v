@@ -123,7 +123,8 @@ Definition lb_fence_pwsw (l : wlabel) : Prop :=
   match l with
   | LFence _ pw _ sw => pw = true ∧ sw = true
   | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
-  | LDev | LRegW _ _ | LCtrl _ | LInstr => False
+  | LDev | LRegW _ _ | LCtrl _ | LInstr
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
 (* ------------------------------------------------------------------ *)
@@ -151,7 +152,7 @@ Section astep.
     (ts ≤ w_vwOld (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -166,6 +167,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** The [pw ∧ sw] mirror of [WeakRobustAcyc.astep_ok_fence_vwNew]: a
@@ -175,7 +178,7 @@ Section astep.
     (w_vwOld (pa_ws ag) ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl; try (by intros _ []).
     intros [-> _] [-> ->]. apply fence_post_vwNew_w.
   Qed.

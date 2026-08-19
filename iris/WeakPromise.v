@@ -114,6 +114,21 @@ Inductive wlabel :=
 | LInstr
     (** Instruction start: [w_ldv := 0], scoping [DLdRes] to one
         instruction.  Carries nothing else. *)
+| LExLoad (aq : bool) (base : Z) (tvs : list (nat * bv 8))
+          (asrc : list dsrc)
+    (** THE EXCLUSIVE READ HALF of the RMW split (design
+        [claude-notes/design/weak-memory-rmw-split.md] §2).  Read
+        semantics are [LLoad]'s with [lat := false] hardwired — the
+        payload is [LLoad]'s minus [lat] — plus, once the machine arms
+        land (slice S2), the write of the agent-local reservation
+        [WeakMem.w_res]. *)
+| LExStore (rl : bool) (base : Z) (data : list (bv 8))
+           (asrc vsrc : list dsrc)
+    (** THE CONDITIONAL WRITE HALF of the RMW split (design §2/§4).
+        Write semantics are [LStore]'s — same payload — plus, at fulfil,
+        the per-byte exclusivity window [excl_ok_ts] against the
+        reservation set by the matching [LExLoad], and the clearing of
+        that reservation. *)
 .
 
 (** WHY THE THREE NEW ARMS COME AFTER [LDev] rather than beside the memory
@@ -169,6 +184,8 @@ Definition lb_depfree (l : wlabel) : Prop :=
   | LStore _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   | LRmw _ _ _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   | LRegW _ _ | LCtrl _ | LInstr => False
+  | LExLoad _ _ _ asrc => asrc = []
+  | LExStore _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   end.
 
 (** D3-2: THE WEAKER PIN THE EVENT INSTANCE ACTUALLY SATISFIES.
@@ -182,8 +199,9 @@ Definition lb_depfree (l : wlabel) : Prop :=
 Definition lb_ldepfree (l : wlabel) : Prop :=
   match l with
   | LLoad _ _ _ _ asrc => asrc = []
+  | LExLoad _ _ _ asrc => asrc = []
   | LSilent | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LFence _ _ _ _
-  | LDev | LRegW _ _ | LCtrl _ | LInstr => True
+  | LDev | LRegW _ _ | LCtrl _ | LInstr | LExStore _ _ _ _ _ => True
   end.
 
 Lemma lb_depfree_ldepfree l : lb_depfree l → lb_ldepfree l.
@@ -346,6 +364,26 @@ Definition excl_ok (log : list wmsg) (i : agent) (base : Z)
     ¬ writes_in_by log (λ tid, tid ≠ Some i) (base + Z.of_nat j)
         t (ts - 1)%nat.
 
+(** [excl_ok] RESTATED OVER THE RESERVATION'S TIMESTAMP COLUMN ALONE
+    (RMW split §4).  [excl_ok] consumes only [tvs.*1] — the value column
+    was dead — so the split's reservation ([WeakMem.wresv]) banks just the
+    timestamps and the write half checks the same per-byte window
+    [(rts_j, ts - 1]] at byte [base + j]. *)
+Definition excl_ok_ts (log : list wmsg) (i : agent) (base : Z)
+    (rts : list nat) (ts : nat) : Prop :=
+  ∀ j t, rts !! j = Some t →
+    ¬ writes_in_by log (λ tid, tid ≠ Some i) (base + Z.of_nat j)
+        t (ts - 1)%nat.
+
+(** The two agree on a reservation banked from a read's [tvs]. *)
+Lemma excl_ok_ts_of_excl_ok log i base tvs ts :
+  excl_ok log i base tvs ts → excl_ok_ts log i base tvs.*1 ts.
+Proof.
+  intros He j t Ht. rewrite list_lookup_fmap in Ht.
+  destruct (tvs !! j) as [[t' v]|] eqn:Hj; simplify_eq/=.
+  by eapply He.
+Qed.
+
 (* ------------------------------------------------------------------ *)
 (** ** The side conditions under an end-extension of the log, and the
        singleton collapse
@@ -399,6 +437,15 @@ Lemma excl_ok_app log l i base tvs ts :
   excl_ok log i base tvs ts → excl_ok (log ++ l) i base tvs ts.
 Proof.
   intros Hle He j t v Htv Hw. eapply He; [done|].
+  by eapply writes_in_by_app_inv.
+Qed.
+
+(** [excl_ok_app] for the reservation form. *)
+Lemma excl_ok_ts_app log l i base rts ts :
+  (ts - 1 ≤ length log)%nat →
+  excl_ok_ts log i base rts ts → excl_ok_ts (log ++ l) i base rts ts.
+Proof.
+  intros Hle He j t Ht Hw. eapply He; [done|].
   by eapply writes_in_by_app_inv.
 Qed.
 

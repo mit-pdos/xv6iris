@@ -59,7 +59,7 @@ Lemma astep_ok_del_vcap {P : Type} img log i (ag : wpagent P) l f ts :
   astep_ok img log i ag l f (Some ts) → (w_vcap (pa_ws ag) < ts)%nat.
 Proof.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     simpl.
   - by intros [_ ?].
   - by intros (_ & _ & ?).
@@ -75,6 +75,8 @@ Proof.
   - by intros [_ ?].
   - by intros [_ ?].
   - by intros [_ ?].
+  - done.
+  - done.
 Qed.
 
 (* ------------------------------------------------------------------ *)

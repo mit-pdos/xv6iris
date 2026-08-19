@@ -376,7 +376,7 @@ Proof.
     apply Hag. left. destruct (tvs_fst_reads base tvs i u Hu) as (a & Ha).
     exists a. by rewrite Hlb. }
   destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc
-                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
+                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc].
   - done.
   - by rewrite (Hread base tvs eq_refl).
   - destruct ts as [t|]; [|done]. by rewrite (Hag t (or_intror eq_refl)).
@@ -389,6 +389,9 @@ Proof.
   - done.
   - done.
   - done.
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  - by rewrite (Hread xbase xtvs eq_refl).
+  - destruct ts as [t|]; [|done]. by rewrite (Hag t (or_intror eq_refl)).
 Qed.
 
 Lemma aevs_post_ext {D : Type} σ σ' (evs : list (aev D)) w :
@@ -901,9 +904,9 @@ Section sim.
     at_ags T !! e.2 = Some ag →
     ae_lb ev = l →
     match l with
-    | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True
+    | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExLoad _ _ _ _ => True
     | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-    | LCtrl _ | LInstr => False
+    | LCtrl _ | LInstr | LExStore _ _ _ _ _ => False
     end →
     lb_reads l = tvs_reads base tvs →
     read_ok_d (pt_img TS) (pt_log TS) (pa_ws ag) (lb_aq l) lat base tvs
@@ -1217,7 +1220,7 @@ Section sim.
     have Hokc := Hok.
     destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
                             |aq rl base tvs data asrc vsrc
-                            |pr pw sr sw| |rdw wsrc|csrc|] eqn:Hlbe.
+                            |pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc] eqn:Hlbe.
     - (* ---- LSilent ---- *)
       destruct Hok as (Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -1456,6 +1459,8 @@ Section sim.
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
+    - done.
+    - done.
   Qed.
 
   (* ---------------------------------------------------------------- *)

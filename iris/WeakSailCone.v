@@ -423,7 +423,8 @@ Definition xrmw_tight (i : agent) (l : wlabel) (c : wpcfg pxv6 unit) : Prop :=
         read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs
   | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _ | WeakPromise.LStore _ _ _ _ _
   | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev | WeakPromise.LRegW _ _
-  | WeakPromise.LCtrl _ | WeakPromise.LInstr => True
+  | WeakPromise.LCtrl _ | WeakPromise.LInstr
+  | WeakPromise.LExLoad _ _ _ _ | WeakPromise.LExStore _ _ _ _ _ => True
   end.
 
 Definition pf_xsolo (next : bool → M unit) (i : agent)
@@ -1390,9 +1391,11 @@ Proof.
       [by intros [-> _] _ Hw1 _; simpl in Hw1|].
     intros [_ H1] [_ H2] Hw1 Hw2 w.
     destruct l1 as [|aq1 lat1 base1 tvs1 as1|rl1 base1 data1 as1 vs1
-                   |aq1 rl1 base1 tvs1 data1 as1 vs1|????| |??|?|]; try done.
+                   |aq1 rl1 base1 tvs1 data1 as1 vs1|????| |??|?| |????|?????];
+      try done.
     destruct l2 as [|aq2 lat2 base2 tvs2 as2|rl2 base2 data2 as2 vs2
-                   |aq2 rl2 base2 tvs2 data2 as2 vs2|????| |??|?|]; try done.
+                   |aq2 rl2 base2 tvs2 data2 as2 vs2|????| |??|?| |????|?????];
+      try done.
   - (* MemWrite *)
     revert H1 H2 Hw1 Hw2.
     destruct (dev_addr (Interface.WriteReq.pa req));
@@ -2001,7 +2004,7 @@ Proof.
   - (* MemRead, RAM *)
     intros [_ H].
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       try done.
     + destruct lat; [done|]. destruct asrc as [|x asrc']; [|done].
       by destruct H as (_ & _ & _ & w & _ & ->).
@@ -2647,7 +2650,7 @@ Section package.
     { have Hx : agn2 = ag' by congruence. by rewrite Hx Heq. }
     rewrite Hst -Hlv in Hps |- *.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl in Hin;
       try (by apply elem_of_nil in Hin);
       (destruct (pa_st ag) as [q|d pend]; destruct st' as [q'|d' pend'];
@@ -2969,11 +2972,13 @@ Section package.
       { rewrite /astep_ok Haets in Hok.
         destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
                                |aq rl base tvs data asrc vsrc|pr pw sr sw|
-                               |rdw wsrc|csrc|];
+                               |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
           [by destruct Hok as (_ & Hc)|by destruct Hok as (_ & _ & Hc)| | |
            by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)
           |by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)
-          |by destruct Hok as (_ & Hc)].
+          |by destruct Hok as (_ & Hc)
+          (* THE RMW SPLIT (S1): no machine arm, so [astep_ok] is [False] *)
+          |done|done].
         - destruct Hok as (ts' & kc & _ & Hlog0 & _ & _ & Hts').
           injection Hts' as <-. exists (WMsg base data (Some e.1) kc).
           split; [exact Hlog0|by rewrite /msg_at Hlog0].

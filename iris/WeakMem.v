@@ -332,6 +332,27 @@ Qed.
 (* ------------------------------------------------------------------ *)
 (** ** The per-agent weak state *)
 
+(** THE AGENT-LOCAL RESERVATION of the RMW split (design
+    [claude-notes/design/weak-memory-rmw-split.md] §3): what an [LExLoad]
+    banks and the matching [LExStore]'s fulfil consumes.
+
+    [rv_ts] holds the read half's per-byte timestamps POSITIONALLY from
+    [rv_base] (byte [j] at [rv_base + j]) — the vocabulary
+    [WeakPromise.excl_ok_ts] consumes; values are NOT carried (the log at
+    [(b, ts)] has them).  [rv_view] is the read half's banked post-view
+    ([ldv_of ws aq (srcs_view ws asrc) base tvs.*1]), which the write
+    half's [fulfil_vpre] must dominate (deviation D-2, PARM's exbank-view
+    contribution). *)
+Record wresv := WResv {
+  rv_base : Z;
+  rv_ts   : list nat;
+  rv_view : nat;
+}.
+Add Printing Constructor wresv.
+
+Global Instance wresv_eq_dec : EqDecision wresv.
+Proof. solve_decision. Defined.
+
 (** The Promising-RISC-V thread state minus promises, minus register views,
     minus the exclusives bank (design doc, Decisions 1 and 3). *)
 Record wstate := WState {
@@ -373,6 +394,24 @@ Record wstate := WState {
   w_regv  : gmap wreg nat;
   w_vcap  : nat;
   w_ldv   : nat;
+  (* THE TWO RMW-SPLIT COMPONENTS (design
+     [claude-notes/design/weak-memory-rmw-split.md] §3).  Both are INERT in
+     the additive slice S1: nothing but [ws_init] writes them and no step
+     function reads them; the machine arms that do land in S2.
+
+     [w_res]   — the agent-local reservation: [Some R] between an [LExLoad]
+                 and its matching [LExStore].  SET by the exclusive read
+                 (superseding), CLEARED by the agent's own store fulfil and
+                 by [LInstr].  Like [w_fwd]/[w_regv]/[w_ldv] it is set and
+                 cleared rather than joined, so it is deliberately absent
+                 from [ws_le]; it IS in [ws_bounded], so that
+                 [fulfil_vpre] can dominate [rv_view].
+     [w_tbank] — the W-TV translation bank: the view banked by the
+                 translation of the access in flight.  Also non-monotone
+                 (it is rebanked per access), hence also out of [ws_le]
+                 and in [ws_bounded]. *)
+  w_res   : option wresv;
+  w_tbank : nat;
 }.
 Add Printing Constructor wstate.
 
@@ -407,7 +446,8 @@ Proof. done. Qed.
 Definition ws_init : wstate :=
   {| w_coh := ∅; w_vrOld := 0; w_vwOld := 0; w_vrNew := 0; w_vwNew := 0;
      w_vRel := 0; w_fwd := ∅; w_pub := 0; w_relp := false;
-     w_regv := ∅; w_vcap := 0; w_ldv := 0 |}.
+     w_regv := ∅; w_vcap := 0; w_ldv := 0;
+     w_res := None; w_tbank := 0 |}.
 
 Lemma regv_init r : regv ws_init r = 0%nat.
 Proof. rewrite /regv /ws_init /= lookup_empty //. Qed.
@@ -422,19 +462,21 @@ Qed.
 Lemma coh_init a : coh ws_init a = 0%nat.
 Proof. done. Qed.
 
-Lemma coh_upd_eq m vrO vwO vrN vwN vR fwd pb rp rg vc ld a n :
+Lemma coh_upd_eq m vrO vwO vrN vwN vR fwd pb rp rg vc ld rs tb a n :
   coh {| w_coh := <[a := n]> m; w_vrOld := vrO; w_vwOld := vwO;
          w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
          w_pub := pb; w_relp := rp;
-         w_regv := rg; w_vcap := vc; w_ldv := ld |} a = n.
+         w_regv := rg; w_vcap := vc; w_ldv := ld;
+         w_res := rs; w_tbank := tb |} a = n.
 Proof. rewrite /coh /= lookup_insert //. Qed.
 
-Lemma coh_upd_ne m vrO vwO vrN vwN vR fwd pb rp rg vc ld a a' n :
+Lemma coh_upd_ne m vrO vwO vrN vwN vR fwd pb rp rg vc ld rs tb a a' n :
   a' ≠ a →
   coh {| w_coh := <[a := n]> m; w_vrOld := vrO; w_vwOld := vwO;
          w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
          w_pub := pb; w_relp := rp;
-         w_regv := rg; w_vcap := vc; w_ldv := ld |} a'
+         w_regv := rg; w_vcap := vc; w_ldv := ld;
+         w_res := rs; w_tbank := tb |} a'
   = default 0%nat (m !! a').
 Proof. intros ?. rewrite /coh /= lookup_insert_ne //. Qed.
 
@@ -749,7 +791,12 @@ Definition load_post_at (ws : wstate) (aq : bool) (vpre : nat) (a : Z) (t : nat)
         post-view over its bytes; [instr_post] ([LInstr]) resets it at every
         instruction start, so nothing accumulates across instructions, and
         [ldv_of] below computes it from a zeroed bank for the RMW. *)
-     w_ldv   := Nat.max (w_ldv ws) vpost |}.
+     w_ldv   := Nat.max (w_ldv ws) vpost;
+     (* INERT in slice S1 (RMW split): the exclusive read's arm will set
+        [w_res] at the RUN level ([load_post_run_d]'s wrapper), never per
+        byte, so the per-byte fold passes both new fields through. *)
+     w_res   := w_res ws;
+     w_tbank := w_tbank ws |}.
 
 Definition load_post (ws : wstate) (aq : bool) (a : Z) (t : nat) : wstate :=
   load_post_at ws aq (load_vpre ws aq) a t.
@@ -793,7 +840,11 @@ Definition store_post_d (ws : wstate) (rl : bool) (vf : nat)
      w_relp  := false;
      w_regv  := w_regv ws;
      w_vcap  := w_vcap ws;
-     w_ldv   := w_ldv ws |}.
+     w_ldv   := w_ldv ws;
+     (* INERT in slice S1: the conditional write's arm clears [w_res] at the
+        RUN level, not per byte. *)
+     w_res   := w_res ws;
+     w_tbank := w_tbank ws |}.
 
 Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
   {| w_coh   := <[a := Nat.max (coh ws a) t]> (w_coh ws);
@@ -808,7 +859,9 @@ Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
      w_relp  := false;
      w_regv  := w_regv ws;
      w_vcap  := w_vcap ws;
-     w_ldv   := w_ldv ws |}.
+     w_ldv   := w_ldv ws;
+     w_res   := w_res ws;
+     w_tbank := w_tbank ws |}.
 
 Lemma store_post_d_0 ws rl a t :
   store_post_d ws rl 0%nat a t = store_post ws rl a t.
@@ -834,7 +887,9 @@ Definition fence_post (ws : wstate) (pr pw sr sw : bool) : wstate :=
         ([vrn ⊔= vcap]) has no RISC-V counterpart (deps design §2.3'). *)
      w_regv  := w_regv ws;
      w_vcap  := w_vcap ws;
-     w_ldv   := w_ldv ws |}.
+     w_ldv   := w_ldv ws;
+     w_res   := w_res ws;
+     w_tbank := w_tbank ws |}.
 
 (* ------------------------------------------------------------------ *)
 (** ** The three DEPENDENCY-ONLY label effects (deps design §2.3)
@@ -854,7 +909,11 @@ Definition regw_post (ws : wstate) (rd : wreg) (v : nat) : wstate :=
      w_vRel  := w_vRel ws;  w_fwd   := w_fwd ws;
      w_pub   := w_pub ws;   w_relp  := w_relp ws;
      w_regv  := <[rd := v]> (w_regv ws);
-     w_vcap  := w_vcap ws;  w_ldv   := w_ldv ws |}.
+     w_vcap  := w_vcap ws;  w_ldv   := w_ldv ws;
+     (* [LRegW] does NOT clear the reservation: the AMO's [rd] write fires
+        between its exclusive read and its conditional write (RMW split
+        §3). *)
+     w_res   := w_res ws;   w_tbank := w_tbank ws |}.
 
 (** [LCtrl srcs]: PARM's [Local.control] — [vcap ⊔= ctrl]. *)
 Definition ctrl_post (ws : wstate) (v : nat) : wstate :=
@@ -865,7 +924,9 @@ Definition ctrl_post (ws : wstate) (v : nat) : wstate :=
      w_pub   := w_pub ws;   w_relp  := w_relp ws;
      w_regv  := w_regv ws;
      w_vcap  := Nat.max v (w_vcap ws);
-     w_ldv   := w_ldv ws |}.
+     w_ldv   := w_ldv ws;
+     (* [LCtrl] does NOT clear the reservation either (RMW split §3). *)
+     w_res   := w_res ws;   w_tbank := w_tbank ws |}.
 
 (** [LInstr]: instruction start.  Resets the load-result bank, which is what
     scopes [DLdRes] to ONE instruction. *)
@@ -876,7 +937,10 @@ Definition instr_post (ws : wstate) : wstate :=
      w_vRel  := w_vRel ws;  w_fwd   := w_fwd ws;
      w_pub   := w_pub ws;   w_relp  := w_relp ws;
      w_regv  := w_regv ws;  w_vcap  := w_vcap ws;
-     w_ldv   := 0%nat |}.
+     w_ldv   := 0%nat;
+     (* INERT in slice S1.  In S2 this becomes [w_res := None] — instruction
+        start is the reservation's GC point (RMW split §3). *)
+     w_res   := w_res ws;   w_tbank := w_tbank ws |}.
 
 Lemma regv_regw_post_eq ws rd v : regv (regw_post ws rd v) rd = v.
 Proof. rewrite /regv /regw_post /= lookup_insert //. Qed.
@@ -991,7 +1055,13 @@ Definition ldv_of (ws : wstate) (aq : bool) (vaddr : nat) (base : Z)
 
     [w_vcap] IS monotone (both [load_post_at_d] and [store_post_d] JOIN into
     it, and [ctrl_post] joins) and it IS a memory-ordering floor — it enters
-    [WeakPromise.fulfil_vpre] — so it is the one new conjunct. *)
+    [WeakPromise.fulfil_vpre] — so it is the one new conjunct.
+
+    THE TWO RMW-SPLIT COMPONENTS JOIN THE SAME NON-MONOTONE CLUB, for the
+    same reason: [w_res] is SET by an exclusive read (superseding a previous
+    reservation) and CLEARED by a store fulfil / [LInstr], and [w_tbank] is
+    REBANKED per access.  Neither gets a conjunct here; both ARE in
+    [ws_bounded]. *)
 Definition ws_le (w1 w2 : wstate) : Prop :=
   (∀ a, (coh w1 a ≤ coh w2 a)%nat) ∧
   (w_vrOld w1 ≤ w_vrOld w2)%nat ∧ (w_vwOld w1 ≤ w_vwOld w2)%nat ∧
@@ -1314,6 +1384,23 @@ Qed.
     the bank's second components [load_post_at] would not preserve
     boundedness — the banked view would flow straight into [w_vrOld]. *)
 
+(** The reservation's own boundedness (RMW split §3): every timestamp it
+    banks — the per-byte read timestamps and the banked post-view — is a
+    real log position.  Vacuous when no reservation is held. *)
+Definition wresv_bounded (o : option wresv) (n : nat) : Prop :=
+  ∀ R, o = Some R →
+    (∀ j t, rv_ts R !! j = Some t → (t ≤ n)%nat) ∧ (rv_view R ≤ n)%nat.
+
+Lemma wresv_bounded_none n : wresv_bounded None n.
+Proof. by intros ? ?. Qed.
+
+Lemma wresv_bounded_mono o n n' :
+  wresv_bounded o n → (n ≤ n')%nat → wresv_bounded o n'.
+Proof.
+  intros Ho Hle R HR. destruct (Ho R HR) as [Hts Hv].
+  split; [|lia]. intros j t Ht. pose proof (Hts j t Ht). lia.
+Qed.
+
 Definition ws_bounded (ws : wstate) (n : nat) : Prop :=
   (w_vrOld ws ≤ n)%nat ∧ (w_vwOld ws ≤ n)%nat ∧
   (w_vrNew ws ≤ n)%nat ∧ (w_vwNew ws ≤ n)%nat ∧ (w_vRel ws ≤ n)%nat ∧
@@ -1325,13 +1412,24 @@ Definition ws_bounded (ws : wstate) (n : nat) : Prop :=
      timestamps, and a reset or an overwrite by a smaller view preserves
      that.  [w_regv] is bounded through the TOTAL accessor [regv], which is
      [0] off the map's domain. *)
-  (∀ r, (regv ws r ≤ n)%nat) ∧ (w_vcap ws ≤ n)%nat ∧ (w_ldv ws ≤ n)%nat.
+  (∀ r, (regv ws r ≤ n)%nat) ∧ (w_vcap ws ≤ n)%nat ∧ (w_ldv ws ≤ n)%nat ∧
+  (* THE TWO RMW-SPLIT COMPONENTS (RMW split §3).  Both are bounded for the
+     same reason as the D2 three: they hold timestamps drawn from the log.
+     [w_res] is the one that MUST be here — [fulfil_vpre] has to dominate
+     [rv_view] at the conditional write. *)
+  wresv_bounded (w_res ws) n ∧ (w_tbank ws ≤ n)%nat.
 
 Lemma ws_bounded_vcap ws n : ws_bounded ws n → (w_vcap ws ≤ n)%nat.
 Proof. by intros (_&_&_&_&_&_&_&_&_&?&_). Qed.
 
 Lemma ws_bounded_ldv ws n : ws_bounded ws n → (w_ldv ws ≤ n)%nat.
-Proof. by intros (_&_&_&_&_&_&_&_&_&_&?). Qed.
+Proof. by intros (_&_&_&_&_&_&_&_&_&_&?&_). Qed.
+
+Lemma ws_bounded_res ws n : ws_bounded ws n → wresv_bounded (w_res ws) n.
+Proof. by intros (_&_&_&_&_&_&_&_&_&_&_&?&_). Qed.
+
+Lemma ws_bounded_tbank ws n : ws_bounded ws n → (w_tbank ws ≤ n)%nat.
+Proof. by intros (_&_&_&_&_&_&_&_&_&_&_&_&?). Qed.
 
 Lemma ws_bounded_regv ws n r : ws_bounded ws n → (regv ws r ≤ n)%nat.
 Proof. by intros (_&_&_&_&_&_&_&_&H&_). Qed.
@@ -1402,27 +1500,32 @@ Proof.
   - intros a. rewrite coh_init. lia.
   - intros a tv. rewrite /ws_init /= lookup_empty. done.
   - intros r. rewrite regv_init. lia.
+  - apply wresv_bounded_none.
 Qed.
 
 Lemma ws_bounded_mono ws n n' :
   ws_bounded ws n → (n ≤ n')%nat → ws_bounded ws n'.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld
+          & Hres & Htb)
          Hle.
   rewrite /ws_bounded. split_and!; try lia.
   - intros a. pose proof (Hcoh a). lia.
   - intros a tv Ha. destruct (Hfwd a tv Ha). split; lia.
   - intros r. move: (Hrg r). rewrite /regv /=. lia.
+  - by eapply wresv_bounded_mono.
 Qed.
 
 (** The [coh] half of every preservation proof below: an insert stays bounded
     if the inserted value is. *)
-Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd pb rp rg vc ld a v n :
+Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd pb rp rg vc ld rs tb
+    a v n :
   (∀ a', (coh ws a' ≤ n)%nat) → (v ≤ n)%nat →
   ∀ a', (coh {| w_coh := <[a := v]> (w_coh ws); w_vrOld := vrO; w_vwOld := vwO;
                 w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd;
                 w_pub := pb; w_relp := rp;
-                w_regv := rg; w_vcap := vc; w_ldv := ld |} a'
+                w_regv := rg; w_vcap := vc; w_ldv := ld;
+                w_res := rs; w_tbank := tb |} a'
          ≤ n)%nat.
 Proof.
   intros Hm Hv a'. destruct (decide (a' = a)) as [->|Hne].
@@ -1460,19 +1563,20 @@ Proof.
   intros Hb Hvp Ht.
   pose proof (fwd_view_bounded ws aq a t n Hb Ht) as Hfv.
   destruct Hb as (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd
-                  & Hrg & Hvc & Hld).
+                  & Hrg & Hvc & Hld & Hres & Htb).
   rewrite /ws_bounded /load_post_at /=.
   split_and!; try (destruct aq; lia).
   - apply coh_upd_bounded; [exact Hcoh|]. pose proof (Hcoh a). lia.
   - exact Hfwd.
   - exact Hrg.
+  - exact Hres.
 Qed.
 
 Lemma store_post_d_bounded ws rl vf a t n n' :
   ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat → (vf ≤ n')%nat →
   ws_bounded (store_post_d ws rl vf a t) n'.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld & Hres & Htb)
          Ht Hle Hvf.
   rewrite /ws_bounded /store_post_d /=.
   split_and!; try (destruct rl, (w_relp ws); simpl; lia).
@@ -1484,6 +1588,7 @@ Proof.
     + rewrite lookup_insert_ne //. intros Ha'.
       destruct (Hfwd a' tv Ha'). split; lia.
   - intros r. move: (Hrg r). rewrite /regv /=. lia.
+  - by eapply wresv_bounded_mono.
 Qed.
 
 Lemma store_post_bounded ws rl a t n n' :
@@ -1497,12 +1602,13 @@ Qed.
 Lemma fence_post_bounded ws pr pw sr sw n :
   ws_bounded ws n → ws_bounded (fence_post ws pr pw sr sw) n.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld).
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld & Hres & Htb).
   rewrite /ws_bounded /fence_post /=.
   split_and!; try (destruct pr, pw, sr, sw; simpl; lia).
   - exact Hcoh.
   - exact Hfwd.
   - exact Hrg.
+  - exact Hres.
 Qed.
 
 (** The three dependency-only effects preserve both orders. *)
@@ -1518,7 +1624,7 @@ Proof. rewrite /ws_le /instr_post /=. split_and!; auto with lia. Qed.
 Lemma regw_post_bounded ws rd v n :
   ws_bounded ws n → (v ≤ n)%nat → ws_bounded (regw_post ws rd v) n.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld & Hres & Htb)
          Hv.
   rewrite /ws_bounded /regw_post /=. split_and!; try lia.
   - exact Hcoh.
@@ -1526,22 +1632,23 @@ Proof.
   - intros r. rewrite /regv /=. destruct (decide (r = rd)) as [->|Hne].
     + rewrite lookup_insert //.
     + rewrite lookup_insert_ne //. apply (Hrg r).
+  - exact Hres.
 Qed.
 
 Lemma ctrl_post_bounded ws v n :
   ws_bounded ws n → (v ≤ n)%nat → ws_bounded (ctrl_post ws v) n.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld)
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld & Hres & Htb)
          Hv.
   rewrite /ws_bounded /ctrl_post /=. split_and!; try lia;
-    [exact Hcoh|exact Hfwd|exact Hrg].
+    [exact Hcoh|exact Hfwd|exact Hrg|exact Hres].
 Qed.
 
 Lemma instr_post_bounded ws n : ws_bounded ws n → ws_bounded (instr_post ws) n.
 Proof.
-  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld).
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld & Hres & Htb).
   rewrite /ws_bounded /instr_post /=. split_and!; try lia;
-    [exact Hcoh|exact Hfwd|exact Hrg].
+    [exact Hcoh|exact Hfwd|exact Hrg|exact Hres].
 Qed.
 
 (** ... and the multi-byte folds the interpreter's read/write arms build. *)

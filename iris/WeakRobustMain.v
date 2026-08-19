@@ -141,8 +141,9 @@ Definition lb_rl (l : wlabel) : bool :=
   match l with
   | LStore rl _ _ _ _ => rl
   | LRmw _ rl _ _ _ _ _ => rl
+  | LExStore rl _ _ _ _ => rl
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => false
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => false
   end.
 
 (* ---- the per-byte folds ---- *)
@@ -257,8 +258,8 @@ Proof.
   intros Hlt Hraise. rewrite /aev_post.
   destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
                           |aq rl base tvs data asrc vsrc
-                          |pr pw sr sw| |rdw wsrc|csrc|] eqn:Hlb;
-    [done| | | | |done|done|done|done].
+                          |pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc] eqn:Hlb;
+    [done| | | | |done|done|done|done| | ].
   - by rewrite w_pub_load_post_run_d.
   - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
     destruct (decide (w_relp w = true ∨ rl = true)) as [Hr|Hr].
@@ -287,6 +288,20 @@ Proof.
                  (srcs_view w vsrc) base (length data) (σ ts) w0 Hrp Hrl).
       lia.
   - by rewrite /fence_post /=.
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  - by rewrite w_pub_load_post_run_d.
+  - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
+    destruct (decide (w_relp w = true ∨ yrl = true)) as [Hr|Hr].
+    + have Hσ : (σ ts < N)%nat.
+      { apply (Hraise ts eq_refl). simpl. tauto. }
+      have := w_pub_store_post_run_d_le yrl (srcs_view w yasrc)
+                (srcs_view w yvsrc) ybase (length ydata) (σ ts) w. lia.
+    + have Hrp : w_relp w = false.
+      { destruct (w_relp w) eqn:E; [|done]. destruct Hr. by left. }
+      have Hrl : yrl = false.
+      { destruct yrl eqn:E; [|done]. destruct Hr. by right. }
+      by rewrite (w_pub_store_post_run_d_eq yrl (srcs_view w yasrc)
+                    (srcs_view w yvsrc) ybase (length ydata) (σ ts) w Hrp Hrl).
 Qed.
 
 (** …hence a whole processed prefix does, provided every raising event
@@ -1443,12 +1458,14 @@ Section exhibit.
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
       destruct l2 as [|aq lat base tvs asrc|rl base data asrc vsrc
                      |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                     |csrc|];
+                     |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
         simpl in Hinrd;
         [by apply elem_of_nil in Hinrd| | by apply elem_of_nil in Hinrd
         | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
         |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
-        |by apply elem_of_nil in Hinrd].
+        |by apply elem_of_nil in Hinrd
+        (* THE RMW SPLIT (S1): no machine arm, so [astep_ok] is [False] *)
+        |by destruct Hok2|by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
         split_and!; [done|done|left; by exists aq, lat, asrc].

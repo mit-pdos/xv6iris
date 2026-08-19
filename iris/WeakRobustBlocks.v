@@ -89,17 +89,17 @@ Local Open Scope Z_scope.
 (** A label that APPENDS a message — the two fulfil-carrying shapes. *)
 Definition lb_writes (l : wlabel) : bool :=
   match l with
-  | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true
+  | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExStore _ _ _ _ _ => true
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => false
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => false
   end.
 
 (** A label that READS. *)
 Definition lb_loads (l : wlabel) : bool :=
   match l with
-  | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true
+  | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExLoad _ _ _ _ => true
   | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => false
+  | LCtrl _ | LInstr | LExStore _ _ _ _ _ => false
   end.
 
 (** The shape conditions the promise-free store/rmw rules impose on a
@@ -109,6 +109,12 @@ Definition lb_ok (l : wlabel) : Prop :=
   match l with
   | LStore _ _ data _ _ => data ≠ []
   | LRmw _ _ _ tvs data _ _ => data ≠ [] ∧ length tvs = length data
+  (* THE RMW SPLIT (S1).  [lb_ok] is what [lts_enabled]'s [le_lb_ok]
+     demands of EVERY label the program emits, and the promise-free
+     machine has no arm for the two split labels until S2 — so in the
+     additive slice "the LTS emits no split label" is exactly this
+     clause, and [cstep_available] reads the contradiction off it. *)
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
   | LCtrl _ | LInstr => True
   end.
@@ -561,7 +567,7 @@ Section complete.
     intros Hen Hi Hb Hag Hps.
     have Hlt : (i < length (pc_ags c))%nat by eapply lookup_lt_Some.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc].
     - (* silent *)
       eexists _, (WPAgent p' (pa_ws ag) (pa_prom ag)). split_and!.
       + split; [eexists; by apply (PFSilent pstep pcls i c ag p' dd)|].
@@ -679,6 +685,9 @@ Section complete.
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists LInstr, dd.
+    (* THE RMW SPLIT (S1): [lb_ok] refutes the two split labels *)
+    - by destruct (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps).
+    - by destruct (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps).
   Qed.
 
   Lemma cstep_bnd i c c' : cstep i c c' → cfg_bnd c → cfg_bnd c'.

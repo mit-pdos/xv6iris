@@ -568,13 +568,7 @@ Section core.
     - iDestruct ("Hcl" $! (fence_post (wgws σ c) pr pw sr sw) (wglog σ)
                    with "[%] [%] [%] [%] [%] Hlog Hlat Hwsa") as "Hσ".
       + reflexivity.
-      + destruct (Hbnd c) as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
-        rewrite /ws_bounded /fence_post /=. split_and!; try (simpl; lia).
-        * destruct sr; [|lia]. destruct pr, pw; simpl; lia.
-        * destruct sw; [|lia]. destruct pr, pw; simpl; lia.
-        * intros a. exact (H7 a).
-        * intros a tv Ha. exact (H8 a tv Ha).
-        * intros r. exact (H9 r).
+      + by apply fence_post_bounded, (Hbnd c).
       + apply (nv_hart_coh_step (wglog σ) c (wgws σ c));
           [exact (no_violation_hart _ _ c Hnv)|].
         intros a Hlt. exfalso. rewrite /fence_post /coh /= in Hlt. lia.
@@ -1889,13 +1883,7 @@ Section adapter.
     ws_bounded ws n -> ws_bounded (efence_apply ws o) n.
   Proof.
     intros Hb. destruct o as [[[[pr pw] sr] sw]|]; [|exact Hb].
-    destruct Hb as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
-    rewrite /ws_bounded /fence_post /=. split_and!; try (simpl; lia).
-    - destruct sr; [|lia]. destruct pr, pw; simpl; lia.
-    - destruct sw; [|lia]. destruct pr, pw; simpl; lia.
-    - intros a. exact (H7 a).
-    - intros a tv Ha. exact (H8 a tv Ha).
-    - intros r. exact (H9 r).
+    by apply fence_post_bounded.
   Qed.
 
   Lemma ewp_ev_barrier (gen : nat) (c : CPU) (b : barrier_kind)

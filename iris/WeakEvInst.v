@@ -166,8 +166,15 @@ Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
          [w_relp] is armed, i.e. right after its [DFence]. *)
       | PDisk _ => ddev_class ws
       end
+  (* THE RMW SPLIT (S1): the conditional write classifies like a plain
+     store, the exclusive read like a load (design §8). *)
+  | LExStore _ _ _ _ _ =>
+      match p with
+      | PHart _ m _ _ _ => pnode_wclass m ws
+      | PDisk _ => ddev_class ws
+      end
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => WCplain
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => WCplain
   end.
 
 Lemma pcls_ev_silent p ws : pcls_ev p LSilent ws = WCplain.
@@ -439,7 +446,8 @@ Definition pdev_ev (p : pexv6) (l : wlabel) (p' : pexv6) : bool :=
   match l with
   | LDev => true
   | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
-  | LFence _ _ _ _ | LRegW _ _ | LCtrl _ | LInstr => false
+  | LFence _ _ _ _ | LRegW _ _ | LCtrl _ | LInstr
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => false
   end.
 
 (* ====================================================================== *)
@@ -469,6 +477,9 @@ Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
   | LRegW _ _ | LCtrl _ | LInstr => True
+  (* THE RMW SPLIT (S1): the side condition of a machine arm that does not
+     exist yet (S2 adds it), so [False]. *)
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
 Definition eregs_apply (σ : wgstate) (c : CPU) (ors : option regstate)
@@ -500,6 +511,12 @@ Definition elab_ws (σ : wgstate) (c : CPU) (l : wlabel) : CPU -> wstate :=
   | LCtrl srcs =>
       <[c := ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)]> (wgws σ)
   | LInstr => <[c := instr_post (wgws σ c)]> (wgws σ)
+  | LExLoad aq base tvs _ =>
+      <[c := load_post_run (wgws σ c) aq base tvs.*1]> (wgws σ)
+  | LExStore rl base data asrc vsrc =>
+      <[c := store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
+               (srcs_view (wgws σ c) vsrc) base (length data)
+               (S (length (wglog σ)))]> (wgws σ)
   end.
 
 Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
@@ -509,8 +526,11 @@ Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
   | LRmw _ _ base _ data _ _ =>
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
+  (* THE RMW SPLIT (S1): the conditional write APPENDS, like a store. *)
+  | LExStore _ base data _ _ =>
+      wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => wglog σ
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => wglog σ
   end.
 
 (** D3: the [eregs_apply] twin for the announced instruction bits.  [None]
@@ -544,6 +564,9 @@ Definition edlab_ok (σ : wgstate) (dws : wstate) (l : wlabel) : Prop :=
   (* the device has no atomic read-modify-write *)
   | LRmw _ _ _ _ _ _ _ => False
   | LRegW _ _ | LCtrl _ | LInstr => True
+  (* THE RMW SPLIT (S1): no arm yet, and the disk has no exclusives
+     anyway — the [LRmw] precedent one line up. *)
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
 Definition edlab_ws (σ : wgstate) (dws : wstate) (l : wlabel) : wstate :=
@@ -560,14 +583,19 @@ Definition edlab_ws (σ : wgstate) (dws : wstate) (l : wlabel) : wstate :=
   | LRegW rd srcs => regw_post dws rd (srcs_view dws srcs)
   | LCtrl srcs => ctrl_post dws (srcs_view dws srcs)
   | LInstr => instr_post dws
+  | LExLoad aq base tvs _ => load_post_run dws aq base tvs.*1
+  | LExStore rl base data _ _ =>
+      store_post_run dws rl base (length data) (S (length (wglog σ)))
   end.
 
 Definition edlab_log (σ : wgstate) (l : wlabel) (k : wm_class) : list wmsg :=
   match l with
   | LStore _ base data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
   | LRmw _ _ base _ data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
+  (* THE RMW SPLIT (S1): the conditional write APPENDS, like a store. *)
+  | LExStore _ base data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => wglog σ
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => wglog σ
   end.
 
 Definition edlab_apply (σ : wgstate) (l : wlabel) (k : wm_class)

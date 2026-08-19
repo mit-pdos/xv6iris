@@ -362,6 +362,13 @@ Section bridge.
     | WeakPromise.LRegW _ _ => None
     | WeakPromise.LCtrl _ => None
     | WeakPromise.LInstr => None
+    (* THE RMW SPLIT (S1).  The axiomatic tier stays FUSED, so the split
+       labels project to the axiomatic PLAIN load / store — the move
+       [WeakInterpProj] already makes.  Nothing emits them yet. *)
+    | WeakPromise.LExLoad aq base tvs _ =>
+        Some (WeakAxiomatic.LLoad aq base (tvs.*1) (tvs.*2))
+    | WeakPromise.LExStore rl base data _ _ =>
+        Some (WeakAxiomatic.LStore rl base data k)
     end.
 
   (** The state projection, RELATIONALLY (see the header): same image, same

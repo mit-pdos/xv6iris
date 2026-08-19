@@ -83,8 +83,9 @@ Definition lb_vsrc (l : wlabel) : list dsrc :=
   match l with
   | LStore _ _ _ _ vsrc => vsrc
   | LRmw _ _ _ _ _ _ vsrc => vsrc
+  | LExStore _ _ _ _ vsrc => vsrc
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => []
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => []
   end.
 
 Lemma srcs_view_ge ws s srcs :
@@ -244,11 +245,13 @@ Lemma fulfil_vext_vcap ws l v :
   fulfil_vext ws l = Some v → (w_vcap ws ≤ v)%nat.
 Proof.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     simpl; try done.
   - intros [= <-]. apply fulfil_vpre_d_vcap.
   - intros [= <-].
     etrans; [apply ws_le_vcap, load_post_run_d_le|apply fulfil_vpre_d_vcap].
+  (* [LExStore]: [LStore]'s arm verbatim (RMW split S1) *)
+  - intros [= <-]. apply fulfil_vpre_d_vcap.
 Qed.
 
 Lemma fulfil_vext_srcs ws l v s :
@@ -256,10 +259,13 @@ Lemma fulfil_vext_srcs ws l v s :
   (dsrc_view ws s ≤ v)%nat.
 Proof.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     simpl; try (by intros _ [?%elem_of_nil|?%elem_of_nil]); try done.
   - intros [= <-] Hin. etrans; [|apply fulfil_vpre_d_vd].
     destruct Hin as [Hin|Hin]; have := srcs_view_ge ws s _ Hin; lia.
+  - intros [= <-] Hin. etrans; [|apply fulfil_vpre_d_vd].
+    destruct Hin as [Hin|Hin]; have := srcs_view_ge ws s _ Hin; lia.
+  (* [LExStore]: [LStore]'s arm verbatim (RMW split S1) *)
   - intros [= <-] Hin. etrans; [|apply fulfil_vpre_d_vd].
     destruct Hin as [Hin|Hin]; have := srcs_view_ge ws s _ Hin; lia.
 Qed.
@@ -281,7 +287,7 @@ Section astep.
     regv (f (pa_ws ag)) rd = regv (pa_ws ag) rd.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [-> _] _.
     - intros (_ & -> & _) _. by rewrite /regv load_post_run_d_regv.
@@ -293,6 +299,8 @@ Section astep.
     - intros [-> _] Hne. apply regv_regw_post_ne. intros ->. by apply (Hne wsrc).
     - intros [-> _] _. by rewrite /regv ctrl_post_regv.
     - intros [-> _] _. by rewrite /regv instr_post_regv.
+    - done.
+    - done.
   Qed.
 
   (** …and an [LRegW rd srcs] assigns it [V(srcs)] exactly. *)
@@ -307,7 +315,7 @@ Section astep.
     (w_ldv (pa_ws ag) ≤ w_ldv (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [-> _] _.
     - intros (_ & -> & _) _. apply load_post_run_d_ldv_ge.
@@ -319,6 +327,8 @@ Section astep.
     - intros [-> _] _. by rewrite regw_post_ldv.
     - intros [-> _] _. by rewrite ctrl_post_ldv.
     - by intros _ Hne.
+    - done.
+    - done.
   Qed.
 
   (** THE LOAD BANKS ITS RESULT VIEW: an UNFORWARDED read of [ts] leaves
@@ -331,7 +341,7 @@ Section astep.
     (ts ≤ w_ldv (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
@@ -350,6 +360,8 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
+    - done.
+    - done.
   Qed.
 
   (** [LCtrl srcs] raises [w_vcap] to [V(srcs)] (PARM's
@@ -367,7 +379,7 @@ Section astep.
     ¬ writes_in log a ts (coh (pa_ws ag) a).
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros _ Hin%elem_of_nil. done.
     - intros (Hr & _ & _) [j [v [Hj ->]]]%elem_of_tvs_reads Hw.
@@ -382,6 +394,8 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
+    - done.
+    - done.
   Qed.
 
   (** THE RMW WRITES WHAT IT READS: the read half's byte [a] is a byte of
@@ -394,7 +408,7 @@ Section astep.
     (ts ≤ coh (f (pa_ws ag)) a)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                    |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -408,6 +422,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
 End astep.

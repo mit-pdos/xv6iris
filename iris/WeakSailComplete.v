@@ -449,7 +449,7 @@ Proof.
   rewrite /sail_mstep /= in Hstep. destruct Hex as [Hd Hlat].
   rewrite Hd in Hstep. destruct Hstep as (_ & Hstep).
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     try done.
   - destruct lat; [done|]. destruct asrc as [|x asrc']; [|done].
     left. by exists aq, base, tvs.
@@ -970,7 +970,7 @@ Section residual.
       + destruct Hsh as (Hcoh & Hsh). destruct Hstep as (_ & Hstep).
         destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                       |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                      |csrc|]; try (by destruct Hstep).
+                      |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try (by destruct Hstep).
         * (* the ONE load arm, exclusive or not *)
           destruct lat; [by destruct Hstep|].
           destruct asrc as [|x asrc']; [|by destruct Hstep].
@@ -1014,7 +1014,7 @@ Section residual.
       + destruct Hstep as (_ & Hstep).
         destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                       |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                      |csrc|]; try (by destruct Hstep).
+                      |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try (by destruct Hstep).
         * destruct lat; [by destruct Hstep|].
           destruct asrc as [|x asrc']; [|by destruct Hstep].
           destruct Hstep as (_ & _ & _ & w & _ & ->). simpl. by apply Hlv.
@@ -1996,7 +1996,7 @@ Proof.
     + destruct Hstep as (Hcoh & Hstep).
       destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                     |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                    |csrc|]; try (by destruct Hstep).
+                    |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try (by destruct Hstep).
       * destruct lat; [by destruct Hstep|].
         destruct asrc as [|x asrc']; [|by destruct Hstep].
         destruct Hstep as (Haq & Hbase & Hlent & w & Hw & ->).
@@ -2091,7 +2091,7 @@ Proof.
     + destruct Hstep as (_ & Hstep).
       destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                     |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                    |csrc|]; try (by destruct Hstep).
+                    |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try (by destruct Hstep).
       * destruct lat; [by destruct Hstep|].
         destruct asrc as [|x asrc']; [|by destruct Hstep].
         destruct Hstep as (_ & _ & _ & w & _ & ->). simpl. by apply Hfr.
@@ -2155,7 +2155,7 @@ Proof.
     + destruct Hstep as (_ & Hstep).
       destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
                     |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
-                    |csrc|]; try (by destruct Hstep).
+                    |csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]; try (by destruct Hstep).
       * destruct lat; [by destruct Hstep|].
         destruct asrc as [|x asrc']; [|by destruct Hstep].
         by destruct Hstep as (_ & _ & _ & w & _ & ->).
@@ -2333,6 +2333,11 @@ Definition post_ws (l : wlabel) (ws : wstate) (n : nat) : wstate :=
   | WeakPromise.LRegW rd srcs => regw_post ws rd (srcs_view ws srcs)
   | WeakPromise.LCtrl srcs => ctrl_post ws (srcs_view ws srcs)
   | WeakPromise.LInstr => instr_post ws
+  | WeakPromise.LExLoad aq base tvs asrc =>
+      load_post_run_d ws aq (srcs_view ws asrc) base tvs.*1
+  | WeakPromise.LExStore rl base data asrc vsrc =>
+      store_post_run_d ws rl (srcs_view ws asrc) (srcs_view ws vsrc)
+        base (length data) (S n)
   end.
 
 Lemma wp_pf_step_inv {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)

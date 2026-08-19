@@ -120,6 +120,16 @@ Definition aev_post {D : Type} (σ : nat → nat) (ev : aev D) (w : wstate) : ws
   | LRegW rd srcs => regw_post w rd (srcs_view w srcs)
   | LCtrl srcs => ctrl_post w (srcs_view w srcs)
   | LInstr => instr_post w
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim. *)
+  | LExLoad aq base tvs asrc =>
+      load_post_run_d w aq (srcs_view w asrc) base (σ <$> tvs.*1)
+  | LExStore rl base data asrc vsrc =>
+      match ae_ts ev with
+      | Some ts =>
+          store_post_run_d w rl (srcs_view w asrc) (srcs_view w vsrc)
+            base (length data) (σ ts)
+      | None => w
+      end
   end.
 
 Definition aevs_post {D : Type} (σ : nat → nat) (evs : list (aev D)) (w : wstate) : wstate :=
@@ -214,8 +224,8 @@ Proof.
   intros Heq. rewrite /aev_post.
   destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
                           |aq rl base tvs data asrc vsrc
-                          |pr pw sr sw| |rdw wsrc|csrc|];
-    [done| | | | |done| | |].
+                          |pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
+    [done| | | | |done| | | | | ].
   - by rewrite !w_relp_load_post_run_d.
   - destruct (ae_ts ev) as [ts|]; [|done].
     by apply w_relp_store_post_run_d_indep.
@@ -225,6 +235,10 @@ Proof.
   - by rewrite /regw_post /=.
   - by rewrite /ctrl_post /=.
   - by rewrite /instr_post /=.
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  - by rewrite !w_relp_load_post_run_d.
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    by apply w_relp_store_post_run_d_indep.
 Qed.
 
 Lemma w_relp_aevs_post_indep {D : Type} σ σ' (evs : list (aev D)) :
@@ -252,7 +266,7 @@ Section fold.
   Proof.
     destruct ev as [lb ts dd]. rewrite /aev_post /=.
     destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc
-                   |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
+                   |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc].
     - by intros [-> _] w.
     - intros (_ & -> & _) w. by rewrite list_fmap_id.
     - intros (ts' & kc & _ & _ & _ & -> & ->) w. done.
@@ -263,6 +277,8 @@ Section fold.
     - by intros [-> _] w.
     - by intros [-> _] w.
     - by intros [-> _] w.
+    - done.
+    - done.
   Qed.
 
   (** THE CORRESPONDENCE.  Every prefix of a wf trace folds the agent's
@@ -558,6 +574,18 @@ Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
   | LRegW rd srcs => lregw_post S rd (lsrcs_view S srcs)
   | LCtrl srcs => lctrl_post S (lsrcs_view S srcs)
   | LInstr => linstr_post S
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim.  The [lstate]
+     mirror gains no [l_res]/[l_tbank] in this slice — [lrel] simply does
+     not constrain the two new [wstate] fields yet. *)
+  | LExLoad aq base tvs asrc =>
+      lload_post_run_d S aq (lsrcs_view S asrc) base tvs.*1
+  | LExStore rl base data asrc vsrc =>
+      match ae_ts ev with
+      | Some ts =>
+          lstore_post_run_d S rl (lsrcs_view S asrc) (lsrcs_view S vsrc)
+            base (length data) ts
+      | None => S
+      end
   end.
 
 Definition laevs_post {D : Type} (evs : list (aev D)) (S : lstate) : lstate :=
@@ -864,7 +892,7 @@ Proof.
   rewrite /laev_post /aev_post /=.
   (* the operand views agree on the two sides, once and for all *)
   destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc
-                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
+                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc].
   - exact Hrel.
   - apply lrel_load_post_run_d; [done|done|by apply lrel_srcs_view].
   - destruct ts as [t|]; [|exact Hrel].
@@ -879,6 +907,11 @@ Proof.
   - apply lrel_regw_post; [done|by apply lrel_srcs_view].
   - apply lrel_ctrl_post; [done|by apply lrel_srcs_view].
   - by apply lrel_instr_post.
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  - apply lrel_load_post_run_d; [done|done|by apply lrel_srcs_view].
+  - destruct ts as [t|]; [|exact Hrel].
+    apply lrel_store_post_run_d; [done|by apply lrel_srcs_view
+                                 |by apply lrel_srcs_view].
 Qed.
 
 Theorem lrel_aevs_post {D : Type} σ (evs : list (aev D)) S w :
@@ -1219,7 +1252,7 @@ Lemma laev_post_leaf {D : Type} (ev : aev D) S u :
 Proof.
   destruct ev as [lb ts dd]. rewrite /laev_post /aev_ts_occurs /=.
   destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc
-                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|].
+                 |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc].
   - by left.
   - intros [Hu|[Hu|(j & Hj)]]%lload_post_run_d_leaf;
       [by left|by left; eapply lsrcs_view_leaf|].
@@ -1240,6 +1273,14 @@ Proof.
   - intros [Hu|Hu]%lregw_post_leaf; [by left|by left; eapply lsrcs_view_leaf].
   - intros [Hu|Hu]%lctrl_post_leaf; [by left|by left; eapply lsrcs_view_leaf].
   - intros Hu%linstr_post_leaf. by left.
+  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  - intros [Hu|[Hu|(j & Hj)]]%lload_post_run_d_leaf;
+      [by left|by left; eapply lsrcs_view_leaf|].
+    right; left. by eapply tvs_fst_reads.
+  - destruct ts as [t|]; [|by left].
+    intros [Hu|[Hu|[Hu|Heq]]]%lstore_post_run_d_leaf;
+      [by left|by left; eapply lsrcs_view_leaf|by left; eapply lsrcs_view_leaf|].
+    subst u. by right; right.
 Qed.
 
 Lemma laevs_post_leaf {D : Type} (evs : list (aev D)) :

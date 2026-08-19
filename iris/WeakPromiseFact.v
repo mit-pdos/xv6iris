@@ -58,8 +58,9 @@ Local Open Scope Z_scope.
 Definition lat_free (l : wlabel) : Prop :=
   match l with
   | LLoad _ lat _ _ _ => lat = false
+  | LExLoad _ _ _ _ => True
   | LSilent | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LFence _ _ _ _
-  | LDev | LRegW _ _ | LCtrl _ | LInstr => True
+  | LDev | LRegW _ _ | LCtrl _ | LInstr | LExStore _ _ _ _ _ => True
   end.
 
 Lemma lat_free_rmw aq rl base tvs data asrc vsrc :
@@ -162,6 +163,13 @@ Section fact.
     | LRegW rd srcs => f = (λ w, regw_post w rd (srcs_view w srcs)) ∧ Dl = None
     | LCtrl srcs => f = (λ w, ctrl_post w (srcs_view w srcs)) ∧ Dl = None
     | LInstr => f = instr_post ∧ Dl = None
+    (* THE RMW SPLIT (slice S1, additive).  [astep_ok] is the SIDE
+       CONDITION OF A MACHINE ARM — [wp_astep_wpstep] turns it back into a
+       [wpstep] — so it must stay in lockstep with [wpstep]'s constructor
+       list, which gains [WPExLoad]/[WPExStore] only in S2.  Until then the
+       two new labels have NO arm, i.e. [False]: the additive slice adds
+       vocabulary, never behaviour. *)
+    | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
     end.
 
   (** The five non-promise rules of [wpstep], as ONE relation indexed by
@@ -196,7 +204,7 @@ Section fact.
     wp_astep i l c c' → wpstep pstep c c'.
   Proof.
     destruct 1 as [cfg ag st' d' f Dl Hlk Hps Hok].
-    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl in Hok.
     - destruct Hok as [-> ->]. by apply WPSilent.
     - destruct Hok as (Hr & -> & ->). by eapply WPLoad.
@@ -207,6 +215,8 @@ Section fact.
     - destruct Hok as [-> ->]. by apply WPRegW.
     - destruct Hok as [-> ->]. by apply WPCtrl.
     - destruct Hok as [-> ->]. by apply WPInstr.
+    - done.
+    - done.
   Qed.
 
   Lemma wp_state_step_wpstep c c' : wp_state_step c c' → wpstep pstep c c'.
@@ -281,8 +291,8 @@ Section fact.
     apply wpstep_split in Hstep as [Hpr|(i & l & Hs)]; [by left|].
     right. exists i, l. split; [|done].
     destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok].
-    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
-      simpl; [done| |done|done|done|done|done|done|done].
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
+      simpl; [done| |done|done|done|done|done|done|done|done|done].
     destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ _ Hps).
   Qed.
 
@@ -377,7 +387,7 @@ Section fact.
     astep_ok img (log ++ l') i ag lb f Dl.
   Proof.
     intros Hb Hlf.
-    destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+    destruct lb as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl in Hlf |- *.
     - done.
     - subst lat. intros (Hr & -> & ->). split_and!; [|done|done].
@@ -391,6 +401,8 @@ Section fact.
       + rewrite lookup_app_l; [done|done].
       + eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
       + eapply excl_ok_app; [lia|done].
+    - done.
+    - done.
     - done.
     - done.
     - done.
@@ -446,8 +458,9 @@ Section fact.
     astep_ok img log i ag l f Dl → astep_ok img log i ag' l f Dl.
   Proof.
     intros Hws Hpr.
-    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
-      simpl; rewrite ?Hws; [done|done| | |done|done|done|done|done].
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
+      simpl; rewrite ?Hws;
+      [done|done| | |done|done|done|done|done|done|done].
     - intros (ts & k & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [by eapply elem_of_weaken|done|done|done|done].
     - intros (ts & k & ? & ? & ? & ? & ? & ? & ? & ?). exists ts, k.
@@ -457,7 +470,7 @@ Section fact.
   Lemma astep_ok_del img log i ag l f Dl ts :
     astep_ok img log i ag l f Dl → Dl = Some ts → ts ∈ pa_prom ag.
   Proof.
-    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+    destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ->].
     - by intros (_ & _ & ->).
@@ -468,6 +481,8 @@ Section fact.
     - by intros [_ ->].
     - by intros [_ ->].
     - by intros [_ ->].
+    - done.
+    - done.
   Qed.
 
   Lemma wp_astep_prom_add i l c c' T ag ag' :

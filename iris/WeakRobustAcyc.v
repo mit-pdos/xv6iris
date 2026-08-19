@@ -115,8 +115,9 @@ Definition lb_aq (l : wlabel) : bool :=
   match l with
   | LLoad aq _ _ _ _ => aq
   | LRmw aq _ _ _ _ _ _ => aq
+  | LExLoad aq _ _ _ => aq
   | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => false
+  | LCtrl _ | LInstr | LExStore _ _ _ _ _ => false
   end.
 
 (** Is the label a [fence r,rw]-or-stronger — [pr] (past reads are
@@ -126,7 +127,8 @@ Definition lb_fence_prsw (l : wlabel) : Prop :=
   match l with
   | LFence pr _ _ sw => pr = true ∧ sw = true
   | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
-  | LDev | LRegW _ _ | LCtrl _ | LInstr => False
+  | LDev | LRegW _ _ | LCtrl _ | LInstr
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
 (* ------------------------------------------------------------------ *)
@@ -185,7 +187,7 @@ Section astep.
     ∀ w, fwd_own log i w → fwd_own log i (f w).
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros [-> _] w Hw. exact Hw.
     - intros (_ & -> & _) w Hw a tf vf. rewrite load_post_run_d_fwd.
@@ -205,6 +207,8 @@ Section astep.
     - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
     - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
     - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
+    - done.
+    - done.
   Qed.
 
   (** EXT, in the form the measure wants: the fulfilling step's PRE-state
@@ -215,7 +219,7 @@ Section astep.
     astep_ok img log i ag l f (Some ts) → (w_vwNew (pa_ws ag) < ts)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -233,6 +237,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** THE SAME-STEP CASE, quantitatively.  [WeakRobustGraph]'s
@@ -246,7 +252,7 @@ Section astep.
     (ts < ts')%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -265,6 +271,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** THE AQ ARM's gain: an acquire read joins its timestamp into
@@ -275,7 +283,7 @@ Section astep.
     (ts ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) -> [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
@@ -296,6 +304,8 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
+    - done.
+    - done.
   Qed.
 
   (** THE FENCE ARM's gain, half 1: an UNFORWARDED read joins its
@@ -307,7 +317,7 @@ Section astep.
     (ts ≤ w_vrOld (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
@@ -328,6 +338,8 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
+    - done.
+    - done.
   Qed.
 
   (** THE FENCE ARM's gain, half 2: a [pr ∧ sw] fence ships [w_vrOld]
@@ -338,7 +350,7 @@ Section astep.
     (w_vrOld (pa_ws ag) ≤ w_vwNew (f (pa_ws ag)))%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl; try (by intros _ []).
     intros [-> _] [-> ->]. apply fence_post_vwNew_r.
   Qed.
@@ -420,8 +432,11 @@ Definition fulfil_vext (ws : wstate) (l : wlabel) : option nat :=
               (load_post_run_d ws aq (srcs_view ws asrc) base (tvs.*1)) rl
               (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
                        (ldv_of ws aq (srcs_view ws asrc) base (tvs.*1))))
+  | LExStore rl _ _ asrc vsrc =>
+      Some (fulfil_vpre_d ws rl
+              (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc)))
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
-  | LCtrl _ | LInstr => None
+  | LCtrl _ | LInstr | LExLoad _ _ _ _ => None
   end.
 
 (** [w_vwNew] is a lower bound of the EXT view: [fulfil_vpre] is a max
@@ -431,7 +446,7 @@ Lemma fulfil_vext_vwNew ws l v :
   fulfil_vext ws l = Some v → (w_vwNew ws ≤ v)%nat.
 Proof.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     simpl; try done.
   - intros [= <-]. rewrite /fulfil_vpre_d /fulfil_vpre. lia.
   - intros [= <-].
@@ -440,6 +455,8 @@ Proof.
                              (tvs.*1)))%nat
       by apply ws_le_vwNew, load_post_run_d_le.
     rewrite /fulfil_vpre_d /fulfil_vpre. lia.
+  - (* [LExStore]: [LStore]'s arm verbatim (RMW split S1) *)
+    intros [= <-]. rewrite /fulfil_vpre_d /fulfil_vpre. lia.
 Qed.
 
 (** THE RELATIVIZED COVERAGE: the fulfil at [k'] checks EXT at a view
@@ -477,7 +494,7 @@ Lemma astep_ok_fulfil_vext {P : Type} img log i (ag : wpagent P) l f ts :
   ∃ v, fulfil_vext (pa_ws ag) l = Some v ∧ (v < ts)%nat.
 Proof.
   destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
     simpl.
   - by intros [_ ?].
   - by intros (_ & _ & ?).
@@ -489,6 +506,8 @@ Proof.
   - by intros [_ ?].
   - by intros [_ ?].
   - by intros [_ ?].
+  - done.
+  - done.
 Qed.
 
 (* ------------------------------------------------------------------ *)

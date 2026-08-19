@@ -126,7 +126,7 @@ Section astep.
     (ts ≤ coh (f (pa_ws ag)) a)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -149,6 +149,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** A step that BOTH reads [(a, tr)] and fulfils [ts] is an [LRmw]
@@ -160,7 +162,7 @@ Section astep.
     (tr < ts)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -179,6 +181,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
   (** ... and its EXCLUSIVITY WINDOW: no OTHER agent's write to the byte
@@ -190,7 +194,7 @@ Section astep.
     ¬ writes_in_by log (λ tid, tid ≠ Some i) a tr (ts - 1)%nat.
   Proof.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc
-                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc|];
+                  |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl.
     - by intros [_ ?].
     - by intros (_ & _ & ?).
@@ -204,6 +208,8 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
+    - done.
+    - done.
   Qed.
 
 End astep.
