@@ -58,23 +58,47 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* 1. THE 4-BYTE FETCH READ, certified.                                   *)
+(* 1. THE FETCH READ, certified, WIDTH-GENERIC.                           *)
 (*                                                                        *)
-(* [UserMem.exec_checked_mem_read_ram_4_U] / [exec_mem_read_fetch_4_U]'s   *)
-(* twins.  Same shape as [PtWalkCert] section 1e's PTE read, one width     *)
-(* down and at the fetch access type: the PMA arm is [PMA_executable] and  *)
-(* the PMP grant is [pmpCheck ... (InstructionFetch tt) User].             *)
+(* [UserMem.exec_checked_mem_read_ram_{2,4}_U] / [exec_mem_read_fetch_    *)
+(* {2,4}_U]'s twins.  Stated ONCE over an arbitrary width [k], exactly as  *)
+(* [UserMemPt]'s [GenRead] does for the DATA read, and instantiated at 4   *)
+(* (the 4-aligned fetch) and at 2 (the 2-aligned split fetch, whose two    *)
+(* halfword reads are what [u_fetch_pure_2] stands on).                    *)
+(*                                                                        *)
+(* THE WIDTH-TYPED READ IS A PREMISE, NOT A LEMMA APPLIED INSIDE.          *)
+(* [read_ram]'s value index is [mword (8*k)] and resists abstraction       *)
+(* inside [sail_mem_read]'s cast (the reason [UserMemPt] section 5 closes  *)
+(* over two width-TYPED bricks), but a CERTIFICATE never scrutinises the   *)
+(* value -- so taking [Hread_plain] as a hypothesis keeps everything here  *)
+(* generic and costs each caller one already-proved brick                  *)
+(* ([exec_read_ram_plain_2] / [_4]).                                       *)
 (* ===================================================================== *)
 
-Lemma goodmb_pmaCheck_ram_fetch (Dr Dw : register -> bool) (addr : mword 64)
-    (pbmt : page_based_mem_type) (region : PMA_Region) (roc : bool)
-    (s : mstate) (mm : pamap) :
-  Dr pma_regions = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
+(* the PMA check at the fetch access type, both halves, width-generic *)
+Lemma exec_pmaCheck_ram_fetch_g (k : Z) (addr : mword 64)
+    (pbmt : page_based_mem_type) (region : PMA_Region) (s : mstate) :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
     = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
+  is_aligned_paddr (Physaddr addr) k = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
-  goodmb Dr Dw (pmaCheck (Physaddr addr) 4 (InstructionFetch tt) pbmt roc) s mm
+  exec (pmaCheck (Physaddr addr) k (InstructionFetch tt) pbmt false) s
+    = Some (Ok pma_ok_aligned, s).
+Proof.
+  intros Hmatch Halign Hexec.
+  destruct region as [rbase rsize rattr rdtree].
+  pma_ok_peel Hmatch Hexec (exec_is_mag_applicable_fetch k s) Halign.
+Qed.
+
+Lemma goodmb_pmaCheck_ram_fetch_g (Dr Dw : register -> bool) (k : Z)
+    (addr : mword 64) (pbmt : page_based_mem_type) (region : PMA_Region)
+    (roc : bool) (s : mstate) (mm : pamap) :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) k (InstructionFetch tt) pbmt roc) s mm
     = true.
 Proof.
   intros HD Hmatch Halign Hfield.
@@ -89,19 +113,54 @@ Proof.
   erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
   rewrite Hfield. cbn [Riscv.rv64d.not negb].
   gmm_lift (goodmb_mag_pma_check_aligned Dr Dw (override_PMA rattr pbmt)
-              (InstructionFetch tt) (Physaddr addr) 4 false s mm
+              (InstructionFetch tt) (Physaddr addr) k false s mm
               (goodmb_returnm Dr Dw false s mm)
-              (exec_is_mag_applicable_fetch 4 s) Halign)
+              (exec_is_mag_applicable_fetch k s) Halign)
            (exec_mag_pma_check_aligned (override_PMA rattr pbmt)
-              (InstructionFetch tt) (Physaddr addr) 4 false s
-              (exec_is_mag_applicable_fetch 4 s) Halign).
+              (InstructionFetch tt) (Physaddr addr) k false s
+              (exec_is_mag_applicable_fetch k s) Halign).
   cbn match beta. reflexivity.
 Qed.
 
-Section FetchRead.
+(* kept for compatibility with the width-4 call sites *)
+Lemma goodmb_pmaCheck_ram_fetch (Dr Dw : register -> bool) (addr : mword 64)
+    (pbmt : page_based_mem_type) (region : PMA_Region) (roc : bool)
+    (s : mstate) (mm : pamap) :
+  Dr pma_regions = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  goodmb Dr Dw (pmaCheck (Physaddr addr) 4 (InstructionFetch tt) pbmt roc) s mm
+    = true.
+Proof. exact (goodmb_pmaCheck_ram_fetch_g Dr Dw 4 addr pbmt region roc s mm). Qed.
+
+(* the PMP grant at the fetch access type (the X bit), width-generic *)
+Lemma goodmb_pmpCheck_user_grant_fetch (Dr Dw : register -> bool)
+    (a : mword 64) (width : Z) (s : mstate) (mm : pamap) :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  goodmb Dr Dw (pmpCheck (Physaddr a) width (InstructionFetch tt) User) s mm = true.
+Proof.
+  intros HDc HDa HA Hord Hrange HX.
+  apply (goodmb_pmpCheck_grant Dr Dw a width (InstructionFetch tt) User s mm
+           HDc HDa HA Hord Hrange).
+  - unfold pmpCheckRWX. cbn match. rewrite HX. apply exec_returnm.
+  - unfold pmpCheckRWX. cbn match. apply goodmb_returnm.
+Qed.
+
+Section FetchReadGen.
   Context (Dr Dw : register -> bool).
+  Context (k : Z) (Hk : 0 < k).
   Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
-  Context (w : bv 32) (s : mstate) (mm : pamap).
+  Context (w : mword (8 * k)) (s : mstate) (mm : pamap).
 
   Hypothesis HDc : Dr pmpcfg_n = true.
   Hypothesis HDa : Dr pmpaddr_n = true.
@@ -115,46 +174,27 @@ Section FetchRead.
     (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.
   Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
     (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint addr) (uint (to_bits 64 4)) = PMP_Match.
+    (uint addr) (uint (to_bits 64 k)) = PMP_Match.
   Hypothesis HX : eq_vec (_get_Pmpcfg_ent_X
     (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
-    (Physaddr addr) 4 = Some region.
-  Hypothesis Halign : is_aligned_paddr (Physaddr addr) 4 = true.
+    (Physaddr addr) k = Some region.
+  Hypothesis Halign : is_aligned_paddr (Physaddr addr) k = true.
   Hypothesis Hexec : (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true.
-  Hypothesis Hc : exec (within_clint (Physaddr addr) 4) s = Some (false, s).
-  Hypothesis Hsig : exec (within_sig (Physaddr addr) 4) s = Some (false, s).
+  Hypothesis Hc : exec (within_clint (Physaddr addr) k) s = Some (false, s).
+  Hypothesis Hsig : exec (within_sig (Physaddr addr) k) s = Some (false, s).
   Hypothesis Hhtif : register_lookup htif_tohost_base s.(sregs) = None.
   Hypothesis Hdev : dev_addr addr = false.
-  Hypothesis Hown : bytes_owned mm addr 4 = true.
-  Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N ->
-    s.(mem) !! (pa_add addr j) = Some (nth_byte w j).
+  Hypothesis Hown : bytes_owned mm addr (Z.to_N k) = true.
+  Hypothesis Hread_plain :
+    exec (read_ram Read_plain (Physaddr addr) k false) s
+      = Some ((w, default_meta), s).
 
-  Let Hh : exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s)
-    := within_htif_false addr 4 s Hhtif.
+  Let Hh : exec (within_htif_readable (Physaddr addr) k) s = Some (false, s)
+    := within_htif_false addr k s Hhtif.
 
-  Lemma fr_exec_cp :
-    exec (check_pma_with_pmp_priority (InstructionFetch tt) pbmt User
-            (Physaddr addr) 4 false) s = Some (Ok pma_ok_aligned, s).
-  Proof.
-    unfold check_pma_with_pmp_priority.
-    rewrite (exec_bind_Some _ _ _ _ _
-               (exec_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
-    cbn match. apply exec_returnM.
-  Qed.
-
-  Lemma fr_good_cp :
-    goodmb Dr Dw (check_pma_with_pmp_priority (InstructionFetch tt) pbmt User
-                    (Physaddr addr) 4 false) s mm = true.
-  Proof.
-    exact (goodmb_check_pma_with_pmp_priority Dr Dw _ _ User _ _ false _ s mm
-             (goodmb_pmaCheck_ram_fetch Dr Dw addr pbmt region false s mm
-                HDp Hmatch Halign Hexec)
-             (exec_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
-  Qed.
-
-  Lemma fr_exec_mmio :
-    exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s).
+  Lemma frg_exec_mmio :
+    exec (within_mmio_readable (Physaddr addr) k) s = Some (false, s).
   Proof.
     unfold within_mmio_readable. cbn [get_config_rvfi].
     rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
@@ -162,127 +202,152 @@ Section FetchRead.
     rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity.
   Qed.
 
-  Lemma goodmb_checked_mem_read_ram_4_U :
-    goodmb Dr Dw (checked_mem_read (InstructionFetch tt) pbmt User
-             (Physaddr addr) 4 false false false false) s mm = true.
+  Lemma frg_exec_cp :
+    exec (check_pma_with_pmp_priority (InstructionFetch tt) pbmt User
+            (Physaddr addr) k false) s = Some (Ok pma_ok_aligned, s).
   Proof.
-    assert (Hrkf : exec (read_kind_of_flags false false false) s
-                   = Some (rv64d_types.Read_plain, s))
-      by (unfold read_kind_of_flags; apply exec_returnM).
+    unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_fetch_g k addr pbmt region s Hmatch Halign Hexec)).
+    cbn match. apply exec_returnM.
+  Qed.
+
+  Lemma frg_good_cp :
+    goodmb Dr Dw (check_pma_with_pmp_priority (InstructionFetch tt) pbmt User
+                    (Physaddr addr) k false) s mm = true.
+  Proof.
+    exact (goodmb_check_pma_with_pmp_priority Dr Dw _ _ User _ _ false _ s mm
+             (goodmb_pmaCheck_ram_fetch_g Dr Dw k addr pbmt region false s mm
+                HDp Hmatch Halign Hexec)
+             (exec_pmaCheck_ram_fetch_g k addr pbmt region s Hmatch Halign Hexec)).
+  Qed.
+
+  Lemma goodmb_checked_mem_read_ram_g_U :
+    goodmb Dr Dw (checked_mem_read (InstructionFetch tt) pbmt User
+             (Physaddr addr) k false false false false) s mm = true.
+  Proof.
     unfold checked_mem_read. apply goodmb_cer.
-    erewrite gm_liftR_seq; [ | apply fr_good_cp | apply fr_exec_cp ].
+    erewrite gm_liftR_seq; [ | apply frg_good_cp | apply frg_exec_cp ].
     cbn beta. cbn match.
     erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
     cbn match beta.
-    rewrite pma_ok_aligned_splittable; rewrite pma_ok_aligned_granule.
-    gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr 4 0 s mm)
-             (exec_split_misaligned_unsplit addr 4 0 s). cbn beta.
+    rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
+    gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr k 0 s mm)
+             (exec_split_misaligned_unsplit addr k 0 s). cbn beta.
     cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
-    gmm_lift (goodmb_returnm Dr Dw (E := exception) rv64d_types.Read_plain s mm) Hrkf.
-    cbn beta.
-    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
-      assert (Hu : execR (Defs.untilMT vs m0 c b) s = Some (inr (w, true, 0), s));
-      [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c b) s mm = true) ] end.
+    assert (Hrkf : exec (read_kind_of_flags false false false) s
+                   = Some (rv64d_types.Read_plain, s))
+      by (unfold read_kind_of_flags; apply exec_returnM).
+    assert (Hrkg : goodmb Dr Dw (read_kind_of_flags false false false) s mm = true)
+      by (unfold read_kind_of_flags; apply goodmb_returnm).
+    gmm_lift Hrkg Hrkf. cbn beta.
+    assert (Havi : add_vec_int addr (0 * k) = addr)
+      by (assert (H0 : (0 * k)%Z = 0) by lia; rewrite H0; apply avi0).
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
+      assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (w, true, 0), s));
+      [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ] end.
     { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
       rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
       change (bits_of_physaddr (Physaddr addr)) with addr.
-      assert (Havi : add_vec_int addr (0 * 4) = addr)
-        by (change (0 * 4)%Z with 0%Z; apply avi0).
       rewrite Havi.
       rewrite (execR_liftR_seq _ _ _ _ _
-                 (exec_pmpCheck_user_grant addr 4 s HA Hord Hrange HX)). cbn beta.
-      cbn match.
-      match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
-        assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+                 (exec_pmpCheck_user_grant addr k s HA Hord Hrange HX)).
+      cbn beta. cbn match.
+      match goal with |- context[Defs.bind (Defs.bind0 ?aa ?bb) _] =>
+        assert (Hseq : execR (Defs.bind0 aa bb) s = Some (inr false, s)) end.
       { rewrite execR_bind0. rewrite execR_returnR. cbn match.
-        rewrite execR_liftR. rewrite fr_exec_mmio. reflexivity. }
+        rewrite execR_liftR. rewrite frg_exec_mmio. reflexivity. }
       rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
       match goal with
-        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
-        assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
-                      = Some (inr w, s)) end.
-      { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
+        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
+        assert (Hrdr : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
+                       = Some (inr w, s)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
         cbn beta match. apply execR_returnR_fwd. }
-      rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
-      rewrite autocast_id. rewrite usvd_zeros_full_32. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hrdr). cbn beta zeta.
+      change (update_subrange_vec_dec (zeros' (8 * 1 * k))
+                (8 * (0 + 1) * k - 1) (8 * 0 * k) (autocast w))
+        with (update_subrange_vec_dec (zeros' (8 * k)) (8 * k - 1) 0
+                (autocast (T := mword) w)).
+      rewrite (usvd_zeros_full_gen (8 * k) w ltac:(lia)).
+      apply execR_returnR_fwd. }
     { eapply gm_untilMT_1; [ reflexivity | | | | ].
       - gmm_liftT ltac:(apply goodmb_assert_exp'_true)
                   ltac:(apply exec_assert_exp'_true). cbn beta.
         change (bits_of_physaddr (Physaddr addr)) with addr.
-        assert (Havi : add_vec_int addr (0 * 4) = addr)
-          by (change (0 * 4)%Z with 0%Z; apply avi0).
         rewrite Havi.
-        gmm_lift (goodmb_pmpCheck_grant Dr Dw addr 4 (InstructionFetch tt) User s mm
-                    HDc HDa HA Hord Hrange
-                    ltac:(unfold pmpCheckRWX; cbn match; rewrite HX; apply exec_returnm)
-                    ltac:(unfold pmpCheckRWX; cbn match; apply goodmb_returnm))
-                 (exec_pmpCheck_user_grant addr 4 s HA Hord Hrange HX).
+        gmm_lift (goodmb_pmpCheck_user_grant_fetch Dr Dw addr k s mm
+                    HDc HDa HA Hord Hrange HX)
+                 (exec_pmpCheck_user_grant addr k s HA Hord Hrange HX).
         cbn beta. cbn match.
-        match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
-          assert (Hseqg : goodmb Dr Dw (Defs.bind0 a b) s mm = true);
-          [ | assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) ] end.
+        match goal with |- context[Defs.bind (Defs.bind0 ?aa ?bb) _] =>
+          assert (Hseqg : goodmb Dr Dw (Defs.bind0 aa bb) s mm = true);
+          [ | assert (Hseq : execR (Defs.bind0 aa bb) s = Some (inr false, s)) ] end.
         { erewrite gm_bind0R; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
           apply goodmb_liftR.
-          exact (goodmb_within_mmio_readable Dr Dw addr 4 s mm HDh Hhtif Hc Hsig). }
+          exact (goodmb_within_mmio_readable Dr Dw addr k s mm HDh Hhtif Hc Hsig). }
         { rewrite execR_bind0. rewrite execR_returnR. cbn match.
-          rewrite execR_liftR. rewrite fr_exec_mmio. reflexivity. }
+          rewrite execR_liftR. rewrite frg_exec_mmio. reflexivity. }
         erewrite (gm_bindR Dr Dw _ _ s s mm false Hseqg Hseq). cbn beta. cbn match.
         match goal with
-          |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+          |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
           assert (Hrdg : goodmb Dr Dw
-                    (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s mm = true);
-          [ | assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s mm = true);
+          [ | assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
                             = Some (inr w, s)) ] end.
         { erewrite gm_liftR_seq;
-            [ | exact (goodmb_read_ram Dr Dw rv64d_types.Read_plain 4 addr false s mm
-                         eq_refl Hdev Hown
-                         (read_bytes_ne s.(mem) addr (Z.to_N 4) w Hbytes))
-              | exact (exec_read_ram_plain_4 addr w s Hdev Hbytes) ].
+            [ | exact (goodmb_read_ram_of_exec Dr Dw Read_plain k addr false
+                         (w, default_meta) s s mm eq_refl Hdev Hown Hread_plain)
+              | exact Hread_plain ].
           cbn beta match. apply goodmb_returnm. }
-        { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
+        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
           cbn beta match. apply execR_returnR_fwd. }
         erewrite (gm_bindR Dr Dw _ _ s s mm w Hrdg Hrd). cbn beta zeta.
-        rewrite autocast_id. rewrite usvd_zeros_full_32. apply goodmb_returnm.
+        change (update_subrange_vec_dec (zeros' (8 * 1 * k))
+                  (8 * (0 + 1) * k - 1) (8 * 0 * k) (autocast w))
+          with (update_subrange_vec_dec (zeros' (8 * k)) (8 * k - 1) 0
+                  (autocast (T := mword) w)).
+        rewrite (usvd_zeros_full_gen (8 * k) w ltac:(lia)).
+        apply goodmb_returnm.
       - rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
         change (bits_of_physaddr (Physaddr addr)) with addr.
-        assert (Havi : add_vec_int addr (0 * 4) = addr)
-          by (change (0 * 4)%Z with 0%Z; apply avi0).
         rewrite Havi.
         rewrite (execR_liftR_seq _ _ _ _ _
-                   (exec_pmpCheck_user_grant addr 4 s HA Hord Hrange HX)). cbn beta.
-        cbn match.
-        match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
-          assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+                   (exec_pmpCheck_user_grant addr k s HA Hord Hrange HX)).
+        cbn beta. cbn match.
+        match goal with |- context[Defs.bind (Defs.bind0 ?aa ?bb) _] =>
+          assert (Hseq : execR (Defs.bind0 aa bb) s = Some (inr false, s)) end.
         { rewrite execR_bind0. rewrite execR_returnR. cbn match.
-          rewrite execR_liftR. rewrite fr_exec_mmio. reflexivity. }
+          rewrite execR_liftR. rewrite frg_exec_mmio. reflexivity. }
         rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
         match goal with
-          |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
-          assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+          |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
+          assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
                         = Some (inr w, s)) end.
-        { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
+        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
           cbn beta match. apply execR_returnR_fwd. }
         rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
-        rewrite autocast_id. rewrite usvd_zeros_full_32. apply execR_returnR_fwd.
+        change (update_subrange_vec_dec (zeros' (8 * 1 * k))
+                  (8 * (0 + 1) * k - 1) (8 * 0 * k) (autocast w))
+          with (update_subrange_vec_dec (zeros' (8 * k)) (8 * k - 1) 0
+                  (autocast (T := mword) w)).
+        rewrite (usvd_zeros_full_gen (8 * k) w ltac:(lia)).
+        apply execR_returnR_fwd.
       - reflexivity.
       - apply execR_returnR_fwd. }
     erewrite (gm_bindR Dr Dw _ _ s s mm (w, true, 0) Hug Hu). cbn beta zeta.
     rewrite autocast_id. apply goodmb_returnm.
   Qed.
 
-  Lemma goodmb_mem_read_fetch_4_U :
+  Lemma goodmb_mem_read_fetch_g_U :
     register_lookup cur_privilege s.(sregs) = User ->
-    goodmb Dr Dw (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 4
+    exec (checked_mem_read (InstructionFetch tt) pbmt User
+            (Physaddr addr) k false false false false) s
+      = Some (Ok (w, default_meta), s) ->
+    goodmb Dr Dw (mem_read (InstructionFetch tt) pbmt (Physaddr addr) k
              false false false) s mm = true.
   Proof.
-    intros Hpriv.
-    assert (Hchk : exec (checked_mem_read (InstructionFetch tt) pbmt User
-                     (Physaddr addr) 4 false false false false) s
-                   = Some (Ok (w, default_meta), s))
-      by (apply exec_checked_mem_read_ram_4_U with (region := region);
-          first [ exact HA | exact Hord | exact Hrange | exact HX | exact Hmatch
-                | exact Halign | exact Hexec | exact Hc | exact Hsig | exact Hh
-                | exact Hdev | exact Hbytes ]).
+    intros Hpriv Hchk.
     unfold mem_read.
     gmm_rr mstatus HDms.
     gmm_rr cur_privilege HDcp.
@@ -299,12 +364,12 @@ Section FetchRead.
     rewrite Hpriv.
     unfold mem_read_priv.
     assert (Hmrg : goodmb Dr Dw (mem_read_priv_meta (InstructionFetch tt) pbmt User
-                     (Physaddr addr) 4 false false false false) s mm = true).
+                     (Physaddr addr) k false false false false) s mm = true).
     { unfold mem_read_priv_meta. cbn [orb andb].
-      gmm_peel goodmb_checked_mem_read_ram_4_U Hchk. cbn match.
+      gmm_peel goodmb_checked_mem_read_ram_g_U Hchk. cbn match.
       unfold mem_read_callback. apply goodmb_returnm. }
     assert (Hmr : exec (mem_read_priv_meta (InstructionFetch tt) pbmt User
-                    (Physaddr addr) 4 false false false false) s
+                    (Physaddr addr) k false false false false) s
                   = Some (Ok (w, default_meta), s)).
     { unfold mem_read_priv_meta. cbn [orb andb].
       rewrite (exec_bind_Some _ _ _ _ _ Hchk). cbn match.
@@ -312,7 +377,164 @@ Section FetchRead.
     gmm_peel Hmrg Hmr. cbn [MemoryOpResult_drop_meta]. apply goodmb_returnm.
   Qed.
 
-End FetchRead.
+End FetchReadGen.
+
+(* --- the two instances.  Their argument lists are the pre-generalisation
+       ones, so no call site of the width-4 pair moved. --- *)
+
+Lemma goodmb_checked_mem_read_ram_4_U (Dr Dw : register -> bool)
+    (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region)
+    (w : bv 32) (s : mstate) (mm : pamap) :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true -> Dr pma_regions = true ->
+  Dr htif_tohost_base = true -> Dr mstatus = true -> Dr cur_privilege = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64)
+    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs))
+    (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  dev_addr addr = false ->
+  bytes_owned mm addr 4 = true ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  goodmb Dr Dw (checked_mem_read (InstructionFetch tt) pbmt User
+           (Physaddr addr) 4 false false false false) s mm = true.
+Proof.
+  intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
+    Hc Hsig Hhtif Hdev Hown Hbytes.
+  assert (Hk4 : 0 < 4) by lia.
+  pose proof (exec_read_ram_plain_4 addr w s Hdev Hbytes) as Hrp.
+  apply (goodmb_checked_mem_read_ram_g_U Dr Dw 4 Hk4 pbmt addr region w s mm);
+    assumption.
+Qed.
+
+Lemma goodmb_mem_read_fetch_4_U (Dr Dw : register -> bool)
+    (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region)
+    (w : bv 32) (s : mstate) (mm : pamap) :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true -> Dr pma_regions = true ->
+  Dr htif_tohost_base = true -> Dr mstatus = true -> Dr cur_privilege = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64)
+    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs))
+    (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  dev_addr addr = false ->
+  bytes_owned mm addr 4 = true ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  goodmb Dr Dw (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 4
+           false false false) s mm = true.
+Proof.
+  intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
+    Hc Hsig Hhtif Hdev Hown Hbytes Hpriv.
+  assert (Hk4 : 0 < 4) by lia.
+  pose proof (exec_read_ram_plain_4 addr w s Hdev Hbytes) as Hrp.
+  pose proof (exec_checked_mem_read_ram_4_U pbmt addr region w s
+                HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig
+                (within_htif_false addr 4 s Hhtif) Hdev Hbytes) as Hchk.
+  apply (goodmb_mem_read_fetch_g_U Dr Dw 4 Hk4 pbmt addr region w s mm);
+    assumption.
+Qed.
+
+(* --- and the width-2 pair, which is what the 2-aligned split fetch needs --- *)
+
+Lemma goodmb_checked_mem_read_ram_2_U (Dr Dw : register -> bool)
+    (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region)
+    (w : bv 16) (s : mstate) (mm : pamap) :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true -> Dr pma_regions = true ->
+  Dr htif_tohost_base = true -> Dr mstatus = true -> Dr cur_privilege = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64)
+    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs))
+    (Physaddr addr) 2 = Some region ->
+  is_aligned_paddr (Physaddr addr) 2 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  exec (within_clint (Physaddr addr) 2) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 2) s = Some (false, s) ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  dev_addr addr = false ->
+  bytes_owned mm addr 2 = true ->
+  (forall j : nat, (N.of_nat j < 2)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  goodmb Dr Dw (checked_mem_read (InstructionFetch tt) pbmt User
+           (Physaddr addr) 2 false false false false) s mm = true.
+Proof.
+  intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
+    Hc Hsig Hhtif Hdev Hown Hbytes.
+  assert (Hk2 : 0 < 2) by lia.
+  pose proof (exec_read_ram_plain_2 addr w s Hdev Hbytes) as Hrp.
+  apply (goodmb_checked_mem_read_ram_g_U Dr Dw 2 Hk2 pbmt addr region w s mm);
+    assumption.
+Qed.
+
+Lemma goodmb_mem_read_fetch_2_U (Dr Dw : register -> bool)
+    (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region)
+    (w : bv 16) (s : mstate) (mm : pamap) :
+  Dr pmpcfg_n = true -> Dr pmpaddr_n = true -> Dr pma_regions = true ->
+  Dr htif_tohost_base = true -> Dr mstatus = true -> Dr cur_privilege = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64)
+    (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X
+    (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs))
+    (Physaddr addr) 2 = Some region ->
+  is_aligned_paddr (Physaddr addr) 2 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  exec (within_clint (Physaddr addr) 2) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 2) s = Some (false, s) ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  dev_addr addr = false ->
+  bytes_owned mm addr 2 = true ->
+  (forall j : nat, (N.of_nat j < 2)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  goodmb Dr Dw (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 2
+           false false false) s mm = true.
+Proof.
+  intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
+    Hc Hsig Hhtif Hdev Hown Hbytes Hpriv.
+  assert (Hk2 : 0 < 2) by lia.
+  pose proof (exec_read_ram_plain_2 addr w s Hdev Hbytes) as Hrp.
+  pose proof (exec_checked_mem_read_ram_2_U pbmt addr region w s
+                HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig
+                (within_htif_false addr 2 s Hhtif) Hdev Hbytes) as Hchk.
+  apply (goodmb_mem_read_fetch_g_U Dr Dw 2 Hk2 pbmt addr region w s mm);
+    assumption.
+Qed.
 
 (* ===================================================================== *)
 (* 2. THE FETCH SHELLS ([UserFetch.exec_fetch_bytes_ok] /                 *)
@@ -1071,6 +1293,64 @@ Proof.
   exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 bd Hbt Hbd).
 Qed.
 
+(* THE WINDOW IS OWNED, at any width the page divides.  Factored out of
+   [u_fetch_bytes] because the 2-ALIGNED split fetch reads HALFWORDS: the
+   coverage argument is width-generic (it is [udata_cov] under
+   [UserBytes.u_walk_pa_window_wf]) and only the byte-list assembly at the
+   end is not. *)
+Lemma u_fetch_win_in (P : uptd) (t : ptree) (mm : pamap) (k : Z)
+    (w va : mword 64) :
+  0 < k -> (k | 4096) ->
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  forall j : nat, (j < Z.to_nat k)%nat ->
+    is_Some (mm !! pa_add (u_walk_pa w va) j).
+Proof.
+  intros Hk Hdvd Hwf Hl Hal j Hj.
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & _).
+  assert (Hd : pa_add (u_walk_pa w va) j ∈ ud_data P).
+  { rewrite (u_walk_pa_window_wf k w va j Hk Hdvd Hal Hj).
+    exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+  destruct (proj1 (Hdm _) Hd) as [bd Hbd].
+  exists bd. rewrite Hmm.
+  destruct (ptree_bytes 2 t !! pa_add (u_walk_pa w va) j) as [c|] eqn:Ht.
+  - exfalso.
+    exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj _ c bd Ht Hbd).
+  - by rewrite (lookup_union_r _ md _ Ht).
+Qed.
+
+(* the TWO instruction bytes of a halfword fetch are in the owned map *)
+Lemma nth_byte_assemble2 (bs : list (bv 8)) (j : nat) :
+  length bs = 2%nat -> (j < 2)%nat ->
+  nth_byte (Z_to_bv 16 (assemble_bytes bs) : mword 16) j = bs !!! j.
+Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
+
+Lemma u_fetch_bytes_2 (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  is_aligned_vaddr (Virtaddr va) 2 = true ->
+  exists ih : mword 16,
+    forall j : nat, (N.of_nat j < 2)%N ->
+      mm !! pa_add (u_walk_pa w va) j = Some (nth_byte ih j).
+Proof.
+  intros Hwf Hl Hal.
+  assert (Hin : forall j : nat, (j < 2)%nat ->
+            is_Some (mm !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj;
+        exact (u_fetch_win_in P t mm 2 w va ltac:(lia) (Z.divide_factor_l 2 2048)
+                 Hwf Hl Hal j ltac:(lia))).
+  destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
+  destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
+  exists (Z_to_bv 16 (assemble_bytes [b0; b1]) : mword 16).
+  intros j HjN.
+  assert (Hj : (j < 2)%nat) by lia.
+  rewrite (nth_byte_assemble2 [b0; b1] j eq_refl Hj).
+  destruct j as [ | [ | ] ]; try lia;
+    cbn [lookup_total list_lookup_total];
+    [ exact Hb0 | exact Hb1 ].
+Qed.
+
 (* the four instruction bytes are in the owned map, with SOME value *)
 Lemma u_fetch_bytes (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
   u_mem_wf P t mm ->
@@ -1081,19 +1361,11 @@ Lemma u_fetch_bytes (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
       mm !! pa_add (u_walk_pa w va) j = Some (nth_byte iw j).
 Proof.
   intros Hwf Hl Hal.
-  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & _).
   set (pa := u_walk_pa w va).
-  assert (Hin : forall j : nat, (j < 4)%nat -> is_Some (mm !! pa_add pa j)).
-  { intros j Hj.
-    assert (Hd : pa_add pa j ∈ ud_data P).
-    { unfold pa. rewrite (u_walk_pa_window w va j Hal Hj).
-      exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
-    destruct (proj1 (Hdm _) Hd) as [bd Hbd].
-    exists bd. rewrite Hmm.
-    destruct (ptree_bytes 2 t !! pa_add pa j) as [c|] eqn:Ht.
-    - exfalso.
-      exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj _ c bd Ht Hbd).
-    - by rewrite (lookup_union_r _ md _ Ht). }
+  assert (Hin : forall j : nat, (j < 4)%nat -> is_Some (mm !! pa_add pa j))
+    by (intros j Hj;
+        exact (u_fetch_win_in P t mm 4 w va ltac:(lia) (Z.divide_factor_l 4 1024)
+                 Hwf Hl Hal j ltac:(lia))).
   destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
   destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
   destruct (Hin 2%nat ltac:(lia)) as [b2 Hb2].
@@ -1251,34 +1523,49 @@ Time Qed.
 (* [Hland] looks at which arm ran.                                         *)
 (* ===================================================================== *)
 
-Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
-    (w va : mword 64) (mi : bool) :
+(* ---------------------------------------------------------------------- *)
+(* 7a. THE FETCH WALK, ONCE -- factored out because the 2-ALIGNED split     *)
+(* fetch runs it TWICE (at [va], and at [va+2] when the low halfword is     *)
+(* not compressed, possibly onto another page).                            *)
+(*                                                                        *)
+(* The landing is stated as [u_tlb_only], NOT as the one-walk disjunction   *)
+(* "[rsf] or ONE [register_set tlb]": that shape does not compose, because  *)
+(* collapsing two nested [register_set tlb]s needs functional              *)
+(* extensionality (see [UserClassifyAsm.u_tlb_only]).  The one-walk caller  *)
+(* below still gets the disjunction, from [Hland] directly.                 *)
+(*                                                                        *)
+(* The three cfg pins are taken SEPARATELY rather than as                   *)
+(* [post_fetch_cfg]: at the second halfword the pc is still [va], so        *)
+(* [post_fetch_cfg _ (va+2) _] is not available, while the three registers  *)
+(* it would supply are unchanged.                                          *)
+(* ---------------------------------------------------------------------- *)
+Lemma u_walk_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (w va : mword 64) :
   ud_um P !! svpn_of va = Some w ->
   uleaf_ok (InstructionFetch tt) w ->
-  is_aligned_vaddr (Virtaddr va) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr va))
     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
                         (Z.sub 39 1) 0)) = false ->
-  post_fetch_cfg (u_state rsf mm) va mi ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
   u_exec_pins P t rsf ->
   u_mem_wf P t mm ->
-  exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
-    exec (fetch tt) (u_state rsf mm)
-      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
-               then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
-               else F_Base (autocast (T := mword) iw)), u_state rsf' mm') /\
-    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+  exists (rsf' : regstate) (mm' : pamap) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (InstructionFetch tt)) (u_state rsf mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rsf' mm') /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (InstructionFetch tt))
+      (u_state rsf mm) mm = true /\
     (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
     u_mem_step P t t' mm mm'.
 Proof.
-  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
-  destruct Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
+  intros Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Hwf.
   destruct Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
   destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
   destruct Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
-  destruct Lms as (Lsxl & _).
   pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   destruct (upt_spec_maps (ud_root P) (ud_tfp P) (ud_um P) t (svpn_of va) w
@@ -1436,30 +1723,77 @@ Proof.
       + exact (u_mem_step_writeback P t mm (svpn_of va) p2 p1
                  (pte_set_ad w a0 d0) _ Hwf Hmaps Hspec'). }
   destruct Hland as (rsf' & mm' & t' & Hsf & Hfile & Htlbok' & Hstep).
-  (* THE INSTRUCTION READ, at the state the walk landed on.  The four
-     bytes are in the OWNED map at BOTH ends: at [mm'] with the values the
-     machine reads, and at [mm] -- the map the certificate is stated over
-     -- as ownership.  [u_mem_step] is what carries the first. *)
-  assert (Hwf' : u_mem_wf P t' mm')
-    by exact (u_mem_step_wf P t t' mm mm' Hwf Hstep).
-  destruct (u_fetch_bytes P t' mm' w va Hwf' Hl Hal) as (iw & Hbytes).
-  assert (Hown4 : bytes_owned mm (u_walk_pa w va) 4 = true).
-  { destruct (u_fetch_bytes P t mm w va Hwf Hl Hal) as (iw0 & Hb0).
-    apply bytes_owned_of_dom. intros j Hj. apply elem_of_dom.
-    exists (nth_byte iw0 j). apply Hb0. lia. }
-  assert (Hramj : forall j : nat, (j < 4)%nat ->
+  exists rsf', mm', t'. split_and!;
+    [ rewrite <- Hsf; exact Htr | exact Htrg | exact Hfile | exact Htlbok'
+    | exact Hstep ].
+Qed.
+
+
+(* ---------------------------------------------------------------------- *)
+(* 7b. THE PHYSICAL GRANT FOR THE INSTRUCTION READ, width-generic.          *)
+(*                                                                        *)
+(* Everything [exec_mem_read_fetch_k_U] / [goodmb_mem_read_fetch_k_U] want *)
+(* EXCEPT the byte values, which the caller gets from [u_fetch_bytes_k].    *)
+(* Used three times: once at width 4 by [u_fetch_pure], and twice at width  *)
+(* 2 by the split fetch (the low halfword at [va], the high one at [va+2]). *)
+(*                                                                        *)
+(* The whole bundle is stated at the POST-walk file [rsf'] and transported  *)
+(* from [rsf] by [u_tlb_only]: a filling walk writes [tlb] and nothing the  *)
+(* read consults.  The [bytes_owned] conjunct alone is at the PRE map [mm], *)
+(* because that is the map the certificate is carried over.                 *)
+(* ---------------------------------------------------------------------- *)
+Lemma u_fetch_read_ok (P : uptd) (t t' : ptree) (mm mm' : pamap)
+    (rsf rsf' : regstate) (k : Z) (w va : mword 64) :
+  0 < k -> (k | 4096) -> k <= 16 ->
+  uint (to_bits 64 k) = k ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  ud_um P !! svpn_of va = Some w ->
+  register_lookup cur_privilege rsf = User ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  u_mem_wf P t' mm' ->
+  u_tlb_only rsf rsf' ->
+  exists region : PMA_Region,
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) = TOR /\
+    zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n rsf') 0) = false /\
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0)) 4)
+      (uint (u_walk_pa w va)) (uint (to_bits 64 k)) = PMP_Match /\
+    eq_vec (_get_Pmpcfg_ent_X
+      (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) ('b"1") = true /\
+    matching_pma_region (register_lookup pma_regions rsf')
+      (Physaddr (u_walk_pa w va)) k = Some region /\
+    is_aligned_paddr (Physaddr (u_walk_pa w va)) k = true /\
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true /\
+    exec (within_clint (Physaddr (u_walk_pa w va)) k) (u_state rsf' mm')
+      = Some (false, u_state rsf' mm') /\
+    exec (within_sig (Physaddr (u_walk_pa w va)) k) (u_state rsf' mm')
+      = Some (false, u_state rsf' mm') /\
+    register_lookup htif_tohost_base rsf' = None /\
+    dev_addr (u_walk_pa w va) = false /\
+    bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true /\
+    register_lookup cur_privilege rsf' = User.
+Proof.
+  intros Hk Hdvd Hk16 Huintk Hal Hl Lcp Hpins Hwf Hwf' Tr.
+  pose proof Hpins as (Hhw & _ & Hpt & _).
+  pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
+  (* the window is owned at the PRE map, and is RAM at the POST map *)
+  assert (Hown : bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true).
+  { apply bytes_owned_of_dom. intros j Hj. apply elem_of_dom.
+    exact (u_fetch_win_in P t mm k w va Hk Hdvd Hwf Hl Hal j ltac:(lia)). }
+  assert (Hramj : forall j : nat, (j < Z.to_nat k)%nat ->
             addr_is_ram (pa_add (u_walk_pa w va) j)).
-  { intros j Hj. destruct Hwf' as (mdx & _ & _ & _ & _ & Hr & _).
-    apply Hr. apply elem_of_dom. exists (nth_byte iw j). apply Hbytes. lia. }
+  { intros j Hj. pose proof Hwf' as (mdx & _ & _ & _ & _ & Hr & _).
+    apply Hr. apply elem_of_dom.
+    exact (u_fetch_win_in P t' mm' k w va Hk Hdvd Hwf' Hl Hal j Hj). }
   assert (Hram0 : addr_is_ram (u_walk_pa w va))
     by (rewrite <- (pa_add_0 (u_walk_pa w va)); apply Hramj; lia).
-  assert (Hram3 : addr_is_ram (pa_add (u_walk_pa w va) 3))
+  assert (Hramk : addr_is_ram (pa_add (u_walk_pa w va) (Z.to_nat k - 1)))
     by (apply Hramj; lia).
-  (* the config cells the read consults survive the TLB write *)
-  assert (Tr : forall r : register, register_beq r (tlb : register) = false ->
-            register_lookup r rsf' = register_lookup r rsf).
-  { intros r Hne. destruct Hfile as [-> | (tv & ->)];
-      [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+  (* the ambient pins survive the TLB write *)
   assert (HA' : pmpAddrMatchType_encdec_backwards
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) = TOR)
     by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA).
@@ -1478,28 +1812,81 @@ Proof.
     by (rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif).
   assert (Lcp' : register_lookup cur_privilege rsf' = User)
     by (rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Lcp).
-  assert (Lsxl' : _get_Mstatus_SXL (register_lookup mstatus rsf') = 'b"10")
-    by (rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Lsxl).
-  destruct (pma_all_ram Hall' (u_walk_pa w va) 4
-              (pma_access_ram _ _ _ Hram0 Hram3
-                 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl))
+  (* [Z.of_nat (Z.to_nat k - 1)] is the access's LAST byte offset.  Named,
+     not an inline [ltac:(lia)]: nat subtraction is truncated, so lia needs
+     [1 <= Z.to_nat k] spelled out and otherwise reports the useless
+     "Cannot find witness". *)
+  assert (Hk1 : (1 <= Z.to_nat k)%nat) by lia.
+  assert (Hkk : Z.of_nat (Z.to_nat k - 1) = k - 1).
+  { rewrite Nat2Z.inj_sub by exact Hk1. rewrite Z2Nat.id by lia. reflexivity. }
+  destruct (pma_all_ram Hall' (u_walk_pa w va) k
+              (pma_access_ram_at _ _ (Z.to_nat k - 1) Hkk Hram0 Hramk
+                 (pma_width_le k 16 Hk Hk16 eq_refl)))
     as (region & Hpmam & Hexecp & _).
-  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0)) 4)
-      (uint (u_walk_pa w va)) (uint (to_bits 64 4)) = PMP_Match)
-    by exact (ram_fetch_pmp (u_walk_pa w va) _ 4 3 ltac:(lia) ltac:(lia)
-                ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-                Hram0 Hram3 Hcovp').
-  assert (Halp : is_aligned_paddr (Physaddr (u_walk_pa w va)) 4 = true)
-    by exact (pa4_aligned _ va Hal).
-  assert (Hclint : exec (within_clint (Physaddr (u_walk_pa w va)) 4)
-                     (u_state rsf' mm') = Some (false, u_state rsf' mm'))
-    by exact (within_clint_false (u_walk_pa w va) 4 (u_state rsf' mm')
-                (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)).
-  assert (Hsigw : exec (within_sig (Physaddr (u_walk_pa w va)) 4)
-                    (u_state rsf' mm') = Some (false, u_state rsf' mm'))
-    by exact (within_sig_false (u_walk_pa w va) 4 (u_state rsf' mm')
-                (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)).
+  exists region. split_and!.
+  - exact HA'.
+  - exact Hord'.
+  - exact (ram_fetch_pmp (u_walk_pa w va) _ k (Z.to_nat k - 1) Hk Hk16
+             Huintk ltac:(lia) Hram0 Hramk Hcovp').
+  - exact HX'.
+  - exact Hpmam.
+  - exact (pa_aligned_div _ va k Hk Hdvd Hal).
+  - exact Hexecp.
+  - exact (within_clint_false (u_walk_pa w va) k (u_state rsf' mm')
+             (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)).
+  - exact (within_sig_false (u_walk_pa w va) k (u_state rsf' mm')
+             (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)).
+  - exact Hhtif'.
+  - exact (addr_is_ram_not_dev _ Hram0).
+  - exact Hown.
+  - exact Lcp'.
+Qed.
+Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (w va : mword 64) (mi : bool) :
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (InstructionFetch tt) w ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  post_fetch_cfg (u_state rsf mm) va mi ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
+    exec (fetch tt) (u_state rsf mm)
+      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               else F_Base (autocast (T := mword) iw)), u_state rsf' mm') /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+    (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    u_mem_step P t t' mm mm'.
+Proof.
+  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
+  pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
+  pose proof Lms as (Lsxl & _).
+  pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
+  pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
+  (* THE WALK, once -- section 7a.  Everything below is the instruction READ
+     at the state it landed on, and the [fetch] shell over the two. *)
+  destruct (u_walk_fetch_pure P t mm rsf w va Hl Hleaf Hcanon Lcp Lsxl Lmenv
+              Hpins Hwf)
+    as (rsf' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep).
+  (* THE INSTRUCTION READ, at the state the walk landed on.  The four
+     bytes are in the OWNED map at BOTH ends: at [mm'] with the values the
+     machine reads, and at [mm] -- the map the certificate is stated over
+     -- as ownership.  [u_mem_step] is what carries the first. *)
+  assert (Hwf' : u_mem_wf P t' mm')
+    by exact (u_mem_step_wf P t t' mm mm' Hwf Hstep).
+  destruct (u_fetch_bytes P t' mm' w va Hwf' Hl Hal) as (iw & Hbytes).
+  (* THE PHYSICAL GRANT -- section 7b, at width 4. *)
+  destruct (u_fetch_read_ok P t t' mm mm' rsf rsf' 4 w va
+              ltac:(lia) (Z.divide_factor_l 4 1024) ltac:(lia)
+              ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins Hwf Hwf'
+              (u_tlb_only_land rsf rsf' Hfile))
+    as (region & HA' & Hord' & Hrange & HX' & Hpmam & Halp & Hexecp &
+        Hclint & Hsigw & Hhtif' & Hdevp & Hown4 & Lcp').
   assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA
                         (Physaddr (u_walk_pa w va)) 4 false false false)
                   (u_state rsf' mm') = Some (Ok iw, u_state rsf' mm'))
@@ -1507,7 +1894,7 @@ Proof.
                 (u_state rsf' mm') HA' Hord' Hrange HX' Hpmam Halp Hexecp
                 Hclint Hsigw
                 (within_htif_false (u_walk_pa w va) 4 (u_state rsf' mm') Hhtif')
-                (addr_is_ram_not_dev _ Hram0) Hbytes Lcp').
+                Hdevp Hbytes Lcp').
   assert (Hmrg : goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
                           (Physaddr (u_walk_pa w va)) 4 false false false)
                    (u_state rsf' mm') mm = true)
@@ -1517,9 +1904,8 @@ Proof.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 HA' Hord' Hrange HX' Hpmam Halp Hexecp Hclint Hsigw Hhtif'
-                (addr_is_ram_not_dev _ Hram0) Hown4 Hbytes Lcp').
+                Hdevp Hown4 Hbytes Lcp').
   (* ...and the fetch on top of the two *)
-  rewrite Hsf in Htr.
   exists iw, rsf', mm', t'. split_and!.
   - exact (exec_fetch_ok_4 (u_state rsf mm) (u_state rsf' mm') va
              (u_walk_pa w va) iw Lpc Hal Htr Hmr).

@@ -845,7 +845,7 @@ fallback is to keep them `iProp` with `bytes_own`/frames threaded through; the
 | R6 | Do the GPRs fit in a footprint at symbolic operands? | **[V] YES via `goodmb`** (§1.3) — the trap in the durable notes is about *computing* `hfrun`, which this route never does |
 | R7 | Can a user store corrupt a PTE? | **[A→V by construction**: the tree bytes and the data bytes are separately owned today, so they are disjoint; the port must EXTRACT that disjointness once into `u_mem_wf` (§4.2).  If it is ever violated, `u_mem_step`'s A/D-only clause fails and the port fails loudly rather than silently |
 
-### 5.5 SUCCESS CRITERION
+### 5.5 SUCCESS CRITERION — MET (see §14.8)
 
 `UserExec.v` … `UserActiveClass.v` compile; `ProofUser.wp_user_exec_closed`
 closes at the 5 rv64d platform axioms **plus the two reservation term axioms**
@@ -1579,10 +1579,13 @@ takes `(t mm rsf va [mi] w)` where an Iris one took `(E sigma sigma_f va g
 w)`, and it owes a certificate the Iris one did not.
 
 **The checkable claim, and it is the one that matters, is that the CASE TREE
-does not move**: every `| _ = Some (CTOR ?p, _) =>` clause head and every
-payload `destruct` line is byte-identical — **104 lines in the base table and
-67 in the RVC table, verified mechanically against the pre-port commit.**
+does not move**: every `| … =>` clause head is byte-identical — **54 heads in
+the base table, 44 in the RVC table** — and the payload `destruct` lines
+differ only where the reference state is spelled (`sigma_f` → `rsf mm`).
 Only the `fin`/`finm` argument lists differ.  Read §5.5's criterion that way.
+The check: cut the two `all: lazymatch type of Hdf with` blocks out of both
+revisions, keep the lines matching `^\s*\|`, truncate each at `=>`, and
+`diff`.  `UserActiveClass.v` §1–§2 is a plain `diff` and is EMPTY.
 
 Two things kept the tables that stable, and they are worth copying:
 * **no dispatch-table entry ever names a `goodmb` twin.**  The certificate is
@@ -1756,23 +1759,73 @@ STILL OPEN, §5 (the fetch-DEPENDENT half), in dependency order:
    `rs'` itself and re-derive the decode fact there with
    `UserTotalU.u_hval_base` rather than transporting `hval` (there is no
    `hval` congruence lemma in the tree).
-2. **The fault-side fetch composer DOES NOT EXIST.**  `UserFetchCert` has
-   only `u_fetch_pure`; `fetch_classify`'s second disjunct
-   (`u_fetch_fault_flavor`) has no `swp`-level producer, so
-   `run_fetch_post`'s `F_Error` arm (`Pf`) cannot be discharged.  This is a
-   P3 deliverable.
+2. **The fault-side fetch composer** — **LANDED** as
+   `UserFaultCert.u_fetch_fault_pure` (§15); it takes its `cur_privilege`
+   and SXL pins out of `post_fetch_cfg`, so the `u_exec_pins` extension
+   §15 flagged is NOT needed for it.  It is 4-aligned only (see §14.5).
 3. **The execute obligation** `swp (execute i) (run_exec_post Pe w)` from
    `base_exec_total_u` / `rvc_exec_total_u`, again via
    `swp_hmrun_of_exec`, with `run_exec_post_direct` / `_redirect` for the
-   `ExecuteAs` fork.  Take the two totalities as Coq-level hypotheses:
-   `base_exec_total_u_holds` needs P4's 19 `arm_*_u` memory arms, which do
-   not exist yet.
+   `ExecuteAs` fork.  Take the two totalities as Coq-level hypotheses;
+   `base_exec_total_u_holds` / `rvc_exec_total_u_holds` are unconditional
+   now that P4b's nineteen `arm_*_u` arms exist (§17).
 4. **The four trap arms**, each an instantiation of `UserTrap`'s
    `UTrapReduce` section at a concrete `s := u_state rsf mm` with its eight
    hypotheses, feeding `u_psi_trap`.
 5. **The assembly** through `HartRunFull.swp_run_hart_active_U` +
    `swp_mono` into `u_step_post`, with `UserStep.u_dispatch_of_pending`
    for the pending-interrupt arm.
+
+### 14.7 §5 AS BUILT — the three layers, and what each one is for
+
+`active_class`' body is three layers, and keeping them apart is what made
+the case tree small:
+
+1. **the PURE producers** (`UserFetchCert` / `UserFaultCert`): five of them,
+   one per `va` geometry, all concluding the same five conjuncts (§14.6).
+2. **the `swp` BRIDGES** (`UserActiveClass` §6a/§6b).  `swp_fetch_of_pure`
+   serves **all five** producers — that is the whole point of giving them a
+   uniform shape, and the alternative was five near-duplicate bridges.
+   `swp_execute_of_pure` is the execute half of `base_post`/`rvc_post`.
+3. **the ARMS** (`UserActiveClass` §5a-§5e): four trap arms plus the two
+   payload builders, each concluding a whole `u_step_post` slot.
+
+**AN ARM MUST NAME THE FILE THE TOWER LANDS ON.**  `u_step_post` binds
+`rs2` OUTSIDE the `swp` (the `u_land` tag is a pure conjunct of the arm, not
+of its postcondition), while `UTrapReduce` hands its landing file back only
+up to footprint agreement and INLINES its `Let`s at section discharge — so
+no name for it escapes.  `u_trap_rs` is that name, written with `let`s so
+the conversion stays linear instead of unfolding `set_reg`'s three-fold body
+into the 3^12 tree `RiscvLang.v:92` warns about.
+
+**`active_class` DOES NOT PIN `medeleg`, AND IT DOES NOT NEED TO.**  The two
+exception towers want the delegation bit for `uc_del`.  It is recoverable
+without touching the frozen interface: `u_open` holds `medeleg ↦ᵣ□` and the
+read-only frame holds the same cell at `u_Df`'s `DfracDiscarded`, so the two
+agree — but the tree had **no two-points-to agreement lemma for registers**
+(`RiscvPtsto` has only `reg_valid_dq`, which wants `reg_interp`).
+`u_reg_pointsto_agree` is it; **its honest home is `RiscvPtsto` beside
+`reg_valid_dq`** and it sits in `UserActiveClass` only to avoid that file's
+cone.  Fold it back at the milestone.
+
+**`gen_cert` IS NOT IN `active_class`' BODY** but every `swp_hmrun_of_exec`
+needs it.  It is persistent and comes from `hw_config`, which
+`wp_user_step_active` already takes, so `active_class_intro` has it — the
+arms and both bridges take it on that footing.
+
+**THE `ExecuteAs` REDIRECT IS TWO `swp_hmrun_of_exec`s, and the second one's
+continuation is NOT wrapped.**  `run_exec_post_redirect` strips the wrapper,
+so after it the goal is `Pe r ib` and applying `run_exec_post_direct` there
+fails with *"iApply: cannot apply (Pe r ib -∗ run_exec_post Pe ib r)"* —
+an error that names the wand and not the arm it was in.  The redirect works
+at all only because it lands on the state it started from, so the second run
+starts from the frame the first handed back.
+
+**AND THE `[-]` TRAP BITES AT `swp_mono`.**  `iApply (swp_mono with "[Hk]
+[-Hk]")` fails with *`iSpecialize: hypotheses ["Hk"] not found`*: the first
+pattern already consumed `Hk`, so naming it in the second pattern's
+exception list refers to nothing.  Every other `swp_mono` in the tree uses
+two EXPLICIT lists; do the same.
 
 ### 14.4 What `u_fetch_pure_2` would take (the 2-aligned / straddle geometry)
 
@@ -1789,11 +1842,269 @@ STILL OPEN, §5 (the fetch-DEPENDENT half), in dependency order:
 * **A THIRD outcome.**  First half fetched, second half's page unmapped or
   denied — the model faults at `va+2`.  The post is no longer
   `F_RVC | F_Base` but `F_RVC | F_Base | F_Error at va+2`.
-* **`u_mem_step` TRANSITIVITY, which does not exist.**  Two walks can each
-  do an A/D write-back, so the two steps must compose; `UserBytes` has only
-  `u_mem_step_refl` and `u_mem_step_wf`.  The missing ingredient is
-  transitivity of `pt_same_shape 2` (the other three conjuncts come from
-  the second step).
+* **`u_mem_step` TRANSITIVITY.**  Two walks can each do an A/D write-back,
+  so the two steps must compose.  `u_mem_step_trans` and
+  `pt_same_shape_trans` **now EXIST** — P4b built them for the page-
+  straddling load/store, at `UserMemCert.v:1056` and `:1044`, together with
+  the landing algebra the one-walk disjunction cannot supply
+  (`u_tlb_only` / `_land` / `_refl` / `_trans`, `UserMemCert.v:987-1002`,
+  and `u_exec_pins_only` `:1015`).  But `UserMemCert.v` is `_CoqProject`
+  line 183 and `UserFetchCert.v` is 181, so a `u_fetch_pure_2` written in
+  `UserFetchCert` cannot see them: **do the fold-back the source note at
+  `UserMemCert.v:964-986` already asks for** (both `_trans` down into
+  `UserBytes.v` beside `u_mem_step_refl`), or put `u_fetch_pure_2` in a new
+  file after `UserMemCert`.
+
+### 14.8 THE TIER IS CLOSED — and two corrections to §14.5's ledger
+
+`ProofUser.wp_user_exec_closed` compiles, at exactly the §5.5 axiom set: the
+five rv64d platform axioms (`valid_reservation`, `plat_term_write`,
+`match_reservation`, `load_reservation`, `cancel_reservation`) plus
+`ResvAxioms.load_reservation_term` / `cancel_reservation_term`.  `ProofUser`
+drops off the red-root list, leaving the four that were always there
+(`WpUmodeStep`, `UservecExitPt`, `UserretEntryPt`, `ProofKvminithart`).
+The dispatch tables and `UserActiveClass` §1–§2 are byte-identical to `main`.
+
+**CORRECTION 1: THERE ARE SIX `va` GEOMETRIES, NOT FIVE.**  §14.5 enumerated
+two 4-aligned producers and three 2-aligned ones and MISSED THE ODD PC,
+which the pre-port case tree handles first
+(`main:UserClassifyAsm.user_fetch_fault_active_align`).  Its exec side
+existed (`UserFetch.exec_fetch_align_fault`); the certificate did not.
+`goodmb_fetch_align_fault` is the cheapest shell in the file — three `PC`
+reads and the misalignment test, no translation and no read — and
+`u_fetch_align_fault_pure`'s premise is `register_lookup PC rsf = va`, NOT
+`post_fetch_cfg`, whose fifth conjunct asserts a 2-alignment that is false
+on an odd pc.  **The lesson: enumerate a case tree from the PRE-PORT
+`iApply`s, not from the producers that happen to exist.**
+
+**CORRECTION 2: `HartRunFull.swp_run_hart_active_U` CANNOT SERVE THIS TIER,
+so §14.3 item 5 as written does not close.**  It returns only the FRAMES on
+the pending-interrupt arm, while the tier needs `resv_frag`, `bytes_own` and
+`u_open` on BOTH arms — the fetch needs the bytes and the reservation
+*before* the branch is decided, `u_arm_pending_interrupt` needs all three
+*after*.  Putting them in the `swp_mono` wand starves the fetch; putting
+them in the fetch obligation starves the interrupt arm.
+`swp_run_hart_active_full` does not help either: its dispatch obligation's
+`None` branch is likewise fixed to the frames.  **This is the same hole
+`SmodeCorePt.swp_run_hart_active_gen_exf_res` already fills for the S tier**
+— a resource `Wd` threaded from the dispatch's `None` branch into the fetch
+— and `UserActiveClass.swp_run_hart_active_res` fills it the same way, in
+the CONSUMING file so `HartRunFull`'s cone is not paid.  **Fold both into
+`HartRunFull` at the milestone; a third tier will want it.**
+
+Two smaller shape notes from the assembly:
+
+* **`u_exec_pins_only` wants a whole-file `u_tlb_only`, which no landing
+  gives.**  What the three transports (`rs1→rsA`, `rsA→rsF`, `rsF→rsX`)
+  actually have is agreement on the FOOTPRINT with a `minstret_increment`
+  exclusion, so `u_pins_move` is stated over `u_Dfix` instead.
+* the three POST-fetch trap arms take `resv_any`, not `resv_frag _ None`:
+  the fetch consumes the fragment and `swp_hmrun_of_exec` hands back only
+  `resv_any`, so they can never see a `None` again.  Only
+  `u_arm_pending_interrupt` keeps the fragment — it fires before the fetch.
+
+### 14.5 §14.3's LIST IS INCOMPLETE, AND §14.4 IS THE MISSING ITEM (RESOLVED — see §14.8)
+
+**§5 is NOT assembly-only.**  §14.3 lists five items and none of them is
+the 2-aligned geometry, so §14 reads as though §14.4 were optional polish.
+It is not: it is a hard prerequisite of `active_class`, and until it lands
+`ProofUser.wp_user_exec_closed` cannot close.
+
+**Why it is unavoidable.**  `UserExec.user_inv` quantifies the pc as a bare
+`va : mword 64` with no alignment conjunct (`UserExec.v:359`), so
+`active_class` must classify EVERY `va`.  The pre-port case tree says so
+outright: `git show main:iris/UserActiveClass.v`'s `active_obligations`
+splits on `is_aligned_vaddr (Virtaddr va) 4` and routes the `false` arm to
+THREE producers of its own — `user_exec_step_producer_2_u`,
+`user_exec_or_fault_active_2_second` and `user_fetch_fault_active_2_first`.
+
+**And BOTH per-node fetch producers are 4-aligned only**, so all three of
+those branches have no producer at all:
+
+* `UserFetchCert.u_fetch_pure:1254` takes
+  `is_aligned_vaddr (Virtaddr va) 4 = true`;
+* `UserFaultCert.u_fetch_fault_pure:1060` takes it too.
+
+The certificate under them is pinned the same way: `goodmb_fetch_ok_4`
+(`UserFetchCert.v:386`) is the only fetch shell, and it consumes
+`Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true` to take the model's
+4-byte branch.  The bricks below it are already width-generic
+(`goodmb_fetch_bytes_ok`, `UserFetchCert.v:334`, takes `width : Z`), so the
+missing piece is the SHELL and the composer, not the leaves.
+
+**THE EXEC SIDE IS COMPLETE; ONLY THE CERTIFICATES AND THE COMPOSER ARE
+MISSING.**  All four 2-aligned exec arms exist and are unchanged from
+`main` — `UserFetch.exec_fetch_rvc_2:354`, `exec_fetch_base_2:380`,
+`exec_fetch_fault_2_second:425`, `exec_fetch_fault_2_first:452` — as does
+the width-2 read, `UserMem.exec_checked_mem_read_ram_2_U:67` /
+`exec_mem_read_fetch_2_U:135`.  `exec_fetch_base_2` is the straddle: it
+threads `s -> s1 -> s2` through TWO `translateAddr` calls.
+
+The exact ledger of what is and is not there:
+
+| ingredient | status |
+|---|---|
+| the four 2-aligned `exec` arms | `UserFetch.v:354,380,425,452` |
+| width-2 `exec` instruction read | `UserMem.v:67,135` |
+| `goodmb (fetch_bytes … width)`, ok + fault | width-GENERIC already: `UserFetchCert.v:334`, `UserFaultCert.v:964` |
+| `u_translate_fault_pure` at `va+2` | alignment-BLIND and `acc`-generic: `UserFaultCert.v:831` |
+| `goodmb_pmaCheck_ram_fetch` | 4 hardcoded, `UserFetchCert.v:69` |
+| `goodmb_checked_mem_read_ram_2_U` (fetch) | MISSING; 4-only twin at `UserFetchCert.v:165` |
+| `goodmb_mem_read_fetch_2_U` | MISSING; 4-only twin at `UserFetchCert.v:273` |
+| `goodmb_fetch_{rvc,base}_2` + the two fault twins | MISSING — `UserFetchCert.v:27-37` says so itself |
+| `u_fetch_bytes` at width 2 | 4-pinned, `UserFetchCert.v:1075`; the generic window lemma it needs already exists (`UserBytes.u_walk_pa_window_wf:517`, `UserMemPt.u_walk_pa_window_div:138`, both `k`-generic) — it also wants a `nth_byte_assemble2` |
+| `u_fetch_pure_2` | MISSING |
+
+The DATA side already solved the genericity problem the fetch side did not:
+`UserMemPt.goodmb_checked_mem_read_ram_U:1091` is the same lemma in a
+`Section GenRead` over `(k : Z)`.  **Copy that shape rather than cloning
+the 4-pinned fetch chain.**
+
+**`HartRunFull` needs no change for any of this.**  `run_fetch_base` /
+`run_fetch_rvc` (`HartRunFull.v:322,339`) read only `pc` off the landing
+file and are geometry-agnostic; the whole gap is the `swp (fetch tt)`
+producer.
+
+**The Iris shape to port from is `main:iris/UserClassifyAsm.v`**, not
+`main:iris/UserClassify.v`: `user_fetch_fault_active_2_first:282` (33 ln),
+`user_exec_or_fault_active_2_second:319` (64 ln) and
+`user_exec_step_producer_2_u:390` (43 ln), over the Pt-layer composers
+`UserFetchPt.user_pt_fetch_instr_2:288` (185 ln),
+`user_pt_fetch_fault_2_first:489` (34) and `_2_second:524` (122) — which
+are UNCHANGED from `main` and still build.  ~480 lines of pre-port Iris
+against a 4-aligned baseline of ~100, and the 3x blow-up in the Pt layer is
+exactly the two-walk threading that `u_mem_step_trans` / `u_tlb_only_trans`
+now do for free.
+
+**§14.4 LANDED FIRST, as a P3-class package, and §14.3's five items are what
+is left.**  All five producers `active_class`' case tree needs now exist and
+are pure: `u_fetch_pure` / `u_fetch_fault_pure` for the 4-aligned arm, and
+`u_fetch_pure_2` / `u_fetch_or_fault_pure_2_second` /
+`u_fetch_fault_pure_2_first` for the 2-aligned one.  What §5 still owes is
+the `swp` layer over them (§14.3 items 1–3), the four trap arms (item 4) and
+the assembly (item 5) — and note that `active_class` cannot compile until
+ALL of its branches have producers, so there is no green intermediate state
+between "no §5" and "all of §5".
+
+A last tell that this was a real hole and not a reading error: **neither
+`u_fetch_pure` nor `u_fetch_fault_pure` has a single consumer anywhere in
+the tree.**  The fetch-dependent half of §5 has never been started.
+
+### 14.6 THE §14.4 PACKAGE, AS BUILT — the shared machinery is in
+
+The fetch path is no longer 4-hardcoded, and `u_fetch_pure` is now three
+lemmas instead of one 250-line script.  What a `u_fetch_pure_2` author
+stands on:
+
+| brick | where | note |
+|---|---|---|
+| `goodmb_checked_mem_read_ram_g_U` / `goodmb_mem_read_fetch_g_U` | `UserFetchCert` §1 | ONE generic section over `k`; the width-2 and width-4 pairs are its instances and the 4 pair kept its old argument list |
+| `u_walk_fetch_pure` | `UserFetchCert` §7a | the fetch walk, once — run it at `va` and again at `va+2` |
+| `u_fetch_read_ok` | `UserFetchCert` §7b | the whole physical grant, width-generic |
+| `u_fetch_win_in` / `u_fetch_bytes_2` / `nth_byte_assemble2` | `UserFetchCert` §5 | the halfword bytes |
+| `u_mem_step_trans` / `pt_same_shape_trans` | `UserBytes` | composes the two walks |
+| `u_tlb_only` + `_land`/`_refl`/`_trans`, `u_exec_pins_only` | `UserClassifyAsm` | composes the two landings |
+| `read_bytes_ne_of_exec_read_ram` / `goodmb_read_ram_of_exec` | `HartMemAsm` | keyed on the exec fact, so the symbolic width never surfaces |
+
+**THE TWO STATEMENT RULES THE EXTRACTION SETTLED**, and both are the same
+rule the page-straddling DATA accesses already found:
+
+* **a walk-level lemma concludes `u_tlb_only`, never the one-walk
+  disjunction.**  `rs' = rs \/ ∃ tv, rs' = register_set tlb tv rs` does not
+  compose — collapsing two nested `register_set tlb` is a pointwise equality
+  of the record's field FUNCTION, i.e. functional extensionality.  The
+  one-walk caller re-derives the disjunction locally, so no landed statement
+  moved.
+* **the cfg pins are taken one by one, not as `post_fetch_cfg`.**  At the
+  second halfword the pc is still `va`, so `post_fetch_cfg _ (va+2) _` does
+  not exist while the three registers it would supply are unchanged.
+
+**AND ONE ARITHMETIC TRAP, which is `durable-notes.md`'s `nat`-literal rule
+in a new place.**  A width-generic access's last byte offset is
+`Z.of_nat (Z.to_nat k - 1)`; nat subtraction is TRUNCATED, so an inline
+`ltac:(lia)` for `Z.of_nat (Z.to_nat k - 1) = k - 1` fails with "Cannot find
+witness" — which reads as an arithmetic gap and is a missing side condition.
+Assert `(1 <= Z.to_nat k)%nat` first, then `Nat2Z.inj_sub` + `Z2Nat.id`.
+
+**A SECTION DISCHARGES ONLY THE VARIABLES A LEMMA USES**, so a positional
+argument list copied from the `Context`/`Hypothesis` block is wrong whenever
+one lemma in the section uses fewer of them than another — here the checked
+read needs neither `Dr mstatus` nor `Dr cur_privilege`, and the error names
+an unrelated hypothesis (`The term "HDms" has type "Dr mstatus = true" while
+it is expected to have type "pmpAddrMatchType_encdec_backwards … = TOR"`).
+Instantiate such a lemma with `apply …; assumption`, not positionally.
+
+**THE FOUR SHELLS ARE LANDED** (`UserFaultCert.Section FetchSplit2Cert`):
+`goodmb_fetch_rvc_2` / `_base_2` / `_fault_2_second` / `_fault_2_first`,
+each the exec twin's proof node for node under a `gsplit_head` Ltac that
+mirrors `UserFetch.split_head`.  Three things they settled:
+
+* **`Ext_Zca`'s gate is NOT register-free, unlike `Ext_Ziccif`'s.**  It is
+  `and_boolM (hartSupports Zca) (or_boolM (currentlyEnabled Ext_C) (not
+  (hartSupports Ext_C)))` and the middle arm reads `misa`, so
+  `vm_compute; reflexivity` cannot close its certificate the way
+  `goodmb_currentlyEnabled_Ziccif`'s is closed.  The new
+  `goodmb_currentlyEnabled_Zca` takes `Dr misa = true` and goes through
+  `DecodeTotalU`'s `goodb_bind_forall` / `_and_boolM` / `_or_boolM` /
+  `_bind_read_reg`, deciding NEITHER arm of the `misa` test — the exec value
+  needs `HmisaC`, the certificate does not.
+* **DESTRUCTURE AN `Acc` GUARD ONLY WHERE THE RECURSION IS ENTERED.**
+  `Defs.Zwf_guarded` reduces on its own (`Acc_intro` + `pos_guard_wf`), so a
+  leaf like `hartSupports Ext_C` closes by `vm_compute`; a
+  `destruct (Defs.Zwf_guarded _)` written up front replaces it with a
+  variable and turns that computable leaf into a stuck term.  Destruct at
+  the inner `_rec_currentlyEnabled` call instead, and give the recursive
+  helper its own lemma taking the `Acc` abstractly.
+* `goodb_bind_forall`'s second premise binds a variable occurring in the
+  conclusion, so `intros _` fails with *"This variable is used in
+  conclusion"*.  Use `intros ?`.
+
+**§14.4 IS DONE.**  The three composers are in `UserFaultCert`:
+`u_fetch_pure_2` (both halves fetchable → `F_RVC` or `F_Base`),
+`u_fetch_or_fault_pure_2_second` (low half ok, next page bad → `F_RVC` or
+`F_Error` at `va+2`) and `u_fetch_fault_pure_2_first` (low half faults →
+`F_Error` at `va`, state unmoved).  Each runs `u_walk_fetch_pure` once or
+twice and `u_fetch_read_ok` at width 2, composing landings with
+`u_tlb_only_trans` / `u_exec_pins_only` and maps with `u_mem_step_trans`.
+
+**BOTH DISJUNCTS OF THE `_second` LEMMA ARE LIVE, and that is the geometry
+rather than a weak statement**: the model reads the second halfword ONLY
+when the first is not compressed, so a compressed low half retires however
+bad the next page is.  One lemma therefore covers a two-outcome case, which
+is why there are three composers and not four.
+
+**THE SUBTLETY FOR ANY FUTURE TWO-WALK COMPOSER.**  The second walk and the
+second read produce certificates stated at the map the FIRST walk landed on,
+while the lemma owes ONE certificate at the ORIGINAL map.
+`HartMemRun.goodmb_dom` fed by `UserBytes.u_mem_step_dom` transports them —
+and the transport must happen BEFORE a shell is applied, because the shells
+take every certificate at one shared map.
+
+Two premises turned out to be free: `post_fetch_cfg`'s fifth conjunct
+already carries `is_aligned_vaddr (Virtaddr va) 2 = true`, and `u_hw_pins`'
+misa pin gives `_get_Misa_C … = 'b"1"` by `vm_compute`.
+
+The shape all three use, decided against what `HartRunFull.run_fetch_post`
+actually consumes:
+
+```coq
+  exists (rsf' : regstate) (mm' : pamap) (t' : ptree) (fr : FetchResult),
+    exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+    <which constructor fr is> /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    u_mem_step P t t' mm mm'.
+```
+
+Exposing `fr` existentially with a constructor disjunct is simpler than
+`u_fetch_pure`'s `if isRVC … then F_RVC … else F_Base …`, and it is all the
+caller needs: `run_fetch_base` / `run_fetch_rvc` do not constrain the WORD,
+only the landing frame, and the decode fact is re-derived at the landing
+file by `UserTotalU.u_hval_base` / `u_hval_rvc`.  The "low half fetches,
+high half faults" case is a DISJUNCTION inside one lemma, not a third
+lemma — the model reads the second halfword only when the first is not
+compressed, so the compressed outcome is always live.
 
 ## 15. P4b IN PROGRESS — the memory arms, and the 5 700 lines that had to go
 

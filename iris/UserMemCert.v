@@ -966,39 +966,18 @@ Qed.
 (* The model splits a straddling access into two translate-and-access     *)
 (* steps ([UserMemMis] section g), so a composer must run the WALK TWICE,  *)
 (* at [va] and at the next page's base, and thread the two [u_mem_step]s   *)
-(* through each other.  Two things had to be added for that:               *)
+(* through each other.  The two things that takes are shared with the      *)
+(* 2-aligned straddling FETCH, so both live BELOW this file:               *)
 (*                                                                       *)
-(*  - [u_mem_step] TRANSITIVITY, which [UserBytes] does not have.  The     *)
-(*    only missing ingredient is transitivity of [pt_same_shape 2]; the    *)
-(*    other three conjuncts come from the second step alone.  (FOLD BACK   *)
-(*    into [UserBytes.v] beside [u_mem_step_refl].)                        *)
-(*                                                                       *)
-(*  - A COMPOSABLE landing fact.  The one-walk composers say the landing   *)
-(*    file is [rs] or ONE [register_set tlb], and that shape does NOT      *)
-(*    compose: collapsing [register_set tlb v2 (register_set tlb v1 rs)]   *)
-(*    to [register_set tlb v2 rs] is a pointwise equality of the record's  *)
-(*    field FUNCTION, i.e. it needs functional extensionality, which is an *)
-(*    axiom this development does not take.  [u_tlb_only] is what every    *)
-(*    consumer actually uses the disjunction FOR (transporting the ambient *)
-(*    pins by [irrelevant_register_set]), it is implied by it, and it is   *)
-(*    transitive.  Two-walk composers conclude [u_tlb_only], not the       *)
-(*    disjunction.                                                        *)
+(*  - [UserBytes.u_mem_step_trans] (on [pt_same_shape_trans]);             *)
+(*  - [UserClassifyAsm.u_tlb_only] and [u_exec_pins_only], the COMPOSABLE  *)
+(*    landing fact.  A one-walk composer says its landing file is [rs] or  *)
+(*    ONE [register_set tlb], and that shape does not compose: collapsing  *)
+(*    [register_set tlb v2 (register_set tlb v1 rs)] to                    *)
+(*    [register_set tlb v2 rs] is a pointwise equality of the record's     *)
+(*    field FUNCTION, i.e. functional extensionality, which this           *)
+(*    development does not assume.                                        *)
 (* ===================================================================== *)
-
-Definition u_tlb_only (rs rs' : regstate) : Prop :=
-  forall r : register, register_beq r (tlb : register) = false ->
-    register_lookup r rs' = register_lookup r rs.
-
-Lemma u_tlb_only_land (rs rs' : regstate) :
-  (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) -> u_tlb_only rs rs'.
-Proof. exact (u_tlb_irrel rs rs'). Qed.
-
-Lemma u_tlb_only_refl (rs : regstate) : u_tlb_only rs rs.
-Proof. intros r _. reflexivity. Qed.
-
-Lemma u_tlb_only_trans (rs rs1 rs2 : regstate) :
-  u_tlb_only rs rs1 -> u_tlb_only rs1 rs2 -> u_tlb_only rs rs2.
-Proof. intros H1 H2 r Hr. rewrite (H2 r Hr). exact (H1 r Hr). Qed.
 
 Lemma u_data_cfg_only (rs rs' : regstate) :
   u_tlb_only rs rs' -> u_data_cfg rs -> u_data_cfg rs'.
@@ -1009,58 +988,11 @@ Proof.
     | rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)); exact Lmenv ].
 Qed.
 
-Lemma u_exec_pins_only (P : uptd) (t t' : ptree) (rs rs' : regstate) :
-  u_tlb_only rs rs' ->
-  tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') ->
-  u_exec_pins P t rs -> u_exec_pins P t' rs'.
-Proof.
-  intros Tr Htlbok' (Hhw & Hcfgp & Hpt & _).
-  destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
-  destruct Hcfgp as (Hmst0 & Hsst0).
-  destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HX & HW & HR & Hcovp).
-  split_and!; [ | | | exact Htlbok' ].
-  - split_and!;
-      [ rewrite (Tr misa ltac:(vm_compute; reflexivity)); exact Hmisa
-      | rewrite (Tr mseccfg ltac:(vm_compute; reflexivity)); exact Hmseccfg
-      | rewrite (Tr senvcfg ltac:(vm_compute; reflexivity)); exact Hsenv
-      | rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif
-      | rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall
-      | rewrite (Tr elp ltac:(vm_compute; reflexivity)); exact Help ].
-  - split_and!;
-      [ rewrite (Tr mstateen0 ltac:(vm_compute; reflexivity)); exact Hmst0
-      | rewrite (Tr sstateen0 ltac:(vm_compute; reflexivity)); exact Hsst0 ].
-  - split_and!;
-      [ exists usatp; split;
-          [ exact Hsatpok
-          | rewrite (Tr satp ltac:(vm_compute; reflexivity)); exact Hsatp ]
-      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA
-      | rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord
-      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX
-      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW
-      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR
-      | rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp ].
-Qed.
+(* [u_exec_pins_only] moved to [UserClassifyAsm], beside [u_exec_pins]. *)
 
-Lemma pt_same_shape_trans (lvl : nat) (t1 t2 t3 : ptree) :
-  pt_same_shape lvl t1 t2 -> pt_same_shape lvl t2 t3 -> pt_same_shape lvl t1 t3.
-Proof.
-  revert t1 t2 t3. induction lvl as [| lvl IH]; intros t1 t2 t3 [Hb1 Hk1] [Hb2 Hk2].
-  - split; [ by rewrite Hb1 | exact I ].
-  - split; [ by rewrite Hb1 |]. intros i.
-    specialize (Hk1 i). specialize (Hk2 i).
-    destruct (pt_kids t1 i) as [c1|]; destruct (pt_kids t2 i) as [c2|];
-      destruct (pt_kids t3 i) as [c3|]; try contradiction; try exact I.
-    exact (IH c1 c2 c3 Hk1 Hk2).
-Qed.
-
-Lemma u_mem_step_trans (P : uptd) (t1 t2 t3 : ptree) (mm1 mm2 mm3 : pamap) :
-  u_mem_step P t1 t2 mm1 mm2 -> u_mem_step P t2 t3 mm2 mm3 ->
-  u_mem_step P t1 t3 mm1 mm3.
-Proof.
-  intros (Hs1 & _ & _) (Hs2 & Hspec & md & Hrest).
-  split_and!; [ exact (pt_same_shape_trans 2 t1 t2 t3 Hs1 Hs2) | exact Hspec |].
-  exists md. exact Hrest.
-Qed.
+(* [pt_same_shape_trans] and [u_mem_step_trans] moved to [UserBytes], beside
+   [pt_same_shape_refl] / [u_mem_step_refl] -- the 2-aligned straddling fetch
+   needs them and [UserFetchCert] is below this file. *)
 
 (* ===================================================================== *)
 (* 9. THE PAGE-STRADDLING LOAD AND STORE.                                 *)

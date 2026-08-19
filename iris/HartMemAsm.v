@@ -415,6 +415,52 @@ Proof.
      [ reflexivity | exfalso; exact (Hrb Hr) ]).
 Qed.
 
+(* THE SAME BRICK, KEYED ON THE READ'S OWN [exec] FACT.  [goodmb_read_ram]
+   asks for [read_bytes <> None]; every caller holds the read's [exec] fact
+   instead, and at a SYMBOLIC width the two are not interchangeable by hand --
+   [read_bytes]' value index is [8 * Z.to_N width] and the model's is
+   [MachineWord.Z_idx (8 * width)], the same number spelled two ways, and the
+   error prints two types that look identical.  Reading the non-[None] out of
+   the exec fact sidesteps the index entirely, so every width-generic reader
+   (the data loads, the 2- and 4-byte fetches) goes through these two. *)
+Lemma read_bytes_ne_of_exec_read_ram (rk : read_kind) (width : Z)
+    (addr : SailStdpp.Values.mword 64) (meta : bool)
+    (r : (SailStdpp.Values.mword (8 * width) * unit)%type) (s s' : mstate) :
+  rk_ram_ok rk = true ->
+  dev_addr addr = false ->
+  exec (read_ram rk (Physaddr addr) width meta) s = Some (r, s') ->
+  read_bytes s.(mem) addr (Z.to_N width) <> None.
+Proof.
+  intros Hrk Hdev He Hnone.
+  unfold read_ram in He. cbn match in He.
+  destruct rk; try discriminate Hrk;
+    (rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)) in He;
+     cbn beta zeta in He;
+     unfold Defs.sail_mem_read in He; cbn beta zeta in He;
+     unfold Defs.bind in He; cbn [Interface.iMon_bind] in He;
+     erewrite exec_MemRead in He; [ | exact Hdev ];
+     match type of He with
+     | context [ read_bytes ?m ?a ?n ] =>
+         replace (read_bytes m a n) with (@None (bv (8 * n))) in He
+           by (symmetry; exact Hnone)
+     end;
+     cbn match in He; discriminate He).
+Qed.
+
+Lemma goodmb_read_ram_of_exec (Dr Dw : register -> bool) (rk : read_kind)
+    (width : Z) (addr : SailStdpp.Values.mword 64) (meta : bool)
+    (r : (SailStdpp.Values.mword (8 * width) * unit)%type) (s s' : mstate) mm :
+  rk_ram_ok rk = true ->
+  dev_addr addr = false ->
+  bytes_owned mm addr (Z.to_N width) = true ->
+  exec (read_ram rk (Physaddr addr) width meta) s = Some (r, s') ->
+  goodmb Dr Dw (read_ram rk (Physaddr addr) width meta) s mm = true.
+Proof.
+  intros Hrk Hdev Hfp He.
+  exact (goodmb_read_ram Dr Dw rk width addr meta s mm Hrk Hdev Hfp
+           (read_bytes_ne_of_exec_read_ram rk width addr meta r s s' Hrk Hdev He)).
+Qed.
+
 Lemma goodmb_write_ram (Dr Dw : register -> bool) (wk : write_kind) (width : Z)
     (addr : SailStdpp.Values.mword 64)
     (data : SailStdpp.Values.mword (8 * width)) s mm :

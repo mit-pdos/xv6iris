@@ -73,51 +73,9 @@ Import Defs.
 (* their rebuild cone.  FOLD THEM BACK beside their exec twins at the      *)
 (* milestone.                                                             *)
 (* ===================================================================== *)
-(* --- 0. the RAM read brick, keyed on the EXEC fact.  [HartMemAsm.
-   goodmb_read_ram] asks for [read_bytes <> None]; every caller in this tier
-   holds the read's own [exec] fact instead, and at a SYMBOLIC width the two
-   are not interchangeable by hand -- [read_bytes]' value index is
-   [8 * Z.to_N k] while the model's is [MachineWord.Z_idx (8 * k)], the same
-   number spelled two ways.  Reading the non-[None] out of the exec fact
-   sidesteps the index entirely. --- *)
-Lemma read_bytes_ne_of_exec_read_ram (rk : read_kind) (width : Z)
-    (addr : SailStdpp.Values.mword 64) (meta : bool)
-    (r : (SailStdpp.Values.mword (8 * width) * unit)%type) (s s' : mstate) :
-  rk_ram_ok rk = true ->
-  dev_addr addr = false ->
-  exec (read_ram rk (Physaddr addr) width meta) s = Some (r, s') ->
-  read_bytes s.(mem) addr (Z.to_N width) <> None.
-Proof.
-  intros Hrk Hdev He Hnone.
-  unfold read_ram in He. cbn match in He.
-  destruct rk; try discriminate Hrk;
-    (rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)) in He;
-     cbn beta zeta in He;
-     unfold Defs.sail_mem_read in He; cbn beta zeta in He;
-     unfold Defs.bind in He; cbn [Interface.iMon_bind] in He;
-     erewrite exec_MemRead in He; [ | exact Hdev ];
-     match type of He with
-     | context [ read_bytes ?m ?a ?n ] =>
-         replace (read_bytes m a n) with (@None (bv (8 * n))) in He
-           by (symmetry; exact Hnone)
-     end;
-     cbn match in He; discriminate He).
-Qed.
-
-Lemma goodmb_read_ram_of_exec (Dr Dw : register -> bool) (rk : read_kind)
-    (width : Z) (addr : SailStdpp.Values.mword 64) (meta : bool)
-    (r : (SailStdpp.Values.mword (8 * width) * unit)%type) (s s' : mstate) mm :
-  rk_ram_ok rk = true ->
-  dev_addr addr = false ->
-  bytes_owned mm addr (Z.to_N width) = true ->
-  exec (read_ram rk (Physaddr addr) width meta) s = Some (r, s') ->
-  goodmb Dr Dw (read_ram rk (Physaddr addr) width meta) s mm = true.
-Proof.
-  intros Hrk Hdev Hfp He.
-  exact (goodmb_read_ram Dr Dw rk width addr meta s mm Hrk Hdev Hfp
-           (read_bytes_ne_of_exec_read_ram rk width addr meta r s s' Hrk Hdev He)).
-Qed.
-
+(* --- 0. the RAM read brick keyed on the EXEC fact ([read_bytes_ne_of_exec_read_ram] / [goodmb_read_ram_of_exec]) now lives in
+   [HartMemAsm], beside [goodmb_read_ram]: the width-generic FETCH reads
+   ([UserFetchCert] section 1) need it and that file is below this one. --- *)
 
 (* --- 0b. the privilege brick (twin of [UserPtTree.exec_effectivePrivilege_
    mprv0]; FOLD BACK beside it at the milestone) --- *)
