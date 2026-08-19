@@ -1478,3 +1478,71 @@ Proof.
   - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_ldepfree.
   - intros H. by apply lb_depfree_ldepfree, (pstep_disk_depfree _ _ _ _ _ H).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** THE RMW SPLIT (S2): THE PRE-SPLIT ALPHABET.  Every arm of the event
+    language pins [l] to one of the nine fused constructors; the split pair
+    is emitted by NOTHING here (its producers land at S3).  The scripts are
+    the [_ldepfree] ones verbatim — each pins the same constructor, and
+    [lb_fused] is [True] on all nine. *)
+
+Lemma pnode_step_fused m rs ib d l m' ors fn' d' oib :
+  pnode_step m rs ib d l m' ors fn' d' oib -> lb_fused l.
+Proof.
+  rewrite /pnode_step. destruct m as [y|T oc k].
+  { by intros (? & -> & _). }
+  destruct oc; simpl; try (by intros (-> & _));
+    try (intros (-> & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try done.
+  - (* MemRead *)
+    destruct (dev_addr _); [by intros (? & _ & -> & _)|].
+    intros (_ & [(_ & w & tvs & _ & _ & -> & _)
+                |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
+                  _ & _ & _ & _ & _ & _ & -> & _)]); done.
+  - (* MemWrite *)
+    destruct (dev_addr _); [by intros (_ & -> & _)|].
+    by intros (_ & -> & _).
+  - (* Barrier *) intros (-> & _). by destruct b.
+  - (* Choose *) by intros (ch & -> & _).
+Qed.
+
+Lemma pstep_node_fused cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_node cpu m rs fn ib d l m' ors fn' d' oib -> lb_fused l.
+Proof.
+  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
+  - by intros (-> & _).
+  - apply pnode_step_fused.
+Qed.
+
+Lemma pstep_plic_fused cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_plic cpu m rs fn ib d l m' ors fn' d' oib -> lb_fused l.
+Proof. rewrite /pstep_plic. by intros (-> & _). Qed.
+
+Lemma pstep_hart_fused cpu m rs fn ib d l m' ors fn' d' oib :
+  pstep_hart cpu m rs fn ib d l m' ors fn' d' oib -> lb_fused l.
+Proof.
+  intros [H|H]; [by eapply pstep_node_fused|by eapply pstep_plic_fused].
+Qed.
+
+Lemma pstep_disk_fused dp d l dp' d' : pstep_disk dp d l dp' d' -> lb_fused l.
+Proof.
+  rewrite /pstep_disk /pdisk_prog /pdisk_uart.
+  intros [[(_ & -> & _)
+          |[(pa & n & aq & k & tvs & _ & _ & -> & _)
+          |[(pa & bs & k & _ & _ & -> & _)
+          |[(k & _ & -> & _)
+          |[(dl & _ & -> & _)
+          |[(pg & _ & _ & -> & _)
+          |[(_ & -> & _)
+          |(p' & _ & _ & -> & _)]]]]]]]
+         |(_ & -> & _)]; exact I.
+Qed.
+
+Theorem pstep_ev_fused p d l p' d' : pstep_ev p d l p' d' -> lb_fused l.
+Proof.
+  rewrite /pstep_ev.
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
+    try (by intros []).
+  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_fused.
+  - intros H. by eapply pstep_disk_fused.
+Qed.

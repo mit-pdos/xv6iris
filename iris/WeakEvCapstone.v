@@ -218,15 +218,19 @@ Section pf_uniform.
       list — deviation D-8 — so the inversion needs to know the step emitted
       none THERE; everywhere else the lists are free.  At the instance the
       premise is [WeakEvInst.pstep_ev_ldepfree]. *)
+  (** THE RMW SPLIT (S2) GATE.  [pf_ok] still refutes the split pair (its
+      arms land with the event language, at S3/R3), so the inversion needs
+      to know the step did not emit one; at the instance the premise is
+      [WeakEvInst.pstep_ev_fused]. *)
   Lemma wp_pf_step_inv i l cfg c' :
-    lb_ldepfree l ->
+    lb_ldepfree l -> lb_fused l ->
     wp_pf_step pstep pcls i l cfg c' ->
     exists ag st' d', pc_ags cfg !! i = Some ag /\
       pstep (pa_st ag) (pc_dev cfg) l st' d' /\
       pf_ok cfg i ag l /\
       c' = pf_cfg cfg i ag l st' d'.
   Proof.
-    intros Hdf.
+    intros Hdf Hfu.
     destruct 1 as [cfg0 ag st' d' Hlk Hps
                   |cfg0 ag aq lat base tvs asrc st' d' Hlk Hps Hrd
                   |cfg0 ag rl base data asrc vsrc k st' d' Hlk Hps Hne Hk
@@ -235,7 +239,11 @@ Section pf_uniform.
                   |cfg0 ag pr pw sr sw st' d' Hlk Hps
                   |cfg0 ag st' d' Hlk Hps
                   |cfg0 ag rdw wsrc st' d' Hlk Hps|cfg0 ag csrc st' d' Hlk Hps
-                  |cfg0 ag st' d' Hlk Hps];
+                  |cfg0 ag st' d' Hlk Hps
+                  |cfg0 ag aq base tvs asrc st' d' Hlk Hps Hrd
+                  |cfg0 ag rl base data asrc vsrc k R st' d'
+                        Hlk Hps Hne Hres Hrb Hrlen Hex Hk];
+      [| | | | | | | | |by exfalso; exact Hfu|by exfalso; exact Hfu];
       simpl in Hdf;
       repeat (match goal with H : _ /\ _ |- _ => destruct H end); subst;
       do 3 eexists; split_and!; try done;
@@ -571,7 +579,9 @@ Proof.
   intros Hlive Hstep.
   have Hdf : lb_ldepfree l.
   { destruct Hstep; by eapply pstep_ev_ldepfree. }
-  apply (wp_pf_step_inv _ _ i l _ _ Hdf) in Hstep
+  have Hfu : lb_fused l.
+  { destruct Hstep; by eapply pstep_ev_fused. }
+  apply (wp_pf_step_inv _ _ i l _ _ Hdf Hfu) in Hstep
     as (ag & st' & d' & Hlk & Hps & Hok & ->).
   rewrite /ecfg_of /= in Hlk.
   destruct (eags_lookup_inv P σ i ag Hlk) as [(c & -> & ->)|(-> & ->)].
@@ -802,6 +812,7 @@ Qed.
 
 Lemma pstep_ev_lat_free_prog : lat_free_prog pstep_ev.
 Proof.
+  split; [|by intros p d l p' d' H; eapply pstep_ev_fused, H].
   intros p d aq base tvs asrc p' d' Hs.
   have Hdf : lb_ldepfree (LLoad aq true base tvs asrc)
     by eapply pstep_ev_ldepfree.

@@ -253,6 +253,44 @@ Section bridge.
       wp_pf_step i WeakPromise.LInstr cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (instr_post (pa_ws ag))
+                         (pa_prom ag)]> (pc_ags cfg)))
+  (** THE RMW SPLIT (S2), the pf forms.  [PFExLoad] is [PFLoad]'s arm at
+      [lat := false] plus the reservation; [PFExStore] is [PFStore]'s
+      APPEND-AT-TOP arm plus the reservation premises and the window
+      [excl_ok_ts], checked against the log AS IT STANDS — a dirty window
+      simply gives the arm no step, which IS the walker's
+      [update_PTE_Bits = None] semantics (design §4). *)
+  | PFExLoad cfg ag aq base tvs asrc st' d' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (pc_dev cfg)
+            (WeakPromise.LExLoad aq base tvs asrc) st' d' →
+      read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
+                (srcs_view (pa_ws ag) asrc) →
+      wp_pf_step i (WeakPromise.LExLoad aq base tvs asrc) cfg
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
+               (<[i := WPAgent st'
+                         (exload_post_run_d (pa_ws ag) aq
+                            (srcs_view (pa_ws ag) asrc) base (tvs.*1))
+                         (pa_prom ag)]> (pc_ags cfg)))
+  | PFExStore cfg ag rl base data asrc vsrc k R st' d' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (pc_dev cfg)
+            (WeakPromise.LExStore rl base data asrc vsrc) st' d' →
+      data ≠ [] →
+      w_res (pa_ws ag) = Some R →
+      rv_base R = base →
+      length (rv_ts R) = length data →
+      excl_ok_ts (pc_log cfg) i base (rv_ts R) (S (length (pc_log cfg))) →
+      k = pcls (pa_st ag) (WeakPromise.LExStore rl base data asrc vsrc)
+               (pa_ws ag) →
+      wp_pf_step i (WeakPromise.LExStore rl base data asrc vsrc) cfg
+        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
+               (<[i := WPAgent st'
+                         (store_post_run_d (pa_ws ag) rl
+                            (srcs_view (pa_ws ag) asrc)
+                            (srcs_view (pa_ws ag) vsrc)
+                            base (length data)
+                            (S (length (pc_log cfg))))
                          (pa_prom ag)]> (pc_ags cfg))).
 
   Definition wp_pf_run c c' : Prop := ∃ i l, wp_pf_step i l c c'.
@@ -274,7 +312,10 @@ Section bridge.
       |cfg ag aq rl base tvs data asrc vsrc k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps
       |cfg ag rd srcs st' d' Hlk Hps|cfg ag srcs st' d' Hlk Hps
-      |cfg ag st' d' Hlk Hps].
+      |cfg ag st' d' Hlk Hps
+      |cfg ag aq base tvs asrc st' d' Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc k R st' d'
+         Hlk Hps Hnn Hres Hrb Hrlen He Hk].
     - apply rtc_once. by eapply WPSilent.
     - apply rtc_once. by eapply WPLoad.
     - eapply wpstep_store_now; [done|done|done| |].
@@ -288,6 +329,11 @@ Section bridge.
     - apply rtc_once. by eapply WPRegW.
     - apply rtc_once. by eapply WPCtrl.
     - apply rtc_once. by eapply WPInstr.
+    (* THE RMW SPLIT (S2) *)
+    - apply rtc_once. by eapply WPExLoad.
+    - eapply wpstep_exstore_now; [done|done|done| | |done|done|done|done].
+      + by destruct (Hwf i ag Hlk).
+      + rewrite (Hnp i ag Hlk). apply not_elem_of_empty.
   Qed.
 
   Lemma no_promises_upd c i ag st' w (lg : list wmsg) (dv : D) :
@@ -513,7 +559,10 @@ Section bridge.
       |cfg ag aq rl base tvs data asrc vsrc k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps
       |cfg ag rd srcs st' d' Hlk Hps|cfg ag srcs st' d' Hlk Hps
-      |cfg ag st' d' Hlk Hps].
+      |cfg ag st' d' Hlk Hps
+      |cfg ag aq base tvs asrc st' d' Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc k R st' d'
+         Hlk Hps Hnn Hres Hrb Hrlen He Hk].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|reflexivity].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply load_post_run_d_le].
     - eapply (own_coh_append _ _ _ _ _ _ _ _ _ d');
@@ -527,6 +576,12 @@ Section bridge.
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply regw_post_le].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply ctrl_post_le].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply instr_post_le].
+    (* THE RMW SPLIT (S2): the two halves follow [PFLoad]'s / [PFStore]'s *)
+    - eapply (own_coh_upd _ _ _ _ _ _ d');
+        [done|done|apply exload_post_run_d_le].
+    - eapply (own_coh_append _ _ _ _ _ _ _ _ _ d');
+        [done|done|apply store_post_run_d_le|].
+      intros j Hj. by apply (store_post_run_d_coh _ rl _ _ base (length data) _ j).
   Qed.
 
   Lemma own_coh_run c c' : own_coh c → rtc wp_pf_run c c' → own_coh c'.
@@ -573,8 +628,16 @@ Section bridge.
       axiomatic side RVWMO's ppo 9–11 (deps design §3), which D2 does not
       do; the premise is discharged trivially by every instance in this
       tree, whose labels all carry empty operand lists. *)
+  (** LIFTED BY A2 (the erasure/re-fusion projection).  The [lb_fused]
+      premise is the RMW split's residue at this projection: the axiomatic
+      tier stays fused (design §2), so a split pair has no per-event image
+      and this step-local theorem cannot have an arm for it.  Re-fusing a
+      split run into a fused axiomatic execution is the A2 track's job, and
+      it is not a step-local simulation — hence a GATE here rather than a
+      forced case.  Every instance in this tree discharges the premise
+      today, since no producer emits [LExLoad]/[LExStore] yet. *)
   Lemma wp_pf_step_mstep i l c c' σ :
-    lb_depfree l →
+    lb_depfree l → lb_fused l →
     own_coh c → cfg_match c σ → wp_pf_step i l c c' →
     ∃ k,
     match proj_lbl k l with
@@ -582,7 +645,7 @@ Section bridge.
     | Some lb => ∃ σ', mstep σ i lb σ' ∧ cfg_match c' σ'
     end.
   Proof.
-    intros Hdf Hoc Hm Hstep. destruct σ as [img lg f].
+    intros Hdf Hfu Hoc Hm Hstep. destruct σ as [img lg f].
     destruct Hm as (Himg & Hlg & Hf). simpl in Himg, Hlg, Hf.
     destruct Hstep as
       [cfg ag st' d' Hlk Hps
@@ -591,7 +654,12 @@ Section bridge.
       |cfg ag aq rl base tvs data asrc vsrc k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps
       |cfg ag rd srcs st' d' Hlk Hps|cfg ag srcs st' d' Hlk Hps
-      |cfg ag st' d' Hlk Hps]; subst img lg;
+      |cfg ag st' d' Hlk Hps
+      |cfg ag aq base tvs asrc st' d' Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc k R st' d'
+         Hlk Hps Hnn Hres Hrb Hrlen He Hk];
+      (* the two split arms are excluded by [lb_fused] *)
+      [| | | | | | | | |exfalso; exact Hfu|exfalso; exact Hfu]; subst img lg;
       [exists WCplain| exists WCplain| exists k| exists k| exists WCplain
       | exists WCplain| exists WCplain| exists WCplain| exists WCplain];
       simpl in Hdf |- *;
@@ -639,15 +707,17 @@ Section bridge.
   Qed.
 
   (** Extending the execution by one pf step. *)
+  (** LIFTED BY A2 (the erasure/re-fusion projection): see
+      [wp_pf_step_mstep] for the [lb_fused] gate. *)
   Lemma bridge_step E i l c c' :
-    lb_depfree l →
+    lb_depfree l → lb_fused l →
     exec_wf E → cfg_match c (stt E (length (ex_tr E))) →
     own_coh c → wp_pf_step i l c c' →
     ∃ E', exec_wf E' ∧ ex_img E' = ex_img E ∧
           cfg_match c' (stt E' (length (ex_tr E'))).
   Proof.
-    intros Hdf HE Hm Hoc Hstep.
-    pose proof (wp_pf_step_mstep i l c c' _ Hdf Hoc Hm Hstep) as [k Hpr].
+    intros Hdf Hfu HE Hm Hoc Hstep.
+    pose proof (wp_pf_step_mstep i l c c' _ Hdf Hfu Hoc Hm Hstep) as [k Hpr].
     destruct (proj_lbl k l) as [lb|].
     - destruct Hpr as (σ' & Hms & Hm').
       exists (Exec (ex_st E ++ [σ']) (ex_tr E ++ [EStep i lb])).
@@ -673,17 +743,28 @@ Section bridge.
     pstep_depfree → wp_pf_step i l c c' → lb_depfree l.
   Proof. intros Hdf Hs. destruct Hs; by eapply Hdf. Qed.
 
+  (** LIFTED BY A2: the run-level twin of [lb_fused] — the program LTS emits
+      only pre-split labels. *)
+  Definition pstep_fused : Prop :=
+    ∀ p d l p' d', pstep p d l p' d' → lb_fused l.
+
+  Lemma wp_pf_step_lb_fused i l c c' :
+    pstep_fused → wp_pf_step i l c c' → lb_fused l.
+  Proof. intros Hfu Hs. destruct Hs; by eapply Hfu. Qed.
+
   Lemma bridge_run c c' :
-    pstep_depfree →
+    pstep_depfree → pstep_fused →
     rtc wp_pf_run c c' → own_coh c →
     ∀ E, exec_wf E → cfg_match c (stt E (length (ex_tr E))) →
     ∃ E', exec_wf E' ∧ ex_img E' = ex_img E ∧
           cfg_match c' (stt E' (length (ex_tr E'))).
   Proof.
-    intros Hpdf. induction 1 as [|x y z (i & l & Hs) _ IH]; intros Hoc E HE Hm.
+    intros Hpdf Hpfu.
+    induction 1 as [|x y z (i & l & Hs) _ IH]; intros Hoc E HE Hm.
     { by exists E. }
     destruct (bridge_step E i l x y
-                (wp_pf_step_lb_depfree i l x y Hpdf Hs) HE Hm Hoc Hs)
+                (wp_pf_step_lb_depfree i l x y Hpdf Hs)
+                (wp_pf_step_lb_fused i l x y Hpfu Hs) HE Hm Hoc Hs)
       as (E1 & HE1 & Himg1 & Hm1).
     destruct (IH (own_coh_step i l x y Hoc Hs) E1 HE1 Hm1)
       as (E2 & HE2 & Himg2 & Hm2).
@@ -697,30 +778,30 @@ Section bridge.
       second conjunct at the final index is literally [ex_log E = pc_log c],
       by definition of [ex_log].) *)
   Theorem wp_pf_bridge img d0 ps c :
-    pstep_depfree →
+    pstep_depfree → pstep_fused →
     rtc wp_pf_run (wp_init img d0 ps) c →
     ∃ E, exec_wf E ∧ ex_img E = img ∧
          cfg_match c (stt E (length (ex_tr E))).
   Proof.
-    intros Hpdf Hrun.
+    intros Hpdf Hpfu Hrun.
     set σ0 := MSt img [] (λ _ : agent, ws_init).
     have HE : exec_wf (Exec [σ0] []) by apply exec_nil.
     have Hm0 : cfg_match (wp_init img d0 ps) (stt (Exec [σ0] []) 0%nat).
     { split_and!; [done|done|].
       intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
       destruct (ps !! i) as [p|]; by simplify_eq/=. }
-    destruct (bridge_run _ _ Hpdf Hrun (own_coh_init img d0 ps)
+    destruct (bridge_run _ _ Hpdf Hpfu Hrun (own_coh_init img d0 ps)
                 (Exec [σ0] []) HE Hm0) as (E & HE' & Himg & Hm).
     exists E. by split_and!.
   Qed.
 
   Corollary wp_pf_bridge_log img d0 ps c :
-    pstep_depfree →
+    pstep_depfree → pstep_fused →
     rtc wp_pf_run (wp_init img d0 ps) c →
     ∃ E, exec_wf E ∧ ex_img E = img ∧ ex_log E = pc_log c.
   Proof.
-    intros Hpdf Hrun.
-    destruct (wp_pf_bridge img d0 ps c Hpdf Hrun) as (E & ? & ? & Hm).
+    intros Hpdf Hpfu Hrun.
+    destruct (wp_pf_bridge img d0 ps c Hpdf Hpfu Hrun) as (E & ? & ? & Hm).
     exists E. split_and!; [done|done|]. by apply cfg_match_log.
   Qed.
 

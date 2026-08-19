@@ -455,7 +455,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps
     |cfg ag rdw wsrc st' Hlk Hps|cfg ag csrc st' Hlk Hps
-    |cfg ag st' Hlk Hps]; try done;
+    |cfg ag st' Hlk Hps
+    |cfg ag aq base tvs asrc st' Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st'
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc]; try done;
     by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx.
 Qed.
 
@@ -478,7 +481,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps
     |cfg ag rdw wsrc st' Hlk Hps|cfg ag csrc st' Hlk Hps
-    |cfg ag st' Hlk Hps];
+    |cfg ag st' Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     [ by eapply PFSilent, pstep_ni_xv6_step
     | by eapply PFLoad; [done|apply pstep_ni_xv6_step|done]
     | by eapply PFStore; [done|apply pstep_ni_xv6_step|done|done]
@@ -487,7 +493,12 @@ Proof.
     | by eapply PFDev, pstep_ni_xv6_step
     | by eapply PFRegW, pstep_ni_xv6_step
     | by eapply PFCtrl, pstep_ni_xv6_step
-    | by eapply PFInstr, pstep_ni_xv6_step ].
+    | by eapply PFInstr, pstep_ni_xv6_step
+    (* THE RMW SPLIT (S2) *)
+    | by eapply PFExLoad; [exact Hlk|apply pstep_ni_xv6_step, Hps|exact Hr]
+    | by eapply PFExStore;
+        [exact Hlk|apply pstep_ni_xv6_step, Hps|exact Hne|exact Hres
+        |exact Hrb|exact Hrlen|exact He|exact Hkc] ].
 Qed.
 
 Lemma pf_xsolo_rtc_run next i c c' :
@@ -524,7 +535,10 @@ Section lift.
       |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
       |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
       |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-      |cfg ag st' dd Hlk Hps]; destruct dd;
+      |cfg ag st' dd Hlk Hps
+      |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk R st' dd
+         Hlk Hps Hne Hres Hrb Hrlen He Hkc]; destruct dd;
       simpl in Has, Himg, Hlog; rewrite Hlk in Has; injection Has as <-.
     - (* silent *)
       exists (WPCfgU (pc_img c) (pc_log c)
@@ -695,6 +709,56 @@ Section lift.
           [exact (lookup_insert_self _ _ _ _ Hax)
           |exact (lookup_insert_self _ _ _ _ Hlk)|done|by rewrite /= Hws
           |exact Hpr].
+      + intros j Hj. simpl. by apply lookup_insert_other.
+    (* THE RMW SPLIT (S2): the exclusive read follows the load's arm, the
+       conditional write the store's *)
+    - have Hr' : read_ok_d (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
+                   (srcs_view (pa_ws agx) asrc)
+        by rewrite Himg Hlog Hws.
+      exists (WPCfgU (pc_img c) (pc_log c)
+               (<[i := WPAgent (PHart st')
+                         (exload_post_run_d (pa_ws agx) aq
+                            (srcs_view (pa_ws agx) asrc) base tvs.*1)
+                         (pa_prom agx)]> (pc_ags c))).
+      split_and!.
+      + apply (PFExLoad (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx aq
+                 base tvs asrc (PHart st') tt
+                 Hax); [rewrite Hst /=; exact Hps|exact Hr'].
+      + by apply xcls_canon_nolog.
+      + exact I.
+      + split_and!; [exact Himg|exact Hlog|].
+        eexists _, _. split_and!;
+          [exact (lookup_insert_self _ _ _ _ Hax)
+          |exact (lookup_insert_self _ _ _ _ Hlk)|done|by rewrite /= Hws|exact Hpr].
+      + intros j Hj. simpl. by apply lookup_insert_other.
+    - have Hkk : kk = lbl_class (WeakPromise.LExStore rl base data asrc vsrc)
+                        (pa_ws ag)
+        by exact (Hcls ag (WMsg base data (Some i) kk) Hlk eq_refl).
+      have Hres' : w_res (pa_ws agx) = Some R by rewrite Hws.
+      have He' : excl_ok_ts (pc_log c) i base (rv_ts R)
+                   (S (length (pc_log c))) by rewrite Hlog.
+      exists (WPCfgU (pc_img c) (pc_log c ++ [WMsg base data (Some i) kk])
+               (<[i := WPAgent (PHart st')
+                         (store_post_run_d (pa_ws agx) rl
+                            (srcs_view (pa_ws agx) asrc)
+                            (srcs_view (pa_ws agx) vsrc)
+                            base (length data)
+                            (S (length (pc_log c)))) (pa_prom agx)]>
+                  (pc_ags c))).
+      split_and!.
+      + apply (PFExStore (pstep_unit (pstep_ni_xv6 next)) lbl_class_p i c agx
+                 rl base data asrc vsrc kk R (PHart st') tt Hax);
+          [rewrite Hst /=; exact Hps|exact Hne|exact Hres'|exact Hrb
+          |exact Hrlen|exact He'|by rewrite Hws].
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        apply app_inv_head in Heq. injection Heq as <-.
+        rewrite Hax in Hag2. injection Hag2 as <-. by rewrite Hws.
+      + exact I.
+      + split_and!; [exact Himg|by rewrite /= Hlog|].
+        eexists _, _. split_and!;
+          [exact (lookup_insert_self _ _ _ _ Hax)
+          |exact (lookup_insert_self _ _ _ _ Hlk)|done
+          |by rewrite /= Hws Hlog|exact Hpr].
       + intros j Hj. simpl. by apply lookup_insert_other.
   Qed.
 
@@ -1438,7 +1502,10 @@ Proof.
     |cfg ag0 pr0 pw0 sr0 sw0 st' dd Hlk0 Hps
     |cfg ag0 st' dd Hlk0 Hps
     |cfg ag0 rdw0 wsrc0 st' dd Hlk0 Hps|cfg ag0 csrc0 st' dd Hlk0 Hps
-    |cfg ag0 st' dd Hlk0 Hps]; try exact I.
+    |cfg ag0 st' dd Hlk0 Hps
+    |cfg ag0 aq0 base0 tvs0 asrc0 st' dd Hlk0 Hps Hr
+    |cfg ag0 rl0 base0 data0 asrc0 vsrc0 kk R st' dd
+         Hlk0 Hps Hne Hres Hrb Hrlen He Hkc]; try exact I.
   simpl. intros ag Hlk. rewrite Hlk0 in Hlk. injection Hlk as <-.
   have Hlat := pf_rmw_latest cfg i ag0 aq0 base0 tvs0 (srcs_view (pa_ws ag0) asrc0) Hoc Hlk0 Hr He.
   intros j t v Htv. destruct (Hr j t v Htv) as (H1 & H2 & _).
@@ -1821,7 +1888,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' Hlk Hps|cfg ag st' Hlk Hps
     |cfg ag rdw wsrc st' Hlk Hps|cfg ag csrc st' Hlk Hps
-    |cfg ag st' Hlk Hps]; by exists ag.
+    |cfg ag st' Hlk Hps
+    |cfg ag aq base tvs asrc st' Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st'
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc]; by exists ag.
 Qed.
 
 (** THE BISIMULATION for a solo step: same label, same log growth, same
@@ -2127,7 +2197,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps]; destruct dd;
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc]; destruct dd;
     destruct (pstep_xv6_ni_or_irq next (pa_st ag) _ st' Hps)
       as [Hni|(q & q' & Hq & Hq' & Hf & Hirq)];
     try (by left; econstructor; eauto);
@@ -2361,7 +2434,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dv Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps
     |cfg ag rdw wsrc st' dv Hlk Hps|cfg ag csrc st' dv Hlk Hps
-    |cfg ag st' dv Hlk Hps];
+    |cfg ag st' dv Hlk Hps
+    |cfg ag aq base tvs asrc st' dv Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dv
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     intros j agj dd pend Hlkj Hstj; simpl in Hlkj;
     (destruct (decide (j = i)) as [->|Hne2];
      [rewrite (lookup_insert_self _ _ _ _ Hlk) in Hlkj;
@@ -2423,7 +2499,10 @@ Proof.
     |cfg ag0 aq rl base tvs data asrc vsrc kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps
     |cfg ag0 rdw wsrc st' dv Hlk0 Hps|cfg ag0 csrc st' dv Hlk0 Hps
-    |cfg ag0 st' dv Hlk0 Hps];
+    |cfg ag0 st' dv Hlk0 Hps
+    |cfg ag0 aq base tvs asrc st' dv Hlk0 Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk R st' dv
+       Hlk0 Hps Hne Hres Hrb Hrlen He Hkc];
     rewrite Hlk' in Hlk0; injection Hlk0 as <-;
     (have Hpsx := pstep_ni_xv6_step _ _ _ _ Hps; rewrite Hst' in Hpsx);
     try (by destruct (pstep_xv6_disk_lbl riscv_step dd' pend _ _ Hpsx)
@@ -2557,7 +2636,10 @@ Proof.
     |cfg ag0 aq rl base tvs data asrc vsrc kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps
     |cfg ag0 rdw wsrc st' dv Hlk0 Hps|cfg ag0 csrc st' dv Hlk0 Hps
-    |cfg ag0 st' dv Hlk0 Hps];
+    |cfg ag0 st' dv Hlk0 Hps
+    |cfg ag0 aq base tvs asrc st' dv Hlk0 Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk R st' dv
+       Hlk0 Hps Hne Hres Hrb Hrlen He Hkc];
     rewrite Hlk in Hlk0; injection Hlk0 as <-;
     (have Hpsx := pstep_ni_xv6_step _ _ _ _ Hps; rewrite Hst in Hpsx);
     try (by destruct (pstep_xv6_disk_lbl riscv_step dd [] _ _ Hpsx)
@@ -2907,7 +2989,10 @@ Section package.
       |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
       |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
       |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-      |cfg ag st' dd Hlk Hps]; destruct dd; try done;
+      |cfg ag st' dd Hlk Hps
+      |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk R st' dd
+         Hlk Hps Hne HresX HrbX HrlenX HeX HkcX]; destruct dd; try done;
       by destruct (app_snoc_absurd _ _ Hlog).
   Qed.
 
@@ -2923,7 +3008,10 @@ Section package.
       |cfg ag0 aq rl base tvs data asrc vsrc kk st' dv Hlk0 Hps Hne Hlen Hr He Hkc
       |cfg ag0 pr pw sr sw st' dv Hlk0 Hps|cfg ag0 st' dv Hlk0 Hps
       |cfg ag0 rdw wsrc st' dv Hlk0 Hps|cfg ag0 csrc st' dv Hlk0 Hps
-      |cfg ag0 st' dv Hlk0 Hps];
+      |cfg ag0 st' dv Hlk0 Hps
+      |cfg ag0 aq base tvs asrc st' dv Hlk0 Hps Hr
+      |cfg ag0 rl base data asrc vsrc kk R st' dv
+         Hlk0 Hps Hne Hres2 Hrb2 Hrlen2 He2 Hkc2];
       rewrite Hlk0 in Hlk; injection Hlk as <-; by exists st'.
   Qed.
 
@@ -2977,13 +3065,18 @@ Section package.
            by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)
           |by destruct Hok as (_ & Hc)|by destruct Hok as (_ & Hc)
           |by destruct Hok as (_ & Hc)
-          (* THE RMW SPLIT (S1): no machine arm, so [astep_ok] is [False] *)
-          |done|done].
+          (* THE RMW SPLIT (S2): the exclusive read fulfils nothing; the
+             conditional write is [LStore]'s arm *)
+          |by destruct Hok as (_ & _ & Hc)| ].
         - destruct Hok as (ts' & kc & _ & Hlog0 & _ & _ & Hts').
           injection Hts' as <-. exists (WMsg base data (Some e.1) kc).
           split; [exact Hlog0|by rewrite /msg_at Hlog0].
         - destruct Hok as (ts' & kc & _ & _ & Hlog0 & _ & _ & _ & _ & Hts').
           injection Hts' as <-. exists (WMsg base data (Some e.1) kc).
+          split; [exact Hlog0|by rewrite /msg_at Hlog0].
+        - destruct Hok
+            as (ts' & kc & R & _ & Hlog0 & _ & _ & _ & _ & _ & _ & Hts').
+          injection Hts' as <-. exists (WMsg ybase ydata (Some e.1) kc).
           split; [exact Hlog0|by rewrite /msg_at Hlog0]. }
       destruct Hm as (m0 & Hlog0 & Hmsg). rewrite Hmsg.
       rewrite (Hcls e.1 T e.2 ev ag1 ts m0 HT Hev Hag1 Haets Hlog0).

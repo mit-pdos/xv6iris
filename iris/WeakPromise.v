@@ -207,6 +207,25 @@ Definition lb_ldepfree (l : wlabel) : Prop :=
 Lemma lb_depfree_ldepfree l : lb_depfree l → lb_ldepfree l.
 Proof. destruct l; simpl; by try (intros ->). Qed.
 
+(** THE FUSED FRAGMENT OF THE LABEL ALPHABET (RMW split S2).
+
+    The nine PRE-SPLIT constructors — the alphabet in which an exclusive
+    access is ONE event ([LRmw]).  It is used as a premise in one place
+    only: the AXIOMATIC PROJECTION ([WeakPromiseBridge] part (D)), whose
+    target [WeakAxiomatic.lbl] is deliberately still fused (design §2:
+    its [LRmw] carries [rmw_latest], strictly stronger than [excl_ok], and
+    its [mstate] has no per-agent scratch for a two-step reservation).  A
+    split pair therefore has no PER-EVENT axiomatic image: the projection
+    of a split run is an ERASURE-then-RE-FUSION, which is the A2 track's
+    subject and NOT a step-local simulation.  Every instance in this tree
+    satisfies the premise today (no producer emits the split labels). *)
+Definition lb_fused (l : wlabel) : Prop :=
+  match l with
+  | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
+  | LFence _ _ _ _ | LDev | LRegW _ _ | LCtrl _ | LInstr => True
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
+  end.
+
 (* ------------------------------------------------------------------ *)
 (** ** Per-agent state and configurations *)
 
@@ -602,7 +621,61 @@ Section machine.
       wpstep cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (instr_post (pa_ws ag))
-                         (pa_prom ag)]> (pc_ags cfg))).
+                         (pa_prom ag)]> (pc_ags cfg)))
+  (** THE RMW SPLIT (S2), the two halves.
+
+      [WPExLoad] is [WPLoad]'s arm at [lat := false] — the exclusive read
+      is never latest-indexed (design §2) — plus the agent-local
+      reservation, which [exload_post_run_d] writes SUPERSEDING whatever
+      [w_res] held.  It is a STATE step: no log, no promise set. *)
+  | WPExLoad cfg i ag aq base tvs asrc st' d' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (pc_dev cfg) (LExLoad aq base tvs asrc) st' d' →
+      read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
+                (srcs_view (pa_ws ag) asrc) →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
+               (<[i := WPAgent st'
+                         (exload_post_run_d (pa_ws ag) aq
+                            (srcs_view (pa_ws ag) asrc) base (tvs.*1))
+                         (pa_prom ag)]> (pc_ags cfg)))
+  (** [WPExStore] is [WPFulfil]'s arm plus the RESERVATION (design §4):
+
+      - the agent MUST hold a matching reservation ([w_res = Some R] with
+        [rv_base R = base] and the widths agreeing).  There is NO
+        plain-store fallback: a partnerless conditional write has no arm at
+        all, which is sound because the promising machine carries no
+        totality obligation and the model never produces the case.
+      - the ATOMICITY WINDOW moves here: [excl_ok_ts] checks, per byte,
+        that no OTHER agent wrote between the reservation's timestamp and
+        [ts].  The clear-on-own-store rule (see [store_post_d]) is what
+        rules out the SAME agent's intervening writes.
+      - EXT gains [rv_view R], the read half's banked post-view — deviation
+        D-2, PARM's [Exbank.view] contribution, which the fused [WPRmw]
+        supplied as [ldv_of].
+      - the fulfil CLEARS the reservation; that is already what
+        [store_post_run_d] does (per byte, in [store_post_d]). *)
+  | WPExStore cfg i ag rl base data asrc vsrc k ts R st' d' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (pc_dev cfg) (LExStore rl base data asrc vsrc) st' d' →
+      ts ∈ pa_prom ag →
+      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i) k) →
+      w_res (pa_ws ag) = Some R →
+      rv_base R = base →
+      length (rv_ts R) = length data →
+      excl_ok_ts (pc_log cfg) i base (rv_ts R) ts →
+      fulfil_ok_d (pa_ws ag) rl base (length data) ts
+                  (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                                    (srcs_view (pa_ws ag) vsrc))
+                           (rv_view R)) →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
+               (<[i := WPAgent st'
+                         (store_post_run_d (pa_ws ag) rl
+                            (srcs_view (pa_ws ag) asrc)
+                            (srcs_view (pa_ws ag) vsrc)
+                            base (length data) ts)
+                         (pa_prom ag ∖ {[ts]})]> (pc_ags cfg))).
 
   (* ---------------------------------------------------------------- *)
   (** ** Initial configurations and behaviors *)
@@ -778,6 +851,28 @@ Section machine.
         destruct (Hwf i ag) as [Hb Hp]; [done|]. split; [|done].
         by apply instr_post_bounded.
       + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* THE RMW SPLIT (S2): exclusive load — [WPLoad]'s arm through
+         [exload_post_run_d_bounded], whose extra obligation is the
+         reservation's own boundedness (the same [Forall] on [tvs.*1]). *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|]. split; [|done].
+        apply exload_post_run_d_bounded;
+          [done|by apply srcs_view_bounded|by eapply read_ok_d_ts_bounded].
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* THE RMW SPLIT (S2): conditional write — [WPFulfil]'s arm verbatim *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|].
+        destruct (Hp ts) as (?&?&_); [done|]. split.
+        { eapply store_post_run_d_bounded; [done|lia|lia| |];
+            by apply srcs_view_bounded. }
+        intros ts' Hts'. simpl in Hts'. apply Hp. set_solver.
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
   Qed.
 
   Lemma cfg_wf_reach cfg cfg' :
@@ -949,6 +1044,83 @@ Section machine.
     have Hprom : ({[ts]} ∪ pa_prom ag) ∖ {[ts]} = pa_prom ag by set_solver.
     rewrite Hprom list_insert_insert in Hrmw.
     exact Hrmw.
+  Qed.
+
+  (** THE RMW SPLIT (S2): [wpstep_rmw_now]'s successor.  The conditional
+      write's fused form — promise at the fresh top, fulfil immediately.
+      Where the rmw lemma carried the read half's [read_ok]/[excl_ok] as
+      premises (the fused label had both halves), this one carries the
+      RESERVATION the earlier [WPExLoad] left, and its window premise is
+      already in the reservation's vocabulary. *)
+  Lemma wpstep_exstore_now cfg i ag rl base data asrc vsrc k R st' d' :
+    pc_ags cfg !! i = Some ag →
+    pstep (pa_st ag) (pc_dev cfg) (LExStore rl base data asrc vsrc) st' d' →
+    data ≠ [] →
+    ws_bounded (pa_ws ag) (length (pc_log cfg)) →
+    S (length (pc_log cfg)) ∉ pa_prom ag →
+    w_res (pa_ws ag) = Some R →
+    rv_base R = base →
+    length (rv_ts R) = length data →
+    excl_ok_ts (pc_log cfg) i base (rv_ts R) (S (length (pc_log cfg))) →
+    rtc wpstep cfg
+      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+             d'
+             (<[i := WPAgent st'
+                       (store_post_run_d (pa_ws ag) rl
+                          (srcs_view (pa_ws ag) asrc)
+                          (srcs_view (pa_ws ag) vsrc)
+                          base (length data)
+                          (S (length (pc_log cfg))))
+                       (pa_prom ag)]> (pc_ags cfg))).
+  Proof.
+    intros Hlk Hps Hnn Hb Hfresh Hres Hrb Hrlen He.
+    have Hva : (srcs_view (pa_ws ag) asrc ≤ length (pc_log cfg))%nat
+      by apply srcs_view_bounded.
+    have Hvd : (srcs_view (pa_ws ag) vsrc ≤ length (pc_log cfg))%nat
+      by apply srcs_view_bounded.
+    have Hrv : (rv_view R ≤ length (pc_log cfg))%nat.
+    { destruct (ws_bounded_res _ _ Hb R Hres) as [_ ?]. done. }
+    pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
+    set ts := S (length (pc_log cfg)).
+    eapply rtc_l.
+    { by eapply (WPPromise cfg i ag base data k). }
+    set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+                 (pc_dev cfg)
+                 (<[i := WPAgent (pa_st ag) (pa_ws ag)
+                           ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
+    eapply rtc_l; [|apply rtc_refl].
+    have Hmidlk : pc_ags mid !! i
+                  = Some (WPAgent (pa_st ag) (pa_ws ag) ({[ts]} ∪ pa_prom ag)).
+    { rewrite /mid /= list_lookup_insert //. }
+    have Hmsg : pc_log mid !! (ts - 1)%nat
+                = Some (WMsg base data (Some i) k).
+    { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
+    (* the window survives the append: it ends at the OLD top *)
+    have He' : excl_ok_ts (pc_log mid) i base (rv_ts R) ts.
+    { rewrite /mid /=. eapply excl_ok_ts_app; [rewrite /ts; lia|done]. }
+    have Hok : fulfil_ok_d (pa_ws ag) rl base (length data) ts
+                 (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                                   (srcs_view (pa_ws ag) vsrc))
+                          (rv_view R)).
+    { split.
+      - intros j Hj. destruct Hb as (_&_&_&_&_&_&Hcoh&_).
+        pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
+      - have Hvdb : (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                                      (srcs_view (pa_ws ag) vsrc))
+                             (rv_view R)
+                     ≤ length (pc_log cfg))%nat by lia.
+        pose proof (fulfil_vpre_d_bounded _ rl _ _ Hb Hvdb).
+        rewrite /ts. lia. }
+    have Hpd : pstep (pa_st ag) (pc_dev mid)
+                 (LExStore rl base data asrc vsrc) st' d'
+      by rewrite /mid /=.
+    pose proof (WPExStore mid i _ rl base data asrc vsrc k ts R st' d'
+                  Hmidlk Hpd ltac:(set_solver) Hmsg Hres Hrb Hrlen He' Hok)
+      as Hex.
+    rewrite /mid /= in Hex.
+    have Hprom : ({[ts]} ∪ pa_prom ag) ∖ {[ts]} = pa_prom ag by set_solver.
+    rewrite Hprom list_insert_insert in Hex.
+    exact Hex.
   Qed.
 
   (** A promise-free step never leaves promises behind: [wpstep_store_now]

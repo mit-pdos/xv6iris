@@ -792,11 +792,19 @@ Definition load_post_at (ws : wstate) (aq : bool) (vpre : nat) (a : Z) (t : nat)
         instruction start, so nothing accumulates across instructions, and
         [ldv_of] below computes it from a zeroed bank for the RMW. *)
      w_ldv   := Nat.max (w_ldv ws) vpost;
-     (* INERT in slice S1 (RMW split): the exclusive read's arm will set
-        [w_res] at the RUN level ([load_post_run_d]'s wrapper), never per
-        byte, so the per-byte fold passes both new fields through. *)
+     (* THE RMW SPLIT (S2): the exclusive read's arm sets [w_res] at the RUN
+        level ([exload_post_run_d]), never per byte, so the fold passes it
+        through. *)
      w_res   := w_res ws;
-     w_tbank := w_tbank ws |}.
+     (* W-TV, THE TRANSLATION BANK (W2b condition 2).  Every read byte BANKS
+        its own contribution, and the contribution is [fwd_view] — the
+        forwarded timestamp — NOT the byte's post-view [vpost]: [vpost]
+        carries [vpre], hence [w_vrNew], and joining that into the next
+        access's [w_vcap] would drag a fence floor into every fulfil's EXT
+        (the audit's [wtv_ldv_leaks_vrNew] probe, which is also why the bank
+        is NOT [w_ldv]).  The bank is CONSUMED at the next access node's
+        [ctrl_post] and RESET by [instr_post]. *)
+     w_tbank := Nat.max (w_tbank ws) (fwd_view ws aq a t) |}.
 
 Definition load_post (ws : wstate) (aq : bool) (a : Z) (t : nat) : wstate :=
   load_post_at ws aq (load_vpre ws aq) a t.
@@ -841,9 +849,17 @@ Definition store_post_d (ws : wstate) (rl : bool) (vf : nat)
      w_regv  := w_regv ws;
      w_vcap  := w_vcap ws;
      w_ldv   := w_ldv ws;
-     (* INERT in slice S1: the conditional write's arm clears [w_res] at the
-        RUN level, not per byte. *)
-     w_res   := w_res ws;
+     (* THE RMW SPLIT (S2).  A STORE CLEARS THE AGENT'S OWN RESERVATION
+        (design §3, the clear-on-own-store rule): a same-agent store to the
+        byte between an exclusive read and its conditional write must make
+        [w_res = Some R] at the write REFUTE that case, which is what turns
+        the L2 no-store window into a theorem.  It is done PER BYTE rather
+        than once per run so that every generic fold lemma — and every
+        consumer that unfolds [store_post_bytes] — keeps its shape; the two
+        agree on every access the machine can take, since a message in the
+        log always has [data ≠ []] ([WPPromise]).
+        [w_tbank] rides through: a store BANKS nothing (W-TV banks reads). *)
+     w_res   := None;
      w_tbank := w_tbank ws |}.
 
 Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
@@ -860,7 +876,8 @@ Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
      w_regv  := w_regv ws;
      w_vcap  := w_vcap ws;
      w_ldv   := w_ldv ws;
-     w_res   := w_res ws;
+     (* THE RMW SPLIT (S2): see [store_post_d]. *)
+     w_res   := None;
      w_tbank := w_tbank ws |}.
 
 Lemma store_post_d_0 ws rl a t :
@@ -938,9 +955,13 @@ Definition instr_post (ws : wstate) : wstate :=
      w_pub   := w_pub ws;   w_relp  := w_relp ws;
      w_regv  := w_regv ws;  w_vcap  := w_vcap ws;
      w_ldv   := 0%nat;
-     (* INERT in slice S1.  In S2 this becomes [w_res := None] — instruction
-        start is the reservation's GC point (RMW split §3). *)
-     w_res   := w_res ws;   w_tbank := w_tbank ws |}.
+     (* THE RMW SPLIT (S2) + W-TV.  Instruction start is BOTH the
+        reservation's GC point (RMW split §3: an [LExLoad] and its
+        conditional write live in one instruction, so a reservation that
+        crosses a boundary is dead) AND the translation bank's reset (W2b
+        condition 1: without it the next instruction's fetch would consume
+        this instruction's data-read views). *)
+     w_res   := None;       w_tbank := 0%nat |}.
 
 Lemma regv_regw_post_eq ws rd v : regv (regw_post ws rd v) rd = v.
 Proof. rewrite /regv /regw_post /= lookup_insert //. Qed.
@@ -986,7 +1007,33 @@ Definition load_run_ats (base : Z) (ts : list nat) : list (Z * nat) :=
 
 (** THE RUN-LEVEL READ.  [ctrl_post … vaddr] is PARM's [vcap ⊔= view(addr)],
     applied ONCE per access rather than per byte (per-byte would be the same
-    join, but hoisting it keeps every per-byte lemma dependency-free). *)
+    join, but hoisting it keeps every per-byte lemma dependency-free).
+
+    W-TV, THE CONSUMPTION SIDE, IS *NOT* HERE YET — AND IT IS NOT A ONE-LINE
+    EDIT (finding of the RMW split's R2 pass; the W2b/W3 worklist entry
+    should carry it).  [w_tbank] is PRODUCED by [load_post_at] and RESET by
+    [instr_post]; what is owed is the join into the access node's [w_vcap],
+    i.e. this [ctrl_post]'s argument becoming [Nat.max vaddr (w_tbank ws)]
+    (and the same in [store_post_run_d]).  Three things move in lockstep
+    with it, none optional:
+
+    1. [load_post_run_d_0] / [store_post_run_d_0] — the dependency-free
+       names are the [_d] ones AT ZERO, and a [w_tbank] that lives only in
+       the [_d] wrapper breaks that equation at ~20 call sites
+       ([WeakSailLTS]'s [pf_load]/[pf_store]/[pf_rmw], [WeakSailComplete],
+       [WeakSailLTS2], [WeakEvCapstone], [WeakPromiseBridge]).  Keeping it
+       means the NON-[_d] names take the bank too — which drags the
+       AXIOMATIC tier ([WeakAxiomatic.mstep] steps with [load_post_run]) and
+       the toy-language projection ([WeakLitmusProj.lcfg_match], via
+       [load_post_run_single]) with it.
+    2. [WeakPromiseBridge.cfg_match] demands per-agent [wstate] EQUALITY
+       with the axiomatic tier, so any [w_vcap] raise the promising machine
+       gains must be matched there (or [cfg_match] must stop looking at
+       [w_vcap]).
+    3. [WeakRobustProv]'s [lstate] mirror has a [w_vcap] conjunct in [lrel]
+       but no [l_tbank]; the bank has to be mirrored (leaf list + [lrel]
+       conjunct + banking in [lload_post_at] + reset in [linstr_post])
+       before [lrel_load_post_run_d] can be re-proved. *)
 Definition load_post_run_d (ws : wstate) (aq : bool) (vaddr : nat) (base : Z)
     (ts : list nat) : wstate :=
   ctrl_post (load_post_bytes_d ws aq vaddr (load_run_ats base ts)) vaddr.
@@ -1033,6 +1080,88 @@ Definition ws_ldv0 (ws : wstate) : wstate := instr_post ws.
 Definition ldv_of (ws : wstate) (aq : bool) (vaddr : nat) (base : Z)
     (ts : list nat) : nat :=
   w_ldv (load_post_run_d (ws_ldv0 ws) aq vaddr base ts).
+
+(* ------------------------------------------------------------------ *)
+(** ** THE EXCLUSIVE READ'S POST-STATE (RMW split S2, design §3/§4)
+
+    [LExLoad]'s read semantics are [LLoad]'s at [lat = false] — literally
+    [load_post_run_d] at the same arguments — PLUS the agent-local
+    reservation.  Nothing else about the load changes, which is what makes
+    every fold/monotonicity/boundedness fact about [load_post_run_d]
+    available here through one record-update wrapper.
+
+    THE RESERVATION SUPERSEDES: an exclusive read overwrites whatever
+    [w_res] held (design §3's "superseding" row), it does not join. *)
+Definition ws_res_set (ws : wstate) (r : option wresv) : wstate :=
+  {| w_coh   := w_coh ws;
+     w_vrOld := w_vrOld ws; w_vwOld := w_vwOld ws;
+     w_vrNew := w_vrNew ws; w_vwNew := w_vwNew ws;
+     w_vRel  := w_vRel ws;  w_fwd   := w_fwd ws;
+     w_pub   := w_pub ws;   w_relp  := w_relp ws;
+     w_regv  := w_regv ws;  w_vcap  := w_vcap ws;  w_ldv := w_ldv ws;
+     w_res   := r;          w_tbank := w_tbank ws |}.
+
+(** Every projection but [w_res] is transparent, BY CONVERSION. *)
+Lemma ws_res_set_coh ws r a : coh (ws_res_set ws r) a = coh ws a.
+Proof. done. Qed.
+Lemma ws_res_set_vrOld ws r : w_vrOld (ws_res_set ws r) = w_vrOld ws.
+Proof. done. Qed.
+Lemma ws_res_set_vwOld ws r : w_vwOld (ws_res_set ws r) = w_vwOld ws.
+Proof. done. Qed.
+Lemma ws_res_set_vrNew ws r : w_vrNew (ws_res_set ws r) = w_vrNew ws.
+Proof. done. Qed.
+Lemma ws_res_set_vwNew ws r : w_vwNew (ws_res_set ws r) = w_vwNew ws.
+Proof. done. Qed.
+Lemma ws_res_set_vRel ws r : w_vRel (ws_res_set ws r) = w_vRel ws.
+Proof. done. Qed.
+Lemma ws_res_set_fwd ws r : w_fwd (ws_res_set ws r) = w_fwd ws.
+Proof. done. Qed.
+Lemma ws_res_set_pub ws r : w_pub (ws_res_set ws r) = w_pub ws.
+Proof. done. Qed.
+Lemma ws_res_set_relp ws r : w_relp (ws_res_set ws r) = w_relp ws.
+Proof. done. Qed.
+Lemma ws_res_set_regv ws r x : regv (ws_res_set ws r) x = regv ws x.
+Proof. done. Qed.
+Lemma ws_res_set_vcap ws r : w_vcap (ws_res_set ws r) = w_vcap ws.
+Proof. done. Qed.
+Lemma ws_res_set_ldv ws r : w_ldv (ws_res_set ws r) = w_ldv ws.
+Proof. done. Qed.
+Lemma ws_res_set_tbank ws r : w_tbank (ws_res_set ws r) = w_tbank ws.
+Proof. done. Qed.
+Lemma ws_res_set_res ws r : w_res (ws_res_set ws r) = r.
+Proof. done. Qed.
+
+Lemma ws_res_set_none ws : ws_res_set ws (w_res ws) = ws.
+Proof. by destruct ws. Qed.
+
+(** THE EXCLUSIVE READ, at the run level.  It takes the TIMESTAMP COLUMN
+    [ts] (not the label's [(t, v)] pairs), exactly as [load_post_run_d]
+    does — the reservation banks only timestamps, which is all
+    [WeakPromise.excl_ok_ts] consumes, and taking the column keeps the
+    function usable by a replay that remaps timestamps
+    ([WeakRobustProv.aev_post]).  [rv_view] is the read half's own banked
+    post-view [ldv_of], which the conditional write's [fulfil_vpre] must
+    dominate (deviation D-2). *)
+Definition exload_post_run_d (ws : wstate) (aq : bool) (vaddr : nat)
+    (base : Z) (ts : list nat) : wstate :=
+  ws_res_set (load_post_run_d ws aq vaddr base ts)
+    (Some (WResv base ts (ldv_of ws aq vaddr base ts))).
+
+Lemma exload_post_run_d_res ws aq vaddr base ts :
+  w_res (exload_post_run_d ws aq vaddr base ts)
+  = Some (WResv base ts (ldv_of ws aq vaddr base ts)).
+Proof. done. Qed.
+
+(** THE RESERVATION'S BANKED VIEW as a TOTAL function of the state — the
+    form a fulfil-pre-view function can consume without an existential
+    ([WeakRobustAcyc.fulfil_vext]).  [0] with no reservation, which is the
+    neutral element of the join it enters. *)
+Definition res_view (ws : wstate) : nat :=
+  match w_res ws with Some R => rv_view R | None => 0%nat end.
+
+Lemma res_view_some ws R : w_res ws = Some R → res_view ws = rv_view R.
+Proof. rewrite /res_view. by move=> ->. Qed.
+
 
 (* ------------------------------------------------------------------ *)
 (** ** Monotonicity: every step function only raises views *)
@@ -1588,7 +1717,7 @@ Proof.
     + rewrite lookup_insert_ne //. intros Ha'.
       destruct (Hfwd a' tv Ha'). split; lia.
   - intros r. move: (Hrg r). rewrite /regv /=. lia.
-  - by eapply wresv_bounded_mono.
+  - apply wresv_bounded_none.
 Qed.
 
 Lemma store_post_bounded ws rl a t n n' :
@@ -1648,7 +1777,7 @@ Lemma instr_post_bounded ws n : ws_bounded ws n → ws_bounded (instr_post ws) n
 Proof.
   intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld & Hres & Htb).
   rewrite /ws_bounded /instr_post /=. split_and!; try lia;
-    [exact Hcoh|exact Hfwd|exact Hrg|exact Hres].
+    [exact Hcoh|exact Hfwd|exact Hrg|apply wresv_bounded_none].
 Qed.
 
 (** ... and the multi-byte folds the interpreter's read/write arms build. *)
@@ -2232,6 +2361,68 @@ Proof.
   intros Hb Hva Hall. rewrite /ldv_of.
   apply ws_bounded_ldv, load_post_run_d_bounded;
     [by apply ws_ldv0_bounded|exact Hva|exact Hall].
+Qed.
+
+(** *** The EXCLUSIVE load run (RMW split S2)
+
+    Everything transfers from [load_post_run_d] through the record update:
+    [ws_res_set] touches only [w_res], which is in neither [ws_le] nor
+    [ws_depmove] and is handled by one extra [ws_bounded] conjunct. *)
+
+Lemma ws_res_set_le ws1 ws2 r : ws_le ws1 ws2 → ws_le ws1 (ws_res_set ws2 r).
+Proof. by rewrite /ws_le /ws_res_set /=. Qed.
+
+Lemma ws_res_set_bounded ws r n :
+  ws_bounded ws n → wresv_bounded r n → ws_bounded (ws_res_set ws r) n.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hpub & Hcoh & Hfwd & Hrg & Hvc & Hld
+          & Hres & Htb) Hr.
+  rewrite /ws_bounded /ws_res_set /=. by split_and!.
+Qed.
+
+Lemma res_view_bounded ws n : ws_bounded ws n → (res_view ws ≤ n)%nat.
+Proof.
+  intros Hb. rewrite /res_view.
+  destruct (w_res ws) as [R|] eqn:HR; [|lia].
+  by destruct (ws_bounded_res _ _ Hb R HR) as [_ ?].
+Qed.
+
+Lemma exload_post_run_d_le ws aq vaddr base ts :
+  ws_le ws (exload_post_run_d ws aq vaddr base ts).
+Proof. apply ws_res_set_le, load_post_run_d_le. Qed.
+
+Lemma exload_post_run_d_bounded ws aq vaddr base ts n :
+  ws_bounded ws n → (vaddr ≤ n)%nat →
+  Forall (λ t, (t ≤ n)%nat) ts →
+  ws_bounded (exload_post_run_d ws aq vaddr base ts) n.
+Proof.
+  intros Hb Hva Hall. apply ws_res_set_bounded.
+  - by apply load_post_run_d_bounded.
+  - intros R [= <-]. simpl. split.
+    + intros j t Ht. rewrite Forall_lookup in Hall. by eapply Hall.
+    + by apply ldv_of_bounded.
+Qed.
+
+Lemma exload_post_run_d_fwd ws aq vaddr base ts :
+  w_fwd (exload_post_run_d ws aq vaddr base ts) = w_fwd ws.
+Proof. rewrite /exload_post_run_d ws_res_set_fwd load_post_run_d_fwd //. Qed.
+
+Lemma exload_post_run_d_relp ws aq vaddr base ts :
+  w_relp (exload_post_run_d ws aq vaddr base ts) = w_relp ws.
+Proof. rewrite /exload_post_run_d ws_res_set_relp load_post_run_d_relp //. Qed.
+
+Lemma exload_post_run_d_coh ws aq vaddr base ts (j : nat) t :
+  ts !! j = Some t →
+  (t ≤ coh (exload_post_run_d ws aq vaddr base ts) (base + Z.of_nat j))%nat.
+Proof.
+  intros Ht. rewrite /exload_post_run_d ws_res_set_coh.
+  by apply load_post_run_d_coh.
+Qed.
+
+Lemma exload_post_run_d_vcap ws aq vaddr base ts :
+  (vaddr ≤ w_vcap (exload_post_run_d ws aq vaddr base ts))%nat.
+Proof.
+  rewrite /exload_post_run_d ws_res_set_vcap. apply load_post_run_d_vcap.
 Qed.
 
 (** *** The store run *)

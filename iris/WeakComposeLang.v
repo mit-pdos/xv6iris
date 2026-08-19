@@ -832,7 +832,10 @@ Section prj.
       |cfg ag aq rl base tvs data asrc vsrc kk st' dv Hlk Hps Hne Hlen Hr He Hkc
       |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps
       |cfg ag rdw wsrc st' dv Hlk Hps|cfg ag csrc st' dv Hlk Hps
-      |cfg ag st' dv Hlk Hps];
+      |cfg ag st' dv Hlk Hps
+      |cfg ag aq base tvs asrc st' dv Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk R st' dv
+         Hlk Hps Hne Hres Hrb Hrlen He Hkc];
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
       rewrite Hstx /= in Hps;
       (destruct st' as [q'|dd pend]; [|done]);
@@ -859,7 +862,10 @@ Section prj.
       |cfg ag aq rl base tvs data asrc vsrc kk st' dv Hlk Hps Hne Hlen Hr He Hkc
       |cfg ag pr pw sr sw st' dv Hlk Hps|cfg ag st' dv Hlk Hps
       |cfg ag rdw wsrc st' dv Hlk Hps|cfg ag csrc st' dv Hlk Hps
-      |cfg ag st' dv Hlk Hps]; destruct dv;
+      |cfg ag st' dv Hlk Hps
+      |cfg ag aq base tvs asrc st' dv Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk R st' dv
+         Hlk Hps Hne Hres Hrb Hrlen He Hkc]; destruct dv;
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
       rewrite Hstx /= in Hps;
       (destruct st' as [q'|dd pend]; [|done]);
@@ -960,6 +966,28 @@ Section prj.
         rewrite /prj_ag /= Hstx. exact Hps.
       + intros ag2 msg Hag2 Heq. simpl in Heq.
         by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    (* THE RMW SPLIT (S2) *)
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LExLoad aq base tvs asrc). split_and!.
+      + apply (PFExLoad (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) aq base tvs asrc q' tt Hlks);
+          [rewrite /prj_ag /= Hstx; exact Hps|exact Hr].
+      + intros ag2 msg Hag2 Heq. simpl in Heq.
+        by destruct (app_snoc_absurd _ _ Heq).
+      + exact I.
+    - split.
+      { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
+      exists (WeakPromise.LExStore rl base data asrc vsrc). split_and!.
+      + apply (PFExStore (pstep_unit (sail_step_ni next)) lbl_class_p i
+                 (prj_cfg q0 cfg) (prj_ag q0 ag) rl base data asrc vsrc kk R
+                 q' tt Hlks);
+          [rewrite /prj_ag /= Hstx; exact Hps|exact Hne|exact Hres|exact Hrb
+          |exact Hrlen|exact He|exact Hkc].
+      + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
+        rewrite Hlks in Hag2. injection Hag2 as <-.
+        exact (Hcls ag msg Hlk Heq).
       + exact I.
   Qed.
 

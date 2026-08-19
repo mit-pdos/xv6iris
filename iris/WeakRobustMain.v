@@ -288,7 +288,8 @@ Proof.
                  (srcs_view w vsrc) base (length data) (σ ts) w0 Hrp Hrl).
       lia.
   - by rewrite /fence_post /=.
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim — [w_pub]
+     does not see the reservation *)
   - by rewrite w_pub_load_post_run_d.
   - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
     destruct (decide (w_relp w = true ∨ yrl = true)) as [Hr|Hr].
@@ -1187,7 +1188,9 @@ Lemma aev_post_coh_read {D : Type} σ (ev : aev D) w (base : Z) tvs (jb : nat) (
   ((∃ aq lat asrc, ae_lb ev = LLoad aq lat base tvs asrc) ∨
    (∃ aq rl data asrc vsrc ts,
       ae_lb ev = LRmw aq rl base tvs data asrc vsrc ∧
-      ae_ts ev = Some ts)) →
+      ae_ts ev = Some ts) ∨
+   (* THE RMW SPLIT (S2): the exclusive read is a third reading shape *)
+   (∃ aq asrc, ae_lb ev = LExLoad aq base tvs asrc)) →
   (σ t ≤ coh (aev_post σ ev w) (base + Z.of_nat jb))%nat.
 Proof.
   intros Htv Hlb.
@@ -1195,27 +1198,33 @@ Proof.
     by rewrite !list_lookup_fmap Htv.
   destruct Hlb
     as [(aq & lat & asrc & Hlb)
-       |(aq & rl & data & asrc & vsrc & ts & Hlb & Hts)];
+       |[(aq & rl & data & asrc & vsrc & ts & Hlb & Hts)
+        |(aq & asrc & Hlb)]];
     rewrite /aev_post Hlb.
   - by apply load_post_run_d_coh.
   - rewrite Hts. etrans; [by apply load_post_run_d_coh|].
     apply ws_le_coh, store_post_run_d_le.
+  - by apply exload_post_run_d_coh.
 Qed.
 
 Lemma astep_read_log_byte {P : Type} (img : image) log i (ag : wpagent P)
     l f D (base : Z) tvs (jb : nat) (t : nat) (v : bv 8) :
   astep_ok img log i ag l f D →
   ((∃ aq lat asrc, l = LLoad aq lat base tvs asrc) ∨
-   (∃ aq rl data asrc vsrc, l = LRmw aq rl base tvs data asrc vsrc)) →
+   (∃ aq rl data asrc vsrc, l = LRmw aq rl base tvs data asrc vsrc) ∨
+   (* THE RMW SPLIT (S2) *)
+   (∃ aq asrc, l = LExLoad aq base tvs asrc)) →
   tvs !! jb = Some (t, v) →
   log_byte img log t (base + Z.of_nat jb) = Some v.
 Proof.
   intros Hok Hlb Htv.
-  destruct Hlb as [(aq & lat & asrc & ->)|(aq & rl & data & asrc & vsrc & ->)];
+  destruct Hlb as [(aq & lat & asrc & ->)
+                  |[(aq & rl & data & asrc & vsrc & ->)|(aq & asrc & ->)]];
     simpl in Hok.
   - destruct Hok as (Hro & _ & _). by destruct (Hro jb t v Htv) as (Hv & _).
   - destruct Hok as (ts & k & _ & _ & _ & Hro & _).
     by destruct (Hro jb t v Htv) as (Hv & _).
+  - destruct Hok as (Hro & _ & _). by destruct (Hro jb t v Htv) as (Hv & _).
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -1454,7 +1463,9 @@ Section exhibit.
         ((∃ aq lat asrc, ae_lb ev2 = LLoad aq lat base tvs asrc) ∨
          (∃ aq rl data asrc vsrc ts,
             ae_lb ev2 = LRmw aq rl base tvs data asrc vsrc ∧
-            ae_ts ev2 = Some ts)).
+            ae_ts ev2 = Some ts) ∨
+         (* THE RMW SPLIT (S2): the exclusive read is a third reading shape *)
+         (∃ aq asrc, ae_lb ev2 = LExLoad aq base tvs asrc)).
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
       destruct l2 as [|aq lat base tvs asrc|rl base data asrc vsrc
                      |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
@@ -1464,15 +1475,20 @@ Section exhibit.
         | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
         |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
         |by apply elem_of_nil in Hinrd
-        (* THE RMW SPLIT (S1): no machine arm, so [astep_ok] is [False] *)
-        |by destruct Hok2|by apply elem_of_nil in Hinrd].
+        (* THE RMW SPLIT (S2): the exclusive read is a THIRD reading
+           shape; the conditional write reads nothing *)
+        | |by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
         split_and!; [done|done|left; by exists aq, lat, asrc].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         destruct Hok2 as (ts2 & k2 & _ & _ & _ & _ & _ & _ & _ & Hts2).
         exists base, tvs, jb, v.
-        split_and!; [done|done|right; by exists aq, rl, data, asrc, vsrc, ts2]. }
+        split_and!;
+          [done|done|right; left; by exists aq, rl, data, asrc, vsrc, ts2].
+      - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
+        exists xbase, xtvs, jb, v.
+        split_and!; [done|done|right; right; by exists xaq, xasrc]. }
     destruct Hshape as (base & tvs & jb & v & Ha & Htv & Hlbsh).
     (* the message really writes that byte *)
     have Hlbv : log_byte (pt_img TS) (pt_log TS) t (base + Z.of_nat jb)
@@ -1481,9 +1497,11 @@ Section exhibit.
                 (ae_lb ev2) f2 (ae_ts ev2) base tvs jb t v Hok2); [|exact Htv].
       destruct Hlbsh
         as [(aq & lat & asrc & Hl)
-           |(aq & rl & data & asrc & vsrc & ts & Hl & _)];
+           |[(aq & rl & data & asrc & vsrc & ts & Hl & _)
+            |(aq & asrc & Hl)]];
         [left; by exists aq, lat, asrc
-        |right; by exists aq, rl, data, asrc, vsrc]. }
+        |right; left; by exists aq, rl, data, asrc, vsrc
+        |right; right; by exists aq, asrc]. }
     have Hbyte : is_Some (msg_byte m (base + Z.of_nat jb)).
     { rewrite (log_byte_pos (pt_img TS) (pt_log TS) t m _ Htpos Hlogm) in Hlbv.
       by exists v. }

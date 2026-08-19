@@ -118,6 +118,12 @@ Proof.
   apply load_post_fold_regv.
 Qed.
 
+(** THE RMW SPLIT (S2): the exclusive read is the load through a [w_res]
+    write, which none of these three components sees. *)
+Lemma exload_post_run_d_regv ws aq vaddr base ts :
+  w_regv (exload_post_run_d ws aq vaddr base ts) = w_regv ws.
+Proof. rewrite /exload_post_run_d /ws_res_set /=. apply load_post_run_d_regv. Qed.
+
 Lemma store_post_d_regv ws rl vf a t :
   w_regv (store_post_d ws rl vf a t) = w_regv ws.
 Proof. done. Qed.
@@ -184,6 +190,12 @@ Proof.
   apply load_post_fold_ldv_ge.
 Qed.
 
+Lemma exload_post_run_d_ldv_ge ws aq vaddr base ts :
+  (w_ldv ws ≤ w_ldv (exload_post_run_d ws aq vaddr base ts))%nat.
+Proof.
+  rewrite /exload_post_run_d /ws_res_set /=. apply load_post_run_d_ldv_ge.
+Qed.
+
 Lemma load_post_run_d_ldv ws aq vaddr base ts (j : nat) t :
   ts !! j = Some t → fwd_view ws aq (base + Z.of_nat j) t = t →
   (t ≤ w_ldv (load_post_run_d ws aq vaddr base ts))%nat.
@@ -194,6 +206,14 @@ Proof.
   apply elem_of_list_lookup_2 with j.
   rewrite /load_run_ats lookup_zip_with
           (lookup_seq_lt 0 (length ts) j Hj) Ht //.
+Qed.
+
+Lemma exload_post_run_d_ldv ws aq vaddr base ts (j : nat) t :
+  ts !! j = Some t → fwd_view ws aq (base + Z.of_nat j) t = t →
+  (t ≤ w_ldv (exload_post_run_d ws aq vaddr base ts))%nat.
+Proof.
+  intros Ht Hfv. rewrite /exload_post_run_d /ws_res_set /=.
+  exact (load_post_run_d_ldv ws aq vaddr base ts j t Ht Hfv).
 Qed.
 
 Lemma store_post_d_ldv ws rl vf a t :
@@ -299,8 +319,11 @@ Section astep.
     - intros [-> _] Hne. apply regv_regw_post_ne. intros ->. by apply (Hne wsrc).
     - intros [-> _] _. by rewrite /regv ctrl_post_regv.
     - intros [-> _] _. by rewrite /regv instr_post_regv.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): the reservation wrapper is transparent to
+       [w_regv] / [w_ldv] / every view. *)
+    - intros (_ & -> & _) _. by rewrite /regv exload_post_run_d_regv.
+    - intros (ts & kc & R & _ & _ & _ & _ & _ & _ & _ & -> & _) _.
+      by rewrite /regv store_post_run_d_regv.
   Qed.
 
   (** …and an [LRegW rd srcs] assigns it [V(srcs)] exactly. *)
@@ -327,8 +350,10 @@ Section astep.
     - intros [-> _] _. by rewrite regw_post_ldv.
     - intros [-> _] _. by rewrite ctrl_post_ldv.
     - by intros _ Hne.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) _. apply exload_post_run_d_ldv_ge.
+    - intros (ts & kc & R & _ & _ & _ & _ & _ & _ & _ & -> & _) _.
+      by rewrite store_post_run_d_ldv.
   Qed.
 
   (** THE LOAD BANKS ITS RESULT VIEW: an UNFORWARDED read of [ts] leaves
@@ -360,8 +385,12 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
+      have Hts : ((xtvs.*1)) !! j = Some ts by rewrite list_lookup_fmap Hj.
+      by apply (exload_post_run_d_ldv (pa_ws ag) xaq
+                  (srcs_view (pa_ws ag) xasrc) xbase (xtvs.*1) j ts Hts).
+    - intros _ _ Hin%elem_of_nil. done.
   Qed.
 
   (** [LCtrl srcs] raises [w_vcap] to [V(srcs)] (PARM's
@@ -394,8 +423,11 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (Hr & _ & _) [j [v [Hj ->]]]%elem_of_tvs_reads Hw.
+      destruct (Hr j ts v Hj) as (_ & (_ & Hnw) & _). apply Hnw.
+      eapply writes_in_le; [|exact Hw]. lia.
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE RMW WRITES WHAT IT READS: the read half's byte [a] is a byte of
@@ -422,8 +454,9 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): VACUOUS on both halves (design §7) *)
+    - by intros (_ & _ & ?).
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
 End astep.

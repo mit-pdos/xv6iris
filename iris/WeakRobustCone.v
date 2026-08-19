@@ -317,7 +317,7 @@ Section stepout.
     - (* ---- LLoad ---- *)
       have Hlat : lat = false.
       { destruct lat; [|done]. exfalso.
-        by destruct (Hlf _ _ _ _ _ _ _ _ Hpure). }
+        by destruct (lat_free_prog_lat pstep _ _ _ _ _ _ _ _ Hlf Hpure). }
       subst lat.
       destruct Hok as (Hro & Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -502,8 +502,10 @@ Section stepout.
         apply (PFInstr pstep pcls e.1 cf (WPAgent (pa_st ag) (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): as in [WeakRobustSim.Qinv_step] — the pf replay
+       is S4's slice, and until then the alphabet premise refutes the pair *)
+    - exfalso. exact (lat_free_prog_fused pstep _ _ _ _ _ Hlf Hpure).
+    - exfalso. exact (lat_free_prog_fused pstep _ _ _ _ _ Hlf Hpure).
   Qed.
 
 End stepout.
@@ -1635,7 +1637,9 @@ Section coneblocks.
         ((∃ aq lat asrc, ae_lb ev2 = LLoad aq lat base tvs asrc) ∨
          (∃ aq rl data asrc vsrc ts,
             ae_lb ev2 = LRmw aq rl base tvs data asrc vsrc ∧
-            ae_ts ev2 = Some ts)).
+            ae_ts ev2 = Some ts) ∨
+         (* THE RMW SPLIT (S2): the exclusive read is a third reading shape *)
+         (∃ aq asrc, ae_lb ev2 = LExLoad aq base tvs asrc)).
     { remember (ae_lb ev2) as l2 eqn:Hlb2.
       destruct l2 as [|aq lat base tvs asrc|rl base data asrc vsrc
                      |aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc
@@ -1645,15 +1649,20 @@ Section coneblocks.
         | |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
         |by apply elem_of_nil in Hinrd|by apply elem_of_nil in Hinrd
         |by apply elem_of_nil in Hinrd
-        (* THE RMW SPLIT (S1): no machine arm, so [astep_ok] is [False] *)
-        |by destruct Hok2|by apply elem_of_nil in Hinrd].
+        (* THE RMW SPLIT (S2): the exclusive read is a THIRD reading
+           shape; the conditional write reads nothing *)
+        | |by apply elem_of_nil in Hinrd].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         exists base, tvs, jb, v.
         split_and!; [done|done|left; by exists aq, lat, asrc].
       - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
         destruct Hok2 as (ts2 & k2 & _ & _ & _ & _ & _ & _ & _ & Hts2).
         exists base, tvs, jb, v.
-        split_and!; [done|done|right; by exists aq, rl, data, asrc, vsrc, ts2]. }
+        split_and!;
+          [done|done|right; left; by exists aq, rl, data, asrc, vsrc, ts2].
+      - apply elem_of_tvs_reads in Hinrd as (jb & v & Htv & ->).
+        exists xbase, xtvs, jb, v.
+        split_and!; [done|done|right; right; by exists xaq, xasrc]. }
     destruct Hshape as (base & tvs & jb & v & Ha & Htv & Hlbsh).
     have Hlbv : log_byte (pt_img TS) (pt_log TS) t (base + Z.of_nat jb)
                 = Some v.
@@ -1661,9 +1670,11 @@ Section coneblocks.
                 (ae_lb ev2) f2 (ae_ts ev2) base tvs jb t v Hok2); [|exact Htv].
       destruct Hlbsh
         as [(aq & lat & asrc & Hl)
-           |(aq & rl & data & asrc & vsrc & ts & Hl & _)];
+           |[(aq & rl & data & asrc & vsrc & ts & Hl & _)
+            |(aq & asrc & Hl)]];
         [left; by exists aq, lat, asrc
-        |right; by exists aq, rl, data, asrc, vsrc]. }
+        |right; left; by exists aq, rl, data, asrc, vsrc
+        |right; right; by exists aq, asrc]. }
     have Hbyte : is_Some (msg_byte m (base + Z.of_nat jb)).
     { rewrite (log_byte_pos (pt_img TS) (pt_log TS) t m _ Htpos Hlogm) in Hlbv.
       by exists v. }

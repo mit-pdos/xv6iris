@@ -163,13 +163,29 @@ Section fact.
     | LRegW rd srcs => f = (λ w, regw_post w rd (srcs_view w srcs)) ∧ Dl = None
     | LCtrl srcs => f = (λ w, ctrl_post w (srcs_view w srcs)) ∧ Dl = None
     | LInstr => f = instr_post ∧ Dl = None
-    (* THE RMW SPLIT (slice S1, additive).  [astep_ok] is the SIDE
-       CONDITION OF A MACHINE ARM — [wp_astep_wpstep] turns it back into a
-       [wpstep] — so it must stay in lockstep with [wpstep]'s constructor
-       list, which gains [WPExLoad]/[WPExStore] only in S2.  Until then the
-       two new labels have NO arm, i.e. [False]: the additive slice adds
-       vocabulary, never behaviour. *)
-    | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
+    (* THE RMW SPLIT (S2).  [astep_ok] is the SIDE CONDITION OF A MACHINE
+       ARM — [wp_astep_wpstep] turns it back into a [wpstep] — so these two
+       are [WPExLoad]'s and [WPExStore]'s premises, verbatim. *)
+    | LExLoad aq base tvs asrc =>
+        read_ok_d img log (pa_ws ag) aq false base tvs
+                  (srcs_view (pa_ws ag) asrc) ∧
+        f = (λ w, exload_post_run_d w aq (srcs_view w asrc) base (tvs.*1)) ∧
+        Dl = None
+    | LExStore rl base data asrc vsrc =>
+        (* NO plain-store fallback (design §4): the reservation is an
+           existential of the SIDE CONDITION, not a disjunct. *)
+        ∃ ts k R, ts ∈ pa_prom ag ∧
+          log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
+          w_res (pa_ws ag) = Some R ∧
+          rv_base R = base ∧ length (rv_ts R) = length data ∧
+          excl_ok_ts log i base (rv_ts R) ts ∧
+          fulfil_ok_d (pa_ws ag) rl base (length data) ts
+            (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
+                              (srcs_view (pa_ws ag) vsrc))
+                     (rv_view R)) ∧
+          f = (λ w, store_post_run_d w rl (srcs_view w asrc)
+                      (srcs_view w vsrc) base (length data) ts) ∧
+          Dl = Some ts
     end.
 
   (** The five non-promise rules of [wpstep], as ONE relation indexed by
@@ -215,8 +231,9 @@ Section fact.
     - destruct Hok as [-> ->]. by apply WPRegW.
     - destruct Hok as [-> ->]. by apply WPCtrl.
     - destruct Hok as [-> ->]. by apply WPInstr.
-    - done.
-    - done.
+    - destruct Hok as (Hr & -> & ->). by eapply WPExLoad.
+    - destruct Hok as (ts & k & R & ? & ? & ? & ? & ? & ? & ? & -> & ->).
+      by eapply WPExStore.
   Qed.
 
   Lemma wp_state_step_wpstep c c' : wp_state_step c c' → wpstep pstep c c'.
@@ -271,18 +288,51 @@ Section fact.
                   (λ w, ctrl_post w (srcs_view w srcs)) None).
     - right. exists i, LInstr.
       by apply (WPAStep i LInstr cfg ag st' d' instr_post None).
+    - right. exists i, (LExLoad aq base tvs asrc).
+      apply (WPAStep i _ cfg ag st' d'
+               (λ w, exload_post_run_d w aq (srcs_view w asrc) base (tvs.*1))
+               None); done.
+    - right. exists i, (LExStore rl base data asrc vsrc).
+      apply (WPAStep i _ cfg ag st' d'
+               (λ w, store_post_run_d w rl (srcs_view w asrc)
+                       (srcs_view w vsrc) base (length data) ts) (Some ts));
+        [done|done|]. by exists ts, k, R.
   Qed.
 
-  (** A LAT-FREE PROGRAM never emits a latest-kind load.  For the kernel
-      the [lat] users are instruction fetch and the read-only page-table
-      walk (design doc Decision 6); the AMO/CAS path is already plain
-      ([WPRmw] reads with [lat = false] and pins its window with
-      [excl_ok]), so this hypothesis is a statement about ifetch and
-      walks only — precisely the surface W2's violation-freedom premise
-      takes over. *)
+  (** THE LAYER-1 PROGRAM-ALPHABET RESTRICTION.  Two conjuncts; the name
+      is historical (it was the first alone).
+
+      (1) LAT-FREEDOM: the program never emits a latest-kind load.  For the
+      kernel the [lat] users are instruction fetch and the read-only
+      page-table walk (design doc Decision 6); the AMO/CAS path is already
+      plain ([WPRmw] reads with [lat = false] and pins its window with
+      [excl_ok]), so this conjunct is a statement about ifetch and walks
+      only — precisely the surface W2's violation-freedom premise takes
+      over.
+
+      (2) PRE-SPLIT ([lb_fused]) — THE RMW SPLIT (S2) RESIDUE, TO DIE AT
+      S4.  The MACHINE has full arms for [LExLoad]/[LExStore] (this file's
+      [astep_ok] included); what is not yet re-indexed is the ROBUSTNESS
+      TOWER above it — the pf REPLAY (`WeakRobustSim.Qinv_step`) needs a
+      ts-obliviousness conjunct for the exclusive read and the split form
+      of `excl_ok_pf` (whose window straddles two events), which is
+      design §8's slice S4.  Rather than gate twenty tower theorems one at
+      a time, the restriction rides HERE, on the one alphabet premise
+      every one of them already carries; every instance in this tree
+      discharges it, since no producer emits the split labels yet.  When
+      S4 lands, delete the conjunct and this paragraph. *)
   Definition lat_free_prog : Prop :=
-    ∀ p d aq base tvs asrc p' d',
-      ¬ pstep p d (LLoad aq true base tvs asrc) p' d'.
+    (∀ p d aq base tvs asrc p' d',
+       ¬ pstep p d (LLoad aq true base tvs asrc) p' d') ∧
+    (∀ p d l p' d', pstep p d l p' d' → lb_fused l).
+
+  Lemma lat_free_prog_lat p d aq base tvs asrc p' d' :
+    lat_free_prog → ¬ pstep p d (LLoad aq true base tvs asrc) p' d'.
+  Proof. intros [H _]. exact (H p d aq base tvs asrc p' d'). Qed.
+
+  Lemma lat_free_prog_fused p d l p' d' :
+    lat_free_prog → pstep p d l p' d' → lb_fused l.
+  Proof. intros [_ H]. exact (H p d l p' d'). Qed.
 
   Lemma lat_free_prog_step c c' :
     lat_free_prog → wpstep pstep c c' → wp_lf_run c c'.
@@ -293,7 +343,7 @@ Section fact.
     destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok].
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl; [done| |done|done|done|done|done|done|done|done|done].
-    destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ _ Hps).
+    destruct lat; [|done]. by destruct (lat_free_prog_lat _ _ _ _ _ _ _ _ Hlfp Hps).
   Qed.
 
   Lemma lat_free_prog_run c c' :
@@ -406,8 +456,16 @@ Section fact.
     - done.
     - done.
     - done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): the exclusive read follows [LLoad]'s bullet at
+       [lat = false]; the conditional write follows [LStore]'s, with the
+       window carried by [excl_ok_ts_app] instead of [excl_ok_app]. *)
+    - intros (Hr & -> & ->). split_and!; [|done|done].
+      eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
+    - intros (ts & k & R & Hin & Hlog & Hres & Hrb & Hrlen & He & Hful & -> & ->).
+      pose proof (lookup_lt_Some _ _ _ Hlog) as Hlt.
+      exists ts, k, R. split_and!; try done.
+      + rewrite lookup_app_l; [done|done].
+      + eapply excl_ok_ts_app; [lia|done].
   Qed.
 
   Lemma wp_astep_app i l c c' m :
@@ -460,11 +518,16 @@ Section fact.
     intros Hws Hpr.
     destruct l as [|aq lat base tvs asrc|rl base data asrc vsrc|aq rl base tvs data asrc vsrc|pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
       simpl; rewrite ?Hws;
-      [done|done| | |done|done|done|done|done|done|done].
+      [done|done| | |done|done|done|done|done|done| ].
     - intros (ts & k & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [by eapply elem_of_weaken|done|done|done|done].
     - intros (ts & k & ? & ? & ? & ? & ? & ? & ? & ?). exists ts, k.
       split_and!; [done|by eapply elem_of_weaken|done|done|done|done|done|done].
+    - (* THE RMW SPLIT (S2): [LStore]'s bullet, one more existential wide *)
+      intros (ts & k & R & ? & ? & ? & ? & ? & ? & ? & ? & ?).
+      exists ts, k, R.
+      split_and!;
+        [by eapply elem_of_weaken|done|done|done|done|done|done|done|done].
   Qed.
 
   Lemma astep_ok_del img log i ag l f Dl ts :
@@ -481,8 +544,10 @@ Section fact.
     - by intros [_ ->].
     - by intros [_ ->].
     - by intros [_ ->].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - by intros (_ & _ & ->).
+    - intros (ts' & k & R & ? & _ & _ & _ & _ & _ & _ & _ & ->).
+      by intros [= <-].
   Qed.
 
   Lemma wp_astep_prom_add i l c c' T ag ag' :

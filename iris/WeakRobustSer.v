@@ -149,8 +149,15 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - by intros (_ & _ & ?).
+    - intros (ts' & kc & R & _ & Hlog & _ & _ & _ & _ & _ & -> & Heq) Hm Hb.
+      injection Heq as Heq. subst ts'.
+      rewrite Hlog in Hm. simplify_eq.
+      destruct (msg_byte_in_range _ _ Hb) as (j & Hj & Ha).
+      simpl in Hj, Ha. subst a.
+      have Hacc : ybase + Z.of_nat j = acc_addr ybase j by rewrite /acc_addr.
+      rewrite Hacc. by apply store_post_run_d_coh.
   Qed.
 
   (** A step that BOTH reads [(a, tr)] and fulfils [ts] is an [LRmw]
@@ -181,8 +188,11 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): VACUOUS on both halves — the exclusive read
+       fulfils nothing, the conditional write reads nothing (design §7).
+       The pair's own version of this fact is owed by S4. *)
+    - by intros (_ & _ & ?).
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
   (** ... and its EXCLUSIVITY WINDOW: no OTHER agent's write to the byte
@@ -208,8 +218,9 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): VACUOUS on both halves (design §7) *)
+    - by intros (_ & _ & ?).
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
 End astep.

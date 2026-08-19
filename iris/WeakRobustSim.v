@@ -389,7 +389,8 @@ Proof.
   - done.
   - done.
   - done.
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim — the
+     reservation is built from the SAME retimed timestamp column *)
   - by rewrite (Hread xbase xtvs eq_refl).
   - destruct ts as [t|]; [|done]. by rewrite (Hag t (or_intror eq_refl)).
 Qed.
@@ -1238,7 +1239,7 @@ Section sim.
     - (* ---- LLoad ---- *)
       have Hlat : lat = false.
       { destruct lat; [|done]. exfalso.
-        by destruct (Hlf _ _ _ _ _ _ _ _ Hpure). }
+        by destruct (lat_free_prog_lat pstep _ _ _ _ _ _ _ _ Hlf Hpure). }
       subst lat.
       destruct Hok as (Hro & Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -1459,8 +1460,16 @@ Section sim.
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
-    - done.
-    - done.
+    (* ---- THE RMW SPLIT (S2): the two split halves ----
+       The pf REPLAY is the one place in the tower that is NOT re-indexed
+       yet (design §8's slice S4): the exclusive read owes a
+       ts-obliviousness conjunct and the conditional write owes the SPLIT
+       form of [excl_ok_pf], whose window straddles two events.  Until S4
+       lands, the alphabet premise [lat_free_prog]'s second conjunct
+       (see [WeakPromiseFact]) refutes them here — vacuously for every
+       instance in this tree, since no producer emits them. *)
+    - exfalso. exact (lat_free_prog_fused pstep _ _ _ _ _ Hlf Hpure).
+    - exfalso. exact (lat_free_prog_fused pstep _ _ _ _ _ Hlf Hpure).
   Qed.
 
   (* ---------------------------------------------------------------- *)

@@ -603,8 +603,42 @@ Definition sail_step (next : bool → M unit)
     fused arm's read half carries no [lat] at all.  So no latest-kind load is
     ever emitted — the hypothesis [WeakPromiseFact]'s front-loading theorem
     takes. *)
+(** THE RMW SPLIT (S2): the PRE-SPLIT conjunct of [lat_free_prog].  No arm
+    of [sail_mstep] mentions [LExLoad]/[LExStore] — the RAM-read arm's
+    inner [match l with … | _ => False]] refutes them outright, every other
+    arm pins [l] to one of the nine — so this LTS lives in the fused
+    alphabet.  (It is the SAIL tier: the split's producers land in
+    [WeakEvLang] at S3, not here.) *)
+Theorem sail_step_fused next p l p' : sail_step next p l p' -> lb_fused l.
+Proof.
+  (* the nine fused constructors are [True]; the two split ones are refuted
+     by exactly [sail_lat_free]'s walk *)
+  destruct l; [done|done|done|done|done|done|done|done|done| |];
+    rewrite /sail_step;
+    (destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by intros [? _]|]);
+    (intros [Hirq|H]; [by destruct Hirq as [? _]|]);
+    (destruct (sp_m p) as [m|]; [|by destruct H as [? _]]);
+    rewrite /sail_mstep in H;
+    (destruct m as [y|T oc k]; [by destruct H as [? _]|]);
+    (destruct oc; simpl in H;
+       try (by destruct H as [? _]); try (by destruct H)).
+  - (* LExLoad / MemRead *)
+    destruct (dev_addr _); [by destruct H as [? _]|]. by destruct H as [_ H].
+  - (* LExLoad / MemWrite *)
+    destruct (dev_addr _); by destruct H as [? _].
+  - (* LExLoad / Barrier *)
+    destruct b; by destruct H as [? _].
+  - (* LExStore / MemRead *)
+    destruct (dev_addr _); [by destruct H as [? _]|]. by destruct H as [_ H].
+  - (* LExStore / MemWrite *)
+    destruct (dev_addr _); by destruct H as [? _].
+  - (* LExStore / Barrier *)
+    destruct b; by destruct H as [? _].
+Qed.
+
 Theorem sail_lat_free next : lat_free_prog (pstep_unit (sail_step next)).
 Proof.
+  split; [|by intros p d l p' d' H; eapply sail_step_fused, H].
   intros p d aq base tvs asrc p' d' H. rewrite /pstep_unit /sail_step in H.
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
   destruct H as [Hirq|H]; [by destruct Hirq as [? _]|].

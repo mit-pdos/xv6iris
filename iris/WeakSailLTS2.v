@@ -407,7 +407,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps];
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     [ by eapply PFSilent, sail_step_ni_step
     | by eapply PFLoad; [done|apply sail_step_ni_step|done]
     | by eapply PFStore; [done|apply sail_step_ni_step|done|done]
@@ -416,7 +419,12 @@ Proof.
     | by eapply PFDev, sail_step_ni_step
     | by eapply PFRegW, sail_step_ni_step
     | by eapply PFCtrl, sail_step_ni_step
-    | by eapply PFInstr, sail_step_ni_step ].
+    | by eapply PFInstr, sail_step_ni_step
+    (* THE RMW SPLIT (S2) *)
+    | by eapply PFExLoad; [done|apply sail_step_ni_step|done]
+    | by eapply PFExStore;
+        [exact Hlk|apply sail_step_ni_step, Hps|exact Hne|exact Hres
+        |exact Hrb|exact Hrlen|exact He|exact Hkc] ].
 Qed.
 
 Lemma lookup_insert_at (l : list (wpagent psail)) (i : agent) a b :
@@ -436,7 +444,11 @@ Proof.
          H0 Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr pw sr sw st' dd H0 Hps|cfg ag0 st' dd H0 Hps
     |cfg ag0 rdw wsrc st' dd H0 Hps|cfg ag0 csrc st' dd H0 Hps
-    |cfg ag0 st' dd H0 Hps];
+    |cfg ag0 st' dd H0 Hps
+    (* THE RMW SPLIT (S2) *)
+    |cfg ag0 aq base tvs asrc st' dd H0 Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk R st' dd
+         H0 Hps Hne Hres Hrb Hrlen He Hkc];
     simpl in Hlk; rewrite Hlk in H0; injection H0 as <-;
     (eexists; (split;
       [ by eapply lookup_insert_at, Hlk
@@ -756,7 +768,10 @@ Section peel.
            Hlk Hps Hne Hlen Hr He Hkc
       |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
       |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-      |cfg ag st' dd Hlk Hps]; destruct dd.
+      |cfg ag st' dd Hlk Hps
+      |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc kk R st' dd
+           Hlk Hps Hne Hres Hrb Hrlen He Hkc]; destruct dd.
     - exists ag. split; [done|]. left. by exists st'.
     - exists ag. split; [done|]. right; left.
       pose proof (sail_step_ni_asrc_nil next (pa_st ag) _ _ _ _ _ _ Hps) as ->.
@@ -788,6 +803,12 @@ Section peel.
       by pose proof (sail_step_ni_dep_free next (pa_st ag) _ st' Hps).
     - by destruct (sail_step_ni_dep_free next (pa_st ag) _ st' Hps).
     - by destruct (sail_step_ni_dep_free next (pa_st ag) _ st' Hps).
+    (* THE RMW SPLIT (S2): the split pair is unreachable here too — this
+       LTS lives in the fused alphabet ([sail_step_fused]) *)
+    - by destruct (sail_step_fused next (pa_st ag) _ st'
+                     (sail_step_ni_step next _ _ _ Hps)).
+    - by destruct (sail_step_fused next (pa_st ag) _ st'
+                     (sail_step_ni_step next _ _ _ Hps)).
   Qed.
 
   (** In the block ⟹ the run has not stopped: peel the first step. *)

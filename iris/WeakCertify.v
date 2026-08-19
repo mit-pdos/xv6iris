@@ -75,8 +75,13 @@ Proof.
   - by intros [_ ?].
   - by intros [_ ?].
   - by intros [_ ?].
-  - done.
-  - done.
+  (* THE RMW SPLIT (S2): the conditional write checks EXT on its OWN
+     pre-state (the read half was a separate step), so this is [LStore]'s
+     one-liner and NOT the rmw's — exactly what the design predicted the
+     reservation's [rv_view] contribution would buy. *)
+  - by intros (_ & _ & ?).
+  - intros (ts' & k & R & _ & _ & _ & _ & _ & _ & Hok & _ & [= ->]).
+    by eapply fulfil_ok_d_vcap.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -197,7 +202,10 @@ Section certify.
       |cfg ag0 aq rl base tvs data asrc vsrc k st' d' Hlk0 Hps Hnn Hlen Hr He Hk
       |cfg ag0 pr pw sr sw st' d' Hlk0 Hps|cfg ag0 st' d' Hlk0 Hps
       |cfg ag0 rd srcs st' d' Hlk0 Hps|cfg ag0 srcs st' d' Hlk0 Hps
-      |cfg ag0 st' d' Hlk0 Hps].
+      |cfg ag0 st' d' Hlk0 Hps
+      |cfg ag0 aq base tvs asrc st' d' Hlk0 Hps Hr
+      |cfg ag0 rl base data asrc vsrc k R st' d'
+           Hlk0 Hps Hnn Hres Hrb Hrlen He Hk].
     all: rewrite Hlk0 in Hlk; simplify_eq; simpl in Hlk'.
     all: (rewrite list_lookup_insert in Hlk';
             [by eapply lookup_lt_Some|by simplify_eq/=]).
@@ -277,7 +285,10 @@ Section certify.
       |cfg ag aq rl base tvs data asrc vsrc k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps|cfg ag st' d' Hlk Hps
       |cfg ag rd srcs st' d' Hlk Hps|cfg ag srcs st' d' Hlk Hps
-      |cfg ag st' d' Hlk Hps].
+      |cfg ag st' d' Hlk Hps
+      |cfg ag aq base tvs asrc st' d' Hlk Hps Hr
+      |cfg ag rl base data asrc vsrc k R st' d'
+           Hlk Hps Hnn Hres Hrb Hrlen He Hk].
     - apply rtc_once. by eapply WPSilent.
     - apply rtc_once. by eapply WPLoad.
     - eapply wpstep_store_now; [done|done|done| |by apply Hfresh].
@@ -289,6 +300,11 @@ Section certify.
     - apply rtc_once. by eapply WPRegW.
     - apply rtc_once. by eapply WPCtrl.
     - apply rtc_once. by eapply WPInstr.
+    (* THE RMW SPLIT (S2) *)
+    - apply rtc_once. by eapply WPExLoad.
+    - eapply wpstep_exstore_now;
+        [done|done|done| |by apply Hfresh|done|done|done|done].
+      by destruct (Hwf i ag Hlk).
   Qed.
 
   Lemma cert_step_rtc_wpstep i c c' :

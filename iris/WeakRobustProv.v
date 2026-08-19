@@ -120,9 +120,11 @@ Definition aev_post {D : Type} (σ : nat → nat) (ev : aev D) (w : wstate) : ws
   | LRegW rd srcs => regw_post w rd (srcs_view w srcs)
   | LCtrl srcs => ctrl_post w (srcs_view w srcs)
   | LInstr => instr_post w
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim. *)
+  (* THE RMW SPLIT (S2).  The exclusive read is [LLoad]'s arm plus the
+     reservation; the conditional write is [LStore]'s verbatim (the clear
+     is inside [store_post_run_d]). *)
   | LExLoad aq base tvs asrc =>
-      load_post_run_d w aq (srcs_view w asrc) base (σ <$> tvs.*1)
+      exload_post_run_d w aq (srcs_view w asrc) base (σ <$> tvs.*1)
   | LExStore rl base data asrc vsrc =>
       match ae_ts ev with
       | Some ts =>
@@ -171,6 +173,12 @@ Proof. apply w_relp_load_post_bytes. Qed.
 Lemma w_relp_load_post_run_d ws aq va base ts :
   w_relp (load_post_run_d ws aq va base ts) = w_relp ws.
 Proof. apply load_post_run_d_relp. Qed.
+
+(** THE RMW SPLIT (S2): the exclusive read is the load plus a [w_res]
+    write, which [w_relp] does not see. *)
+Lemma w_relp_exload_post_run_d ws aq va base ts :
+  w_relp (exload_post_run_d ws aq va base ts) = w_relp ws.
+Proof. apply exload_post_run_d_relp. Qed.
 
 (** [w_relp] after a store run depends on the PRE-state's [w_relp] and
     on the byte list — never on the timestamp. *)
@@ -235,8 +243,8 @@ Proof.
   - by rewrite /regw_post /=.
   - by rewrite /ctrl_post /=.
   - by rewrite /instr_post /=.
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
-  - by rewrite !w_relp_load_post_run_d.
+  (* THE RMW SPLIT (S2) *)
+  - by rewrite !w_relp_exload_post_run_d.
   - destruct (ae_ts ev) as [ts|]; [|done].
     by apply w_relp_store_post_run_d_indep.
 Qed.
@@ -277,8 +285,9 @@ Section fold.
     - by intros [-> _] w.
     - by intros [-> _] w.
     - by intros [-> _] w.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) w. by rewrite list_fmap_id.
+    - intros (ts' & kc & R & _ & _ & _ & _ & _ & _ & _ & -> & ->) w. done.
   Qed.
 
   (** THE CORRESPONDENCE.  Every prefix of a wf trace folds the agent's
@@ -574,9 +583,12 @@ Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
   | LRegW rd srcs => lregw_post S rd (lsrcs_view S srcs)
   | LCtrl srcs => lctrl_post S (lsrcs_view S srcs)
   | LInstr => linstr_post S
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim.  The [lstate]
-     mirror gains no [l_res]/[l_tbank] in this slice — [lrel] simply does
-     not constrain the two new [wstate] fields yet. *)
+  (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim.  The [lstate]
+     mirror gains no [l_res]/[l_tbank] — [lrel] does not constrain the two
+     new [wstate] fields, and it does not need to: the reservation is
+     agent-local scratch whose timestamps the replay never has to remap
+     (they are consumed by [excl_ok_ts] at the [LExStore], which
+     [astep_ok] reads off the BEHAVIOR's state, not the replayed one). *)
   | LExLoad aq base tvs asrc =>
       lload_post_run_d S aq (lsrcs_view S asrc) base tvs.*1
   | LExStore rl base data asrc vsrc =>
@@ -862,6 +874,11 @@ Proof.
   rewrite /=. apply IH. by apply lrel_store_post_d.
 Qed.
 
+(** THE RMW SPLIT (S2): [lrel] mentions none of [w_res]'s components, so a
+    reservation write is transparent to it. *)
+Lemma lrel_ws_res_set σ S w r : lrel σ S w → lrel σ S (ws_res_set w r).
+Proof. by rewrite /lrel /ws_res_set /coh /regv /=. Qed.
+
 Lemma lrel_store_post_run σ S w rl base n t :
   lrel σ S w →
   lrel σ (lstore_post_run S rl base n t) (store_post_run w rl base n (σ t)).
@@ -907,8 +924,11 @@ Proof.
   - apply lrel_regw_post; [done|by apply lrel_srcs_view].
   - apply lrel_ctrl_post; [done|by apply lrel_srcs_view].
   - by apply lrel_instr_post.
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
-  - apply lrel_load_post_run_d; [done|done|by apply lrel_srcs_view].
+  (* THE RMW SPLIT (S2): the exclusive read is the load's arm through
+     [lrel_ws_res_set] — [lrel] does not constrain [w_res]. *)
+  - rewrite /exload_post_run_d.
+    apply lrel_ws_res_set, lrel_load_post_run_d;
+      [done|done|by apply lrel_srcs_view].
   - destruct ts as [t|]; [|exact Hrel].
     apply lrel_store_post_run_d; [done|by apply lrel_srcs_view
                                  |by apply lrel_srcs_view].
@@ -1273,7 +1293,9 @@ Proof.
   - intros [Hu|Hu]%lregw_post_leaf; [by left|by left; eapply lsrcs_view_leaf].
   - intros [Hu|Hu]%lctrl_post_leaf; [by left|by left; eapply lsrcs_view_leaf].
   - intros Hu%linstr_post_leaf. by left.
-  (* THE RMW SPLIT (S1): [LLoad]'s / [LStore]'s arm verbatim *)
+  (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim — the
+     reservation is on the [wstate] side only, so the [lstate] leaf
+     analysis is unchanged *)
   - intros [Hu|[Hu|(j & Hj)]]%lload_post_run_d_leaf;
       [by left|by left; eapply lsrcs_view_leaf|].
     right; left. by eapply tvs_fst_reads.

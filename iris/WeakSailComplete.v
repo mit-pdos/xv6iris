@@ -429,7 +429,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps]; try done;
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc]; try done;
     by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx.
 Qed.
 
@@ -500,7 +503,10 @@ Proof.
            Hlk0 Hps Hne Hlen Hr He Hkc
       |cfg ag0 pr pw sr sw st' dd Hlk0 Hps|cfg ag0 st' dd Hlk0 Hps
       |cfg ag0 rdw wsrc st' dd Hlk0 Hps|cfg ag0 csrc st' dd Hlk0 Hps
-      |cfg ag0 st' dd Hlk0 Hps];
+      |cfg ag0 st' dd Hlk0 Hps
+      |cfg ag0 aq base tvs asrc st' dd Hlk0 Hps Hr
+      |cfg ag0 rl base data asrc vsrc kk R st' dd
+           Hlk0 Hps Hne Hres Hrb Hrlen He Hkc];
       simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
       try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
       destruct (excl_read_lbl next (pa_st ag) _ st' Hfe Hex Hps)
@@ -515,7 +521,10 @@ Proof.
            Hlk0 Hps Hne Hlen Hr He Hkc
       |cfg ag0 pr pw sr sw st' dd Hlk0 Hps|cfg ag0 st' dd Hlk0 Hps
       |cfg ag0 rdw wsrc st' dd Hlk0 Hps|cfg ag0 csrc st' dd Hlk0 Hps
-      |cfg ag0 st' dd Hlk0 Hps];
+      |cfg ag0 st' dd Hlk0 Hps
+      |cfg ag0 aq base tvs asrc st' dd Hlk0 Hps Hr
+      |cfg ag0 rl base data asrc vsrc kk R st' dd
+           Hlk0 Hps Hne Hres Hrb Hrlen He Hkc];
       simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
       try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
       destruct (con_write_lbl next (pa_st ag) _ st' Hfe Hcw Hps)
@@ -567,7 +576,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps];
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     try (by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx).
   - split_and!; [done|done|by intros j Hj; apply lookup_insert_other|].
     intros ag2 Hag2. simpl in Hag2. rewrite Hlk in Hag2. injection Hag2 as <-.
@@ -1555,7 +1567,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps];
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     destruct dd; rewrite Hdev in Hps;
     have Hlkd : pc_ags d !! i = Some ag by rewrite Hags.
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
@@ -1592,6 +1607,19 @@ Proof.
     rewrite -Himg -Hlog. exact (PFCtrl pstep pcls i d ag csrc st' tt Hlkd Hps).
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog. exact (PFInstr pstep pcls i d ag st' tt Hlkd Hps).
+  (* THE RMW SPLIT (S2) *)
+  - have Hr' : read_ok_d (pc_img d) (pc_log d) (pa_ws ag) aq false base tvs
+                 (srcs_view (pa_ws ag) asrc)
+      by rewrite Himg Hlog.
+    eexists. split_and!; [reflexivity|reflexivity|]. simpl.
+    rewrite -Himg -Hlog.
+    exact (PFExLoad pstep pcls i d ag aq base tvs asrc st' tt Hlkd Hps Hr').
+  - have He' : excl_ok_ts (pc_log d) i base (rv_ts R) (S (length (pc_log d)))
+      by rewrite Hlog.
+    eexists. split_and!; [reflexivity|reflexivity|]. simpl.
+    rewrite -Himg -Hlog.
+    exact (PFExStore pstep pcls i d ag rl base data asrc vsrc kk R st' tt
+             Hlkd Hps Hne Hres Hrb Hrlen He' Hkc).
 Qed.
 
 (** The QUIET transplant, which needs only the stepping agent's slot: a
@@ -1615,7 +1643,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kc st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps];
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     try (by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx);
     destruct dd; rewrite Hdev in Hps;
     have Hlkd : pc_ags d !! k = Some ag by rewrite Hags.
@@ -2333,8 +2364,9 @@ Definition post_ws (l : wlabel) (ws : wstate) (n : nat) : wstate :=
   | WeakPromise.LRegW rd srcs => regw_post ws rd (srcs_view ws srcs)
   | WeakPromise.LCtrl srcs => ctrl_post ws (srcs_view ws srcs)
   | WeakPromise.LInstr => instr_post ws
+  (* THE RMW SPLIT (S2): the exclusive read banks the reservation *)
   | WeakPromise.LExLoad aq base tvs asrc =>
-      load_post_run_d ws aq (srcs_view ws asrc) base tvs.*1
+      exload_post_run_d ws aq (srcs_view ws asrc) base tvs.*1
   | WeakPromise.LExStore rl base data asrc vsrc =>
       store_post_run_d ws rl (srcs_view ws asrc) (srcs_view ws vsrc)
         base (length data) (S n)
@@ -2376,7 +2408,10 @@ Proof.
     |cfg ag0 aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr pw sr sw st' dd Hlk Hps|cfg ag0 st' dd Hlk Hps
     |cfg ag0 rdw wsrc st' dd Hlk Hps|cfg ag0 csrc st' dd Hlk Hps
-    |cfg ag0 st' dd Hlk Hps];
+    |cfg ag0 st' dd Hlk Hps
+    |cfg ag0 aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag0 rl base data asrc vsrc kk R st' dd
+        Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     destruct dd;
     (have Hdv : pc_dev cfg = tt by destruct (pc_dev cfg));
     rewrite Hdv in Hps;
@@ -2443,6 +2478,27 @@ Proof.
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
     rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
     exact (PFInstr pstep pcls i d agd stD tt Hlkd Hpsd).
+  (* THE RMW SPLIT (S2) *)
+  - exists st', []. split_and!;
+      [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
+    have Hr' : read_ok_d (pc_img d) (pc_log d) (pa_ws agd) aq false base tvs
+                 (srcs_view (pa_ws agd) asrc)
+      by rewrite Himg Hlog Hws.
+    rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
+    exact (PFExLoad pstep pcls i d agd aq base tvs asrc stD tt
+             Hlkd Hpsd Hr').
+  - exists st', [WMsg base data (Some i) kk]. split_and!;
+      [exact Hps|reflexivity|reflexivity|reflexivity|].
+    intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
+    have Hres' : w_res (pa_ws agd) = Some R by rewrite Hws.
+    have He' : excl_ok_ts (pc_log d) i base (rv_ts R)
+                 (S (length (pc_log d))) by rewrite Hlog.
+    have Hkc' : kk = pcls (pa_st agd) (WeakPromise.LExStore rl base data
+                             asrc vsrc) (pa_ws agd) by rewrite Hkcls.
+    rewrite -Himg -{1}Hlog -{1}Hlog -Hws -Hprom.
+    exact (PFExStore pstep pcls i d agd rl base data asrc vsrc kk R stD tt
+             Hlkd Hpsd Hne Hres' Hrb Hrlen He' Hkc').
 Qed.
 
 (** *** 9.7 configurations that differ only in one agent's register file *)
@@ -2601,7 +2657,10 @@ Proof.
     |cfg ag aq rl base tvs data asrc vsrc kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps|cfg ag st' dd Hlk Hps
     |cfg ag rdw wsrc st' dd Hlk Hps|cfg ag csrc st' dd Hlk Hps
-    |cfg ag st' dd Hlk Hps];
+    |cfg ag st' dd Hlk Hps
+    |cfg ag aq base tvs asrc st' dd Hlk Hps Hr
+    |cfg ag rl base data asrc vsrc kk R st' dd
+       Hlk Hps Hne Hres Hrb Hrlen He Hkc];
     destruct dd; rewrite /pstep_unit in Hps;
     destruct (sail_step_irq_or_ni next (pa_st ag) _ st' Hps)
       as [[Hf Hirq]|Hni];
@@ -2616,6 +2675,11 @@ Proof.
   - right. by eapply PFRegW.
   - right. by eapply PFCtrl.
   - right. by eapply PFInstr.
+  (* THE RMW SPLIT (S2) *)
+  - right. by eapply PFExLoad.
+  - right. eapply (PFExStore _ _ _ _ _ rl base data asrc vsrc kk R);
+      [exact Hlk|exact Hni|exact Hne|exact Hres|exact Hrb|exact Hrlen
+      |exact He|exact Hkc].
 Qed.
 
 

@@ -346,7 +346,9 @@ Section trace.
     destruct l; simpl;
       [by intros [_ ->]|by intros (_ & _ & ->)|done|done|by intros [_ ->]
       |by intros [_ ->]|by intros [_ ->]|by intros [_ ->]|by intros [_ ->]
-      |done|done].
+      (* THE RMW SPLIT (S2): the exclusive read fulfils nothing, the
+         conditional write does *)
+      |by intros (_ & _ & ->)|done].
   Qed.
 
   Lemma atrace_ts_none img log i T k ev :
@@ -376,7 +378,8 @@ Section trace.
     apply (astep_prog_step d0) in Hps as (d & d' & Hps).
     destruct (ae_lb ev) as [|aq lat base tvs asrc| | | | | | | | |]; simpl;
       [done| |done|done|done|done|done|done|done|done|done].
-    destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ _ Hps).
+    destruct lat; [|done].
+    by destruct (lat_free_prog_lat pstep _ _ _ _ _ _ _ _ Hlfp Hps).
   Qed.
 
   (* ---------------------------------------------------------------- *)

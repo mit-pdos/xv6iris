@@ -285,6 +285,25 @@ Lemma retag_excl_ok_2 f log i base tvs ts :
   excl_ok log i base tvs ts → excl_ok (retag_log f log) i base tvs ts.
 Proof. apply retag_excl_ok. Qed.
 
+(** THE RMW SPLIT (S2): the same, for the reservation-shaped window.  The
+    proof is [retag_excl_ok]'s verbatim — a retag moves no [msg_byte] and
+    no [wm_tid]. *)
+Lemma retag_excl_ok_ts f log i base rts ts :
+  excl_ok_ts (retag_log f log) i base rts ts ↔ excl_ok_ts log i base rts ts.
+Proof.
+  rewrite /excl_ok_ts. split; intros He j t Ht Hw; eapply He; [done| |done|].
+  - by eapply retag_writes_in_by_2.
+  - by eapply retag_writes_in_by_1.
+Qed.
+
+Lemma retag_excl_ok_ts_1 f log i base rts ts :
+  excl_ok_ts (retag_log f log) i base rts ts → excl_ok_ts log i base rts ts.
+Proof. apply retag_excl_ok_ts. Qed.
+
+Lemma retag_excl_ok_ts_2 f log i base rts ts :
+  excl_ok_ts log i base rts ts → excl_ok_ts (retag_log f log) i base rts ts.
+Proof. apply retag_excl_ok_ts. Qed.
+
 (** [fulfil_ok] mentions no log at all — recorded so the audit above is
     complete on the page. *)
 Lemma retag_fulfil_ok ws rl base n ts :
@@ -346,7 +365,10 @@ Section machine.
             Hlk Hps Hlen Hin Hm Hr He Hok
       | cfg i ag pr pw sr sw st' d' Hlk Hps |cfg i ag st' d' Hlk Hps
       | cfg i ag rd srcs st' d' Hlk Hps | cfg i ag srcs st' d' Hlk Hps
-      | cfg i ag st' d' Hlk Hps].
+      | cfg i ag st' d' Hlk Hps
+      | cfg i ag aq base tvs asrc st' d' Hlk Hps Hr
+      | cfg i ag rl base data asrc vsrc k ts R st' d'
+            Hlk Hps Hin Hm Hres Hrb Hrlen He Hok].
     - (* WPPromise: the appended class is the rule's free binder — take
          [f] at the OLD log length *)
       pose proof (WPPromise (P:=P) (D:=D) pstep
@@ -397,6 +419,18 @@ Section machine.
     - exact (WPInstr (P:=P) (D:=D) pstep
                (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
                i ag st' d' Hlk Hps).
+    (* THE RMW SPLIT (S2): [WPLoad]'s / [WPFulfil]'s arguments verbatim,
+       with the window in the reservation's vocabulary. *)
+    - apply (WPExLoad (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag aq base tvs asrc st' d' Hlk Hps).
+      simpl. by apply retag_read_ok_2.
+    - apply (WPExStore (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag rl base data asrc vsrc (f (ts - 1)%nat) ts R st' d'
+               Hlk Hps Hin); [|exact Hres|exact Hrb|exact Hrlen| |exact Hok].
+      + simpl. by rewrite retag_log_lookup Hm.
+      + simpl. by apply retag_excl_ok_ts_2.
   Qed.
 
   Lemma wpsteps_retag f c c' :
@@ -553,8 +587,23 @@ Section machine.
     - done.
     - done.
     - done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - split.
+      + intros (Hr & ? & ?). split_and!; [|done|done]. by apply retag_read_ok_2.
+      + intros (Hr & ? & ?). split_and!; [|done|done]. by eapply retag_read_ok_1.
+    - split.
+      + intros (ts & k & R & Hin & Hm & Hres & Hrb & Hrlen & He & Hok & Hf & HD).
+        exists ts, (f (ts - 1)%nat), R.
+        split_and!; [done| |done|done|done| |done|done|done].
+        * by rewrite retag_log_lookup Hm.
+        * by apply retag_excl_ok_ts_2.
+      + intros (ts & k & R & Hin & Hm & Hres & Hrb & Hrlen & He & Hok & Hf & HD).
+        apply retag_log_lookup_inv in Hm as (m & Hm & Heq).
+        destruct m as [pa dat tid ak]. rewrite /retag_msg /= in Heq.
+        simplify_eq/=.
+        exists ts, ak, R.
+        split_and!; [done|done|done|done|done| |done|done|done].
+        by eapply retag_excl_ok_ts_1.
   Qed.
 
   Lemma asteps_wf_retag f img log i ags evs :
@@ -701,7 +750,9 @@ Section machine.
     assert (ag1 = ag) as -> by congruence.
     have Htid : wm_tid m0 = Some i.
     { destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
-                             |aq rl base tvs data asrc vsrc| | | | | | |];
+                             |aq rl base tvs data asrc vsrc| | | | |
+                             |xaq xbase xtvs xasrc
+                             |yrl ybase ydata yasrc yvsrc];
         simpl in Hok.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as (_ & _ & HD). by rewrite HD in Hts.
@@ -718,8 +769,13 @@ Section machine.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
       - destruct Hok as [_ HD]. by rewrite HD in Hts.
-      - done.
-      - done. }
+      (* THE RMW SPLIT (S2): the exclusive read has [Dl = None]; the
+         conditional write names the author, as [LStore] does *)
+      - destruct Hok as (_ & _ & HD). by rewrite HD in Hts.
+      - destruct Hok as (ts' & k' & R & _ & Hlk & _ & _ & _ & _ & _ & _ & HD).
+        have Hq : ts' = ts by congruence. subst ts'.
+        have Hm' : m0 = WMsg ybase ydata (Some i) k' by congruence.
+        by rewrite Hm'. }
     eapply (canon_f_spec clsf TS (ts - 1)%nat m0 i T k ev ag);
       [done|done|done|done|by rewrite Hsp|done|].
     intros k1 k2 ev1 ev2 He1 Ht1 He2 Ht2.

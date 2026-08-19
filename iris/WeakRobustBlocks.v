@@ -375,7 +375,10 @@ Section complete.
                        Hag Hps Hdne Hlen Hro Hex
                   |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps
                   |cfg ag rdw wsrc st' dd Hag Hps|cfg ag csrc st' dd Hag Hps
-                  |cfg ag st' dd Hag Hps]; simpl.
+                  |cfg ag st' dd Hag Hps
+                  |cfg ag aq base tvs asrc st' dd Hag Hps Hro
+                  |cfg ag rl base data asrc vsrc k R st' dd
+                       Hag Hps Hdne Hres Hrb Hrlen Hex Hk]; simpl.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
       exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)). split_and!; [done|done|].
       reflexivity.
@@ -401,6 +404,13 @@ Section complete.
       eexists ag, _. split_and!; [done|done|]. apply ctrl_post_le.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
       eexists ag, _. split_and!; [done|done|]. apply instr_post_le.
+    (* THE RMW SPLIT (S2) *)
+    - split_and!; [done| |exists []; rewrite app_nil_r; by split].
+      eexists ag, _. split_and!; [done|done|]. apply exload_post_run_d_le.
+    - split_and!; [done| |].
+      + eexists ag, _. split_and!; [done|done|]. apply store_post_run_d_le.
+      + exists [WMsg base data (Some i) k]. split; [done|].
+        by apply list_relations.Forall_singleton.
   Qed.
 
   Lemma wp_pf_step_frame i l c c' j :
@@ -475,7 +485,10 @@ Section complete.
                        Hag Hps Hdne Hlen Hro Hex
                   |cfg ag pr pw sr sw st' dd Hag Hps|cfg ag st' dd Hag Hps
                   |cfg ag rdw wsrc st' dd Hag Hps|cfg ag csrc st' dd Hag Hps
-                  |cfg ag st' dd Hag Hps];
+                  |cfg ag st' dd Hag Hps
+                  |cfg ag aq base tvs asrc st' dd Hag Hps Hro
+                  |cfg ag rl base data asrc vsrc k R st' dd
+                       Hag Hps Hdne Hres Hrb Hrlen Hex Hk];
       intros Hb j ag2 Hag2; simpl in Hag2 |- *.
     - destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
@@ -548,6 +561,29 @@ Section complete.
         simplify_eq/=. apply instr_post_bounded. by eapply Hb.
       + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
         by eapply Hb.
+    (* THE RMW SPLIT (S2): the exclusive read is [LLoad]'s arm plus the
+       reservation's own bound; the conditional write is [LStore]'s *)
+    - destruct (decide (j = i)) as [->|Hne].
+      + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
+        simplify_eq/=.
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        have Hva := srcs_view_bounded (pa_ws ag) _ asrc Hbag.
+        apply exload_post_run_d_bounded;
+          [exact Hbag|exact Hva|by eapply read_ok_forall].
+      + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
+        by eapply Hb.
+    - rewrite length_app /=.
+      destruct (decide (j = i)) as [->|Hne].
+      + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
+        simplify_eq/=.
+        have Hbag : ws_bounded (pa_ws ag) (length (pc_log cfg)) by eapply Hb.
+        have Hva := srcs_view_bounded (pa_ws ag) _ asrc Hbag.
+        have Hvd := srcs_view_bounded (pa_ws ag) _ vsrc Hbag.
+        eapply (store_post_run_d_bounded _ _ _ _ _ _ _
+                  (length (pc_log cfg)));
+          [exact Hbag|lia|lia|lia|lia].
+      + rewrite (lookup_insert_other _ _ _ _ Hne) in Hag2.
+        eapply ws_bounded_mono; [by eapply Hb|lia].
   Qed.
 
   (* ---------------------------------------------------------------- *)

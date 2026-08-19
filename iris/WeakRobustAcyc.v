@@ -207,8 +207,15 @@ Section astep.
     - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
     - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
     - intros [-> _] w Hw a tf vf. exact (Hw a tf vf).
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) w Hw a tf vf.
+      rewrite exload_post_run_d_fwd. exact (Hw a tf vf).
+    - intros (ts & kc & R & _ & Hlog & _ & _ & _ & _ & (_ & Hext) & -> & _)
+             w Hw a tf vf Hlk.
+      apply store_post_run_d_fwd_inv in Hlk as [[-> _]|Hlk];
+        [|exact (Hw a tf vf Hlk)].
+      split; [rewrite /fulfil_vpre_d /fulfil_vpre in Hext; lia|].
+      eexists. split; [exact Hlog|done].
   Qed.
 
   (** EXT, in the form the measure wants: the fulfilling step's PRE-state
@@ -237,8 +244,10 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): the conditional write is [LStore]'s arm *)
+    - by intros (_ & _ & ?).
+    - intros (ts' & kc & R & _ & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq).
+      simplify_eq. rewrite /fulfil_vpre_d /fulfil_vpre in Hext. lia.
   Qed.
 
   (** THE SAME-STEP CASE, quantitatively.  [WeakRobustGraph]'s
@@ -271,8 +280,9 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): VACUOUS on both halves (design §7) *)
+    - by intros (_ & _ & ?).
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE AQ ARM's gain: an acquire read joins its timestamp into
@@ -304,8 +314,14 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): the exclusive read is [LLoad]'s arm, through
+       the reservation wrapper (transparent to every view). *)
+    - intros (_ & -> & _) -> [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
+      have Hts : ((xtvs.*1)) !! j = Some ts by rewrite list_lookup_fmap Hj.
+      etrans;
+        [by apply (load_post_run_vwNew_aq (pa_ws ag) xbase (xtvs.*1) j ts Hts)|].
+      apply ws_le_vwNew, load_post_bytes_d_mono.
+    - intros _ _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE FENCE ARM's gain, half 1: an UNFORWARDED read joins its
@@ -338,8 +354,13 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
+      have Hts : ((xtvs.*1)) !! j = Some ts by rewrite list_lookup_fmap Hj.
+      etrans; [|apply ws_le_vrOld, load_post_bytes_d_mono].
+      apply (load_post_run_vrOld' (pa_ws ag) xaq xbase (xtvs.*1) j ts Hts).
+      rewrite /acc_addr. exact Hfv.
+    - intros _ _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE FENCE ARM's gain, half 2: a [pr ∧ sw] fence ships [w_vrOld]
@@ -432,9 +453,13 @@ Definition fulfil_vext (ws : wstate) (l : wlabel) : option nat :=
               (load_post_run_d ws aq (srcs_view ws asrc) base (tvs.*1)) rl
               (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
                        (ldv_of ws aq (srcs_view ws asrc) base (tvs.*1))))
+  (* THE RMW SPLIT (S2): [LRmw]'s shape, with the read half's banked
+     post-view coming from the RESERVATION ([res_view], a total function
+     of the state) instead of from the fused label's own [ldv_of]. *)
   | LExStore rl _ _ asrc vsrc =>
       Some (fulfil_vpre_d ws rl
-              (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc)))
+              (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
+                       (res_view ws)))
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
   | LCtrl _ | LInstr | LExLoad _ _ _ _ => None
   end.
@@ -455,7 +480,7 @@ Proof.
                              (tvs.*1)))%nat
       by apply ws_le_vwNew, load_post_run_d_le.
     rewrite /fulfil_vpre_d /fulfil_vpre. lia.
-  - (* [LExStore]: [LStore]'s arm verbatim (RMW split S1) *)
+  - (* [LExStore] (RMW split S2) *)
     intros [= <-]. rewrite /fulfil_vpre_d /fulfil_vpre. lia.
 Qed.
 
@@ -506,8 +531,10 @@ Proof.
   - by intros [_ ?].
   - by intros [_ ?].
   - by intros [_ ?].
-  - done.
-  - done.
+  (* THE RMW SPLIT (S2) *)
+  - by intros (_ & _ & ?).
+  - intros (ts' & kc & R & _ & _ & Hres & _ & _ & _ & (_ & Hext) & _ & Heq).
+    simplify_eq. rewrite (res_view_some _ _ Hres). by eexists.
 Qed.
 
 (* ------------------------------------------------------------------ *)

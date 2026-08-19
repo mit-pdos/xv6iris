@@ -167,8 +167,11 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): the conditional write is [LStore]'s arm *)
+    - by intros (_ & _ & ?).
+    - intros (ts' & kc & R & _ & Hlog & _ & _ & _ & _ & _ & -> & Heq) Hm Hb.
+      injection Heq as <-. rewrite Hlog in Hm. simplify_eq.
+      apply store_post_run_d_vwOld. by apply (msg_byte_len _ a Hb).
   Qed.
 
   (** The [pw ∧ sw] mirror of [WeakRobustAcyc.astep_ok_fence_vwNew]: a

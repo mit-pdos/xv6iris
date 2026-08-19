@@ -177,8 +177,10 @@ Section astep.
     - intros [-> _] w. apply regw_post_le.
     - intros [-> _] w. apply ctrl_post_le.
     - intros [-> _] w. apply instr_post_le.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) w. apply exload_post_run_d_le.
+    - intros (ts & kc & R & _ & _ & _ & _ & _ & _ & _ & -> & _) w.
+      apply store_post_run_d_le.
   Qed.
 
   (** A fulfilled timestamp is nonzero: [fulfil_ok]'s EXT conjunct
@@ -199,8 +201,10 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - by intros (_ & _ & ?).
+    - intros (ts' & kc & R & _ & _ & _ & _ & _ & _ & (_ & Hext) & _ & Heq).
+      simplify_eq. lia.
   Qed.
 
   (** A read's timestamp names a real write of the byte it reads
@@ -223,8 +227,11 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): the exclusive read reads, the conditional
+       write does not *)
+    - intros (Hro & _ & _) [j [v [Hj ->]]]%elem_of_tvs_reads.
+      destruct (Hro j ts v Hj) as (Hb & _ & _). by eexists.
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE READ RAISES [coh]: after a step whose label reads [(a, ts)],
@@ -254,8 +261,12 @@ Section astep.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
     - intros _ Hin%elem_of_nil. done.
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - intros (_ & -> & _) [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
+      have Hts : (xtvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
+      by apply (exload_post_run_d_coh (pa_ws ag) xaq
+                  (srcs_view (pa_ws ag) xasrc) xbase (xtvs.*1) j ts Hts).
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
   (** THE FULFIL LOWERS NOTHING BUT DEMANDS [coh < ts] on every byte of
@@ -275,8 +286,10 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - by intros (_ & _ & ?).
+    - intros (ts' & kc & R & _ & Hlog & _ & _ & _ & _ & _ & _ & Heq).
+      simplify_eq. by eexists _, _, _.
   Qed.
 
   Lemma astep_ok_fulfil_coh img log i ag l f ts m a :
@@ -302,8 +315,13 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2) *)
+    - by intros (_ & _ & ?).
+    - intros (ts' & kc & R & _ & Hlog & _ & _ & _ & _ & (Hcoh & _) & _ & Heq)
+             Hm Hb.
+      simplify_eq.
+      destruct (msg_byte_in_range _ _ Hb) as (j & Hj & ->). simpl in Hj |- *.
+      by apply Hcoh.
   Qed.
 
   (** THE SAME-STEP CASE of the own-read lemma: a step can NEVER read
@@ -334,8 +352,11 @@ Section astep.
     - by intros [_ ?].
     - by intros [_ ?].
     - by intros [_ ?].
-    - done.
-    - done.
+    (* THE RMW SPLIT (S2): both arms are now VACUOUS (design §7) — the
+       exclusive read fulfils nothing, the conditional write reads
+       nothing, so no single step both reads and fulfils. *)
+    - by intros (_ & _ & ?).
+    - intros _ Hin%elem_of_nil. done.
   Qed.
 
 End astep.
