@@ -549,12 +549,12 @@ Section ProofNamexRoot.
        The licence itself is PURE -- the evidence lives in the region's
        invariant, not in the caller's hands -- which is exactly why it costs
        this walk nothing.  This is the root clause's first consumer. *)
-    iAssert (iname gi gfs ROOTINO RootL) as "Hlic";
+    iAssert (iname gi gfs inodestart ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
     iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
-              Kig Hn Hrino ltac:(discriminate) HA3a0 HA3a1 Hbelow
+              Kig Hn Hrino HA3a0 HA3a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl Hlic").
     iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href Hru _".
     destruct Higp as (Hcsig & Hkig & Higa0).

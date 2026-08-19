@@ -1821,7 +1821,7 @@ Section ProofSysChdirBody.
           iApply (Iput.wp_iput_sconf (CID := CID32) gs j gl gu gd gk pd pav pu bn
                     g gfs gi cn gtl gilc gislc cov logstart bmapstart inodestart
                     nib size dev used1 kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
-                    P6 (K - 20)%nat eb b lks true
+                    P6 (K - 20)%nat eb b lks
                     ltac:(lia) Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
@@ -1833,7 +1833,7 @@ Section ProofSysChdirBody.
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
           iIntros (CID33 Hq33 mip n2 used2)
             "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-             Hop Hislot _".
+             Hop Hislot".
           assert (Hpc50 : ret_pc (P6 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x50)) by (rewrite HP6ra; pcw).
           iEval (rewrite Hpc50) in "Hpc".
@@ -2075,7 +2075,7 @@ Section ProofSysChdirBody.
                     pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                     inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
-                    Q1 (K - 20)%nat eb b lks true
+                    Q1 (K - 20)%nat eb b lks
                     ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
@@ -2087,7 +2087,7 @@ Section ProofSysChdirBody.
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
           iIntros (CID30 Hq30 mup n2 used2)
             "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-             Hop Hislot _".
+             Hop Hislot".
           assert (Hpc76 : ret_pc (Q1 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x76)) by (rewrite HQ1ra; pcw).
           iEval (rewrite Hpc76) in "Hpc".

@@ -149,7 +149,7 @@
    block, and nothing in the scan can say the inum names a live inode.
    §20.17.5 answered that with a paragraph -- the enumeration of the six
    reasons a caller believes its inum -- and [IgetLic.v] makes it a type:
-   one binder [l : ilic] and one premise [iname γi γfs inum l].  The user's
+   one binder [l : ilic] and one premise [iname γi γfs inodestart inum l].  The user's
    invariant ("the kernel will never invoke iget on inode numbers in
    directories in a disconnected subtree") is not statable about the
    machine's traces; it IS statable here, at DELIVERY, and that is why the
@@ -229,13 +229,6 @@ Definition wp_iget_sconf_body
   (* the requested inum is inside the inode region: [ipool_acc]'s premise on
      the recycle arm, and the ONLY constraint on either argument *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
-  (* THE MINT's ONE PURE PREMISE (item 7a-wire, iclaim-ledger.md §5''.3).
-     [IgetLic.iname_mint_ok]'s [BufL] row transports the licence's own
-     decoded type fact to the REGION's record through the two block halves,
-     so a [BufL]-licenced iget must be at the block the constructor names.
-     [discriminate] at every non-[BufL] caller in the tree; the real
-     equation only at [ProofIreclaim]'s boot walk. *)
-  (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
   (* a0 = dev, a1 = inum, sign-extended -- the scan's 64-bit [bne]s at
      +0x4c / +0x52 compare them against the [c.lw] of a cell *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
@@ -265,8 +258,12 @@ Definition wp_iget_sconf_body
   panic_env -∗
   (* THE precondition that makes the mint safe, on both arms *)
   iref_slot -∗
-  (* THE LICENCE: borrowed here, returned below at the SAME [l] *)
-  iname γi γfs inum l -∗
+  (* THE LICENCE: borrowed here, returned below at the SAME [l].  It is
+     indexed by the region's start because the [BufL] arm carries its own
+     block tie (SIMP-1) -- the standalone block equation this contract used
+     to state, and the [discriminate] it forced on every non-[BufL] caller,
+     are both gone. *)
+  iname γi γfs inodestart inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
     sie_cap_gpr KT1 mr K b p -∗
@@ -283,7 +280,7 @@ Definition wp_iget_sconf_body
        life and is surrendered at the iput that closes it. *)
     runit (is_claim l) (bv_unsigned inum) -∗
     (* ...and BACK, unspent and at the SAME [l] *)
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

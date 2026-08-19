@@ -504,7 +504,7 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 38)%nat eb b lks true
+              dqb dqs M2 (K - 38)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -514,7 +514,7 @@ Section ProofSysLinkTails.
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot _".
+       Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xcc)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".
@@ -830,7 +830,7 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 38)%nat eb b lks true
+              dqb dqs M2 (K - 38)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -840,7 +840,7 @@ Section ProofSysLinkTails.
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot _".
+       Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xdc)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".
@@ -1463,7 +1463,7 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID11) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn' bm (S u) pidv dq
-              dqb dqs Q2 (K - 38)%nat eb b lks true
+              dqb dqs Q2 (K - 38)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -1476,7 +1476,7 @@ Section ProofSysLinkTails.
     { rewrite /log_op. iExists (Sb ∪ {[IBLOCK inum inodestart]}). iExact "Hop". }
     iIntros (CID12 Hq12 mup n2 used2)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot _".
+       Hop Hislot".
     assert (Hpc110 : ret_pc (Q2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SL + 0x110)) by (rewrite HQ2ra; pcw).
     iEval (rewrite Hpc110) in "Hpc".
@@ -1827,7 +1827,7 @@ Section ProofSysLinkTails.
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
-              M2 (K - 38)%nat eb b lks true
+              M2 (K - 38)%nat eb b lks
               HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -1840,7 +1840,7 @@ Section ProofSysLinkTails.
     { done. }
     iIntros (CID3 Hq3 mup n1 used1 Sb1 w)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused1 Hbmres Hbsl %Hsb1 %Hwm
-       %Hcrbw %Hn1 Hop Hislot _".
+       %Hcrbw %Hn1 Hop Hislot".
     assert (Hpcf4 : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xf4)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpcf4) in "Hpc".
@@ -2103,7 +2103,7 @@ Section ProofSysLinkTails.
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
-              M2 (K - 38)%nat eb b lks true
+              M2 (K - 38)%nat eb b lks
               HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -2116,7 +2116,7 @@ Section ProofSysLinkTails.
     { done. }
     iIntros (CID3 Hq3 mup n1 used1 Sb1 w)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused1 Hbmres Hbsl %Hsb1 %Hwm
-       %Hcrbw %Hn1 Hop Hislot _".
+       %Hcrbw %Hn1 Hop Hislot".
     assert (Hpcec : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xec)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpcec) in "Hpc".

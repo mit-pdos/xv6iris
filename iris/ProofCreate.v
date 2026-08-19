@@ -3072,7 +3072,7 @@ Section ProofCreateMain.
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                  G2 (K - 10)%nat eb b lks true
+                  G2 (K - 10)%nat eb b lks
                   ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
@@ -3086,7 +3086,7 @@ Section ProofCreateMain.
         { iEval (cbn beta iota). iEmpIntro. }
         iIntros (CIDup Hqup mup n2 used2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl _".
+           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl".
         assert (Hpcup : ret_pc (G2 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x8a)) by (rewrite HG2ra; pcw).
         iEval (rewrite Hpcup) in "Hpc".
@@ -3503,7 +3503,7 @@ Section ProofCreateMain.
                     cn gtl gild gisld cov logstart bmapstart inodestart nib size
                     dev used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                     false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                    F3 (K - 10)%nat eb b lks true
+                    F3 (K - 10)%nat eb b lks
                     ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
@@ -3517,7 +3517,7 @@ Section ProofCreateMain.
           { iEval (cbn beta iota). iEmpIntro. }
           iIntros (CIDu1 Hqu1 mu1 n2 used2 Sb2 wf1)
             "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-             %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl _".
+             %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl".
           assert (Hpcu1 : ret_pc (F3 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x54)) by (rewrite HF3ra; pcw).
           iEval (rewrite Hpcu1) in "Hpc".
@@ -3726,7 +3726,7 @@ Section ProofCreateMain.
                       cn gtl gilc gislc cov logstart bmapstart inodestart nib
                       size dev used2 kslot (qq/2)%Qp (qq/2)%Qp gc cinum dnc bmc
                       n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
-                      B2 (K - 10)%nat eb b lks true
+                      B2 (K - 10)%nat eb b lks
                       ltac:(exact HKiup) Hkslot ltac:(discriminate)
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
@@ -3742,7 +3742,7 @@ Section ProofCreateMain.
             { iEval (cbn beta iota). iEmpIntro. }
             iIntros (CIDU2 HqU2 mu2 n3 used3 Sb3 wf2)
               "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd3 Hbmr Hbsl
-               %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2 _".
+               %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2".
             assert (Hpcu2 : ret_pc (B2 !!! Regidx Rra : mword 64)
                             = mword_of_int (CK + 0x9e)) by (rewrite HB2ra; pcw).
             iEval (rewrite Hpcu2) in "Hpc".
@@ -4251,7 +4251,7 @@ Section ProofCreateMain.
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                  J2 (K - 10)%nat eb b lks true
+                  J2 (K - 10)%nat eb b lks
                   ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
@@ -4265,7 +4265,7 @@ Section ProofCreateMain.
         { iEval (cbn beta iota). iEmpIntro. }
         iIntros (CIDup Hqup mup n2 used2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl _".
+           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl".
         assert (Hpcup : ret_pc (J2 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x94)) by (rewrite HJ2ra; pcw).
         iEval (rewrite Hpcup) in "Hpc".
@@ -5550,7 +5550,7 @@ Section ProofCreateMain.
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
                        size dev used' kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
                        n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
-                       Y2 (K - 10)%nat eb b lks true
+                       Y2 (K - 10)%nat eb b lks
                        ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
@@ -5564,7 +5564,7 @@ Section ProofCreateMain.
              { iEval (cbn beta iota). iEmpIntro. }
              iIntros (CIDU2 HqU2 mu2 n2 used2 Sb2 wf2)
                "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-                %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2 _".
+                %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2".
              assert (Hpcu2 : ret_pc (Y2 !!! Regidx Rra : mword 64)
                              = mword_of_int (CK + 0xe6)) by (rewrite HY2ra; pcw).
              iEval (rewrite Hpcu2) in "Hpc".
@@ -5891,7 +5891,7 @@ Section ProofCreateMain.
                 gtl γil γisl cov logstart bmapstart inodestart nib size dev
                 used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dn bm (S q1) Sb1
                 false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                Z2 (K - 10)%nat eb b lks true
+                Z2 (K - 10)%nat eb b lks
                 ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
@@ -5905,7 +5905,7 @@ Section ProofCreateMain.
       { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDU HqU mu n2 used2 Sb2 wf)
         "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-         %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl _".
+         %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl".
       assert (Hpcu : ret_pc (Z2 !!! Regidx Rra : mword 64)
                      = mword_of_int (CK + 0xf2)) by (rewrite HZ2ra; pcw).
       iEval (rewrite Hpcu) in "Hpc".
@@ -6350,7 +6350,7 @@ Section ProofCreateMain.
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
-              G4 (K - 10)%nat eb b lks true
+              G4 (K - 10)%nat eb b lks
               ltac:(exact HKiup) Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
@@ -6368,7 +6368,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDG7 HqG7 mu1 n5 used5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd5 Hbmr Hbsl
-       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 _".
+       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1".
     (* THE LEDGER, at the body's disjunction (finding (3) in the banner) *)
     assert (Hipn5 : (iput_units <= n5)%nat).
     { destruct (decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
@@ -6518,7 +6518,7 @@ Section ProofCreateMain.
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
-              G6 (K - 10)%nat eb b lks true
+              G6 (K - 10)%nat eb b lks
               ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
@@ -6532,7 +6532,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDGA HqGA mu2 n6 used6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd6 Hbmr Hbsl
-       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 _".
+       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2".
     assert (Hpcu2 : ret_pc (G6 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x15c)) by (rewrite HG6ra; pcw).
     iEval (rewrite Hpcu2) in "Hpc".
@@ -7166,7 +7166,7 @@ Section ProofCreateMain.
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
-              G4 (K - 10)%nat eb b lks true
+              G4 (K - 10)%nat eb b lks
               ltac:(exact HKiup) Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
@@ -7184,7 +7184,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDG7 HqG7 mu1 n5 used5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd5 Hbmr Hbsl
-       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 _".
+       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1".
     assert (Hipn5 : (iput_units <= n5)%nat).
     { destruct (decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
         as [Hin | Hout].
@@ -7267,7 +7267,7 @@ Section ProofCreateMain.
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dp bmp
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
-              G6 (K - 10)%nat eb b lks true
+              G6 (K - 10)%nat eb b lks
               ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
@@ -7281,7 +7281,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDGA HqGA mu2 n6 used6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd6 Hbmr Hbsl
-       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 _".
+       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2".
     assert (Hpcu2 : ret_pc (G6 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x15c)) by (rewrite HG6ra; pcw).
     iEval (rewrite Hpcu2) in "Hpc".
@@ -9043,7 +9043,7 @@ Section ProofCreateMain.
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
                     true true false e0 pidv (DfracOwn (1/4)) dqb dqs
-                    T2 (K - 10)%nat eb b lks true
+                    T2 (K - 10)%nat eb b lks
                     ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
@@ -9057,7 +9057,7 @@ Section ProofCreateMain.
           { iEval (cbn beta iota). iEmpIntro. }
           iIntros (CIDT3 HqT3 mu2 n7 used7 Sb7 wf7)
             "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd7 Hbmr Hbsl
-             %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2 _".
+             %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2".
           assert (Hpcu2 : ret_pc (T2 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0xe6)) by (rewrite HT2ra; pcw).
           iEval (rewrite Hpcu2) in "Hpc".

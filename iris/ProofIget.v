@@ -472,7 +472,7 @@ Section ProofIget.
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
-    intros pcE ret_tgt HK HnZ Hnib Hbno Ha0 Ha1 Hfresh.
+    intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* [Hlic] is the LICENCE (increment C'-lite, fs-fragments.md §7.1).
@@ -823,7 +823,7 @@ Section ProofIget.
            the pool's await arm -- so it can no longer be captured here at
            +0x44 and produced at +0x9c.  Each arm hands back what the mover
            returned, at the SAME [l], and this tail relays it to [Hcont]. *)
-        iname γi γfs inum l -∗
+        iname γi γfs inodestart inum l -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
       with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
@@ -1044,7 +1044,7 @@ Section ProofIget.
       iref_slot -∗
       (* THE LICENCE rides the scan (increment IIIe): it is spent at whichever
          exit the scan takes, so it can no longer sit inside [TAILC]. *)
-      iname γi γfs inum l -∗
+      iname γi γfs inodestart inum l -∗
       TAILC -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -1081,7 +1081,7 @@ Section ProofIget.
         ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
         ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
         iref_slot -∗
-        iname γi γfs inum l -∗
+        iname γi γfs inodestart inum l -∗
         TAILC -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "Hstep".
       { iIntros (Ms) "%Hsreg %Hscan' %Hemp' Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hlic Hcont2".
@@ -1311,7 +1311,7 @@ Section ProofIget.
                        icnt_half (bv_unsigned inum) 0%nat ∗
                        frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
-                       iname γi γfs inum l)%I
+                       iname γi γfs inodestart inum l)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
                       with "Hcg Hpc Hi72 [Hgid HinT Hbundle Hlic]").
             { rewrite Hpa72 Hsv72.
@@ -1386,7 +1386,7 @@ Section ProofIget.
                        iref_tok e (1/2/2)%Qp ∗
                        (∃ g : gname, live_gen e (1/2) g ∗ ity_pending g) ∗
                        IcacheRef.frzsel e (1/2)%Qp false ∗
-                       iname γi γfs inum l ∗
+                       iname γi γfs inodestart inum l ∗
                        ifreeze_off (bv_unsigned inum) ∗
                        icnt_half (bv_unsigned inum) 1%nat ∗
                        runit (is_claim l) (bv_unsigned inum))%I
@@ -1406,7 +1406,7 @@ Section ProofIget.
                  arm at +0x7c, the half into [islot2]'s live one. *)
               iMod (iref_alloc_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib
                       M e inum l (1/2/2)%Qp
-                      ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hbno He HMe
+                      ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib He HMe
                       ig_quarter_lt
                       with "Hinv Hrinv Hhalf Hisl Hlic Hfoff Hicnt0")
                 as "[Hcell Hback2]".
@@ -1865,7 +1865,7 @@ Section ProofIget.
            the region's bit is DOWN and the frozen alternative dies on
            [frzm_agree].  The three MISS exits above re-park it untouched. *)
         iApply fupd_wp.
-        iMod (frz_park_lic_off ⊤ γi γfs inodestart nib inum l j qj
+        iMod (frz_park_lic_off ⊤ γi γfs inodestart nib inum l j
                 ltac:(solve_ndisj) Hnib with "Hrinv Hlic Hpark")
           as "(Hlic & Hmirj & Hselj)".
         iModIntro.
@@ -1925,7 +1925,7 @@ Section ProofIget.
                    isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
                    iref_tok j (qj'/2)%Qp ∗
                    IcacheRef.frzsel j (1/2)%Qp false ∗
-                   iname γi γfs inum l ∗
+                   iname γi γfs inodestart inum l ∗
                    icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
                    runit (is_claim l) (bv_unsigned inum))%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
@@ -1939,7 +1939,7 @@ Section ProofIget.
              comes straight back, and travels on to [Hcont2]. *)
           iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib M j inum l
                   qj (qj'/2)%Qp nj
-                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMj Hqv Hno1 Hbno
+                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMj Hqv Hno1
                   with "Hinv Hrinv Hhalf Hisl Hselj Hlic Hicnt") as "[Hcell Hback2]".
           iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
           iMod ("Hback2" with "Hcell")

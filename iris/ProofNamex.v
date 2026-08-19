@@ -3325,7 +3325,7 @@ Section ProofNamexMain.
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks true
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
@@ -3343,7 +3343,7 @@ Section ProofNamexMain.
                      { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
-                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2 _".
+                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x80)).
                      { rewrite HND2ra. pcw. }
@@ -4116,7 +4116,7 @@ Section ProofNamexMain.
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GB3 (K - 12)%nat eb b lks true
+                                     GB3 (K - 12)%nat eb b lks
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
@@ -4136,7 +4136,7 @@ Section ProofNamexMain.
                            { iExact "Hropen". }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
-                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl _".
+                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl".
                            assert (Hpce2 : ret_pc (GB3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0xf2)).
                            { rewrite HGB3ra. pcw. }
@@ -4338,7 +4338,7 @@ Section ProofNamexMain.
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GC3 (K - 12)%nat eb b lks true
+                                     GC3 (K - 12)%nat eb b lks
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
@@ -4358,7 +4358,7 @@ Section ProofNamexMain.
                            { iExact "Hropen". }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
-                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl3 _".
+                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl3".
                            assert (Hpc88 : ret_pc (GC3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0x92)).
                            { rewrite HGC3ra. pcw. }
@@ -4631,7 +4631,7 @@ Section ProofNamexMain.
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks true
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
@@ -4649,7 +4649,7 @@ Section ProofNamexMain.
                      { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
-                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2 _".
+                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x5a)).
                      { rewrite HND2ra. pcw. }
@@ -5409,13 +5409,13 @@ Section ProofNamexMain.
          ([IgetLic.iname_root_alloc]).  The licence is PURE: the evidence
          lives in the region's invariant, not in this walk's hands, which
          is why it costs the walk nothing. *)
-      iAssert (iname gi gfs ROOTINO RootL) as "Hlicr";
+      iAssert (iname gi gfs inodestart ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
-                Hrino ltac:(discriminate) HA3a0 HA3a1 ltac:(lkbelow)
+                Hrino HA3a0 HA3a1 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.

@@ -341,9 +341,7 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    lock beside §2.2's [icnt] slot half, and [InodeRegion.ireg_freeze_au]
    SWAPS it for [ifreeze_pre].  The mint is then a fragment-in-hand step
    ([link_freeze_step]) and double-freeze is refuted by [Excl] alone.
-   The [None]-form mint and spend the design asks for are stated below
-   anyway ([link_mint_freeze] / [link_spend_freeze]); the boot ledger uses
-   the [FrzOff] form. *)
+   The boot ledger uses the [FrzOff] form throughout. *)
 Inductive frz := FrzOff | FrzPre (rg : bool) | FrzPost (rg : bool).
 
 Global Instance frz_eq_dec : EqDecision frz.
@@ -2021,46 +2019,6 @@ Section IcacheLink.
     apply (prod_local_update' (A := linkElemUR1) (B := natUR)); [| apply link_lu_id].
     apply (prod_local_update' (A := linkElemUR0) (B := frzUR)); [apply link_lu_id |].
     apply (option_local_update (A := frzR)), exclusive_local_update. done.
-  Qed.
-
-  (* THE [None]-FORM MINT the design's §2.1 asks for, stated for
-     completeness: at a ledger whose f cell was never allocated the freeze
-     is minted out of the authority alone, exactly as [link_mint_ref] mints
-     an [iref_lic].  The boot ledger does not use it -- it is born at
-     [Some (Excl FrzOff)] so that the mint can be exclusive (see [frz]'s
-     header) -- but the move is legal and here. *)
-  Lemma link_mint_freeze (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
-      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (rc : nat) (rg : bool) :
-    link_auth z wl wdu wdt g c r p None rc ==∗
-    link_auth z wl wdu wdt g c r p (Some (Excl (FrzPre rg))) rc ∗ ifreeze_pre rg z.
-  Proof.
-    rewrite /link_auth /ifreeze_pre /ifreeze. iIntros "Ha".
-    iApply (link_update_alloc with "Ha").
-    rewrite /lelem /lelemf /lelemc /lelem0.
-    apply (prod_local_update' (A := linkElemUR1) (B := natUR)); [| apply link_lu_id].
-    apply (prod_local_update' (A := linkElemUR0) (B := frzUR)); [apply link_lu_id |].
-    apply (alloc_option_local_update (A := frzR) (Excl (FrzPre rg))). done.
-  Qed.
-
-  (* ...AND THE [None]-FORM SPEND: [Some FrzPost -> None], the retire that
-     drops the column rather than returning the off-token.  Consumes the
-     fragment, so the deallocation is frame-preserving. *)
-  Lemma link_spend_freeze (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
-      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat)
-      (rg : bool) :
-    link_auth z wl wdu wdt g c r p f rc -∗ ifreeze_post rg z ==∗
-    link_auth z wl wdu wdt g c r p None rc.
-  Proof.
-    rewrite /link_auth /ifreeze_post. iIntros "Ha Hb".
-    iDestruct (link_freeze_agree with "Ha Hb") as %->.
-    rewrite /ifreeze.
-    iMod (link_update _ _ _ (lelemc wl wdu wdt g c r p None rc)
-            (lelem 0 0 0 0 None 0 None)
-            with "Ha Hb") as "[$ _]"; [| done].
-    rewrite /lelem /lelemf /lelemc /lelem0.
-    apply (prod_local_update' (A := linkElemUR1) (B := natUR)); [| apply link_lu_id].
-    apply (prod_local_update' (A := linkElemUR0) (B := frzUR)); [apply link_lu_id |].
-    apply (delete_option_local_update (A := frzR)), _.
   Qed.
 
   (* ===================================================================== *)
