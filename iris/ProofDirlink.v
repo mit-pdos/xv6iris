@@ -167,7 +167,8 @@ Section DirlinkMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string dl_msg_a dl_msg _ eq_refl
-              ltac:(unfold text_end, dl_msg_a; lia) dl_msg_bytes with "Hd").
+              ltac:(unfold text_end, dl_msg_a; lia)
+              ltac:(vm_compute; discriminate) dl_msg_bytes with "Hd").
   Qed.
 End DirlinkMsg.
 

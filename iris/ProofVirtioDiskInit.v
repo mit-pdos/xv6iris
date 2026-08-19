@@ -767,7 +767,8 @@ Section ProofVirtioDiskInit.
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string 0x80007650%Z "virtio_disk"%string nmv eq_refl
-                  ltac:(unfold text_end; lia) Hstrb with "Hkdata") as "#Hstr".
+                  ltac:(unfold text_end; lia)
+                  ltac:(vm_compute; discriminate) Hstrb with "Hkdata") as "#Hstr".
     (* frame-cell address facts (4-slot frame: ra@24, s0@16, s1@8, s2@0) *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))

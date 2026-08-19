@@ -118,7 +118,8 @@ Section ConsoleinitBody.
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string cons_name_str "cons"%string name eq_refl
-                  ltac:(unfold text_end, cons_name_str; lia) Hcons
+                  ltac:(unfold text_end, cons_name_str; lia)
+                  ltac:(vm_compute; discriminate) Hcons
                   with "Hkdata") as "#Hstr".
     (* frame-cell address facts (2-slot frame: ra @ slot 1, s0 @ slot 2) *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 2).

@@ -304,21 +304,24 @@ Section ProcdumpData.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string pd_nl_a pd_nl _ eq_refl
-              ltac:(unfold text_end, pd_nl_a; lia) pd_nl_bytes with "Hd").
+              ltac:(unfold text_end, pd_nl_a; lia)
+              ltac:(vm_compute; discriminate) pd_nl_bytes with "Hd").
   Qed.
 
   Lemma pd_qqq_str : (kernel_data : iProp Σ) -∗ (mword_of_int pd_qqq_a : mword 64) ↦ₛ□ pd_qqq.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string pd_qqq_a pd_qqq _ eq_refl
-              ltac:(unfold text_end, pd_qqq_a; lia) pd_qqq_bytes with "Hd").
+              ltac:(unfold text_end, pd_qqq_a; lia)
+              ltac:(vm_compute; discriminate) pd_qqq_bytes with "Hd").
   Qed.
 
   Lemma pd_fmt_str : (kernel_data : iProp Σ) -∗ (mword_of_int pd_fmt_a : mword 64) ↦ₛ□ pd_fmt.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string pd_fmt_a pd_fmt _ eq_refl
-              ltac:(unfold text_end, pd_fmt_a; lia) pd_fmt_bytes with "Hd").
+              ltac:(unfold text_end, pd_fmt_a; lia)
+              ltac:(vm_compute; discriminate) pd_fmt_bytes with "Hd").
   Qed.
 
   (* --- the six state names, over a SYMBOLIC index --- *)
@@ -339,9 +342,14 @@ Section ProcdumpData.
     intro Hk.
     assert (Hle : text_end <= pd_state_a k)
       by (unfold text_end, pd_state_a, pd_state_s0; lia).
+    assert (Hhi : pd_state_a k + Z.of_nat (S (String.length (pd_state_name k)))
+                  <= rodata_end)
+      by (destruct k as [|[|[|[|[|[|k']]]]]]; try lia;
+          vm_compute; discriminate).
     pose proof (pd_state_bytes k Hk) as Hb.
     iIntros "#Hd".
-    iApply (kernel_data_string (pd_state_a k) (pd_state_name k) _ eq_refl Hle Hb with "Hd").
+    iApply (kernel_data_string (pd_state_a k) (pd_state_name k) _ eq_refl
+              Hle Hhi Hb with "Hd").
   Qed.
 
   (* --- the table entry itself: [ld a2,0(a5)] with a5 = states_0 + 8k --- *)
@@ -364,12 +372,14 @@ Section ProcdumpData.
     intro Hk.
     assert (Hle : text_end <= pd_states_a + 8 * Z.of_nat k)
       by (unfold text_end, pd_states_a, KernelSyms.states_0; lia).
+    assert (Hhi : pd_states_a + 8 * Z.of_nat k + Z.of_nat 8%nat <= rodata_end)
+      by (unfold rodata_end, pd_states_a, KernelSyms.states_0; lia).
     pose proof (pd_states_bytes k Hk) as Hb.
     iIntros "#Hd". rewrite /word_pointsto. iSplit.
     { iPureIntro. unfold pd_states_a, KernelSyms.states_0.
       destruct k as [|[|[|[|[|[|k']]]]]]; try lia; vm_compute; reflexivity. }
     iApply (kernel_data_window (pd_states_a + 8 * Z.of_nat k) (pd_state_p k) 8%nat _ eq_refl
-              Hle Hb with "Hd").
+              Hle Hhi Hb with "Hd").
   Qed.
 
 End ProcdumpData.

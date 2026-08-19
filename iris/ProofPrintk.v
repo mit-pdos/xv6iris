@@ -4205,7 +4205,8 @@ Section ProofPrintk.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string pk_null_str "(null)"%string _ eq_refl
-              ltac:(unfold text_end, pk_null_str; lia) with "Hd").
+              ltac:(unfold text_end, pk_null_str; lia)
+              ltac:(vm_compute; discriminate) with "Hd").
     intros j b Hj.
     do 7 (destruct j as [|j];
           [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]).
@@ -4398,7 +4399,8 @@ Section ProofPrintk.
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]).
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string pk_digits_addr "0123456789abcdef"%string _ eq_refl
-                  ltac:(unfold text_end, pk_digits_addr; lia) Hbytes with "Hd") as "#Hs".
+                  ltac:(unfold text_end, pk_digits_addr; lia)
+                  ltac:(vm_compute; discriminate) Hbytes with "Hd") as "#Hs".
     rewrite /pk_digits. iApply big_sepL_intro. iIntros "!>" (u j Hu).
     apply lookup_seq in Hu. destruct Hu as [-> Hlt].
     iExists (pk_fbyte "0123456789abcdef"%string u).

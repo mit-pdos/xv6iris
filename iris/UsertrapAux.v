@@ -125,14 +125,16 @@ Section UsertrapData.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string ut_fmt1_a ut_fmt1 _ eq_refl
-              ltac:(unfold text_end, ut_fmt1_a; lia) ut_fmt1_bytes with "Hd").
+              ltac:(unfold text_end, ut_fmt1_a; lia)
+              ltac:(vm_compute; discriminate) ut_fmt1_bytes with "Hd").
   Qed.
 
   Lemma ut_fmt2_str : (kernel_data : iProp Σ) -∗ ut_fmt2_p ↦ₛ□ ut_fmt2.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string ut_fmt2_a ut_fmt2 _ eq_refl
-              ltac:(unfold text_end, ut_fmt2_a; lia) ut_fmt2_bytes with "Hd").
+              ltac:(unfold text_end, ut_fmt2_a; lia)
+              ltac:(vm_compute; discriminate) ut_fmt2_bytes with "Hd").
   Qed.
 
   (* the argument big-op printk takes.  Both lists are all-[PkANum] and

@@ -540,31 +540,13 @@ Section ProofSysUnlinkBody.
     by rewrite {1}(Qp.div_2 q) in Hc.
   Qed.
 
-  (* [KernelDataInv.kernel_data_window] extracts the bytes of a machine
-     WORD; a name literal is a byte STRING that is not NUL-terminated
-     within its window, so neither that lemma nor [kernel_data_string]
-     applies.  The same proof at a byte function. *)
-  Lemma su_kd_bytes `{GEN : GenId} (A : Z) (W : nat) (f : nat -> bv 8) (a : mword 64) :
-    a = mword_of_int A ->
-    text_end <= A ->
-    (forall j, (j < W)%nat ->
-       KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some (f j)) ->
-    kernel_data -∗
-    ([∗ list] j ∈ seq 0 W, (pa_add a j) ↦ₘ□ f j).
-  Proof.
-    iIntros (-> HA Hbytes) "#Hd". iApply big_sepL_intro. iIntros "!>" (i j Hi).
-    apply lookup_seq in Hi. destruct Hi as [-> Hlt]. simpl.
-    rewrite pa_add_mword.
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat i)%Z (f i) with "Hd").
-    apply map_lookup_filter_Some_2; [apply Hbytes; exact Hlt | cbn; lia].
-  Qed.
-
   Lemma su_dot_window `{GEN : GenId} (a : mword 64) :
     a = mword_of_int su_dot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dot_f j).
   Proof.
-    intros ->. iApply (su_kd_bytes su_dot_addr 14 su_dot_f _ eq_refl
-                         ltac:(unfold text_end, su_dot_addr; lia)).
+    intros ->. iApply (kernel_data_bytes su_dot_addr 14 su_dot_f _ eq_refl
+                         ltac:(unfold text_end, su_dot_addr; lia)
+                         ltac:(vm_compute; discriminate)).
     intros j Hj.
     do 14 (destruct j as [|j]; [vm_compute; reflexivity |]).
     exfalso. lia.
@@ -574,8 +556,9 @@ Section ProofSysUnlinkBody.
     a = mword_of_int su_dotdot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dotdot_f j).
   Proof.
-    intros ->. iApply (su_kd_bytes su_dotdot_addr 14 su_dotdot_f _ eq_refl
-                         ltac:(unfold text_end, su_dotdot_addr; lia)).
+    intros ->. iApply (kernel_data_bytes su_dotdot_addr 14 su_dotdot_f _ eq_refl
+                         ltac:(unfold text_end, su_dotdot_addr; lia)
+                         ltac:(vm_compute; discriminate)).
     intros j Hj.
     do 14 (destruct j as [|j]; [vm_compute; reflexivity |]).
     exfalso. lia.

@@ -472,7 +472,8 @@ Section ProofMainSecondary.
     iPoseProof (mni_2e with "Htext") as "Hi2e".
     iPoseProof (kernel_data_string ms_hart_addr ms_hart
                   (mword_of_int ms_hart_addr) eq_refl
-                  ltac:(unfold text_end, ms_hart_addr; lia) ms_hart_bytes
+                  ltac:(unfold text_end, ms_hart_addr; lia)
+                  ltac:(vm_compute; discriminate) ms_hart_bytes
                   with "Hkdata") as "#Hfmt".
     pose proof ms_hart_fmt as (Hkh & Hnh & Hlh).
     (* ---- +0x20 jal cpuid ---- *)

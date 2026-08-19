@@ -346,6 +346,70 @@ equation makes every instantiation a claim that can quietly go false — so
 prefer a contract that COMPUTES the arm to one that takes the arm's
 identity as a hypothesis.
 
+## A PERSISTENT POINTS-TO AT A **WRITABLE** IMAGE BYTE IS AN INCONSISTENT PREMISE
+
+The loaded image is not two ranges but THREE, and the middle one is invisible
+in the program headers. xv6 links a SINGLE RWX `PT_LOAD`, so
+`KernelData.kernel_segments` — and `RiscvLang.img_end`, derived from it — can
+only say where the file image ends. The read-only/writable split lives in the
+ELF's SECTION table:
+
+| | |
+|---|---|
+| `[ram_lo, rodata_end)` | `.text` / `.rodata` / `.eh_frame` — read-only forever |
+| `[rodata_end, img_end)` | `.data` / `.got` / `.got.plt` — initialized and WRITABLE |
+| `[img_end, kernelMemEnd)` | `.bss` — zero-filled and writable |
+
+`RiscvLang.rodata_end` is that boundary. It is GENERATED, like every other
+image constant: `tools/dump_elf.py` parses the section headers and emits
+`KernelData.kernelRodataEnd` (the lowest writable *allocated* section's
+address) with the whole allocated-section table beside it as a comment, so the
+reading is auditable in the file rather than in a tool.
+
+**Anything that resides image bytes at `DfracDiscarded` must stop at
+`rodata_end`, not at `img_end`.** `KernelDataInv.kernel_data` used to stop at
+`img_end`, so it claimed permanent read-only status for `first` and `nextpid`
+— two `.data` globals xv6 *stores* to (`first = 0` in forkret,
+`nextpid = nextpid + 1` in allocpid). Nothing failed to compile, and the
+consequence is the section above's, exactly: any contract holding
+`kernel_data` *and* ownership of one of those cells is VACUOUS, so
+`SpecForkret.wp_forkret_body`'s proven contract said nothing to a caller that
+also held `kernel_data`.
+
+**The tier index does not save you.** `mem_pointsto` bottoms out in a
+`pointsto` keyed on the PHYSICAL address, with `ktier_pin` only a pure side
+condition, and a kernel global is identity-mapped — so `↦ₘ□` and `↦₄` at the
+same `.data` address really do collide, at every tier.
+
+**State the tripwire POSITIVELY.** `kernel_data ∗ first ↦₄{dq} w ⊢ False` is
+the wrong shape: after the fix that conjunction is precisely what must be
+SATISFIABLE. `KernelDataInv`'s §T instead pins the DOMAIN — `kdata_ro_bounds`
+(everything resident is in `[text_end, rodata_end)`) plus `kdata_ro_first` /
+`kdata_ro_nextpid`, two `vm_compute`d instances saying the globals xv6 writes
+are not in it. Re-widen the filter, or move the image so a written global
+falls below the boundary, and those two fail.
+
+**Writable-by-flags is not the same as written.** `.got`/`.got.plt` are
+writable sections xv6 never writes (statically linked, non-PIE), and `_entry`'s
+GOT slot must persist so all eight harts share the `&stack0` word. That ONE
+word is persisted by name out of the boot carve
+(`BootCarve.boot_ran_phys_word`, off the owned range) rather than by widening
+`kernel_data` back over a whole writable section — a claim about one cell,
+which is checkable, in place of a claim about a section, which is not.
+
+### The tactic trap this dragged in: `by apply map_lookup_filter_Some_2`
+
+Adding the second bound turns the filter's side condition into a two-conjunct
+BETA-REDEX, `(fun p => text_end <= p.1 < rodata_end) (a, b)`, and stdpp's
+`done` on that over `KernelData.kernel_data`'s 17932 entries takes **minutes**
+— 1.3 s with an explicit proof, over 14 minutes with `by`, with no error and
+no output, so it reads as a hung build rather than a slow tactic. The
+one-condition form is fine, which is why the regression arrives exactly when
+you tighten the filter. **Reduce the side condition before closing it**
+(`apply map_lookup_filter_Some_2; [exact Hlk | cbn; split; assumption]`), and
+treat any `by`/`done` over a `map_lookup_filter_Some*` goal on an image map as
+a bug.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
@@ -1663,10 +1727,12 @@ table, which names the symbol, the offset and the field kind (`word32` /
 `auipc`/`addi` pair computes). If you find yourself about to write a hex
 literal that came out of `kernel.asm`, add a row instead.
 
-Two constants are NOT routed through the generator, because the dumper
+Three constants are NOT routed through the generator, because the dumper
 already emits exactly them and a generator would be a second copy:
 `RiscvLang.img_end` (the single PT_LOAD's `vaddr + filesz`, from
-`KernelData.kernel_segments`) and `PageGeom.kmem_lo` (the `end` symbol, from
+`KernelData.kernel_segments`), `RiscvLang.rodata_end` (the read-only/writable
+boundary, from `KernelData.kernelRodataEnd` — see "A PERSISTENT POINTS-TO AT A
+WRITABLE IMAGE BYTE") and `PageGeom.kmem_lo` (the `end` symbol, from
 `KernelSyms.end_`).
 
 **Both use `Definition c : Z := ltac:(let x := eval vm_compute in <e> in exact x).`

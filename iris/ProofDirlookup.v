@@ -157,7 +157,8 @@ Section DirlookupMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string dlk_msg_a dlk_msg _ eq_refl
-              ltac:(unfold text_end, dlk_msg_a; lia) dlk_msg_bytes with "Hd").
+              ltac:(unfold text_end, dlk_msg_a; lia)
+              ltac:(vm_compute; discriminate) dlk_msg_bytes with "Hd").
   Qed.
 End DirlookupMsg.
 

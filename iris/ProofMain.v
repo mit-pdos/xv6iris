@@ -422,11 +422,13 @@ Section ProofMain.
     iPoseProof (mni_6a with "Htext") as "Hi6a".
     iPoseProof (kernel_data_string mn_nl_addr mn_nl
                   (mword_of_int mn_nl_addr) eq_refl
-                  ltac:(unfold text_end, mn_nl_addr; lia) mn_nl_bytes
+                  ltac:(unfold text_end, mn_nl_addr; lia)
+                  ltac:(vm_compute; discriminate) mn_nl_bytes
                   with "Hkdata") as "#Hsnl".
     iPoseProof (kernel_data_string mn_boot_addr mn_boot
                   (mword_of_int mn_boot_addr) eq_refl
-                  ltac:(unfold text_end, mn_boot_addr; lia) mn_boot_bytes
+                  ltac:(unfold text_end, mn_boot_addr; lia)
+                  ltac:(vm_compute; discriminate) mn_boot_bytes
                   with "Hkdata") as "#Hsbt".
     pose proof mn_nl_fmt as (Hknl & Hnnl & Hlnl).
     pose proof mn_boot_fmt as (Hkbt & Hnbt & Hlbt).

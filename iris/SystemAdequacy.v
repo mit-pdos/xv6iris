@@ -131,10 +131,16 @@ Section SystemBoot.
     iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd Hir Hpav γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & _ & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     (* the harts' reservation mirrors (design §3a) are gone from this
        interface: [boot_shared_alloc] threads each into its hart's [pc_is]. *)
+    (* THE [_] IS [BootShared.main_data_raw] -- the image's writable
+       initialized globals (`first`, `nextpid`), which [kernel_data] stopped
+       claiming when it was narrowed to [rodata_end].  Nothing consumes them
+       until forkret's [first] arm and userinit's [nextpid] land, and Iris is
+       affine, so they are dropped here exactly as [Hprocsavail] is dropped
+       inside [boot_shared_alloc].  Name it when a client wants it. *)
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".

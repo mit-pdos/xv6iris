@@ -801,7 +801,8 @@ Section IallocOut.
               Hsbn Hsbi Hsl Hiref Hop Hcont".
     iPoseProof (kernel_data_string ia_msg_addr ia_msg
                   (mword_of_int ia_msg_addr) eq_refl
-                  ltac:(unfold text_end, ia_msg_addr; lia) ia_msg_bytes
+                  ltac:(unfold text_end, ia_msg_addr; lia)
+                  ltac:(vm_compute; discriminate) ia_msg_bytes
                   with "Hkdata") as "#Hstr".
     iPoseProof (iali_66 with "Htext") as "Hi66".
     iPoseProof (iali_68 with "Htext") as "Hi68".

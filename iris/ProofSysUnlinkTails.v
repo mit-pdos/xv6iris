@@ -177,7 +177,8 @@ Section SuMsgStr.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string su_nlink_a su_nlink_s _ eq_refl
-              ltac:(unfold text_end, su_nlink_a; lia) su_nlink_bytes with "Hd").
+              ltac:(unfold text_end, su_nlink_a; lia)
+              ltac:(vm_compute; discriminate) su_nlink_bytes with "Hd").
   Qed.
 
   Lemma su_readi_str :
@@ -185,7 +186,8 @@ Section SuMsgStr.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string su_readi_a su_readi_s _ eq_refl
-              ltac:(unfold text_end, su_readi_a; lia) su_readi_bytes with "Hd").
+              ltac:(unfold text_end, su_readi_a; lia)
+              ltac:(vm_compute; discriminate) su_readi_bytes with "Hd").
   Qed.
 
   Lemma su_writei_str :
@@ -193,7 +195,8 @@ Section SuMsgStr.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string su_writei_a su_writei_s _ eq_refl
-              ltac:(unfold text_end, su_writei_a; lia) su_writei_bytes with "Hd").
+              ltac:(unfold text_end, su_writei_a; lia)
+              ltac:(vm_compute; discriminate) su_writei_bytes with "Hd").
   Qed.
 End SuMsgStr.
 

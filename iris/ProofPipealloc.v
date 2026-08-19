@@ -156,7 +156,8 @@ Section ProofPipealloc.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string pipe_name_str "pipe"%string
                   (mword_of_int pipe_name_str) eq_refl
-                  ltac:(unfold text_end, pipe_name_str; lia) Hpipestr
+                  ltac:(unfold text_end, pipe_name_str; lia)
+                  ltac:(vm_compute; discriminate) Hpipestr
                   with "Hkdata") as "#Hstr".
     (* ===== PROLOGUE: 6-slot frame, ra/s0/s1/s4 saves, s0 := sp+48 ===== *)
     iPoseProof (pai_00 with "Htext") as "Hi00".
