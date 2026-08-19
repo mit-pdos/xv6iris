@@ -248,7 +248,7 @@ UmodeAbi.v
 UmodeArith.v
 UmodeSyscall.v
 UmodeIo.v
-# WpUmodeStep.v
+WpUmodeStep.v
 # WpUmodeLeaf.v
 # WpUmodeBranch.v
 # WpUmodeStore.v
