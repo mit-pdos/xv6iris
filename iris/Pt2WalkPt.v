@@ -2403,7 +2403,8 @@ Section Pt2Engine.
              Hpc Hinstr Hex Hcont".
     iDestruct (pt2_kcur_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
-    iApply (wp_instr_tramp_pt (pt2_res_kcur rc Sp) pc pa is_rvc i
+    iApply (wp_instr_tramp_pt (pt2_res_kcur rc Sp) (pt2_res_kcur rc Sp)
+              pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mie_v menvcfg0 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
@@ -2513,7 +2514,8 @@ Section Pt2Engine.
              Hpc Hinstr Hex Hcont".
     iDestruct (pt2_kprev_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
-    iApply (wp_instr_tramp_pt (pt2_res_kprev rc kroot Sc) pc pa is_rvc i
+    iApply (wp_instr_tramp_pt (pt2_res_kprev rc kroot Sc)
+              (pt2_res_kprev rc kroot Sc) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mie_v menvcfg0 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok

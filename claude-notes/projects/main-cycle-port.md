@@ -2305,20 +2305,86 @@ way in and resealing it on the way out.  Both were checked to APPLY at the
 two real call sites' geometry (`uva 0x96`/`upa 0x96` and `uva 0xa8`/`upa
 0xa8`, `ai_sfence`), all eight geometry premises by `vm_compute`.
 
-**WHAT IS LEFT: `UserretEntryPt` AND `UservecExitPt`.**  `UservecPt` and
-`UserretPt` are converted (above) and `UserretPt` is GREEN; the other two
-need the same treatment for their own leaves and two block lemmas -- their
-obligations are still the old
-`∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) … ⌝ ∗ …` shape and
-the per-node engine hands them `swp (execute i)` instead.  They also STEP
-THE SWITCH WINDOW, and that is no longer a blocker: `Pt2WalkPt`'s
-`wp_instr_pt2_tramp_kcur` / `_kprev` are built and were checked to apply at
-both real call sites' geometry.  (The paragraph this replaces said the
-window had no per-node walk and that these two files waited on it -- true
-when it was written, and `Pt2Walk.v`/`Pt2WalkPt.v` are the answer.)  Their
-call sites of `wp_instr_ktramp_pt_share` / `wp_instr_u_pt` take the
-post-port argument lists (no `is_aligned_paddr` premises, `mie1` /
-`menvcfg1` / `Rl` riders).
+**THE WHOLE TRAMPOLINE LANE IS CONVERTED AND GREEN (2026-08-19).**
+`UserretEntryPt` and `UservecExitPt` are done (4d672abc) and so are their
+two consumers `ProofUserret` / `ProofUservec` (3932c12d); the trampoline
+lane owns no red root any more.  Times: `UserretEntryPt` 5.8 s,
+`UservecExitPt` 6.4 s, `ProofUserret` 19.7 s, `ProofUservec` 29.5 s.  Both
+block statements (`wp_userret_entry_pt`, `wp_uservec_exit_pt`) are
+BYTE-IDENTICAL, checked mechanically against the pre-port commit.
+
+**THE ONE ENGINE CHANGE, AND IT IS THE WINDOW'S EXIT THAT FORCES IT:
+`TrampStepPt.wp_instr_tramp_pt` NOW TAKES A LANDING RESIDUE `Res1` BESIDE
+ITS RUNNING `Res`.**  Every ORDINARY trampoline step leaves the table's
+residue where it found it -- all four wrappers instantiate `Res1 := Res`
+and their statements did not move (verified) -- but the window's CLOSING
+`sfence.vma` does not: the flush is the fact that turns `tlb_ok_pt2` back
+into `tlb_ok_pt`, and per node that fact is BORN INSIDE the `swp`
+obligation.  The only way out of the obligation is the residue it hands
+back, and `Rl` cannot carry it (`Rl` is keyed on `npc`/`ms`/`mdv`, never on
+the tlb value).  Sealing the cell into `tlb_inv_pt2_k*` first would discard
+it outright -- the invariant is existential in the tlb value, which is the
+kvminithart lane's "do not re-seal the tlb cell" rule in a second place.
+So the exit step runs at `Res := pt2_res_k*` and `Res1 :=` the table it
+lands on, and its continuation is one `_swp_close`.  **Anything else --
+enriching `Res` with a disjunction or an `∧`-guarded implication -- fails
+for the same reason: `Res` is consumed by the FETCH obligation before the
+execute, so it must be weak there and strong at the landing, and one
+predicate cannot be both.**
+
+**CONSEQUENTLY FOUR OF THE EIGHT STEPS DRIVE `wp_instr_tramp_pt` DIRECTLY**
+rather than through a table wrapper, and the two reasons are different:
+
+- the two `csrw satp` MOVE satp, and a wrapper pins the landing satp to the
+  running one.  The residues themselves do NOT mention satp
+  (`SRegime.kpt_res_at` ignores its `satp0` argument outright;
+  `UptWalkPt.upt_res_pt` never had one), so `Res1 := Res` still holds and
+  the window is ENTERED in the engine's own continuation, off the cells it
+  hands back -- `tlb_inv_pt2_kprev_enter` (a wand) for userret,
+  `tlb_inv_pt2_kcur_enter` (a fupd, so `iApply fupd_wp` first, at `⊤`) for
+  uservec.
+- the two exit `sfence.vma` are the `Res1` case above.
+
+**THE FOUR INSTRUCTION WALKS, and none of them needed new machinery:**
+
+- `fence.i` -- `WpSconfEngine.swp_execute_FENCEI_s`, which takes `gen_cert`
+  and nothing else.
+- `sfence.vma` -- `WpSconfSfence.swp_execute_SFENCE_VMA_S_gen`, ADDED: the
+  composer at an arbitrary `Drw`/`Dro`/`Df`.  `execute_SFENCE_VMA_S_cert`
+  was already `Dr`/`Dw`-generic, so the generalization is free; what forced
+  it is that `sf_Df` is `fun _ => DfracOwn 1` while the trampoline engine
+  LENDS its config cells at the caller's `dq`.  The frame that fits is
+  `WpSmodePtEngine.sda_*` (tlb rw; mstatus/priv/menvcfg at `dq`;
+  satp/pmpcfg/pmpaddr owned; misa/pma/htif discarded) -- exactly
+  `sda_frames_in`'s ten cells, which is exactly what the obligation hands
+  you.  `swp_execute_SFENCE_VMA_S` is now its instance; no statement moved.
+- `csrw satp` -- `HartSCsr.swp_execute_CSRReg_w_p` over
+  `WpSconfCsr.swp_write_CSR_satp_S`, at the two-cell frame
+  `pw2_rs Supervisor satp _ mstatus _` (satp is written, mstatus is read by
+  `check_TVM_SATP` and by `architecture Supervisor`).  Its legality premise
+  is the ONE `hval` `HartSCsr.hval_check_CSR_result_S` cannot serve -- satp
+  reads mstatus, which is not in `D_m` and which no reference state pins --
+  so `WpSconfCsr.hval_check_CSR_result_satp_S_w` LOST ITS `Local`.  That is
+  the whole change to that file.
+- the LINKING `c.jalr` -- `UservecExitPt.swp_cj_JALR_link`, which is
+  `WpSmodePtEngine.swp_cj_JALR_ret` with `swp_wX_file` in place of
+  `swp_wX_zero`.  It replaces the file's old whole-`execute` tower
+  `exec_execute_JALR_link_zca` AND the `currentlyEnabled Ext_Zicfilp` peel
+  that tower needed: per node the landing-pad gate is `hval_cj_update_elp`,
+  already proved, and `cj_Df` is dfrac-parametric so the lent fractions fit.
+
+**AND THE APPROVED `wp_ualu_pt` CHANGE'S OWED HALF IS PAID.**  Unblocking
+these two files made `ProofUserret` / `ProofUservec` visible for the first
+time, and each failed at its three `wp_ualu_pt` sites -- the pre-port
+argument list, exactly as recorded under "LEAF-STATEMENT CHANGES".  Per
+site the fix is one `WpMmodeSwpBase` node shape plus the value equation the
+deleted second `exec` premise used to carry: `swp_execute_pure_w` at
+`luival` (lui), `swp_execute_rw2` (addiw), `swp_execute_rw` at
+`shift_bits_left` (slli) -- the same three `WpSconfAlu`'s own leaves use.
+Both files also had to `Require Riscv.riscv_extras`: `shift_bits_left` is
+NOT re-exported through `WpMmodeShiftiop`, and the error ("the variable
+shift_bits_left was not found") reads like a missing lemma rather than a
+missing import.
 
 ## THE DOWNSTREAM COMPILE TAIL (2026-08-18) -- what it took, and the two
 ## things it is BLOCKED on
@@ -2668,35 +2734,55 @@ it here.  What is left is the rest:
   bisect.  `Unshelve` before `Qed` prints the leftovers and names the
   culprit in one run.  Write `ltac:(by srs)`.
 
-## CHECKPOINT 2026-08-18 (session 2) -- THE CURRENT HANDOFF STATE
+## CHECKPOINT 2026-08-18 (session 2) -- SUPERSEDED by the red-root table
+## immediately below; the LANE write-ups after it are still current.
 
-Branch `hart-node-port`, LOCAL ONLY (still nothing pushed).  Working tree
-CLEAN at handoff.  Last whole-tree run: `./gcp-rocq/run-on-gcp make -k -j36
-proofs`, **8 red roots**, down from 14 at the start of the session.
+### THE THREE RED ROOTS (2026-08-19, after the trampoline lane closed)
 
-### THE EIGHT RED ROOTS, CLASSIFIED
-
-Each line is a ROOT: every file that merely depends on one is skipped by
-`-k`, not broken.
+Branch `hart-node-port`, LOCAL ONLY (still nothing pushed).  Last whole-tree
+run: `./gcp-rocq/run-on-gcp make -k -j36 proofs`, **3 red roots**.  Each
+line is a ROOT: every file that merely depends on one is skipped by `-k`,
+not broken.
 
 | root | error | lane |
 |---|---|---|
-| `ProofKvminithart` | `iIntro: cannot turn … sconf_step_obl …` | **S-mode leaf, NOT ported** — see below |
-| `ProofMain` | `iSpecialize: cannot instantiate (tlb ↦ᵣ tlbvec0 -∗ …)` | ruling 1 (tlb → `bare_inv`) |
-| `ProofMainSecondary` | same | ruling 1 |
+| `ProofKvminithart` | `iIntro: cannot turn … sconf_step_obl …` | kvminithart: the `csrw satp` leaf — see below |
 | `ProofUser` | `arm_LOAD_u C pt` — pre-port arity | P7 §5 assembly + the last 2 arms |
-| `UserretPt` | `wp_instr_u_pt` not found | trampoline lane (b) |
-| `UservecExitPt` | `wp_instr_u_pt` not found | trampoline lane (a)+(b) |
-| `UserretEntryPt` | `wp_instr_ktramp_pt_share` not found | trampoline lane (a) |
 | `WpUmodeStep` | `minstret_inv_body` not found | "Not started" (verified U-mode tier) |
 
-**CURRENT COUNT (2026-08-19, after the kvminithart lane and the boot
-chain): FOUR red roots** — `ProofUser`, `UserretEntryPt`, `UservecExitPt`,
-`WpUmodeStep`.  `ProofKvminithart`, `ProofMain`, `ProofMainSecondary`,
-`UserretPt` and `BootChain` are green; `BootChain` was never a lane of its
-own — it only became reachable when `ProofKvminithart` fell, and nothing
-above it (`BootShared`, `SystemAdequacy`) needed more than the same three
-port-shape fixes.  Recount rather than trusting this line.
+**CURRENT COUNT (2026-08-19, after the kvminithart lane, the boot chain and
+the trampoline lane): TWO red roots** — `ProofUser` and `WpUmodeStep`.
+Green now: `ProofKvminithart`, `ProofMain`, `ProofMainSecondary`,
+`BootChain`, `UserretPt`, `UservecPt`, `UserretEntryPt`, `UservecExitPt`,
+`ProofUserret`, `ProofUservec`.  `BootChain` was never a lane of its own —
+it only became reachable when `ProofKvminithart` fell, and nothing above it
+(`BootShared`, `SystemAdequacy`) needed more than the same three port-shape
+fixes.  Recount rather than trusting this line.
+
+GONE since the eight-root table: `ProofMain` / `ProofMainSecondary` (the
+kvminithart tlb ruling, `5cea2c9e`), `UserretPt` / `UservecExitPt` /
+`UserretEntryPt` (the trampoline lane, `732cc4db` + `4d672abc`), and with
+them `ProofUserret` / `ProofUservec`, which surfaced red the moment the
+trampoline blocks went green and were fixed in `3932c12d`.
+
+**A ROOT THAT FALLS CAN UNCOVER NEW ONES, AND THAT IS NOT A REGRESSION.**
+`ProofUserret` / `ProofUservec` had never been compiled since the port
+started; `-k` had been SKIPPING them, not passing them.  When counting
+roots after a lane closes, expect the number to fall by less than the
+number of files you fixed, and read the newly-visible ones as the lane's
+own tail rather than as breakage you introduced.
+
+### (DONE) THE KVMINITHART LANE'S REMAINING PIECE HAD A TEMPLATE
+
+**`545026c7` landed the leaf and closed `ProofKvminithart`; kept because the
+template it names is still the one to copy for any further `csrw satp` at
+Supervisor.**  The `csrw satp` leaf at Supervisor (item 1 of "WHAT IS LEFT IN THE LANE"
+below) is written, in the trampoline lane, twice:
+`UserretEntryPt`/`UservecExitPt`'s step 2 is `swp_execute_CSRReg_w_p` over
+`WpSconfCsr.swp_write_CSR_satp_S` at `pw2_rs Supervisor satp _ mstatus _`,
+with `WpSconfCsr.hval_check_CSR_result_satp_S_w` (no longer `Local`) for
+the legality premise.  Copy it; what differs is only the wrapper the cells
+come from.
 
 ### THE KVMINITHART LANE: THE SFENCE HALF IS BUILT (session 2), THE SATP HALF IS NOT
 
@@ -2948,13 +3034,11 @@ Doing this lane turns THREE roots green and is the largest single win left.
    answer).  Beware: `make -C iris -f CoqMakefile <one>.vo` through
    `run-on-gcp` runs WITHOUT the opam switch (`rocq: not found`) — prefix it
    with `opam exec --switch=/shared/xv6rocq --` if you want a single file.
-3. Pick a lane.  Four roots are left, in descending order of
-   roots-per-effort: the trampoline leaves (`UserretEntryPt` /
-   `UservecExitPt`, which need `wp_instr_u_pt` and
-   `wp_instr_ktramp_pt_share`), `WpUmodeStep` (1, not started — its error is
-   `minstret_inv_body`, i.e. the same post-port MinstretInv interface the
-   boot chain was ported onto), the last two memory arms + P7 §5
-   (`ProofUser`, and it is the biggest).
+3. Pick a lane.  TWO are left, one root each: `WpUmodeStep` (not started —
+   its error is `minstret_inv_body`, i.e. the same post-port MinstretInv
+   interface the boot chain was ported onto), and the last two memory arms +
+   P7 §5 (`ProofUser`, and it is the biggest).  The kvminithart, boot-chain
+   and trampoline lanes are all CLOSED.
 4. Standing rules, unchanged: no caller-visible leaf/spec statement change
    without the user; every address claim from
    `mem_pointsto_claim`/`wordw_claim_of`; per-file <5 min; commit by

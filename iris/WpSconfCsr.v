@@ -1229,7 +1229,12 @@ Section SWrites.
     cbn match. apply exec_returnm.
   Qed.
 
-  Local Lemma hval_check_CSR_result_satp_S_w (D Drw : gset register)
+  (* EXPORTED (the read twin above stays [Local]): satp's write check is the
+     one CSR legality [HartSCsr.hval_check_CSR_result_S] cannot serve --
+     [check_TVM_SATP] reads mstatus, which is not in [D_m] and whose value no
+     reference state pins -- and the trampoline's own [csrw satp] leaves
+     ([UserretEntryPt], [UservecExitPt]) need it at their frame. *)
+  Lemma hval_check_CSR_result_satp_S_w (D Drw : gset register)
       (rs : regstate) :
     (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
     (misa : register) ∈ D -> (mstatus : register) ∈ D ->
