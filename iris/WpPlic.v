@@ -208,9 +208,10 @@ Proof.
         Hmdl & Hmenv)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
                         HMPP & HTVM).
-    iDestruct (sie_cap_to_cells (CID := CID) with "Hcap")
-      as (satp0 tlbv pcfg paddr)
-      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & HRes & Hstk & Harm & #Hwit)".
+    (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
+       [WpIntrInv.sda_slot_acc] below, the one place the two translation
+       arms are told apart. *)
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -221,15 +222,14 @@ Proof.
     iDestruct "Hkmapb" as "[#Hkms _]".
     iDestruct (kmap_static_claims_at (svpn_of ea) KP_rw Hdevstatic
                  with "Hkms") as "#Hclaim".
+    (* ---- THE FRAME, OUT OF THE FOLDED SLOT.  [SD] is abstract here:
+           [sda_Drw] under the kernel table, the EMPTY set under Bare. ---- *)
+    iDestruct (sda_slot_acc (CID := CID) kt (DfracOwn 1) mst0 MENVCFG_S
+                 pmar0 eq_refl HSXL HMPRV (pma_all_ram Hpma_all)
+                 with "Htr Hms Hpriv Hmenv Hpma Hhtif Hmisa")
+      as (SD satp0 tlbv pcfg paddr)
+      "(%Hdisj & %Hsub & %Hsok & %Hpok & Htrobl & Hrw & Hro & HRes & Hclose)".
     destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-    iAssert (hreg_frame (CID := CID)
-               (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) sda_Drw ∗
-             hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
-               (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) sda_Dro)%I
-      with "[Htlb Hms Hpriv Hmenv Hsatp Hpcfg Hpaddr]" as "[Hrw Hro]".
-    { rewrite sda_frames.
-      iFrame "Htlb Hms Hpriv Hmenv Hsatp Hpcfg Hpaddr".
-      iFrame "Hpma Hhtif Hmisa". }
     iAssert (sr_swp_res (strans_regime (CID := CID))
                (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
       with "[HRes]" as "HRes".
@@ -275,9 +275,9 @@ Proof.
               (tp_pin (CID := CID) m !!! Regidx rs1) (sign_extend' 64 imm))) 4
             = true) by (rewrite Hea; exact Halign).
     iApply (swp_mono (CID := CID)
-              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm] [-]").
+              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
     2:{ iApply (swp_execute_STORE_dev_S4 (CID := CID)
-                  sda_Drw sda_Dro (sda_Df (DfracOwn 1))
+                  SD sda_Dro (sda_Df (DfracOwn 1))
                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                   imm rs2 rs1 (tp_pin (CID := CID) m)
                   (pa_of (kpt_leaf_ppn (svpn_of ea)) ea) storeword
@@ -285,41 +285,42 @@ Proof.
                   True%I (sr_swp_res (strans_regime (CID := CID))) rr
                   (sr_swp_mode (strans_regime (CID := CID)) satp0)
                   Lsv
-                  sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                  sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                  Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                  (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                   (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_pma _ _ _ _ _ _ _)
                   (sda_rs_pcfg _ _ _ _ _ _ _) (sda_rs_paddr _ _ _ _ _ _ _)
                   (sda_rs_htif _ _ _ _ _ _ _)
                   Lmxr Lpmm Lsxl
                   (hval_transform_effective_address_S_mode
-                     (sda_Drw ∪ sda_Dro) sda_Drw
+                     (SD ∪ sda_Dro) SD
                      (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                      (add_vec (tp_pin (CID := CID) m !!! Regidx rs1)
                         (sign_extend' 64 imm))
                      (Store Data)
                      (sr_swp_mode (strans_regime (CID := CID)) satp0)
-                     sda_in_mst sda_in_priv sda_in_menv sda_in_satp
+                     (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
                      (sda_rs_priv _ _ _ _ _ _ _)
                      Lep eq_refl eq_refl eq_refl Lmxr Lpmm Lsxl Lmd)
-                  (hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw
+                  (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
                      (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                      (sr_swp_mode (strans_regime (CID := CID)) satp0)
-                     sda_in_mst sda_in_satp Lsxl Lmd)
+                     (sda_in_mst_D SD) (sda_in_satp_D SD) Lsxl Lmd)
                   Lep
                   HA Hord HW Hcov (pma_all_io Hpma_all) Hdcls
                   Lva Hpalign
-                  with "Hcert Hfrag HRes Hfile Hrw Hro [] []").
+                  with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] []").
         - (* the data translation, at the DEVICE page's static claim *)
           iIntros "Hfrag HRes Hrw Hro".
           rewrite Hea.
-          iApply (sda_translate (CID := CID) (strans_regime (CID := CID))
-                    kt KT0 (DfracOwn 1) (Store Data) KP_rw mst0 MENVCFG_S
-                    satp0 pmar0 pcfg paddr tlbv ea (kpt_leaf_ppn (svpn_of ea)) rr
-                    (or_intror (or_intror (or_introl eq_refl))) eq_refl eq_refl
-                    HSXL HMPRV Hsok
-                    ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                    (pma_all_ram Hpma_all) Healt Hpaid
-                    with "Hwit Hclaim Hcert Hfrag HRes Hrw Hro").
+          iApply ("Htrobl" $! KT0 (Store Data) KP_rw
+                    ea (kpt_leaf_ppn (svpn_of ea)) rr
+                    with "[%] [%] [%] [%] [%] Hwit Hclaim Hcert
+                    Hfrag HRes Hrw Hro").
+          + apply _.
+          + exact (or_intror (or_intror (or_introl eq_refl))).
+          + exact eq_refl.
+          + exact Healt.
+          + exact Hpaid.
         - (* THE MMIO WRITE NODE: the PLIC invariant is opened HERE *)
           iIntros (sigma) "Hsi".
           iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
@@ -346,7 +347,7 @@ Proof.
     iSplitR; [done|].
     iAssert (∃ tv2 : type_of_register tlb,
                hreg_frame (CID := CID)
-                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Drw ∗
+                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) SD ∗
                hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                strans_res_at (CID := CID) satp0 tv2)%I
@@ -357,7 +358,7 @@ Proof.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
         iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
@@ -368,10 +369,9 @@ Proof.
                register_lookup_set) in "HRes".
         rewrite irrelevant_register_set; [| vm_compute; reflexivity].
         rewrite sda_rs_satp. iExact "HRes". }
-    iCombine "Hrw Hro" as "Hrwro".
-    iEval (rewrite sda_frames) in "Hrwro".
-    iDestruct "Hrwro" as "(Htlb & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg &
-                          Hpaddr & _ & _)".
+    (* the slot re-seals itself, at the landing tlb value *)
+    iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes") as
+      "(Htr & Hms & Hpriv & Hmenv)".
     iExists (add_vec_int pc (if is_rvc then 2 else 4)), mst0, m, n.
     iFrame "HPC HnPC".
     iSplitL "Hfrag"; [ iApply (resv_any_intro _ None with "Hfrag") | ].
@@ -379,11 +379,8 @@ Proof.
     { rewrite /sconf_at_priv. iExists mdv0.
       iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
       iPureIntro. split; assumption. }
-    iSplitL "Hsatp Htlb Hpcfg Hpaddr HRes Hstk Harm".
-    { iApply (sie_cap_of_cells (CID := CID) kt m n false p satp0 tv2 pcfg paddr
-                Hsok ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                with "Hsatp Htlb Hpcfg Hpaddr HRes [Hstk Harm]").
-      rewrite /sie_cap_rest. iFrame "Hstk Harm Hwit". }
+    iSplitL "Htr Hstk Harm".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iFrame "Hfile". iPureIntro. split_and!; reflexivity.
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
@@ -514,9 +511,10 @@ Proof.
         Hmdl & Hmenv)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
                         HMPP & HTVM).
-    iDestruct (sie_cap_to_cells (CID := CID) with "Hcap")
-      as (satp0 tlbv pcfg paddr)
-      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & HRes & Hstk & Harm & #Hwit)".
+    (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
+       [WpIntrInv.sda_slot_acc] below, the one place the two translation
+       arms are told apart. *)
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -527,15 +525,14 @@ Proof.
     iDestruct "Hkmapb" as "[#Hkms _]".
     iDestruct (kmap_static_claims_at (svpn_of ea) KP_rw Hdevstatic
                  with "Hkms") as "#Hclaim".
+    (* ---- THE FRAME, OUT OF THE FOLDED SLOT.  [SD] is abstract here:
+           [sda_Drw] under the kernel table, the EMPTY set under Bare. ---- *)
+    iDestruct (sda_slot_acc (CID := CID) kt (DfracOwn 1) mst0 MENVCFG_S
+                 pmar0 eq_refl HSXL HMPRV (pma_all_ram Hpma_all)
+                 with "Htr Hms Hpriv Hmenv Hpma Hhtif Hmisa")
+      as (SD satp0 tlbv pcfg paddr)
+      "(%Hdisj & %Hsub & %Hsok & %Hpok & Htrobl & Hrw & Hro & HRes & Hclose)".
     destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-    iAssert (hreg_frame (CID := CID)
-               (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) sda_Drw ∗
-             hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
-               (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) sda_Dro)%I
-      with "[Htlb Hms Hpriv Hmenv Hsatp Hpcfg Hpaddr]" as "[Hrw Hro]".
-    { rewrite sda_frames.
-      iFrame "Htlb Hms Hpriv Hmenv Hsatp Hpcfg Hpaddr".
-      iFrame "Hpma Hhtif Hmisa". }
     iAssert (sr_swp_res (strans_regime (CID := CID))
                (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
       with "[HRes]" as "HRes".
@@ -575,9 +572,9 @@ Proof.
               (tp_pin (CID := CID) m !!! Regidx rs1) (sign_extend' 64 imm))) 4
             = true) by (rewrite Hea; exact Halign).
     iApply (swp_mono (CID := CID)
-              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm] [-]").
+              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
     2:{ iApply (swp_execute_LOAD_dev_S4_ex (CID := CID)
-                  sda_Drw sda_Dro (sda_Df (DfracOwn 1))
+                  SD sda_Dro (sda_Df (DfracOwn 1))
                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                   imm rs1 rd is_unsigned (tp_pin (CID := CID) m)
                   (pa_of (kpt_leaf_ppn (svpn_of ea)) ea)
@@ -587,44 +584,45 @@ Proof.
                      (fun v => ⌜P v⌝)%I)
                   (sr_swp_res (strans_regime (CID := CID))) rr
                   (sr_swp_mode (strans_regime (CID := CID)) satp0)
-                  sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                  sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                  Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                  (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                   (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _)
                   (sda_rs_pma _ _ _ _ _ _ _) (sda_rs_pcfg _ _ _ _ _ _ _)
                   (sda_rs_paddr _ _ _ _ _ _ _)
                   Lmxr Lpmm Lsxl
                   (hval_transform_effective_address_S_mode
-                     (sda_Drw ∪ sda_Dro) sda_Drw
+                     (SD ∪ sda_Dro) SD
                      (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                      (add_vec (tp_pin (CID := CID) m !!! Regidx rs1)
                         (sign_extend' 64 imm))
                      (Load Data)
                      (sr_swp_mode (strans_regime (CID := CID)) satp0)
-                     sda_in_mst sda_in_priv sda_in_menv sda_in_satp
+                     (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
                      (sda_rs_priv _ _ _ _ _ _ _)
                      Lep eq_refl eq_refl eq_refl Lmxr Lpmm Lsxl Lmd)
-                  (hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw
+                  (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
                      (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                      (sr_swp_mode (strans_regime (CID := CID)) satp0)
-                     sda_in_mst sda_in_satp Lsxl Lmd)
+                     (sda_in_mst_D SD) (sda_in_satp_D SD) Lsxl Lmd)
                   Lep
                   HA Hord HR Hcov (pma_all_io Hpma_all) Hdcls
                   Lva Hpalign Hrd
                   (swp_dev_read_node4_ex (CID := CID)
                      (pa_of (kpt_leaf_ppn (svpn_of ea)) ea) (fun v => ⌜P v⌝)%I
                      (proj1 Hdcls))
-                  with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hpinv]").
+                  with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [Hpinv]").
         - (* the data translation, at the DEVICE page's static claim *)
           iIntros "Hfrag HRes Hrw Hro".
           rewrite Hea.
-          iApply (sda_translate (CID := CID) (strans_regime (CID := CID))
-                    kt KT0 (DfracOwn 1) (Load Data) KP_rw mst0 MENVCFG_S
-                    satp0 pmar0 pcfg paddr tlbv ea (kpt_leaf_ppn (svpn_of ea)) rr
-                    (or_intror (or_introl eq_refl)) I eq_refl
-                    HSXL HMPRV Hsok
-                    ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                    (pma_all_ram Hpma_all) Healt Hpaid
-                    with "Hwit Hclaim Hcert Hfrag HRes Hrw Hro").
+          iApply ("Htrobl" $! KT0 (Load Data) KP_rw
+                    ea (kpt_leaf_ppn (svpn_of ea)) rr
+                    with "[%] [%] [%] [%] [%] Hwit Hclaim Hcert
+                    Hfrag HRes Hrw Hro").
+          + apply _.
+          + exact (or_intror (or_introl eq_refl)).
+          + exact I.
+          + exact Healt.
+          + exact Hpaid.
         - (* THE MMIO READ NODE: the PLIC invariant is opened HERE, and the
              value read is the DEVICE's -- which is why the engine had to go
              existential (HartSMem's [_ex] chain). *)
@@ -654,7 +652,7 @@ Proof.
     iSplitR; [done|].
     iAssert (∃ tv2 : type_of_register tlb,
                hreg_frame (CID := CID)
-                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Drw ∗
+                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) SD ∗
                hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                strans_res_at (CID := CID) satp0 tv2)%I
@@ -665,7 +663,7 @@ Proof.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
         iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
@@ -676,10 +674,9 @@ Proof.
                register_lookup_set) in "HRes".
         rewrite irrelevant_register_set; [| vm_compute; reflexivity].
         rewrite sda_rs_satp. iExact "HRes". }
-    iCombine "Hrw Hro" as "Hrwro".
-    iEval (rewrite sda_frames) in "Hrwro".
-    iDestruct "Hrwro" as "(Htlb & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg &
-                          Hpaddr & _ & _)".
+    (* the slot re-seals itself, at the landing tlb value *)
+    iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes") as
+      "(Htr & Hms & Hpriv & Hmenv)".
     iExists (add_vec_int pc (if is_rvc then 2 else 4)), mst0,
             (<[Regidx rd := regval_into_reg (ldval v)]> m), n.
     iFrame "HPC HnPC Hany".
@@ -691,13 +688,8 @@ Proof.
                    = <[Regidx rd := regval_into_reg (ldval v)]> m
                        !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iSplitL "Hsatp Htlb Hpcfg Hpaddr HRes Hstk Harm".
-    { iApply (sie_cap_of_cells (CID := CID) kt
-                (<[Regidx rd := regval_into_reg (ldval v)]> m)
-                n false p satp0 tv2 pcfg paddr Hsok
-                ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                with "Hsatp Htlb Hpcfg Hpaddr HRes [Hstk Harm]").
-      rewrite /sie_cap_rest -Hspv. iFrame "Hstk Harm Hwit". }
+    iSplitL "Htr Hstk Harm".
+    { rewrite /sie_cap -Hspv. iFrame "Hstk Htr Harm Hwit". }
     iSplitL "Hfile".
     { iEval (rewrite (tp_pin_upd m rd (regval_into_reg (ldval v)) Hrdtp))
         in "Hfile". iExact "Hfile". }
