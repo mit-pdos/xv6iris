@@ -1,11 +1,35 @@
 # CHECKPOINT: the kvminithart TLB lane (handoff, 2026-08-19)
 
-**4b IS COMPLETE.**  Branch `hart-node-port`, clean at **`5cea2c9e`**,
-nothing pushed.  Red roots **8 → 6**: `ProofMain` and `ProofMainSecondary`
-went green with the flip (the revert of `52f89133` fixed their
-`iDestruct "Hhart"` over-destructure, exactly as predicted).  What is left is
-`ProofKvminithart` (4c) plus `ProofUser`, `UserretPt`, `UservecExitPt`,
-`UserretEntryPt`, `WpUmodeStep` (4d) — none of them this lane's.
+**4b IS COMPLETE, AND THE THREE SIDE LANES ARE INTEGRATED.**  Branch
+`hart-node-port`, clean at **`c08bfc54`**, nothing pushed.
+
+Red roots **8 → 5**.  `ProofMain` and `ProofMainSecondary` went green with
+the flip (the revert of `52f89133` fixed their `iDestruct "Hhart"`
+over-destructure, exactly as predicted); `UserretPt` went green with the
+trampoline merge.  **What is left: `ProofKvminithart` (4c) plus `ProofUser`,
+`UserretEntryPt`, `UservecExitPt`, `WpUmodeStep` (4d)** — none of them this
+lane's.
+
+**THE INTEGRATION (2026-08-19), three worktree branches all based at
+`08a0c5bc`, merged `--no-ff` in this order, full tree validated after each:**
+
+| merge | branch | brings | roots after |
+|---|---|---|---|
+| `1c8f1b9e` | `worktree-agent-aab868999efbd207e` | P4b's last two memory arms (`arm_STORECON_u`, `arm_AMO_u`), `UserMemClassifyAmo`, the `SmodeCore` width generalization | 6 (clean merge, no conflicts) |
+| `5800e4e6` | `worktree-agent-abcaa4a0448942d9b` | `TrampStepPt`'s ktramp wrappers, `UptWalkPt`'s window walk, the `UserretPt` / `UservecPt` conversions | **5** — `UserretPt` GREEN |
+| `41be2780` | `worktree-agent-a4e2ac8a5ca7fd75e` | `Pt2Walk.v` / `Pt2WalkPt.v`, the switch window's per-node walk | 5 |
+
+**THE FLIP COST THE MERGES NOTHING.**  Branch 2 was written against the
+PRE-flip record and survived untouched: it rides `kpt_swp_open` /
+`kpt_swp_close` and the `tramp_*_of_regime` producers, all of which the flip
+KEPT — only `sr_swp_open` / `sr_swp_close` went, and nothing outside
+`SmodeCorePt.wp_instr_s_config_sr` ever used them.  **The one piece of
+semantic fallout came from branch 2 against branch 3, not from the flip:**
+`TrampStepPt.wp_instr_tramp_pt` gained a `priv1 : Privilege` parameter
+(userret's `sret` is the one trampoline instruction that lands outside
+Supervisor), and branch 3's two window engines were written before it, so
+they passed `Rl` into the new slot.  Fixed at both call sites with
+`Supervisor` (`c08bfc54`); no exported statement on either side moved.
 
 Read [`main-cycle-port.md`](main-cycle-port.md) — "THE KVMINITHART LANE: THE
 SETTLED ANSWER" and "THE FIFTEEN DATA-LEAF SITES" — before this file. This
@@ -752,12 +776,21 @@ universal quantifier` — the raw-step shape, not a missing lemma).
 **NOTE for 4c:** the satp switch FLIPS THE ARM inside its own `execute`. That
 is why `sie_cap_cells_at` exists; do not be surprised by it.
 
-### 4d. The other four roots — independent, and none of them small
+### 4d. The other three roots — independent, and none of them small
 
-* `UserretPt`, `UservecExitPt`, `UserretEntryPt` need **`wp_instr_u_pt`** and
-  **`wp_instr_ktramp_pt_share`**, which **do not exist anywhere in the tree**
-  (`grep` finds only uses). A per-node trampoline instruction engine has to be
-  written. `TrampStepPt` provides only `wp_instr_tramp_pt`.
+* `UservecExitPt` and `UserretEntryPt`.  **The engines they were waiting on
+  now all EXIST** (this is the biggest change from the integration):
+  `TrampStepPt.wp_instr_ktramp_pt_share`, `UptWalkPt.wp_instr_u_pt` /
+  `wp_instr_u_pt_user`, and — for the switch window they alone step —
+  `Pt2WalkPt.wp_instr_pt2_tramp_kcur` / `_kprev`.  What is left is the same
+  conversion `UserretPt` and `UservecPt` have already had: their own leaves
+  and two block lemmas still carry the old
+  `∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) …⌝ ∗ …`
+  obligation, and the per-node engine hands them `swp (execute i)`.  The
+  first error is `UservecExitPt.v:198` (`wp_instr_u_pt` not in scope — a
+  missing `Require`/instantiation, not a missing lemma) and
+  `UserretEntryPt.v:120`.  Recipe: `main-cycle-port.md`'s trampoline
+  section, "WHAT IS LEFT".
 * `WpUmodeStep` references `minstret_inv_body`, which no longer exists —
   `MinstretInv.minstret_inv` is `emp` post-port. Needs porting to the trivial
   form.
