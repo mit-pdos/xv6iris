@@ -180,7 +180,11 @@ Definition lb_depfree (l : wlabel) : Prop :=
     RVWMO's syntactic dependencies).  That one pin is all the instance's
     uniform-shape inversion needs, so it gets its own name. *)
 Definition lb_ldepfree (l : wlabel) : Prop :=
-  match l with LLoad _ _ _ _ asrc => asrc = [] | _ => True end.
+  match l with
+  | LLoad _ _ _ _ asrc => asrc = []
+  | LSilent | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LFence _ _ _ _
+  | LDev | LRegW _ _ | LCtrl _ | LInstr => True
+  end.
 
 Lemma lb_depfree_ldepfree l : lb_depfree l → lb_ldepfree l.
 Proof. destruct l; simpl; by try (intros ->). Qed.

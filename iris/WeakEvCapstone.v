@@ -144,7 +144,8 @@ Section pf_uniform.
         ++ [WMsg base data (Some i)
               (pcls (pa_st ag) (LRmw aq rl base tvs data asrc vsrc)
                  (pa_ws ag))]
-    | _ => pc_log cfg
+    | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+    | LCtrl _ | LInstr => pc_log cfg
     end.
 
   Definition pf_ws (cfg : wpcfg P D) (ag : wpagent P) (l : wlabel) : wstate :=
@@ -164,7 +165,7 @@ Section pf_uniform.
     | LRegW rd srcs => regw_post (pa_ws ag) rd (srcs_view (pa_ws ag) srcs)
     | LCtrl srcs => ctrl_post (pa_ws ag) (srcs_view (pa_ws ag) srcs)
     | LInstr => instr_post (pa_ws ag)
-    | _ => pa_ws ag
+    | LSilent | LDev => pa_ws ag
     end.
 
   Definition pf_cfg (cfg : wpcfg P D) (i : agent) (ag : wpagent P)

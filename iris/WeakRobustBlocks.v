@@ -88,11 +88,19 @@ Local Open Scope Z_scope.
 
 (** A label that APPENDS a message — the two fulfil-carrying shapes. *)
 Definition lb_writes (l : wlabel) : bool :=
-  match l with LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true | _ => false end.
+  match l with
+  | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => false
+  end.
 
 (** A label that READS. *)
 Definition lb_loads (l : wlabel) : bool :=
-  match l with LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true | _ => false end.
+  match l with
+  | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => true
+  | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => false
+  end.
 
 (** The shape conditions the promise-free store/rmw rules impose on a
     label ([WeakPromiseBridge.PFStore] / [PFRmw]): a message is nonempty,
@@ -101,7 +109,8 @@ Definition lb_ok (l : wlabel) : Prop :=
   match l with
   | LStore _ _ data _ _ => data ≠ []
   | LRmw _ _ _ tvs data _ _ => data ≠ [] ∧ length tvs = length data
-  | _ => True
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => True
   end.
 
 (** Two side-condition-free readings of a list insert, so that no proof

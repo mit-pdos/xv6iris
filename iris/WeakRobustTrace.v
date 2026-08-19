@@ -339,7 +339,8 @@ Section trace.
     astep_ok img log i ag l f Dl →
     match l with
     | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True
-    | _ => Dl = None
+    | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+    | LCtrl _ | LInstr => Dl = None
     end.
   Proof.
     destruct l; simpl;
@@ -351,7 +352,8 @@ Section trace.
     atrace_wf img log i T → at_evs T !! k = Some ev →
     match ae_lb ev with
     | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True
-    | _ => ae_ts ev = None
+    | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+    | LCtrl _ | LInstr => ae_ts ev = None
     end.
   Proof.
     intros Hwf Hev.

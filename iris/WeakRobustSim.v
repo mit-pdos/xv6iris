@@ -900,7 +900,11 @@ Section sim.
     at_evs T !! e.2 = Some ev →
     at_ags T !! e.2 = Some ag →
     ae_lb ev = l →
-    match l with LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True | _ => False end →
+    match l with
+    | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True
+    | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+    | LCtrl _ | LInstr => False
+    end →
     lb_reads l = tvs_reads base tvs →
     read_ok_d (pt_img TS) (pt_log TS) (pa_ws ag) (lb_aq l) lat base tvs
               (srcs_view (pa_ws ag) (lb_asrc l)) →

@@ -273,7 +273,9 @@ Lemma sail_step_ni_dep_free next p l p' :
   sail_step_ni next p l p' →
   match l with
   | WeakPromise.LRegW _ _ | WeakPromise.LCtrl _ | WeakPromise.LInstr => False
-  | _ => True
+  | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _
+  | WeakPromise.LStore _ _ _ _ _ | WeakPromise.LRmw _ _ _ _ _ _ _
+  | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev => True
   end.
 Proof.
   intros H%sail_step_ni_depfree. by destruct l.
@@ -318,7 +320,9 @@ Definition lbl_class (l : wlabel) (ws : wstate) : wm_class :=
   | WeakPromise.LStore rl _ _ _ _ =>
       if (w_relp ws || rl)%bool then WCrel else WCplain
   | WeakPromise.LRmw _ _ _ _ _ _ _ => WCexcl
-  | _ => WCplain
+  | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _ | WeakPromise.LFence _ _ _ _
+  | WeakPromise.LDev | WeakPromise.LRegW _ _ | WeakPromise.LCtrl _
+  | WeakPromise.LInstr => WCplain
   end.
 
 Lemma lbl_class_store ak ws base data :
@@ -372,7 +376,9 @@ Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail unit) : Prop :=
   | WeakPromise.LRmw aq _ base tvs _ _ _ =>
       ∀ ag, pc_ags c !! i = Some ag →
         read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs
-  | _ => True
+  | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _ | WeakPromise.LStore _ _ _ _ _
+  | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev | WeakPromise.LRegW _ _
+  | WeakPromise.LCtrl _ | WeakPromise.LInstr => True
   end.
 
 Definition pf_solo (next : bool → M unit) (i : agent)

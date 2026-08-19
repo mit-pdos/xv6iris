@@ -166,7 +166,8 @@ Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
          [w_relp] is armed, i.e. right after its [DFence]. *)
       | PDisk _ => ddev_class ws
       end
-  | _ => WCplain
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => WCplain
   end.
 
 Lemma pcls_ev_silent p ws : pcls_ev p LSilent ws = WCplain.
@@ -435,7 +436,11 @@ Definition pstep_ev (p : pexv6) (d : dev_state) (l : wlabel)
     side, start/commit/latch and the UART on the disk side — so the marker
     is a function of the LABEL alone. *)
 Definition pdev_ev (p : pexv6) (l : wlabel) (p' : pexv6) : bool :=
-  match l with LDev => true | _ => false end.
+  match l with
+  | LDev => true
+  | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
+  | LFence _ _ _ _ | LRegW _ _ | LCtrl _ | LInstr => false
+  end.
 
 (* ====================================================================== *)
 (** ** 3. The memory half: a SIDE CONDITION and a σ-TRANSFORMER, both
@@ -504,7 +509,8 @@ Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
   | LRmw _ _ base _ data _ _ =>
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
-  | _ => wglog σ
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => wglog σ
   end.
 
 (** D3: the [eregs_apply] twin for the announced instruction bits.  [None]
@@ -560,7 +566,8 @@ Definition edlab_log (σ : wgstate) (l : wlabel) (k : wm_class) : list wmsg :=
   match l with
   | LStore _ base data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
   | LRmw _ _ base _ data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
-  | _ => wglog σ
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => wglog σ
   end.
 
 Definition edlab_apply (σ : wgstate) (l : wlabel) (k : wm_class)

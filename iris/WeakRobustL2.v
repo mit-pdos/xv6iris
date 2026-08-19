@@ -83,7 +83,8 @@ Definition lb_vsrc (l : wlabel) : list dsrc :=
   match l with
   | LStore _ _ _ _ vsrc => vsrc
   | LRmw _ _ _ _ _ _ vsrc => vsrc
-  | _ => []
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => []
   end.
 
 Lemma srcs_view_ge ws s srcs :

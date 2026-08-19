@@ -222,7 +222,8 @@ Section ord.
         | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ =>
             lsrcs_view (pre_lstate TS r) (lb_asrc l)
             ++ lfloor (pre_lstate TS r) (lb_aq l) a
-        | _ => []
+        | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+        | LCtrl _ | LInstr => []
         end
     | None => []
     end.
@@ -1254,7 +1255,11 @@ Section ordwf.
     ptraces_wf pstep TS → ptraces_ws_init TS →
     pt_trs TS !! r.1 = Some T → at_ags T !! r.2 = Some ag →
     gev_lb TS r = Some l →
-    match l with LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True | _ => False end →
+    match l with
+    | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ => True
+    | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+    | LCtrl _ | LInstr => False
+    end →
     rd_floor TS r a
     = Nat.max (load_vpre_d (pa_ws ag) (lb_aq l)
                  (srcs_view (pa_ws ag) (lb_asrc l)))

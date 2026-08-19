@@ -112,7 +112,8 @@ Definition lb_reads (l : wlabel) : list (Z * nat) :=
   match l with
   | LLoad _ _ base tvs _ => tvs_reads base tvs
   | LRmw _ _ base tvs _ _ _ => tvs_reads base tvs
-  | _ => []
+  | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => []
   end.
 
 (** THE ADDRESS-OPERAND LIST of a label (D2).  [[]] on every label that
@@ -123,7 +124,7 @@ Definition lb_asrc (l : wlabel) : list dsrc :=
   | LLoad _ _ _ _ asrc => asrc
   | LStore _ _ _ asrc _ => asrc
   | LRmw _ _ _ _ _ asrc _ => asrc
-  | _ => []
+  | LSilent | LFence _ _ _ _ | LDev | LRegW _ _ | LCtrl _ | LInstr => []
   end.
 
 Lemma elem_of_tvs_reads base tvs a ts :

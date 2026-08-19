@@ -421,7 +421,9 @@ Definition xrmw_tight (i : agent) (l : wlabel) (c : wpcfg pxv6 unit) : Prop :=
   | WeakPromise.LRmw aq _ base tvs _ _ _ =>
       ∀ ag, pc_ags c !! i = Some ag →
         read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs
-  | _ => True
+  | WeakPromise.LSilent | WeakPromise.LLoad _ _ _ _ _ | WeakPromise.LStore _ _ _ _ _
+  | WeakPromise.LFence _ _ _ _ | WeakPromise.LDev | WeakPromise.LRegW _ _
+  | WeakPromise.LCtrl _ | WeakPromise.LInstr => True
   end.
 
 Definition pf_xsolo (next : bool → M unit) (i : agent)

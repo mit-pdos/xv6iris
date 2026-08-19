@@ -115,14 +115,19 @@ Definition lb_aq (l : wlabel) : bool :=
   match l with
   | LLoad aq _ _ _ _ => aq
   | LRmw aq _ _ _ _ _ _ => aq
-  | _ => false
+  | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => false
   end.
 
 (** Is the label a [fence r,rw]-or-stronger — [pr] (past reads are
     pred) and [sw] (future writes are succ)?  Exactly the two bits
     [fence_post] needs to route [w_vrOld] into [w_vwNew]. *)
 Definition lb_fence_prsw (l : wlabel) : Prop :=
-  match l with LFence pr _ _ sw => pr = true ∧ sw = true | _ => False end.
+  match l with
+  | LFence pr _ _ sw => pr = true ∧ sw = true
+  | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
+  | LDev | LRegW _ _ | LCtrl _ | LInstr => False
+  end.
 
 (* ------------------------------------------------------------------ *)
 (** ** DELIVERABLE 1: THE [fwd_own] INVARIANT *)
@@ -415,7 +420,8 @@ Definition fulfil_vext (ws : wstate) (l : wlabel) : option nat :=
               (load_post_run_d ws aq (srcs_view ws asrc) base (tvs.*1)) rl
               (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
                        (ldv_of ws aq (srcs_view ws asrc) base (tvs.*1))))
-  | _ => None
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => None
   end.
 
 (** [w_vwNew] is a lower bound of the EXT view: [fulfil_vpre] is a max

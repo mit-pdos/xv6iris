@@ -141,7 +141,8 @@ Definition lb_rl (l : wlabel) : bool :=
   match l with
   | LStore rl _ _ _ _ => rl
   | LRmw _ rl _ _ _ _ _ => rl
-  | _ => false
+  | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
+  | LCtrl _ | LInstr => false
   end.
 
 (* ---- the per-byte folds ---- *)

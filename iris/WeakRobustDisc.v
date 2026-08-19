@@ -120,7 +120,11 @@ Local Open Scope Z_scope.
     pair [WeakMem.fence_post_vwNew_w] routes [w_vwOld] into [w_vwNew]
     on. *)
 Definition lb_fence_pwsw (l : wlabel) : Prop :=
-  match l with LFence _ pw _ sw => pw = true ∧ sw = true | _ => False end.
+  match l with
+  | LFence _ pw _ sw => pw = true ∧ sw = true
+  | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _
+  | LDev | LRegW _ _ | LCtrl _ | LInstr => False
+  end.
 
 (* ------------------------------------------------------------------ *)
 (** ** THE TWO NEW [astep_ok] FACTS *)

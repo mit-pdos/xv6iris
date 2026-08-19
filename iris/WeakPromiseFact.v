@@ -56,7 +56,11 @@ Local Open Scope Z_scope.
     which is why the rmw — the walker's CAS, the kernel's AMOs — is
     lat-free; the only [lat] users are ifetch and read-only walks. *)
 Definition lat_free (l : wlabel) : Prop :=
-  match l with LLoad _ lat _ _ _ => lat = false | _ => True end.
+  match l with
+  | LLoad _ lat _ _ _ => lat = false
+  | LSilent | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LFence _ _ _ _
+  | LDev | LRegW _ _ | LCtrl _ | LInstr => True
+  end.
 
 Lemma lat_free_rmw aq rl base tvs data asrc vsrc :
   lat_free (LRmw aq rl base tvs data asrc vsrc).
