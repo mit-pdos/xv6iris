@@ -143,7 +143,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 (* so that vmfault's other callers -- usertrap, copyinstr -- do not have *)
 (* to name a memory they say nothing about.                              *)
 (* ===================================================================== *)
-Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
     (p : mword 64) (b : bool) (lks : gset string) :=
@@ -183,7 +183,7 @@ Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kalloc
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf_mem :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
       (p : mword 64) (b : bool) (lks : gset string),
