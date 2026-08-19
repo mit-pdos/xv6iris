@@ -32,13 +32,14 @@ Require Import SpecWalk.
 Require Import SpecMappages.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Set Printing Depth 40.
 Local Open Scope Z_scope.
 
 Module MappagesProof (Walk : WALK) : MAPPAGES.
 
 Section ProofMappages.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

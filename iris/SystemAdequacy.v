@@ -49,6 +49,7 @@ Require Import FsCrash.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -107,9 +108,8 @@ Proof. reflexivity. Qed.
 Definition XV6_DISK_BYTES : nat := (2000 * 1024)%nat.
 
 Section SystemBoot.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
-  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ,
-            !uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ}.
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
   Context `{GEN : GenId}.
 
   (* NO [icacheG] BINDER: [fileG] carries it, together with the ambient
@@ -188,7 +188,7 @@ End SystemBoot.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_power_adequacy Σ
-    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+    `{!xv6G Σ, !riscvGpreS Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ}
     (g : gstate)
     (* the ONLY hypotheses about the machine: it is off, and nothing has ever
@@ -219,7 +219,7 @@ Proof.
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' Hbf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -245,8 +245,8 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_fs_adequacy Σ
-    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !fsCrashG Σ}
+    `{!xv6G Σ, !riscvGpreS Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+      !irefslotGpreS Σ}
     (g : gstate) (cov : gset Z) (logstart : Z)
     (D0 : gmap Z (list (bv 8)))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
@@ -268,7 +268,7 @@ Proof.
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' Hbf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -294,8 +294,7 @@ Local Instance adequacy_icfg : icfg :=
          1%positive 1%positive 1%positive.
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; irefslotΣ; icacheΣ;
-     pavΣ; fsCrashΣ ].
+  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].
 
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :

@@ -25,6 +25,7 @@ Require Import WpPushOffBridges.
 Require Import SpecPushOff.
 Require Import ProcGeom.
 Require WpGprCsrwC.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
@@ -94,7 +95,7 @@ Qed.
 Module PushOffProof (Mycpu : MYCPU) : PUSHOFF.
 
 Section ProofPushOff.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Context {kt : ktier}.
   Lemma ppi_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x24) : mword 64) false

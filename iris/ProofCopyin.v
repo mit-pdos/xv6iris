@@ -131,6 +131,7 @@ Require Import SpecWalkaddr SpecVmfault SpecMemmove.
 Require Import SpecCopyin.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 
@@ -165,7 +166,7 @@ Module CopyinProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) (Memmove : MEMMOVE)
   : COPYIN.
 
 Section ProofCopyin.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not

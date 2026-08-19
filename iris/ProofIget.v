@@ -126,6 +126,7 @@ Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -383,8 +384,7 @@ End IgetMsg.
 Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) (PN : PANIC) : IGET.
 
 Section ProofIget.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).

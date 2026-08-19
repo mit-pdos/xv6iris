@@ -34,6 +34,7 @@ Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import MemAccessGen.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -92,7 +93,7 @@ Proof.
 Qed.
 
 Section WpUldPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ld rd, imm(a0) inside userret: instruction on the TRAMPOLINE page,
@@ -1142,7 +1143,7 @@ Section UsretSwp.
 End UsretSwp.
 
 Section WpUaluUsretPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* any a0-writing instruction on the trampoline page inside userret:

@@ -313,27 +313,33 @@ Proof. rewrite /Mcount fmap_insert. reflexivity. Qed.
 Lemma Mcount_delete M k : Mcount (delete k M) = delete k (Mcount M).
 Proof. rewrite /Mcount fmap_delete. reflexivity. Qed.
 
-(* [pipeG] is a SUPERCLASS rather than a sibling context assumption, so that
-   the ~100 files that merely mention [proc_priv] do not have to name the
-   pipe layer's ghosts.  A file that needs both must take [fileG] alone and
-   project: two instance paths to [inG Σ fracR] print identically and do not
-   unify.
+(* THIS CLASS CARRIES ITS OWN CAMERA AND ITS OWN CONFIG, AND NOTHING ELSE.
 
-   [icacheG] and [icfg] are superclasses for the SAME reason, and the rule
-   is the same: a file that needs both the file table and the inode cache
-   takes [fileG] alone (SpecFileread.v is the one such file today).  They
-   are here because an FD_INODE file's payload IS an inode reference --
-   [IcacheRef.inode_held] -- so the predicate cannot be stated without the
-   cache's algebra and its three constants.  [cinvG] is the cancellable
-   invariant the payload's fraction law needs; see [inode_pay]. *)
+   It used to carry [pipeG], [icacheG] and [cinvG] as superclasses too, for
+   a good reason stated badly: "so that the ~100 files that merely mention
+   [proc_priv] do not have to name the pipe layer's ghosts", with the rule
+   "a file that needs both must take [fileG] alone and project: two instance
+   paths to [inG Σ fracR] print identically and do not unify."
+
+   The reason was right and the remedy was local.  Bundling pure capacity so
+   that consumers name ONE class is exactly right -- it is why [Xv6G.xv6G]
+   exists -- but a bundle per subsystem gives you as many instance paths as
+   you have bundles, and the rule it forces ("take [fileG] alone") is
+   unenforceable: twenty-seven files bound [fileG] and [!icacheG] side by
+   side, and [FsReady.v] deliberately declared [icacheG]/[icfg] LAST so that
+   resolution would prefer them.  That is the double path the rule was
+   written to prevent, in the tree, compiling.
+
+   So the three capacity classes moved to [xv6G], which is the ONE bundle,
+   and this class keeps what is genuinely its own: the file table's camera,
+   and [icfg] -- which is not capacity at all but a record of NAMES, so it
+   does not belong in [xv6G] either.  A file that needs the file table now
+   takes [xv6G] and [fileG]: one path to each. *)
 Class fileG (Σ : gFunctors) := FileG {
   file_inG :: inG Σ fileUR;
-  file_pipeG :: pipeG Σ;
-  file_icacheG :: icacheG Σ;
-  file_cinvG :: cinvG Σ;
   file_icfg :: icfg;
 }.
-Definition fileΣ : gFunctors := #[GFunctor fileUR; pipeΣ; icacheΣ; cinvΣ].
+Definition fileΣ : gFunctors := #[GFunctor fileUR].
 Global Instance subG_fileΣ {Σ} `{ICFG : icfg} : subG fileΣ Σ -> fileG Σ.
 Proof. solve_inG. Qed.
 
@@ -472,7 +478,12 @@ Global Instance word_pointsto_timeless'' `{!riscvGS Σ} (ktr : ktier) (a : Arch.
 Proof. exact (word_pointsto_timeless' ktr a dq w). Qed.
 
 Section FileInv.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  (* [icacheG]/[pipeG]/[cinvG] are bound HERE rather than reached through
+     [fileG], since they left that class (see its note).  This file is
+     BELOW [Xv6G.v] -- it is one of the files the bundle is built out of --
+     so it names them individually; everything above takes [xv6G]. *)
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
+            !icacheG Σ, !pipeG Σ, !cinvG Σ}.
 
   (* ---- the content cells, at an arbitrary fraction ----
 

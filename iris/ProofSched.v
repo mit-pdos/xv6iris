@@ -28,6 +28,7 @@ Require Import CodeSched.
 Require Import SpecMyproc SpecHolding SpecSwtch SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -158,7 +159,7 @@ Module SchedProof (Myproc : MYPROC) (Holding : HOLDING) (Swtch : SWTCH) : SCHED.
 (* and [rget_tp] reads it off with no hypothesis at all.                   *)
 (* ===================================================================== *)
 Section SchedPostSwtch.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Lemma sched_post_swtch `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
@@ -544,7 +545,7 @@ Section SchedPostSwtch.
 End SchedPostSwtch.
 
 Section ProofSched.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sched_sconf 

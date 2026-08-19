@@ -33,12 +33,12 @@ Require Import RegFile.
 Require Import WpLock DiskPtsto WpUart.
 Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.
 Require Import SpecPrintk.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module Printk := PrintkProof Consputc Printint Acquire Release.
 
 Module PrintkGen : PRINTK_GEN.
-  Lemma wp_printk_gen_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_printk_gen_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool)

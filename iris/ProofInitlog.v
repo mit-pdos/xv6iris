@@ -93,6 +93,7 @@ Require Import SpecInitlog.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -201,8 +202,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section InitlogDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
      The window vocabulary is ByteBuf's ([bb_bytes_of_list] to trade the
@@ -267,8 +267,7 @@ End InitlogDefs.
 (* ===================================================================== *)
 
 Section ProofInitlog.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_initlog_sconf 

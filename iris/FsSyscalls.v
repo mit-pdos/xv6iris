@@ -151,6 +151,7 @@ Require Import ProcAvail.
 Require Import FsCfg.     (* the ambient fs names [fs_ready] is stated at *)
 Require Import FsReady.   (* SIMP-2: [fs_world] is now the derived form *)
 Import Defs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -201,9 +202,7 @@ Record fs_geom `{ICFG : icfg}
 (* ====================================================================== *)
 
 Section FsBundles.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   (* the ambient fs names [FsReady.fs_ready] is stated at.  Not a
      superclass of anything, so unlike [icfg] (which rides in on [fileG])
@@ -353,10 +352,8 @@ End FsBundles.
     -1 arm.  Every syscall in sysfile.c is in the same position; see the
     file header. *)
 Definition wp_sys_mkdir_friendly_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
 
     (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
@@ -413,10 +410,8 @@ Definition wp_sys_mkdir_friendly_body
 Module FsSysMkdir (M : SYSMKDIR).
 
   Lemma wp_sys_mkdir_friendly
-      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-        !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -529,10 +524,8 @@ End FsSysMkdir.
     the friendly shape: a two-armed disjunction over the process block, with
     nothing machine-level in it. *)
 Definition wp_sys_chdir_friendly_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
 
     (γf γa γpr : gname)
     (γs : list gname) (j : nat) (γl : gname)
@@ -586,10 +579,8 @@ Definition wp_sys_chdir_friendly_body
 Module FsSysChdir (M : SYSCHDIR).
 
   Lemma wp_sys_chdir_friendly
-      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-        !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

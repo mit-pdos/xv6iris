@@ -163,6 +163,7 @@ Require Import FileInvDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* main's stack budget: its own 16-byte / 2-slot frame over its deepest
@@ -183,8 +184,7 @@ Require Import ProcAvail.
    4096-byte per-hart stack, so nothing upstream has to change. *)
 Notation K_main := (122%nat) (only parsing).
 Section SpecMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -446,8 +446,7 @@ End SpecMain.
 
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (m : regfile) (K : nat)
       (p0 : mword 64)

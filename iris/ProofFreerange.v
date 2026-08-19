@@ -58,6 +58,7 @@ Require Import CodeFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -65,7 +66,7 @@ Import Defs.
 Module FreerangeProof (Kfree : KFREE) : FREERANGE.
 
 Section ProofFreerange.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ================================================================= *)

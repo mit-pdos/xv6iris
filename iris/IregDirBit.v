@@ -51,12 +51,12 @@ Require Import DirView.
 Require Import IcacheRef.
 Require Import DirLinks.
 Require Import InodeRegion.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
 Section IregDirBit.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
-            !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
   (* ------------------------------------------------------------------ *)

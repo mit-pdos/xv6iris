@@ -62,6 +62,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -74,7 +75,7 @@ Local Open Scope Z_scope.
    went 26 -> 56 (SpecFetchstr.v).  argstr's whole body is the fetchstr call,
    so it takes the rise straight through: 4 + 56 = 60. *)
 Notation argstr_stack := (60%nat) (only parsing).
-Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_argstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (v : mword 64)
@@ -113,7 +114,7 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ,
 
 Module Type ARGSTR.
   Parameter wp_argstr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string),

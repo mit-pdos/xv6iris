@@ -151,6 +151,7 @@ Require Import SpecCreate.      (* [create_slots], [create_units], [K_create] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -172,10 +173,8 @@ Section SpecSysMkdir.
 End SpecSysMkdir.
 
 Definition wp_sys_mkdir_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
@@ -311,10 +310,7 @@ Definition wp_sys_mkdir_sconf_body
 
 Module Type SYSMKDIR.
   Parameter wp_sys_mkdir_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

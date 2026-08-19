@@ -34,6 +34,7 @@ Require Import CodeSleeplock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecInitsleeplock.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -56,7 +57,7 @@ Local Ltac rgne :=
 Module InitsleeplockProof (Initlock : INITLOCK) : INITSLEEPLOCK.
 
 Section ProofInitsleeplock.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

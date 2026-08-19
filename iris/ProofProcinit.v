@@ -74,6 +74,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecProcinit.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -169,8 +170,7 @@ Module ProcinitProof (Initlock : INITLOCK) : PROCINIT.
 
 Section ProofProcinit.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{!lockG Σ}.
+  Context `{!xv6G Σ}.
   Context `{!fileG Σ}.
   Context `{!fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop

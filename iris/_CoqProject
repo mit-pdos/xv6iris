@@ -1247,6 +1247,7 @@ LinkSysMkdir.v
 # the predicate without importing the syscall bodies.
 FsCfg.v
 FsReady.v
+FirstTok.v
 FsSyscalls.v
 LinkFsSyscalls.v
 SpecSysMknod.v
@@ -1270,6 +1271,7 @@ ProofUserretClosed.v
 LogDefs.v
 ProcDefs.v
 BioDefs.v
+Xv6G.v
 InodeDefs.v
 SpecSysUnlink.v
 ProofSysUnlinkParts.v

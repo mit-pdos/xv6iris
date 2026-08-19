@@ -80,6 +80,7 @@ Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import SpecKexec.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -481,7 +482,7 @@ End KexecBFrame.
 (*  THE FRAME FROM +0x0cc ONWARD.                                         *)
 (* ===================================================================== *)
 Section KexecBFrameB.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
@@ -520,9 +521,7 @@ End KexecBFrameB.
 (*  THE TWO OUTPUT STATES.                                                *)
 (* ===================================================================== *)
 Section KexecBSeam.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.  (* NB: icacheG + icfg come
               from [fileG] -- ProofKexecA.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
   Context `{GEN : GenId} `{CID0 : CpuId}.

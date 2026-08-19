@@ -41,6 +41,7 @@ Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeRegion.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Notation ST_EMPTY := 0%nat.
 Notation ST_FILLED := 1%nat.
@@ -56,8 +57,7 @@ Class escrowAG (Σ : gFunctors) := {
 }.
 
 Section escrowA.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
-            !logG Σ, !escrowAG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !escrowAG Σ}.
   Context `{ICFG : icfg}.
 
   (* ------------------------------------------------------------------ *)

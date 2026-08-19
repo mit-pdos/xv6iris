@@ -44,10 +44,11 @@ Require Import SmodeCore.
 Require Import IntrDefs CpuOwn.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
-Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
          mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
     (An Ao : ctx_adm)
@@ -127,7 +128,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
 
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)

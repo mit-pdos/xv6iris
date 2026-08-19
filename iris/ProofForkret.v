@@ -71,6 +71,7 @@ Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -96,9 +97,7 @@ Ltac reg_neq :=
 Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section Res.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the residue is the closed loop's, re-exported unchanged *)
@@ -134,10 +133,7 @@ Section Res.
 End Res.
 
 Theorem wp_forkret
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)

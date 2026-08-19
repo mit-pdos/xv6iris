@@ -107,6 +107,7 @@ Require Import MstatusBits WpIntrCore.
 Require Import SmodeCorePt.
 Require Import WpSmodePtEngine WpSmodePtFetch.
 Require Export IntrDefs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1067,7 +1068,7 @@ End TrapSwp.
 
 Section IntrEngine.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
@@ -2519,7 +2520,7 @@ Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
    cycle boundary, not inside it -- so lending them costs the engine
    nothing, and [csrr time] / [csrr sip] / [csrw stimecmp] cannot be
    written without them. *)
-Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
@@ -2545,7 +2546,7 @@ Definition intr_cb_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
 
 (* ...and the CLOCK-FREE reading, for the leaves that never touch a clock
    cell: the same callback with the three cells passed straight through. *)
-Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+Definition intr_cb `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
@@ -2579,7 +2580,7 @@ Definition intr_cb `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
    mstatus VALUE and the residue to the satp/tlb values, and those values
    are in the frame.  Reading them off the landing file is what keeps the
    two halves talking about the same cells. *)
-Definition intr_ret `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (p : mword 64) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
@@ -2600,7 +2601,7 @@ Definition intr_ret `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
    [nextPC] is the pc the cycle commits, so both arms name their landing pc
    by reading it off rather than by an existential the continuation could
    not tie down. *)
-Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
@@ -2643,7 +2644,7 @@ Definition intr_psi `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
                    wp_next true p (fun CID =>
                      intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))))%I.
 
-Lemma wp_exec_step_intr_clock `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_exec_step_intr_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
@@ -3124,7 +3125,7 @@ Qed.
    which is what every leaf that does not name one wants -- and it is what
    keeps the 68 call sites of the funnel unchanged.                        *)
 (* ===================================================================== *)
-Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_exec_step_intr `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :

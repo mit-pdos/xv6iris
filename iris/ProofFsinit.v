@@ -100,6 +100,7 @@ Require Import SpecPrintk.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -182,9 +183,8 @@ Definition fsi_thr4 (m M : regfile) : Prop :=
     M !!! Regidx c = (m !!! Regidx c : mword 64).
 
 Section FsinitDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
   Definition fsi_frame (m : regfile) : iProp Σ :=
@@ -275,9 +275,8 @@ End FsinitDefs.
 (*  +0x58 .. +0x62 : THE ONLY EXIT.  restore the four, pop, return.       *)
 (* ===================================================================== *)
 Section FsinitEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -520,9 +519,8 @@ End FsinitEpilogue.
 (*  +0x00 .. +0x54 : the push, the four calls, and the magic test.        *)
 (* ===================================================================== *)
 Section FsinitMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

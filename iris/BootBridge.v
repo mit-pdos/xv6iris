@@ -101,6 +101,7 @@ Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -250,7 +251,7 @@ Definition mstatus_reset : mword 64 := mword_of_int 0xA00000000.
 
 
 Section BootBridge.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* NO [KT0] BINDER: the boot capability is at KT0 by construction

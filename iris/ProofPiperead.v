@@ -87,6 +87,7 @@ Require Import SpecPiperead.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -344,7 +345,7 @@ Qed.
 
 Section PrLeaves.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* copyin/copyout's one-byte buffer, in and out of the [seq 0 1] big-sep *)
@@ -382,7 +383,7 @@ Module PipereadProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN)
                      (Copyout : COPYOUT) (ReleaseGen : RELEASE_GEN) : PIPEREAD.
 
 Section ProofPiperead.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register disequality guard (perf rule): [unify] settles convertibility

@@ -58,6 +58,7 @@ Require Import CodeBpin.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBpin.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -95,7 +96,7 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 Module BpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BPIN.
 
 Section ProofBpin.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

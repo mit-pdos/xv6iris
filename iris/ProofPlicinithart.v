@@ -57,6 +57,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodePlicinithart.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* The hart-id case split, the two context base addresses, their geometry and
@@ -87,8 +88,7 @@ Local Ltac rgne :=
 Module PlicinithartProof (Cpuid : CPUID) : PLICINITHART.
 
 Section ProofPlicinithart.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

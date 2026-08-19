@@ -332,6 +332,7 @@ Require Import SpecSyscall.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -436,9 +437,8 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Ltac stkeq := unfold pa_stk, add_vec_int; f_equal; apply bv_eq; vm_compute; reflexivity.
 
 Section SyscallVocab.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ===================================================================== *)
@@ -508,9 +508,8 @@ Section SyscallVocab.
      the Section's variables would be fixed at the Section's [Σ], and
      [syscall_env] -- which binds its own -- could not then mention it. *)
   Definition sysc_fs_env
-      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-        !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
+      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (pj : mword 64) (bn : bio_names) (fn : fclose_names) : iProp Σ :=
     (* the ties to the ambient cache, and the two [fn] fields nothing else
        pins ([fcn_dq] is what iput's pid quarter is lent at) *)
@@ -577,9 +576,8 @@ Section SyscallVocab.
      and their POSITIONS are the interface every arm's [iDestruct] pattern is
      written against -- a new conjunct goes at the END. *)
   Definition syscall_env
-      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-        !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
+      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       : iProp Σ :=
     (∃ (γa γp γw γft γtk γpr : gname)
@@ -1588,9 +1586,8 @@ End SyscallVocab.
    serves all 22 entries.  [V'] is the callee's own outgoing private block,
    which the store then advances to [upd_tf V' _]. *)
 Section SyscallRet.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma sysc_ret_tail
@@ -1684,9 +1681,8 @@ End SyscallRet.
    delivered at a REBOUND hart, the tail has to come from an earlier
    section. *)
 Section SyscallArms.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* PLACEHOLDER for a not-yet-specialized table entry: an honest
@@ -2855,9 +2851,8 @@ End SyscallArms.
 (* ===================================================================== *)
 (* S4 -- THE CAPSTONE. *)
 Section SyscallMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* CAPSTONE.  The shared scaffolding (`sysc_arm_pre`/`sysc_hcont_ty`/

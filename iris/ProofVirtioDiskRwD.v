@@ -64,6 +64,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -518,7 +519,7 @@ Proof.
 Qed.
 
 Section VdrwdMaps.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* NB the binder types are left to inference: a [gmap Arch.pa _] written
      out in a file that imports SailStdpp.Values picks up a DIFFERENT
@@ -606,8 +607,7 @@ Qed.
 (* ===================================================================== *)
 
 Section VdrwdLeaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the avail-ring INDEX read: [lhu rd,2(rs1)] with rs1 = disk.avail.
@@ -1011,7 +1011,7 @@ Lemma vdrwd_off_static (base a : Arch.pa) (k n : nat) :
 Proof. intros -> Hkn Hs j Hj. rewrite pa_add_add. apply Hs. lia. Qed.
 
 Section VdrwdPinRes.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the three word widths and the byte, straight into the [range_map] shape *)
   Lemma vdrwd_w2 (a : Arch.pa) (w : bv 16) :
@@ -1076,7 +1076,7 @@ Section VdrwdPinRes.
 End VdrwdPinRes.
 
 Section VdrwdPinBuild.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* THE ownership half: the seventeen formatted cells, the ring cell and the
      caller's buffer become the pin and the writable footprint the publish
@@ -1489,7 +1489,7 @@ Qed.
 (* ===================================================================== *)
 
 Section VdrwdP4.
-  Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

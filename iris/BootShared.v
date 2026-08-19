@@ -45,6 +45,7 @@ From Kernel Require KernelSyms.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import TicksInv.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -232,9 +233,8 @@ Proof. exact (fun H => H). Qed.
 (* ====================================================================== *)
 
 Section BootBss.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
   (* ---- the stack family.  The per-element shape is NAMED (a lambda [Φ]
@@ -359,9 +359,8 @@ Proof.
 Qed.
 
 Section BootBssChain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
   (* ONE hart's memory share, exactly as [BootChain.boot_hart_res] spells it
@@ -760,14 +759,13 @@ Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
    (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
 
 Section BootAlloc.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ}.
   (* NO [icacheG] BINDER: [fileG] already carries it, and [IcacheRef.icfg]
      with it (FileInv.v's header -- two instance paths print identically and
      do not unify).  The itable's authority gname is CANONICAL, a field of
      that ambient [icfg], so unlike the fd- and iref-slot supplies there is
      nothing to mint here. *)
-  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ,
-            !uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
   Context `{GEN : GenId}.
 
   (* The two PER-HART GHOST BUNDLES, NAMED -- and the naming is load-bearing:

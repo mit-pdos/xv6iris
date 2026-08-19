@@ -67,6 +67,7 @@ From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -385,7 +386,7 @@ End BootChain.
 (* ====================================================================== *)
 
 Section BootRun.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
@@ -582,8 +583,7 @@ End BootRun.
 (* ====================================================================== *)
 
 Section BootSecondary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma boot_hart_secondary (rs : regstate)
@@ -632,8 +632,7 @@ End BootSecondary.
 (* ====================================================================== *)
 
 Section BootPrimary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma boot_hart_primary (rs : regstate)

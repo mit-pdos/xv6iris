@@ -17,6 +17,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -59,7 +60,7 @@ Import Defs.
 
    [6 <= av] does NOT move: [av] is still the ENTRY usable count, which is what
    push_off's own 4-slot frame and the mycpu() call come out of. *)
-Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
+Definition wp_push_off_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
@@ -127,7 +128,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
 
    [4 <= av] does NOT move even though [av] changed meaning: pop_off's own
    4-slot frame comes out of the ENTRY count [trap_res bexit + av >= av]. *)
-Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
+Definition wp_pop_off_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -161,11 +162,11 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !xv6G Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_push_off_sconf_body kt m av n eb p b lks.
   Parameter wp_pop_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !xv6G Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (lks : gset string),
       wp_pop_off_sconf_body kt m av n eb p lks.
 End PUSHOFF.

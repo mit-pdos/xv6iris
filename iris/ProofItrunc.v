@@ -61,6 +61,7 @@ Require Import ProofItruncParts.
 Require Import CodeItrunc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -81,8 +82,7 @@ Notation IT := KernelSyms.itrunc.
 (*  The continuation: itrunc's postcondition, as a resource               *)
 (* ===================================================================== *)
 Section ItruncCont.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (γfs : fs_names) (γi : gname) (bn : bio_names)
@@ -187,8 +187,7 @@ Proof. apply elem_of_union_r, elem_of_singleton_2. reflexivity. Qed.
 (*  budget still owed is iupdate's one unit.                              *)
 (* ===================================================================== *)
 Section ItruncTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -671,8 +670,7 @@ End ItruncTail.
 (*  Fuel induction over NDIRECT - k, the lw_scan idiom.                    *)
 (* ===================================================================== *)
 Section ItruncDLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
@@ -1252,8 +1250,7 @@ End ItruncDLoop.
 (*  store, no map, and no [inode_map] traffic at all.                      *)
 (* ===================================================================== *)
 Section ItruncELoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
@@ -1791,8 +1788,7 @@ End ItruncELoop.
 (*  clears the cell, restores s4 and rejoins the tail at +0x38.            *)
 (* ===================================================================== *)
 Section ItruncIArm.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
@@ -2526,8 +2522,7 @@ End ItruncIArm.
 (*  and the shared tail.                                                  *)
 (* ===================================================================== *)
 Section ItruncMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  [log_opS] is an exclusive
      ghost_map element with no auth-monotone shadow, so a counted post hands

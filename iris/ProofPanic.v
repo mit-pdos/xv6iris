@@ -50,6 +50,7 @@ Require Import SpecPrintk.
 Require Import SpecPanic.
 Require Import CodePanic.
 From Kernel Require KernelInstrs KernelData KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -136,7 +137,7 @@ End PanicData.
 (* loop was entered on.                                                   *)
 (* ===================================================================== *)
 Section PanicSpin.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
 
   Context {kt : ktier}.
@@ -176,8 +177,7 @@ End PanicSpin.
 (* ===================================================================== *)
 Module PanicProof (Printk : PRINTK) : PANIC.
 Section ProofPanic.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

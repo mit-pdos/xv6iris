@@ -81,6 +81,7 @@ Require Import IrefSlots InodeRegion.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 
@@ -90,7 +91,7 @@ Local Open Scope Z_scope.
 Definition pipe_name_str : Z := 0x800075b8%Z.
 
 Section SpecPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* [pf0]/[pf1] are the CALLER's two [struct file *] locals -- cells on its
      own frame -- so they ride the caller's regime. *)
 
@@ -142,7 +143,7 @@ Section SpecPipealloc.
 End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ, !uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
@@ -223,7 +224,7 @@ Definition wp_pipealloc_sconf_body
    derived lemma's statement. *)
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks.

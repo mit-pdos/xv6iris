@@ -18,9 +18,10 @@ Require Import KallocInv.
 Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
-Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
+Definition wp_memset_page_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -82,6 +83,6 @@ Module Type MEMSETPAGE.
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_page_val_sconf_body kt m0 n cval b pcur.
   Parameter wp_memset_page_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_page_sconf_body kt m0 n cval b pcur.
 End MEMSETPAGE.

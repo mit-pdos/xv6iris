@@ -71,6 +71,7 @@ Require Import SpecConsolewrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -118,8 +119,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section CwBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
   Notation Rra  := (mword_of_int 1  : mword 5).

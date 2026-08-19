@@ -68,6 +68,7 @@ From Kernel Require KernelSyms.
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Require Import UserFrame.  (* [u_regs_pc_is]: the pc_is bundle in u_regs *)
 Local Open Scope Z_scope.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -75,9 +76,7 @@ Import Defs.
 (* ===================================================================== *)
 Module UserretClosed (R : USERRET) (US : USER) (UV : USERVEC).
 Section UserretClosed.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   (* [Rut], instantiated: the kernel-side bundle, keyed on the address space
@@ -205,9 +204,7 @@ Module UserretClosedProof (R : USERRET) (US : USER) (UV : USERVEC)
   Module LP := UserretClosed R US UV.
 
 Section Res.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the residue is uservec's, re-exported unchanged *)
@@ -227,10 +224,7 @@ Section Res.
 End Res.
 
   Theorem wp_userret_closed
-      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) :

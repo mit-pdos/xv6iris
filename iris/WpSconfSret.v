@@ -82,12 +82,13 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
    frame kit it shares with the rest of the sconf tier *)
 Require Import WpSmodePtEngine HartSCsr HartSwp HartMFrame HartLift HartSpan
         HartSpanChar HartRegNode HartMCycle HartGoodb WpDecodeBridge.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
 Section WpSconfSret.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {p : mword 64}.

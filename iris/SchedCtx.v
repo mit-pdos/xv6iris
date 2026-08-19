@@ -63,6 +63,7 @@ Require Export IrefSlots.
 Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw
@@ -88,7 +89,7 @@ Proof.
 Qed.
 
 Section SchedCtx.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).

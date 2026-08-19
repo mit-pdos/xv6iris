@@ -658,6 +658,65 @@ Three practical points:
   unfold short.  Check for `rewrite /<name>` at the call sites before
   promising a zero-churn move.
 
+## ONE BUNDLE PER GHOST CLASS, OR THE SAME `inG` GETS TWO INSTANCE PATHS
+
+`Xv6G.xv6G` bundles the thirteen ghost classes that are PURE CAPACITY -- only
+`inG`/`ghost_varG`/`ghost_mapG` fields, no `gname`.  That is the membership
+test, and it is also why adequacy can hand the whole thing out before a single
+instruction runs: there is nothing in it to allocate (`xv6GΣ` +
+`subG_xv6GΣ`).  The rule that comes with it: **a file at or above `Xv6G.v`
+binds `xv6G` and does NOT bind any member.**  Binding both compiles.
+
+**Why it matters.** Two instances of one `inG` are not equal, so resources
+built at each are different propositions THAT PRINT IDENTICALLY.  The failures
+read `iFrame: cannot frame`, `iSpecialize: cannot instantiate`, or eleven
+UNDEFINED EVARS naming classes that are not the culprit.
+
+**What was found doing it, and the general shape.** Three ad-hoc bundles each
+carried capacity belonging to the one bundle:
+
+- `FileInvDefs.fileG` carried `pipeG`/`icacheG`/`cinvG`.  Its own comment
+  stated the right motive and the wrong remedy, with an unenforceable rule
+  ("a file that needs both takes `fileG` alone") -- **twenty-seven files bound
+  `fileG` and `!icacheG` side by side**, and `FsReady.v` deliberately declared
+  `icacheG`/`icfg` LAST so resolution would prefer them.  `fileG` now keeps
+  only its own camera and `icfg`.
+- `RiscvAdequacy.riscvGpreS` carried `uartGhostG`/`diskGhostG`.  Removed;
+  `riscvΣ` still supplies the functors, so `subG_riscvGpreS` is unchanged in
+  strength -- only who NAMES them moved.
+- **`mono_natG` has FIVE owners** (`DiskPtsto.disk_nc_inG`, `CrashProto`'s
+  two, `riscv_pre_genGS`, `riscvF_genGS`) and is NOT fixed.  It forced the
+  tree's one carve-out: `RiscvAdequacy`'s `Section power` deliberately binds
+  `!sieG Σ` rather than `xv6G`, because `xv6G` drags in `diskGhostG`'s
+  `mono_natG` and shadows the generation counter.  **Reordering the binders
+  does not help** -- the allocation lemma fixes the instance at ITS
+  statement, not at the consuming section.  Giving `mono_natG` one owner is
+  the next increment.
+
+**Four ways a binder sweep breaks that the build reports as something else:**
+
+- **Duplicate insertion.**  The unit is not the binder GROUP: adjacent groups
+  (`` `{…} `{…} ``) are one construct, and consecutive `Context` COMMANDS
+  share a section.  Insert once per construct and once per lexical scope
+  (a `Section`/`End` stack), or you manufacture the very double path you are
+  removing.  Symptom: `Signature components ... do not match` with the class
+  appearing twice in the expected type.
+- **Import placed after first use.**  A file with a SECOND `Require` block
+  below its sections gets the import too late, and backtick generalization
+  then invents a fresh `xv6G : gFunctors → Type` VARIABLE, silently.  Insert
+  after the FIRST `Require` block.
+- **Module-qualified binders.**  `!WpLock.lockG Σ`, `!LogInv.logG Σ` -- some
+  written deliberately, with a comment, to dodge an import.  A pattern
+  matching only unqualified names leaves them, and they are then a second
+  path beside the bundle.
+- **Positional `@` applications.**  Changing a section's binder count
+  silently mis-aligns `@f Σ inst _ _ _ …`.  Symptom: `Illegal application
+  (Non-functional construction)`, naming nothing relevant.
+
+Selecting files by NAME (`Spec*`/`Proof*`/`Link*`) is also wrong: select by
+dependency position (not in the bundle's own cone), or the `Wp*`/`User*`
+files above the boundary keep their own binders and fail.
+
 ## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
 
 When a class is a *definitional* one used as an INDEX rather than as a

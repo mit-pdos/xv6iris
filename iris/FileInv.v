@@ -29,10 +29,11 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FileInvDefs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section FileInv.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
 
 
   Definition ftable_res (γ : gname) : iProp Σ :=
@@ -620,7 +621,7 @@ Proof.
 Qed.
 
 Section FileGhostAlloc.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
 
   Lemma fpay_map0_split (γ : gname) (n : nat) :
     own γ ((ε, (fpay_map0 n, ε)) : fileUR) ⊢

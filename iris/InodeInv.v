@@ -64,6 +64,7 @@ Require Export IcacheRef.   (* the in-core scalar fields + the reference *)
 Require Export InodeDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -743,7 +744,7 @@ Qed.
 (* ===================================================================== *)
 
 Section InodeRes.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* --- inode_map: the thirteen addrs cells, plus the indirect block --- *)
 

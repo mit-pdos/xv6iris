@@ -112,6 +112,7 @@ Require Import ProofReadiParts.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -150,8 +151,7 @@ Local Ltac nz := vm_compute; discriminate.
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section ReadiDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -301,8 +301,7 @@ Definition rd_sp (m M : regfile) : Prop :=
 (*  +0xdc .. +0xec : THE RETURN.                                          *)
 (* ===================================================================== *)
 Section ReadiRet.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -622,8 +621,7 @@ End ReadiRet.
 (*  +0xd8 .. +0xda : a0 := s3, restore s3.  THREE PATHS JOIN HERE.        *)
 (* ===================================================================== *)
 Section ReadiJoin.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -767,8 +765,7 @@ End ReadiJoin.
 (*  plus arithmetic (claude-notes/durable-notes.md).                      *)
 (* ===================================================================== *)
 Section ReadiExit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -1011,8 +1008,7 @@ End ReadiExit.
 (*  [rd_blocks_step] is exactly the decrease that pays for it.            *)
 (* ===================================================================== *)
 Section ReadiLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -2371,8 +2367,7 @@ End ReadiLoop.
 (*  test, the clamp and the n = 0 arm.                                    *)
 (* ===================================================================== *)
 Section ReadiMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not

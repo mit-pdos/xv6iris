@@ -22,6 +22,7 @@ Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* proc_mapstacks(kpgtbl=a0): kalloc a page for each of the 64 process kernel
@@ -37,7 +38,7 @@ From Kernel Require KernelSyms.
    graft -- see KvmMap; the proof telescopes it), so every kalloc-null /
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
-Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
@@ -79,7 +80,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p on b lks.
 End PROC_MAPSTACKS.

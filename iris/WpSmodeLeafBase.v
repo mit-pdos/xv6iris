@@ -16,6 +16,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 From iris.bi.lib Require Import fractional.
 Require Import Riscv.riscv_extras SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -24,7 +25,7 @@ Local Open Scope Z_scope.
    specific leaf lemmas in the WpSmode<Family>.v files). Relocated here from the
    former WpSmodeToBeDeleted.v so callers use the specific per-instruction lemmas. *)
 Section WpSmodeGprEngine.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

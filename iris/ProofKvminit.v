@@ -30,6 +30,7 @@ Require Import CodeKvminit.
 Require Import SpecKvmmake SpecKvminit.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -44,7 +45,7 @@ Proof. lia. Qed.
 (* THE BODY: sealed and parameterized by the kvmmake WP hypothesis.       *)
 (* ===================================================================== *)
 Section KvminitBody.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -278,7 +279,7 @@ End KvminitBody.
 (* proven spec, discharging the KVMINIT Module Type.                       *)
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
-  Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_kvminit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
       : wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument

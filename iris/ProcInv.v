@@ -72,6 +72,7 @@ Require Import RiscvExtras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -197,7 +198,7 @@ Section ProcInv.
      [FdSlots] and [IrefSlots] already do this and [IrefSlots.v]'s header
      spells out the argument.  What propagates is the CLASS -- capacity, no
      resource, no change to any statement's shape. *)
-  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{ !fileG Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* A LIVE fd slot: the cell, and -- when non-null -- an actual reference on
      the [struct file] it points at.  [file_ref] is deliberately neither

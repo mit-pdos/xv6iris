@@ -24,6 +24,7 @@ Require Import TrampPt UserretDefs UserretPt UserretEntryPt.
 Require Import SpecUserret.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -34,7 +35,7 @@ Local Notation idx0f := (subrange_vec_dec tf_vpn 8 0).
 
 Module UserretProof : USERRET.
 Section UserretAllPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_pt (kroot uroot tfp : mword 44)

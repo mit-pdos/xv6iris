@@ -63,10 +63,11 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import BarePt.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
-Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string) :=
@@ -114,7 +115,7 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 
 Module Type UVMFREE.
   Parameter wp_uvmfree_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string),

@@ -57,6 +57,7 @@ Require Import CodeConsputc.
 Require Import SpecUartPutc SpecConsputc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -71,8 +72,7 @@ Proof. lia. Qed.
 Module ConsputcProof (UartPutc : UARTPUTC) : CONSPUTC.
 
 Section ProofConsputc.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -484,7 +484,7 @@ End ProofConsputc.
 (* THE SEALED FUNCTOR: instantiate the callee's WP hypothesis with its     *)
 (* proven spec, discharging the CONSPUTC Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_consputc_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_consputc_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       {kt : ktier} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string)
       : wp_consputc_sconf_body kt γl γd γv m0 K bs n eb b p lks :=

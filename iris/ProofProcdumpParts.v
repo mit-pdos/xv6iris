@@ -37,6 +37,7 @@ Require Import ProcGeom.
 Require Import ProcdumpAux.
 Require Import CodeProcdump.
 From Kernel Require KernelInstrs KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP otherwise spends tens of minutes
@@ -57,7 +58,7 @@ Lemma pd_Kpop (K : nat) : (10 <= K)%nat -> ((K - 10) + 10)%nat = K.
 Proof. lia. Qed.
 
 Section ProofProcdumpParts.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with

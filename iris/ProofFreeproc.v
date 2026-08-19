@@ -69,6 +69,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKfree SpecProcFreepagetable.
 Require Import SpecFreeproc.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -130,7 +131,7 @@ Proof. intro H. rewrite length_insert. exact H. Qed.
 Module FreeprocProof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) : FREEPROC.
 
 Section ProofFreeproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FR := KernelSyms.freeproc.

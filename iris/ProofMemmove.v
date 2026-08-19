@@ -60,6 +60,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import SpecMemmove.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -148,7 +149,7 @@ Qed.
 Module MemmoveProof : MEMMOVE.
 
 Section ProofMemmove.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

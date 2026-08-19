@@ -117,6 +117,7 @@ Require Import ProcInv.
 Require Import WpGprCsrwA.   (* [mepc_val]: the sepc write legalizes *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -148,8 +149,7 @@ Definition prepare_return_tf (ws : list (mword 64))
         (<[tf_ksatp_idx := ksat]> ws))).
 
 Definition wp_prepare_return_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (av : nat) (p : mword 64)
     (epc : mword 64) (b : bool) (lks : gset string) :=
@@ -232,8 +232,7 @@ Definition wp_prepare_return_sconf_body
 
 Module Type PREPARE_RETURN.
   Parameter wp_prepare_return_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
       (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string),

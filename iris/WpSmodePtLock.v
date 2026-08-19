@@ -15,6 +15,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep Riscv
 Require Import WpGpr WpMmodeLeafBase.
 Require Import SmodeCore WpAmo WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -140,7 +141,7 @@ Section ExecAmoGS4walkPt.
 End ExecAmoGS4walkPt.
 
 Section WpSmodePtLock.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

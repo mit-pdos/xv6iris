@@ -76,6 +76,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -84,7 +85,7 @@ Import Defs.
    leaves have: this function's kernel buffer is a FRAME local at [KT1] for
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
-Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_copyin_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
@@ -133,7 +134,7 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 
 Module Type COPYIN.
   Parameter wp_copyin_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),

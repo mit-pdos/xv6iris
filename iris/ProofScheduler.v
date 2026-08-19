@@ -55,6 +55,7 @@ Require Import CodeScheduler.
 Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -194,7 +195,7 @@ Proof. intro H. apply eq_vec_false_iff. exact H. Qed.
    twice per dispatch round: c->proc goes 0 -> proc_addr jj at +0x68 and back
    at +0x76, while [wp_swtch_sconf] wants the bundle and [cpu_own] at the SAME
    index. *)
-Lemma sc_retag_p `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_retag_p `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (mm : regfile) (n : nat) (px qx : mword 64) :
   sie_cap_gpr KT1 mm n false px ⊣⊢ sie_cap_gpr KT1 mm n false qx.
 Proof. reflexivity. Qed.
@@ -203,7 +204,7 @@ Proof. reflexivity. Qed.
    and it is opened / rebuilt at five points.  Three one-liners rather than
    five hand-rolled destructuring patterns (the bundle is LEFT-nested now:
    [((cells ∗ count) ∗ C)]). *)
-Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_cpu_own_open `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (px : mword 64) (eb : bool) (lks : gset string) :
   cpu_own 0 eb px false lks -∗
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
@@ -215,7 +216,7 @@ Proof.
   iIntros "(((_ & Hn & Hi & Hp) & Hl & Hcs) & Hc)". iFrame.
 Qed.
 
-Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (lks : gset string) :
+Lemma sc_cpu_own_mk `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (lks : gset string) :
   a_cpu_noff cid_word ↦₄ noff_val 0 -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
@@ -228,7 +229,7 @@ Proof.
   iFrame "Hn Hi Hc Hp Hl Hcs". iPureIntro. vm_compute. reflexivity.
 Qed.
 
-Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (px : mword 64) (eb : bool) (lks : gset string) :
   cpu_priv 0 eb px lks -∗ intr_count 0 false -∗ cpu_own 0 false px false lks.
 Proof.
@@ -249,7 +250,7 @@ Qed.
    scheduler is the one caller that can meet it -- its loop head, between the
    previous round's release and the next acquire, is precisely where the held
    set is empty. *)
-Lemma sc_flip_pre `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (eb : bool) :
+Lemma sc_flip_pre `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (eb : bool) :
   cpu_own 0 eb px eb ∅ -∗
   (if eb then emp else intr_count 0 false) ∗
   (if eb then emp else cpu_priv 0 true px ∅).
@@ -266,7 +267,7 @@ Qed.
 Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (Swtch : SWTCH) : SCHEDULER.
 
 Section ProofScheduler.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)

@@ -86,6 +86,7 @@ Require Import KallocInv.
 Require Import ProcPt.
 Require Import ProcPtOwn.
 Require Import PtFree.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -429,7 +430,7 @@ Proof.
 Qed.
 
 Section BarePt.
-  Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* THE PREDICATE, at any [fx].  Compare [ProcPtOwn.proc_pt]: same three
      conjuncts, with the fixed-leaf map exposed and its [fx_wf] carried

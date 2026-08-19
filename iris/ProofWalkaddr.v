@@ -57,6 +57,7 @@ Require Import SpecWalk.
 Require Import SpecWalkaddr.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 
@@ -170,7 +171,7 @@ Local Ltac rgne :=
 Module WalkaddrProof (WalkNoalloc : WALK_NOALLOC) : WALKADDR.
 
 Section ProofWalkaddr.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_walkaddr_sconf (mm : regfile) (t : ptree)

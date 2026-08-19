@@ -45,6 +45,7 @@ Require Import CodeHolding WpHoldingInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecHolding.
 Require Import ProcGeom.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* seqz on (a - b) is 0 when a <> b (holding +0x1e). *)
@@ -85,7 +86,7 @@ Qed.
 Module HoldingProof (Mycpu : MYCPU) : HOLDING.
 
 Section ProofHolding.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

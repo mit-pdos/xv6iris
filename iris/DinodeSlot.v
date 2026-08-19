@@ -66,6 +66,7 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -440,7 +441,7 @@ Qed.
 (* ===================================================================== *)
 
 Section IupdateRes.
-  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the 64 bytes at [a], read as [dinode_bytes d]: the six pieces the four
      [sh]s, the [sw] and the [memmove] touch, at the offsets those

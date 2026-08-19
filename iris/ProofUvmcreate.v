@@ -28,6 +28,7 @@ Require Import CodeUvmcreate.
 Require Import SpecKalloc SpecMemset SpecUvmcreate.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -62,7 +63,7 @@ Proof. unfold text_end, kmem_lo. lia. Qed.
 Module UvmcreateProof (AK : KALLOC) (MS : MEMSET) : UVMCREATE.
 
 Section ProofUvmcreate.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

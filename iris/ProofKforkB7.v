@@ -56,6 +56,7 @@ Require Import KptTree TrampPt.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -80,7 +81,7 @@ Proof.
 Qed.
 
 Section KforkB7.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Ra5 := (mword_of_int 15 : mword 5).

@@ -124,6 +124,7 @@ Require Import ProofKexecParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -494,7 +495,7 @@ Lemma kxc_s0_of_sp (X : mword 64) :
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section KexecA.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -903,9 +904,7 @@ End KexecA.
    [wp_kexec_sconf_body] offers a fraction, so the +0x02c call cannot be
    stated at [dqa].  When SpecKexec.v is fixed, this line is already right. *)
 Section KexecASeam.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -983,9 +982,7 @@ Module KexecTailProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                       (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                       (EndOp : END_OP).
 Section KexecAExit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1209,9 +1206,7 @@ End KexecAExit.
    same-Section sibling would resolve its [CpuId] through the section
    variable by name. *)
 Section KexecABad.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1596,9 +1591,7 @@ Module KexecTailProofC (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
 Module T := KexecTailProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp.
 
 Section KexecCBad.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

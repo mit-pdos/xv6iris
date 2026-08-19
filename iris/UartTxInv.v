@@ -65,6 +65,7 @@ Require Import RiscvPtsto.
 Require Import DevModel DiskPtsto WpUart.
 Require Import WpLock.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* [◯ML []] is the UNIT of the mono-list resource algebra
@@ -76,8 +77,7 @@ Lemma mono_list_lb_nil_is_unit (A : ofe) :
 Proof. done. Qed.
 
 Section UartTxInv.
-  Context `{!riscvGS Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   (* [WpUart.dev_inv] carries the era-local permit channel at the ambient
      generation (PermInv.v), so the two lemmas below that OPEN it are
      [GenId]-indexed too.  Implicit, so no caller changes: every holder of

@@ -176,6 +176,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* kfork's own frame is 8 slots (addi sp,sp,-64); the deepest callee is
@@ -184,8 +185,7 @@ Local Open Scope Z_scope.
    (10), myproc (10), safestrcpy (2). *)
 Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
@@ -211,9 +211,7 @@ Definition kfork_post
       (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
-      !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
     (inodestart : Z) (nib : nat)
@@ -272,9 +270,7 @@ Definition wp_kfork_sconf_body
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
-             !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)

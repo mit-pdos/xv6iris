@@ -92,6 +92,7 @@ Require Import CodeSysLink.
 Require Import ProofSysLinkParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -109,9 +110,7 @@ Module SysLinkTails (Ilock : ILOCK) (Iupdate : IUPDATE)
                     (Iunlockput : IUNLOCKPUT) (EndOp : END_OP).
 
 Section ProofSysLinkTails.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

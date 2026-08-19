@@ -32,6 +32,7 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame HartMemRun.
 Require Import WpDecodeBridge KptGoodb.
 Require Import SmodeCorePt TrampStepPt WpSmodePtEngine.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -630,7 +631,7 @@ Lemma upt_swp_mode_ok (uroot : mword 44) (satp0 : mword 64) :
 Proof. intros (Hmode & _ & _ & _). rewrite Hmode. vm_compute. reflexivity. Qed.
 
 Section UptTramp.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac tlbpeel :=

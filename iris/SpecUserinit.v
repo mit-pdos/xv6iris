@@ -60,6 +60,7 @@ Require Import KallocInv KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* PROVISIONAL stack budget: 50 is what main() has available below its own
@@ -72,8 +73,7 @@ Notation K_userinit := (120%nat) (only parsing).
 Definition userinit_pages : nat := 8%nat.
 
 Definition wp_userinit_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
     (eb : bool) (pj : mword 64)
@@ -109,8 +109,7 @@ Definition wp_userinit_sconf_body
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64)

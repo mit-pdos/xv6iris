@@ -26,6 +26,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -42,7 +43,7 @@ Import Defs.
    (the resource is re-established at the new hart by push_off/mycpu/pop_off
    run there), so nothing here needs [b = false].  Contrast [cpuid()]/
    [mycpu()] itself, whose returned hart id a migration WOULD invalidate. *)
-Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_myproc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.myproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -66,6 +67,6 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
 
 Module Type MYPROC.
   Parameter wp_myproc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_myproc_sconf_body m av n eb p b lks.
 End MYPROC.

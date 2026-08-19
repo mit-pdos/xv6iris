@@ -97,6 +97,7 @@ Require Import SpecIsmapped SpecKalloc SpecMemsetPage SpecMappages SpecKfree.
 Require Import SpecVmfault.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* proc_pt-altitude goals are enormous; without this a one-line mistake in the
@@ -143,7 +144,7 @@ Module VmfaultProof (Ismapped : ISMAPPED) (Kalloc : KALLOC)
   : VMFAULT.
 
 Section ProofVmfault.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

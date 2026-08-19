@@ -121,6 +121,7 @@ Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -378,7 +379,7 @@ Proof.
 Qed.
 
 Section IcacheBootRegion.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
   (* [FsBoot.fs_L0_big], for this map *)
@@ -742,8 +743,7 @@ End IcacheBootRegion.
 (* ===================================================================== *)
 
 Section IcacheBootPool.
-  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* THE POOL'S KEYS ARE THE [mword] ROUND TRIP, and the ledger's are plain
@@ -977,8 +977,7 @@ Lemma ci_inums_empty : ci_inums ∅ = (∅ : gset Z).
 Proof. rewrite /ci_inums map_to_list_empty //. Qed.
 
 Section IcacheBootTable.
-  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* ONE itable ENTRY'S RAW CELLS -- what the loader leaves and iinit does

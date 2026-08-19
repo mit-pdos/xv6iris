@@ -50,6 +50,7 @@ Require Import CodeNamecmp.
 Require Import SpecStrncmp.
 Require Import SpecNamecmp.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -152,7 +153,7 @@ Definition nc_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))).
 
 Section ProofNamecmpMain.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {ktf ktg : ktier}.
 

@@ -37,6 +37,7 @@ Require Import BufOwn.
 Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -47,7 +48,7 @@ Set Printing Depth 40.
 (* ===================================================================== *)
 
 Section BreadEscrowLeaves.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
@@ -99,7 +100,7 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 (* ===================================================================== *)
 
 Section BreadScan.
-  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the one-slot update of the scan's [devs] / [bnos] functions.  Named (not
      an inline [fun j => if decide (j = k) then v else f j]) because the

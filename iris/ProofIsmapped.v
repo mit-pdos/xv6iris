@@ -61,6 +61,7 @@ Require Import SpecWalk.
 Require Import SpecIsmapped.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -72,7 +73,7 @@ Module IsmappedProof (WalkNoalloc : WALK_NOALLOC) : ISMAPPED.
 (* ---- the epilogue (+0x14..+0x1a): pop the frame and return, whatever
    a0 holds -- its own lemma, CID a BINDER (see the file header). ---- *)
 Section IsmappedEpi.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Local Ltac rgne :=
     rewrite rget_ne;
@@ -232,7 +233,7 @@ Section IsmappedEpi.
 End IsmappedEpi.
 
 Section ProofIsmapped.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac rgne :=

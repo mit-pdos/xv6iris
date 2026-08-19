@@ -98,6 +98,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -130,8 +131,7 @@ Section IregBoxPure.
 End IregBoxPure.
 
 Section IregBox.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 

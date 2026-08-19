@@ -108,6 +108,7 @@ Require Import SpecBmap.      (* bmap_cost, bmap_need -- the link-2 contract *)
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -346,7 +347,7 @@ Section LogAmort.
      [diskGhostG], not [mono_natG]: instance search fails on the first
      unresolvable field of [riscvGS] it reaches, which is why this reads
      like an unrelated missing import. *)
-  Context `{!riscvGS Σ, !diskGhostG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* "u units are genuinely free, and one unit is still held back for each
      block of F this op has not yet logged."

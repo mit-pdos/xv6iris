@@ -87,6 +87,7 @@ Require Import SpecConsoleread.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -176,7 +177,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 Notation Rs11 := (mword_of_int 27 : mword 5).
 
 Section CrBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
   Local Ltac rgne :=
@@ -644,7 +645,7 @@ Module ConsolereadProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Killed : KILLED)
                         : CONSOLEREAD.
 
 Section ProofConsoleread.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* Normalise every [rget m k] the leaves produce back to [m !!! Regidx k]

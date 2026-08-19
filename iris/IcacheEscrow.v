@@ -176,6 +176,7 @@ Require Import IgetLic.
 Require Import IcacheInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -194,8 +195,7 @@ Record ic_names := MkIcNames {
 }.
 
 Section IcacheEscrow.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
@@ -657,7 +657,6 @@ Section IcacheEscrow.
        variable of that name instead of the class (the trap IcacheInv's
        preamble records), and every use of [ireg_inv] below would then fail
        to find the real instance. *)
-    Context `{!LogInv.logG Σ}.
 
   Lemma ipool_shape_to_np E γfs γi (inodestart : Z) (nib : nat)
       cov logstart (inum : mword 32) (l : ilic) :
@@ -3309,7 +3308,7 @@ End IcacheEscrow.
 (* ===================================================================== *)
 
 Section IcacheEscrowAlloc.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Local Lemma ic_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.

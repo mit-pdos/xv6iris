@@ -54,6 +54,7 @@ Require Import SpecProcdump.
 Require Import ProcdumpAux.
 Require Import CodeProcdump.
 From Kernel Require KernelInstrs KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc resources otherwise
@@ -338,8 +339,7 @@ End ProcdumpLoopRes.
 (* ===================================================================== *)
 
 Section ProofProcdumpLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rsp := (mword_of_int 2 : mword 5).

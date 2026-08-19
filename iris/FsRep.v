@@ -77,11 +77,12 @@ Require Import DirView.
 Require Import DirLinks.
 Require Import InodeRegion.
 Require Import FsTree.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
 Section FsRep.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
   (* ------------------------------------------------------------------ *)

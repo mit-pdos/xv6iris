@@ -53,6 +53,7 @@ Require Import SRegime.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -75,8 +76,7 @@ Local Lemma data2_id_4 (v : mword 32) :
 
 Section WpSconfLock.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{!lockG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the

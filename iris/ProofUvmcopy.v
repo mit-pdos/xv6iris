@@ -92,6 +92,7 @@ Require Import SpecWalk SpecKalloc SpecMemmove SpecMappages SpecKfree SpecUvmunm
 Require Import SpecUvmcopy.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -306,7 +307,7 @@ Local Notation URs6 := (mword_of_int 22 : mword 5).
 Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmcopyDefs.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmcopy's post disjunction, at an abstract return value *)
@@ -353,7 +354,7 @@ Module UvmcopyProof (WalkNoalloc : WALK_NOALLOC) (Kalloc : KALLOC)
   : UVMCOPY.
 
 Section ProofUvmcopy.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := URra.

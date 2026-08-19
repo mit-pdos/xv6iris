@@ -30,6 +30,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -54,7 +55,7 @@ Qed.
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_cpuid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -88,7 +89,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
+Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -113,9 +114,9 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `
 
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (p : mword 64),
       wp_cpuid_sconf_body kt m0 n p.
   Parameter wp_call_cpuid_sconf_cs :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
       wp_call_cpuid_sconf_cs_body kt P jimm m n p.
 End CPUID.

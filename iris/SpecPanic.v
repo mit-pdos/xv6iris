@@ -86,6 +86,7 @@ Require Import CpuOwn.
 Require Import UartTxInv.
 Require Import PrintkArgs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -93,8 +94,7 @@ Import Defs.
    named here, because that file sits above this one). *)
 Notation panic_stack := (52%nat) (only parsing).
 Section PanicEnv.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
 
   (* the three persistent credentials the printk cone needs, as one
@@ -159,8 +159,7 @@ Section PanicEnv.
 
 End PanicEnv.
 
-Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (m : regfile) (K : nat)
     (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
@@ -184,8 +183,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
 
 Module Type PANIC.
   Parameter wp_panic_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (kt : ktier) (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),

@@ -66,6 +66,7 @@ Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 
@@ -77,9 +78,8 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
                       (Initlock : INITLOCK) (Fileclose : FILECLOSE) : PIPEALLOC.
 
 Section ProofPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

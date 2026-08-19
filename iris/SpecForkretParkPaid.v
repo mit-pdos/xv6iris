@@ -41,6 +41,7 @@ Require Import SpecForkret.
 Require Import SpecForkretPark.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -92,10 +93,7 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 
 Definition forkret_park_pkg
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -127,10 +125,7 @@ Definition forkret_park_pkg
       URes h (pv_upt V) (add_vec ks (mword_of_int 4096))))%I.
 
 Definition forkret_park_paid_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) : Prop :=
@@ -170,10 +165,7 @@ Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
   Include SpecUsertrap.USERTRAP_RES.
   Parameter forkret_park_paid :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate) (av : nat),
       forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h))

@@ -48,13 +48,14 @@ Require Import WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
-Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_plicinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
@@ -75,6 +76,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
 
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64),
       wp_plicinit_sconf_body m0 n p.
 End PLICINIT.

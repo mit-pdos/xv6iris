@@ -36,6 +36,7 @@ Require Import KernelText.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* memmove(dst, src, len): copies [len] bytes from [src] to [dst] and returns
@@ -54,7 +55,7 @@ Import Defs.
    [kt].  One shared datum tier cannot state any of those.  Both tiers are
    EXPLICIT: eager [KtierLe] refl would otherwise silently re-derive them as
    [kt] and every page caller would fail at its give-back. *) 
-Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_memmove_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
     (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -85,7 +86,7 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type MEMMOVE.
   Parameter wp_memmove_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
       (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
       wp_memmove_sconf_body kt kts ktw m0 n len src_bytes dst_olds b p.

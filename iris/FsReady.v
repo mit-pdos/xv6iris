@@ -138,13 +138,12 @@ Require Import FileInvDefs.
 Require Import SpecPrintk.
 Require Import ProcAvail.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section FsReady.
   (* FsSyscalls' own [Section FsBundles] context, verbatim... *)
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   (* ...AND THE CACHE'S INDEX, EXPLICIT AND DECLARED LAST (the header's
      last section).  Last, because instance resolution prefers the most
@@ -152,7 +151,7 @@ Section FsReady.
      below is at [ICFG]/[icacheG0] rather than at [fileG]'s baked fields,
      and the whole projection family is stated at the same index a
      consumer's own section would carry. *)
-  Context `{!icacheG Σ} `{ICFG : icfg} `{FSC : fscfg}.
+  Context `{!xv6G Σ} `{ICFG : icfg} `{FSC : fscfg}.
 
   (* ================================================================== *)
   (*  1.  THE PREDICATE                                                  *)

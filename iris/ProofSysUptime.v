@@ -48,6 +48,7 @@ Require Import TicksInv.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecSysUptime.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -111,7 +112,7 @@ Proof. apply eq_vec_true_iff. reflexivity. Qed.
 Module SysUptimeProof (Acquire : ACQUIRE) (Release : RELEASE) : SYSUPTIME.
 
 Section ProofSysUptime.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -33,6 +33,7 @@ Require Import CodeProcMapstacks.
 Require Import SpecKalloc SpecKvmmap SpecProcMapstacks.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -82,7 +83,7 @@ Proof. intro H. replace (64 - i)%nat with (S (63 - i)) by lia. reflexivity. Qed.
 Module ProcMapstacksProof (K : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS.
 
 Section ProofPMS.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop/
      prologue lemmas below apply EACH OTHER at a hart that a [wp_next]
      crossing may have migrated to, so each needs its OWN implicit

@@ -80,6 +80,7 @@ Require Import BcacheInv.
 Require Export BioDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -215,7 +216,7 @@ Proof.
 Qed.
 
 Section BioInv.
-  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* full ownership of a 4-byte cell is exclusive: the escrow's park swap
      refutes the parked arm with the full valid cell in hand. *)

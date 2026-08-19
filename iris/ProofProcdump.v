@@ -42,6 +42,7 @@ Require Import SpecProcdump.
 Require Import ProofProcdumpParts.
 Require Import ProofProcdumpLoop.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -57,8 +58,7 @@ Proof. unfold NPROC. lia. Qed.
 
 Module ProcdumpProof : PROCDUMP.
 Section ProofProcdumpMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.

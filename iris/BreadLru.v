@@ -45,6 +45,7 @@ Require Import BufOwn.
 Require Import BcacheInv.
 Require Import BioInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -218,7 +219,7 @@ Proof. unfold neq_vec. by rewrite bd_sext_eqv. Qed.
 (* ==================================================================== *)
 
 Section BreadSlots.
-  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* THE FORWARD SCAN's borrow.  The scan reads [b->dev] and [b->blockno] of
      a buffer it knows nothing about, so the two arms of [bio_slot_res] are

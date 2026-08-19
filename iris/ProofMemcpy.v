@@ -48,6 +48,7 @@ Require Import SpecMemmove.
 Require Import SpecMemcpy.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -59,7 +60,7 @@ Local Ltac rgne :=
 Module MemcpyProof (MM : MEMMOVE) : MEMCPY.
 
 Section ProofMemcpy.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

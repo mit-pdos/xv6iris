@@ -18,6 +18,7 @@ Require Import WpSmodeSret MstatusBits.
 Require Import SmodeCorePt WpSmodePtFetch.
 Require Import HartSwp HartSFrame WpSmodePtEngine.
 Require Import RegFile.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* helper: exec_execute_JAL_gpr_zca *)
@@ -156,7 +157,7 @@ Proof.
 Qed.
 
 Section WpSmodePtCtl.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- from WpSmodeFence.v ---- *)

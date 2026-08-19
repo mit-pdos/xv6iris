@@ -33,6 +33,7 @@ Require Import VirtioModel DiskPtsto DiskInv.
 Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -276,7 +277,7 @@ Ltac vdrw_hi_peel :=
       end ].
 
 Section VdrwDefs.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1  : mword 5).
@@ -513,7 +514,7 @@ Proof.
 Qed.
 
 Section VdrwbDefs.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* [free_bundles] only reads [fr] below 8, so a pointwise agreement there
      is all a re-fold needs.  The partial-free tail re-marks the descriptors
@@ -1023,7 +1024,7 @@ Proof.
 Qed.
 
 Section VdrwcDefs.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the parts of a descriptor slot's bundle P3 does NOT touch: [free_desc]
      wants them back at P6, so they ride through unchanged. *)

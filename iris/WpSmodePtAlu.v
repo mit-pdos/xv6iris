@@ -18,10 +18,11 @@ Require Import WpMmodeLeafBase.
 Require Import WpSmodePtLeaves.
 Require Import HartSwp WpMmodeSwpBase.
 Require Import RegFile.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Section WpSmodePtAlu.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- from WpSmodeItype.v ---- *)

@@ -19,6 +19,7 @@ Require Import CalleeSaved.
 Require Import IntrDefs WpNext.
 Require Import ByteBuf.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -31,7 +32,7 @@ Definition snc_post (f h : nat -> bv 8) (n : nat) : Prop :=
     (forall j, (j < k)%nat -> h j = f j) /\
     (forall j, (k <= j)%nat -> (j < n)%nat -> h j = (mword_of_int 0 : mword 8)).
 
-Definition wp_strncpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+Definition wp_strncpy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
     (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.strncpy in
   let s := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -59,7 +60,7 @@ Definition wp_strncpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type STRNCPY.
   Parameter wp_strncpy_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
       wp_strncpy_sconf_body mm n f g K dq b p.
 End STRNCPY.

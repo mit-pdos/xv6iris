@@ -49,6 +49,7 @@ Require Import SpecSysWait.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeSysWait.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -85,7 +86,7 @@ Proof. unfold NARG. lia. Qed.
 Module SysWaitProof (Argaddr : ARGADDR) (Kwait : KWAIT) : SYSWAIT.
 
 Section ProofSysWait.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.

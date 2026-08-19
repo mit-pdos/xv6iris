@@ -58,6 +58,7 @@ Require Import SpecWalk.
 Require Import SpecUvmclear.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -97,7 +98,7 @@ Qed.
 Module UvmclearProof (WalkNoalloc : WALK_NOALLOC) : UVMCLEAR.
 
 Section ProofUvmclear.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* read the node claim's [page_valid] without consuming it (persistent) *)

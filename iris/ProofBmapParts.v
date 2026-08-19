@@ -54,6 +54,7 @@ Require Import FsBlocks.
 Require Import BlockWords.
 Require Import InodeInv.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -356,7 +357,7 @@ Proof.
 Qed.
 
 Section BmapRes.
-  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* ONE 4-byte cell of a checked-out buffer's data area, borrowed and put
      back at whatever value the store left there. *)

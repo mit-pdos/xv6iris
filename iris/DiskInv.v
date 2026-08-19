@@ -55,6 +55,7 @@ Require Import RiscvExtras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -192,7 +193,7 @@ Proof.
 Qed.
 
 Section DiskInv.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* -- the immutable page pointers (persistent after boot wiring) ------- *)
 

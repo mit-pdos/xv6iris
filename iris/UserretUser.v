@@ -51,12 +51,13 @@ Require Import KptShare.
 Require Import TrampPt.
 Require Import SpecUserret SpecUser.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Module UserretUser (R : USERRET) (U : USER).
 Section UserretUser.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
