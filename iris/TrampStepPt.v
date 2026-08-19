@@ -24,22 +24,17 @@
    witness [sr_kwit], which is [emp] at [kpt_share_regime] and [False] at
    Bare (which is what keeps the route sound).
 
-   WHAT IS NOT HERE, and what it needs.  The engine is regime-generic and
-   the SHARED KERNEL TABLE instance is proved ([ktramp_fetch_tr_share], off
-   [SRegime.kpt_share_regime] / [HartSKpt.swp_translate_kpt]).  The other
-   two tables the trampoline tower steps on have NO per-node walk yet, so
-   they have no [tramp_fetch_tr] producer:
-     - the USER table [UptTree.utlb_inv_pt] (7 sites, [UservecPt] /
-       [UserretPt] / [UservecExitPt]);
+   WHERE THE INSTANCES ARE.  The engine is regime-generic; each table the
+   trampoline tower steps on brings its own [tramp_fetch_tr] producer:
+     - the SHARED KERNEL table: [ktramp_fetch_tr_share] below, off
+       [SRegime.kpt_share_regime] / [HartSKpt.swp_translate_kpt];
+     - the USER table [UptTree.utlb_inv_pt]: [UptWalkPt.utramp_fetch_tr];
      - the switch-window two-table invariants [TransPt.tlb_inv_pt2_kcur] /
-       [_kprev] (2 sites).
-   Both are exec-level today ([utlb_inv_pt_translateAddr_tramp_fetch],
-   [tlb_inv_pt2_translateAddr]); each needs the swp assembly
-   [HartSKpt.swp_translate_kpt] is for the kernel table -- the front end
-   ([PtTreeAdue.swp_translateAddr_pt_front]), the hit/miss split
-   ([HartSTrans.swp_translate_hit] / [CommonWalk.swp_translate_TLB_miss_user])
-   and the three [read_pte] nodes over the table's own bytes.  Until they
-   exist, TransPt.v and the four Pt consumers stay red. *)
+       [_kprev]: [Pt2WalkPt.pt2_tramp_fetch_tr_kcur] / [_kprev].
+   The last two are BESPOKE, not [tramp_tr_obl_of_regime] instances: an
+   [SRegime.s_regime]'s [sr_inv] is keyed on ONE table's [kmap_at] claim,
+   and neither the user table (its mapping facts come from [um]) nor the
+   window (two asymmetric tables) fits that shape. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.

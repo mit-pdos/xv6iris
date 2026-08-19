@@ -2172,13 +2172,53 @@ recur:
   `UptWalkPt.utf_translate` is that shape at the trapframe leaf, for both
   `Load Data` and `Store Data`.
 
-**WHAT IS LEFT.**  (a) The SWITCH-WINDOW two-table invariants
-`TransPt.tlb_inv_pt2_kcur` / `_kprev` still have no per-node walk: they
-differ from `utlb_inv_pt` in the TLB agreement (`tlb_ok_pt2` over two trees)
-and in taking an ABSTRACT tree spec `Sp` rather than `upt_tree_spec`, so
-`swp_translate_upt` does not instantiate -- the exec side is
-`TransPt.ptree2_translateAddr_cases` and the certificate would have to be
-its `goodmb` twin.  (b) The four files' own leaves.
+**THE SWITCH WINDOW'S PER-NODE WALK IS BUILT (`Pt2Walk.v` + `Pt2WalkPt.v`),
+AND IT IS THE ONE PLACE THE TWO ROUTES MEET.**  `TransPt.tlb_inv_pt2_kcur` /
+`_kprev` hold TWO live tables, one EXCLUSIVELY OWNED (`ptree_own`, abstract
+spec) and one SHARED (`KptShare.kpt_inv`), so neither existing route serves
+the whole walk:
+
+- `UptWalkPt.swp_translate_upt`'s route (`HartMemRun.swp_hmrun_of_exec`
+  under a `goodmb` certificate) answers every memory access out of an OWNED
+  byte map, and the shared table's bytes are not owned;
+- `HartSKpt.swp_translate_kpt`'s route (a per-node open of `kptN`, read and
+  write seams as iProps) needs those seams PERSISTENT-backed, and a linear
+  `ptree_own` cannot back five independently-consumed ones.
+
+**THEY DO NOT HAVE TO MIX**, because each arm of
+`TransPt.ptree2_translateAddr_cases` touches exactly ONE tree and which one
+is decided by a PURE case split on the TLB slot the va hashes to -- off
+`tlb_ok_pt2`'s own per-entry disjunction, before any `swp` reasoning.  A
+slot that misses (empty or foreign tag) walks the CURRENT tree; a hit on
+this vpn's entry touches only its PROVENANCE tree's leaf slot.  So each
+window walk dispatches once and then runs one route.  Three things this
+needed:
+
+- **`tlb_ok_pt` IS TOO STRONG FOR A WINDOW, AND NEITHER WALK LEMMA EVER
+  NEEDED IT.**  `KptTree.ptree_translateAddr_cases` and
+  `PtWalkCert.goodmb_ptree_translateAddr` consume the whole premise in a
+  single `Htlbok vpn ent Hslot`.  `Pt2Walk.tlb_slot_pt` is that one slot's
+  worth -- "the slot fails the tag test, or holds THIS vpn's entry off `t`"
+  -- and both are restated over it (`_slot` suffix).  `KptTree`'s cone is
+  773 files, so the restatement lives in the new leaf, not in place.
+- **A HIT DOES NOT WALK, so the tree it touches need not be `satp`'s root.**
+  That is exactly the window's PREVIOUS table.  Hence the `_hit_slot`
+  twins, without the `pt_base t = root_ppn` premise and without the two
+  upper slots -- and, on the shared side, with the invariant's root split
+  off from satp's (`swp_translate_kpt_hit_slot` takes both).
+- **`assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver` COSTS
+  24 SECONDS** (`coqc -time`), and it is one `elem_of_union_l` away from
+  free.  `Pt2WalkPt` compiles in 13 s with the named lemma and 62 s with
+  `set_solver`; `HartSKpt.swp_translate_kpt` still carries the `set_solver`
+  form.
+
+The engines `Pt2WalkPt.wp_instr_pt2_tramp_kcur` / `_kprev` are
+`TrampStepPt.wp_instr_tramp_pt` at that residue, opening the window on the
+way in and resealing it on the way out.  Both were checked to APPLY at the
+two real call sites' geometry (`uva 0x96`/`upa 0x96` and `uva 0xa8`/`upa
+0xa8`, `ai_sfence`), all eight geometry premises by `vm_compute`.
+
+**WHAT IS LEFT.**  The four files' own leaves.
 
 `UservecPt` / `UserretPt` / `UserretEntryPt` / `UservecExitPt` need their
 own leaves converted: their obligations are the old
@@ -2190,8 +2230,9 @@ in place of the regime's translation (`Rt := fun rs => upt_res_pt uroot tfp
 um (register_lookup tlb rs)`); `wp_ucsrw_sscratch_pt` /
 `wp_ucsrr_sscratch_pt` / `wp_ualu_pt` / `wp_usret_pt` are register-only and
 follow `WpSconfCsr` / `WpSmodePtAlu` / `WpSmodePtCtl`; the two block lemmas
-compose.  `UservecPt` and `UserretPt` need only the USER table and are
-unblocked today; `UserretEntryPt` and `UservecExitPt` also need (a).
+compose.  `UservecPt` and `UserretPt` need only the USER table;
+`UserretEntryPt` and `UservecExitPt` also step the switch window, whose
+engines are `Pt2WalkPt.wp_instr_pt2_tramp_kcur` / `_kprev`.
 
 ## THE DOWNSTREAM COMPILE TAIL (2026-08-18) -- what it took, and the two
 ## things it is BLOCKED on

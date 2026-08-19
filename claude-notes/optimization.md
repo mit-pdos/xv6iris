@@ -196,6 +196,17 @@ worth 20× on individual files.
       If the override ever looks like it is doing nothing, check that
       `set_shrink` is in scope and that it is actually clearing, before
       believing anything about the goal.
+  - **A SINGLE MEMBERSHIP IN A UNION OF TWO `gset register` VARIABLES STILL
+    COSTS 24 s, override or not.** `assert ((tlb : register) ∈ Drw ∪ Dro) by
+    set_solver` inside a `swp` translation proof measures **24 s per call**
+    (`coqc -time`) — and adding `Require Import FastSetSolver` to the file
+    changes nothing, so this is not a "the override is not in scope" case.
+    Two of them made `Pt2WalkPt.v` a 62 s file; `by (apply elem_of_union_l;
+    exact HWtlb)` makes it 13 s. The rule the durable notes give for
+    tower-carrying proofs (name the union lemma) is therefore still the rule
+    whenever the sets are VARIABLES rather than literals — which is exactly
+    the `Drw`/`Dro` frame idiom. `HartSKpt.swp_translate_kpt` still carries
+    the `set_solver` form.
   - **Two things the override does NOT fix**, both goal-side rather than
     context-side, so the old workarounds stand: `gset (mword n)` still fails
     (instance divergence — see the durable notes), and `set_unfold` still

@@ -871,7 +871,8 @@ Section Pt2SharedWalk.
       Hmisa Hmenv HPBMTE HADUE Heff Heffg Hss Hssg Htm Htmg Hppn Hasid
       Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk Htlbok0.
     iIntros "#Hat #Hkinv #Hlb0 #Hcert Hfrag Hrw Hro".
-    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver.
+    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro)
+      by (apply elem_of_union_l; exact HWtlb).  (* NOT set_solver: 24 s each *)
     iApply swp_fupd.
     iMod (kpt_path_at root_ppn t0 (svpn_of va) ppn kp ⊤ ltac:(solve_ndisj)
             with "Hat Hlb0 Hkinv") as (p2 p1 a0 d0) "%Hpath".
@@ -1242,7 +1243,8 @@ Section Pt2SharedWalk.
       Hmisa Hmenv HPBMTE HADUE Heff Heffg Hss Hssg Htm Htmg Hppn Hasid
       Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk Htlbok0.
     iIntros "#Hat #Hkinv #Hlb0 #Hcert Hfrag Hrw Hro".
-    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver.
+    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro)
+      by (apply elem_of_union_l; exact HWtlb).  (* NOT set_solver: 24 s each *)
     iApply swp_fupd.
     iMod (kpt_path_at kroot t0 (svpn_of va) ppn kp ⊤ ltac:(solve_ndisj)
             with "Hat Hlb0 Hkinv") as (p2 p1 a0 d0) "%Hpath".
