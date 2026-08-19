@@ -189,12 +189,23 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
+  (DESCOPED from the hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
 - **[`user-echo.md`](projects/user-echo.md)** — the Umode tier's SECOND
   program, `echo`: the first with loops, memory reads, an argv area and a
   syscall with a real precondition. Read it for the pieces that grew to carry
   it — the stack as a splittable BUDGET, `uM_only` as the image
   postcondition of a call, the `mword_of_int` calculus, and the one generic
-  branch leaf that replaces an op cross-product.
+  branch leaf that replaces an op cross-product. (DESCOPED from the
+  hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
+- **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
+  `sh`, on ONE input (`echo Hello world!`): the syscall protocol at I/O
+  depth, which is what lets a theorem say what a process DOES rather than
+  only that it steps. Read it for the observing `exec` arm, the ghost stdin
+  stream, and why fixing the input removes the two things the tier cannot
+  express. (DESCOPED from the hart-node-port build — see the ruling in
+  [`user-tier-port.md`](projects/user-tier-port.md).)
 
 ## `completed/` — finished projects, archived for reference
 

@@ -231,31 +231,40 @@ UserMem.v
 UserFetch.v
 UserCompute.v
 UserStepFull.v
-UmodeMem.v
-UmodeCap.v
-UmodeFetch.v
-UmodeAbi.v
-UmodeArith.v
-UmodeSyscall.v
-UmodeIo.v
-WpUmodeStep.v
-WpUmodeLeaf.v
-WpUmodeBranch.v
-WpUmodeStore.v
-WpUmodeLoad.v
-USpecSync.v
-UCodeSync.v
-UProofSync.v
-UCodeEcho.v
-USpecEcho.v
-UCodeSh.v
-USpecSh.v
-USpecShParse.v
-UmodeFrame.v
-UProofShLib.v
-UProofShMem.v
-UProofEchoA.v
-UProofEcho.v
+# --- BEGIN descoped tier: verified Umode WP (sync/echo/sh) ---
+# Ruling (project owner, 2026-08-19): the proofs of the specific user-mode
+# binaries sync/echo/sh, and the Umode WP infrastructure that exists only to
+# support them, are descoped from the hart-node-port build. This is NOT the
+# ProofUser/UserExec "run arbitrary user-mode code" tier, which is kept and is
+# being finished separately. The .v files below remain on disk untouched;
+# reviving this tier means uncommenting these rows and porting them per
+# claude-notes/projects/user-tier-port.md's P8 entry ("the same bricks").
+# UmodeMem.v
+# UmodeCap.v
+# UmodeFetch.v
+# UmodeAbi.v
+# UmodeArith.v
+# UmodeSyscall.v
+# UmodeIo.v
+# WpUmodeStep.v
+# WpUmodeLeaf.v
+# WpUmodeBranch.v
+# WpUmodeStore.v
+# WpUmodeLoad.v
+# USpecSync.v
+# UCodeSync.v
+# UProofSync.v
+# UCodeEcho.v
+# USpecEcho.v
+# UCodeSh.v
+# USpecSh.v
+# USpecShParse.v
+# UmodeFrame.v
+# UProofShLib.v
+# UProofShMem.v
+# UProofEchoA.v
+# UProofEcho.v
+# --- END descoped tier ---
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
