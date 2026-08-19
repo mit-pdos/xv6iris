@@ -1861,9 +1861,32 @@ an unrelated hypothesis (`The term "HDms" has type "Dr mstatus = true" while
 it is expected to have type "pmpAddrMatchType_encdec_backwards … = TOR"`).
 Instantiate such a lemma with `apply …; assumption`, not positionally.
 
-The remaining §14.4 items are the four `goodmb` fetch SHELLS (twins of
-`UserFetch`'s `exec_fetch_rvc_2` / `_base_2` / `_fault_2_second` /
-`_fault_2_first`), then `u_fetch_pure_2` and the two fault composers.  The
+**THE FOUR SHELLS ARE LANDED** (`UserFaultCert.Section FetchSplit2Cert`):
+`goodmb_fetch_rvc_2` / `_base_2` / `_fault_2_second` / `_fault_2_first`,
+each the exec twin's proof node for node under a `gsplit_head` Ltac that
+mirrors `UserFetch.split_head`.  Three things they settled:
+
+* **`Ext_Zca`'s gate is NOT register-free, unlike `Ext_Ziccif`'s.**  It is
+  `and_boolM (hartSupports Zca) (or_boolM (currentlyEnabled Ext_C) (not
+  (hartSupports Ext_C)))` and the middle arm reads `misa`, so
+  `vm_compute; reflexivity` cannot close its certificate the way
+  `goodmb_currentlyEnabled_Ziccif`'s is closed.  The new
+  `goodmb_currentlyEnabled_Zca` takes `Dr misa = true` and goes through
+  `DecodeTotalU`'s `goodb_bind_forall` / `_and_boolM` / `_or_boolM` /
+  `_bind_read_reg`, deciding NEITHER arm of the `misa` test — the exec value
+  needs `HmisaC`, the certificate does not.
+* **DESTRUCTURE AN `Acc` GUARD ONLY WHERE THE RECURSION IS ENTERED.**
+  `Defs.Zwf_guarded` reduces on its own (`Acc_intro` + `pos_guard_wf`), so a
+  leaf like `hartSupports Ext_C` closes by `vm_compute`; a
+  `destruct (Defs.Zwf_guarded _)` written up front replaces it with a
+  variable and turns that computable leaf into a stuck term.  Destruct at
+  the inner `_rec_currentlyEnabled` call instead, and give the recursive
+  helper its own lemma taking the `Acc` abstractly.
+* `goodb_bind_forall`'s second premise binds a variable occurring in the
+  conclusion, so `intros _` fails with *"This variable is used in
+  conclusion"*.  Use `intros ?`.
+
+What §14.4 still owes is `u_fetch_pure_2` and its two fault siblings.  The
 shape for those three, decided against what `HartRunFull.run_fetch_post`
 actually consumes:
 
