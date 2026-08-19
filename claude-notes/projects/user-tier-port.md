@@ -1704,6 +1704,57 @@ STILL OPEN, §5 (the fetch-DEPENDENT half), in dependency order:
    `swp_mono` into `u_step_post`, with `UserStep.u_dispatch_of_pending`
    for the pending-interrupt arm.
 
+### 14.7 §5 AS BUILT — the three layers, and what each one is for
+
+`active_class`' body is three layers, and keeping them apart is what made
+the case tree small:
+
+1. **the PURE producers** (`UserFetchCert` / `UserFaultCert`): five of them,
+   one per `va` geometry, all concluding the same five conjuncts (§14.6).
+2. **the `swp` BRIDGES** (`UserActiveClass` §6a/§6b).  `swp_fetch_of_pure`
+   serves **all five** producers — that is the whole point of giving them a
+   uniform shape, and the alternative was five near-duplicate bridges.
+   `swp_execute_of_pure` is the execute half of `base_post`/`rvc_post`.
+3. **the ARMS** (`UserActiveClass` §5a-§5e): four trap arms plus the two
+   payload builders, each concluding a whole `u_step_post` slot.
+
+**AN ARM MUST NAME THE FILE THE TOWER LANDS ON.**  `u_step_post` binds
+`rs2` OUTSIDE the `swp` (the `u_land` tag is a pure conjunct of the arm, not
+of its postcondition), while `UTrapReduce` hands its landing file back only
+up to footprint agreement and INLINES its `Let`s at section discharge — so
+no name for it escapes.  `u_trap_rs` is that name, written with `let`s so
+the conversion stays linear instead of unfolding `set_reg`'s three-fold body
+into the 3^12 tree `RiscvLang.v:92` warns about.
+
+**`active_class` DOES NOT PIN `medeleg`, AND IT DOES NOT NEED TO.**  The two
+exception towers want the delegation bit for `uc_del`.  It is recoverable
+without touching the frozen interface: `u_open` holds `medeleg ↦ᵣ□` and the
+read-only frame holds the same cell at `u_Df`'s `DfracDiscarded`, so the two
+agree — but the tree had **no two-points-to agreement lemma for registers**
+(`RiscvPtsto` has only `reg_valid_dq`, which wants `reg_interp`).
+`u_reg_pointsto_agree` is it; **its honest home is `RiscvPtsto` beside
+`reg_valid_dq`** and it sits in `UserActiveClass` only to avoid that file's
+cone.  Fold it back at the milestone.
+
+**`gen_cert` IS NOT IN `active_class`' BODY** but every `swp_hmrun_of_exec`
+needs it.  It is persistent and comes from `hw_config`, which
+`wp_user_step_active` already takes, so `active_class_intro` has it — the
+arms and both bridges take it on that footing.
+
+**THE `ExecuteAs` REDIRECT IS TWO `swp_hmrun_of_exec`s, and the second one's
+continuation is NOT wrapped.**  `run_exec_post_redirect` strips the wrapper,
+so after it the goal is `Pe r ib` and applying `run_exec_post_direct` there
+fails with *"iApply: cannot apply (Pe r ib -∗ run_exec_post Pe ib r)"* —
+an error that names the wand and not the arm it was in.  The redirect works
+at all only because it lands on the state it started from, so the second run
+starts from the frame the first handed back.
+
+**AND THE `[-]` TRAP BITES AT `swp_mono`.**  `iApply (swp_mono with "[Hk]
+[-Hk]")` fails with *`iSpecialize: hypotheses ["Hk"] not found`*: the first
+pattern already consumed `Hk`, so naming it in the second pattern's
+exception list refers to nothing.  Every other `swp_mono` in the tree uses
+two EXPLICIT lists; do the same.
+
 ### 14.4 What `u_fetch_pure_2` would take (the 2-aligned / straddle geometry)
 
 `u_fetch_pure` requires `is_aligned_vaddr (Virtaddr va) 4 = true`.  A
